@@ -295,11 +295,13 @@ class OPNsenseParser:
             descr = self._get_text(vlan, "descr", "")
 
             if vlan_id and parent:
-                vlans.append({
-                    "vlan_id": int(vlan_id),
-                    "parent_interface": parent,
-                    "description": descr,
-                })
+                vlans.append(
+                    {
+                        "vlan_id": int(vlan_id),
+                        "parent_interface": parent,
+                        "description": descr,
+                    }
+                )
 
         return vlans
 
@@ -650,10 +652,16 @@ class OPNsenseParser:
             f.write("- Custom plugins/packages\n\n")
             f.write("## Next Steps\n\n")
             f.write("1. **Review the generated files** - Check all configurations\n")
-            f.write("2. **Copy to InfraFoundry** - `cp -r opnsense/ $INFRAFOUNDRY_CONFIG_REPO/envs/prod/`\n")
-            f.write("3. **Add sensitive data** - Create `secrets/opnsense.yaml` for VPN credentials\n")
+            f.write(
+                "2. **Copy to InfraFoundry** - `cp -r opnsense/ $INFRAFOUNDRY_CONFIG_REPO/envs/prod/`\n"
+            )
+            f.write(
+                "3. **Add sensitive data** - Create `secrets/opnsense.yaml` for VPN credentials\n"
+            )
             f.write("4. **Encrypt secrets** - `infra secrets encrypt secrets/opnsense.yaml`\n")
-            f.write("5. **Update environment** - Add OPNsense provider to `envs/prod/environment.yaml`\n")
+            f.write(
+                "5. **Update environment** - Add OPNsense provider to `envs/prod/environment.yaml`\n"
+            )
             f.write("6. **Generate Terraform** - `infra plan --env prod`\n")
             f.write("7. **Apply changes** - `infra apply --env prod`\n\n")
             f.write("## Rebuilding from Scratch\n\n")
