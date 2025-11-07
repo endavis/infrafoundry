@@ -113,12 +113,20 @@ def main(ctx: click.Context, config_dir: Path | None) -> None:
 @main.command()
 @click.option("--env", "-e", required=True, help="Environment name (e.g., dev, prod)")
 @click.option("--dry-run", is_flag=True, help="Show what would be done without doing it")
+@click.option(
+    "--resource",
+    "-r",
+    multiple=True,
+    help="Specific resource name(s) to target (can be used multiple times)",
+)
 @click.pass_context
-def plan(ctx: click.Context, env: str, dry_run: bool) -> None:
+def plan(ctx: click.Context, env: str, dry_run: bool, resource: tuple[str, ...]) -> None:
     """Plan infrastructure changes."""
     try:
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
-        orchestrator.plan(env, dry_run=dry_run)
+        orchestrator.plan(
+            env, dry_run=dry_run, resource_filter=list(resource) if resource else None
+        )
 
         if dry_run:
             console.print("\n[bold cyan]Dry run complete. No files generated.[/bold cyan]")
@@ -134,12 +142,20 @@ def plan(ctx: click.Context, env: str, dry_run: bool) -> None:
 @main.command()
 @click.option("--env", "-e", required=True, help="Environment name")
 @click.option("--auto-approve", is_flag=True, help="Skip confirmation prompts")
+@click.option(
+    "--resource",
+    "-r",
+    multiple=True,
+    help="Specific resource name(s) to target (can be used multiple times)",
+)
 @click.pass_context
-def apply(ctx: click.Context, env: str, auto_approve: bool) -> None:
+def apply(ctx: click.Context, env: str, auto_approve: bool, resource: tuple[str, ...]) -> None:
     """Apply infrastructure changes."""
     try:
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
-        orchestrator.apply(env, auto_approve=auto_approve)
+        orchestrator.apply(
+            env, auto_approve=auto_approve, resource_filter=list(resource) if resource else None
+        )
         console.print("\n[bold green]Apply complete![/bold green]")
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
@@ -149,12 +165,20 @@ def apply(ctx: click.Context, env: str, auto_approve: bool) -> None:
 @main.command()
 @click.option("--env", "-e", required=True, help="Environment name")
 @click.option("--auto-approve", is_flag=True, help="Skip confirmation prompts")
+@click.option(
+    "--resource",
+    "-r",
+    multiple=True,
+    help="Specific resource name(s) to target (can be used multiple times)",
+)
 @click.pass_context
-def destroy(ctx: click.Context, env: str, auto_approve: bool) -> None:
+def destroy(ctx: click.Context, env: str, auto_approve: bool, resource: tuple[str, ...]) -> None:
     """Destroy infrastructure."""
     try:
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
-        orchestrator.destroy(env, auto_approve=auto_approve)
+        orchestrator.destroy(
+            env, auto_approve=auto_approve, resource_filter=list(resource) if resource else None
+        )
         console.print("\n[bold green]Destroy complete![/bold green]")
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
