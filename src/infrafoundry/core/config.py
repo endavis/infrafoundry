@@ -84,6 +84,16 @@ class ConfigManager:
         if not data:
             return []
 
+        # Get the resource list - handle both dict and direct list formats
+        resource_list = data.get(resource_type, []) if isinstance(data, dict) else []
+
+        # Ensure resource_list is actually a list
+        if not isinstance(resource_list, list):
+            raise ValueError(
+                f"Expected list for '{resource_type}' in {resource_file}, "
+                f"got {type(resource_list).__name__}"
+            )
+
         resources = [
             ResourceConfig(
                 name=item["name"],
@@ -91,7 +101,8 @@ class ConfigManager:
                 provider=provider,
                 config=item,
             )
-            for item in data.get(resource_type, [])
+            for item in resource_list
+            if isinstance(item, dict) and "name" in item
         ]
 
         return resources
