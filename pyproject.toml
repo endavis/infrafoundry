@@ -3,7 +3,7 @@ name = "infrafoundry"
 version = "0.1.0"
 description = "Infrastructure automation framework with pluggable providers (Proxmox, OPNsense, Kubernetes)"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "click>=8.1.0",
     "pyyaml>=6.0",
@@ -32,15 +32,15 @@ build-backend = "hatchling.build"
 
 [tool.black]
 line-length = 100
-target-version = ['py311']
+target-version = ['py312']
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

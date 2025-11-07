@@ -1,7 +1,7 @@
 """Proxmox provider for InfraFoundry."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -21,11 +21,13 @@ class ProxmoxProvider(ProviderBase):
             lstrip_blocks=True,
         )
 
+    @override
     def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate Proxmox configuration."""
         required_fields = ["name"]
         return all(field in config for field in required_fields)
 
+    @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Proxmox resources."""
         self.ensure_directories()
@@ -82,6 +84,7 @@ class ProxmoxProvider(ProviderBase):
         content = template.render(networks=networks)
         (self.terraform_dir / "networks.tf").write_text(content)
 
+    @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
         """Generate Ansible playbooks for Proxmox post-configuration."""
         self.ensure_directories()
@@ -114,10 +117,12 @@ class ProxmoxProvider(ProviderBase):
         tasks_content = tasks_template.render()
         (tasks_dir / "main.yml").write_text(tasks_content)
 
+    @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
         return ["vms", "templates", "networks"]
 
+    @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
