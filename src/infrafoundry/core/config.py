@@ -247,6 +247,7 @@ class ConfigManager:
             ValueError: If duplicate resource names are found
         """
         all_resources = []
+        resource_locations: dict[str, list[str]] = {}  # Track where each resource is defined
         discovered_providers = set()
 
         # Discover providers from provider-centric directories
@@ -265,31 +266,86 @@ class ConfigManager:
                         continue
                     resource_file = config_file.stem
                     resources = self.load_resources(env_name, provider_name, resource_file)
+
+                    # Track location for each resource
+                    for resource in resources:
+                        key = f"{resource.provider}:{resource.name}"
+                        if key not in resource_locations:
+                            resource_locations[key] = []
+                        resource_locations[key].append(str(config_file))
+
                     all_resources.extend(resources)
 
         # Load from resource-centric files (once)
-        resource_centric = self.load_resource_centric_files(env_name)
-        all_resources.extend(resource_centric)
+        resources_dir = self.base_dir / env_name / "resources"
+        if resources_dir.exists():
+            for config_file in resources_dir.glob("*.yaml"):
+                with open(config_file) as f:
+                    data = yaml.safe_load(f)
+
+                if not data or "resources" not in data:
+                    continue
+
+                resource_list = data["resources"]
+                if not isinstance(resource_list, list):
+                    raise ValueError(
+                        f"Expected list for 'resources' in {config_file}, "
+                        f"got {type(resource_list).__name__}"
+                    )
+
+                for item in resource_list:
+                    if not isinstance(item, dict):
+                        continue
+
+                    # Validate required fields
+                    if "provider" not in item:
+                        resource_name = item.get("name", "unnamed")
+                        raise ValueError(
+                            f"Missing 'provider' field in resource in {config_file}: "
+                            f"{resource_name}"
+                        )
+                    if "type" not in item:
+                        resource_name = item.get("name", "unnamed")
+                        raise ValueError(
+                            f"Missing 'type' field in resource in {config_file}: "
+                            f"{resource_name}"
+                        )
+                    if "name" not in item:
+                        raise ValueError(
+                            f"Missing 'name' field in resource in {config_file}"
+                        )
+
+                    # Extract config dict (everything except provider/type/name)
+                    config = item.get("config", {})
+                    # Also include name in config for backwards compatibility
+                    config["name"] = item["name"]
+
+                    resource = ResourceConfig(
+                        name=item["name"],
+                        type=item["type"],
+                        provider=item["provider"],
+                        config=config,
+                    )
+
+                    # Track location
+                    key = f"{resource.provider}:{resource.name}"
+                    if key not in resource_locations:
+                        resource_locations[key] = []
+                    resource_locations[key].append(str(config_file))
+
+                    all_resources.append(resource)
 
         # Check for duplicate resource names
-        seen_names: dict[str, str] = {}
-        duplicates: list[tuple[str, list[str]]] = []
-
-        for resource in all_resources:
-            key = f"{resource.provider}:{resource.name}"
-            if key in seen_names:
-                # Found duplicate
-                if not any(d[0] == key for d in duplicates):
-                    duplicates.append((key, [seen_names[key], "current"]))
-            else:
-                # Track first occurrence (we don't have file info, so use generic label)
-                seen_names[key] = "multiple files"
+        duplicates = []
+        for key, locations in resource_locations.items():
+            if len(locations) > 1:
+                duplicates.append(f"{key} found in: {', '.join(locations)}")
 
         if duplicates:
-            dup_list = [dup[0] for dup in duplicates]
             raise ValueError(
-                f"Duplicate resource names found in environment '{env_name}': "
-                f"{', '.join(dup_list)}. Each resource name must be unique within its provider."
+                f"Duplicate resource names found in environment '{env_name}':\n  "
+                + "\n  ".join(duplicates)
+                + "\n\nEach resource name must be unique within its provider."
             )
 
         return all_resources
