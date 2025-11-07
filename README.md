@@ -138,6 +138,90 @@ infra plan --env dev
 infra apply --env dev
 ```
 
+## CLI Commands
+
+### Resource Management
+
+```bash
+# List all resources in an environment
+infra list --env dev
+
+# Filter by provider
+infra list --env dev --provider proxmox
+
+# Filter by resource type
+infra list --env dev --type vms
+
+# Combine filters
+infra list --env dev --provider proxmox --type vms
+```
+
+### Infrastructure Operations
+
+```bash
+# Plan changes (all resources)
+infra plan --env dev
+
+# Plan changes (specific resources)
+infra plan --env dev --resource web-01
+infra plan --env dev --resource web-01 --resource web-02
+
+# Plan with dry-run (no file generation)
+infra plan --env dev --dry-run
+
+# Apply changes (all resources)
+infra apply --env dev
+
+# Apply specific resources only
+infra apply --env dev --resource web-01
+
+# Destroy infrastructure
+infra destroy --env dev
+
+# Destroy specific resources
+infra destroy --env dev --resource web-01
+```
+
+### Environment Management
+
+```bash
+# List available environments
+infra envs
+
+# Show status of deployed infrastructure
+infra status --env dev
+```
+
+### Secret Management
+
+```bash
+# Initialize age encryption key
+infra secrets init
+
+# Encrypt a secrets file
+infra secrets encrypt secrets/proxmox.yaml
+
+# Decrypt and view a secrets file
+infra secrets decrypt secrets/proxmox.yaml
+```
+
+### Multiple Configuration Files
+
+InfraFoundry supports organizing resources across multiple YAML files:
+
+```bash
+# All these files will be loaded as "vms" type:
+envs/dev/proxmox/vms.yaml            # Main VMs
+envs/dev/proxmox/vms-webservers.yaml # Web server VMs
+envs/dev/proxmox/vms-databases.yaml  # Database VMs
+
+# Plan includes all VMs from all files
+infra plan --env dev
+
+# Target specific VM from any file
+infra plan --env dev --resource db-01
+```
+
 ## Project Structure
 
 **Framework Repository** (this repo):
@@ -216,8 +300,9 @@ variables:
 
 ### Provider Resources
 
-Resources are organized by provider and type:
+Resources are organized by provider and type. You can use a single file or split resources across multiple files:
 
+**Single file per type:**
 ```
 envs/dev/
 ├── proxmox/
@@ -234,6 +319,25 @@ envs/dev/
     ├── services.yaml
     └── configmaps.yaml
 ```
+
+**Multiple files per type (recommended for large environments):**
+```
+envs/prod/
+├── proxmox/
+│   ├── vms-webservers.yaml      # Web tier VMs
+│   ├── vms-databases.yaml       # Database VMs
+│   ├── vms-infrastructure.yaml  # Infrastructure VMs
+│   ├── templates.yaml
+│   └── networks.yaml
+└── kubernetes/
+    ├── deployments-frontend.yaml
+    ├── deployments-backend.yaml
+    └── services.yaml
+```
+
+Files are grouped by the prefix before the first dash. For example:
+- `vms.yaml`, `vms-web.yaml`, `vms-db.yaml` all map to resource type `vms`
+- `deployments.yaml`, `deployments-api.yaml` both map to type `deployments`
 
 ### Example: Proxmox VM
 
