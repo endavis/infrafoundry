@@ -62,27 +62,34 @@ class ConfigManager:
         return EnvironmentConfig(**data)
 
     def load_resources(
-        self, env_name: str, provider: str, resource_type: str
+        self, env_name: str, provider: str, resource_file: str
     ) -> list[ResourceConfig]:
         """Load resource configurations for a provider.
 
         Args:
             env_name: Environment name
             provider: Provider name (e.g., 'proxmox')
-            resource_type: Resource type (e.g., 'vms', 'networks')
+            resource_file: Resource filename without extension (e.g., 'vms', 'vms-01')
 
         Returns:
             List of ResourceConfig objects
         """
-        resource_file = self.base_dir / env_name / provider / f"{resource_type}.yaml"
-        if not resource_file.exists():
+        resource_path = self.base_dir / env_name / provider / f"{resource_file}.yaml"
+        if not resource_path.exists():
             return []
 
-        with open(resource_file) as f:
+        with open(resource_path) as f:
             data = yaml.safe_load(f)
 
         if not data:
             return []
+
+        # Extract resource type from filename
+        # Supports:
+        #   - vms.yaml -> type: vms
+        #   - vms-01.yaml -> type: vms
+        #   - vms-webservers.yaml -> type: vms
+        resource_type = resource_file.split("-")[0] if "-" in resource_file else resource_file
 
         # Get the resource list - handle both dict and direct list formats
         resource_list = data.get(resource_type, []) if isinstance(data, dict) else []
@@ -90,7 +97,7 @@ class ConfigManager:
         # Ensure resource_list is actually a list
         if not isinstance(resource_list, list):
             raise ValueError(
-                f"Expected list for '{resource_type}' in {resource_file}, "
+                f"Expected list for '{resource_type}' in {resource_path}, "
                 f"got {type(resource_list).__name__}"
             )
 
@@ -126,8 +133,9 @@ class ConfigManager:
             if config_file.name == "environment.yaml":
                 continue
 
-            resource_type = config_file.stem
-            resources = self.load_resources(env_name, provider, resource_type)
+            # Use the filename without extension
+            resource_file = config_file.stem
+            resources = self.load_resources(env_name, provider, resource_file)
             all_resources.extend(resources)
 
         return all_resources
