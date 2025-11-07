@@ -36,7 +36,6 @@ env/
 # User configuration (use example-config/ as template, or separate repo)
 envs/
 secrets/
-endavis-infra/
 
 # Secrets and sensitive data
 *.key
