@@ -1,7 +1,7 @@
 """OPNsense provider for InfraFoundry."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -21,11 +21,13 @@ class OPNsenseProvider(ProviderBase):
             lstrip_blocks=True,
         )
 
+    @override
     def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate OPNsense configuration."""
         required_fields = ["name"]
         return all(field in config for field in required_fields)
 
+    @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OPNsense resources."""
         self.ensure_directories()
@@ -82,6 +84,7 @@ class OPNsenseProvider(ProviderBase):
         content = template.render(aliases=aliases)
         (self.terraform_dir / "aliases.tf").write_text(content)
 
+    @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
         """Generate Ansible playbooks for OPNsense configuration."""
         self.ensure_directories()
@@ -96,10 +99,12 @@ class OPNsenseProvider(ProviderBase):
         inventory_content = inventory_template.render()
         (self.ansible_dir / "inventory.yml").write_text(inventory_content)
 
+    @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
         return ["firewall_rules", "vlans", "aliases"]
 
+    @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {

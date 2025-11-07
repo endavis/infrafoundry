@@ -1,7 +1,7 @@
 """Kubernetes provider for InfraFoundry."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -21,11 +21,13 @@ class KubernetesProvider(ProviderBase):
             lstrip_blocks=True,
         )
 
+    @override
     def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate Kubernetes configuration."""
         required_fields = ["name"]
         return all(field in config for field in required_fields)
 
+    @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Kubernetes resources."""
         self.ensure_directories()
@@ -91,6 +93,7 @@ class KubernetesProvider(ProviderBase):
         content = template.render(namespaces=namespaces)
         (self.terraform_dir / "namespaces.tf").write_text(content)
 
+    @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
         """Generate Ansible playbooks for Kubernetes post-configuration."""
         self.ensure_directories()
@@ -105,10 +108,12 @@ class KubernetesProvider(ProviderBase):
         inventory_content = inventory_template.render()
         (self.ansible_dir / "inventory.yml").write_text(inventory_content)
 
+    @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
         return ["deployments", "services", "configmaps", "namespaces"]
 
+    @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {

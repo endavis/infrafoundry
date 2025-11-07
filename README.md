@@ -43,7 +43,7 @@ See [Separate Configuration Repository Guide](docs/separate-config-repo.md) for 
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - [uv](https://github.com/astral-sh/uv) - Fast Python package installer
 - [Terraform](https://www.terraform.io/) >= 1.6
 - [Ansible](https://www.ansible.com/) >= 2.15
