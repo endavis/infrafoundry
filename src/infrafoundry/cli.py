@@ -227,6 +227,54 @@ def envs(ctx: click.Context) -> None:
         sys.exit(1)
 
 
+@main.command()
+@click.option("--env", "-e", required=True, help="Environment name")
+@click.option("--provider", "-p", help="Filter by provider (e.g., proxmox, opnsense)")
+@click.pass_context
+def list(ctx: click.Context, env: str, provider: str | None) -> None:
+    """List all resources in an environment."""
+    try:
+        config_repo = ctx.obj.get("config_dir")
+        if config_repo:
+            config_manager = ConfigManager(base_dir=config_repo / "envs")
+        else:
+            config_manager = ConfigManager()
+
+        env_config = config_manager.load_environment(env)
+        providers_to_list = [provider] if provider else env_config.providers
+
+        console.print(f"[bold cyan]Resources in {env}:[/bold cyan]\n")
+
+        total_resources = 0
+        for provider_name in providers_to_list:
+            if provider_name not in env_config.providers:
+                console.print(
+                    f"[yellow]Warning: Provider '{provider_name}' "
+                    f"not configured for environment '{env}'[/yellow]"
+                )
+                continue
+
+            resources = config_manager.get_all_resources(env, provider_name)
+            if not resources:
+                continue
+
+            console.print(f"[bold]{provider_name}[/bold] ({len(resources)} resources):")
+            for resource in resources:
+                console.print(f"  • {resource.name:<40} [dim]({resource.type})[/dim]")
+
+            console.print()
+            total_resources += len(resources)
+
+        if total_resources == 0:
+            console.print("[yellow]No resources found[/yellow]")
+        else:
+            console.print(f"[dim]Total: {total_resources} resources[/dim]")
+
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        sys.exit(1)
+
+
 @main.group()
 def secrets() -> None:
     """Manage encrypted secrets."""
