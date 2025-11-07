@@ -156,13 +156,12 @@ Create `envs/staging/environment.yaml`:
 ```yaml
 name: staging
 description: Staging environment
-providers:
-  - proxmox
-  - kubernetes
 variables:
   cluster_name: staging-cluster
   domain: staging.example.com
 ```
+
+**Note:** Providers are auto-discovered from resource files - no need to declare them explicitly.
 
 Add provider-specific configurations:
 

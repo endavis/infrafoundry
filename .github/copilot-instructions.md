@@ -36,10 +36,11 @@ InfraFoundry is a pluggable infrastructure automation framework that generates T
    - Templates live in `src/infrafoundry/providers/{name}/templates/{name}/`
 
 3. **Configurations** (separate repo or `example-config/`):
-   - `envs/{env}/environment.yaml` - defines which providers to use
+   - `envs/{env}/environment.yaml` - environment name, description, and variables
    - **Provider-centric** (original): `envs/{env}/{provider}/{resource_type}.yaml` - resource definitions
    - **Resource-centric** (new): `envs/{env}/resources/*.yaml` - multi-provider resource definitions
    - `secrets/` - Encrypted credentials with SOPS
+   - **Note:** Providers are auto-discovered from resources; no need to declare them
 
 **Data flow:**
 `YAML configs` (separate repo) → `ConfigManager` (checks `INFRAFOUNDRY_CONFIG_REPO` or `--config-dir`) → `Orchestrator` → `Provider.generate_terraform()` → `generated/terraform/` → `terraform apply`
@@ -205,8 +206,8 @@ infra secrets decrypt file.yaml  # Decrypt and display
 1. Create `src/infrafoundry/providers/newprovider/__init__.py` implementing `ProviderBase`
 2. Add templates in `providers/newprovider/templates/newprovider/`
 3. Register in `src/infrafoundry/cli.py` `_get_orchestrator()` function
-4. Create example configs in `envs/dev/newprovider/`
-5. Update `envs/dev/environment.yaml` to include new provider
+4. Create example configs in `envs/dev/newprovider/` or `envs/dev/resources/`
+5. Provider will be auto-discovered when resources are found
 
 **Adding a new resource type to existing provider:**
 1. Create `envs/dev/{provider}/{resource_type}.yaml` example
