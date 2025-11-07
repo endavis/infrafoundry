@@ -241,44 +241,45 @@ def list(ctx: click.Context, env: str, provider: str | None, type: str | None) -
         else:
             config_manager = ConfigManager()
 
-        env_config = config_manager.load_environment(env)
-        providers_to_list = [provider] if provider else env_config.providers
+        # Get all resources from all providers (handles both formats)
+        all_resources = config_manager.get_all_resources_all_providers(env)
+
+        # Apply filters
+        if provider:
+            all_resources = [r for r in all_resources if r.provider == provider]
+        if type:
+            all_resources = [r for r in all_resources if r.type == type]
+
+        if not all_resources:
+            if type and provider:
+                console.print(
+                    f"[yellow]No resources found with provider '{provider}' "
+                    f"and type '{type}'[/yellow]"
+                )
+            elif type:
+                console.print(f"[yellow]No resources found with type '{type}'[/yellow]")
+            elif provider:
+                console.print(f"[yellow]No resources found with provider '{provider}'[/yellow]")
+            else:
+                console.print("[yellow]No resources found[/yellow]")
+            return
 
         console.print(f"[bold cyan]Resources in {env}:[/bold cyan]\n")
 
-        total_resources = 0
-        for provider_name in providers_to_list:
-            if provider_name not in env_config.providers:
-                console.print(
-                    f"[yellow]Warning: Provider '{provider_name}' "
-                    f"not configured for environment '{env}'[/yellow]"
-                )
-                continue
+        # Group by provider for display
+        by_provider: dict[str, list] = {}
+        for resource in all_resources:
+            if resource.provider not in by_provider:
+                by_provider[resource.provider] = []
+            by_provider[resource.provider].append(resource)
 
-            resources = config_manager.get_all_resources(env, provider_name)
-            if not resources:
-                continue
-
-            # Filter by type if specified
-            if type:
-                resources = [r for r in resources if r.type == type]
-                if not resources:
-                    continue
-
+        for provider_name, resources in sorted(by_provider.items()):
             console.print(f"[bold]{provider_name}[/bold] ({len(resources)} resources):")
-            for resource in resources:
+            for resource in sorted(resources, key=lambda r: r.name):
                 console.print(f"  • {resource.name:<40} [dim]({resource.type})[/dim]")
-
             console.print()
-            total_resources += len(resources)
 
-        if total_resources == 0:
-            if type:
-                console.print(f"[yellow]No resources found with type '{type}'[/yellow]")
-            else:
-                console.print("[yellow]No resources found[/yellow]")
-        else:
-            console.print(f"[dim]Total: {total_resources} resources[/dim]")
+        console.print(f"[dim]Total: {len(all_resources)} resources[/dim]")
 
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")

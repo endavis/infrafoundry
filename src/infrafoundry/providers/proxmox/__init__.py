@@ -50,14 +50,14 @@ class ProxmoxProvider(ProviderBase):
         (self.terraform_dir / "variables.tf").write_text(variables_content)
 
         # Generate resources by type
-        if "vms" in resources_by_type:
-            self._generate_vms_terraform(resources_by_type["vms"])
+        if "vm" in resources_by_type:
+            self._generate_vms_terraform(resources_by_type["vm"])
 
-        if "templates" in resources_by_type:
-            self._generate_templates_terraform(resources_by_type["templates"])
+        if "template" in resources_by_type:
+            self._generate_templates_terraform(resources_by_type["template"])
 
-        if "networks" in resources_by_type:
-            self._generate_networks_terraform(resources_by_type["networks"])
+        if "network" in resources_by_type:
+            self._generate_networks_terraform(resources_by_type["network"])
 
         # Generate outputs
         outputs_template = self.jinja_env.get_template("proxmox/outputs.tf.j2")
@@ -120,13 +120,13 @@ class ProxmoxProvider(ProviderBase):
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["vms", "templates", "networks"]
+        return ["vm", "template", "network"]
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
-            "vms": ["templates", "networks"],
-            "templates": [],
-            "networks": [],
+            "vm": ["template", "network"],
+            "template": [],
+            "network": [],
         }

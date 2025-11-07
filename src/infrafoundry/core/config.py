@@ -86,13 +86,21 @@ class ConfigManager:
 
         # Extract resource type from filename
         # Supports:
-        #   - vms.yaml -> type: vms
-        #   - vms-01.yaml -> type: vms
-        #   - vms-webservers.yaml -> type: vms
+        #   - vm.yaml -> type: vm
+        #   - vm-01.yaml -> type: vm
+        #   - vm-webservers.yaml -> type: vm
         resource_type = resource_file.split("-")[0] if "-" in resource_file else resource_file
 
         # Get the resource list - handle both dict and direct list formats
-        resource_list = data.get(resource_type, []) if isinstance(data, dict) else []
+        # Try singular first, then plural for backwards compatibility
+        if isinstance(data, dict):
+            resource_list = data.get(resource_type, [])
+            # Try plural form if singular not found (backwards compatibility)
+            if not resource_list and not resource_type.endswith("s"):
+                plural_type = f"{resource_type}s"
+                resource_list = data.get(plural_type, [])
+        else:
+            resource_list = []
 
         # Ensure resource_list is actually a list
         if not isinstance(resource_list, list):
@@ -114,8 +122,86 @@ class ConfigManager:
 
         return resources
 
+    def load_resource_centric_files(self, env_name: str) -> list[ResourceConfig]:
+        """Load resource-centric configuration files.
+
+        Resource-centric files have format:
+        ```yaml
+        resources:
+          - provider: proxmox
+            type: vm
+            name: web-01
+            config:
+              cores: 4
+              memory: 8192
+        ```
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            List of ResourceConfig objects from all resource-centric files
+        """
+        resources_dir = self.base_dir / env_name / "resources"
+        if not resources_dir.exists():
+            return []
+
+        all_resources = []
+        for config_file in resources_dir.glob("*.yaml"):
+            with open(config_file) as f:
+                data = yaml.safe_load(f)
+
+            if not data or "resources" not in data:
+                continue
+
+            resource_list = data["resources"]
+            if not isinstance(resource_list, list):
+                raise ValueError(
+                    f"Expected list for 'resources' in {config_file}, "
+                    f"got {type(resource_list).__name__}"
+                )
+
+            for item in resource_list:
+                if not isinstance(item, dict):
+                    continue
+
+                # Validate required fields
+                if "provider" not in item:
+                    resource_name = item.get("name", "unnamed")
+                    raise ValueError(
+                        f"Missing 'provider' field in resource in {config_file}: "
+                        f"{resource_name}"
+                    )
+                if "type" not in item:
+                    resource_name = item.get("name", "unnamed")
+                    raise ValueError(
+                        f"Missing 'type' field in resource in {config_file}: " f"{resource_name}"
+                    )
+                if "name" not in item:
+                    raise ValueError(f"Missing 'name' field in resource in {config_file}")
+
+                # Extract config dict (everything except provider/type/name)
+                config = item.get("config", {})
+                # Also include name in config for backwards compatibility
+                config["name"] = item["name"]
+
+                all_resources.append(
+                    ResourceConfig(
+                        name=item["name"],
+                        type=item["type"],
+                        provider=item["provider"],
+                        config=config,
+                    )
+                )
+
+        return all_resources
+
     def get_all_resources(self, env_name: str, provider: str) -> list[ResourceConfig]:
         """Load all resources for a provider in an environment.
+
+        Supports both provider-centric and resource-centric formats:
+        - Provider-centric: envs/{env}/{provider}/*.yaml
+        - Resource-centric: envs/{env}/resources/*.yaml
 
         Args:
             env_name: Environment name
@@ -124,19 +210,55 @@ class ConfigManager:
         Returns:
             List of all ResourceConfig objects for the provider
         """
+        all_resources = []
+
+        # Load provider-centric files (original format)
         provider_dir = self.base_dir / env_name / provider
-        if not provider_dir.exists():
-            return []
+        if provider_dir.exists():
+            for config_file in provider_dir.glob("*.yaml"):
+                if config_file.name == "environment.yaml":
+                    continue
+
+                # Use the filename without extension
+                resource_file = config_file.stem
+                resources = self.load_resources(env_name, provider, resource_file)
+                all_resources.extend(resources)
+
+        # Load resource-centric files (new format)
+        resource_centric = self.load_resource_centric_files(env_name)
+        # Filter to only resources for this provider
+        all_resources.extend([r for r in resource_centric if r.provider == provider])
+
+        return all_resources
+
+    def get_all_resources_all_providers(self, env_name: str) -> list[ResourceConfig]:
+        """Load all resources from all providers in an environment.
+
+        Supports both provider-centric and resource-centric formats.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            List of all ResourceConfig objects from all providers
+        """
+        # Get providers from environment config
+        env_config = self.load_environment(env_name)
 
         all_resources = []
-        for config_file in provider_dir.glob("*.yaml"):
-            if config_file.name == "environment.yaml":
-                continue
 
-            # Use the filename without extension
-            resource_file = config_file.stem
-            resources = self.load_resources(env_name, provider, resource_file)
-            all_resources.extend(resources)
+        # Load from provider-centric directories
+        for provider_name in env_config.providers:
+            provider_resources = self.get_all_resources(env_name, provider_name)
+            all_resources.extend(provider_resources)
+
+        # Load from resource-centric files (avoid duplicates)
+        # Resource-centric files are already included in get_all_resources()
+        # So we only need to add resources from providers NOT in environment.yaml
+        resource_centric = self.load_resource_centric_files(env_name)
+        all_resources.extend(
+            [r for r in resource_centric if r.provider not in env_config.providers]
+        )
 
         return all_resources
 
