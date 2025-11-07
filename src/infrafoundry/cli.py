@@ -107,7 +107,13 @@ def _get_orchestrator(config_repo: Path | None = None) -> Orchestrator:
 def main(ctx: click.Context, config_dir: Path | None) -> None:
     """InfraFoundry - Infrastructure automation framework."""
     ctx.ensure_object(dict)
-    ctx.obj["config_dir"] = config_dir
+    # Use --config-dir flag if provided, otherwise check environment variable
+    if config_dir:
+        ctx.obj["config_dir"] = config_dir
+    elif config_repo := os.getenv("INFRAFOUNDRY_CONFIG_REPO"):
+        ctx.obj["config_dir"] = Path(config_repo)
+    else:
+        ctx.obj["config_dir"] = None
 
 
 @main.command()
