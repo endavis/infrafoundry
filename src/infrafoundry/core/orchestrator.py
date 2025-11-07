@@ -86,7 +86,6 @@ class Orchestrator:
         Returns:
             Dict with plan results per provider
         """
-        env_config = self.config_manager.load_environment(env_name)
         results = {}
 
         if resource_filter:
@@ -97,7 +96,17 @@ class Orchestrator:
         else:
             self.console.print(f"\n[bold cyan]Planning infrastructure for: {env_name}[/bold cyan]")
 
-        for provider_name in env_config.providers:
+        # Get all resources and discover providers dynamically
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+        # Group resources by provider
+        resources_by_provider: dict[str, list[Any]] = {}
+        for resource in all_resources:
+            if resource.provider not in resources_by_provider:
+                resources_by_provider[resource.provider] = []
+            resources_by_provider[resource.provider].append(resource)
+
+        for provider_name, resources in resources_by_provider.items():
             if provider_name not in self.providers:
                 self.console.print(
                     f"[yellow]Warning: Provider '{provider_name}' not registered[/yellow]"
@@ -105,7 +114,6 @@ class Orchestrator:
                 continue
 
             provider = self.providers[provider_name]
-            resources = self.config_manager.get_all_resources(env_name, provider_name)
 
             # Validate resources before processing
             self.validate_resources(resources)
@@ -171,7 +179,6 @@ class Orchestrator:
         # First, generate the plans
         self.plan(env_name, dry_run=False, resource_filter=resource_filter)
 
-        env_config = self.config_manager.load_environment(env_name)
         results = {}
 
         if resource_filter:
@@ -184,7 +191,17 @@ class Orchestrator:
                 f"\n[bold green]Applying infrastructure for: {env_name}[/bold green]"
             )
 
-        for provider_name in env_config.providers:
+        # Get all resources and discover providers dynamically
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+        # Group resources by provider
+        resources_by_provider: dict[str, list[Any]] = {}
+        for resource in all_resources:
+            if resource.provider not in resources_by_provider:
+                resources_by_provider[resource.provider] = []
+            resources_by_provider[resource.provider].append(resource)
+
+        for provider_name, resources in resources_by_provider.items():
             if provider_name not in self.providers:
                 continue
 
@@ -192,7 +209,6 @@ class Orchestrator:
 
             # Check if any resources match filter for this provider
             if resource_filter:
-                resources = self.config_manager.get_all_resources(env_name, provider_name)
                 resources = [r for r in resources if r.name in resource_filter]
                 if not resources:
                     continue  # Skip provider if no matching resources
@@ -228,7 +244,6 @@ class Orchestrator:
         Returns:
             Dict with destroy results per provider
         """
-        env_config = self.config_manager.load_environment(env_name)
         results = {}
 
         if resource_filter:
@@ -245,7 +260,17 @@ class Orchestrator:
                 self.console.print("[yellow]Aborted[/yellow]")
                 return {}
 
-        for provider_name in env_config.providers:
+        # Get all resources and discover providers dynamically
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+        # Group resources by provider
+        resources_by_provider: dict[str, list[Any]] = {}
+        for resource in all_resources:
+            if resource.provider not in resources_by_provider:
+                resources_by_provider[resource.provider] = []
+            resources_by_provider[resource.provider].append(resource)
+
+        for provider_name, resources in resources_by_provider.items():
             if provider_name not in self.providers:
                 continue
 
@@ -253,7 +278,6 @@ class Orchestrator:
 
             # Check if any resources match filter for this provider
             if resource_filter:
-                resources = self.config_manager.get_all_resources(env_name, provider_name)
                 resources = [r for r in resources if r.name in resource_filter]
                 if not resources:
                     continue  # Skip provider if no matching resources
@@ -338,19 +362,26 @@ class Orchestrator:
         Args:
             env_name: Environment name
         """
-        env_config = self.config_manager.load_environment(env_name)
-
         table = Table(title=f"Infrastructure Status: {env_name}")
         table.add_column("Provider", style="cyan")
         table.add_column("Resources", style="magenta")
         table.add_column("Status", style="green")
 
-        for provider_name in env_config.providers:
+        # Get all resources and discover providers dynamically
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+        # Group resources by provider
+        resources_by_provider: dict[str, list[Any]] = {}
+        for resource in all_resources:
+            if resource.provider not in resources_by_provider:
+                resources_by_provider[resource.provider] = []
+            resources_by_provider[resource.provider].append(resource)
+
+        for provider_name, resources in sorted(resources_by_provider.items()):
             if provider_name not in self.providers:
                 table.add_row(provider_name, "N/A", "[yellow]Not registered[/yellow]")
                 continue
 
-            resources = self.config_manager.get_all_resources(env_name, provider_name)
             provider = self.providers[provider_name]
 
             # Check if Terraform state exists

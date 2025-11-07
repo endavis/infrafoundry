@@ -235,6 +235,7 @@ class ConfigManager:
         """Load all resources from all providers in an environment.
 
         Supports both provider-centric and resource-centric formats.
+        Discovers providers dynamically from available resources.
 
         Args:
             env_name: Environment name
@@ -242,23 +243,30 @@ class ConfigManager:
         Returns:
             List of all ResourceConfig objects from all providers
         """
-        # Get providers from environment config
-        env_config = self.load_environment(env_name)
-
         all_resources = []
+        discovered_providers = set()
 
-        # Load from provider-centric directories
-        for provider_name in env_config.providers:
-            provider_resources = self.get_all_resources(env_name, provider_name)
-            all_resources.extend(provider_resources)
+        # Discover providers from provider-centric directories
+        env_dir = self.base_dir / env_name
+        if env_dir.exists():
+            for item in env_dir.iterdir():
+                if item.is_dir() and item.name not in ("resources", "secrets"):
+                    discovered_providers.add(item.name)
 
-        # Load from resource-centric files (avoid duplicates)
-        # Resource-centric files are already included in get_all_resources()
-        # So we only need to add resources from providers NOT in environment.yaml
+        # Load from provider-centric directories (without resource-centric included)
+        for provider_name in discovered_providers:
+            provider_dir = self.base_dir / env_name / provider_name
+            if provider_dir.exists():
+                for config_file in provider_dir.glob("*.yaml"):
+                    if config_file.name == "environment.yaml":
+                        continue
+                    resource_file = config_file.stem
+                    resources = self.load_resources(env_name, provider_name, resource_file)
+                    all_resources.extend(resources)
+
+        # Load from resource-centric files (once)
         resource_centric = self.load_resource_centric_files(env_name)
-        all_resources.extend(
-            [r for r in resource_centric if r.provider not in env_config.providers]
-        )
+        all_resources.extend(resource_centric)
 
         return all_resources
 

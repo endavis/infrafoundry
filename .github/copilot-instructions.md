@@ -90,13 +90,13 @@ infra secrets decrypt file.yaml  # Decrypt and display
 
 **2. Configuration Files:**
 - Supports **two formats** for organizing resources:
-  
+
   **Provider-Centric** (traditional):
   - Files organized by provider: `envs/{env}/{provider}/`
   - Resource type from filename: `vm.yaml`, `firewall_rule.yaml`
   - Multiple files per type: `vm.yaml`, `vm-services.yaml` (both type `vm`)
   - Use singular names for resource types: `vm:`, `deployment:`, `firewall_rule:`
-  
+
   **Resource-Centric** (new, recommended for multi-provider):
   - Files in: `envs/{env}/resources/*.yaml`
   - Each resource specifies its provider:
@@ -111,7 +111,7 @@ infra secrets decrypt file.yaml  # Decrypt and display
     ```
   - Organize by service/application instead of provider
   - See all infrastructure for a service in one file
-  
+
 - Config repo structure: `envs/`, `secrets/`, `.envrc.local`, `.gitignore`, `README.md`
 - Both formats can be used simultaneously
 
