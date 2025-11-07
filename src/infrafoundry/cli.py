@@ -254,37 +254,65 @@ def secrets_init(key_file: str) -> None:
 
 
 @secrets.command("encrypt")
-@click.argument("file", type=click.Path(exists=True))
+@click.argument("file", type=click.Path())
 def secrets_encrypt(file: str) -> None:
     """Encrypt a file with SOPS."""
     try:
         import subprocess
+        from pathlib import Path
 
+        # Resolve path relative to config repo if set
+        config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
+        if config_repo and not Path(file).is_absolute():
+            file_path = Path(config_repo) / file
+            config_dir = Path(config_repo)
+        else:
+            file_path = Path(file)
+            config_dir = file_path.parent.parent if "secrets" in file_path.parts else Path.cwd()
+
+        if not file_path.exists():
+            console.print(f"[red]File not found: {file_path}[/red]")
+            sys.exit(1)
+
+        # Run sops from config directory so it finds .sops.yaml
         result = subprocess.run(
-            ["sops", "--encrypt", "--in-place", file],
+            ["sops", "--encrypt", "--in-place", str(file_path)],
             capture_output=True,
             text=True,
+            cwd=str(config_dir),
         )
 
         if result.returncode != 0:
             console.print(f"[red]Encryption failed: {result.stderr}[/red]")
             sys.exit(1)
 
-        console.print(f"[green]Encrypted: {file}[/green]")
+        console.print(f"[green]Encrypted: {file_path}[/green]")
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
 
 
 @secrets.command("decrypt")
-@click.argument("file", type=click.Path(exists=True))
+@click.argument("file", type=click.Path())
 def secrets_decrypt(file: str) -> None:
     """Decrypt and display a SOPS-encrypted file."""
     try:
         import subprocess
+        from pathlib import Path
+
+        # Resolve path relative to config repo if set
+        config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
+        if config_repo and not Path(file).is_absolute():
+            file_path = Path(config_repo) / file
+        else:
+            file_path = Path(file)
+
+        if not file_path.exists():
+            console.print(f"[red]File not found: {file_path}[/red]")
+            sys.exit(1)
 
         result = subprocess.run(
-            ["sops", "--decrypt", file],
+            ["sops", "--decrypt", str(file_path)],
             capture_output=True,
             text=True,
         )
