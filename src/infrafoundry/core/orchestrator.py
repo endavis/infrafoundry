@@ -43,6 +43,36 @@ class Orchestrator:
         """
         self.providers[provider.name] = provider
 
+    def validate_resources(self, resources: list[Any]) -> None:
+        """Validate that all resources have providers that support their types.
+
+        Args:
+            resources: List of ResourceConfig objects to validate
+
+        Raises:
+            ValueError: If a resource's provider doesn't support its type
+        """
+        for resource in resources:
+            provider_name = resource.provider
+            resource_type = resource.type
+
+            # Check if provider is registered
+            if provider_name not in self.providers:
+                raise ValueError(
+                    f"Provider '{provider_name}' not registered for resource "
+                    f"'{resource.name}' (type: {resource_type})"
+                )
+
+            # Check if provider supports the resource type
+            provider = self.providers[provider_name]
+            supported_types = provider.get_resource_types()
+            if resource_type not in supported_types:
+                raise ValueError(
+                    f"Provider '{provider_name}' does not support resource type "
+                    f"'{resource_type}' for resource '{resource.name}'. "
+                    f"Supported types: {', '.join(supported_types)}"
+                )
+
     def plan(
         self, env_name: str, dry_run: bool = False, resource_filter: list[str] | None = None
     ) -> dict[str, Any]:
@@ -76,6 +106,9 @@ class Orchestrator:
 
             provider = self.providers[provider_name]
             resources = self.config_manager.get_all_resources(env_name, provider_name)
+
+            # Validate resources before processing
+            self.validate_resources(resources)
 
             # Filter resources if specified
             if resource_filter:

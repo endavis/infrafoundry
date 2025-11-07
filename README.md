@@ -300,50 +300,136 @@ variables:
 
 ### Provider Resources
 
-Resources are organized by provider and type. You can use a single file or split resources across multiple files:
+InfraFoundry supports two configuration patterns:
+
+#### 1. Provider-Centric (Traditional)
+
+Resources are organized by provider and type in separate directories:
 
 **Single file per type:**
 ```
 envs/dev/
 ├── proxmox/
-│   ├── vms.yaml
-│   ├── templates.yaml
-│   └── networks.yaml
+│   ├── vm.yaml
+│   ├── template.yaml
+│   └── network.yaml
 ├── opnsense/
-│   ├── firewall_rules.yaml
-│   ├── vlans.yaml
-│   └── aliases.yaml
+│   ├── firewall_rule.yaml
+│   ├── vlan.yaml
+│   └── alias.yaml
 └── kubernetes/
-    ├── namespaces.yaml
-    ├── deployments.yaml
-    ├── services.yaml
-    └── configmaps.yaml
+    ├── namespace.yaml
+    ├── deployment.yaml
+    ├── service.yaml
+    └── configmap.yaml
 ```
 
 **Multiple files per type (recommended for large environments):**
 ```
 envs/prod/
 ├── proxmox/
-│   ├── vms-webservers.yaml      # Web tier VMs
-│   ├── vms-databases.yaml       # Database VMs
-│   ├── vms-infrastructure.yaml  # Infrastructure VMs
-│   ├── templates.yaml
-│   └── networks.yaml
+│   ├── vm-webservers.yaml       # Web tier VMs
+│   ├── vm-databases.yaml        # Database VMs
+│   ├── vm-infrastructure.yaml   # Infrastructure VMs
+│   ├── template.yaml
+│   └── network.yaml
 └── kubernetes/
-    ├── deployments-frontend.yaml
-    ├── deployments-backend.yaml
-    └── services.yaml
+    ├── deployment-frontend.yaml
+    ├── deployment-backend.yaml
+    └── service.yaml
 ```
 
 Files are grouped by the prefix before the first dash. For example:
-- `vms.yaml`, `vms-web.yaml`, `vms-db.yaml` all map to resource type `vms`
-- `deployments.yaml`, `deployments-api.yaml` both map to type `deployments`
+- `vm.yaml`, `vm-web.yaml`, `vm-db.yaml` all map to resource type `vm`
+- `deployment.yaml`, `deployment-api.yaml` both map to type `deployment`
+
+**Example provider-centric file:**
+```yaml
+# envs/dev/proxmox/vm.yaml
+vm:
+  - name: web-server-01
+    target_node: pve01
+    clone: ubuntu-22-04-template
+    cores: 2
+    memory: 4096
+```
+
+#### 2. Resource-Centric (Recommended for Multi-Provider Services)
+
+Group all infrastructure for a service/application in one file, regardless of provider:
+
+```
+envs/prod/
+├── resources/
+│   ├── web-server.yaml          # VM + firewall + DNS for web server
+│   ├── database-cluster.yaml    # Database VMs + networking
+│   └── monitoring.yaml          # Monitoring stack across providers
+├── proxmox/
+│   └── shared-templates.yaml    # Shared resources
+└── environment.yaml
+```
+
+**Example resource-centric file:**
+```yaml
+# envs/prod/resources/web-server.yaml
+resources:
+  - provider: proxmox
+    type: vm
+    name: web-server-01
+    config:
+      node: pve1
+      cores: 4
+      memory: 8192
+      disk_size: 50
+      network:
+        bridge: vmbr0
+        vlan: 10
+      template: ubuntu-22.04-cloudinit
+
+  - provider: opnsense
+    type: firewall_rule
+    name: allow-web-80
+    config:
+      action: pass
+      interface: LAN
+      protocol: tcp
+      destination_port: 80
+      destination: web-server-01
+
+  - provider: opnsense
+    type: firewall_rule
+    name: allow-web-443
+    config:
+      action: pass
+      interface: LAN
+      protocol: tcp
+      destination_port: 443
+      destination: web-server-01
+```
+
+**Benefits of resource-centric:**
+- All infrastructure for a service in one place
+- Easier to understand complete service architecture
+- Better for GitOps (service changes touch one file)
+- Natural cross-provider dependencies
+- Organize by business logic, not technical boundaries
+
+**Use provider-centric when:**
+- Single provider environment
+- Bulk operations on similar resources
+- Simple infrastructure
+
+**Use resource-centric when:**
+- Multi-provider services
+- Complex applications with many components
+- Team-based infrastructure (one file per team/service)
+- GitOps workflows with PR-based reviews
 
 ### Example: Proxmox VM
 
 ```yaml
-# envs/dev/proxmox/vms.yaml
-vms:
+# envs/dev/proxmox/vm.yaml
+vm:
   - name: web-server-01
     target_node: pve01
     clone: ubuntu-22-04-template
