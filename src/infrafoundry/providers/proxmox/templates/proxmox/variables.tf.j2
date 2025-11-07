@@ -1,21 +1,24 @@
 variable "proxmox_api_url" {
-  description = "Proxmox API URL"
+  description = "Proxmox API URL (can also use PM_API_URL or PROXMOX_API_URL environment variable)"
   type        = string
+  default     = null
 }
 
 variable "proxmox_api_token_id" {
-  description = "Proxmox API token ID"
+  description = "Proxmox API token ID (can also use PM_API_TOKEN_ID or PROXMOX_API_TOKEN_ID environment variable)"
   type        = string
+  default     = null
 }
 
 variable "proxmox_api_token_secret" {
-  description = "Proxmox API token secret"
+  description = "Proxmox API token secret (can also use PM_API_TOKEN_SECRET or PROXMOX_API_TOKEN_SECRET environment variable)"
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "proxmox_tls_insecure" {
   description = "Skip TLS verification"
   type        = bool
-  default     = false
+  default     = true
 }

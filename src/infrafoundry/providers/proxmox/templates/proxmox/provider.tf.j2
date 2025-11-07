@@ -8,8 +8,11 @@ terraform {
 }
 
 provider "proxmox" {
-  pm_api_url          = var.proxmox_api_url
-  pm_api_token_id     = var.proxmox_api_token_id
-  pm_api_token_secret = var.proxmox_api_token_secret
-  pm_tls_insecure     = var.proxmox_tls_insecure
+  # Credentials are read from environment variables:
+  # - PM_API_URL
+  # - PM_API_TOKEN_ID
+  # - PM_API_TOKEN_SECRET
+  # - PM_TLS_INSECURE (optional, defaults to false)
+
+  # All configuration via environment variables - no explicit values needed
 }
