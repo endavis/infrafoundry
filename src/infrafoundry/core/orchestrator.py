@@ -70,21 +70,32 @@ class Orchestrator:
 
             self.console.print(f"\n[bold]{provider_name}[/bold]: {len(resources)} resources")
 
+            if dry_run:
+                self.console.print("  [dim]Would generate Terraform and Ansible files[/dim]")
+                results[provider_name] = {"resources": len(resources), "dry_run": True}
+                continue
+
             # Generate Terraform and Ansible files
-            if not dry_run:
-                provider.ensure_directories()
-                provider.generate_terraform(resources)
-                provider.generate_ansible(resources)
+            provider.ensure_directories()
+            provider.generate_terraform(resources)
+            provider.generate_ansible(resources)
 
-                # Export secrets for this provider
-                try:
-                    secrets_file = f"{provider_name}.yaml"
-                    tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
-                    self.secret_manager.export_for_terraform(secrets_file, tf_vars)
-                except FileNotFoundError:
-                    self.console.print(f"[yellow]No secrets file for {provider_name}[/yellow]")
+            # Export secrets for this provider
+            try:
+                secrets_file = f"{provider_name}.yaml"
+                tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
+                self.secret_manager.export_for_terraform(secrets_file, tf_vars)
+            except FileNotFoundError:
+                self.console.print(f"[yellow]No secrets file for {provider_name}[/yellow]")
 
-            results[provider_name] = {"resources": len(resources)}
+            # Run terraform plan
+            self.console.print("  [dim]Running terraform plan...[/dim]")
+            tf_result = self._run_terraform(provider, "plan", auto_approve=False)
+
+            results[provider_name] = {
+                "resources": len(resources),
+                "terraform_plan": tf_result,
+            }
 
         return results
 
@@ -113,9 +124,16 @@ class Orchestrator:
             provider = self.providers[provider_name]
             self.console.print(f"\n[bold]Applying {provider_name}...[/bold]")
 
-            # Run Terraform
+            # Run Terraform apply
             tf_result = self._run_terraform(provider, "apply", auto_approve)
-            results[provider_name] = {"terraform": tf_result}
+
+            # Run Ansible playbook (check mode for dry run)
+            ansible_result = self._run_ansible(provider, check_mode=not auto_approve)
+
+            results[provider_name] = {
+                "terraform": tf_result,
+                "ansible": ansible_result,
+            }
 
         return results
 
@@ -182,6 +200,42 @@ class Orchestrator:
         result = subprocess.run(cmd, cwd=tf_dir, capture_output=False)
 
         return {"exit_code": result.returncode, "success": result.returncode == 0}
+
+    def _run_ansible(self, provider: ProviderBase, check_mode: bool = True) -> dict[str, Any]:
+        """Run Ansible playbook for a provider.
+
+        Args:
+            provider: Provider instance
+            check_mode: If True, run in check mode (dry run)
+
+        Returns:
+            Dict with command results
+        """
+        ansible_dir = provider.ansible_dir
+        playbook = ansible_dir / "playbook.yml"
+        inventory = ansible_dir / "inventory.yml"
+
+        if not playbook.exists():
+            self.console.print("[dim]No Ansible playbook found, skipping...[/dim]")
+            return {"skipped": True}
+
+        # Build command
+        cmd = ["ansible-playbook", "-i", str(inventory), str(playbook)]
+        if check_mode:
+            cmd.append("--check")
+            self.console.print("[dim]Running Ansible in check mode (dry run)...[/dim]")
+        else:
+            self.console.print("[dim]Running Ansible playbook...[/dim]")
+
+        # Run command
+        try:
+            result = subprocess.run(cmd, cwd=ansible_dir, capture_output=False)
+            return {"exit_code": result.returncode, "success": result.returncode == 0}
+        except FileNotFoundError:
+            self.console.print(
+                "[yellow]ansible-playbook not found. Install Ansible to use this feature.[/yellow]"
+            )
+            return {"error": "ansible-playbook not found", "success": False}
 
     def status(self, env_name: str) -> None:
         """Show status of infrastructure.
