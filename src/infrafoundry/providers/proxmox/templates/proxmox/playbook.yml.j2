@@ -8,6 +8,14 @@
   roles:
     - role: common
       when: "'vms' in group_names"
+{% for resource in resources %}
+{% if resource.type == 'vms' and resource.config.get('ansible_roles') %}
+{% for role in resource.config.ansible_roles %}
+    - role: {{ role }}
+      when: inventory_hostname == '{{ resource.config.name }}'
+{% endfor %}
+{% endif %}
+{% endfor %}
 
   tasks:
     - name: Wait for VMs to be accessible
@@ -23,3 +31,17 @@
       package:
         name: qemu-guest-agent
         state: present
+
+{% for resource in resources %}
+{% if resource.type == 'vms' and resource.config.get('ansible_tasks') %}
+    # Custom tasks for {{ resource.config.name }}
+{% for task in resource.config.ansible_tasks %}
+    - name: {{ task.name }}
+      when: inventory_hostname == '{{ resource.config.name }}'
+      {{ task.module }}:
+{% for key, value in task.params.items() %}
+        {{ key }}: {{ value }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+{% endfor %}
