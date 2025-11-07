@@ -1,0 +1,91 @@
+{% for deployment in deployments %}
+resource "kubernetes_deployment" "{{ deployment.config.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ deployment.config.name }}"
+    namespace = "{{ deployment.config.namespace | default('default') }}"
+
+    {% if deployment.config.labels is defined %}
+    labels = {
+      {% for key, value in deployment.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  spec {
+    replicas = {{ deployment.config.replicas | default(1) }}
+
+    selector {
+      match_labels = {
+        app = "{{ deployment.config.name }}"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          app = "{{ deployment.config.name }}"
+          {% if deployment.config.labels is defined %}
+          {% for key, value in deployment.config.labels.items() %}
+          "{{ key }}" = "{{ value }}"
+          {% endfor %}
+          {% endif %}
+        }
+      }
+
+      spec {
+        {% for container in deployment.config.containers %}
+        container {
+          name  = "{{ container.name }}"
+          image = "{{ container.image }}"
+
+          {% if container.ports is defined %}
+          {% for port in container.ports %}
+          port {
+            container_port = {{ port.containerPort }}
+            {% if port.name is defined %}
+            name = "{{ port.name }}"
+            {% endif %}
+            {% if port.protocol is defined %}
+            protocol = "{{ port.protocol }}"
+            {% endif %}
+          }
+          {% endfor %}
+          {% endif %}
+
+          {% if container.env is defined %}
+          {% for env in container.env %}
+          env {
+            name  = "{{ env.name }}"
+            value = "{{ env.value }}"
+          }
+          {% endfor %}
+          {% endif %}
+
+          {% if container.resources is defined %}
+          resources {
+            {% if container.resources.limits is defined %}
+            limits = {
+              {% for key, value in container.resources.limits.items() %}
+              "{{ key }}" = "{{ value }}"
+              {% endfor %}
+            }
+            {% endif %}
+            {% if container.resources.requests is defined %}
+            requests = {
+              {% for key, value in container.resources.requests.items() %}
+              "{{ key }}" = "{{ value }}"
+              {% endfor %}
+            }
+            {% endif %}
+          }
+          {% endif %}
+        }
+        {% endfor %}
+      }
+    }
+  }
+}
+
+{% endfor %}

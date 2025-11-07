@@ -1,0 +1,16 @@
+variable "opnsense_api_url" {
+  description = "OPNsense API URL"
+  type        = string
+}
+
+variable "opnsense_api_key" {
+  description = "OPNsense API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "opnsense_api_secret" {
+  description = "OPNsense API secret"
+  type        = string
+  sensitive   = true
+}

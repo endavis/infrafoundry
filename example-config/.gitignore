@@ -1,0 +1,23 @@
+# Secrets and sensitive data
+secrets/*.key
+secrets/*.yaml
+!secrets/.gitkeep
+!secrets/*.yaml.example
+
+# Terraform state and variables
+*.tfvars
+!*.tfvars.example
+
+# Generated files
+generated/
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# Backups
+*.bak
+*.backup
+
+# OS files
+.DS_Store
+Thumbs.db

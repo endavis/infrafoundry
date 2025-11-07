@@ -1,0 +1,98 @@
+stages:
+  - validate
+  - plan
+  - apply
+
+variables:
+  PYTHON_VERSION: "3.11"
+  INFRAFOUNDRY_CONFIG_DIR: "envs"
+  INFRAFOUNDRY_SECRETS_DIR: "secrets"
+
+.install_dependencies: &install_dependencies
+  - curl -LsSf https://astral.sh/uv/install.sh | sh
+  - export PATH="$HOME/.cargo/bin:$PATH"
+  - uv pip install --system -e .
+  - wget https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64 -O /usr/local/bin/sops
+  - chmod +x /usr/local/bin/sops
+  - wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
+  - unzip terraform_1.6.0_linux_amd64.zip -d /usr/local/bin/
+
+.configure_secrets: &configure_secrets
+  - mkdir -p secrets
+  - echo "$SOPS_AGE_KEY" | base64 -d > secrets/age.key
+  - chmod 600 secrets/age.key
+  - export SOPS_AGE_KEY_FILE=$(pwd)/secrets/age.key
+
+validate:
+  stage: validate
+  image: python:3.11-slim
+  before_script:
+    - *install_dependencies
+  script:
+    - infra envs
+    - echo "Validation complete"
+  only:
+    - merge_requests
+    - main
+
+plan:dev:
+  stage: plan
+  image: python:3.11-slim
+  before_script:
+    - *install_dependencies
+    - *configure_secrets
+  script:
+    - infra plan --env dev
+  artifacts:
+    paths:
+      - generated/
+    expire_in: 1 week
+  only:
+    - merge_requests
+    - main
+
+apply:dev:
+  stage: apply
+  image: python:3.11-slim
+  before_script:
+    - *install_dependencies
+    - *configure_secrets
+  script:
+    - infra apply --env dev --auto-approve
+    - infra status --env dev
+  dependencies:
+    - plan:dev
+  only:
+    - main
+  when: manual
+  environment:
+    name: dev
+    on_stop: destroy:dev
+
+apply:prod:
+  stage: apply
+  image: python:3.11-slim
+  before_script:
+    - *install_dependencies
+    - *configure_secrets
+  script:
+    - infra apply --env prod --auto-approve
+    - infra status --env prod
+  only:
+    - main
+  when: manual
+  environment:
+    name: prod
+
+destroy:dev:
+  stage: apply
+  image: python:3.11-slim
+  before_script:
+    - *install_dependencies
+    - *configure_secrets
+  script:
+    - infra destroy --env dev --auto-approve
+  when: manual
+  environment:
+    name: dev
+    action: stop

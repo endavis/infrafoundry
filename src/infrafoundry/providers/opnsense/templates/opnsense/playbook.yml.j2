@@ -1,0 +1,23 @@
+---
+# OPNsense Ansible Playbook - Post-configuration
+- name: Configure OPNsense
+  hosts: opnsense
+  gather_facts: false
+
+  tasks:
+    - name: Reload firewall rules
+      uri:
+        url: "{{ opnsense_api_url }}/api/firewall/filter/apply"
+        method: POST
+        headers:
+          Authorization: "Basic {{ (opnsense_api_key + ':' + opnsense_api_secret) | b64encode }}"
+        validate_certs: false
+      when: firewall_rules_changed | default(false)
+
+    - name: Reload filter
+      uri:
+        url: "{{ opnsense_api_url }}/api/firewall/filter/reload"
+        method: POST
+        headers:
+          Authorization: "Basic {{ (opnsense_api_key + ':' + opnsense_api_secret) | b64encode }}"
+        validate_certs: false

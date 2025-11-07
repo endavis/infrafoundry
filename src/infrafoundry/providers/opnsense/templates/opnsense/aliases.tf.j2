@@ -1,0 +1,16 @@
+{% for alias in aliases %}
+resource "opnsense_firewall_alias" "{{ alias.config.name | replace('-', '_') }}" {
+  name        = "{{ alias.config.name }}"
+  type        = "{{ alias.config.type | default('host') }}"
+  description = "{{ alias.config.description | default('') }}"
+
+  content = [
+    {% for item in alias.config.content %}
+    "{{ item }}",
+    {% endfor %}
+  ]
+
+  enabled = {{ alias.config.enabled | default(true) | lower }}
+}
+
+{% endfor %}

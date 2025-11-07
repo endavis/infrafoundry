@@ -1,0 +1,17 @@
+{% for configmap in configmaps %}
+resource "kubernetes_config_map" "{{ configmap.config.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ configmap.config.name }}"
+    namespace = "{{ configmap.config.namespace | default('default') }}"
+  }
+
+  data = {
+    {% for key, value in configmap.config.data.items() %}
+    "{{ key }}" = <<-EOT
+{{ value }}
+    EOT
+    {% endfor %}
+  }
+}
+
+{% endfor %}

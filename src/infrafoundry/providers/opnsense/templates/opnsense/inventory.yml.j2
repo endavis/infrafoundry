@@ -1,0 +1,13 @@
+---
+# OPNsense Inventory
+all:
+  children:
+    opnsense:
+      hosts:
+        opnsense_firewall:
+          ansible_host: "{{ lookup('env', 'OPNSENSE_API_URL') | regex_replace('https?://([^:/]+).*', '\\1') }}"
+          ansible_connection: local
+      vars:
+        opnsense_api_url: "{{ lookup('env', 'OPNSENSE_API_URL') }}"
+        opnsense_api_key: "{{ lookup('env', 'OPNSENSE_API_KEY') }}"
+        opnsense_api_secret: "{{ lookup('env', 'OPNSENSE_API_SECRET') }}"
