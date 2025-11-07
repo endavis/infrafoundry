@@ -1,0 +1,25 @@
+---
+# Common role for Proxmox VMs
+- name: Ensure basic packages are installed
+  package:
+    name:
+      - curl
+      - wget
+      - vim
+      - htop
+    state: present
+
+- name: Configure timezone
+  timezone:
+    name: UTC
+
+- name: Ensure NTP is configured
+  package:
+    name: chrony
+    state: present
+
+- name: Start and enable chronyd
+  service:
+    name: chronyd
+    state: started
+    enabled: true

@@ -1,0 +1,41 @@
+{% for service in services %}
+resource "kubernetes_service" "{{ service.config.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ service.config.name }}"
+    namespace = "{{ service.config.namespace | default('default') }}"
+
+    {% if service.config.labels is defined %}
+    labels = {
+      {% for key, value in service.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  spec {
+    type = "{{ service.config.type | default('ClusterIP') }}"
+
+    selector = {
+      app = "{{ service.config.selector | default(service.config.name) }}"
+    }
+
+    {% for port in service.config.ports %}
+    port {
+      port        = {{ port.port }}
+      target_port = {{ port.targetPort | default(port.port) }}
+      {% if port.protocol is defined %}
+      protocol    = "{{ port.protocol }}"
+      {% endif %}
+      {% if port.name is defined %}
+      name        = "{{ port.name }}"
+      {% endif %}
+      {% if port.nodePort is defined and service.config.type == 'NodePort' %}
+      node_port   = {{ port.nodePort }}
+      {% endif %}
+    }
+    {% endfor %}
+  }
+}
+
+{% endfor %}

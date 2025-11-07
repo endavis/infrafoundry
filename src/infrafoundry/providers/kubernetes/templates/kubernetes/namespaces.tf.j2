@@ -1,0 +1,24 @@
+{% for ns in namespaces %}
+resource "kubernetes_namespace" "{{ ns.config.name | replace('-', '_') }}" {
+  metadata {
+    name = "{{ ns.config.name }}"
+
+    {% if ns.config.labels is defined %}
+    labels = {
+      {% for key, value in ns.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if ns.config.annotations is defined %}
+    annotations = {
+      {% for key, value in ns.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+}
+
+{% endfor %}

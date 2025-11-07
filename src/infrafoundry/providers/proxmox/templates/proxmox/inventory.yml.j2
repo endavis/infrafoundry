@@ -1,0 +1,13 @@
+---
+# Proxmox Inventory - Dynamically generated from Terraform outputs
+all:
+  children:
+    proxmox_vms:
+      hosts:
+{% for resource in resources %}
+{% if resource.type == 'vms' %}
+        {{ resource.config.name }}:
+          ansible_host: "{{ resource.config.ipconfig.split('=')[1].split('/')[0] if resource.config.ipconfig is defined else 'CHANGEME' }}"
+          ansible_user: "{{ resource.config.ssh_user | default('root') }}"
+{% endif %}
+{% endfor %}

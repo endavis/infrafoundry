@@ -1,0 +1,37 @@
+# Outputs for Kubernetes resources
+
+{% if resources_by_type.get('namespaces') %}
+output "namespaces" {
+  description = "Created namespaces"
+  value = [
+    {% for ns in resources_by_type['namespaces'] %}
+    "{{ ns.config.name }}",
+    {% endfor %}
+  ]
+}
+{% endif %}
+
+{% if resources_by_type.get('deployments') %}
+output "deployments" {
+  description = "Created deployments"
+  value = {
+    {% for deployment in resources_by_type['deployments'] %}
+    "{{ deployment.config.name }}" = {
+      namespace = "{{ deployment.config.namespace | default('default') }}"
+      replicas  = {{ deployment.config.replicas | default(1) }}
+    }
+    {% endfor %}
+  }
+}
+{% endif %}
+
+{% if resources_by_type.get('services') %}
+output "services" {
+  description = "Created services"
+  value = {
+    {% for service in resources_by_type['services'] %}
+    "{{ service.config.name }}" = kubernetes_service.{{ service.config.name | replace('-', '_') }}.spec[0].cluster_ip
+    {% endfor %}
+  }
+}
+{% endif %}

@@ -1,0 +1,49 @@
+{% for vm in vms %}
+resource "proxmox_vm_qemu" "{{ vm.config.name | replace('-', '_') }}" {
+  name        = "{{ vm.config.name }}"
+  target_node = "{{ vm.config.target_node }}"
+  {% if vm.config.clone is defined %}
+  clone       = "{{ vm.config.clone }}"
+  {% endif %}
+
+  # VM Configuration
+  cores   = {{ vm.config.cores | default(2) }}
+  sockets = {{ vm.config.sockets | default(1) }}
+  memory  = {{ vm.config.memory | default(2048) }}
+
+  {% if vm.config.disk is defined %}
+  # Disk Configuration
+  disk {
+    size    = "{{ vm.config.disk.size | default('32G') }}"
+    type    = "{{ vm.config.disk.type | default('scsi') }}"
+    storage = "{{ vm.config.disk.storage | default('local-lvm') }}"
+  }
+  {% endif %}
+
+  {% if vm.config.network is defined %}
+  # Network Configuration
+  network {
+    model  = "{{ vm.config.network.model | default('virtio') }}"
+    bridge = "{{ vm.config.network.bridge | default('vmbr0') }}"
+    {% if vm.config.network.tag is defined %}
+    tag    = {{ vm.config.network.tag }}
+    {% endif %}
+  }
+  {% endif %}
+
+  {% if vm.config.ipconfig is defined %}
+  # IP Configuration
+  ipconfig0 = "{{ vm.config.ipconfig }}"
+  {% endif %}
+
+  # Startup Configuration
+  onboot  = {{ vm.config.onboot | default(true) | lower }}
+  agent   = {{ vm.config.agent | default(1) }}
+
+  {% if vm.config.tags is defined %}
+  # Tags
+  tags = "{{ vm.config.tags | join(',') }}"
+  {% endif %}
+}
+
+{% endfor %}

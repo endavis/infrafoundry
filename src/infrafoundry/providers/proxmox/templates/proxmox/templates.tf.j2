@@ -1,0 +1,35 @@
+{% for template in templates %}
+# Template: {{ template.config.name }}
+resource "proxmox_vm_qemu" "template_{{ template.config.name | replace('-', '_') }}" {
+  name        = "{{ template.config.name }}"
+  target_node = "{{ template.config.target_node }}"
+  iso         = "{{ template.config.iso }}"
+
+  # Template Configuration
+  cores   = {{ template.config.cores | default(2) }}
+  sockets = {{ template.config.sockets | default(1) }}
+  memory  = {{ template.config.memory | default(2048) }}
+
+  # Disk Configuration
+  disk {
+    size    = "{{ template.config.disk.size | default('32G') }}"
+    type    = "{{ template.config.disk.type | default('scsi') }}"
+    storage = "{{ template.config.disk.storage | default('local-lvm') }}"
+  }
+
+  # Network Configuration
+  network {
+    model  = "{{ template.config.network.model | default('virtio') }}"
+    bridge = "{{ template.config.network.bridge | default('vmbr0') }}"
+  }
+
+  # Mark as template
+  template = true
+
+  {% if template.config.cloud_init is defined and template.config.cloud_init %}
+  # Cloud-init Configuration
+  cicustom = "{{ template.config.cicustom | default('') }}"
+  {% endif %}
+}
+
+{% endfor %}

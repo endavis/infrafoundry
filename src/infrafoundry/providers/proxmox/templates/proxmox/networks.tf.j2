@@ -1,0 +1,14 @@
+# Proxmox networks are typically managed at the node level
+# This file can be used for network bridge configuration if needed
+
+{% for network in networks %}
+# Network: {{ network.config.name }}
+# Note: Proxmox network bridges are typically configured manually on nodes
+# or via Ansible for more complex network configurations
+# Bridge: {{ network.config.bridge | default('vmbr0') }}
+# VLAN: {{ network.config.vlan | default('none') }}
+# CIDR: {{ network.config.cidr | default('N/A') }}
+
+{% endfor %}
+
+# Use Ansible playbooks for complex network configurations

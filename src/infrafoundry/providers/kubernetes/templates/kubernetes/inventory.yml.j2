@@ -1,0 +1,9 @@
+---
+# Kubernetes Inventory - Uses localhost with kubectl
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  vars:
+    kubeconfig: "{{ lookup('env', 'KUBECONFIG') | default('~/.kube/config', true) }}"

@@ -1,0 +1,34 @@
+# Outputs for OPNsense resources
+
+{% if resources_by_type.get('firewall_rules') %}
+output "firewall_rules" {
+  description = "Created firewall rules"
+  value = [
+    {% for rule in resources_by_type['firewall_rules'] %}
+    "{{ rule.config.name }}",
+    {% endfor %}
+  ]
+}
+{% endif %}
+
+{% if resources_by_type.get('vlans') %}
+output "vlans" {
+  description = "Configured VLANs"
+  value = {
+    {% for vlan in resources_by_type['vlans'] %}
+    "{{ vlan.config.name }}" = {{ vlan.config.tag }}
+    {% endfor %}
+  }
+}
+{% endif %}
+
+{% if resources_by_type.get('aliases') %}
+output "aliases" {
+  description = "Created aliases"
+  value = [
+    {% for alias in resources_by_type['aliases'] %}
+    "{{ alias.config.name }}",
+    {% endfor %}
+  ]
+}
+{% endif %}

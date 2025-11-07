@@ -1,0 +1,23 @@
+# Outputs for Proxmox resources
+
+{% if resources_by_type.get('vms') %}
+output "vm_ips" {
+  description = "IP addresses of created VMs"
+  value = {
+    {% for vm in resources_by_type['vms'] %}
+    "{{ vm.config.name }}" = proxmox_vm_qemu.{{ vm.config.name | replace('-', '_') }}.default_ipv4_address
+    {% endfor %}
+  }
+}
+{% endif %}
+
+{% if resources_by_type.get('templates') %}
+output "templates" {
+  description = "Created templates"
+  value = [
+    {% for template in resources_by_type['templates'] %}
+    "{{ template.config.name }}",
+    {% endfor %}
+  ]
+}
+{% endif %}
