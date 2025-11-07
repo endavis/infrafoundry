@@ -230,8 +230,9 @@ def envs(ctx: click.Context) -> None:
 @main.command()
 @click.option("--env", "-e", required=True, help="Environment name")
 @click.option("--provider", "-p", help="Filter by provider (e.g., proxmox, opnsense)")
+@click.option("--type", "-t", help="Filter by resource type (e.g., vms, firewall_rules)")
 @click.pass_context
-def list(ctx: click.Context, env: str, provider: str | None) -> None:
+def list(ctx: click.Context, env: str, provider: str | None, type: str | None) -> None:
     """List all resources in an environment."""
     try:
         config_repo = ctx.obj.get("config_dir")
@@ -258,6 +259,12 @@ def list(ctx: click.Context, env: str, provider: str | None) -> None:
             if not resources:
                 continue
 
+            # Filter by type if specified
+            if type:
+                resources = [r for r in resources if r.type == type]
+                if not resources:
+                    continue
+
             console.print(f"[bold]{provider_name}[/bold] ({len(resources)} resources):")
             for resource in resources:
                 console.print(f"  • {resource.name:<40} [dim]({resource.type})[/dim]")
@@ -266,7 +273,10 @@ def list(ctx: click.Context, env: str, provider: str | None) -> None:
             total_resources += len(resources)
 
         if total_resources == 0:
-            console.print("[yellow]No resources found[/yellow]")
+            if type:
+                console.print(f"[yellow]No resources found with type '{type}'[/yellow]")
+            else:
+                console.print("[yellow]No resources found[/yellow]")
         else:
             console.print(f"[dim]Total: {total_resources} resources[/dim]")
 
