@@ -272,20 +272,17 @@ def list(ctx: click.Context, env: str, provider: str | None, type: str | None) -
 
         console.print(f"[bold cyan]Resources in {env}:[/bold cyan]\n")
 
-        # Group by provider for display
-        by_provider: dict[str, list] = {}
+        # Sort all resources by name
+        all_resources.sort(key=lambda r: r.name)
+
+        # Display each resource on a single line
         for resource in all_resources:
-            if resource.provider not in by_provider:
-                by_provider[resource.provider] = []
-            by_provider[resource.provider].append(resource)
+            console.print(
+                f"  • {resource.name:<40} [bold]{resource.provider:<12}[/bold] "
+                f"[dim]({resource.type})[/dim]"
+            )
 
-        for provider_name, resources in sorted(by_provider.items()):
-            console.print(f"[bold]{provider_name}[/bold] ({len(resources)} resources):")
-            for resource in sorted(resources, key=lambda r: r.name):
-                console.print(f"  • {resource.name:<40} [dim]({resource.type})[/dim]")
-            console.print()
-
-        console.print(f"[dim]Total: {len(all_resources)} resources[/dim]")
+        console.print(f"\n[dim]Total: {len(all_resources)} resources[/dim]")
 
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
