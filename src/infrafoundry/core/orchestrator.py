@@ -43,12 +43,15 @@ class Orchestrator:
         """
         self.providers[provider.name] = provider
 
-    def plan(self, env_name: str, dry_run: bool = False) -> dict[str, Any]:
+    def plan(
+        self, env_name: str, dry_run: bool = False, resource_filter: list[str] | None = None
+    ) -> dict[str, Any]:
         """Plan infrastructure changes.
 
         Args:
             env_name: Environment name
             dry_run: If True, only show what would be done
+            resource_filter: Optional list of resource names to target
 
         Returns:
             Dict with plan results per provider
@@ -56,7 +59,13 @@ class Orchestrator:
         env_config = self.config_manager.load_environment(env_name)
         results = {}
 
-        self.console.print(f"\n[bold cyan]Planning infrastructure for: {env_name}[/bold cyan]")
+        if resource_filter:
+            self.console.print(
+                f"\n[bold cyan]Planning infrastructure for: {env_name} "
+                f"(resources: {', '.join(resource_filter)})[/bold cyan]"
+            )
+        else:
+            self.console.print(f"\n[bold cyan]Planning infrastructure for: {env_name}[/bold cyan]")
 
         for provider_name in env_config.providers:
             if provider_name not in self.providers:
@@ -68,7 +77,18 @@ class Orchestrator:
             provider = self.providers[provider_name]
             resources = self.config_manager.get_all_resources(env_name, provider_name)
 
-            self.console.print(f"\n[bold]{provider_name}[/bold]: {len(resources)} resources")
+            # Filter resources if specified
+            if resource_filter:
+                original_count = len(resources)
+                resources = [r for r in resources if r.name in resource_filter]
+                if not resources:
+                    continue  # Skip provider if no matching resources
+                self.console.print(
+                    f"\n[bold]{provider_name}[/bold]: {len(resources)} of {original_count} "
+                    f"resources (filtered)"
+                )
+            else:
+                self.console.print(f"\n[bold]{provider_name}[/bold]: {len(resources)} resources")
 
             if dry_run:
                 self.console.print("  [dim]Would generate Terraform and Ansible files[/dim]")
@@ -99,29 +119,51 @@ class Orchestrator:
 
         return results
 
-    def apply(self, env_name: str, auto_approve: bool = False) -> dict[str, Any]:
+    def apply(
+        self,
+        env_name: str,
+        auto_approve: bool = False,
+        resource_filter: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Apply infrastructure changes.
 
         Args:
             env_name: Environment name
             auto_approve: If True, skip confirmation prompts
+            resource_filter: Optional list of resource names to target
 
         Returns:
             Dict with apply results per provider
         """
         # First, generate the plans
-        self.plan(env_name, dry_run=False)
+        self.plan(env_name, dry_run=False, resource_filter=resource_filter)
 
         env_config = self.config_manager.load_environment(env_name)
         results = {}
 
-        self.console.print(f"\n[bold green]Applying infrastructure for: {env_name}[/bold green]")
+        if resource_filter:
+            self.console.print(
+                f"\n[bold green]Applying infrastructure for: {env_name} "
+                f"(resources: {', '.join(resource_filter)})[/bold green]"
+            )
+        else:
+            self.console.print(
+                f"\n[bold green]Applying infrastructure for: {env_name}[/bold green]"
+            )
 
         for provider_name in env_config.providers:
             if provider_name not in self.providers:
                 continue
 
             provider = self.providers[provider_name]
+
+            # Check if any resources match filter for this provider
+            if resource_filter:
+                resources = self.config_manager.get_all_resources(env_name, provider_name)
+                resources = [r for r in resources if r.name in resource_filter]
+                if not resources:
+                    continue  # Skip provider if no matching resources
+
             self.console.print(f"\n[bold]Applying {provider_name}...[/bold]")
 
             # Run Terraform apply
@@ -137,12 +179,18 @@ class Orchestrator:
 
         return results
 
-    def destroy(self, env_name: str, auto_approve: bool = False) -> dict[str, Any]:
+    def destroy(
+        self,
+        env_name: str,
+        auto_approve: bool = False,
+        resource_filter: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Destroy infrastructure.
 
         Args:
             env_name: Environment name
             auto_approve: If True, skip confirmation prompts
+            resource_filter: Optional list of resource names to target
 
         Returns:
             Dict with destroy results per provider
@@ -150,7 +198,13 @@ class Orchestrator:
         env_config = self.config_manager.load_environment(env_name)
         results = {}
 
-        self.console.print(f"\n[bold red]Destroying infrastructure for: {env_name}[/bold red]")
+        if resource_filter:
+            self.console.print(
+                f"\n[bold red]Destroying infrastructure for: {env_name} "
+                f"(resources: {', '.join(resource_filter)})[/bold red]"
+            )
+        else:
+            self.console.print(f"\n[bold red]Destroying infrastructure for: {env_name}[/bold red]")
 
         if not auto_approve:
             response = input("Are you sure you want to destroy? (yes/no): ")
@@ -163,6 +217,14 @@ class Orchestrator:
                 continue
 
             provider = self.providers[provider_name]
+
+            # Check if any resources match filter for this provider
+            if resource_filter:
+                resources = self.config_manager.get_all_resources(env_name, provider_name)
+                resources = [r for r in resources if r.name in resource_filter]
+                if not resources:
+                    continue  # Skip provider if no matching resources
+
             self.console.print(f"\n[bold]Destroying {provider_name}...[/bold]")
 
             # Run Terraform destroy
@@ -193,7 +255,7 @@ class Orchestrator:
 
         # Build command
         cmd = ["terraform", command]
-        if auto_approve and command in ("apply", "destroy"):
+        if auto_approve and command in {"apply", "destroy"}:
             cmd.append("-auto-approve")
 
         # Run command
