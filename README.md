@@ -289,14 +289,12 @@ Each environment (dev, staging, prod) has:
 # envs/dev/environment.yaml
 name: dev
 description: Development environment
-providers:
-  - proxmox
-  - opnsense
-  - kubernetes
 variables:
   environment: development
   region: us-east
 ```
+
+**Note:** Providers are auto-discovered from resource files. No need to declare them in `environment.yaml`.
 
 ### Provider Resources
 
