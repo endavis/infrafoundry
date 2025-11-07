@@ -1,0 +1,44 @@
+---
+# Enable IP forwarding for exit node functionality
+
+- name: Check if system is immutable
+  set_fact:
+    sysctl_persistent: "{{ not is_immutable }}"
+
+- name: Enable IPv4 forwarding (persistent)
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    sysctl_set: yes
+    reload: yes
+  when: sysctl_persistent
+
+- name: Enable IPv6 forwarding (persistent)
+  sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: "1"
+    state: present
+    sysctl_set: yes
+    reload: yes
+  when: sysctl_persistent
+
+# For immutable systems, set at runtime only
+- name: Enable IPv4 forwarding (runtime only for immutable systems)
+  command: sysctl -w net.ipv4.ip_forward=1
+  when: not sysctl_persistent
+  changed_when: false
+
+- name: Enable IPv6 forwarding (runtime only for immutable systems)
+  command: sysctl -w net.ipv6.conf.all.forwarding=1
+  when: not sysctl_persistent
+  changed_when: false
+
+- name: Verify IP forwarding is enabled
+  command: sysctl net.ipv4.ip_forward net.ipv6.conf.all.forwarding
+  register: ip_forward_status
+  changed_when: false
+
+- name: Display IP forwarding status
+  debug:
+    msg: "{{ ip_forward_status.stdout_lines }}"

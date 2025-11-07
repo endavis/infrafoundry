@@ -1,0 +1,60 @@
+---
+# Install Tailscale via native package managers (apt, yum, dnf)
+
+- name: Install Tailscale on Debian/Ubuntu
+  block:
+    - name: Add Tailscale GPG key (Debian/Ubuntu)
+      apt_key:
+        url: https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_distribution_release }}.noarmor.gpg
+        state: present
+        keyring: /usr/share/keyrings/tailscale-archive-keyring.gpg
+
+    - name: Add Tailscale repository (Debian/Ubuntu)
+      apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu {{ ansible_distribution_release }} main"
+        state: present
+        filename: tailscale
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Tailscale (Debian/Ubuntu)
+      apt:
+        name: tailscale
+        state: present
+  when: ansible_os_family == "Debian"
+
+- name: Install Tailscale on RHEL/CentOS/Fedora
+  block:
+    - name: Add Tailscale repository (RHEL/CentOS)
+      yum_repository:
+        name: tailscale-stable
+        description: Tailscale stable
+        baseurl: "https://pkgs.tailscale.com/stable/rhel/{{ ansible_distribution_major_version }}/tailscale.repo"
+        gpgcheck: yes
+        gpgkey: https://pkgs.tailscale.com/stable/rhel/{{ ansible_distribution_major_version }}/repo.gpg
+        enabled: yes
+      when: ansible_distribution in ["RedHat", "CentOS"]
+
+    - name: Add Tailscale repository (Fedora)
+      yum_repository:
+        name: tailscale-stable
+        description: Tailscale stable
+        baseurl: "https://pkgs.tailscale.com/stable/fedora/tailscale.repo"
+        gpgcheck: yes
+        gpgkey: https://pkgs.tailscale.com/stable/fedora/repo.gpg
+        enabled: yes
+      when: ansible_distribution == "Fedora"
+
+    - name: Install Tailscale (RHEL/CentOS/Fedora)
+      package:
+        name: tailscale
+        state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Set Tailscale binary paths for native installation
+  set_fact:
+    tailscale_bin: "/usr/bin/tailscale"
+    tailscaled_service: "tailscaled.service"
