@@ -1,7 +1,7 @@
 # InfraFoundry - AI Coding Agent Instructions
 
 ## Project Overview
-InfraFoundry is a pluggable infrastructure automation framework that generates Terraform and Ansible code from YAML configurations. It's built with Python 3.11+, uses uv for package management, and supports Proxmox, OPNsense, and Kubernetes providers.
+InfraFoundry is a pluggable infrastructure automation framework that generates Terraform and Ansible code from YAML configurations. It's built with Python 3.12+, uses uv for package management, and supports Proxmox, OPNsense, and Kubernetes providers.
 
 **Important:** InfraFoundry separates framework code (this repository) from user infrastructure configurations (separate repositories). This allows independent versioning, private configs with public framework, and better access control.
 
@@ -37,11 +37,12 @@ InfraFoundry is a pluggable infrastructure automation framework that generates T
 
 3. **Configurations** (separate repo or `example-config/`):
    - `envs/{env}/environment.yaml` - defines which providers to use
-   - `envs/{env}/{provider}/{resource_type}.yaml` - resource definitions
+   - **Provider-centric** (original): `envs/{env}/{provider}/{resource_type}.yaml` - resource definitions
+   - **Resource-centric** (new): `envs/{env}/resources/*.yaml` - multi-provider resource definitions
    - `secrets/` - Encrypted credentials with SOPS
 
 **Data flow:**
-`YAML configs` (separate repo) → `ConfigManager` (checks `INFRAFOUNDRY_CONFIG_REPO`) → `Orchestrator` → `Provider.generate_terraform()` → `generated/terraform/` → `terraform apply`
+`YAML configs` (separate repo) → `ConfigManager` (checks `INFRAFOUNDRY_CONFIG_REPO` or `--config-dir`) → `Orchestrator` → `Provider.generate_terraform()` → `generated/terraform/` → `terraform apply`
 
 ### Build / Run / Test
 
@@ -61,7 +62,9 @@ make format                      # Format with black
 # Infrastructure operations (with separate config repo)
 export INFRAFOUNDRY_CONFIG_REPO="/path/to/config-repo"
 infra envs                       # List environments
+infra list --env dev             # List all resources
 infra plan --env dev             # Generate Terraform
+infra plan --env dev --resource web-01  # Target specific resource
 infra apply --env dev            # Apply infrastructure
 infra status --env dev           # Check deployment status
 infra destroy --env dev          # Tear down
@@ -83,16 +86,39 @@ infra secrets decrypt file.yaml  # Decrypt and display
 - Set `INFRAFOUNDRY_CONFIG_REPO` to point to config repo
 - Or use `--config-dir` CLI flag on every command
 - ConfigManager/SecretManager check env var first, fall back to local dirs
+- **CLI precedence**: `--config-dir` flag > `INFRAFOUNDRY_CONFIG_REPO` env var > default `./envs`
 
 **2. Configuration Files:**
-- Organized by environment (`envs/{env}/`) and provider
-- Each resource type gets its own YAML file (`vms.yaml`, `firewall_rules.yaml`)
-- Use plural names for resource collections (`vms:`, `deployments:`)
+- Supports **two formats** for organizing resources:
+  
+  **Provider-Centric** (traditional):
+  - Files organized by provider: `envs/{env}/{provider}/`
+  - Resource type from filename: `vm.yaml`, `firewall_rule.yaml`
+  - Multiple files per type: `vm.yaml`, `vm-services.yaml` (both type `vm`)
+  - Use singular names for resource types: `vm:`, `deployment:`, `firewall_rule:`
+  
+  **Resource-Centric** (new, recommended for multi-provider):
+  - Files in: `envs/{env}/resources/*.yaml`
+  - Each resource specifies its provider:
+    ```yaml
+    resources:
+      - provider: proxmox
+        type: vm
+        name: web-server-01
+        config:
+          cores: 4
+          memory: 8192
+    ```
+  - Organize by service/application instead of provider
+  - See all infrastructure for a service in one file
+  
 - Config repo structure: `envs/`, `secrets/`, `.envrc.local`, `.gitignore`, `README.md`
+- Both formats can be used simultaneously
 
 **3. Provider Implementation:**
 - All providers inherit from `ProviderBase`
 - Must implement: `validate_config()`, `generate_terraform()`, `generate_ansible()`, `get_resource_types()`
+- Use `@override` decorator (Python 3.12+) on all abstract method implementations
 - Templates use Jinja2, stored in `src/infrafoundry/providers/{name}/templates/{name}/`
 - Generated files go to `generated/terraform/{provider}/` and `generated/ansible/{provider}/`
 
@@ -111,15 +137,20 @@ infra secrets decrypt file.yaml  # Decrypt and display
 - CI: Base64-encode age key, store as `SOPS_AGE_KEY`
 
 **6. Code Style:**
-- Python 3.11+ type hints (use `list[str]` not `List[str]`, `X | None` not `Optional[X]`)
+- Python 3.12+ type hints (use `list[str]` not `List[str]`, `X | None` not `Optional[X]`)
+- Use `@override` decorator for all method overrides (improves type safety)
 - Black formatting, ruff linting (enforced in CI)
 - Docstrings in Google style
 - Max line length: 100 characters
 
-**6. File Naming:**
+**7. File Naming:**
 - Python: snake_case for files/functions/variables
 - YAML: kebab-case for resource names (`web-server-01`)
 - Terraform resources: Convert to snake_case in templates (`web_server_01`)
+
+**8. Terminal Commands:**
+- Use `cat -pp` or `batcat -pp` for displaying file contents (user has batcat installed)
+- Plain output without decorations for piping/viewing
 
 ### Integration Points & Dependencies
 
@@ -164,6 +195,11 @@ infra secrets decrypt file.yaml  # Decrypt and display
 - Run before any infra commands in CI
 
 ### Common Development Workflows
+
+**Choosing configuration format:**
+- **Provider-centric**: Best for simple, single-provider setups (e.g., all Proxmox VMs)
+- **Resource-centric**: Best for complex multi-provider services (e.g., VM + firewall + DNS)
+- Both formats can coexist in the same environment
 
 **Adding a new provider:**
 1. Create `src/infrafoundry/providers/newprovider/__init__.py` implementing `ProviderBase`
@@ -217,8 +253,8 @@ terraform plan                   # Review Terraform plan
 ```python
 def get_dependencies(self) -> dict[str, list[str]]:
     return {
-        "vms": ["templates", "networks"],  # VMs depend on templates and networks
-        "firewall_rules": ["aliases"],      # Rules depend on aliases
+        "vm": ["template", "network"],  # VMs depend on templates and networks
+        "firewall_rule": ["alias"],      # Rules depend on aliases
     }
 ```
 
@@ -244,7 +280,8 @@ def get_dependencies(self) -> dict[str, list[str]]:
 
 **Configuration Changes:**
 - `envs/{env}/environment.yaml` - Environment definition
-- `envs/{env}/{provider}/*.yaml` - Resource definitions
+- `envs/{env}/{provider}/*.yaml` - Provider-centric resource definitions
+- `envs/{env}/resources/*.yaml` - Resource-centric resource definitions
 
 **CI/CD Changes:**
 - `.github/workflows/` - GitHub Actions
