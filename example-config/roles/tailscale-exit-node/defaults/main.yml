@@ -1,0 +1,26 @@
+---
+# Role defaults - can be overridden in ansible_vars
+tailscale_exit_node: true
+tailscale_advertise_routes: []
+tailscale_accept_routes: true
+tailscale_configure_firewall: true
+tailscale_enable_ip_forwarding: true
+tailscale_force_snap: false
+tailscale_snap_channel: "latest/stable"
+tailscale_start_on_boot: true
+tailscale_hostname: "{{ ansible_hostname }}"
+tailscale_firewall_zones:
+  - public
+
+# Authentication method: 'authkey' or 'oauth'
+tailscale_auth_method: "authkey"
+
+# Auth key (when using authkey method)
+tailscale_auth_key: ""
+
+# OAuth configuration (when using oauth method)
+tailscale_oauth_client_id: ""
+tailscale_oauth_client_secret: ""
+
+# Timeout for OAuth login (seconds)
+tailscale_oauth_timeout: 300
