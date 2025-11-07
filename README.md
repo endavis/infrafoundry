@@ -368,7 +368,39 @@ make test             # Run tests
 make lint             # Run linters
 make format           # Format code
 make check            # Run all checks
+
+# Tools
+python tools/opnsense-parser.py config.xml  # Parse OPNsense config
 ```
+
+## Tools
+
+### OPNsense Configuration Parser
+
+Extract and convert OPNsense XML configurations to structured YAML files:
+
+```bash
+# Parse OPNsense backup
+python tools/opnsense-parser.py ~/Downloads/config-OPNsense.xml
+
+# Parse with custom output directory
+python tools/opnsense-parser.py config.xml -o my-configs
+
+# Parse directly to config repo
+python tools/opnsense-parser.py config.xml \
+  -o $INFRAFOUNDRY_CONFIG_REPO/envs/prod/opnsense
+```
+
+**Exports:**
+- System settings (hostname, DNS, timezone)
+- Network interfaces and VLANs
+- Gateways and routing
+- Firewall rules and aliases
+- NAT configurations
+- DHCP servers with static mappings
+- OpenVPN clients
+
+**Documentation:** See [docs/tools/opnsense-parser.md](docs/tools/opnsense-parser.md) for full details.
 
 ## Troubleshooting
 
