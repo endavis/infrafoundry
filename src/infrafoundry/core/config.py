@@ -242,6 +242,9 @@ class ConfigManager:
 
         Returns:
             List of all ResourceConfig objects from all providers
+
+        Raises:
+            ValueError: If duplicate resource names are found
         """
         all_resources = []
         discovered_providers = set()
@@ -267,6 +270,27 @@ class ConfigManager:
         # Load from resource-centric files (once)
         resource_centric = self.load_resource_centric_files(env_name)
         all_resources.extend(resource_centric)
+
+        # Check for duplicate resource names
+        seen_names: dict[str, str] = {}
+        duplicates: list[tuple[str, list[str]]] = []
+
+        for resource in all_resources:
+            key = f"{resource.provider}:{resource.name}"
+            if key in seen_names:
+                # Found duplicate
+                if not any(d[0] == key for d in duplicates):
+                    duplicates.append((key, [seen_names[key], "current"]))
+            else:
+                # Track first occurrence (we don't have file info, so use generic label)
+                seen_names[key] = "multiple files"
+
+        if duplicates:
+            dup_list = [dup[0] for dup in duplicates]
+            raise ValueError(
+                f"Duplicate resource names found in environment '{env_name}': "
+                f"{', '.join(dup_list)}. Each resource name must be unique within its provider."
+            )
 
         return all_resources
 
