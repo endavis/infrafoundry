@@ -157,7 +157,7 @@ infra secrets decrypt file.yaml  # Decrypt and display
 - Must implement: `validate_config()`, `generate_terraform()`, `generate_ansible()`, `get_resource_types()`
 - Use `@override` decorator (Python 3.12+) on all abstract method implementations
 - Templates use Jinja2, stored in `src/infrafoundry/providers/{name}/templates/{name}/`
-- Generated files go to `generated/terraform/{provider}/` and `generated/ansible/{provider}/`
+- Generated files go to `generated/{env}/terraform/{provider}/` and `generated/{env}/ansible/{provider}/`
 
 **4. Environment Variables:**
 - Framework-specific: `INFRAFOUNDRY_*` prefix (CONFIG_REPO, CONFIG_DIR, SECRETS_DIR, OUTPUT_DIR, LOG_LEVEL)
@@ -258,7 +258,7 @@ infra secrets decrypt file.yaml  # Decrypt and display
 make format                      # Format code
 infra plan --env dev --dry-run   # Check what would be generated
 infra plan --env dev             # Generate Terraform files
-cd generated/terraform/{provider}
+cd generated/dev/terraform/{provider}
 terraform plan                   # Review Terraform plan
 ```
 
@@ -280,7 +280,7 @@ terraform plan                   # Review Terraform plan
 - Check templates directory exists: `ls src/infrafoundry/providers/{name}/templates/`
 
 **Generated Terraform errors:**
-- Review generated files in `generated/terraform/{provider}/`
+- Review generated files in `generated/{env}/terraform/{provider}/`
 - Check Jinja2 template syntax in `providers/{provider}/templates/`
 - Validate with `terraform validate` in generated directory
 
