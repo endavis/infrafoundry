@@ -401,6 +401,64 @@ def drift(env: str) -> None:
 
 
 @main.command()
+@click.option("--env", "-e", help="Show policies for specific environment")
+@click.pass_context
+def policies(ctx: click.Context, env: str | None) -> None:
+    """List available infrastructure policies."""
+    try:
+        orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
+
+        if env:
+            policies_list = orchestrator.policy_engine.get_policies_for_environment(env)
+            console.print(f"\n[bold]Policies for {env}:[/bold]")
+        else:
+            policies_list = orchestrator.policy_engine.policies
+            console.print("\n[bold]All Policies:[/bold]")
+
+        if not policies_list:
+            console.print("[yellow]No policies found.[/yellow]")
+            console.print(
+                "[dim]Create policy files in the 'policies' directory.[/dim]"
+            )
+            return
+
+        # Display policies in a table
+        table = Table(show_header=True)
+        table.add_column("Name", style="cyan")
+        table.add_column("Type", style="blue")
+        table.add_column("Level", style="yellow")
+        table.add_column("Enabled", style="green")
+        table.add_column("Environments", style="magenta")
+        table.add_column("Description", style="dim")
+
+        for policy in policies_list:
+            level_color = {
+                "error": "red",
+                "warning": "yellow",
+                "info": "blue",
+            }.get(policy.level.value, "white")
+
+            table.add_row(
+                policy.name,
+                policy.type.value,
+                f"[{level_color}]{policy.level.value}[/{level_color}]",
+                "✓" if policy.enabled else "✗",
+                ", ".join(policy.environments) if policy.environments else "all",
+                policy.description,
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Total: {len(policies_list)} policy/policies[/dim]")
+
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        import traceback
+
+        console.print(traceback.format_exc())
+        sys.exit(1)
+
+
+@main.command()
 @click.option("--env", "-e", required=True, help="Environment name")
 @click.option("--limit", "-l", default=10, help="Maximum number of rollback points to show")
 @click.pass_context
@@ -578,13 +636,27 @@ def resources(
     multiple=True,
     help="Specific resource name(s) to target (can be used multiple times)",
 )
+@click.option(
+    "--enforce-policies",
+    is_flag=True,
+    help="Enforce policy checks (block on violations)",
+)
 @click.pass_context
-def plan(ctx: click.Context, env: str, dry_run: bool, resource: tuple[str, ...]) -> None:
+def plan(
+    ctx: click.Context,
+    env: str,
+    dry_run: bool,
+    resource: tuple[str, ...],
+    enforce_policies: bool,
+) -> None:
     """Plan infrastructure changes."""
     try:
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
         orchestrator.plan(
-            env, dry_run=dry_run, resource_filter=list(resource) if resource else None
+            env,
+            dry_run=dry_run,
+            resource_filter=list(resource) if resource else None,
+            enforce_policies=enforce_policies,
         )
 
         if dry_run:
