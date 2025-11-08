@@ -96,6 +96,32 @@ def _get_orchestrator(config_repo: Path | None = None) -> Orchestrator:
     return orchestrator
 
 
+def _load_env_credentials(env_name: str, config_dir: Path | None = None) -> None:
+    """Load environment-specific credentials and update os.environ.
+
+    Automatically loads credentials from secrets/{env}/ directory if it exists.
+    This allows each environment to have different credentials without manual
+    environment variable management.
+
+    Args:
+        env_name: Environment name (dev, staging, prod, etc.)
+        config_dir: Configuration directory (defaults to context config_dir)
+    """
+    from infrafoundry.core.env_credentials import load_environment_credentials
+
+    try:
+        env_vars = load_environment_credentials(env_name, config_dir)
+        if env_vars:
+            os.environ.update(env_vars)
+            # Debug logging (only if LOG_LEVEL=DEBUG)
+            if os.getenv("INFRAFOUNDRY_LOG_LEVEL") == "DEBUG":
+                console.print(f"[dim]Loaded credentials for environment: {env_name}[/dim]")
+    except Exception as e:
+        # Silently fail - credentials might be in environment already
+        if os.getenv("INFRAFOUNDRY_LOG_LEVEL") == "DEBUG":
+            console.print(f"[dim]Could not load env-specific credentials: {e}[/dim]")
+
+
 @click.group()
 @click.version_option(version="0.1.0", prog_name="infrafoundry")
 @click.option(
@@ -343,7 +369,8 @@ def impact(env: str, resource: str) -> None:
 
 @main.command()
 @click.option("--env", "-e", required=True, help="Environment name")
-def drift(env: str) -> None:
+@click.pass_context
+def drift(ctx: click.Context, env: str) -> None:
     """Detect infrastructure drift from declared configuration.
 
     Checks if actual infrastructure state matches the declared configuration
@@ -352,7 +379,10 @@ def drift(env: str) -> None:
     from rich.panel import Panel
     from rich.table import Table
 
-    orchestrator = _get_orchestrator()
+    # Load environment-specific credentials
+    _load_env_credentials(env, ctx.obj.get("config_dir"))
+
+    orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
 
     try:
         # Run drift detection
@@ -384,12 +414,14 @@ def drift(env: str) -> None:
 
         if not total_drift:
             console.print(
-                "\n[bold green]✓ No drift detected - infrastructure matches configuration[/bold green]"
+                "\n[bold green]✓ No drift detected - "
+                "infrastructure matches configuration[/bold green]"
             )
         else:
             console.print("\n[bold yellow]⚠ Drift detected![/bold yellow]")
             console.print(
-                "[dim]Run 'infra plan' to see detailed changes, or 'infra apply' to reconcile.[/dim]"
+                "[dim]Run 'infra plan' to see detailed changes, "
+                "or 'infra apply' to reconcile.[/dim]"
             )
 
     except Exception as e:
@@ -649,6 +681,9 @@ def plan(
 ) -> None:
     """Plan infrastructure changes."""
     try:
+        # Load environment-specific credentials
+        _load_env_credentials(env, ctx.obj.get("config_dir"))
+
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
         orchestrator.plan(
             env,
@@ -699,6 +734,9 @@ def apply(
 ) -> None:
     """Apply infrastructure changes."""
     try:
+        # Load environment-specific credentials
+        _load_env_credentials(env, ctx.obj.get("config_dir"))
+
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
         orchestrator.apply(
             env,
@@ -726,6 +764,9 @@ def apply(
 def destroy(ctx: click.Context, env: str, auto_approve: bool, resource: tuple[str, ...]) -> None:
     """Destroy infrastructure."""
     try:
+        # Load environment-specific credentials
+        _load_env_credentials(env, ctx.obj.get("config_dir"))
+
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
         orchestrator.destroy(
             env, auto_approve=auto_approve, resource_filter=list(resource) if resource else None
@@ -742,6 +783,9 @@ def destroy(ctx: click.Context, env: str, auto_approve: bool, resource: tuple[st
 def status(ctx: click.Context, env: str) -> None:
     """Show infrastructure status."""
     try:
+        # Load environment-specific credentials
+        _load_env_credentials(env, ctx.obj.get("config_dir"))
+
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
         orchestrator.status(env)
     except Exception as e:

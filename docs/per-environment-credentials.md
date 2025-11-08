@@ -2,6 +2,25 @@
 
 Different environments (dev, staging, prod) typically need different credentials. This guide covers best practices for managing environment-specific credentials in InfraFoundry.
 
+## Automatic Credential Loading
+
+**InfraFoundry automatically loads environment-specific credentials based on the `--env` flag.** You don't need to manually switch environment variables - the CLI handles it for you!
+
+```bash
+# Just use --env flag - credentials are loaded automatically!
+infra plan --env dev      # Uses secrets/dev/proxmox.yaml, etc.
+infra apply --env staging # Uses secrets/staging/proxmox.yaml, etc.
+infra plan --env prod     # Uses secrets/prod/proxmox.yaml, etc.
+```
+
+When you run a command with `--env`, InfraFoundry:
+1. Looks for encrypted secrets in `secrets/{env}/proxmox.yaml`, `secrets/{env}/opnsense.yaml`, etc.
+2. Decrypts them using SOPS
+3. Sets the appropriate environment variables (`PROXMOX_API_URL`, `OPNSENSE_API_KEY`, etc.)
+4. Proceeds with the operation using the correct credentials
+
+**No manual environment switching required!** ✨
+
 ## The Challenge
 
 Each environment needs its own set of credentials:
@@ -78,25 +97,41 @@ sops --encrypt --in-place secrets/staging/proxmox.yaml
 sops --encrypt --in-place secrets/prod/proxmox.yaml
 ```
 
-**3. Update `.envrc.local` to load environment-specific secrets:**
+**3. Use with InfraFoundry:**
+
+```bash
+# Credentials are loaded automatically based on --env flag!
+infra plan --env dev       # Automatically uses secrets/dev/proxmox.yaml
+infra apply --env staging  # Automatically uses secrets/staging/proxmox.yaml
+infra plan --env prod      # Automatically uses secrets/prod/proxmox.yaml
+```
+
+**That's it!** No need to manually load environment variables or switch contexts. The CLI handles everything automatically.
+
+#### Optional: Manual Loading in .envrc.local
+
+For advanced use cases (debugging, testing, CI/CD), you can still manually load credentials in `.envrc.local`:
 
 ```bash
 # .envrc.local
 export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/age.key"
 
-# Function to load environment secrets
+# Optional: Set default environment for direnv-based workflows
+export INFRA_ENV="${INFRA_ENV:-dev}"
+
+# Optional: Function to manually load environment secrets
 load_env_secrets() {
     local env=$1
     local secrets_dir="${INFRAFOUNDRY_CONFIG_REPO}/secrets/${env}"
-    
+
     if [[ -f "${secrets_dir}/proxmox.yaml" ]]; then
         # Decrypt and export Proxmox credentials
         eval "$(sops --decrypt "${secrets_dir}/proxmox.yaml" | \
             yq eval '.proxmox_api_url, .proxmox_token_id, .proxmox_token_secret' - | \
             awk '{print "export PROXMOX_" toupper($1) "=" $2}')"
     fi
-    
+
     if [[ -f "${secrets_dir}/opnsense.yaml" ]]; then
         # Decrypt and export OPNsense credentials
         eval "$(sops --decrypt "${secrets_dir}/opnsense.yaml" | \
@@ -105,46 +140,27 @@ load_env_secrets() {
     fi
 }
 
-# Set default environment or use ENV variable
-export INFRA_ENV="${INFRA_ENV:-dev}"
-load_env_secrets "$INFRA_ENV"
-
-echo "Loaded credentials for environment: $INFRA_ENV"
+# Uncomment to auto-load on direnv reload (not needed for normal CLI usage)
+# load_env_secrets "$INFRA_ENV"
+# echo "Loaded credentials for environment: $INFRA_ENV"
 ```
 
-**4. Usage:**
-
-```bash
-# Work on dev (default)
-infra plan --env dev
-
-# Switch to staging
-export INFRA_ENV=staging
-direnv reload  # Reload environment
-infra plan --env staging
-
-# Switch to prod
-export INFRA_ENV=prod
-direnv reload
-infra apply --env prod
-
-# Or specify inline
-INFRA_ENV=prod infra plan --env prod
-```
+**Note:** Manual loading is **optional** and rarely needed. The CLI loads credentials automatically.
 
 #### Pros & Cons
 
 **Pros:**
+- ✅ Automatic credential loading - no manual environment switching
 - ✅ All secrets version controlled (encrypted)
 - ✅ Single age key for all environments
 - ✅ Easy to add new environments
 - ✅ Credentials stored with infrastructure configs
 - ✅ Team can share encrypted secrets
+- ✅ Simple workflow: just use `--env` flag
 
 **Cons:**
-- ❌ Requires `yq` tool for YAML parsing
-- ❌ Needs manual environment switching
 - ❌ All team members have access to all env secrets (if shared key)
+- ⚠️  Requires SOPS and age for encryption/decryption
 
 ---
 
@@ -183,11 +199,11 @@ creation_rules:
   # Dev secrets - dev team members
   - path_regex: dev/.*\.yaml$
     age: age1dev_public_key_here...
-  
+
   # Staging secrets - senior devs + ops
   - path_regex: staging/.*\.yaml$
     age: age1staging_public_key_here...
-  
+
   # Production secrets - ops team only
   - path_regex: prod/.*\.yaml$
     age: age1prod_public_key_here...
@@ -332,17 +348,17 @@ SECRETS_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/credentials.yaml"
 if [[ -f "$SECRETS_FILE" ]]; then
     # Extract credentials for current environment
     CREDS=$(sops --decrypt "$SECRETS_FILE" | yq eval ".${INFRA_ENV}" -)
-    
+
     # Proxmox
     export PROXMOX_API_URL=$(echo "$CREDS" | yq eval '.proxmox.api_url' -)
     export PROXMOX_API_TOKEN_ID=$(echo "$CREDS" | yq eval '.proxmox.token_id' -)
     export PROXMOX_API_TOKEN_SECRET=$(echo "$CREDS" | yq eval '.proxmox.token_secret' -)
-    
+
     # OPNsense
     export OPNSENSE_API_URL=$(echo "$CREDS" | yq eval '.opnsense.api_url' -)
     export OPNSENSE_API_KEY=$(echo "$CREDS" | yq eval '.opnsense.api_key' -)
     export OPNSENSE_API_SECRET=$(echo "$CREDS" | yq eval '.opnsense.api_secret' -)
-    
+
     echo "Loaded ${INFRA_ENV} credentials"
 fi
 ```
@@ -398,10 +414,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production  # GitHub environment protection
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up secrets
         env:
           # From GitHub Secrets
@@ -426,7 +442,7 @@ export INFRA_ENV="${INFRA_ENV:-dev}"
 fetch_aws_secrets() {
     local env=$1
     local secret_name="infrafoundry/${env}/credentials"
-    
+
     # Fetch and parse secrets
     aws secretsmanager get-secret-value \
         --secret-id "$secret_name" \
@@ -449,7 +465,7 @@ export VAULT_ADDR="https://vault.example.com"
 fetch_vault_secrets() {
     local env=$1
     local path="secret/infrafoundry/${env}"
-    
+
     # Read secrets from Vault
     vault kv get -format=json "$path" | \
         jq -r '.data.data | to_entries[] | "export \(.key)=\(.value)"'
@@ -565,7 +581,7 @@ INFRA_ENV=prod infra plan --env prod --dry-run
    # Update secret
    sops secrets/prod/proxmox.yaml
    # Change proxmox_token_secret
-   
+
    # Re-encrypt
    sops --encrypt --in-place secrets/prod/proxmox.yaml
    ```
@@ -579,7 +595,7 @@ INFRA_ENV=prod infra plan --env prod --dry-run
    ```bash
    # Encrypt age key with GPG
    gpg --encrypt --recipient your-email@example.com secrets/age.key
-   
+
    # Store encrypted backup in password manager
    ```
 

@@ -30,27 +30,33 @@ export INFRA_ENV="${INFRA_ENV:-dev}"
 # export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
 
 # ============================================================================
-# CREDENTIALS - Per-Environment
+# CREDENTIALS - Automatic Loading by CLI
 # ============================================================================
-# Recommended: Store credentials in secrets/{env}/ directories
-# See: docs/per-environment-credentials.md for detailed setup options
+# The InfraFoundry CLI automatically loads credentials based on --env flag!
 #
-# Option 1: Environment-specific encrypted files (recommended for teams)
+# Just create encrypted secrets files:
 #   secrets/dev/proxmox.yaml, secrets/staging/proxmox.yaml, secrets/prod/proxmox.yaml
-#   Switch environments: export INFRA_ENV=prod && direnv reload
 #
-# Option 2: Direct environment variables (simple for solo developers)
-#   Uncomment and set credentials below
+# Then use with --env flag:
+#   infra plan --env dev      # Automatically uses secrets/dev/
+#   infra apply --env staging # Automatically uses secrets/staging/
+#   infra plan --env prod     # Automatically uses secrets/prod/
+#
+# See: docs/per-environment-credentials.md for setup instructions
 # ============================================================================
 
+# Optional: Set default environment for display/reference purposes
+# (Not required - CLI loads credentials based on --env flag)
+export INFRA_ENV="${INFRA_ENV:-dev}"
+
+# Optional: Direct environment variables (for solo developers or testing)
+# NOTE: CLI auto-loading from secrets/{env}/ is recommended for production use
 # Proxmox credentials
-# NOTE: For per-environment credentials, use secrets/{env}/proxmox.yaml instead
 # export PROXMOX_API_URL=https://proxmox.example.com:8006/api2/json
 # export PROXMOX_API_TOKEN_ID=user@pam!token
 # export PROXMOX_API_TOKEN_SECRET=your-secret-here
 
 # OPNsense credentials
-# NOTE: For per-environment credentials, use secrets/{env}/opnsense.yaml instead
 # export OPNSENSE_API_URL=https://opnsense.example.com
 # export OPNSENSE_API_KEY=your-api-key
 # export OPNSENSE_API_SECRET=your-api-secret
