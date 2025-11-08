@@ -9,11 +9,15 @@ InfraFoundry enables reproducible, multi-provider infrastructure deployment with
 - 🔌 **Pluggable Providers**: Proxmox, OPNsense, Kubernetes (extensible to ESXi, Docker, cloud providers)
 - 🔐 **Secure Secrets**: SOPS with age encryption for secrets shared between Terraform and Ansible
 - 📝 **Declarative Config**: YAML configuration files separated by resource type
-- � **Separate Config Repos**: Keep infrastructure configs in separate repository from framework
-- �🚀 **CI/CD Ready**: GitHub Actions and GitLab CI examples with auto-approve
-- 🐍 **Modern Python**: Built with Python 3.11+, uv package manager, type hints
+- 🏗️ **Separate Config Repos**: Keep infrastructure configs in separate repository from framework
+- 🚀 **CI/CD Ready**: GitHub Actions and GitLab CI examples with auto-approve
+- 🐍 **Modern Python**: Built with Python 3.12+, uv package manager, type hints
 - 🔄 **Reproducible**: Complete environment definition in version control
 - 🎯 **Developer Friendly**: direnv integration, rich CLI with colored output
+- 📊 **State Tracking**: Full deployment history and resource lifecycle tracking
+- 🔍 **Event System**: Hook into any point in the deployment lifecycle
+- 🌐 **Dependency Resolution**: Smart dependency graphs with circular detection
+- 📈 **Foundation for Advanced Features**: Drift detection, impact analysis, automated rollback
 
 ## Architecture
 
@@ -48,7 +52,7 @@ See [Separate Configuration Repository Guide](docs/separate-config-repo.md) for 
   ```bash
   # Install uv (recommended method)
   curl -LsSf https://astral.sh/uv/install.sh | sh
-  
+
   # Or with pip (if uv not available)
   pip install uv
   ```
@@ -60,7 +64,31 @@ See [Separate Configuration Repository Guide](docs/separate-config-repo.md) for 
 
 ### Installation
 
-**Option 1: Separate Configuration Repository (Recommended)**
+**Option 1: Interactive Setup (Recommended)**
+
+```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone the repository
+git clone https://github.com/yourusername/infrafoundry.git
+cd infrafoundry
+
+# Install dependencies with uv
+uv pip install -e .
+
+# Run the interactive setup wizard
+./setup-config.sh
+
+# The wizard will:
+# - Check for and install uv if needed
+# - Guide you through configuration choices
+# - Create environment files
+# - Set up secrets management
+# - Generate .envrc.local for direnv
+```
+
+**Option 2: Separate Configuration Repository (Manual)**
 
 ```bash
 # Install uv if not already installed
@@ -88,7 +116,7 @@ infra secrets init
 infra envs
 ```
 
-**Option 2: Embedded Configuration (Legacy)**
+**Option 3: Embedded Configuration (Legacy)**
 
 ```bash
 # Install uv if not already installed
@@ -113,7 +141,7 @@ infra secrets init
 infra --version
 ```
 
-> **Note:** The separate configuration repository pattern is recommended for better separation of concerns, easier team collaboration, and independent versioning. See [docs/separate-config-repo.md](docs/separate-config-repo.md) for details.
+> **Note:** The interactive setup wizard (`setup-config.sh`) is the easiest way to get started. It automates configuration creation, secret management setup, and environment variable configuration. For manual setup or CI/CD environments, use Option 2 (separate config repo) or Option 3 (embedded).
 
 ### Basic Usage
 
@@ -126,11 +154,17 @@ export INFRAFOUNDRY_CONFIG_REPO="/path/to/my-infrastructure-config"
 # Or use --config-dir flag
 infra --config-dir /path/to/my-infrastructure-config envs
 
+# Initialize state tracking (first-time setup)
+infra init
+
 # List available environments
 infra envs
 
 # Plan infrastructure changes
 infra plan --env dev
+
+# View deployment history
+infra history
 
 # Apply infrastructure
 infra apply --env dev
@@ -145,6 +179,9 @@ infra destroy --env dev
 **With embedded configuration (legacy):**
 
 ```bash
+# Initialize state tracking
+infra init
+
 # Commands work the same, configs are in ./envs/
 infra envs
 infra plan --env dev
@@ -194,6 +231,30 @@ infra destroy --env dev
 # Destroy specific resources
 infra destroy --env dev --resource web-01
 ```
+
+### State Management
+
+InfraFoundry tracks deployment history and resource state in a local database:
+
+```bash
+# Initialize state database (first-time setup)
+infra init
+
+# View deployment history
+infra history
+
+# View history for specific environment
+infra history --env prod
+
+# Limit number of results
+infra history --limit 10
+```
+
+State is stored in `~/.infrafoundry/state.db` by default. This enables:
+- **Deployment tracking**: See who deployed what and when
+- **Resource tracking**: Monitor resource lifecycle and state
+- **Audit trails**: Full history of infrastructure changes
+- **Future features**: Drift detection, impact analysis, rollback
 
 ### Environment Management
 
