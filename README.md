@@ -57,8 +57,8 @@ See [Separate Configuration Repository Guide](docs/separate-config-repo.md) for 
 
 ```bash
 # Install the framework
-git clone https://github.com/yourusername/infrafoundry2.git
-cd infrafoundry2
+git clone https://github.com/yourusername/infrafoundry.git
+cd infrafoundry
 uv pip install -e .
 
 # Create your configuration repository from example
@@ -82,8 +82,8 @@ infra envs
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/infrafoundry2.git
-cd infrafoundry2
+git clone https://github.com/yourusername/infrafoundry.git
+cd infrafoundry
 
 # Install dependencies with uv
 uv pip install -e .
@@ -227,7 +227,7 @@ infra plan --env dev --resource db-01
 **Framework Repository** (this repo):
 
 ```
-infrafoundry2/
+infrafoundry/
 ├── src/infrafoundry/          # Core framework
 │   ├── core/                  # Base classes and managers
 │   │   ├── provider.py        # Provider base class
@@ -645,6 +645,6 @@ ls src/infrafoundry/providers/*/templates/
 
 ## Support
 
-- Issues: https://github.com/yourusername/infrafoundry2/issues
-- Discussions: https://github.com/yourusername/infrafoundry2/discussions
+- Issues: https://github.com/yourusername/infrafoundry/issues
+- Discussions: https://github.com/yourusername/infrafoundry/discussions
 - Documentation: https://infrafoundry.readthedocs.io

@@ -37,7 +37,7 @@ See https://direnv.net/docs/installation.html
 2. **Allow direnv in this project** (first time only):
 
    ```bash
-   cd /path/to/infrafoundry2
+   cd /path/to/infrafoundry
    direnv allow
    ```
 
@@ -57,7 +57,7 @@ See https://direnv.net/docs/installation.html
 
 ### Automatic loading
 ```bash
-cd ~/projects/infrafoundry2
+cd ~/projects/infrafoundry
 # Output: 🔧 InfraFoundry environment loaded
 #         Config: envs
 #         Secrets: secrets
