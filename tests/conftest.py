@@ -142,6 +142,31 @@ def mock_policy_dir(temp_dir):
 
 
 @pytest.fixture
+def mock_config():
+    """Create mock configuration data for orchestrator tests."""
+    from unittest.mock import Mock
+
+    # Mock environment
+    environment = {
+        "name": "dev",
+        "description": "Development environment",
+        "variables": {"datacenter": "dc1", "network": "vmbr0"},
+    }
+
+    # Mock resources
+    resources = []
+    for i in range(2):
+        resource = Mock()
+        resource.provider = "proxmox"
+        resource.type = "vm"
+        resource.name = f"web-0{i+1}"
+        resource.config = {"cores": 2, "memory": 4096}
+        resources.append(resource)
+
+    return {"environment": environment, "resources": resources}
+
+
+@pytest.fixture
 def mock_terraform_state():
     """Create a mock Terraform state."""
     return {
