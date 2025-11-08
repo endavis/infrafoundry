@@ -8,11 +8,12 @@ secrets/*.yaml
 *.tfvars
 !*.tfvars.example
 
-# Generated files
+# Generated files (environment-specific)
 generated/
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.tfstate.lock.hcl
 
 # Backups
 *.bak
