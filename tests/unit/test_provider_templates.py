@@ -416,7 +416,7 @@ class TestOPNsenseTemplates:
         def b64encode_filter(s: str) -> str:
             """Base64 encode filter for Jinja2 (mimics Ansible filter)."""
             if not s:
-                return ''
+                return ""
             return base64.b64encode(s.encode()).decode()
 
         def regex_replace_filter(value: str, pattern: str, replacement: str) -> str:
@@ -426,11 +426,11 @@ class TestOPNsenseTemplates:
         def lookup_filter(plugin: str, *args, **kwargs) -> str:
             """Lookup filter (mimics Ansible lookup)."""
             # Return empty string for env lookups in tests
-            return ''
+            return ""
 
-        provider.jinja_env.filters['b64encode'] = b64encode_filter
-        provider.jinja_env.filters['regex_replace'] = regex_replace_filter
-        provider.jinja_env.globals['lookup'] = lookup_filter
+        provider.jinja_env.filters["b64encode"] = b64encode_filter
+        provider.jinja_env.filters["regex_replace"] = regex_replace_filter
+        provider.jinja_env.globals["lookup"] = lookup_filter
 
         # Patch template.render to inject test variables
         original_get_template = provider.jinja_env.get_template
@@ -443,9 +443,9 @@ class TestOPNsenseTemplates:
             def render_with_test_vars(**kwargs):
                 """Inject test variables into template context."""
                 test_vars = {
-                    'opnsense_api_url': 'https://opnsense.test',
-                    'opnsense_api_key': 'testkey',
-                    'opnsense_api_secret': 'testsecret',
+                    "opnsense_api_url": "https://opnsense.test",
+                    "opnsense_api_key": "testkey",
+                    "opnsense_api_secret": "testsecret",
                 }
                 kwargs.update(test_vars)
                 return original_render(**kwargs)
@@ -453,7 +453,7 @@ class TestOPNsenseTemplates:
             template.render = render_with_test_vars
             return template
 
-        with patch.object(provider.jinja_env, 'get_template', side_effect=get_template_with_vars):
+        with patch.object(provider.jinja_env, "get_template", side_effect=get_template_with_vars):
             provider.generate_ansible([])
             playbook = provider.ansible_dir / "playbook.yml"
             assert playbook.exists()
@@ -461,6 +461,7 @@ class TestOPNsenseTemplates:
             assert "Configure OPNsense" in content
             assert "api/firewall/filter/apply" in content
             assert "api/firewall/filter/reload" in content
+
     def test_generate_outputs_tf(
         self, provider: OPNsenseProvider, firewall_rule: ResourceConfig
     ) -> None:
@@ -647,9 +648,9 @@ class TestKubernetesTemplates:
         # Add Ansible-specific functions to Jinja2 environment
         def lookup_filter(plugin: str, *args, **kwargs) -> str:
             """Lookup filter (mimics Ansible lookup)."""
-            return ''
+            return ""
 
-        provider.jinja_env.globals['lookup'] = lookup_filter
+        provider.jinja_env.globals["lookup"] = lookup_filter
 
         resources = [
             ResourceConfig(
@@ -679,14 +680,14 @@ class TestKubernetesTemplates:
 
             def render_with_mock(**kwargs):
                 """Inject mock item into template context."""
-                kwargs['item'] = mock_item
+                kwargs["item"] = mock_item
                 return original_render(**kwargs)
 
             template.render = render_with_mock
             return template
 
         with patch.object(
-            provider.jinja_env, 'get_template', side_effect=get_template_with_mock_item
+            provider.jinja_env, "get_template", side_effect=get_template_with_mock_item
         ):
             provider.generate_ansible(resources)
             playbook = provider.ansible_dir / "playbook.yml"

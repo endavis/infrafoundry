@@ -441,9 +441,7 @@ class TestStateManager:
 
         # Add dependency: vm depends on network
         state_manager.add_resource_dependency(
-            resource_id=resource2.id,
-            depends_on_id=resource1.id,
-            dependency_type="explicit"
+            resource_id=resource2.id, depends_on_id=resource1.id, dependency_type="explicit"
         )
 
         # Verify dependency was added successfully

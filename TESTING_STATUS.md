@@ -360,7 +360,7 @@ pytest --cov=src/infrafoundry \
    ```bash
    # Create test file
    touch tests/unit/test_new_feature.py
-   
+
    # Write failing tests
    pytest tests/unit/test_new_feature.py  # Should fail
    ```
@@ -474,8 +474,8 @@ For detailed contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-**Last Coverage Run:** November 8, 2025  
-**Coverage Status:** 69.89% (70% rounded) ✅  
+**Last Coverage Run:** November 8, 2025
+**Coverage Status:** 69.89% (70% rounded) ✅
 **CI Status:** All checks passing ✅
 
 ---

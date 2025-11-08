@@ -200,11 +200,7 @@ class TestConfigManager:
 
         # Create resource file with plural type key (vms instead of vm)
         resource_file = envs_dir / "vm.yaml"
-        config_data = {
-            "vms": [  # Plural form
-                {"name": "vm-01", "cores": 4, "memory": 8192}
-            ]
-        }
+        config_data = {"vms": [{"name": "vm-01", "cores": 4, "memory": 8192}]}  # Plural form
         with open(resource_file, "w") as f:
             yaml.dump(config_data, f)
 
@@ -227,9 +223,7 @@ class TestConfigManager:
 
         # Create resource file with dict instead of list
         resource_file = envs_dir / "vm.yaml"
-        config_data = {
-            "vm": {"name": "vm-01"}  # Dict instead of list
-        }
+        config_data = {"vm": {"name": "vm-01"}}  # Dict instead of list
         with open(resource_file, "w") as f:
             yaml.dump(config_data, f)
 
