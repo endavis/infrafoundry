@@ -105,27 +105,41 @@ def mock_policy_dir(temp_dir):
     policy_dir.mkdir()
 
     # Resource limits policy
-    resource_limits = {
-        "name": "resource_limits",
-        "description": "Enforce VM resource limits",
-        "level": "warning",
-        "rules": [
-            {"field": "cores", "max": 16, "message": "VM cores exceed maximum of 16"},
-            {"field": "memory", "max": 65536, "message": "VM memory exceeds maximum of 64GB"},
-        ],
+    resource_limits_file = {
+        "policies": [
+            {
+                "name": "resource_limits",
+                "type": "resource_limit",
+                "description": "Enforce VM resource limits",
+                "level": "warning",
+                "rules": {
+                    "limits": {
+                        "max_cpu": 16,
+                        "max_memory_mb": 65536,
+                    }
+                },
+            }
+        ]
     }
     with open(policy_dir / "resource_limits.yaml", "w") as f:
-        yaml.dump(resource_limits, f)
+        yaml.dump(resource_limits_file, f)
 
     # Required tags policy
-    required_tags = {
-        "name": "require_tags",
-        "description": "Require tags on all resources",
-        "level": "error",
-        "required_tags": ["environment", "owner", "project"],
+    required_tags_file = {
+        "policies": [
+            {
+                "name": "require_tags",
+                "type": "required_tags",
+                "description": "Require tags on all resources",
+                "level": "error",
+                "rules": {
+                    "tags": ["environment", "owner", "project"]
+                },
+            }
+        ]
     }
     with open(policy_dir / "require_tags.yaml", "w") as f:
-        yaml.dump(required_tags, f)
+        yaml.dump(required_tags_file, f)
 
     return policy_dir
 
