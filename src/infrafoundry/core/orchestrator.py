@@ -1,5 +1,6 @@
 """Core orchestration for infrastructure deployment."""
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -8,8 +9,10 @@ from rich.console import Console
 from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.secrets import SecretManager
+from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
 
 
 class Orchestrator:
@@ -20,6 +23,8 @@ class Orchestrator:
         config_manager: ConfigManager,
         secret_manager: SecretManager,
         output_dir: Path | None = None,
+        state_manager: StateManager | None = None,
+        event_manager: EventManager | None = None,
     ) -> None:
         """Initialize orchestrator.
 
@@ -27,6 +32,8 @@ class Orchestrator:
             config_manager: Configuration manager instance
             secret_manager: Secret manager instance
             output_dir: Directory for generated files (defaults to ./generated)
+            state_manager: State manager instance (creates default if None)
+            event_manager: Event manager instance (creates default if None)
         """
         self.config_manager = config_manager
         self.secret_manager = secret_manager
@@ -34,6 +41,13 @@ class Orchestrator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.console = Console()
         self.providers: dict[str, ProviderBase] = {}
+
+        # Initialize state and event managers
+        self.state_manager = state_manager or StateManager()
+        self.event_manager = event_manager or EventManager()
+
+        # Get current user for tracking
+        self._current_user = os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
 
     def register_provider(self, provider: ProviderBase) -> None:
         """Register a provider plugin.
@@ -86,77 +100,139 @@ class Orchestrator:
         Returns:
             Dict with plan results per provider
         """
+        # Create deployment record
+        deployment_id = self.state_manager.create_deployment(
+            environment=env_name,
+            command="plan",
+            user=self._current_user,
+            dry_run=dry_run,
+            metadata={"resource_filter": resource_filter},
+        )
+
+        # Emit before_plan event
+        self.event_manager.emit_event(
+            EventType.BEFORE_PLAN,
+            env_name,
+            {"deployment_id": deployment_id, "dry_run": dry_run},
+        )
+
         results = {}
 
-        if resource_filter:
-            self.console.print(
-                f"\n[bold cyan]Planning infrastructure for: {env_name} "
-                f"(resources: {', '.join(resource_filter)})[/bold cyan]"
-            )
-        else:
-            self.console.print(f"\n[bold cyan]Planning infrastructure for: {env_name}[/bold cyan]")
-
-        # Get all resources and discover providers dynamically
-        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
-
-        # Group resources by provider
-        resources_by_provider: dict[str, list[Any]] = {}
-        for resource in all_resources:
-            if resource.provider not in resources_by_provider:
-                resources_by_provider[resource.provider] = []
-            resources_by_provider[resource.provider].append(resource)
-
-        for provider_name, resources in resources_by_provider.items():
-            if provider_name not in self.providers:
-                self.console.print(
-                    f"[yellow]Warning: Provider '{provider_name}' not registered[/yellow]"
-                )
-                continue
-
-            provider = self.providers[provider_name]
-
-            # Validate resources before processing
-            self.validate_resources(resources)
-
-            # Filter resources if specified
+        try:
             if resource_filter:
-                original_count = len(resources)
-                resources = [r for r in resources if r.name in resource_filter]
-                if not resources:
-                    continue  # Skip provider if no matching resources
                 self.console.print(
-                    f"\n[bold]{provider_name}[/bold]: {len(resources)} of {original_count} "
-                    f"resources (filtered)"
+                    f"\n[bold cyan]Planning infrastructure for: {env_name} "
+                    f"(resources: {', '.join(resource_filter)})[/bold cyan]"
                 )
             else:
-                self.console.print(f"\n[bold]{provider_name}[/bold]: {len(resources)} resources")
+                self.console.print(
+                    f"\n[bold cyan]Planning infrastructure for: {env_name}[/bold cyan]"
+                )
 
-            if dry_run:
-                self.console.print("  [dim]Would generate Terraform and Ansible files[/dim]")
-                results[provider_name] = {"resources": len(resources), "dry_run": True}
-                continue
+            # Get all resources and discover providers dynamically
+            all_resources = self.config_manager.get_all_resources_all_providers(env_name)
 
-            # Generate Terraform and Ansible files
-            provider.ensure_directories()
-            provider.generate_terraform(resources)
-            provider.generate_ansible(resources)
+            # Group resources by provider
+            resources_by_provider: dict[str, list[Any]] = {}
+            for resource in all_resources:
+                if resource.provider not in resources_by_provider:
+                    resources_by_provider[resource.provider] = []
+                resources_by_provider[resource.provider].append(resource)
 
-            # Export secrets for this provider
-            try:
-                secrets_file = f"{provider_name}.yaml"
-                tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
-                self.secret_manager.export_for_terraform(secrets_file, tf_vars)
-            except FileNotFoundError:
-                self.console.print(f"[yellow]No secrets file for {provider_name}[/yellow]")
+            for provider_name, resources in resources_by_provider.items():
+                if provider_name not in self.providers:
+                    self.console.print(
+                        f"[yellow]Warning: Provider '{provider_name}' not registered[/yellow]"
+                    )
+                    continue
 
-            # Run terraform plan
-            self.console.print("  [dim]Running terraform plan...[/dim]")
-            tf_result = self._run_terraform(provider, "plan", auto_approve=False)
+                provider = self.providers[provider_name]
 
-            results[provider_name] = {
-                "resources": len(resources),
-                "terraform_plan": tf_result,
-            }
+                # Validate resources before processing
+                self.validate_resources(resources)
+
+                # Filter resources if specified
+                if resource_filter:
+                    original_count = len(resources)
+                    resources = [r for r in resources if r.name in resource_filter]
+                    if not resources:
+                        continue  # Skip provider if no matching resources
+                    self.console.print(
+                        f"\n[bold]{provider_name}[/bold]: {len(resources)} of "
+                        f"{original_count} resources (filtered)"
+                    )
+                else:
+                    self.console.print(
+                        f"\n[bold]{provider_name}[/bold]: {len(resources)} resources"
+                    )
+
+                # Track resources in state
+                for resource in resources:
+                    tracked_resource = self.state_manager.track_resource(
+                        deployment_id=deployment_id,
+                        environment=env_name,
+                        provider=provider_name,
+                        resource_type=resource.type,
+                        name=resource.name,
+                        state=ResourceState.PLANNED,
+                        config=resource.config,
+                    )
+                    self.event_manager.emit_event(
+                        EventType.RESOURCE_PLANNED,
+                        env_name,
+                        {
+                            "resource_id": tracked_resource.id,
+                            "provider": provider_name,
+                            "name": resource.name,
+                        },
+                    )
+
+                if dry_run:
+                    self.console.print("  [dim]Would generate Terraform and Ansible files[/dim]")
+                    results[provider_name] = {"resources": len(resources), "dry_run": True}
+                    continue
+
+                # Generate Terraform and Ansible files
+                provider.ensure_directories()
+                provider.generate_terraform(resources)
+                provider.generate_ansible(resources)
+
+                # Export secrets for this provider
+                try:
+                    secrets_file = f"{provider_name}.yaml"
+                    tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
+                    self.secret_manager.export_for_terraform(secrets_file, tf_vars)
+                except FileNotFoundError:
+                    self.console.print(f"[yellow]No secrets file for {provider_name}[/yellow]")
+
+                # Run terraform plan
+                self.console.print("  [dim]Running terraform plan...[/dim]")
+                tf_result = self._run_terraform(provider, "plan", auto_approve=False)
+
+                results[provider_name] = {
+                    "resources": len(resources),
+                    "terraform_plan": tf_result,
+                }
+
+            # Mark deployment as completed
+            self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
+
+            # Emit after_plan event
+            self.event_manager.emit_event(
+                EventType.AFTER_PLAN,
+                env_name,
+                {"deployment_id": deployment_id, "results": results},
+            )
+
+        except Exception as e:
+            # Mark deployment as failed
+            self.state_manager.update_deployment_status(
+                deployment_id, DeploymentStatus.FAILED, str(e)
+            )
+            self.event_manager.emit_event(
+                EventType.PLAN_FAILED, env_name, {"deployment_id": deployment_id, "error": str(e)}
+            )
+            raise
 
         return results
 
