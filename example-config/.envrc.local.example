@@ -1,0 +1,54 @@
+# .envrc.local - Personal settings for configuration repository (git-ignored)
+# Copy this to .envrc.local and customize with your credentials and preferences
+
+# Point to this configuration repository
+export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
+
+# Output directory for generated Terraform/Ansible files
+# Default: ./generated (creates dev/, staging/, prod/ subdirectories)
+# Each environment gets isolated directories with separate Terraform state
+export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"
+
+# SOPS age encryption key
+export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/age.key"
+
+# Personal preferences
+# export INFRAFOUNDRY_LOG_LEVEL=DEBUG
+# export TF_LOG=DEBUG
+
+# State management (deployment tracking and resource state)
+# Default: SQLite at ~/.infrafoundry/state.db
+# export INFRAFOUNDRY_STATE_BACKEND=sqlite
+# export INFRAFOUNDRY_STATE_CONNECTION=sqlite:////home/user/.infrafoundry/state.db
+
+# For team usage with PostgreSQL:
+# export INFRAFOUNDRY_STATE_BACKEND=postgresql
+# export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
+
+# Proxmox credentials
+export PROXMOX_API_URL=https://proxmox.example.com:8006/api2/json
+export PROXMOX_API_TOKEN_ID=user@pam!token
+export PROXMOX_API_TOKEN_SECRET=your-secret-here
+
+# OPNsense credentials
+export OPNSENSE_API_URL=https://opnsense.example.com
+export OPNSENSE_API_KEY=your-api-key
+export OPNSENSE_API_SECRET=your-api-secret
+
+# Kubernetes config (if not using default ~/.kube/config)
+# export KUBECONFIG="${INFRAFOUNDRY_CONFIG_REPO}/kubeconfig"
+
+# Terraform backend configuration (for remote state)
+# Local state (default): Stored in generated/{env}/terraform/{provider}/.terraform/
+# Remote state (production): Use S3, Terraform Cloud, or other backend
+# export INFRAFOUNDRY_TF_BACKEND_TYPE=s3
+# export INFRAFOUNDRY_TF_BACKEND_BUCKET=my-terraform-state
+# export INFRAFOUNDRY_TF_BACKEND_REGION=us-east-1
+# export INFRAFOUNDRY_TF_BACKEND_KEY=infrafoundry/terraform.tfstate
+
+# Ansible configuration overrides
+# export ANSIBLE_HOST_KEY_CHECKING=False
+# export ANSIBLE_STDOUT_CALLBACK=yaml
+
+# Python virtual environment (uncomment to auto-activate)
+# layout python python3.12
