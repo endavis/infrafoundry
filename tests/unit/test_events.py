@@ -124,3 +124,23 @@ class TestEventManager:
         repr_str = repr(event)
         assert "BEFORE_PLAN" in repr_str
         assert "dev" in repr_str
+
+    def test_global_handler_error_handling(self):
+        """Test that global handler errors don't stop other handlers."""
+        manager = EventManager()
+        calls = []
+
+        def failing_global_handler(event: Event):
+            raise RuntimeError("Global handler error")
+
+        def working_global_handler(event: Event):
+            calls.append("global_success")
+
+        manager.subscribe_all(failing_global_handler)
+        manager.subscribe_all(working_global_handler)
+
+        # Should not raise exception
+        manager.emit_event(EventType.BEFORE_PLAN, "dev", {})
+
+        # Working global handler should still be called
+        assert "global_success" in calls

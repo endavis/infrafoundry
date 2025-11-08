@@ -162,3 +162,27 @@ class TestConfigManager:
         resources = config.get_all_resources("dev", "nonexistent-provider")
         # Should return empty list
         assert resources == []
+
+    def test_init_with_config_repo_env(self, temp_dir, monkeypatch):
+        """Test initialization with INFRAFOUNDRY_CONFIG_REPO environment variable."""
+        config_repo = temp_dir / "config-repo"
+        config_repo.mkdir()
+        envs_dir = config_repo / "envs"
+        envs_dir.mkdir()
+
+        monkeypatch.setenv("INFRAFOUNDRY_CONFIG_REPO", str(config_repo))
+        config = ConfigManager()
+        assert config.base_dir == envs_dir
+
+    def test_init_with_config_dir_env(self, temp_dir, monkeypatch):
+        """Test initialization with INFRAFOUNDRY_CONFIG_DIR environment variable."""
+        custom_dir = temp_dir / "custom-envs"
+        custom_dir.mkdir()
+
+        monkeypatch.delenv("INFRAFOUNDRY_CONFIG_REPO", raising=False)
+        monkeypatch.setenv("INFRAFOUNDRY_CONFIG_DIR", str(custom_dir))
+        monkeypatch.chdir(temp_dir)
+
+        config = ConfigManager()
+        assert config.base_dir == custom_dir
+
