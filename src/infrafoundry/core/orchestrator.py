@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -500,6 +501,26 @@ class Orchestrator:
             # Get all resources and discover providers dynamically
             all_resources = self.config_manager.get_all_resources_all_providers(env_name)
 
+            # Capture configuration snapshot for rollback
+            rollback_snapshot = {
+                "environment": env_name,
+                "timestamp": datetime.utcnow().isoformat(),
+                "resources": [
+                    {
+                        "provider": r.provider,
+                        "type": r.type,
+                        "name": r.name,
+                        "config": r.config,
+                    }
+                    for r in all_resources
+                ],
+            }
+
+            # Store rollback data in deployment
+            self.state_manager.update_deployment_rollback_data(
+                deployment_id=deployment_id, rollback_data=rollback_snapshot
+            )
+
             # Group resources by provider
             resources_by_provider: dict[str, list[Any]] = {}
             for resource in all_resources:
@@ -747,6 +768,88 @@ class Orchestrator:
             raise
 
         return results
+
+    def rollback(self, deployment_id: int, auto_approve: bool = False) -> dict[str, Any]:
+        """Rollback infrastructure to a previous deployment state.
+
+        Args:
+            deployment_id: ID of deployment to rollback to
+            auto_approve: If True, skip confirmation prompts
+
+        Returns:
+            Dict with rollback results
+
+        Raises:
+            ValueError: If deployment not found or has no rollback data
+        """
+        # Get deployment with rollback data
+        deployment = self.state_manager.get_deployment_by_id(deployment_id)
+        if not deployment:
+            raise ValueError(f"Deployment {deployment_id} not found")
+
+        if not deployment.rollback_data:
+            raise ValueError(f"Deployment {deployment_id} has no rollback data")
+
+        rollback_data = deployment.rollback_data
+        env_name = rollback_data["environment"]
+
+        self.console.print(
+            f"\n[bold yellow]Rolling back {env_name} to deployment {deployment_id}[/bold yellow]"
+        )
+        self.console.print(
+            f"[dim]Deployment from: {deployment.started_at.strftime('%Y-%m-%d %H:%M:%S')}[/dim]"
+        )
+        self.console.print(f"[dim]Resources: {len(rollback_data.get('resources', []))}[/dim]\n")
+
+        if not auto_approve:
+            confirm = input("Are you sure you want to rollback? (yes/no): ")
+            if confirm.lower() != "yes":
+                self.console.print("[yellow]Rollback cancelled.[/yellow]")
+                return {}
+
+        # Create deployment record for rollback
+        rollback_deployment_id = self.state_manager.create_deployment(
+            environment=env_name,
+            command="apply",
+            user=self._current_user,
+            dry_run=False,
+            metadata={"rollback_from": deployment_id, "rollback": True},
+        )
+
+        try:
+            # Write rollback configurations to temporary files
+            # For now, we'll use the current config structure and rely on users
+            # having the correct configuration in their repo
+            # In a production system, you'd want to write the configs to temp files
+
+            self.console.print(
+                f"\n[bold yellow]⚠ Note: Rollback requires the configuration "
+                f"repository to be at the state from deployment {deployment_id}[/bold yellow]"
+            )
+            self.console.print(
+                "[dim]Consider using git to checkout the appropriate commit if needed.[/dim]\n"
+            )
+
+            # Apply the infrastructure using current configuration
+            # This assumes the user has set their config repo to the correct state
+            results = self.apply(env_name, auto_approve=True, resource_filter=None)
+
+            self.state_manager.update_deployment_status(
+                rollback_deployment_id, DeploymentStatus.COMPLETED
+            )
+
+            self.console.print(
+                f"\n[bold green]✓ Rollback to deployment {deployment_id} completed![/bold green]"
+            )
+
+            return results
+
+        except Exception as e:
+            self.state_manager.update_deployment_status(
+                rollback_deployment_id, DeploymentStatus.FAILED, str(e)
+            )
+            self.console.print(f"\n[bold red]✗ Rollback failed: {e}[/bold red]")
+            raise
 
     def _get_terraform_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
         """Extract Terraform resource IDs from state.

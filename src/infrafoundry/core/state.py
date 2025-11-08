@@ -67,6 +67,7 @@ class Deployment(Base):
     dry_run = Column(Boolean, default=False, nullable=False)  # Whether this was a dry run
     error_message = Column(Text)
     extra_data = Column(JSON)  # Renamed from metadata to avoid SQLAlchemy reserved word
+    rollback_data = Column(JSON)  # Configuration snapshot for rollback
 
     # Relationships
     resources = relationship("Resource", back_populates="deployment")
@@ -216,6 +217,21 @@ class StateManager:
                 deployment.completed_at = datetime.utcnow()
                 if error_message:
                     deployment.error_message = error_message
+                session.commit()
+
+    def update_deployment_rollback_data(
+        self, deployment_id: int, rollback_data: dict[str, Any]
+    ) -> None:
+        """Update deployment with rollback data.
+
+        Args:
+            deployment_id: Deployment ID
+            rollback_data: Configuration snapshot for rollback
+        """
+        with self.SessionLocal() as session:
+            deployment = session.query(Deployment).filter_by(id=deployment_id).first()
+            if deployment:
+                deployment.rollback_data = rollback_data
                 session.commit()
 
     def track_resource(
@@ -375,6 +391,48 @@ class StateManager:
             # Detach from session
             session.expunge_all()
             return deployments
+
+    def get_rollback_points(self, environment: str, limit: int = 10) -> list[Deployment]:
+        """Get available rollback points for an environment.
+
+        Args:
+            environment: Environment name
+            limit: Maximum number of rollback points
+
+        Returns:
+            List of successful apply deployments with rollback data
+        """
+        with self.SessionLocal() as session:
+            query = (
+                session.query(Deployment)
+                .filter_by(
+                    environment=environment,
+                    command="apply",
+                    status=DeploymentStatus.COMPLETED,
+                    dry_run=False,
+                )
+                .filter(Deployment.rollback_data.isnot(None))
+                .order_by(Deployment.completed_at.desc())
+                .limit(limit)
+            )
+            deployments = query.all()
+            session.expunge_all()
+            return deployments
+
+    def get_deployment_by_id(self, deployment_id: int) -> Deployment | None:
+        """Get deployment by ID.
+
+        Args:
+            deployment_id: Deployment ID
+
+        Returns:
+            Deployment object or None
+        """
+        with self.SessionLocal() as session:
+            deployment = session.query(Deployment).filter_by(id=deployment_id).first()
+            if deployment:
+                session.expunge(deployment)
+            return deployment
 
     def get_resources(
         self,
