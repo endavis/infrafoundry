@@ -2,8 +2,8 @@
 
 ## Test Suite Summary
 
-**Total Unit Tests:** 77 passing ✅  
-**Overall Project Coverage:** 34%  
+**Total Tests:** 103 passing ✅ (77 unit + 26 integration)  
+**Overall Project Coverage:** 43%  
 **Core Modules Coverage:** 51%  
 
 **Status:** All critical core components have excellent test coverage (70%+)
@@ -189,3 +189,86 @@ Would require either:
 ✅ **Test suite is maintainable and well-structured**  
 
 The project has a **solid foundation** for continued development. Core business logic is thoroughly tested. Integration testing is the natural next phase.
+
+---
+
+## Integration Tests Added (Nov 8, 2025)
+
+### Summary
+**+26 integration tests** added across Orchestrator and CLI
+
+| Test Suite | Tests | Coverage Impact |
+|------------|-------|-----------------|
+| **Orchestrator Workflows** | 11 | orchestrator.py: 8% → 12% |
+| **CLI Commands** | 15 | cli.py: 0% → 24% |
+
+**Overall Impact:** 37% → 43% coverage (+6%)
+
+### Orchestrator Integration Tests (11 tests)
+- ✅ Component initialization with all managers
+- ✅ Environment configuration loading  
+- ✅ Resource retrieval from configs
+- ✅ Event system integration
+- ✅ Policy engine loading
+- ✅ State tracking functionality
+- ✅ Output directory creation
+- ✅ Notification manager integration
+- ✅ Default manager creation (state, event)
+- ✅ Provider registry initialization
+
+### CLI Integration Tests (15 tests)
+- ✅ Help and version commands
+- ✅ Environment listing (envs)
+- ✅ Required flags validation for commands:
+  - list, plan, apply, destroy, status, validate, rollback
+- ✅ Secrets subcommands (init, encrypt, decrypt)
+- ✅ CLI flags (--config-dir, --debug)
+
+### Current Test Status
+
+**Total Tests:** 103 passing  
+- Unit tests: 77
+- Integration tests: 26
+
+**Coverage by Module:**
+- secrets.py: **100%** ✅
+- events.py: **94%** ✅
+- state.py: **87%** ✅
+- provider.py: **79%** ✅
+- config.py: **78%** ✅
+- notifications.py: **77%** ✅
+- policy.py: **72%** ✅
+- **cli.py: 24%** (was 0%)
+- **orchestrator.py: 12%** (was 8%)
+
+**Overall: 43%** coverage
+
+---
+
+## Next Steps for Testing
+
+To reach 70%+ overall coverage:
+
+1. **More Orchestrator Tests** (currently 12%)
+   - Plan workflow with actual Terraform generation
+   - Apply workflow with mocked Terraform execution
+   - Dependency resolution and ordering
+   - Multi-provider orchestration
+   - Rollback functionality
+
+2. **Dependency Resolver Tests** (currently 0%)
+   - Topological sorting
+   - Cycle detection
+   - Dependency graph building
+
+3. **More CLI Tests** (currently 24%)
+   - Full command execution with mocked orchestrator
+   - Error handling scenarios
+   - Interactive prompts testing
+
+4. **Provider Tests** (currently 29-34%)
+   - Terraform template generation
+   - Ansible playbook generation
+   - Provider-specific resource handling
+
+Integration tests require more complex setup but provide the highest value for testing complete workflows.
