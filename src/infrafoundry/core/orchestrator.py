@@ -14,6 +14,7 @@ from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.policy import PolicyEngine, PolicyLevel
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
@@ -29,6 +30,7 @@ class Orchestrator:
         output_dir: Path | None = None,
         state_manager: StateManager | None = None,
         event_manager: EventManager | None = None,
+        policy_dir: Path | None = None,
     ) -> None:
         """Initialize orchestrator.
 
@@ -38,6 +40,7 @@ class Orchestrator:
             output_dir: Directory for generated files (defaults to ./generated)
             state_manager: State manager instance (creates default if None)
             event_manager: Event manager instance (creates default if None)
+            policy_dir: Directory containing policy files (defaults to ./policies)
         """
         self.config_manager = config_manager
         self.secret_manager = secret_manager
@@ -46,9 +49,10 @@ class Orchestrator:
         self.console = Console()
         self.providers: dict[str, ProviderBase] = {}
 
-        # Initialize state and event managers
+        # Initialize state, event, and policy managers
         self.state_manager = state_manager or StateManager()
         self.event_manager = event_manager or EventManager()
+        self.policy_engine = PolicyEngine(policy_dir)
 
         # Get current user for tracking
         self._current_user = os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
@@ -144,6 +148,106 @@ class Orchestrator:
             )
 
         return graph
+
+    def check_policies(
+        self, env_name: str, resources: list[Any], enforce: bool = False
+    ) -> tuple[bool, list]:
+        """Check resources against policies.
+
+        Args:
+            env_name: Environment name
+            resources: List of resources to check
+            enforce: If True, raise exception on ERROR-level violations
+
+        Returns:
+            Tuple of (passed, violations)
+
+        Raises:
+            Exception: If enforce=True and ERROR-level violations exist
+        """
+        self.event_manager.emit_event(
+            EventType.POLICY_CHECK_STARTED,
+            env_name,
+            {"resource_count": len(resources)},
+        )
+
+        violations = self.policy_engine.evaluate_resources(resources, env_name)
+
+        # Group violations by level
+        errors = [v for v in violations if v.level == PolicyLevel.ERROR]
+        warnings = [v for v in violations if v.level == PolicyLevel.WARNING]
+        infos = [v for v in violations if v.level == PolicyLevel.INFO]
+
+        # Display violations
+        if violations:
+            self.console.print("\n[bold yellow]Policy Violations:[/bold yellow]")
+
+            if errors:
+                self.console.print(f"\n[bold red]Errors ({len(errors)}):[/bold red]")
+                for v in errors:
+                    self.console.print(
+                        f"  [red]✗[/red] {v.resource_name} ({v.provider}): {v.message}"
+                    )
+                    self.event_manager.emit_event(
+                        EventType.POLICY_VIOLATION,
+                        env_name,
+                        {
+                            "policy": v.policy_name,
+                            "resource": v.resource_name,
+                            "level": "error",
+                            "message": v.message,
+                        },
+                    )
+
+            if warnings:
+                self.console.print(f"\n[bold yellow]Warnings ({len(warnings)}):[/bold yellow]")
+                for v in warnings:
+                    self.console.print(
+                        f"  [yellow]⚠[/yellow] {v.resource_name} ({v.provider}): {v.message}"
+                    )
+                    self.event_manager.emit_event(
+                        EventType.POLICY_VIOLATION,
+                        env_name,
+                        {
+                            "policy": v.policy_name,
+                            "resource": v.resource_name,
+                            "level": "warning",
+                            "message": v.message,
+                        },
+                    )
+
+            if infos:
+                self.console.print(f"\n[dim]Info ({len(infos)}):[/dim]")
+                for v in infos:
+                    self.console.print(
+                        f"  [dim]ℹ[/dim] {v.resource_name} ({v.provider}): {v.message}"
+                    )
+
+        # Check if policies passed
+        passed = len(errors) == 0
+
+        if passed:
+            self.event_manager.emit_event(
+                EventType.POLICY_CHECK_PASSED,
+                env_name,
+                {"violations": len(violations)},
+            )
+            if not violations:
+                self.console.print("\n[green]✓ All policies passed[/green]")
+        else:
+            self.event_manager.emit_event(
+                EventType.POLICY_CHECK_FAILED,
+                env_name,
+                {"errors": len(errors), "warnings": len(warnings)},
+            )
+
+            if enforce:
+                raise Exception(
+                    f"Policy check failed with {len(errors)} error(s). "
+                    "Fix violations or use --skip-policies to bypass."
+                )
+
+        return passed, violations
 
     def detect_drift(self, env_name: str) -> dict[str, Any]:
         """Detect infrastructure drift from declared configuration.
@@ -304,7 +408,11 @@ class Orchestrator:
         }
 
     def plan(
-        self, env_name: str, dry_run: bool = False, resource_filter: list[str] | None = None
+        self,
+        env_name: str,
+        dry_run: bool = False,
+        resource_filter: list[str] | None = None,
+        enforce_policies: bool = False,
     ) -> dict[str, Any]:
         """Plan infrastructure changes.
 
@@ -312,6 +420,7 @@ class Orchestrator:
             env_name: Environment name
             dry_run: If True, only show what would be done
             resource_filter: Optional list of resource names to target
+            enforce_policies: If True, block on policy violations
 
         Returns:
             Dict with plan results per provider
@@ -347,6 +456,10 @@ class Orchestrator:
 
             # Get all resources and discover providers dynamically
             all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+            # Check policies if there are any defined
+            if self.policy_engine.policies:
+                self.check_policies(env_name, all_resources, enforce=enforce_policies)
 
             # Group resources by provider
             resources_by_provider: dict[str, list[Any]] = {}

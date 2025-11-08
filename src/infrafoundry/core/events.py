@@ -47,6 +47,11 @@ class EventType(str, Enum):
     DRIFT_CHECK_STARTED = "drift_check_started"
     DRIFT_CHECK_COMPLETED = "drift_check_completed"
 
+    # Policy enforcement
+    POLICY_CHECK_STARTED = "policy_check_started"
+    POLICY_VIOLATION = "policy_violation"
+    POLICY_CHECK_PASSED = "policy_check_passed"
+    POLICY_CHECK_FAILED = "policy_check_failed"
 
 class Event:
     """Event object passed to handlers."""
