@@ -217,8 +217,13 @@ my-config-repo/
 │   ├── opnsense.yaml              # Encrypted
 │   └── kubernetes.yaml            # Encrypted
 ├── generated/                     # Git-ignored
-│   ├── terraform/
-│   └── ansible/
+│   ├── dev/
+│   │   ├── terraform/
+│   │   └── ansible/
+│   ├── staging/
+│   └── prod/
+│       ├── terraform/
+│       └── ansible/
 ├── docs/
 │   ├── architecture.md
 │   ├── runbooks/
@@ -665,17 +670,29 @@ sops -d secrets/proxmox.yaml
 
 ### Generated files location
 
-By default, generated files go to `./generated/`:
+By default, generated files go to `./generated/` with environment-based subdirectories:
 
 ```bash
+# Default structure (when running from config repo)
+config-repo/
+└── generated/
+    ├── dev/
+    │   ├── terraform/
+    │   └── ansible/
+    ├── staging/
+    └── prod/
+
 # Override output directory
 export INFRAFOUNDRY_OUTPUT_DIR="/path/to/output"
 
-# Or run from config repo root
+# Run from config repo root
 cd /path/to/config-repo
 infra plan --env dev
-ls generated/
+ls generated/dev/terraform/
 ```
+
+**Important:** Each environment gets its own subdirectory, preventing file collisions when working with multiple environments.
+
 
 ## Examples
 
