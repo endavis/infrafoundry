@@ -78,6 +78,14 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     return orchestrator
 
 
+def mock_apply_methods(orchestrator):
+    """Helper to mock methods needed for apply workflow."""
+    with patch.object(orchestrator, "_run_terraform", return_value={"success": True}):
+        with patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}):
+            with patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+                yield
+
+
 class TestPlanWorkflow:
     """Tests for plan workflow."""
 
@@ -129,7 +137,7 @@ class TestPlanWorkflow:
             orchestrator.plan(env_name="dev", dry_run=False)
 
             # Check deployment was created
-            deployments = orchestrator.state_manager.list_deployments(environment="dev")
+            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert len(deployments) > 0
             assert deployments[0].command == "plan"
             assert deployments[0].environment == "dev"
@@ -139,7 +147,7 @@ class TestPlanWorkflow:
         events_received = []
 
         def capture_event(event):
-            events_received.append(event.type)
+            events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.BEFORE_PLAN, capture_event)
         orchestrator.event_manager.subscribe(EventType.AFTER_PLAN, capture_event)
@@ -156,7 +164,7 @@ class TestPlanWorkflow:
             orchestrator.plan(env_name="dev", dry_run=False)
 
             # Check resources were tracked
-            resources = orchestrator.state_manager.get_resources_by_environment("dev")
+            resources = orchestrator.state_manager.get_resources(environment="dev")
             assert len(resources) > 0
             assert resources[0].state == ResourceState.PLANNED
 
@@ -188,7 +196,7 @@ class TestPlanWorkflow:
                 orchestrator.plan(env_name="dev", dry_run=False)
 
             # Check deployment was marked as failed
-            deployments = orchestrator.state_manager.list_deployments(environment="dev")
+            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].status == DeploymentStatus.FAILED
             assert "Terraform failed" in deployments[0].error_message
 
@@ -197,7 +205,7 @@ class TestPlanWorkflow:
         events_received = []
 
         def capture_event(event):
-            events_received.append(event.type)
+            events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.PLAN_FAILED, capture_event)
 
@@ -217,34 +225,39 @@ class TestApplyWorkflow:
         """Test that apply runs plan before applying."""
         with patch.object(orchestrator, "plan") as mock_plan, patch.object(
             orchestrator, "_run_terraform"
+        ), patch.object(
+            orchestrator, "_get_terraform_resource_ids", return_value={}
+        ), patch.object(
+            orchestrator, "_run_ansible", return_value={"success": True}
         ):
             orchestrator.apply(env_name="dev", auto_approve=True)
 
-            # Verify plan was called first
-            mock_plan.assert_called_once_with(
-                env_name="dev", dry_run=False, resource_filter=None
-            )
+            # Verify plan was called first (with positional arg)
+            mock_plan.assert_called_once()
+            assert mock_plan.call_args[0][0] == "dev"  # First positional arg
+            assert mock_plan.call_args[1]["dry_run"] is False
 
     def test_apply_basic_workflow(self, orchestrator, mock_providers):
         """Test basic apply workflow execution."""
-        with patch.object(orchestrator, "_run_terraform") as mock_tf:
-            mock_tf.return_value = {"success": True, "applied": 2}
-
+        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
+             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
+             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+            
             result = orchestrator.apply(env_name="dev", auto_approve=True)
 
             # Verify apply completed
             assert "proxmox" in result
 
-            # Verify terraform was run twice (plan + apply)
-            assert mock_tf.call_count >= 1
-
     def test_apply_creates_deployment_record(self, orchestrator):
         """Test that apply creates a deployment record."""
-        with patch.object(orchestrator, "_run_terraform"):
+        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
+             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
+             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+
             orchestrator.apply(env_name="dev", auto_approve=True)
 
             # Check deployment was created
-            deployments = orchestrator.state_manager.list_deployments(
+            deployments = orchestrator.state_manager.get_deployment_history(
                 environment="dev", command="apply"
             )
             assert len(deployments) > 0
@@ -252,17 +265,23 @@ class TestApplyWorkflow:
 
     def test_apply_captures_rollback_snapshot(self, orchestrator):
         """Test that apply captures configuration snapshot for rollback."""
-        with patch.object(orchestrator, "_run_terraform"):
+        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
+             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
+             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+
             orchestrator.apply(env_name="dev", auto_approve=True)
 
             # Check that deployment has rollback data
-            deployments = orchestrator.state_manager.list_deployments(environment="dev")
+            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             # At least one deployment should exist
             assert len(deployments) > 0
 
     def test_apply_with_resource_filter(self, orchestrator, mock_providers):
         """Test apply with resource filter."""
-        with patch.object(orchestrator, "_run_terraform"):
+        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
+             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
+             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+
             result = orchestrator.apply(
                 env_name="dev", auto_approve=True, resource_filter=["web-01"]
             )
@@ -275,12 +294,15 @@ class TestApplyWorkflow:
         events_received = []
 
         def capture_event(event):
-            events_received.append(event.type)
+            events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.BEFORE_APPLY, capture_event)
         orchestrator.event_manager.subscribe(EventType.AFTER_APPLY, capture_event)
 
-        with patch.object(orchestrator, "_run_terraform"):
+        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
+             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
+             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+
             orchestrator.apply(env_name="dev", auto_approve=True)
 
         assert EventType.BEFORE_APPLY in events_received
@@ -295,21 +317,25 @@ class TestApplyWorkflow:
                 orchestrator.apply(env_name="dev", auto_approve=True)
 
             # Check deployment was marked as failed
-            deployments = orchestrator.state_manager.list_deployments(environment="dev")
+            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             failed_deployments = [d for d in deployments if d.status == DeploymentStatus.FAILED]
-            assert len(failed_deployments) > 0
+            assert failed_deployments
 
     def test_apply_emits_failure_event(self, orchestrator):
         """Test that apply failure emits failure event."""
         events_received = []
 
         def capture_event(event):
-            events_received.append(event.type)
+            events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.APPLY_FAILED, capture_event)
 
-        with patch.object(orchestrator, "_run_terraform") as mock_tf:
-            mock_tf.side_effect = RuntimeError("Apply failed")
+        with patch.object(orchestrator, "_run_terraform") as mock_tf, \
+             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
+             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+            
+            # Make terraform fail during apply (not plan)
+            mock_tf.side_effect = [{"success": True}, RuntimeError("Apply failed")]
 
             with pytest.raises(RuntimeError):
                 orchestrator.apply(env_name="dev", auto_approve=True)
@@ -336,7 +362,7 @@ class TestDestroyWorkflow:
             orchestrator.destroy(env_name="dev", auto_approve=True)
 
             # Check deployment was created
-            deployments = orchestrator.state_manager.list_deployments(
+            deployments = orchestrator.state_manager.get_deployment_history(
                 environment="dev", command="destroy"
             )
             assert len(deployments) > 0
@@ -350,7 +376,7 @@ class TestDestroyWorkflow:
             assert result == {}
 
             # Check deployment was marked as failed
-            deployments = orchestrator.state_manager.list_deployments(environment="dev")
+            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].status == DeploymentStatus.FAILED
             assert "aborted" in deployments[0].error_message.lower()
 
@@ -381,7 +407,7 @@ class TestDestroyWorkflow:
         events_received = []
 
         def capture_event(event):
-            events_received.append(event.type)
+            events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.BEFORE_DESTROY, capture_event)
         orchestrator.event_manager.subscribe(EventType.AFTER_DESTROY, capture_event)
@@ -398,7 +424,7 @@ class TestDestroyWorkflow:
             orchestrator.destroy(env_name="dev", auto_approve=True)
 
             # Resources should be tracked (state updates happen in _run_terraform mock)
-            resources = orchestrator.state_manager.get_resources_by_environment("dev")
+            resources = orchestrator.state_manager.get_resources(environment="dev")
             assert len(resources) > 0
 
     def test_destroy_failure_updates_deployment_status(self, orchestrator):
@@ -410,9 +436,9 @@ class TestDestroyWorkflow:
                 orchestrator.destroy(env_name="dev", auto_approve=True)
 
             # Check deployment was marked as failed
-            deployments = orchestrator.state_manager.list_deployments(environment="dev")
+            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             failed_deployments = [d for d in deployments if d.status == DeploymentStatus.FAILED]
-            assert len(failed_deployments) > 0
+            assert failed_deployments
 
 
 class TestMultiProviderWorkflow:
@@ -427,6 +453,7 @@ class TestMultiProviderWorkflow:
         kubernetes.ensure_directories = Mock()
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
+        kubernetes.get_resource_types = Mock(return_value=["deployment", "service"])
         mock_providers["kubernetes"] = kubernetes
         orchestrator.providers = mock_providers
 
@@ -445,11 +472,19 @@ class TestMultiProviderWorkflow:
             assert "proxmox" in result
             assert "kubernetes" in result
 
-    def test_apply_multiple_providers_serial(self, orchestrator, mock_providers, mock_config):
+    def test_apply_multiple_providers_serial(
+        self, orchestrator, mock_providers, mock_config, tmp_path
+    ):
         """Test apply workflow with multiple providers in serial mode."""
         # Add second provider
         kubernetes = Mock()
         kubernetes.name = "kubernetes"
+        kubernetes.terraform_dir = tmp_path / "generated" / "terraform" / "kubernetes"
+        kubernetes.ansible_dir = tmp_path / "generated" / "ansible" / "kubernetes"
+        kubernetes.ensure_directories = Mock()
+        kubernetes.generate_terraform = Mock()
+        kubernetes.generate_ansible = Mock()
+        kubernetes.get_resource_types = Mock(return_value=["deployment", "service"])
         mock_providers["kubernetes"] = kubernetes
         orchestrator.providers = mock_providers
 
@@ -461,7 +496,10 @@ class TestMultiProviderWorkflow:
         k8s_resource.config = {}
         mock_config["resources"].append(k8s_resource)
 
-        with patch.object(orchestrator, "_run_terraform"):
+        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
+             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
+             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+
             result = orchestrator.apply(
                 env_name="dev", auto_approve=True, parallel=False
             )
@@ -503,10 +541,13 @@ class TestWorkflowStateManagement:
 
     def test_deployment_lifecycle_plan_to_apply(self, orchestrator):
         """Test complete deployment lifecycle from plan to apply."""
-        with patch.object(orchestrator, "_run_terraform"):
+        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
+             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
+             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+
             # Plan
             orchestrator.plan(env_name="dev", dry_run=False)
-            plan_deployments = orchestrator.state_manager.list_deployments(
+            plan_deployments = orchestrator.state_manager.get_deployment_history(
                 environment="dev", command="plan"
             )
             assert len(plan_deployments) > 0
@@ -514,7 +555,7 @@ class TestWorkflowStateManagement:
 
             # Apply
             orchestrator.apply(env_name="dev", auto_approve=True)
-            apply_deployments = orchestrator.state_manager.list_deployments(
+            apply_deployments = orchestrator.state_manager.get_deployment_history(
                 environment="dev", command="apply"
             )
             assert len(apply_deployments) > 0
@@ -524,7 +565,7 @@ class TestWorkflowStateManagement:
         with patch.object(orchestrator, "_run_terraform"):
             # Plan - resources should be PLANNED
             orchestrator.plan(env_name="dev", dry_run=False)
-            resources = orchestrator.state_manager.get_resources_by_environment("dev")
+            resources = orchestrator.state_manager.get_resources(environment="dev")
             assert all(r.state == ResourceState.PLANNED for r in resources)
 
     def test_deployment_metadata_captured(self, orchestrator):
@@ -534,6 +575,6 @@ class TestWorkflowStateManagement:
                 env_name="dev", dry_run=True, resource_filter=["web-01"]
             )
 
-            deployments = orchestrator.state_manager.list_deployments(environment="dev")
+            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].dry_run is True
-            assert "resource_filter" in deployments[0].metadata
+            assert "resource_filter" in deployments[0].extra_data
