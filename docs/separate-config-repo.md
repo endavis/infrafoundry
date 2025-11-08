@@ -303,8 +303,8 @@ jobs:
             sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo apt update && sudo apt install terraform
 
-          # Ansible
-          pip install ansible
+          # Ansible (use uv)
+          uv pip install ansible
 
           # SOPS
           wget https://github.com/getsops/sops/releases/latest/download/sops-latest.linux.amd64
@@ -387,8 +387,8 @@ variables:
         tee /etc/apt/sources.list.d/hashicorp.list
       apt update && apt install -y terraform
 
-      # Ansible
-      pip install ansible
+      # Ansible (use uv)
+      uv pip install ansible
 
       # SOPS
       wget https://github.com/getsops/sops/releases/latest/download/sops-latest.linux.amd64
