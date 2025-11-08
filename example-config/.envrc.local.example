@@ -12,6 +12,10 @@ export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"
 # SOPS age encryption key
 export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/age.key"
 
+# Environment selection (dev, staging, prod)
+# Default to dev if not specified
+export INFRA_ENV="${INFRA_ENV:-dev}"
+
 # Personal preferences
 # export INFRAFOUNDRY_LOG_LEVEL=DEBUG
 # export TF_LOG=DEBUG
@@ -25,15 +29,31 @@ export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/age.key"
 # export INFRAFOUNDRY_STATE_BACKEND=postgresql
 # export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
 
+# ============================================================================
+# CREDENTIALS - Per-Environment
+# ============================================================================
+# Recommended: Store credentials in secrets/{env}/ directories
+# See: docs/per-environment-credentials.md for detailed setup options
+#
+# Option 1: Environment-specific encrypted files (recommended for teams)
+#   secrets/dev/proxmox.yaml, secrets/staging/proxmox.yaml, secrets/prod/proxmox.yaml
+#   Switch environments: export INFRA_ENV=prod && direnv reload
+#
+# Option 2: Direct environment variables (simple for solo developers)
+#   Uncomment and set credentials below
+# ============================================================================
+
 # Proxmox credentials
-export PROXMOX_API_URL=https://proxmox.example.com:8006/api2/json
-export PROXMOX_API_TOKEN_ID=user@pam!token
-export PROXMOX_API_TOKEN_SECRET=your-secret-here
+# NOTE: For per-environment credentials, use secrets/{env}/proxmox.yaml instead
+# export PROXMOX_API_URL=https://proxmox.example.com:8006/api2/json
+# export PROXMOX_API_TOKEN_ID=user@pam!token
+# export PROXMOX_API_TOKEN_SECRET=your-secret-here
 
 # OPNsense credentials
-export OPNSENSE_API_URL=https://opnsense.example.com
-export OPNSENSE_API_KEY=your-api-key
-export OPNSENSE_API_SECRET=your-api-secret
+# NOTE: For per-environment credentials, use secrets/{env}/opnsense.yaml instead
+# export OPNSENSE_API_URL=https://opnsense.example.com
+# export OPNSENSE_API_KEY=your-api-key
+# export OPNSENSE_API_SECRET=your-api-secret
 
 # Kubernetes config (if not using default ~/.kube/config)
 # export KUBECONFIG="${INFRAFOUNDRY_CONFIG_REPO}/kubeconfig"
