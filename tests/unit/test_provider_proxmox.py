@@ -14,7 +14,7 @@ class TestProxmoxProvider:
         config_dir = temp_dir / "config"
         config_dir.mkdir()
         output_dir = temp_dir / "output"
-        
+
         provider = ProxmoxProvider(
             config_dir=config_dir,
             output_dir=output_dir,
@@ -25,7 +25,7 @@ class TestProxmoxProvider:
         """Test getting supported resource types."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
-        
+
         provider = ProxmoxProvider(
             config_dir=config_dir,
             output_dir=temp_dir / "output",
@@ -38,7 +38,7 @@ class TestProxmoxProvider:
         """Test dependency resolution."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
-        
+
         provider = ProxmoxProvider(
             config_dir=config_dir,
             output_dir=temp_dir / "output",

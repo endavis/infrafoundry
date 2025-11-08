@@ -63,20 +63,21 @@ class TestConfigManager:
         broken_env.mkdir()
 
         config = ConfigManager(envs_dir)
-        
+
         # List will include broken, but validate will fail
         envs = config.list_environments()
         assert "broken" in envs
-        
+
         # Validate should return False for incomplete environment
         assert not config.validate_environment("broken")
-        
+
         # Create complete environment
         good_env = envs_dir / "good"
         good_env.mkdir()
         import yaml
+
         with open(good_env / "environment.yaml", "w") as f:
             yaml.dump({"name": "good", "description": "Good env"}, f)
-        
+
         # Now validate should pass
         assert config.validate_environment("good")

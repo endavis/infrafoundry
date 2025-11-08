@@ -3,7 +3,7 @@
 import pytest
 import yaml
 
-from infrafoundry.core.policy import PolicyEngine, PolicyLevel, PolicyViolation, PolicyType
+from infrafoundry.core.policy import PolicyEngine, PolicyLevel, PolicyType, PolicyViolation
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -29,10 +29,7 @@ class TestPolicyEngine:
 
         # Create ResourceConfig objects (within limits)
         resource = ResourceConfig(
-            provider="proxmox",
-            type="vm",
-            name="vm-01",
-            config={"cores": 8, "memory": 16384}
+            provider="proxmox", type="vm", name="vm-01", config={"cores": 8, "memory": 16384}
         )
         violations = engine.evaluate_resources([resource], "dev")
         # No violations
@@ -41,10 +38,7 @@ class TestPolicyEngine:
 
         # Resource exceeding limits
         resource2 = ResourceConfig(
-            provider="proxmox",
-            type="vm",
-            name="vm-02",
-            config={"cores": 32, "memory": 131072}
+            provider="proxmox", type="vm", name="vm-02", config={"cores": 32, "memory": 131072}
         )
         violations = engine.evaluate_resources([resource2], "dev")
         assert len(violations) > 0
@@ -58,10 +52,7 @@ class TestPolicyEngine:
             provider="proxmox",
             type="vm",
             name="vm-01",
-            config={
-                "cores": 4,
-                "tags": "environment, owner, project"  # String format
-            }
+            config={"cores": 4, "tags": "environment, owner, project"},  # String format
         )
         violations = engine.evaluate_resources([resource], "dev")
         tag_violations = [v for v in violations if "tag" in v.message.lower()]
@@ -72,7 +63,7 @@ class TestPolicyEngine:
             provider="proxmox",
             type="vm",
             name="vm-02",
-            config={"cores": 4, "tags": "environment"}  # Missing owner and project
+            config={"cores": 4, "tags": "environment"},  # Missing owner and project
         )
         violations = engine.evaluate_resources([resource2], "dev")
         tag_violations = [v for v in violations if "tag" in v.message.lower()]
@@ -95,12 +86,7 @@ class TestPolicyEngine:
             yaml.dump(warning_policy, f)
 
         engine = PolicyEngine(policy_dir)
-        resource = ResourceConfig(
-            provider="test",
-            type="vm",
-            name="vm-01",
-            config={"cores": 8}
-        )
+        resource = ResourceConfig(provider="test", type="vm", name="vm-01", config={"cores": 8})
         violations = engine.evaluate_resources([resource], "dev")
 
         if violations:
@@ -115,12 +101,7 @@ class TestPolicyEngine:
         assert len(engine.policies) == 0
 
         # No policies = no violations
-        resource = ResourceConfig(
-            provider="test",
-            type="vm",
-            name="anything",
-            config={}
-        )
+        resource = ResourceConfig(provider="test", type="vm", name="anything", config={})
         violations = engine.evaluate_resources([resource], "dev")
         assert len(violations) == 0
 
@@ -130,16 +111,13 @@ class TestPolicyEngine:
 
         resources = [
             ResourceConfig(
-                provider="proxmox",
-                type="vm",
-                name="vm-01",
-                config={"cores": 2, "memory": 4096}
+                provider="proxmox", type="vm", name="vm-01", config={"cores": 2, "memory": 4096}
             ),
             ResourceConfig(
                 provider="proxmox",
                 type="vm",
                 name="vm-02",
-                config={"cores": 32, "memory": 8192}  # Violates cores limit
+                config={"cores": 32, "memory": 8192},  # Violates cores limit
             ),
         ]
 

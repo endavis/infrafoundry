@@ -1,12 +1,10 @@
 """Unit tests for NotificationManager."""
 
-import json
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 from infrafoundry.core.notifications import (
-    NotificationChannel,
     NotificationManager,
     SlackNotifier,
     WebhookNotifier,
