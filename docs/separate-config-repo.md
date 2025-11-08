@@ -746,6 +746,7 @@ Each client config has their own:
 
 - [InfraFoundry Documentation](../README.md)
 - [State Management Strategies](state-management.md) - Understanding Terraform state, InfraFoundry state, and generated files
+- [Per-Environment Credentials](per-environment-credentials.md) - Managing different credentials for dev, staging, and production
 - [Plugin Development Guide](plugin-development.md)
 - [SOPS Documentation](https://github.com/getsops/sops)
 - [age Encryption](https://github.com/FiloSottile/age)

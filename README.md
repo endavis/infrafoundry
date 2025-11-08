@@ -902,6 +902,7 @@ YAML Configs → ConfigManager → Providers → Jinja2 Templates → Generated 
 ### Core Guides
 - **[Separate Configuration Repository](docs/separate-config-repo.md)** - Best practices for organizing infrastructure configs
 - **[State Management Strategies](docs/state-management.md)** - Understanding and managing Terraform state, InfraFoundry state, and generated files
+- **[Per-Environment Credentials](docs/per-environment-credentials.md)** - Managing different credentials for dev, staging, and production
 - **[Plugin Development](docs/plugin-development.md)** - Creating custom provider plugins
 - **[direnv Setup](docs/direnv.md)** - Environment variable management
 
