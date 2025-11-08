@@ -63,7 +63,8 @@ direnv allow                     # Load environment
 
 # Development
 make dev                         # Install with dev dependencies (uses uv)
-make test                        # Run pytest
+make test                        # Run pytest (286 tests)
+make coverage                    # Run tests with full coverage report (70%)
 make lint                        # Run ruff
 make format                      # Format with black
 
