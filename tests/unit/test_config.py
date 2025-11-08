@@ -539,3 +539,128 @@ class TestConfigManager:
         # Should get only the vm, not fail on environment.yaml
         assert len(resources) == 1
         assert resources[0].name == "test-vm"
+
+    def test_load_resource_centric_files_missing_provider_direct_call(self, temp_dir):
+        """Test load_resource_centric_files directly with missing provider."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create resource file with missing provider field
+        resource_file = envs_dir / "test.yaml"
+        config_data = {
+            "resources": [
+                {
+                    "type": "vm",  # Missing 'provider'
+                    "name": "web-01",
+                    "config": {"cores": 4},
+                }
+            ]
+        }
+        with open(resource_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Missing 'provider' field"):
+            config.load_resource_centric_files("dev")
+
+    def test_load_resource_centric_files_missing_type_direct_call(self, temp_dir):
+        """Test load_resource_centric_files directly with missing type."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create resource file with missing type field
+        resource_file = envs_dir / "test.yaml"
+        config_data = {
+            "resources": [
+                {
+                    "provider": "proxmox",  # Missing 'type'
+                    "name": "web-01",
+                    "config": {"cores": 4},
+                }
+            ]
+        }
+        with open(resource_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Missing 'type' field"):
+            config.load_resource_centric_files("dev")
+
+    def test_load_resource_centric_files_missing_name_direct_call(self, temp_dir):
+        """Test load_resource_centric_files directly with missing name."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create resource file with missing name field
+        resource_file = envs_dir / "test.yaml"
+        config_data = {
+            "resources": [
+                {
+                    "provider": "proxmox",
+                    "type": "vm",  # Missing 'name'
+                    "config": {"cores": 4},
+                }
+            ]
+        }
+        with open(resource_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Missing 'name' field"):
+            config.load_resource_centric_files("dev")
+
+    def test_load_resources_with_null_yaml(self, temp_dir):
+        """Test load_resources when YAML file contains explicit null."""
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create YAML file with explicit null
+        resource_file = envs_dir / "vm.yaml"
+        resource_file.write_text("null\n")
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources("dev", "proxmox")
+        # Should return empty list when YAML is null
+        assert len(resources) == 0
+
+    def test_load_resources_with_empty_dict(self, temp_dir):
+        """Test load_resources when YAML file is empty dict."""
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create YAML file with empty dict
+        resource_file = envs_dir / "vm.yaml"
+        resource_file.write_text("{}\n")
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources("dev", "proxmox")
+        # Should return empty list when YAML is empty dict
+        assert len(resources) == 0
+
+    def test_get_all_resources_all_providers_with_resources_dir_empty_files(self, temp_dir):
+        """Test get_all_resources_all_providers with empty files in resources dir."""
+        # Create environment
+        envs_dir = temp_dir / "envs" / "dev"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        env_file = envs_dir / "environment.yaml"
+        env_data = {"name": "dev", "description": "Test"}
+        with open(env_file, "w") as f:
+            yaml.dump(env_data, f)
+
+        # Create resources directory with empty file
+        resources_dir = envs_dir / "resources"
+        resources_dir.mkdir(parents=True, exist_ok=True)
+
+        empty_file = resources_dir / "empty.yaml"
+        empty_file.write_text("")
+
+        # Create file without resources key
+        no_resources = resources_dir / "no_resources.yaml"
+        with open(no_resources, "w") as f:
+            yaml.dump({"other": "data"}, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources_all_providers("dev")
+        # Should handle empty files and files without resources key
+        assert len(resources) == 0
