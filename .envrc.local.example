@@ -23,6 +23,26 @@
 # export INFRAFOUNDRY_STATE_BACKEND=postgresql
 # export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
 
+# ============================================================================
+# CREDENTIALS - Automatic Loading by CLI
+# ============================================================================
+# The InfraFoundry CLI automatically loads credentials based on --env flag!
+#
+# If using a separate config repo with encrypted secrets:
+#   config-repo/secrets/dev/proxmox.yaml
+#   config-repo/secrets/staging/proxmox.yaml
+#   config-repo/secrets/prod/proxmox.yaml
+#
+# Just use --env flag:
+#   infra plan --env dev      # Automatically uses secrets/dev/
+#   infra apply --env staging # Automatically uses secrets/staging/
+#   infra plan --env prod     # Automatically uses secrets/prod/
+#
+# See: docs/per-environment-credentials.md for setup instructions
+# ============================================================================
+
+# Optional: Direct environment variables (for simple setups or testing)
+# NOTE: CLI auto-loading from secrets/{env}/ is recommended for production
 # Proxmox credentials
 export PROXMOX_API_URL=https://proxmox.example.com:8006/api2/json
 export PROXMOX_API_TOKEN_ID=user@pam!token
