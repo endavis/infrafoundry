@@ -1,13 +1,27 @@
 # InfraFoundry
 
-**A pluggable infrastructure automation framework built on Terraform, Ansible, and Python.**
+**A pluggable infrastructure code generator and orchestration framework for Terraform and Ansible.**
 
 [![Tests](https://github.com/endavis/infrafoundry/actions/workflows/tests.yml/badge.svg)](https://github.com/endavis/infrafoundry/actions/workflows/tests.yml)
 [![Coverage](https://img.shields.io/badge/coverage-70%25-brightgreen)](https://github.com/endavis/infrafoundry)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-InfraFoundry enables reproducible, multi-provider infrastructure deployment with a focus on simplicity, security, and CI/CD integration.
+InfraFoundry generates Terraform and Ansible configurations from YAML definitions, then optionally orchestrates their execution. It enables reproducible, multi-provider infrastructure deployment with a focus on simplicity, security, and CI/CD integration.
+
+## What InfraFoundry Does
+
+**Primary: Infrastructure as Code Generation**
+- Reads declarative YAML configurations for your infrastructure
+- Generates Terraform `.tf` files for resource provisioning
+- Generates Ansible playbooks for post-deployment configuration
+- Supports multiple providers: Proxmox, OPNsense, Kubernetes
+
+**Secondary: Tool Orchestration** 
+- Optionally executes `terraform init/plan/apply/destroy`
+- Optionally runs `ansible-playbook` for configuration management
+- Coordinates multi-provider deployments with dependency resolution
+- Does NOT replace Terraform/Ansible - it generates configs and orchestrates their execution
 
 ## Features
 
@@ -147,6 +161,93 @@ infra --version
 ```
 
 > **Note:** The interactive setup wizard (`setup-config.sh`) is the easiest way to get started. It automates configuration creation, secret management setup, and environment variable configuration. For manual setup or CI/CD environments, use Option 2 (separate config repo) or Option 3 (embedded).
+
+## How It Works
+
+InfraFoundry follows a clear workflow that separates code generation from execution:
+
+### 1. Plan (Generate Only)
+
+```bash
+infra plan --env dev
+```
+
+**What happens:**
+- ✅ Reads YAML configs from `envs/dev/`
+- ✅ Validates resources and dependencies
+- ✅ Generates Terraform files → `generated/terraform/{provider}/`
+- ✅ Generates Ansible playbooks → `generated/ansible/{provider}/`
+- ❌ Does NOT execute terraform or ansible
+- ❌ Does NOT create any infrastructure
+
+**Output:** Generated `.tf` files and playbooks ready for review
+
+### 2. Apply (Generate + Execute)
+
+```bash
+infra apply --env dev
+```
+
+**What happens:**
+- ✅ Generates configs (same as plan)
+- ✅ Runs `terraform init` (first time only)
+- ✅ Runs `terraform apply` for each provider
+- ✅ Runs `ansible-playbook` (if playbooks exist)
+- ✅ Tracks deployment in state database
+
+**Result:** Infrastructure is provisioned and configured
+
+### 3. Destroy (Execute Removal)
+
+```bash
+infra destroy --env dev
+```
+
+**What happens:**
+- ✅ Runs `terraform destroy` for each provider
+- ✅ Updates state database
+
+### Generated Files Structure
+
+```
+generated/
+├── terraform/
+│   ├── proxmox/
+│   │   ├── main.tf          # Generated from YAML
+│   │   ├── variables.tf     # Generated from YAML
+│   │   ├── outputs.tf       # Generated from YAML
+│   │   └── .terraform/      # Created by terraform init
+│   ├── opnsense/
+│   │   └── ...
+│   └── kubernetes/
+│       └── ...
+└── ansible/
+    ├── proxmox/
+    │   ├── playbook.yml     # Generated from YAML
+    │   ├── inventory.yml    # Generated from YAML
+    │   └── roles/           # Your custom roles
+    └── ...
+```
+
+**Key Point:** You can review and manually execute the generated files if you prefer:
+
+```bash
+# Generate configs only
+infra plan --env dev
+
+# Manually review generated files
+cd generated/terraform/proxmox
+cat main.tf
+
+# Manually execute (instead of infra apply)
+terraform init
+terraform plan
+terraform apply
+
+# Run Ansible separately
+cd ../../ansible/proxmox
+ansible-playbook -i inventory.yml playbook.yml
+```
 
 ### Basic Usage
 
@@ -747,11 +848,38 @@ ls src/infrafoundry/providers/*/templates/
 
 ## Architecture
 
-- **Core Framework**: Provider base class, config/secret managers, orchestrator
-- **Providers**: Pluggable modules implementing provider-specific logic
-- **Templates**: Jinja2 templates for generating Terraform and Ansible
-- **CLI**: Click-based command-line interface with rich output
-- **Orchestrator**: Coordinates provider execution and dependency management
+InfraFoundry is built around a clear separation of concerns:
+
+**Code Generation Layer:**
+- **Providers**: Pluggable modules (Proxmox, OPNsense, Kubernetes) that implement `ProviderBase`
+- **Templates**: Jinja2 templates for generating Terraform `.tf` files and Ansible playbooks
+- **Config Manager**: Loads and validates YAML configurations
+- **Secret Manager**: Handles SOPS encryption/decryption, exports secrets to Terraform/Ansible
+
+**Orchestration Layer:**
+- **Orchestrator**: Coordinates multi-provider deployments, manages dependencies, optionally executes tools
+- **CLI**: Click-based command-line interface with rich console output
+- **State Manager**: SQLite database tracking deployment history and resource lifecycle
+- **Event System**: Hooks for notifications and custom integrations
+- **Policy Engine**: Validates resources against organizational policies
+
+**Data Flow:**
+
+```
+YAML Configs → ConfigManager → Providers → Jinja2 Templates → Generated Files
+                                    ↓
+                              Orchestrator (optional)
+                                    ↓
+                    terraform init/apply  +  ansible-playbook
+                                    ↓
+                              Infrastructure
+```
+
+**Key Design Principles:**
+1. **Generation before execution** - Always generate configs first, optionally execute
+2. **Provider plugins** - Easy to add new providers (ESXi, AWS, Azure, etc.)
+3. **Tool agnostic** - Generated files are standard Terraform/Ansible, work without InfraFoundry
+4. **Separate configs** - Framework code separate from infrastructure definitions
 
 ## Contributing
 
