@@ -13,7 +13,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
-from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.events import Event, EventManager, EventType
+from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.policy import PolicyEngine, PolicyLevel
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.secrets import SecretManager
@@ -31,6 +32,7 @@ class Orchestrator:
         state_manager: StateManager | None = None,
         event_manager: EventManager | None = None,
         policy_dir: Path | None = None,
+        notifications_config: Path | None = None,
     ) -> None:
         """Initialize orchestrator.
 
@@ -41,6 +43,7 @@ class Orchestrator:
             state_manager: State manager instance (creates default if None)
             event_manager: Event manager instance (creates default if None)
             policy_dir: Directory containing policy files (defaults to ./policies)
+            notifications_config: Path to notifications config file
         """
         self.config_manager = config_manager
         self.secret_manager = secret_manager
@@ -49,13 +52,31 @@ class Orchestrator:
         self.console = Console()
         self.providers: dict[str, ProviderBase] = {}
 
-        # Initialize state, event, and policy managers
+        # Initialize state, event, policy, and notification managers
         self.state_manager = state_manager or StateManager()
         self.event_manager = event_manager or EventManager()
         self.policy_engine = PolicyEngine(policy_dir)
+        self.notification_manager = NotificationManager(notifications_config)
+
+        # Subscribe notification manager to events
+        self._setup_notifications()
 
         # Get current user for tracking
         self._current_user = os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
+
+    def _setup_notifications(self) -> None:
+        """Set up notification handlers for events."""
+        if not self.notification_manager or not self.notification_manager.channels:
+            return
+
+        # Subscribe to all events
+        def event_handler(event: Event) -> None:
+            """Forward events to notification manager."""
+            self.notification_manager.notify(event.event_type.value, event.environment, event.data)
+
+        # Subscribe to all event types
+        for event_type in EventType:
+            self.event_manager.subscribe(event_type, event_handler)
 
     def register_provider(self, provider: ProviderBase) -> None:
         """Register a provider plugin.
