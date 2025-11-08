@@ -311,9 +311,7 @@ class ConfigManager:
                             f"{resource_name}"
                         )
                     if "name" not in item:
-                        raise ValueError(
-                            f"Missing 'name' field in resource in {config_file}"
-                        )
+                        raise ValueError(f"Missing 'name' field in resource in {config_file}")
 
                     # Extract config dict (everything except provider/type/name)
                     config = item.get("config", {})
