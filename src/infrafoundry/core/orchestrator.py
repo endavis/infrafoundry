@@ -816,7 +816,7 @@ class Orchestrator:
                 SpinnerColumn(), TextColumn("[progress.description]{task.description}")
             ) as progress:
                 task = progress.add_task(
-                    f"[cyan]Applying providers...", total=len(future_to_provider)
+                    "[cyan]Applying providers...", total=len(future_to_provider)
                 )
 
                 for future in as_completed(future_to_provider):

@@ -361,9 +361,7 @@ class TestStateManager:
         with state_manager.SessionLocal() as session:
             from infrafoundry.core.state import DeploymentEvent
 
-            events = (
-                session.query(DeploymentEvent).filter_by(deployment_id=deployment_id).all()
-            )
+            events = session.query(DeploymentEvent).filter_by(deployment_id=deployment_id).all()
             assert len(events) == 1
             event = events[0]
             assert event.event_type == "resource_created"

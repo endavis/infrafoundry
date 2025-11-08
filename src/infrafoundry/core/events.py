@@ -53,6 +53,7 @@ class EventType(str, Enum):
     POLICY_CHECK_PASSED = "policy_check_passed"
     POLICY_CHECK_FAILED = "policy_check_failed"
 
+
 class Event:
     """Event object passed to handlers."""
 

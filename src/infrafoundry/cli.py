@@ -417,9 +417,7 @@ def policies(ctx: click.Context, env: str | None) -> None:
 
         if not policies_list:
             console.print("[yellow]No policies found.[/yellow]")
-            console.print(
-                "[dim]Create policy files in the 'policies' directory.[/dim]"
-            )
+            console.print("[dim]Create policy files in the 'policies' directory.[/dim]")
             return
 
         # Display policies in a table
@@ -498,7 +496,7 @@ def rollback_points(ctx: click.Context, env: str, limit: int) -> None:
         console.print()
         console.print(table)
         console.print(
-            f"\n[dim]Use 'infra rollback --deployment-id <ID>' to rollback to a specific point[/dim]"
+            "\n[dim]Use 'infra rollback --deployment-id <ID>' to rollback to a specific point[/dim]"
         )
 
     except Exception as e:

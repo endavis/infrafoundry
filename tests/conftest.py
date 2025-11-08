@@ -2,7 +2,6 @@
 
 import tempfile
 from pathlib import Path
-from typing import Any
 
 import pytest
 import yaml
@@ -132,9 +131,7 @@ def mock_policy_dir(temp_dir):
                 "type": "required_tags",
                 "description": "Require tags on all resources",
                 "level": "error",
-                "rules": {
-                    "tags": ["environment", "owner", "project"]
-                },
+                "rules": {"tags": ["environment", "owner", "project"]},
             }
         ]
     }
@@ -158,7 +155,7 @@ def mock_terraform_state():
                 "mode": "managed",
                 "type": "proxmox_vm_qemu",
                 "name": "test_vm_01",
-                "provider": "provider[\"registry.terraform.io/telmate/proxmox\"]",
+                "provider": 'provider["registry.terraform.io/telmate/proxmox"]',
                 "instances": [
                     {
                         "schema_version": 0,
