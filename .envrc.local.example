@@ -8,6 +8,15 @@
 # export INFRAFOUNDRY_LOG_LEVEL=DEBUG
 # export TF_LOG=DEBUG
 
+# State management (deployment tracking and resource state)
+# Default: SQLite at ~/.infrafoundry/state.db
+# export INFRAFOUNDRY_STATE_BACKEND=sqlite
+# export INFRAFOUNDRY_STATE_CONNECTION=sqlite:////home/user/.infrafoundry/state.db
+
+# For team usage with PostgreSQL:
+# export INFRAFOUNDRY_STATE_BACKEND=postgresql
+# export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
+
 # Proxmox credentials
 export PROXMOX_API_URL=https://proxmox.example.com:8006/api2/json
 export PROXMOX_API_TOKEN_ID=user@pam!token
