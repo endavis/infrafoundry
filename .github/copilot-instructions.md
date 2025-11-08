@@ -1,7 +1,12 @@
 # InfraFoundry - AI Coding Agent Instructions
 
 ## Project Overview
-InfraFoundry is a pluggable infrastructure automation framework that generates Terraform and Ansible code from YAML configurations. It's built with Python 3.12+, uses uv for package management, and supports Proxmox, OPNsense, and Kubernetes providers.
+InfraFoundry is an infrastructure code generator and orchestration framework that generates Terraform and Ansible configurations from YAML definitions. It's built with Python 3.12+, uses uv for package management, and supports Proxmox, OPNsense, and Kubernetes providers.
+
+**What InfraFoundry Does:**
+1. **Primary: Code Generation** - Reads YAML configs, generates Terraform `.tf` files and Ansible playbooks
+2. **Secondary: Tool Orchestration** - Optionally executes `terraform` and `ansible-playbook` commands
+3. **Does NOT** replace Terraform/Ansible - it generates standard configs and orchestrates their execution
 
 **Important:** InfraFoundry separates framework code (this repository) from user infrastructure configurations (separate repositories). This allows independent versioning, private configs with public framework, and better access control.
 
@@ -21,29 +26,47 @@ InfraFoundry is a pluggable infrastructure automation framework that generates T
 - **Framework Repository** (this repo): Core code, provider plugins, templates
 - **Configuration Repository** (separate): User's infrastructure configs, secrets
 
-**Three-layer design:**
-1. **Core Framework** (`src/infrafoundry/core/`):
+**Two-layer design:**
+
+1. **Code Generation Layer**:
    - `provider.py`: `ProviderBase` - abstract class all providers implement
    - `config.py`: `ConfigManager` - loads YAML configs (supports `INFRAFOUNDRY_CONFIG_REPO`)
    - `secrets.py`: `SecretManager` - SOPS/age encryption (supports `INFRAFOUNDRY_CONFIG_REPO`)
-   - `orchestrator.py`: `Orchestrator` - coordinates multi-provider deployments
+   - Providers: Generate Terraform `.tf` files and Ansible playbooks from templates
+   - Templates: Jinja2 templates in `providers/{name}/templates/`
+
+2. **Orchestration Layer**:
+   - `orchestrator.py`: `Orchestrator` - coordinates multi-provider deployments, runs terraform/ansible
    - `cli.py`: Click-based CLI with `--config-dir` option
+   - `state.py`: SQLite database for deployment tracking
+   - `events.py`: Event system for notifications and hooks
 
-2. **Providers** (`src/infrafoundry/providers/`):
-   - Each provider (proxmox, opnsense, kubernetes) implements `ProviderBase`
-   - `generate_terraform()` - renders Jinja2 templates to `.tf` files
-   - `generate_ansible()` - renders Jinja2 templates to playbooks
-   - Templates live in `src/infrafoundry/providers/{name}/templates/{name}/`
+**Providers** (`src/infrafoundry/providers/`):
+- Each provider (proxmox, opnsense, kubernetes) implements `ProviderBase`
+- `generate_terraform()` - renders Jinja2 templates to `.tf` files
+- `generate_ansible()` - renders Jinja2 templates to playbooks
+- Templates live in `src/infrafoundry/providers/{name}/templates/{name}/`
 
-3. **Configurations** (separate repo or `example-config/`):
-   - `envs/{env}/environment.yaml` - environment name, description, and variables
-   - **Provider-centric** (original): `envs/{env}/{provider}/{resource_type}.yaml` - resource definitions
-   - **Resource-centric** (new): `envs/{env}/resources/*.yaml` - multi-provider resource definitions
-   - `secrets/` - Encrypted credentials with SOPS
-   - **Note:** Providers are auto-discovered from resources; no need to declare them
+**Configurations** (separate repo or `example-config/`):
+- `envs/{env}/environment.yaml` - environment name, description, and variables
+- **Provider-centric** (original): `envs/{env}/{provider}/{resource_type}.yaml` - resource definitions
+- **Resource-centric** (new): `envs/{env}/resources/*.yaml` - multi-provider resource definitions
+- `secrets/` - Encrypted credentials with SOPS
+- **Note:** Providers are auto-discovered from resources; no need to declare them
 
 **Data flow:**
-`YAML configs` (separate repo) → `ConfigManager` (checks `INFRAFOUNDRY_CONFIG_REPO` or `--config-dir`) → `Orchestrator` → `Provider.generate_terraform()` → `generated/terraform/` → `terraform apply`
+```
+YAML configs → ConfigManager → Orchestrator → Providers → Jinja2 → generated/*.tf
+                                                                   ↓
+                                                    (optional) terraform init/apply
+                                                                   ↓
+                                                              Infrastructure
+```
+
+**Commands:**
+- `infra plan` - Generate configs only (no execution)
+- `infra apply` - Generate + execute terraform/ansible
+- `infra destroy` - Execute terraform destroy
 
 ### Build / Run / Test
 
