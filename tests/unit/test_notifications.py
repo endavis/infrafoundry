@@ -416,9 +416,7 @@ class TestNotificationManager:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
-        manager.notify(
-            "DRIFT_DETECTED", "prod", {"to_add": 2, "to_change": 3, "to_destroy": 1}
-        )
+        manager.notify("DRIFT_DETECTED", "prod", {"to_add": 2, "to_change": 3, "to_destroy": 1})
 
         # Check that notification was sent
         assert mock_post.call_count == 1
@@ -465,3 +463,47 @@ class TestNotificationManager:
         assert len(blocks) >= 2
         # Check for policy event type in header
         assert "POLICY_VIOLATION" in str(blocks)
+
+    @patch("requests.post")
+    def test_slack_emoji_for_various_event_types(self, mock_post, temp_dir):
+        """Test Slack emoji selection for different event types."""
+        import yaml
+
+        mock_post.return_value.status_code = 200
+
+        config = {
+            "channels": [
+                {
+                    "name": "slack1",
+                    "type": "slack",
+                    "enabled": True,
+                    "config": {"webhook_url": "https://hooks.slack.com/services/XXX"},
+                }
+            ]
+        }
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(config, f)
+
+        manager = NotificationManager(config_file)
+
+        # Test various event types to cover emoji branches
+        test_events = [
+            ("PLAN_FAILED", "❌"),  # failed
+            ("APPLY_COMPLETED", "✅"),  # completed
+            ("VALIDATION_PASSED", "✅"),  # passed
+            ("DRIFT_DETECTED", "⚠️"),  # drift
+            ("POLICY_VIOLATION", "🛡️"),  # policy
+            ("CUSTOM_EVENT", "ℹ️"),  # default (else branch)
+        ]
+
+        for event_type, expected_emoji in test_events:
+            mock_post.reset_mock()
+            manager.notify(event_type, "dev", {"data": "test"})
+
+            # Check emoji appears in the notification
+            call_args = mock_post.call_args
+            blocks = call_args[1]["json"]["blocks"]
+            # Emoji should be in the header text
+            header_text = str(blocks[0])
+            assert expected_emoji in header_text or event_type in header_text

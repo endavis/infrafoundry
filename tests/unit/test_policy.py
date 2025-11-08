@@ -196,9 +196,7 @@ class TestPolicyEngine:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
-        resource = ResourceConfig(
-            provider="proxmox", type="vm", name="vm-01", config={"cores": 16}
-        )
+        resource = ResourceConfig(provider="proxmox", type="vm", name="vm-01", config={"cores": 16})
         violations = engine.evaluate_resources([resource], "dev")
         # No violations because policy is disabled
         assert len(violations) == 0
@@ -223,9 +221,7 @@ class TestPolicyEngine:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
-        resource = ResourceConfig(
-            provider="proxmox", type="vm", name="vm-01", config={"cores": 16}
-        )
+        resource = ResourceConfig(provider="proxmox", type="vm", name="vm-01", config={"cores": 16})
 
         # Should violate in prod
         violations_prod = engine.evaluate_resources([resource], "prod")
@@ -256,16 +252,12 @@ class TestPolicyEngine:
         engine = PolicyEngine(policy_dir)
 
         # Valid name
-        resource1 = ResourceConfig(
-            provider="proxmox", type="vm", name="vm-web-01", config={}
-        )
+        resource1 = ResourceConfig(provider="proxmox", type="vm", name="vm-web-01", config={})
         violations1 = engine.evaluate_resources([resource1], "dev")
         assert len(violations1) == 0
 
         # Invalid name
-        resource2 = ResourceConfig(
-            provider="proxmox", type="vm", name="invalid_name", config={}
-        )
+        resource2 = ResourceConfig(provider="proxmox", type="vm", name="invalid_name", config={})
         violations2 = engine.evaluate_resources([resource2], "dev")
         assert len(violations2) > 0
 
@@ -295,9 +287,7 @@ class TestPolicyEngine:
         assert len(violations1) == 0
 
         # Invalid name
-        resource2 = ResourceConfig(
-            provider="any", type="any", name="Invalid_Name_123", config={}
-        )
+        resource2 = ResourceConfig(provider="any", type="any", name="Invalid_Name_123", config={})
         violations2 = engine.evaluate_resources([resource2], "dev")
         assert len(violations2) > 0
 
@@ -591,4 +581,3 @@ class TestPolicyEngine:
         )
         violations = engine.evaluate_resources([resource], "dev")
         assert len(violations) > 0
-
