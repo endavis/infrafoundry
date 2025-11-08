@@ -348,8 +348,8 @@ class TestOPNsenseTemplates:
 
         content = rules_tf.read_text()
         assert "allow_web_traffic" in content
-        assert 'action' in content and 'pass' in content
-        assert 'interface' in content and 'lan' in content
+        assert "action" in content and "pass" in content
+        assert "interface" in content and "lan" in content
         assert 'protocol = "tcp"' in content
         assert "Allow web traffic to web server" in content
 
@@ -755,3 +755,75 @@ class TestProviderResourceGrouping:
         assert (provider.terraform_dir / "services.tf").exists()
         assert (provider.terraform_dir / "configmaps.tf").exists()
         assert (provider.terraform_dir / "namespaces.tf").exists()
+
+
+class TestProviderValidation:
+    """Test provider config validation methods."""
+
+    def test_proxmox_validate_config(self, tmp_path: Path):
+        """Test Proxmox config validation."""
+        provider = ProxmoxProvider(tmp_path / "config", tmp_path / "output")
+
+        # Valid config with required 'name' field
+        assert provider.validate_config({"name": "vm-01"}) is True
+
+        # Invalid config missing 'name'
+        assert provider.validate_config({"other": "value"}) is False
+
+    def test_opnsense_validate_config(self, tmp_path: Path):
+        """Test OPNsense config validation."""
+        provider = OPNsenseProvider(tmp_path / "config", tmp_path / "output")
+
+        # Valid config with required 'name' field
+        assert provider.validate_config({"name": "rule-01"}) is True
+
+        # Invalid config missing 'name'
+        assert provider.validate_config({"action": "pass"}) is False
+
+    def test_kubernetes_validate_config(self, tmp_path: Path):
+        """Test Kubernetes config validation."""
+        provider = KubernetesProvider(tmp_path / "config", tmp_path / "output")
+
+        # Valid config with required 'name' field
+        assert provider.validate_config({"name": "deployment-01"}) is True
+
+        # Invalid config missing 'name'
+        assert provider.validate_config({"other": "value"}) is False
+
+
+class TestProviderDependencies:
+    """Test provider dependency methods."""
+
+    def test_proxmox_get_dependencies(self, tmp_path: Path):
+        """Test Proxmox resource dependencies."""
+        provider = ProxmoxProvider(tmp_path / "config", tmp_path / "output")
+        deps = provider.get_dependencies()
+
+        # VMs depend on templates and networks
+        assert "vm" in deps
+        assert "template" in deps["vm"]
+        assert "network" in deps["vm"]
+
+    def test_opnsense_get_dependencies(self, tmp_path: Path):
+        """Test OPNsense resource dependencies."""
+        provider = OPNsenseProvider(tmp_path / "config", tmp_path / "output")
+        deps = provider.get_dependencies()
+
+        # Firewall rules depend on aliases and vlans
+        assert "firewall_rules" in deps
+        assert "aliases" in deps["firewall_rules"]
+        assert "vlans" in deps["firewall_rules"]
+
+    def test_kubernetes_get_dependencies(self, tmp_path: Path):
+        """Test Kubernetes resource dependencies."""
+        provider = KubernetesProvider(tmp_path / "config", tmp_path / "output")
+        deps = provider.get_dependencies()
+
+        # Deployments depend on namespaces and configmaps
+        assert "deployments" in deps
+        assert "namespaces" in deps["deployments"]
+        assert "configmaps" in deps["deployments"]
+
+        # Services depend on deployments
+        assert "services" in deps
+        assert "deployments" in deps["services"]

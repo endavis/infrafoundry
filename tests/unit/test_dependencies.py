@@ -416,9 +416,7 @@ class TestDependencyGraph:
         graph.add_resource("proxmox", "network", "network-01")
 
         # Layer 2: templates
-        graph.add_resource(
-            "proxmox", "template", "ubuntu-template", dependencies=["storage-01"]
-        )
+        graph.add_resource("proxmox", "template", "ubuntu-template", dependencies=["storage-01"])
 
         # Layer 3: VMs
         graph.add_resource(
@@ -435,9 +433,7 @@ class TestDependencyGraph:
         )
 
         # Layer 4: load balancer
-        graph.add_resource(
-            "proxmox", "vm", "lb-01", dependencies=["web-01", "web-02"]
-        )
+        graph.add_resource("proxmox", "vm", "lb-01", dependencies=["web-01", "web-02"])
 
         batches = graph.topological_sort()
 

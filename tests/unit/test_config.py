@@ -185,4 +185,3 @@ class TestConfigManager:
 
         config = ConfigManager()
         assert config.base_dir == custom_dir
-

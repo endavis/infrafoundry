@@ -95,11 +95,10 @@ class TestCLICommands:
         """Test secrets init command."""
         secrets_dir = temp_dir / "secrets"
         env = {"INFRAFOUNDRY_SECRETS_DIR": str(secrets_dir)}
-        
+
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
-                returncode=0,
-                stdout="AGE-SECRET-KEY-1234567890ABCDEF\nage1234567890"
+                returncode=0, stdout="AGE-SECRET-KEY-1234567890ABCDEF\nage1234567890"
             )
             result = cli_runner.invoke(cli, ["secrets", "init"], env=env)
             # Command should attempt to run

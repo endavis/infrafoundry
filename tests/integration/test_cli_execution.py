@@ -45,9 +45,7 @@ def test_env(tmp_path: Path):
     # Create dev environment config
     dev_dir = config_dir / "dev"
     dev_dir.mkdir()
-    (dev_dir / "environment.yaml").write_text(
-        "name: dev\ndescription: Development environment\n"
-    )
+    (dev_dir / "environment.yaml").write_text("name: dev\ndescription: Development environment\n")
 
     return {
         "INFRAFOUNDRY_CONFIG_DIR": str(config_dir),

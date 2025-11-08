@@ -124,9 +124,7 @@ class TestPlanWorkflow:
         with patch.object(orchestrator, "_run_terraform") as mock_tf:
             mock_tf.return_value = {"success": True, "changes": 1}
 
-            result = orchestrator.plan(
-                env_name="dev", dry_run=False, resource_filter=["web-01"]
-            )
+            result = orchestrator.plan(env_name="dev", dry_run=False, resource_filter=["web-01"])
 
             # Verify only filtered resources were processed
             assert result["proxmox"]["resources"] == 1
@@ -223,12 +221,11 @@ class TestApplyWorkflow:
 
     def test_apply_runs_plan_first(self, orchestrator):
         """Test that apply runs plan before applying."""
-        with patch.object(orchestrator, "plan") as mock_plan, patch.object(
-            orchestrator, "_run_terraform"
-        ), patch.object(
-            orchestrator, "_get_terraform_resource_ids", return_value={}
-        ), patch.object(
-            orchestrator, "_run_ansible", return_value={"success": True}
+        with (
+            patch.object(orchestrator, "plan") as mock_plan,
+            patch.object(orchestrator, "_run_terraform"),
+            patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
+            patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
         ):
             orchestrator.apply(env_name="dev", auto_approve=True)
 
@@ -239,10 +236,12 @@ class TestApplyWorkflow:
 
     def test_apply_basic_workflow(self, orchestrator, mock_providers):
         """Test basic apply workflow execution."""
-        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
-             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
-             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
-            
+        with (
+            patch.object(orchestrator, "_run_terraform", return_value={"success": True}),
+            patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
+            patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
+        ):
+
             result = orchestrator.apply(env_name="dev", auto_approve=True)
 
             # Verify apply completed
@@ -250,9 +249,11 @@ class TestApplyWorkflow:
 
     def test_apply_creates_deployment_record(self, orchestrator):
         """Test that apply creates a deployment record."""
-        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
-             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
-             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+        with (
+            patch.object(orchestrator, "_run_terraform", return_value={"success": True}),
+            patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
+            patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
+        ):
 
             orchestrator.apply(env_name="dev", auto_approve=True)
 
@@ -265,9 +266,11 @@ class TestApplyWorkflow:
 
     def test_apply_captures_rollback_snapshot(self, orchestrator):
         """Test that apply captures configuration snapshot for rollback."""
-        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
-             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
-             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+        with (
+            patch.object(orchestrator, "_run_terraform", return_value={"success": True}),
+            patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
+            patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
+        ):
 
             orchestrator.apply(env_name="dev", auto_approve=True)
 
@@ -278,9 +281,11 @@ class TestApplyWorkflow:
 
     def test_apply_with_resource_filter(self, orchestrator, mock_providers):
         """Test apply with resource filter."""
-        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
-             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
-             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+        with (
+            patch.object(orchestrator, "_run_terraform", return_value={"success": True}),
+            patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
+            patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
+        ):
 
             result = orchestrator.apply(
                 env_name="dev", auto_approve=True, resource_filter=["web-01"]
@@ -299,9 +304,11 @@ class TestApplyWorkflow:
         orchestrator.event_manager.subscribe(EventType.BEFORE_APPLY, capture_event)
         orchestrator.event_manager.subscribe(EventType.AFTER_APPLY, capture_event)
 
-        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
-             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
-             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+        with (
+            patch.object(orchestrator, "_run_terraform", return_value={"success": True}),
+            patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
+            patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
+        ):
 
             orchestrator.apply(env_name="dev", auto_approve=True)
 
@@ -330,10 +337,12 @@ class TestApplyWorkflow:
 
         orchestrator.event_manager.subscribe(EventType.APPLY_FAILED, capture_event)
 
-        with patch.object(orchestrator, "_run_terraform") as mock_tf, \
-             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
-             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
-            
+        with (
+            patch.object(orchestrator, "_run_terraform") as mock_tf,
+            patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
+            patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
+        ):
+
             # Make terraform fail during apply (not plan)
             mock_tf.side_effect = [{"success": True}, RuntimeError("Apply failed")]
 
@@ -382,9 +391,10 @@ class TestDestroyWorkflow:
 
     def test_destroy_proceeds_with_confirmation(self, orchestrator):
         """Test that destroy proceeds when user confirms."""
-        with patch("builtins.input", return_value="yes"), patch.object(
-            orchestrator, "_run_terraform"
-        ) as mock_tf:
+        with (
+            patch("builtins.input", return_value="yes"),
+            patch.object(orchestrator, "_run_terraform") as mock_tf,
+        ):
             mock_tf.return_value = {"success": True}
 
             result = orchestrator.destroy(env_name="dev", auto_approve=False)
@@ -496,13 +506,13 @@ class TestMultiProviderWorkflow:
         k8s_resource.config = {}
         mock_config["resources"].append(k8s_resource)
 
-        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
-             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
-             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+        with (
+            patch.object(orchestrator, "_run_terraform", return_value={"success": True}),
+            patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
+            patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
+        ):
 
-            result = orchestrator.apply(
-                env_name="dev", auto_approve=True, parallel=False
-            )
+            result = orchestrator.apply(env_name="dev", auto_approve=True, parallel=False)
 
             # Both providers should be processed
             assert "proxmox" in result
@@ -541,9 +551,11 @@ class TestWorkflowStateManagement:
 
     def test_deployment_lifecycle_plan_to_apply(self, orchestrator):
         """Test complete deployment lifecycle from plan to apply."""
-        with patch.object(orchestrator, "_run_terraform", return_value={"success": True}), \
-             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}), \
-             patch.object(orchestrator, "_run_ansible", return_value={"success": True}):
+        with (
+            patch.object(orchestrator, "_run_terraform", return_value={"success": True}),
+            patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
+            patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
+        ):
 
             # Plan
             orchestrator.plan(env_name="dev", dry_run=False)
@@ -571,9 +583,7 @@ class TestWorkflowStateManagement:
     def test_deployment_metadata_captured(self, orchestrator):
         """Test that deployment metadata is properly captured."""
         with patch.object(orchestrator, "_run_terraform"):
-            orchestrator.plan(
-                env_name="dev", dry_run=True, resource_filter=["web-01"]
-            )
+            orchestrator.plan(env_name="dev", dry_run=True, resource_filter=["web-01"])
 
             deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].dry_run is True
