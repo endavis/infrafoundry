@@ -175,8 +175,8 @@ infra plan --env dev
 **What happens:**
 - ✅ Reads YAML configs from `envs/dev/`
 - ✅ Validates resources and dependencies
-- ✅ Generates Terraform files → `generated/terraform/{provider}/`
-- ✅ Generates Ansible playbooks → `generated/ansible/{provider}/`
+- ✅ Generates Terraform files → `generated/{env}/terraform/{provider}/`
+- ✅ Generates Ansible playbooks → `generated/{env}/ansible/{provider}/`
 - ❌ Does NOT execute terraform or ansible
 - ❌ Does NOT create any infrastructure
 
@@ -211,32 +211,46 @@ infra destroy --env dev
 
 ```
 generated/
-├── terraform/
-│   ├── proxmox/
-│   │   ├── main.tf          # Generated from YAML
-│   │   ├── variables.tf     # Generated from YAML
-│   │   ├── outputs.tf       # Generated from YAML
-│   │   └── .terraform/      # Created by terraform init
-│   ├── opnsense/
-│   │   └── ...
-│   └── kubernetes/
+├── dev/                         # Environment: dev
+│   ├── terraform/
+│   │   ├── proxmox/
+│   │   │   ├── main.tf          # Generated from YAML
+│   │   │   ├── variables.tf     # Generated from YAML
+│   │   │   ├── outputs.tf       # Generated from YAML
+│   │   │   └── .terraform/      # Created by terraform init
+│   │   ├── opnsense/
+│   │   │   └── ...
+│   │   └── kubernetes/
+│   │       └── ...
+│   └── ansible/
+│       ├── proxmox/
+│       │   ├── playbook.yml     # Generated from YAML
+│       │   ├── inventory.yml    # Generated from YAML
+│       │   └── roles/           # Your custom roles
 │       └── ...
-└── ansible/
-    ├── proxmox/
-    │   ├── playbook.yml     # Generated from YAML
-    │   ├── inventory.yml    # Generated from YAML
-    │   └── roles/           # Your custom roles
-    └── ...
+├── staging/                     # Environment: staging
+│   ├── terraform/
+│   └── ansible/
+└── prod/                        # Environment: prod
+    ├── terraform/
+    └── ansible/
 ```
 
-**Key Point:** You can review and manually execute the generated files if you prefer:
+**Key Point:** Each environment has its own directory with separate Terraform state!
+
+- ✅ Can work on dev and prod simultaneously
+- ✅ Terraform state isolated per environment
+- ✅ No risk of overwriting one environment with another
+- ✅ Clear separation for team collaboration
+
+**You can review and manually execute the generated files if you prefer:**
 
 ```bash
 # Generate configs only
 infra plan --env dev
 
 # Manually review generated files
-cd generated/terraform/proxmox
+cd generated/dev/terraform/proxmox
 cat main.tf
 
 # Manually execute (instead of infra apply)
@@ -248,6 +262,8 @@ terraform apply
 cd ../../ansible/proxmox
 ansible-playbook -i inventory.yml playbook.yml
 ```
+
+**For production:** Configure remote Terraform backend in your generated files to share state with your team.
 
 ### Basic Usage
 
@@ -829,7 +845,7 @@ sops --decrypt secrets/proxmox.yaml
 
 ```bash
 # View state
-cd generated/terraform/proxmox
+cd generated/dev/terraform/proxmox
 terraform show
 
 # Import existing resources
