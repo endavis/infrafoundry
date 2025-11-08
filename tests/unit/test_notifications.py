@@ -507,3 +507,28 @@ class TestNotificationManager:
             # Emoji should be in the header text
             header_text = str(blocks[0])
             assert expected_emoji in header_text or event_type in header_text
+
+    def test_webhook_missing_url_config(self):
+        """Test webhook notifier with missing URL configuration."""
+        config = {}  # No URL provided
+        notifier = WebhookNotifier(config)
+        result = notifier.send("APPLY_COMPLETED", "dev", {"resource": "vm-01"})
+        assert result is False
+
+    def test_slack_missing_webhook_url_config(self):
+        """Test Slack notifier with missing webhook URL configuration."""
+        config = {}  # No webhook_url provided
+        notifier = SlackNotifier(config)
+        result = notifier.send("APPLY_COMPLETED", "dev", {"resource": "vm-01"})
+        assert result is False
+
+    @patch("requests.post")
+    def test_slack_network_error(self, mock_post):
+        """Test Slack notifier handling network error."""
+        import requests
+
+        mock_post.side_effect = requests.RequestException("Network error")
+        config = {"webhook_url": "https://hooks.slack.com/test"}
+        notifier = SlackNotifier(config)
+        result = notifier.send("APPLY_COMPLETED", "dev", {"resource": "vm-01"})
+        assert result is False
