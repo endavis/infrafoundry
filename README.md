@@ -17,7 +17,7 @@ InfraFoundry generates Terraform and Ansible configurations from YAML definition
 - Generates Ansible playbooks for post-deployment configuration
 - Supports multiple providers: Proxmox, OPNsense, Kubernetes
 
-**Secondary: Tool Orchestration** 
+**Secondary: Tool Orchestration**
 - Optionally executes `terraform init/plan/apply/destroy`
 - Optionally runs `ansible-playbook` for configuration management
 - Coordinates multi-provider deployments with dependency resolution
@@ -896,6 +896,22 @@ YAML Configs → ConfigManager → Providers → Jinja2 Templates → Generated 
 2. **Provider plugins** - Easy to add new providers (ESXi, AWS, Azure, etc.)
 3. **Tool agnostic** - Generated files are standard Terraform/Ansible, work without InfraFoundry
 4. **Separate configs** - Framework code separate from infrastructure definitions
+
+## Documentation
+
+### Core Guides
+- **[Separate Configuration Repository](docs/separate-config-repo.md)** - Best practices for organizing infrastructure configs
+- **[State Management Strategies](docs/state-management.md)** - Understanding and managing Terraform state, InfraFoundry state, and generated files
+- **[Plugin Development](docs/plugin-development.md)** - Creating custom provider plugins
+- **[direnv Setup](docs/direnv.md)** - Environment variable management
+
+### Tool Documentation
+- **[OPNsense Parser](docs/tools/opnsense-parser.md)** - Converting OPNsense XML configs to YAML
+
+### Additional Resources
+- [Terraform Backend Configuration](https://www.terraform.io/language/settings/backends)
+- [SOPS Documentation](https://github.com/getsops/sops)
+- [age Encryption](https://github.com/FiloSottile/age)
 
 ## Contributing
 

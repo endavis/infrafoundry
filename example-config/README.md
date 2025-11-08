@@ -369,10 +369,36 @@ Regularly backup:
 - `secrets/age.key` - Encryption key (store securely offline)
 - `secrets/.sops.yaml` - SOPS configuration
 - `.envrc.local` - Local environment settings (keep private)
+- `generated/` - Generated Terraform state files (for each environment)
+
+**Note:** Each environment (dev, staging, prod) has isolated state in `generated/{env}/terraform/{provider}/`. This prevents conflicts when working on multiple environments simultaneously.
+
+## State Management
+
+InfraFoundry manages three types of state:
+
+1. **Terraform State**: `generated/{env}/terraform/{provider}/.terraform/terraform.tfstate`
+   - Tracks infrastructure resources created by Terraform
+   - Separate state per environment (dev, staging, prod)
+   - Can use remote backends (S3, Terraform Cloud) for team collaboration
+
+2. **InfraFoundry State**: `~/.infrafoundry/state.db`
+   - Tracks deployment history and resource lifecycle
+   - Provides audit trail for all operations
+   - Can use PostgreSQL for shared team state
+
+3. **Generated Configs**: `generated/{env}/`
+   - Temporary `.tf` files and Ansible playbooks
+   - Reproducible from YAML configs
+   - Git-ignored, regenerated on each plan/apply
+
+For more details, see [State Management Guide](../docs/state-management.md).
 
 ## Related Documentation
 
 - [InfraFoundry Framework](https://github.com/your-org/infrafoundry)
+- [State Management Strategies](../docs/state-management.md)
+- [Separate Config Repository Guide](../docs/separate-config-repo.md)
 - [Provider Documentation](https://github.com/your-org/infrafoundry/tree/main/docs)
 - [SOPS Documentation](https://github.com/getsops/sops)
 - [age Encryption](https://github.com/FiloSottile/age)

@@ -17,8 +17,9 @@ InfraFoundry is an infrastructure code generator and orchestration framework tha
 2. `src/infrafoundry/providers/` - Provider plugins (proxmox, opnsense, kubernetes)
 3. `example-config/` - Example configuration repository structure
 4. `docs/separate-config-repo.md` - Separate config repo pattern guide
-5. `pyproject.toml` - Dependencies and project metadata
-6. `README.md` - Complete project documentation
+5. `docs/state-management.md` - State management strategies and best practices
+6. `pyproject.toml` - Dependencies and project metadata
+7. `README.md` - Complete project documentation
 
 ### Architecture
 
@@ -40,6 +41,12 @@ InfraFoundry is an infrastructure code generator and orchestration framework tha
    - `cli.py`: Click-based CLI with `--config-dir` option
    - `state.py`: SQLite database for deployment tracking
    - `events.py`: Event system for notifications and hooks
+
+**State Management** (see `docs/state-management.md`):
+- **Terraform State**: `generated/{env}/terraform/{provider}/.terraform/terraform.tfstate` - Infrastructure resource state
+- **InfraFoundry State**: `~/.infrafoundry/state.db` - Deployment history, audit trail, rollback data
+- **Generated Configs**: `generated/{env}/` - Reproducible from YAML, git-ignored
+- Environment isolation prevents state conflicts between dev/staging/prod
 
 **Providers** (`src/infrafoundry/providers/`):
 - Each provider (proxmox, opnsense, kubernetes) implements `ProviderBase`
