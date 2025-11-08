@@ -45,6 +45,13 @@ See [Separate Configuration Repository Guide](docs/separate-config-repo.md) for 
 
 - Python 3.12+
 - [uv](https://github.com/astral-sh/uv) - Fast Python package installer
+  ```bash
+  # Install uv (recommended method)
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  
+  # Or with pip (if uv not available)
+  pip install uv
+  ```
 - [Terraform](https://www.terraform.io/) >= 1.6
 - [Ansible](https://www.ansible.com/) >= 2.15
 - [SOPS](https://github.com/getsops/sops) - For secret management
@@ -56,6 +63,9 @@ See [Separate Configuration Repository Guide](docs/separate-config-repo.md) for 
 **Option 1: Separate Configuration Repository (Recommended)**
 
 ```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Install the framework
 git clone https://github.com/yourusername/infrafoundry.git
 cd infrafoundry
@@ -81,6 +91,9 @@ infra envs
 **Option 2: Embedded Configuration (Legacy)**
 
 ```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Clone the repository
 git clone https://github.com/yourusername/infrafoundry.git
 cd infrafoundry
