@@ -141,6 +141,164 @@ class Orchestrator:
 
         return graph
 
+    def detect_drift(self, env_name: str) -> dict[str, Any]:
+        """Detect infrastructure drift from declared configuration.
+
+        Compares the actual infrastructure state (from Terraform state) with
+        the declared configuration to identify resources that have been
+        modified, added, or deleted outside of InfraFoundry.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            Dict with drift detection results per provider
+        """
+        # Emit drift check started event
+        self.event_manager.emit_event(
+            EventType.DRIFT_CHECK_STARTED,
+            env_name,
+            {"environment": env_name},
+        )
+
+        self.console.print(f"\n[bold cyan]Checking for drift in: {env_name}[/bold cyan]")
+
+        results = {}
+        drift_detected = False
+
+        try:
+            # Get all resources and discover providers dynamically
+            all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+            # Group resources by provider
+            resources_by_provider: dict[str, list[Any]] = {}
+            for resource in all_resources:
+                if resource.provider not in resources_by_provider:
+                    resources_by_provider[resource.provider] = []
+                resources_by_provider[resource.provider].append(resource)
+
+            for provider_name, resources in resources_by_provider.items():
+                if provider_name not in self.providers:
+                    continue
+
+                provider = self.providers[provider_name]
+
+                self.console.print(f"\n[bold]Checking {provider_name}...[/bold]")
+
+                # Run terraform plan to detect drift
+                # This will compare current state with declared config
+                plan_result = self._run_terraform(provider, "plan", auto_approve=False)
+
+                # Parse the plan output to detect changes
+                drift_info = self._parse_terraform_plan_for_drift(plan_result)
+
+                if drift_info["has_changes"]:
+                    drift_detected = True
+                    self.console.print(
+                        f"  [yellow]⚠ Drift detected: {drift_info['summary']}[/yellow]"
+                    )
+
+                    # Emit drift detected event
+                    self.event_manager.emit_event(
+                        EventType.DRIFT_DETECTED,
+                        env_name,
+                        {
+                            "provider": provider_name,
+                            "changes": drift_info,
+                        },
+                    )
+                else:
+                    self.console.print("  [green]✓ No drift detected[/green]")
+
+                results[provider_name] = drift_info
+
+            # Emit drift check completed event
+            self.event_manager.emit_event(
+                EventType.DRIFT_CHECK_COMPLETED,
+                env_name,
+                {
+                    "drift_detected": drift_detected,
+                    "results": results,
+                },
+            )
+
+            if not drift_detected:
+                self.console.print(
+                    "\n[bold green]✓ All infrastructure matches declared configuration[/bold green]"
+                )
+
+        except Exception as e:
+            self.console.print(f"\n[bold red]Error detecting drift:[/bold red] {e}")
+            raise
+
+        return results
+
+    def _parse_terraform_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
+        """Parse Terraform plan output to detect drift.
+
+        Args:
+            plan_result: Result dictionary from _run_terraform
+
+        Returns:
+            Dict with drift information
+        """
+        output = plan_result.get("output", "")
+
+        # Look for Terraform's plan summary line
+        # Example: "Plan: 1 to add, 2 to change, 0 to destroy."
+        import re
+
+        plan_pattern = r"Plan: (\d+) to add, (\d+) to change, (\d+) to destroy"
+        match = re.search(plan_pattern, output)
+
+        if match:
+            to_add = int(match.group(1))
+            to_change = int(match.group(2))
+            to_destroy = int(match.group(3))
+
+            has_changes = (to_add + to_change + to_destroy) > 0
+
+            # Build summary message
+            parts = []
+            if to_add > 0:
+                parts.append(f"{to_add} to add")
+            if to_change > 0:
+                parts.append(f"{to_change} to change")
+            if to_destroy > 0:
+                parts.append(f"{to_destroy} to destroy")
+
+            summary = ", ".join(parts) if parts else "No changes"
+
+            return {
+                "has_changes": has_changes,
+                "to_add": to_add,
+                "to_change": to_change,
+                "to_destroy": to_destroy,
+                "summary": summary,
+                "raw_output": output,
+            }
+
+        # If no plan line found, check for "No changes" message
+        if "No changes" in output or "no changes are needed" in output.lower():
+            return {
+                "has_changes": False,
+                "to_add": 0,
+                "to_change": 0,
+                "to_destroy": 0,
+                "summary": "No changes",
+                "raw_output": output,
+            }
+
+        # Unknown state
+        return {
+            "has_changes": None,
+            "to_add": None,
+            "to_change": None,
+            "to_destroy": None,
+            "summary": "Unable to parse plan output",
+            "raw_output": output,
+        }
+
     def plan(
         self, env_name: str, dry_run: bool = False, resource_filter: list[str] | None = None
     ) -> dict[str, Any]:
