@@ -329,12 +329,19 @@ class StateManager:
             session.commit()
 
     def get_deployment_history(
-        self, environment: str | None = None, limit: int = 50, exclude_dry_run: bool = False
+        self,
+        environment: str | None = None,
+        command: str | None = None,
+        status: DeploymentStatus | None = None,
+        limit: int = 50,
+        exclude_dry_run: bool = False,
     ) -> list[Deployment]:
         """Get deployment history.
 
         Args:
             environment: Filter by environment (None for all)
+            command: Filter by command type (plan, apply, destroy)
+            status: Filter by deployment status
             limit: Maximum number of records
             exclude_dry_run: If True, exclude dry-run deployments
 
@@ -345,6 +352,10 @@ class StateManager:
             query = session.query(Deployment)
             if environment:
                 query = query.filter_by(environment=environment)
+            if command:
+                query = query.filter_by(command=command)
+            if status:
+                query = query.filter_by(status=status)
             if exclude_dry_run:
                 query = query.filter_by(dry_run=False)
             deployments = query.order_by(Deployment.started_at.desc()).limit(limit).all()

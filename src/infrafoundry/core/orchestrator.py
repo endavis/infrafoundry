@@ -87,6 +87,60 @@ class Orchestrator:
                     f"Supported types: {', '.join(supported_types)}"
                 )
 
+    def build_dependency_graph(self, env_name: str) -> "DependencyGraph":
+        """Build dependency graph for an environment.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            DependencyGraph with all resources and dependencies
+        """
+        from infrafoundry.core.dependencies import DependencyGraph
+
+        graph = DependencyGraph()
+
+        # Get all resources for the environment
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+        # Build a map of resources by provider and type for dependency resolution
+        resources_by_provider: dict[str, list[Any]] = {}
+        for resource in all_resources:
+            if resource.provider not in resources_by_provider:
+                resources_by_provider[resource.provider] = []
+            resources_by_provider[resource.provider].append(resource)
+
+        # Add all resources to graph with their dependencies
+        for resource in all_resources:
+            provider_name = resource.provider
+            dependencies: list[str] = []
+
+            if provider_name in self.providers:
+                provider = self.providers[provider_name]
+                dependency_rules = provider.get_dependencies()
+
+                # Check if this resource type has dependencies
+                if resource.type in dependency_rules:
+                    required_types = dependency_rules[resource.type]
+
+                    # Find resources of required types from same provider
+                    provider_resources = resources_by_provider.get(provider_name, [])
+                    for other_resource in provider_resources:
+                        if (
+                            other_resource.type in required_types
+                            and other_resource.name != resource.name
+                        ):
+                            dependencies.append(other_resource.name)
+
+            graph.add_resource(
+                provider=resource.provider,
+                resource_type=resource.type,
+                name=resource.name,
+                dependencies=dependencies,
+            )
+
+        return graph
+
     def plan(
         self, env_name: str, dry_run: bool = False, resource_filter: list[str] | None = None
     ) -> dict[str, Any]:
