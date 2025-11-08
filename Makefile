@@ -33,6 +33,19 @@ clean:
 test:
 	pytest -v --cov=infrafoundry --cov-report=term-missing
 
+test-unit:
+	pytest -v -m unit tests/unit/
+
+test-integration:
+	pytest -v -m integration tests/integration/
+
+test-coverage:
+	pytest -v --cov=infrafoundry --cov-report=html --cov-report=term-missing
+	@echo "Coverage report generated in htmlcov/index.html"
+
+test-fast:
+	pytest -v -m "not slow"
+
 lint:
 	ruff check src/ tests/
 
