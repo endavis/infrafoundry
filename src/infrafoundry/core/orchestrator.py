@@ -542,6 +542,9 @@ class Orchestrator:
                     results[provider_name] = {"resources": len(resources), "dry_run": True}
                     continue
 
+                # Set environment for provider to ensure correct output directory
+                provider.set_environment(env_name)
+
                 # Generate Terraform and Ansible files
                 provider.ensure_directories()
                 provider.generate_terraform(resources)
@@ -745,6 +748,9 @@ class Orchestrator:
 
             self.console.print(f"\n[bold]Applying {provider_name}...[/bold]")
 
+            # Set environment for provider to ensure correct output directory
+            provider.set_environment(env_name)
+
             result = self._apply_single_provider(
                 env_name=env_name,
                 deployment_id=deployment_id,
@@ -793,6 +799,9 @@ class Orchestrator:
                     continue
 
                 provider = self.providers[provider_name]
+
+                # Set environment for provider to ensure correct output directory
+                provider.set_environment(env_name)
 
                 # Check if any resources match filter for this provider
                 if resource_filter:
@@ -993,6 +1002,9 @@ class Orchestrator:
                         continue  # Skip provider if no matching resources
 
                 self.console.print(f"\n[bold]Destroying {provider_name}...[/bold]")
+
+                # Set environment for provider to ensure correct output directory
+                provider.set_environment(env_name)
 
                 # Track resources being destroyed and store their IDs
                 resource_ids = {}

@@ -25,13 +25,30 @@ class ProviderBase(ABC):
         Args:
             name: Provider name (e.g., 'proxmox', 'opnsense', 'kubernetes')
             config_dir: Directory containing provider configs
-            output_dir: Directory for generated Terraform/Ansible files
+            output_dir: Base directory for generated Terraform/Ansible files
+                       (actual paths will be output_dir/{env}/{terraform|ansible}/{provider})
         """
         self.name = name
         self.config_dir = config_dir
-        self.output_dir = output_dir
+        self.base_output_dir = output_dir  # Store base, use set_environment() for actual paths
+        self.output_dir = output_dir  # Legacy compatibility
         self.terraform_dir = output_dir / "terraform" / name
         self.ansible_dir = output_dir / "ansible" / name
+        self._current_environment: str | None = None
+
+    def set_environment(self, env_name: str) -> None:
+        """Set the current environment and update output directories.
+
+        This should be called before generate_terraform() or generate_ansible()
+        to ensure files are generated in the correct environment-specific directory.
+
+        Args:
+            env_name: Environment name (e.g., 'dev', 'staging', 'prod')
+        """
+        self._current_environment = env_name
+        self.output_dir = self.base_output_dir / env_name
+        self.terraform_dir = self.output_dir / "terraform" / self.name
+        self.ansible_dir = self.output_dir / "ansible" / self.name
 
     @abstractmethod
     def validate_config(self, config: dict[str, Any]) -> bool:
