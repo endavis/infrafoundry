@@ -1,5 +1,6 @@
 """Core orchestration for infrastructure deployment."""
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -546,6 +547,20 @@ class Orchestrator:
                 # Run Terraform apply
                 tf_result = self._run_terraform(provider, "apply", auto_approve)
 
+                # Extract Terraform resource IDs from state if apply was successful
+                if tf_result["success"]:
+                    terraform_ids = self._get_terraform_resource_ids(provider)
+
+                    # Update tracked resources with Terraform IDs
+                    for resource_name, terraform_id in terraform_ids.items():
+                        if resource_name in resource_ids:
+                            db_resource_id = resource_ids[resource_name]
+                            # Update resource with Terraform ID
+                            self.state_manager.update_resource(
+                                resource_id=db_resource_id,
+                                terraform_id=terraform_id,
+                            )
+
                 # Run Ansible playbook (check mode for dry run)
                 ansible_result = self._run_ansible(provider, check_mode=not auto_approve)
 
@@ -732,6 +747,47 @@ class Orchestrator:
             raise
 
         return results
+
+    def _get_terraform_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
+        """Extract Terraform resource IDs from state.
+
+        Args:
+            provider: Provider instance
+
+        Returns:
+            Dict mapping resource names to Terraform resource addresses
+        """
+        tf_dir = provider.terraform_dir
+
+        try:
+            # Run terraform show -json to get state
+            result = subprocess.run(
+                ["terraform", "show", "-json"],
+                cwd=tf_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            state = json.loads(result.stdout)
+            resource_ids = {}
+
+            # Extract resource addresses from state
+            if "values" in state and "root_module" in state["values"]:
+                root = state["values"]["root_module"]
+                if "resources" in root:
+                    for resource in root["resources"]:
+                        # Resource address format: provider_type.resource_name
+                        address = resource.get("address")
+                        name = resource.get("name")
+                        if address and name:
+                            resource_ids[name] = address
+
+            return resource_ids
+
+        except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError) as e:
+            self.console.print(f"[yellow]Warning: Could not extract Terraform IDs: {e}[/yellow]")
+            return {}
 
     def _run_terraform(
         self, provider: ProviderBase, command: str, auto_approve: bool = False

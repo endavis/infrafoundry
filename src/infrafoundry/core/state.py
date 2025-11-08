@@ -281,6 +281,19 @@ class StateManager:
                     resource.terraform_id = terraform_id
                 session.commit()
 
+    def update_resource(self, resource_id: int, terraform_id: str) -> None:
+        """Update resource with Terraform ID.
+
+        Args:
+            resource_id: Resource ID to update
+            terraform_id: Terraform resource address
+        """
+        with self.SessionLocal() as session:
+            resource = session.query(Resource).filter_by(id=resource_id).first()
+            if resource:
+                resource.terraform_id = terraform_id
+                session.commit()
+
     def add_resource_dependency(
         self, resource_id: int, depends_on_id: int, dependency_type: str = "explicit"
     ) -> None:
