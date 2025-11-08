@@ -153,9 +153,7 @@ def init() -> None:
 @main.command()
 @click.option("--env", "-e", help="Filter by environment")
 @click.option("--limit", "-n", default=50, help="Number of deployments to show")
-@click.option(
-    "--exclude-dry-runs", is_flag=True, help="Exclude dry-run deployments from history"
-)
+@click.option("--exclude-dry-runs", is_flag=True, help="Exclude dry-run deployments from history")
 def history(env: str | None, limit: int, exclude_dry_runs: bool) -> None:
     """Show deployment history."""
     from rich.table import Table
