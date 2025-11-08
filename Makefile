@@ -1,4 +1,4 @@
-.PHONY: help install dev clean test lint format check plan apply destroy
+.PHONY: help install dev clean test coverage lint format check plan apply destroy
 
 help:
 	@echo "InfraFoundry - Infrastructure Automation Framework"
@@ -10,6 +10,7 @@ help:
 	@echo ""
 	@echo "Development commands:"
 	@echo "  make test          Run pytest"
+	@echo "  make coverage      Run tests with full coverage report"
 	@echo "  make lint          Run ruff linter"
 	@echo "  make format        Format code with black"
 	@echo "  make check         Run all checks (lint + type check)"
@@ -26,12 +27,19 @@ dev:
 	uv pip install -e ".[dev]"
 
 clean:
-	rm -rf build/ dist/ *.egg-info __pycache__ .pytest_cache .mypy_cache .ruff_cache
+	rm -rf build/ dist/ *.egg-info __pycache__ .pytest_cache .mypy_cache .ruff_cache htmlcov/ coverage.xml .coverage
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
 test:
-	pytest -v --cov=infrafoundry --cov-report=term-missing
+	pytest -v
+
+coverage:
+	pytest --cov=src/infrafoundry --cov-report=term-missing --cov-report=html --cov-report=xml --cov-fail-under=69 -v
+	@echo ""
+	@echo "Coverage report generated:"
+	@echo "  HTML: htmlcov/index.html"
+	@echo "  XML:  coverage.xml"
 
 test-unit:
 	pytest -v -m unit tests/unit/

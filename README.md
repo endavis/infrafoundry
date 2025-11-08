@@ -2,6 +2,11 @@
 
 **A pluggable infrastructure automation framework built on Terraform, Ansible, and Python.**
 
+[![Tests](https://github.com/endavis/infrafoundry/actions/workflows/tests.yml/badge.svg)](https://github.com/endavis/infrafoundry/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/badge/coverage-70%25-brightgreen)](https://github.com/endavis/infrafoundry)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 InfraFoundry enables reproducible, multi-provider infrastructure deployment with a focus on simplicity, security, and CI/CD integration.
 
 ## Features
@@ -547,7 +552,33 @@ proxmox_api_token_secret: your-secret-token
 
 ## CI/CD Integration
 
-### GitHub Actions
+InfraFoundry includes comprehensive CI/CD workflows for both testing and deployment.
+
+### Automated Testing (GitHub Actions)
+
+The test workflow (`.github/workflows/tests.yml`) runs on every push and PR:
+
+**Four parallel jobs:**
+1. **Main Tests**: Full test suite with coverage (69% threshold)
+2. **Python Matrix**: Tests on Python 3.12 and 3.13
+3. **Integration Tests**: Tests with Terraform and Ansible installed
+4. **Code Quality**: Black, ruff, isort, and mypy checks
+
+**Coverage reporting:**
+- Coverage reports uploaded as CI artifacts
+- Codecov integration for tracking trends
+- PR comments with coverage changes
+- Coverage badge auto-updated
+
+**Local testing:**
+```bash
+make test          # Run all tests
+make coverage      # Run with coverage report
+make lint          # Run linting
+make format        # Format code
+```
+
+### Infrastructure Deployment (GitHub Actions)
 
 ```yaml
 # .github/workflows/infra-deploy.yml
@@ -574,6 +605,7 @@ See `.gitlab-ci.yml.example` for complete configuration.
 - `PROXMOX_API_*` - Proxmox credentials
 - `OPNSENSE_API_*` - OPNsense credentials
 - `KUBECONFIG` - Kubernetes config (optional)
+- `CODECOV_TOKEN` - Codecov token (optional, for test workflow)
 
 ## Development
 
