@@ -1,6 +1,7 @@
 """Unit tests for ConfigManager."""
 
 import pytest
+import yaml
 
 from infrafoundry.core.config import ConfigManager
 
@@ -257,3 +258,146 @@ class TestConfigManager:
         resources = config.get_all_resources("dev", "proxmox")
         # Should return empty list for direct list format
         assert len(resources) == 0
+
+    def test_get_resources_from_empty_yaml_file(self, temp_dir):
+        """Test get_resources with empty YAML file."""
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create empty YAML file
+        resource_file = envs_dir / "vm.yaml"
+        resource_file.write_text("")  # Empty file
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources("dev", "proxmox")
+        # Should return empty list for empty file
+        assert len(resources) == 0
+
+    def test_get_all_resources_missing_provider_field(self, temp_dir):
+        """Test get_all_resources with missing provider field in resource-centric format."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create environment.yaml
+        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_data = {"name": "dev", "description": "Test"}
+        with open(env_file, "w") as f:
+            yaml.dump(env_data, f)
+
+        # Create resource file with missing provider field
+        resource_file = envs_dir / "test.yaml"
+        config_data = {
+            "resources": [
+                {
+                    "type": "vm",  # Missing 'provider' field
+                    "name": "web-01",
+                    "config": {"cores": 4},
+                }
+            ]
+        }
+        with open(resource_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Missing 'provider' field"):
+            config.get_all_resources_all_providers("dev")
+
+    def test_get_all_resources_missing_type_field(self, temp_dir):
+        """Test get_all_resources with missing type field in resource-centric format."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create environment.yaml
+        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_data = {"name": "dev", "description": "Test"}
+        with open(env_file, "w") as f:
+            yaml.dump(env_data, f)
+
+        # Create resource file with missing type field
+        resource_file = envs_dir / "test.yaml"
+        config_data = {
+            "resources": [
+                {
+                    "provider": "proxmox",  # Missing 'type' field
+                    "name": "web-01",
+                    "config": {"cores": 4},
+                }
+            ]
+        }
+        with open(resource_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Missing 'type' field"):
+            config.get_all_resources_all_providers("dev")
+
+    def test_get_all_resources_missing_name_field(self, temp_dir):
+        """Test get_all_resources with missing name field in resource-centric format."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create environment.yaml
+        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_data = {"name": "dev", "description": "Test"}
+        with open(env_file, "w") as f:
+            yaml.dump(env_data, f)
+
+        # Create resource file with missing name field
+        resource_file = envs_dir / "test.yaml"
+        config_data = {
+            "resources": [
+                {
+                    "provider": "proxmox",
+                    "type": "vm",  # Missing 'name' field
+                    "config": {"cores": 4},
+                }
+            ]
+        }
+        with open(resource_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Missing 'name' field"):
+            config.get_all_resources_all_providers("dev")
+
+    def test_get_all_resources_duplicate_names(self, temp_dir):
+        """Test get_all_resources_all_providers with duplicate resource names."""
+        # Create two different files with same resource name
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create environment.yaml
+        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_data = {"name": "dev", "description": "Test"}
+        with open(env_file, "w") as f:
+            yaml.dump(env_data, f)
+
+        # First file
+        file1 = envs_dir / "vm.yaml"
+        config1 = {"vm": [{"name": "web-01", "config": {"cores": 2}}]}
+        with open(file1, "w") as f:
+            yaml.dump(config1, f)
+
+        # Second file with duplicate name
+        file2 = envs_dir / "vm-services.yaml"
+        config2 = {"vm": [{"name": "web-01", "config": {"cores": 4}}]}
+        with open(file2, "w") as f:
+            yaml.dump(config2, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Duplicate resource names found"):
+            config.get_all_resources_all_providers("dev")
+
+    def test_list_environments_nonexistent_base_dir(self, temp_dir):
+        """Test list_environments when base_dir doesn't exist."""
+        config = ConfigManager(temp_dir / "nonexistent")
+        envs = config.list_environments()
+        assert envs == []
+
+    def test_validate_environment_nonexistent(self, temp_dir):
+        """Test validate_environment with nonexistent environment."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir(parents=True)
+
+        config = ConfigManager(envs_dir)
+        assert not config.validate_environment("nonexistent")
