@@ -607,13 +607,35 @@ def plan(ctx: click.Context, env: str, dry_run: bool, resource: tuple[str, ...])
     multiple=True,
     help="Specific resource name(s) to target (can be used multiple times)",
 )
+@click.option(
+    "--parallel",
+    is_flag=True,
+    help="Apply providers in parallel (experimental)",
+)
+@click.option(
+    "--max-workers",
+    type=int,
+    default=4,
+    help="Maximum number of parallel workers (default: 4)",
+)
 @click.pass_context
-def apply(ctx: click.Context, env: str, auto_approve: bool, resource: tuple[str, ...]) -> None:
+def apply(
+    ctx: click.Context,
+    env: str,
+    auto_approve: bool,
+    resource: tuple[str, ...],
+    parallel: bool,
+    max_workers: int,
+) -> None:
     """Apply infrastructure changes."""
     try:
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
         orchestrator.apply(
-            env, auto_approve=auto_approve, resource_filter=list(resource) if resource else None
+            env,
+            auto_approve=auto_approve,
+            resource_filter=list(resource) if resource else None,
+            parallel=parallel,
+            max_workers=max_workers,
         )
         console.print("\n[bold green]Apply complete![/bold green]")
     except Exception as e:

@@ -213,6 +213,19 @@ class DependencyGraph:
 
         return all_deps
 
+    def get_execution_batches(self) -> list[list[str]]:
+        """Get batches of resources that can be executed in parallel.
+
+        Returns:
+            List of batches where each batch contains resources with no
+            dependencies between them. Batches are ordered so that each
+            batch's dependencies are satisfied by previous batches.
+
+        Raises:
+            CircularDependencyError: If circular dependencies are detected
+        """
+        return self.topological_sort()
+
     def get_impact_analysis(self, resource_name: str) -> dict[str, any]:
         """Analyze the impact of changing/deleting a resource.
 
