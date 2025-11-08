@@ -408,19 +408,59 @@ class TestOPNsenseTemplates:
 
     def test_generate_ansible_playbook(self, provider: OPNsenseProvider) -> None:
         """Test OPNsense Ansible playbook generation."""
-        # OPNsense playbook uses b64encode filter which isn't available
-        # in basic Jinja2, so skip this test or mark it as expected to fail
-        # with the template error
-        try:
+        import base64
+        import re
+        from unittest.mock import patch
+
+        # Add Ansible-specific filters to Jinja2 environment
+        def b64encode_filter(s: str) -> str:
+            """Base64 encode filter for Jinja2 (mimics Ansible filter)."""
+            if not s:
+                return ''
+            return base64.b64encode(s.encode()).decode()
+
+        def regex_replace_filter(value: str, pattern: str, replacement: str) -> str:
+            """Regex replace filter (mimics Ansible filter)."""
+            return re.sub(pattern, replacement, value)
+
+        def lookup_filter(plugin: str, *args, **kwargs) -> str:
+            """Lookup filter (mimics Ansible lookup)."""
+            # Return empty string for env lookups in tests
+            return ''
+
+        provider.jinja_env.filters['b64encode'] = b64encode_filter
+        provider.jinja_env.filters['regex_replace'] = regex_replace_filter
+        provider.jinja_env.globals['lookup'] = lookup_filter
+
+        # Patch template.render to inject test variables
+        original_get_template = provider.jinja_env.get_template
+
+        def get_template_with_vars(name):
+            """Get template and wrap render method to inject variables."""
+            template = original_get_template(name)
+            original_render = template.render
+
+            def render_with_test_vars(**kwargs):
+                """Inject test variables into template context."""
+                test_vars = {
+                    'opnsense_api_url': 'https://opnsense.test',
+                    'opnsense_api_key': 'testkey',
+                    'opnsense_api_secret': 'testsecret',
+                }
+                kwargs.update(test_vars)
+                return original_render(**kwargs)
+
+            template.render = render_with_test_vars
+            return template
+
+        with patch.object(provider.jinja_env, 'get_template', side_effect=get_template_with_vars):
             provider.generate_ansible([])
             playbook = provider.ansible_dir / "playbook.yml"
             assert playbook.exists()
             content = playbook.read_text()
             assert "Configure OPNsense" in content
-        except Exception:
-            # Expected - template uses b64encode filter not available in Jinja2
-            pytest.skip("OPNsense playbook requires Ansible Jinja2 filters")
-
+            assert "api/firewall/filter/apply" in content
+            assert "api/firewall/filter/reload" in content
     def test_generate_outputs_tf(
         self, provider: OPNsenseProvider, firewall_rule: ResourceConfig
     ) -> None:
@@ -598,9 +638,65 @@ class TestKubernetesTemplates:
 
     def test_generate_ansible_playbook(self, provider: KubernetesProvider) -> None:
         """Test Kubernetes Ansible playbook generation."""
-        # Kubernetes playbook uses complex Jinja2 filters and loops
-        # that expect full ResourceConfig objects with proper structure
-        pytest.skip("Kubernetes playbook requires complex Jinja2 template rendering")
+        from unittest.mock import MagicMock, patch
+
+        # Kubernetes playbook uses Ansible loop constructs (item variable)
+        # which are only available at Ansible runtime. We need to provide
+        # a mock 'item' object for the template to render.
+
+        # Add Ansible-specific functions to Jinja2 environment
+        def lookup_filter(plugin: str, *args, **kwargs) -> str:
+            """Lookup filter (mimics Ansible lookup)."""
+            return ''
+
+        provider.jinja_env.globals['lookup'] = lookup_filter
+
+        resources = [
+            ResourceConfig(
+                provider="kubernetes",
+                type="deployments",
+                name="web-app",
+                config={
+                    "name": "web-app",
+                    "namespace": "default",
+                    "replicas": 3,
+                },
+            ),
+        ]
+
+        # Create a mock item object that provides the structure needed by the template
+        mock_item = MagicMock()
+        mock_item.config.name = "web-app"
+        mock_item.config.namespace = "default"
+
+        # Patch template.render to inject mock item
+        original_get_template = provider.jinja_env.get_template
+
+        def get_template_with_mock_item(name):
+            """Get template and wrap render method to inject mock item."""
+            template = original_get_template(name)
+            original_render = template.render
+
+            def render_with_mock(**kwargs):
+                """Inject mock item into template context."""
+                kwargs['item'] = mock_item
+                return original_render(**kwargs)
+
+            template.render = render_with_mock
+            return template
+
+        with patch.object(
+            provider.jinja_env, 'get_template', side_effect=get_template_with_mock_item
+        ):
+            provider.generate_ansible(resources)
+            playbook = provider.ansible_dir / "playbook.yml"
+            assert playbook.exists()
+            content = playbook.read_text()
+            assert "Configure Kubernetes resources" in content
+            assert "kubectl wait" in content
+            assert "kubectl get deployments" in content
+            # Verify Ansible loop syntax is preserved
+            assert "loop:" in content
 
     def test_generate_outputs_tf(
         self, provider: KubernetesProvider, deployment_resource: ResourceConfig
