@@ -1,0 +1,55 @@
+channels:
+  # Webhook notifier for general events
+  - name: webhook-general
+    type: webhook
+    enabled: false  # Set to true and configure URL to enable
+    config:
+      url: https://your-webhook-endpoint.com/notifications
+      headers:
+        Authorization: Bearer your-token-here
+    events:
+      # Deployment lifecycle
+      - after_apply
+      - apply_failed
+      - after_destroy
+      - destroy_failed
+      # Drift detection
+      - drift_detected
+      # Policy enforcement
+      - policy_check_failed
+
+  # Slack notifier for critical events
+  - name: slack-critical
+    type: slack
+    enabled: false  # Set to true and configure webhook_url to enable
+    config:
+      webhook_url: https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+    events:
+      - apply_failed
+      - destroy_failed
+      - policy_check_failed
+      - drift_detected
+
+  # Slack notifier for all deployment events
+  - name: slack-deployments
+    type: slack
+    enabled: false
+    config:
+      webhook_url: https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+    events:
+      - before_apply
+      - after_apply
+      - apply_failed
+      - before_destroy
+      - after_destroy
+      - destroy_failed
+
+  # Webhook for policy violations only
+  - name: webhook-policy
+    type: webhook
+    enabled: false
+    config:
+      url: https://your-compliance-system.com/violations
+    events:
+      - policy_violation
+      - policy_check_failed
