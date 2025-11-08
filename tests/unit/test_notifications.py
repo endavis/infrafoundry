@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from infrafoundry.core.notifications import (
+    NotificationChannel,
     NotificationManager,
     SlackNotifier,
     WebhookNotifier,
@@ -212,3 +213,255 @@ class TestNotificationManager:
 
         # Both channels should receive notification
         assert mock_post.call_count == 2
+
+    @patch("requests.post")
+    def test_webhook_no_url_configured(self, mock_post, temp_dir):
+        """Test webhook notifier with missing URL."""
+        import yaml
+
+        config = {
+            "channels": [
+                {
+                    "name": "webhook1",
+                    "type": "webhook",
+                    "enabled": True,
+                    "config": {},  # No URL
+                }
+            ]
+        }
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(config, f)
+
+        manager = NotificationManager(config_file)
+        # Should not raise exception, just print error
+        manager.notify("AFTER_APPLY", "dev", {"resource": "vm-01"})
+        mock_post.assert_not_called()
+
+    @patch("requests.post")
+    def test_webhook_request_exception(self, mock_post, temp_dir):
+        """Test webhook notifier with request exception."""
+        import yaml
+
+        mock_post.side_effect = Exception("Connection error")
+
+        config = {
+            "channels": [
+                {
+                    "name": "webhook1",
+                    "type": "webhook",
+                    "enabled": True,
+                    "config": {"url": "https://webhook.example.com"},
+                }
+            ]
+        }
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(config, f)
+
+        manager = NotificationManager(config_file)
+        # Should not raise exception, just print error
+        manager.notify("AFTER_APPLY", "dev", {"resource": "vm-01"})
+
+    @patch("requests.post")
+    def test_slack_no_webhook_url_configured(self, mock_post, temp_dir):
+        """Test Slack notifier with missing webhook URL."""
+        import yaml
+
+        config = {
+            "channels": [
+                {
+                    "name": "slack1",
+                    "type": "slack",
+                    "enabled": True,
+                    "config": {},  # No webhook_url
+                }
+            ]
+        }
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(config, f)
+
+        manager = NotificationManager(config_file)
+        # Should not raise exception, just print error
+        manager.notify("AFTER_APPLY", "dev", {"resource": "vm-01"})
+        mock_post.assert_not_called()
+
+    @patch("requests.post")
+    def test_slack_request_exception(self, mock_post, temp_dir):
+        """Test Slack notifier with request exception."""
+        import yaml
+
+        mock_post.side_effect = Exception("Connection error")
+
+        config = {
+            "channels": [
+                {
+                    "name": "slack1",
+                    "type": "slack",
+                    "enabled": True,
+                    "config": {"webhook_url": "https://hooks.slack.com/services/XXX"},
+                }
+            ]
+        }
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(config, f)
+
+        manager = NotificationManager(config_file)
+        # Should not raise exception, just print error
+        manager.notify("AFTER_APPLY", "dev", {"resource": "vm-01"})
+
+    def test_load_config_invalid_yaml(self, temp_dir):
+        """Test loading configuration with invalid YAML."""
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            f.write("invalid: yaml: content:\n  bad indentation")
+
+        # Should not raise exception
+        manager = NotificationManager(config_file)
+        assert len(manager.channels) == 0
+
+    def test_load_config_empty_file(self, temp_dir):
+        """Test loading configuration from empty file."""
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            f.write("")
+
+        manager = NotificationManager(config_file)
+        assert len(manager.channels) == 0
+
+    def test_load_config_no_channels_key(self, temp_dir):
+        """Test loading configuration without channels key."""
+        import yaml
+
+        config = {"some_other_key": "value"}
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(config, f)
+
+        manager = NotificationManager(config_file)
+        assert len(manager.channels) == 0
+
+    @patch("requests.post")
+    def test_add_channel_dynamically(self, mock_post, temp_dir):
+        """Test adding a channel after initialization."""
+        manager = NotificationManager()
+
+        channel = NotificationChannel(
+            name="dynamic",
+            type="webhook",
+            enabled=True,
+            config={"url": "https://webhook.example.com"},
+        )
+        manager.add_channel(channel)
+
+        mock_post.return_value.status_code = 200
+        manager.notify("AFTER_APPLY", "dev", {"resource": "vm-01"})
+
+        assert mock_post.call_count == 1
+
+    @patch("requests.post")
+    def test_slack_format_apply_failed_event(self, mock_post, temp_dir):
+        """Test Slack formatting for APPLY_FAILED event."""
+        import yaml
+
+        mock_post.return_value.status_code = 200
+
+        config = {
+            "channels": [
+                {
+                    "name": "slack1",
+                    "type": "slack",
+                    "enabled": True,
+                    "config": {"webhook_url": "https://hooks.slack.com/services/XXX"},
+                }
+            ]
+        }
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(config, f)
+
+        manager = NotificationManager(config_file)
+        manager.notify("APPLY_FAILED", "dev", {"error": "Terraform apply failed"})
+
+        # Check that notification was sent
+        assert mock_post.call_count == 1
+        call_args = mock_post.call_args
+        blocks = call_args[1]["json"]["blocks"]
+        # Should have header and section with fields at minimum
+        assert len(blocks) >= 2
+        # Check for error event type in header
+        assert "APPLY_FAILED" in str(blocks)
+
+    @patch("requests.post")
+    def test_slack_format_drift_detected_event(self, mock_post, temp_dir):
+        """Test Slack formatting for DRIFT_DETECTED event."""
+        import yaml
+
+        mock_post.return_value.status_code = 200
+
+        config = {
+            "channels": [
+                {
+                    "name": "slack1",
+                    "type": "slack",
+                    "enabled": True,
+                    "config": {"webhook_url": "https://hooks.slack.com/services/XXX"},
+                }
+            ]
+        }
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(config, f)
+
+        manager = NotificationManager(config_file)
+        manager.notify(
+            "DRIFT_DETECTED", "prod", {"to_add": 2, "to_change": 3, "to_destroy": 1}
+        )
+
+        # Check that notification was sent
+        assert mock_post.call_count == 1
+        call_args = mock_post.call_args
+        blocks = call_args[1]["json"]["blocks"]
+        # Should have header and section with fields at minimum
+        assert len(blocks) >= 2
+        # Check for drift event type in header
+        assert "DRIFT_DETECTED" in str(blocks)
+
+    @patch("requests.post")
+    def test_slack_format_policy_violation_event(self, mock_post, temp_dir):
+        """Test Slack formatting for POLICY_VIOLATION event."""
+        import yaml
+
+        mock_post.return_value.status_code = 200
+
+        config = {
+            "channels": [
+                {
+                    "name": "slack1",
+                    "type": "slack",
+                    "enabled": True,
+                    "config": {"webhook_url": "https://hooks.slack.com/services/XXX"},
+                }
+            ]
+        }
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(config, f)
+
+        manager = NotificationManager(config_file)
+        manager.notify(
+            "POLICY_VIOLATION",
+            "dev",
+            {"policy": "require-tags", "resource": "vm-01", "level": "ERROR"},
+        )
+
+        # Check that notification was sent
+        assert mock_post.call_count == 1
+        call_args = mock_post.call_args
+        blocks = call_args[1]["json"]["blocks"]
+        # Should have header and section with fields at minimum
+        assert len(blocks) >= 2
+        # Check for policy event type in header
+        assert "POLICY_VIOLATION" in str(blocks)
