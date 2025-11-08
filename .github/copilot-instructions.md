@@ -18,8 +18,9 @@ InfraFoundry is an infrastructure code generator and orchestration framework tha
 3. `example-config/` - Example configuration repository structure
 4. `docs/separate-config-repo.md` - Separate config repo pattern guide
 5. `docs/state-management.md` - State management strategies and best practices
-6. `pyproject.toml` - Dependencies and project metadata
-7. `README.md` - Complete project documentation
+6. `docs/per-environment-credentials.md` - Managing different credentials per environment
+7. `pyproject.toml` - Dependencies and project metadata
+8. `README.md` - Complete project documentation
 
 ### Architecture
 
