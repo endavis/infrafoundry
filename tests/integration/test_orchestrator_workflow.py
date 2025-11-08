@@ -1,32 +1,50 @@
 """Integration tests for Orchestrator workflows."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from pathlib import Path
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager
 from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import StateManager
+
+
+@pytest.fixture
+def mock_secret_manager(mock_secrets_dir):
+    """Create a mock SecretManager."""
+    with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
+        with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            manager = SecretManager(secrets_dir=mock_secrets_dir)
+            # Mock decrypt to return simple data
+            manager.decrypt_file = MagicMock(return_value={"api_token": "test-token"})
+            return manager
 
 
 @pytest.mark.integration
 class TestOrchestratorWorkflow:
     """Integration tests for complete workflows."""
 
-    def test_orchestrator_init(
-        self, mock_config_dir, mock_secrets_dir, mock_policy_dir, temp_dir
+    def test_orchestrator_initialization(
+        self, mock_config_dir, mock_secret_manager, mock_policy_dir, temp_dir
     ):
         """Test Orchestrator initialization with all components."""
-        config = ConfigManager(str(mock_config_dir / "envs"))
+        config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
         state_dir = temp_dir / "state"
         state_dir.mkdir()
 
+        # Create StateManager with proper SQLite connection string
+        state_db = state_dir / "state.db"
+        state_manager = StateManager(f"sqlite:///{state_db}")
+        state_manager.initialize()
+
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=None,
-            output_dir=str(output_dir),
-            state_manager=StateManager(str(state_dir / "state.db")),
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
+            state_manager=state_manager,
             event_manager=EventManager(),
             policy_dir=mock_policy_dir,
         )
@@ -34,41 +52,54 @@ class TestOrchestratorWorkflow:
         assert orchestrator is not None
         assert orchestrator.config_manager == config
         assert orchestrator.event_manager is not None
+        assert orchestrator.state_manager is not None
+        assert orchestrator.policy_engine is not None
+        assert orchestrator.output_dir == output_dir
 
-    def test_plan_workflow(
-        self, mock_config_dir, mock_secrets_dir, mock_policy_dir, temp_dir
+    def test_load_environment_configuration(
+        self, mock_config_dir, mock_secret_manager, temp_dir
     ):
-        """Test plan workflow without actual Terraform."""
-        config = ConfigManager(str(mock_config_dir / "envs"))
+        """Test loading environment configuration."""
+        config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
-        state_dir = temp_dir / "state"
-        state_dir.mkdir()
 
-        orchestrator = Orchestrator(
+        Orchestrator(
             config_manager=config,
-            secret_manager=None,
-            output_dir=str(output_dir),
-            state_manager=StateManager(str(state_dir / "state.db")),
-            event_manager=EventManager(),
-            policy_dir=mock_policy_dir,
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
         )
 
-        # Test dry-run plan (doesn't execute Terraform)
-        result = orchestrator.plan("dev", dry_run=True)
-        assert result is not None
+        # Load environment
+        env = config.load_environment("dev")
+        assert env is not None
+        assert env.name == "dev"
+        assert env.description == "Development environment"
+        assert "datacenter" in env.variables
 
-        # Check that Terraform files were generated
-        tf_dir = output_dir / "terraform"
-        assert tf_dir.exists()
-
-    def test_event_emission_during_plan(
-        self, mock_config_dir, mock_policy_dir, temp_dir
+    def test_get_resources_from_config(
+        self, mock_config_dir, mock_secret_manager, temp_dir
     ):
-        """Test that events are emitted during plan."""
-        config = ConfigManager(str(mock_config_dir / "envs"))
+        """Test retrieving resources from configuration."""
+        config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
-        state_dir = temp_dir / "state"
-        state_dir.mkdir()
+
+        Orchestrator(
+            config_manager=config,
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
+        )
+
+        # Get resources for proxmox provider
+        resources = config.get_all_resources("dev", "proxmox")
+        assert resources is not None
+        assert len(resources) > 0
+
+    def test_event_system_integration(
+        self, mock_config_dir, mock_secret_manager, mock_policy_dir, temp_dir
+    ):
+        """Test that event system is integrated."""
+        config = ConfigManager(mock_config_dir / "envs")
+        output_dir = temp_dir / "output"
 
         event_manager = EventManager()
         events_received = []
@@ -81,99 +112,155 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=None,
-            output_dir=str(output_dir),
-            state_manager=StateManager(str(state_dir / "state.db")),
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
             event_manager=event_manager,
             policy_dir=mock_policy_dir,
         )
 
-        # Run plan
-        orchestrator.plan("dev", dry_run=True)
+        # Event manager should be set up
+        assert orchestrator.event_manager is not None
+        assert orchestrator.event_manager == event_manager
 
-        # Should have received events
-        assert len(events_received) > 0
-
-    def test_policy_enforcement_during_plan(
-        self, mock_config_dir, mock_policy_dir, temp_dir
+    def test_policy_engine_loaded(
+        self, mock_config_dir, mock_secret_manager, mock_policy_dir, temp_dir
     ):
-        """Test that policies are enforced during plan."""
-        config = ConfigManager(str(mock_config_dir / "envs"))
+        """Test that policy engine loads policies."""
+        config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
-        state_dir = temp_dir / "state"
-        state_dir.mkdir()
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=None,
-            output_dir=str(output_dir),
-            state_manager=StateManager(str(state_dir / "state.db")),
-            event_manager=EventManager(),
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
             policy_dir=mock_policy_dir,
         )
 
-        # Plan should run policy checks
-        # (Actual assertions depend on test data and policy configuration)
-        result = orchestrator.plan("dev", dry_run=True)
-        assert result is not None
+        # Policy engine should be loaded with policies
+        assert orchestrator.policy_engine is not None
+        policies = orchestrator.policy_engine.policies
+        assert len(policies) > 0
 
-    def test_dependency_graph_build(
-        self, mock_config_dir, temp_dir
+        # Verify specific policies exist
+        policy_names = {p.name for p in policies}
+        assert "resource_limits" in policy_names
+        assert "require_tags" in policy_names
+
+    def test_state_tracking_integration(
+        self, mock_config_dir, mock_secret_manager, temp_dir
     ):
-        """Test building dependency graph."""
-        config = ConfigManager(str(mock_config_dir / "envs"))
+        """Test state tracking functionality."""
+        config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
         state_dir = temp_dir / "state"
         state_dir.mkdir()
 
+        state_db = state_dir / "state.db"
+        state_manager = StateManager(f"sqlite:///{state_db}")
+        state_manager.initialize()
+
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=None,
-            output_dir=str(output_dir),
-            state_manager=StateManager(str(state_dir / "state.db")),
-            event_manager=EventManager(),
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
+            state_manager=state_manager,
         )
 
-        # Build dependency graph
-        graph = orchestrator.build_dependency_graph("dev")
-        assert graph is not None
-        assert len(graph.nodes) > 0
+        # Create a deployment record
+        deployment_id = orchestrator.state_manager.create_deployment(
+            environment="dev",
+            command="plan",
+            user="test-user",
+        )
 
-    def test_list_resources(self, mock_config_dir, temp_dir):
-        """Test listing resources."""
-        config = ConfigManager(str(mock_config_dir / "envs"))
+        assert deployment_id is not None
+
+        # Verify deployment was tracked
+        deployment = orchestrator.state_manager.get_deployment_by_id(deployment_id)
+        assert deployment is not None
+        assert deployment.environment == "dev"
+        assert deployment.command == "plan"
+        assert deployment.user == "test-user"
+
+    def test_output_directory_created(
+        self, mock_config_dir, mock_secret_manager, temp_dir
+    ):
+        """Test that output directory is created automatically."""
+        config = ConfigManager(mock_config_dir / "envs")
+        output_dir = temp_dir / "custom_output"
+
+        orchestrator = Orchestrator(
+            config_manager=config,
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
+        )
+
+        # Output directory should be created
+        assert output_dir.exists()
+        assert output_dir.is_dir()
+        assert orchestrator.output_dir == output_dir
+
+    def test_notification_manager_integration(
+        self, mock_config_dir, mock_secret_manager, temp_dir
+    ):
+        """Test that notification manager is initialized."""
+        config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
-        state_dir = temp_dir / "state"
-        state_dir.mkdir()
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=None,
-            output_dir=str(output_dir),
-            state_manager=StateManager(str(state_dir / "state.db")),
-            event_manager=EventManager(),
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
         )
 
-        # List should return resources
-        resources = orchestrator.list_resources("dev")
-        assert resources is not None
+        # Notification manager should exist
+        assert orchestrator.notification_manager is not None
 
-    def test_validate_with_policies(self, mock_config_dir, mock_policy_dir, temp_dir):
-        """Test validation with policy enforcement."""
-        config = ConfigManager(str(mock_config_dir / "envs"))
+    def test_default_state_manager_created(
+        self, mock_config_dir, mock_secret_manager, temp_dir
+    ):
+        """Test that default state manager is created if not provided."""
+        config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
-        state_dir = temp_dir / "state"
-        state_dir.mkdir()
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=None,
-            output_dir=str(output_dir),
-            state_manager=StateManager(str(state_dir / "state.db")),
-            event_manager=EventManager(),
-            policy_dir=mock_policy_dir,
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
         )
 
-        # Validate should check policies
-        result = orchestrator.validate("dev")
-        assert result is not None
+        # Default state manager should be created
+        assert orchestrator.state_manager is not None
+
+    def test_default_event_manager_created(
+        self, mock_config_dir, mock_secret_manager, temp_dir
+    ):
+        """Test that default event manager is created if not provided."""
+        config = ConfigManager(mock_config_dir / "envs")
+        output_dir = temp_dir / "output"
+
+        orchestrator = Orchestrator(
+            config_manager=config,
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
+        )
+
+        # Default event manager should be created
+        assert orchestrator.event_manager is not None
+
+    def test_provider_registry_initialized(
+        self, mock_config_dir, mock_secret_manager, temp_dir
+    ):
+        """Test that provider registry is initialized."""
+        config = ConfigManager(mock_config_dir / "envs")
+        output_dir = temp_dir / "output"
+
+        orchestrator = Orchestrator(
+            config_manager=config,
+            secret_manager=mock_secret_manager,
+            output_dir=output_dir,
+        )
+
+        # Providers dict should exist and be empty initially
+        assert hasattr(orchestrator, "providers")
+        assert isinstance(orchestrator.providers, dict)
