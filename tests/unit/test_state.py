@@ -386,3 +386,65 @@ class TestStateManager:
         assert ResourceState.DELETING.value == "deleting"
         assert ResourceState.DELETED.value == "deleted"
         assert ResourceState.ERROR.value == "error"
+
+    def test_update_resource(self, state_manager):
+        """Test updating resource terraform_id."""
+        # Create deployment and resource
+        deployment_id = state_manager.create_deployment(
+            environment="dev",
+            command="apply",
+        )
+
+        resource = state_manager.track_resource(
+            deployment_id=deployment_id,
+            environment="dev",
+            provider="proxmox",
+            resource_type="vm",
+            name="test-vm",
+            state=ResourceState.PLANNED,
+        )
+
+        # Update terraform_id
+        state_manager.update_resource(resource.id, terraform_id="proxmox_vm.test_vm")
+
+        # Verify update
+        resources = state_manager.get_resources(environment="dev", provider="proxmox")
+        assert len(resources) == 1
+        assert resources[0].terraform_id == "proxmox_vm.test_vm"
+
+    def test_add_resource_dependency(self, state_manager):
+        """Test adding resource dependencies."""
+        # Create deployment
+        deployment_id = state_manager.create_deployment(
+            environment="dev",
+            command="apply",
+        )
+
+        # Create two resources
+        resource1 = state_manager.track_resource(
+            deployment_id=deployment_id,
+            environment="dev",
+            provider="proxmox",
+            resource_type="network",
+            name="network",
+            state=ResourceState.ACTIVE,
+        )
+
+        resource2 = state_manager.track_resource(
+            deployment_id=deployment_id,
+            environment="dev",
+            provider="proxmox",
+            resource_type="vm",
+            name="vm",
+            state=ResourceState.PLANNED,
+        )
+
+        # Add dependency: vm depends on network
+        state_manager.add_resource_dependency(
+            resource_id=resource2.id,
+            depends_on_id=resource1.id,
+            dependency_type="explicit"
+        )
+
+        # Verify dependency was added successfully
+        # The test succeeds if no exception is raised
