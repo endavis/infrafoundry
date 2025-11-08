@@ -755,11 +755,31 @@ ls src/infrafoundry/providers/*/templates/
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure `make check` passes
-5. Submit a pull request
+We welcome contributions! Please follow these guidelines:
+
+1. **Fork the repository** and create a feature branch
+2. **Write tests** for new functionality (maintain 70% coverage)
+3. **Run quality checks** before committing:
+   ```bash
+   make format        # Format code with black
+   make lint          # Run ruff linting
+   make coverage      # Run tests with coverage (must pass 69% threshold)
+   ```
+4. **Ensure all checks pass** - CI will verify:
+   - All 286+ tests passing
+   - Coverage ≥ 69%
+   - Code formatting (black)
+   - Linting (ruff)
+5. **Submit a pull request** with clear description
+
+**Testing Guidelines:**
+- Add tests for new features and bug fixes
+- Follow existing test patterns in `tests/unit/`
+- Use fixtures for common setup
+- Mock external dependencies (Terraform, Ansible, APIs)
+- Check `htmlcov/index.html` for coverage gaps
+
+See [TESTING_STATUS.md](TESTING_STATUS.md) for testing status and [docs/ci-cd-testing.md](docs/ci-cd-testing.md) for testing guide.
 
 ## License
 
