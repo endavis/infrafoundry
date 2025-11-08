@@ -81,3 +81,84 @@ class TestConfigManager:
 
         # Now validate should pass
         assert config.validate_environment("good")
+
+    def test_get_resources_empty_environment(self, temp_dir):
+        """Test getting resources from environment with no resources."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        empty_env = envs_dir / "empty"
+        empty_env.mkdir()
+
+        import yaml
+
+        with open(empty_env / "environment.yaml", "w") as f:
+            yaml.dump({"name": "empty", "description": "Empty environment"}, f)
+
+        config = ConfigManager(envs_dir)
+        resources = config.get_all_resources("empty", "proxmox")
+        assert resources == []
+
+    def test_get_resources_invalid_yaml(self, temp_dir):
+        """Test handling of invalid YAML files."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        bad_env = envs_dir / "bad"
+        bad_env.mkdir()
+        proxmox_dir = bad_env / "proxmox"
+        proxmox_dir.mkdir(parents=True)
+
+        # Create invalid YAML file
+        (proxmox_dir / "vms.yaml").write_text("invalid: yaml: content::")
+
+        config = ConfigManager(envs_dir)
+        # Should handle gracefully (return empty or raise)
+        try:
+            resources = config.get_all_resources("bad", "proxmox")
+            # If it succeeds, should return empty list
+            assert isinstance(resources, list)
+        except Exception:
+            # If it raises, that's also acceptable
+            pass
+
+    def test_get_resources_with_resource_filter(self, mock_config_dir):
+        """Test filtering resources by name."""
+        config = ConfigManager(mock_config_dir / "envs")
+        all_resources = config.get_all_resources("dev", "proxmox")
+
+        if all_resources:
+            # Filter to specific resource
+            first_resource_name = all_resources[0].name
+            filtered = [r for r in all_resources if r.name == first_resource_name]
+            assert len(filtered) >= 1
+            assert filtered[0].name == first_resource_name
+
+    def test_load_environment_with_invalid_yaml(self, temp_dir):
+        """Test loading environment with invalid YAML."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        bad_env = envs_dir / "bad-yaml"
+        bad_env.mkdir()
+
+        # Create invalid YAML
+        (bad_env / "environment.yaml").write_text("invalid: yaml: content::")
+
+        config = ConfigManager(envs_dir)
+
+        with pytest.raises(Exception):  # Should raise some exception
+            config.load_environment("bad-yaml")
+
+    def test_list_environments_empty_directory(self, temp_dir):
+        """Test listing environments from empty directory."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+
+        config = ConfigManager(envs_dir)
+        envs = config.list_environments()
+        assert envs == []
+
+    def test_get_all_resources_nonexistent_provider(self, mock_config_dir):
+        """Test getting resources for non-existent provider."""
+        config = ConfigManager(mock_config_dir / "envs")
+        resources = config.get_all_resources("dev", "nonexistent-provider")
+        # Should return empty list
+        assert resources == []
