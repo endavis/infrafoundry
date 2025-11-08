@@ -11,6 +11,84 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Function to download installer with curl
+download_with_curl() {
+    if command -v curl &> /dev/null; then
+        echo -e "${YELLOW}Attempting download with curl...${NC}"
+        if curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh 2>/dev/null; then
+            echo -e "${GREEN}✓ Downloaded with curl${NC}"
+            return 0
+        else
+            echo -e "${RED}✗ Download with curl failed${NC}"
+            return 1
+        fi
+    else
+        return 1
+    fi
+}
+
+# Function to download installer with wget
+download_with_wget() {
+    if command -v wget &> /dev/null; then
+        echo -e "${YELLOW}Attempting download with wget...${NC}"
+        if wget -q https://astral.sh/uv/install.sh -O /tmp/uv-install.sh 2>/dev/null; then
+            echo -e "${GREEN}✓ Downloaded with wget${NC}"
+            return 0
+        else
+            echo -e "${RED}✗ Download with wget failed${NC}"
+            return 1
+        fi
+    else
+        return 1
+    fi
+}
+
+# Function to run the install script
+run_install_script() {
+    echo -e "${YELLOW}Running uv installer...${NC}"
+    if sh /tmp/uv-install.sh; then
+        rm -f /tmp/uv-install.sh
+        echo -e "${GREEN}✓ Installer completed${NC}"
+        return 0
+    else
+        rm -f /tmp/uv-install.sh
+        echo -e "${RED}✗ Installer failed${NC}"
+        return 1
+    fi
+}
+
+# Function to install uv via pip
+install_with_pip() {
+    if command -v pip &> /dev/null || command -v pip3 &> /dev/null; then
+        echo -e "${YELLOW}Installing uv with pip...${NC}"
+        if pip install uv 2>/dev/null || pip3 install uv 2>/dev/null; then
+            echo -e "${GREEN}✓ Installed with pip${NC}"
+            return 0
+        else
+            echo -e "${RED}✗ pip installation failed${NC}"
+            echo "Please install uv manually: https://github.com/astral-sh/uv"
+            exit 1
+        fi
+    else
+        echo -e "${RED}✗ No installation method available (curl, wget, or pip)${NC}"
+        echo "Please install uv manually: https://github.com/astral-sh/uv"
+        exit 1
+    fi
+}
+
+# Function to verify uv binary is available
+verify_uv() {
+    if command -v uv &> /dev/null; then
+        echo -e "${GREEN}✓ uv is ready${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ uv binary not found after installation${NC}"
+        echo "Try running: source ~/.bashrc or source ~/.zshrc"
+        echo "Or install manually: https://github.com/astral-sh/uv"
+        exit 1
+    fi
+}
+
 echo -e "${BLUE}"
 cat << "EOF"
 ╔═══════════════════════════════════════════════════════╗
@@ -22,6 +100,28 @@ EOF
 echo -e "${NC}"
 
 echo "This wizard will help you set up your InfraFoundry configuration."
+echo ""
+
+# Check for uv and install if needed
+echo -e "${YELLOW}Checking dependencies...${NC}"
+if ! command -v uv &> /dev/null; then
+    echo -e "${YELLOW}⚠ uv is not installed. Installing uv...${NC}"
+
+    # Try to download the installer
+    if download_with_curl || download_with_wget; then
+        # Download succeeded, run the installer
+        run_install_script
+        export PATH="$HOME/.cargo/bin:$PATH"
+    else
+        # Download failed, fall back to pip
+        install_with_pip
+    fi
+
+    # Verify uv is now available
+    verify_uv
+else
+    echo -e "${GREEN}✓ uv is installed${NC}"
+fi
 echo ""
 
 # Determine if using separate config repo or local
@@ -137,13 +237,10 @@ fi
 echo ""
 echo -e "${GREEN}Generating configuration files...${NC}"
 
-# Create environment.yaml
+# Create environment.yaml (providers are auto-discovered from resources)
 cat > "$ENV_DIR/environment.yaml" << EOF
 name: $env_name
 description: ${env_name^} environment
-providers:
-  - proxmox
-  - opnsense
 
 variables:
   environment: $env_name
@@ -157,9 +254,9 @@ echo -e "${GREEN}✓ Created $ENV_DIR/environment.yaml${NC}"
 # Create Proxmox directory
 mkdir -p "$ENV_DIR/proxmox"
 
-# Create a basic VM configuration
-cat > "$ENV_DIR/proxmox/vms.yaml" << EOF
-vms:
+# Create a basic VM configuration (using singular 'vm' resource type)
+cat > "$ENV_DIR/proxmox/vm.yaml" << EOF
+vm:
   - name: test-vm-01
     target_node: $proxmox_node
     clone: $vm_template
@@ -185,7 +282,7 @@ EOF
 if [[ "$setup_tailscale" =~ ^[Yy]$ ]]; then
     if [ "$tailscale_auth_method" = "2" ]; then
         # OAuth configuration
-        cat >> "$ENV_DIR/proxmox/vms.yaml" << EOF
+        cat >> "$ENV_DIR/proxmox/vm.yaml" << EOF
 
   # Tailscale exit node (OAuth authentication)
   - name: tailscale-exit-01
@@ -218,7 +315,7 @@ if [[ "$setup_tailscale" =~ ^[Yy]$ ]]; then
 EOF
     else
         # Auth Key configuration (default)
-        cat >> "$ENV_DIR/proxmox/vms.yaml" << EOF
+        cat >> "$ENV_DIR/proxmox/vm.yaml" << EOF
 
   # Tailscale exit node
   - name: tailscale-exit-01
@@ -250,7 +347,7 @@ EOF
     fi
 fi
 
-echo -e "${GREEN}✓ Created $ENV_DIR/proxmox/vms.yaml${NC}"
+echo -e "${GREEN}✓ Created $ENV_DIR/proxmox/vm.yaml${NC}"
 
 # Create OPNsense directory
 mkdir -p "$ENV_DIR/opnsense"
@@ -349,7 +446,7 @@ echo ""
 
 echo "📁 Configuration files created:"
 echo "   • $ENV_DIR/environment.yaml"
-echo "   • $ENV_DIR/proxmox/vms.yaml"
+echo "   • $ENV_DIR/proxmox/vm.yaml"
 echo "   • $ENV_DIR/opnsense/firewall_rules.yaml"
 echo "   • $CONFIG_DIR/secrets/credentials.yaml"
 echo "   • .envrc.local"
@@ -377,7 +474,7 @@ echo ""
 echo -e "${YELLOW}🚀 Next Steps:${NC}"
 echo ""
 echo "1. Review and customize your configuration:"
-echo "   • Edit $ENV_DIR/proxmox/vms.yaml to add/modify VMs"
+echo "   • Edit $ENV_DIR/proxmox/vm.yaml to add/modify VMs"
 echo "   • Edit $ENV_DIR/opnsense/firewall_rules.yaml for firewall rules"
 echo ""
 echo "2. Test the configuration:"
