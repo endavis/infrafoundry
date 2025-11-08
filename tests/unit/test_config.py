@@ -185,3 +185,75 @@ class TestConfigManager:
 
         config = ConfigManager()
         assert config.base_dir == custom_dir
+
+    def test_get_resources_with_plural_type(self, temp_dir):
+        """Test resource loading with plural type format (backwards compatibility)."""
+        import yaml
+
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True)
+
+        # Create env config
+        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_file.write_text("name: dev\ndescription: Test\n")
+
+        # Create resource file with plural type key (vms instead of vm)
+        resource_file = envs_dir / "vm.yaml"
+        config_data = {
+            "vms": [  # Plural form
+                {"name": "vm-01", "cores": 4, "memory": 8192}
+            ]
+        }
+        with open(resource_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources("dev", "proxmox")
+        # Should find resources using plural fallback
+        assert len(resources) >= 1
+        assert resources[0].name == "vm-01"
+
+    def test_get_resources_with_invalid_type(self, temp_dir):
+        """Test resource loading with non-list resource type."""
+        import yaml
+
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True)
+
+        # Create env config
+        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_file.write_text("name: dev\ndescription: Test\n")
+
+        # Create resource file with dict instead of list
+        resource_file = envs_dir / "vm.yaml"
+        config_data = {
+            "vm": {"name": "vm-01"}  # Dict instead of list
+        }
+        with open(resource_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Expected list"):
+            config.get_all_resources("dev", "proxmox")
+
+    def test_get_resources_direct_list_format(self, temp_dir):
+        """Test resource loading with direct list format (not dict)."""
+        import yaml
+
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True)
+
+        # Create env config
+        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_file.write_text("name: dev\ndescription: Test\n")
+
+        # Create resource file as direct list (invalid format)
+        resource_file = envs_dir / "vm.yaml"
+        config_data = [{"name": "vm-01"}]  # Direct list, not dict
+        with open(resource_file, "w") as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources("dev", "proxmox")
+        # Should return empty list for direct list format
+        assert len(resources) == 0
