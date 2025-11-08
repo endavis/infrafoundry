@@ -144,3 +144,42 @@ class TestEventManager:
 
         # Working global handler should still be called
         assert "global_success" in calls
+
+    def test_unsubscribe(self):
+        """Test unsubscribing a handler from an event."""
+        manager = EventManager()
+        calls = []
+
+        def handler1(event: Event):
+            calls.append("handler1")
+
+        def handler2(event: Event):
+            calls.append("handler2")
+
+        # Subscribe both handlers
+        manager.subscribe(EventType.BEFORE_PLAN, handler1)
+        manager.subscribe(EventType.BEFORE_PLAN, handler2)
+
+        # Emit - both should be called
+        manager.emit_event(EventType.BEFORE_PLAN, "dev", {})
+        assert len(calls) == 2
+
+        # Unsubscribe handler1
+        calls.clear()
+        manager.unsubscribe(EventType.BEFORE_PLAN, handler1)
+
+        # Emit again - only handler2 should be called
+        manager.emit_event(EventType.BEFORE_PLAN, "dev", {})
+        assert len(calls) == 1
+        assert "handler2" in calls
+        assert "handler1" not in calls
+
+    def test_unsubscribe_nonexistent_handler(self):
+        """Test unsubscribing a handler that was never subscribed."""
+        manager = EventManager()
+
+        def handler(event: Event):
+            pass
+
+        # Should not raise exception when unsubscribing non-existent handler
+        manager.unsubscribe(EventType.BEFORE_PLAN, handler)

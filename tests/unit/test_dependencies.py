@@ -445,3 +445,39 @@ class TestDependencyGraph:
 
         # Load balancer should be in last batch
         assert "proxmox:lb-01" in batches[-1]
+
+    def test_get_all_dependencies_with_shared_dependency(self):
+        """Test get_all_dependencies with diamond pattern (shared dependency)."""
+        graph = DependencyGraph()
+
+        # Diamond pattern: D depends on B and C, both B and C depend on A
+        graph.add_resource("proxmox", "vm", "A")
+        graph.add_resource("proxmox", "vm", "B", dependencies=["A"])
+        graph.add_resource("proxmox", "vm", "C", dependencies=["A"])
+        graph.add_resource("proxmox", "vm", "D", dependencies=["B", "C"])
+
+        # Get all dependencies of D - should visit A only once
+        all_deps = graph.get_all_dependencies("proxmox:D")
+
+        assert "proxmox:A" in all_deps
+        assert "proxmox:B" in all_deps
+        assert "proxmox:C" in all_deps
+        assert len(all_deps) == 3  # A, B, C (A counted once despite multiple paths)
+
+    def test_get_all_dependents_with_shared_dependent(self):
+        """Test get_all_dependents with inverse diamond pattern."""
+        graph = DependencyGraph()
+
+        # Inverse diamond: A is used by B and C, D depends on both B and C
+        graph.add_resource("proxmox", "vm", "A")
+        graph.add_resource("proxmox", "vm", "B", dependencies=["A"])
+        graph.add_resource("proxmox", "vm", "C", dependencies=["A"])
+        graph.add_resource("proxmox", "vm", "D", dependencies=["B", "C"])
+
+        # Get all dependents of A - should visit D only once
+        all_dependents = graph.get_all_dependents("proxmox:A")
+
+        assert "proxmox:B" in all_dependents
+        assert "proxmox:C" in all_dependents
+        assert "proxmox:D" in all_dependents
+        assert len(all_dependents) == 3  # B, C, D (D counted once despite multiple paths)
