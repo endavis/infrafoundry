@@ -48,17 +48,29 @@ InfraFoundry is a pluggable infrastructure automation framework that generates T
 ### Build / Run / Test
 
 **Framework development:**
+
+**CRITICAL: Always use `uv` for Python package management!**
+- Use `uv pip install` instead of `pip install`
+- Use `uv pip uninstall` instead of `pip uninstall`
+- Use `uv pip list` instead of `pip list`
+- Never use plain `pip` - it may install to wrong environment
+
 ```bash
 # Setup
-uv pip install -e .              # Install package
+uv pip install -e .              # Install package in editable mode
 cp .envrc.local.example .envrc.local  # Set up direnv
 direnv allow                     # Load environment
 
 # Development
-make dev                         # Install with dev dependencies
+make dev                         # Install with dev dependencies (uses uv)
 make test                        # Run pytest
 make lint                        # Run ruff
 make format                      # Format with black
+
+# Adding dependencies
+uv pip install <package>         # Install new package
+# Then update pyproject.toml manually or regenerate with:
+uv pip freeze > requirements.txt
 
 # Infrastructure operations (with separate config repo)
 export INFRAFOUNDRY_CONFIG_REPO="/path/to/config-repo"

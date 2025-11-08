@@ -503,22 +503,28 @@ See `.gitlab-ci.yml.example` for complete configuration.
 
 ## Development
 
+**Package Management:** This project uses `uv` for all Python package management. Always use `uv pip` commands instead of plain `pip`.
+
 ### Adding a New Provider
 
 1. Create provider module:
 
 ```python
 # src/infrafoundry/providers/yourprovider/__init__.py
+from typing import override
 from infrafoundry.core.provider import ProviderBase
 
 class YourProvider(ProviderBase):
+    @override
     def get_resource_types(self) -> list[str]:
         return ["resources", "configs"]
 
+    @override
     def generate_terraform(self, resources):
         # Generate .tf files from templates
         pass
 
+    @override
     def generate_ansible(self, resources):
         # Generate playbooks from templates
         pass
@@ -527,6 +533,16 @@ class YourProvider(ProviderBase):
 2. Create Jinja2 templates in `providers/yourprovider/templates/`
 3. Register in `cli.py`
 4. Add example configs in `envs/dev/yourprovider/`
+
+### Installing Dependencies
+
+```bash
+# ALWAYS use uv for package management
+uv pip install <package>         # Install a package
+uv pip install -e .              # Install project in editable mode
+uv pip install -e ".[dev]"       # Install with dev dependencies
+uv pip list                      # List installed packages
+```
 
 ### Running Tests
 

@@ -228,8 +228,8 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo apt update && sudo apt install terraform
 
-          # Install Ansible
-          pip install ansible
+          # Install Ansible (use uv)
+          uv pip install ansible
 
           # Install SOPS
           wget https://github.com/getsops/sops/releases/latest/download/sops-latest.linux.amd64
