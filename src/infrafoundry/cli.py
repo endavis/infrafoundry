@@ -117,6 +117,114 @@ def main(ctx: click.Context, config_dir: Path | None) -> None:
 
 
 @main.command()
+def init() -> None:
+    """Initialize InfraFoundry state database."""
+    from infrafoundry.core.state import StateManager
+
+    try:
+        console.print("[cyan]Initializing InfraFoundry state database...[/cyan]")
+
+        # Get state backend configuration
+        state_backend = os.getenv("INFRAFOUNDRY_STATE_BACKEND", "sqlite")
+        connection_string = os.getenv("INFRAFOUNDRY_STATE_CONNECTION")
+
+        if state_backend == "sqlite" and not connection_string:
+            state_dir = Path.home() / ".infrafoundry"
+            state_dir.mkdir(parents=True, exist_ok=True)
+            db_path = state_dir / "state.db"
+            console.print(f"[dim]Using SQLite database at: {db_path}[/dim]")
+
+        state_manager = StateManager(connection_string)
+        state_manager.initialize()
+
+        console.print("[bold green]✓ State database initialized successfully![/bold green]")
+
+        if state_backend == "sqlite":
+            console.print(f"\n[dim]Database location: {db_path}[/dim]")
+
+        console.print("\n[bold]State tracking is now enabled.[/bold]")
+        console.print("Deployment history and resource state will be recorded.")
+
+    except Exception as e:
+        console.print(f"[bold red]Error initializing state database:[/bold red] {e}")
+        sys.exit(1)
+
+
+@main.command()
+@click.option("--env", "-e", help="Filter by environment")
+@click.option("--limit", "-n", default=50, help="Number of deployments to show")
+@click.option(
+    "--exclude-dry-runs", is_flag=True, help="Exclude dry-run deployments from history"
+)
+def history(env: str | None, limit: int, exclude_dry_runs: bool) -> None:
+    """Show deployment history."""
+    from rich.table import Table
+
+    from infrafoundry.core.state import StateManager
+
+    try:
+        state_manager = StateManager()
+
+        deployments = state_manager.get_deployment_history(
+            environment=env, limit=limit, exclude_dry_run=exclude_dry_runs
+        )
+
+        if not deployments:
+            console.print("[yellow]No deployment history found.[/yellow]")
+            console.print("\n[dim]Run 'infra init' to initialize state tracking.[/dim]")
+            return
+
+        table = Table(title="Deployment History")
+        table.add_column("ID", style="cyan")
+        table.add_column("Environment", style="green")
+        table.add_column("Command", style="blue")
+        table.add_column("Status", style="magenta")
+        table.add_column("Dry Run", style="yellow")
+        table.add_column("Started", style="dim")
+        table.add_column("User", style="yellow")
+
+        for deployment in deployments:
+            # Get status value (handle both enum and string)
+            status_str = (
+                deployment.status.value
+                if hasattr(deployment.status, "value")
+                else str(deployment.status)
+            )
+
+            status_color = {
+                "completed": "green",
+                "failed": "red",
+                "in_progress": "yellow",
+                "planned": "cyan",
+            }.get(status_str, "white")
+
+            # Format dry_run indicator
+            dry_run_indicator = "✓" if deployment.dry_run else ""
+
+            table.add_row(
+                str(deployment.id),
+                deployment.environment,
+                deployment.command,
+                f"[{status_color}]{status_str}[/{status_color}]",
+                dry_run_indicator,
+                (
+                    deployment.started_at.strftime("%Y-%m-%d %H:%M:%S")
+                    if deployment.started_at
+                    else ""
+                ),
+                deployment.user or "unknown",
+            )
+
+        console.print(table)
+
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        if "no such table" in str(e).lower():
+            console.print("\n[dim]Run 'infra init' to initialize state tracking.[/dim]")
+        sys.exit(1)
+
+
+@main.command()
 @click.option("--env", "-e", required=True, help="Environment name (e.g., dev, prod)")
 @click.option("--dry-run", is_flag=True, help="Show what would be done without doing it")
 @click.option(
