@@ -255,52 +255,125 @@ class Orchestrator:
         # First, generate the plans
         self.plan(env_name, dry_run=False, resource_filter=resource_filter)
 
+        # Create deployment record for apply
+        deployment_id = self.state_manager.create_deployment(
+            environment=env_name,
+            command="apply",
+            user=self._current_user,
+            dry_run=False,
+            metadata={"resource_filter": resource_filter, "auto_approve": auto_approve},
+        )
+
+        # Emit before_apply event
+        self.event_manager.emit_event(
+            EventType.BEFORE_APPLY,
+            env_name,
+            {"deployment_id": deployment_id, "auto_approve": auto_approve},
+        )
+
         results = {}
 
-        if resource_filter:
-            self.console.print(
-                f"\n[bold green]Applying infrastructure for: {env_name} "
-                f"(resources: {', '.join(resource_filter)})[/bold green]"
-            )
-        else:
-            self.console.print(
-                f"\n[bold green]Applying infrastructure for: {env_name}[/bold green]"
-            )
-
-        # Get all resources and discover providers dynamically
-        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
-
-        # Group resources by provider
-        resources_by_provider: dict[str, list[Any]] = {}
-        for resource in all_resources:
-            if resource.provider not in resources_by_provider:
-                resources_by_provider[resource.provider] = []
-            resources_by_provider[resource.provider].append(resource)
-
-        for provider_name, resources in resources_by_provider.items():
-            if provider_name not in self.providers:
-                continue
-
-            provider = self.providers[provider_name]
-
-            # Check if any resources match filter for this provider
+        try:
             if resource_filter:
-                resources = [r for r in resources if r.name in resource_filter]
-                if not resources:
-                    continue  # Skip provider if no matching resources
+                self.console.print(
+                    f"\n[bold green]Applying infrastructure for: {env_name} "
+                    f"(resources: {', '.join(resource_filter)})[/bold green]"
+                )
+            else:
+                self.console.print(
+                    f"\n[bold green]Applying infrastructure for: {env_name}[/bold green]"
+                )
 
-            self.console.print(f"\n[bold]Applying {provider_name}...[/bold]")
+            # Get all resources and discover providers dynamically
+            all_resources = self.config_manager.get_all_resources_all_providers(env_name)
 
-            # Run Terraform apply
-            tf_result = self._run_terraform(provider, "apply", auto_approve)
+            # Group resources by provider
+            resources_by_provider: dict[str, list[Any]] = {}
+            for resource in all_resources:
+                if resource.provider not in resources_by_provider:
+                    resources_by_provider[resource.provider] = []
+                resources_by_provider[resource.provider].append(resource)
 
-            # Run Ansible playbook (check mode for dry run)
-            ansible_result = self._run_ansible(provider, check_mode=not auto_approve)
+            for provider_name, resources in resources_by_provider.items():
+                if provider_name not in self.providers:
+                    continue
 
-            results[provider_name] = {
-                "terraform": tf_result,
-                "ansible": ansible_result,
-            }
+                provider = self.providers[provider_name]
+
+                # Check if any resources match filter for this provider
+                if resource_filter:
+                    resources = [r for r in resources if r.name in resource_filter]
+                    if not resources:
+                        continue  # Skip provider if no matching resources
+
+                self.console.print(f"\n[bold]Applying {provider_name}...[/bold]")
+
+                # Track resources being applied and store their IDs
+                resource_ids = {}
+                for resource in resources:
+                    tracked_resource = self.state_manager.track_resource(
+                        deployment_id=deployment_id,
+                        environment=env_name,
+                        provider=provider_name,
+                        resource_type=resource.type,
+                        name=resource.name,
+                        state=ResourceState.CREATING,
+                        config=resource.config,
+                    )
+                    resource_ids[resource.name] = tracked_resource.id
+                    self.event_manager.emit_event(
+                        EventType.RESOURCE_CREATING,
+                        env_name,
+                        {
+                            "resource_id": tracked_resource.id,
+                            "provider": provider_name,
+                            "name": resource.name,
+                        },
+                    )
+
+                # Run Terraform apply
+                tf_result = self._run_terraform(provider, "apply", auto_approve)
+
+                # Run Ansible playbook (check mode for dry run)
+                ansible_result = self._run_ansible(provider, check_mode=not auto_approve)
+
+                # Update resource states to ACTIVE after successful apply
+                for resource in resources:
+                    if resource.name in resource_ids:
+                        self.state_manager.update_resource_state(
+                            resource_id=resource_ids[resource.name],
+                            state=ResourceState.ACTIVE,
+                        )
+                        self.event_manager.emit_event(
+                            EventType.RESOURCE_CREATED,
+                            env_name,
+                            {"provider": provider_name, "name": resource.name},
+                        )
+
+                results[provider_name] = {
+                    "terraform": tf_result,
+                    "ansible": ansible_result,
+                }
+
+            # Mark deployment as completed
+            self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
+
+            # Emit after_apply event
+            self.event_manager.emit_event(
+                EventType.AFTER_APPLY,
+                env_name,
+                {"deployment_id": deployment_id, "results": results},
+            )
+
+        except Exception as e:
+            # Mark deployment as failed
+            self.state_manager.update_deployment_status(
+                deployment_id, DeploymentStatus.FAILED, str(e)
+            )
+            self.event_manager.emit_event(
+                EventType.APPLY_FAILED, env_name, {"deployment_id": deployment_id, "error": str(e)}
+            )
+            raise
 
         return results
 
@@ -320,49 +393,131 @@ class Orchestrator:
         Returns:
             Dict with destroy results per provider
         """
+        # Create deployment record for destroy
+        deployment_id = self.state_manager.create_deployment(
+            environment=env_name,
+            command="destroy",
+            user=self._current_user,
+            dry_run=False,
+            metadata={"resource_filter": resource_filter, "auto_approve": auto_approve},
+        )
+
+        # Emit before_destroy event
+        self.event_manager.emit_event(
+            EventType.BEFORE_DESTROY,
+            env_name,
+            {"deployment_id": deployment_id, "auto_approve": auto_approve},
+        )
+
         results = {}
 
-        if resource_filter:
-            self.console.print(
-                f"\n[bold red]Destroying infrastructure for: {env_name} "
-                f"(resources: {', '.join(resource_filter)})[/bold red]"
-            )
-        else:
-            self.console.print(f"\n[bold red]Destroying infrastructure for: {env_name}[/bold red]")
-
-        if not auto_approve:
-            response = input("Are you sure you want to destroy? (yes/no): ")
-            if response.lower() != "yes":
-                self.console.print("[yellow]Aborted[/yellow]")
-                return {}
-
-        # Get all resources and discover providers dynamically
-        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
-
-        # Group resources by provider
-        resources_by_provider: dict[str, list[Any]] = {}
-        for resource in all_resources:
-            if resource.provider not in resources_by_provider:
-                resources_by_provider[resource.provider] = []
-            resources_by_provider[resource.provider].append(resource)
-
-        for provider_name, resources in resources_by_provider.items():
-            if provider_name not in self.providers:
-                continue
-
-            provider = self.providers[provider_name]
-
-            # Check if any resources match filter for this provider
+        try:
             if resource_filter:
-                resources = [r for r in resources if r.name in resource_filter]
-                if not resources:
-                    continue  # Skip provider if no matching resources
+                self.console.print(
+                    f"\n[bold red]Destroying infrastructure for: {env_name} "
+                    f"(resources: {', '.join(resource_filter)})[/bold red]"
+                )
+            else:
+                self.console.print(
+                    f"\n[bold red]Destroying infrastructure for: {env_name}[/bold red]"
+                )
 
-            self.console.print(f"\n[bold]Destroying {provider_name}...[/bold]")
+            if not auto_approve:
+                response = input("Are you sure you want to destroy? (yes/no): ")
+                if response.lower() != "yes":
+                    self.console.print("[yellow]Aborted[/yellow]")
+                    # Mark deployment as failed with abort message
+                    self.state_manager.update_deployment_status(
+                        deployment_id, DeploymentStatus.FAILED, "User aborted"
+                    )
+                    return {}
 
-            # Run Terraform destroy
-            tf_result = self._run_terraform(provider, "destroy", auto_approve)
-            results[provider_name] = {"terraform": tf_result}
+            # Get all resources and discover providers dynamically
+            all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+            # Group resources by provider
+            resources_by_provider: dict[str, list[Any]] = {}
+            for resource in all_resources:
+                if resource.provider not in resources_by_provider:
+                    resources_by_provider[resource.provider] = []
+                resources_by_provider[resource.provider].append(resource)
+
+            for provider_name, resources in resources_by_provider.items():
+                if provider_name not in self.providers:
+                    continue
+
+                provider = self.providers[provider_name]
+
+                # Check if any resources match filter for this provider
+                if resource_filter:
+                    resources = [r for r in resources if r.name in resource_filter]
+                    if not resources:
+                        continue  # Skip provider if no matching resources
+
+                self.console.print(f"\n[bold]Destroying {provider_name}...[/bold]")
+
+                # Track resources being destroyed and store their IDs
+                resource_ids = {}
+                for resource in resources:
+                    tracked_resource = self.state_manager.track_resource(
+                        deployment_id=deployment_id,
+                        environment=env_name,
+                        provider=provider_name,
+                        resource_type=resource.type,
+                        name=resource.name,
+                        state=ResourceState.DELETING,
+                        config=resource.config,
+                    )
+                    resource_ids[resource.name] = tracked_resource.id
+                    self.event_manager.emit_event(
+                        EventType.RESOURCE_DELETING,
+                        env_name,
+                        {
+                            "resource_id": tracked_resource.id,
+                            "provider": provider_name,
+                            "name": resource.name,
+                        },
+                    )
+
+                # Run Terraform destroy
+                tf_result = self._run_terraform(provider, "destroy", auto_approve)
+
+                # Update resource states to DELETED after successful destroy
+                for resource in resources:
+                    if resource.name in resource_ids:
+                        self.state_manager.update_resource_state(
+                            resource_id=resource_ids[resource.name],
+                            state=ResourceState.DELETED,
+                        )
+                        self.event_manager.emit_event(
+                            EventType.RESOURCE_DELETED,
+                            env_name,
+                            {"provider": provider_name, "name": resource.name},
+                        )
+
+                results[provider_name] = {"terraform": tf_result}
+
+            # Mark deployment as completed
+            self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
+
+            # Emit after_destroy event
+            self.event_manager.emit_event(
+                EventType.AFTER_DESTROY,
+                env_name,
+                {"deployment_id": deployment_id, "results": results},
+            )
+
+        except Exception as e:
+            # Mark deployment as failed
+            self.state_manager.update_deployment_status(
+                deployment_id, DeploymentStatus.FAILED, str(e)
+            )
+            self.event_manager.emit_event(
+                EventType.DESTROY_FAILED,
+                env_name,
+                {"deployment_id": deployment_id, "error": str(e)},
+            )
+            raise
 
         return results
 
