@@ -401,3 +401,141 @@ class TestConfigManager:
 
         config = ConfigManager(envs_dir)
         assert not config.validate_environment("nonexistent")
+
+    def test_get_resources_skips_environment_yaml_in_provider_dir(self, temp_dir):
+        """Test that environment.yaml in provider directory is skipped."""
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create environment.yaml in provider directory (should be skipped)
+        wrong_env_file = envs_dir / "environment.yaml"
+        wrong_env_data = {"invalid": "data"}
+        with open(wrong_env_file, "w") as f:
+            yaml.dump(wrong_env_data, f)
+
+        # Create valid resource file
+        vm_file = envs_dir / "vm.yaml"
+        vm_data = {"vm": [{"name": "test-vm", "config": {"cores": 2}}]}
+        with open(vm_file, "w") as f:
+            yaml.dump(vm_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources("dev", "proxmox")
+        # Should get only the vm, not fail on environment.yaml
+        assert len(resources) == 1
+        assert resources[0].name == "test-vm"
+
+    def test_load_resources_with_yaml_returning_none(self, temp_dir):
+        """Test load_resources when YAML file contains only comments."""
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create YAML file with only comments (yaml.safe_load returns None)
+        resource_file = envs_dir / "vm.yaml"
+        resource_file.write_text("# Just a comment\n# Another comment\n")
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources("dev", "proxmox")
+        # Should return empty list when YAML returns None
+        assert len(resources) == 0
+
+    def test_load_resource_centric_files_empty_file(self, temp_dir):
+        """Test load_resource_centric_files with empty YAML file."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create empty YAML file
+        resource_file = envs_dir / "test.yaml"
+        resource_file.write_text("")
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.load_resource_centric_files("dev")
+        # Should return empty list for empty file
+        assert len(resources) == 0
+
+    def test_load_resource_centric_files_missing_resources_key(self, temp_dir):
+        """Test load_resource_centric_files when 'resources' key is missing."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create YAML file without 'resources' key
+        resource_file = envs_dir / "test.yaml"
+        data = {"other_key": "value"}
+        with open(resource_file, "w") as f:
+            yaml.dump(data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.load_resource_centric_files("dev")
+        # Should skip files without 'resources' key
+        assert len(resources) == 0
+
+    def test_load_resource_centric_files_non_list_resources(self, temp_dir):
+        """Test load_resource_centric_files when resources is not a list."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create YAML file with resources as dict instead of list
+        resource_file = envs_dir / "test.yaml"
+        data = {"resources": {"not": "a list"}}
+        with open(resource_file, "w") as f:
+            yaml.dump(data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Expected list for 'resources'"):
+            config.load_resource_centric_files("dev")
+
+    def test_load_resource_centric_files_non_dict_item(self, temp_dir):
+        """Test load_resource_centric_files when resource item is not a dict."""
+        envs_dir = temp_dir / "envs" / "dev" / "resources"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create YAML file with non-dict item in resources list
+        resource_file = envs_dir / "test.yaml"
+        data = {
+            "resources": [
+                "not a dict",  # Invalid item (should be skipped)
+                {
+                    "provider": "proxmox",
+                    "type": "vm",
+                    "name": "web-01",
+                    "config": {"cores": 2},
+                },
+            ]
+        }
+        with open(resource_file, "w") as f:
+            yaml.dump(data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.load_resource_centric_files("dev")
+        # Should skip non-dict items and return only valid resource
+        assert len(resources) == 1
+        assert resources[0].name == "web-01"
+
+    def test_get_all_resources_all_providers_skips_environment_yaml(self, temp_dir):
+        """Test that get_all_resources_all_providers skips environment.yaml."""
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create environment.yaml in main dir
+        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_data = {"name": "dev", "description": "Test"}
+        with open(env_file, "w") as f:
+            yaml.dump(env_data, f)
+
+        # Create environment.yaml in provider directory (should be skipped)
+        wrong_env_file = envs_dir / "environment.yaml"
+        wrong_env_data = {"invalid": "data"}
+        with open(wrong_env_file, "w") as f:
+            yaml.dump(wrong_env_data, f)
+
+        # Create valid resource file
+        vm_file = envs_dir / "vm.yaml"
+        vm_data = {"vm": [{"name": "test-vm", "config": {"cores": 2}}]}
+        with open(vm_file, "w") as f:
+            yaml.dump(vm_data, f)
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources_all_providers("dev")
+        # Should get only the vm, not fail on environment.yaml
+        assert len(resources) == 1
+        assert resources[0].name == "test-vm"
