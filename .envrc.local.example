@@ -4,6 +4,12 @@
 # Configuration repository location (if different from default)
 # export INFRAFOUNDRY_CONFIG_REPO=/path/to/my-infrastructure-config
 
+# Output directory for generated Terraform/Ansible files
+# Default: ./generated (relative to current directory)
+# Each environment gets its own subdirectory: generated/{env}/terraform/, generated/{env}/ansible/
+# export INFRAFOUNDRY_OUTPUT_DIR=/path/to/custom/output
+# export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"  # If using separate config repo
+
 # Personal preferences
 # export INFRAFOUNDRY_LOG_LEVEL=DEBUG
 # export TF_LOG=DEBUG
