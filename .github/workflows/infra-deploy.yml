@@ -25,7 +25,7 @@ on:
           - destroy
 
 env:
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: '3.12'
   UV_VERSION: '0.1.0'
 
 jobs:
