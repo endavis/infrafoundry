@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "rich>=13.0.0",
     "ansible>=2.15.0",
+    "requests>=2.32.0",
 ]
 
 [project.optional-dependencies]
