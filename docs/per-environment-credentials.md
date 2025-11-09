@@ -84,10 +84,10 @@ echo "secrets/*/age.key" >> .gitignore
 creation_rules:
   - path_regex: dev/.*\.yaml$
     age: age1xxx...dev-public-key...xxx  # Public key from secrets/dev/age.key
-  
+
   - path_regex: staging/.*\.yaml$
     age: age1xxx...staging-public-key...xxx  # Public key from secrets/staging/age.key
-  
+
   - path_regex: prod/.*\.yaml$
     age: age1xxx...prod-public-key...xxx  # Public key from secrets/prod/age.key
 ```

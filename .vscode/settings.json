@@ -2,7 +2,7 @@
   // Python Configuration
   "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
   "python.terminal.activateEnvironment": true,
-  
+
   // Testing Configuration
   "python.testing.pytestEnabled": true,
   "python.testing.pytestArgs": [
@@ -11,7 +11,7 @@
     "--tb=short"
   ],
   "python.testing.unittestEnabled": false,
-  
+
   // Linting and Formatting
   "python.linting.enabled": false,
   "python.formatting.provider": "none",
@@ -23,17 +23,17 @@
     },
     "editor.rulers": [100]
   },
-  
+
   // Ruff Configuration
   "ruff.enable": true,
   "ruff.organizeImports": true,
   "ruff.fixAll": true,
-  
+
   // Black Configuration
   "black-formatter.args": [
     "--line-length=100"
   ],
-  
+
   // YAML Configuration
   "[yaml]": {
     "editor.defaultFormatter": "redhat.vscode-yaml",
@@ -44,17 +44,17 @@
   "yaml.schemas": {
     "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml"
   },
-  
+
   // Terraform Configuration
   "[terraform]": {
     "editor.defaultFormatter": "hashicorp.terraform",
     "editor.formatOnSave": true
   },
   "terraform.languageServer.enable": true,
-  
+
   // Ansible Configuration
   "ansible.python.interpreterPath": "${workspaceFolder}/.venv/bin/python",
-  
+
   // Files Configuration
   "files.exclude": {
     "**/__pycache__": true,
@@ -72,7 +72,7 @@
     "**/node_modules/**": true,
     "**/__pycache__/**": true
   },
-  
+
   // Search Configuration
   "search.exclude": {
     "**/.venv": true,
@@ -83,17 +83,17 @@
     "**/*.pyc": true,
     ".pytest_cache": true
   },
-  
+
   // Editor Configuration
   "editor.tabSize": 4,
   "editor.insertSpaces": true,
   "editor.trimAutoWhitespace": true,
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
-  
+
   // Git Configuration
   "git.ignoreLimitWarning": true,
-  
+
   // Spell Checker Configuration
   "cSpell.words": [
     "infrafoundry",
@@ -112,7 +112,7 @@
     "pydantic",
     "jinja"
   ],
-  
+
   // TODO Tree Configuration
   "todo-tree.general.tags": [
     "TODO",
@@ -122,7 +122,7 @@
     "NOTE",
     "XXX"
   ],
-  
+
   // Terminal Configuration
   "terminal.integrated.env.linux": {
     "INFRAFOUNDRY_LOG_LEVEL": "INFO"
