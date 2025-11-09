@@ -55,6 +55,7 @@ class Orchestrator:
 
         # Initialize state, event, policy, and notification managers
         self.state_manager = state_manager or StateManager()
+        self.state_manager.initialize()  # Initialize database schema
         self.event_manager = event_manager or EventManager()
         self.policy_engine = PolicyEngine(policy_dir)
         self.notification_manager = NotificationManager(notifications_config)
