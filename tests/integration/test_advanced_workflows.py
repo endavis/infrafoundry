@@ -94,22 +94,36 @@ class TestPolicyEnforcement:
         """Test that plan reports policy violations."""
         orchestrator, provider = advanced_orchestrator
 
-        with patch.object(provider, "generate_terraform"):
+        # Create terraform directory to prevent FileNotFoundError
+        provider.terraform_dir.mkdir(parents=True, exist_ok=True)
+        (provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
+
+        with patch("subprocess.run") as mock_subprocess:
+            mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
+
+            # Don't patch generate_terraform - let the mock provider method be called
             # Plan should complete and report any policy violations
             orchestrator.plan("dev", enforce_policies=False)
 
-            # Verify generation was called
-            provider.generate_terraform.assert_called()
+        # Verify generation was called
+        provider.generate_terraform.assert_called()
 
     def test_plan_with_enforce_policies_flag(self, advanced_orchestrator):
         """Test plan with enforce_policies flag."""
         orchestrator, provider = advanced_orchestrator
 
-        with patch.object(provider, "generate_terraform"):
-            # Should accept enforce_policies parameter
-            orchestrator.plan("dev", enforce_policies=True)
+        # Create terraform directory to prevent FileNotFoundError
+        provider.terraform_dir.mkdir(parents=True, exist_ok=True)
+        (provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
 
-            provider.generate_terraform.assert_called()
+        with patch("subprocess.run") as mock_subprocess:
+            mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
+
+            with patch.object(provider, "generate_terraform"):
+                # Should accept enforce_policies parameter
+                orchestrator.plan("dev", enforce_policies=True)
+
+                provider.generate_terraform.assert_called()
 
 
 @pytest.mark.integration
@@ -195,22 +209,43 @@ class TestRollbackScenarios:
         )
 
         # Add resources to deployment
-        state_manager.add_resource(
+        state_manager.track_resource(
             deployment_id=deployment_id,
-            resource_id="proxmox/vm/test-vm",
+            environment="dev",
             provider="proxmox",
             resource_type="vm",
-            resource_name="test-vm",
+            name="test-vm",
             state=ResourceState.ACTIVE,
             config={"cores": 2, "memory": 4096},
         )
 
-        state_manager.complete_deployment(deployment_id, DeploymentStatus.COMPLETED)
+        # Add rollback data
+        rollback_data = {
+            "environment": "dev",
+            "providers": ["proxmox"],
+            "resources": [
+                {
+                    "provider": "proxmox",
+                    "type": "vm",
+                    "name": "test-vm",
+                    "config": {"cores": 2, "memory": 4096},
+                }
+            ],
+        }
+        state_manager.update_deployment_rollback_data(deployment_id, rollback_data)
 
-        with patch.object(orchestrator, "_run_terraform") as mock_tf:
-            mock_tf.return_value = {"exit_code": 0, "success": True}
+        state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
 
-            with patch.object(provider, "generate_terraform"):
+        # Create terraform directory for rollback
+        provider.terraform_dir.mkdir(parents=True, exist_ok=True)
+        (provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
+
+        with patch("subprocess.run") as mock_subprocess:
+            mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
+
+            with patch.object(orchestrator, "_run_terraform") as mock_tf:
+                mock_tf.return_value = {"exit_code": 0, "success": True}
+
                 # Perform rollback
                 result = orchestrator.rollback(deployment_id, auto_approve=True)
 
@@ -254,64 +289,109 @@ class TestMultiProviderCoordination:
         """Test applying resources with dependencies across providers."""
         orchestrator, proxmox_provider = advanced_orchestrator
 
+        # Create config directory for OPNsense
+        config_dir = tmp_path / "config" / "envs" / "dev" / "opnsense"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create OPNsense firewall rule config
+        rule_file = config_dir / "firewall_rule.yaml"
+        rule_file.write_text("""
+firewall_rules:
+  - name: allow-web
+    action: pass
+    interface: lan
+    protocol: tcp
+    destination_port: 80
+""")
+
         # Add OPNsense provider
         opnsense_provider = Mock()
         opnsense_provider.name = "opnsense"
-        opnsense_provider.terraform_dir = tmp_path / "terraform" / "opnsense"
-        opnsense_provider.ansible_dir = tmp_path / "ansible" / "opnsense"
+        opnsense_provider.terraform_dir = tmp_path / "generated" / "terraform" / "opnsense"
+        opnsense_provider.ansible_dir = tmp_path / "generated" / "ansible" / "opnsense"
         opnsense_provider.ensure_directories = Mock()
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.generate_ansible = Mock()
         opnsense_provider.validate_config = Mock()
         opnsense_provider.get_resource_types = Mock(return_value=["firewall_rule", "alias"])
         opnsense_provider.get_dependencies = Mock(return_value={"firewall_rule": ["alias"]})
+        opnsense_provider.set_environment = Mock()
 
         orchestrator.register_provider(opnsense_provider)
 
-        with patch.object(orchestrator, "_run_terraform") as mock_tf:
-            mock_tf.return_value = {"exit_code": 0, "success": True}
+        # Create terraform directories
+        proxmox_provider.terraform_dir.mkdir(parents=True, exist_ok=True)
+        (proxmox_provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
+        opnsense_provider.terraform_dir.mkdir(parents=True, exist_ok=True)
+        (opnsense_provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
 
-            with patch.object(orchestrator, "_run_ansible") as mock_ansible:
-                mock_ansible.return_value = {"exit_code": 0, "success": True}
+        with patch("subprocess.run") as mock_subprocess:
+            mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
-                with patch.object(proxmox_provider, "generate_terraform"):
-                    with patch.object(opnsense_provider, "generate_terraform"):
-                        # Apply should handle provider ordering
-                        orchestrator.apply("dev", auto_approve=True)
+            with patch.object(orchestrator, "_run_terraform") as mock_tf:
+                mock_tf.return_value = {"exit_code": 0, "success": True}
 
-                        # Both providers should have been called
-                        proxmox_provider.generate_terraform.assert_called()
-                        opnsense_provider.generate_terraform.assert_called()
+                with patch.object(orchestrator, "_run_ansible") as mock_ansible:
+                    mock_ansible.return_value = {"exit_code": 0, "success": True}
+
+                    # Apply should handle provider ordering
+                    orchestrator.apply("dev", auto_approve=True)
+
+                    # Both providers should have been called
+                    proxmox_provider.generate_terraform.assert_called()
+                    opnsense_provider.generate_terraform.assert_called()
 
     def test_parallel_provider_execution(self, advanced_orchestrator, tmp_path):
         """Test parallel execution of independent providers."""
         orchestrator, proxmox_provider = advanced_orchestrator
 
+        # Create config directory for Kubernetes
+        config_dir = tmp_path / "config" / "envs" / "dev" / "kubernetes"
+        config_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create Kubernetes deployment config
+        deploy_file = config_dir / "deployment.yaml"
+        deploy_file.write_text("""
+deployments:
+  - name: web-app
+    replicas: 3
+    image: nginx:latest
+    port: 80
+""")
+
         # Add independent provider
         k8s_provider = Mock()
         k8s_provider.name = "kubernetes"
-        k8s_provider.terraform_dir = tmp_path / "terraform" / "kubernetes"
-        k8s_provider.ansible_dir = tmp_path / "ansible" / "kubernetes"
+        k8s_provider.terraform_dir = tmp_path / "generated" / "terraform" / "kubernetes"
+        k8s_provider.ansible_dir = tmp_path / "generated" / "ansible" / "kubernetes"
         k8s_provider.ensure_directories = Mock()
         k8s_provider.generate_terraform = Mock()
         k8s_provider.generate_ansible = Mock()
         k8s_provider.validate_config = Mock()
         k8s_provider.get_resource_types = Mock(return_value=["deployment", "service"])
         k8s_provider.get_dependencies = Mock(return_value={})
+        k8s_provider.set_environment = Mock()
 
         orchestrator.register_provider(k8s_provider)
 
-        with patch.object(orchestrator, "_run_terraform") as mock_tf:
-            mock_tf.return_value = {"exit_code": 0, "success": True}
+        # Create terraform directories
+        proxmox_provider.terraform_dir.mkdir(parents=True, exist_ok=True)
+        (proxmox_provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
+        k8s_provider.terraform_dir.mkdir(parents=True, exist_ok=True)
+        (k8s_provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
 
-            with patch.object(proxmox_provider, "generate_terraform"):
-                with patch.object(k8s_provider, "generate_terraform"):
-                    # Apply with parallel execution
-                    orchestrator.apply("dev", auto_approve=True, parallel=True)
+        with patch("subprocess.run") as mock_subprocess:
+            mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
-                    # Both providers should have been executed
-                    proxmox_provider.generate_terraform.assert_called()
-                    k8s_provider.generate_terraform.assert_called()
+            with patch.object(orchestrator, "_run_terraform") as mock_tf:
+                mock_tf.return_value = {"exit_code": 0, "success": True}
+
+                # Apply with parallel execution
+                orchestrator.apply("dev", auto_approve=True, parallel=True)
+
+                # Both providers should have been executed
+                proxmox_provider.generate_terraform.assert_called()
+                k8s_provider.generate_terraform.assert_called()
 
     def test_provider_failure_handling(self, advanced_orchestrator):
         """Test handling when one provider fails during apply."""
@@ -390,15 +470,20 @@ class TestErrorRecoveryAndCleanup:
         """Test that concurrent operations on same environment are prevented."""
         orchestrator, provider = advanced_orchestrator
 
-        # This would typically use locks or state checks
-        # For now, just verify basic apply works
-        with patch.object(orchestrator, "_run_terraform") as mock_tf:
-            mock_tf.return_value = {"exit_code": 0, "success": True}
+        # Create terraform directory
+        provider.terraform_dir.mkdir(parents=True, exist_ok=True)
+        (provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
 
-            with patch.object(provider, "generate_terraform"):
-                # First operation
-                orchestrator.apply("dev", auto_approve=True)
+        with patch("subprocess.run") as mock_subprocess:
+            mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
-                # State should reflect the operation
-                deployments = orchestrator.state_manager.get_deployment_history("dev", limit=1)
-                assert len(deployments) > 0
+            with patch.object(orchestrator, "_run_terraform") as mock_tf:
+                mock_tf.return_value = {"exit_code": 0, "success": True}
+
+                with patch.object(provider, "generate_terraform"):
+                    # First operation
+                    orchestrator.apply("dev", auto_approve=True)
+
+                    # State should reflect the operation
+                    deployments = orchestrator.state_manager.get_deployment_history("dev", limit=1)
+                    assert len(deployments) > 0
