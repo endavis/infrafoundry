@@ -34,17 +34,20 @@ def advanced_orchestrator(tmp_path):
 
     # Create environment file
     env_file = config_dir / "envs" / "dev" / "environment.yaml"
-    env_file.write_text("""
+    env_file.write_text(
+        """
 name: dev
 description: Development environment
 variables:
   max_memory_mb: 8192
   require_approval: false
-""")
+"""
+    )
 
     # Create VM config
     vm_file = config_dir / "envs" / "dev" / "proxmox" / "vm.yaml"
-    vm_file.write_text("""
+    vm_file.write_text(
+        """
 vms:
   - name: test-vm-01
     node: pve1
@@ -52,7 +55,8 @@ vms:
     memory: 4096
     disk_size: 32
     template: ubuntu-22-04
-""")
+"""
+    )
 
     # Create components
     config_manager = ConfigManager(base_dir=config_dir / "envs")
@@ -292,17 +296,19 @@ class TestMultiProviderCoordination:
         # Create config directory for OPNsense
         config_dir = tmp_path / "config" / "envs" / "dev" / "opnsense"
         config_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Create OPNsense firewall rule config
         rule_file = config_dir / "firewall_rule.yaml"
-        rule_file.write_text("""
+        rule_file.write_text(
+            """
 firewall_rules:
   - name: allow-web
     action: pass
     interface: lan
     protocol: tcp
     destination_port: 80
-""")
+"""
+        )
 
         # Add OPNsense provider
         opnsense_provider = Mock()
@@ -351,13 +357,15 @@ firewall_rules:
 
         # Create Kubernetes deployment config
         deploy_file = config_dir / "deployment.yaml"
-        deploy_file.write_text("""
+        deploy_file.write_text(
+            """
 deployments:
   - name: web-app
     replicas: 3
     image: nginx:latest
     port: 80
-""")
+"""
+        )
 
         # Add independent provider
         k8s_provider = Mock()
