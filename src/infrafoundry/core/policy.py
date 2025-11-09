@@ -150,23 +150,23 @@ class PolicyEngine:
             if "max_memory_mb" in limits:
                 memory = config.get("memory")
                 if memory and memory > limits["max_memory_mb"]:
-                        violations.append(
-                            PolicyViolation(
-                                policy_name=policy.name,
-                                policy_type=policy.type,
-                                level=policy.level,
-                                resource_name=resource.name,
-                                provider=resource.provider,
-                                message=(
-                                    f"Memory ({memory}MB) exceeds limit "
-                                    f"({limits['max_memory_mb']}MB)"
-                                ),
-                                details={
-                                    "actual": memory,
-                                    "limit": limits["max_memory_mb"],
-                                },
-                            )
+                    violations.append(
+                        PolicyViolation(
+                            policy_name=policy.name,
+                            policy_type=policy.type,
+                            level=policy.level,
+                            resource_name=resource.name,
+                            provider=resource.provider,
+                            message=(
+                                f"Memory ({memory}MB) exceeds limit "
+                                f"({limits['max_memory_mb']}MB)"
+                            ),
+                            details={
+                                "actual": memory,
+                                "limit": limits["max_memory_mb"],
+                            },
                         )
+                    )
 
         return violations
 
