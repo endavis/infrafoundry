@@ -19,7 +19,8 @@ from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.policy import PolicyEngine, PolicyLevel
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.secrets import SecretManager
-from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
+from infrafoundry.core.state import (DeploymentStatus, ResourceState,
+                                     StateManager)
 
 
 class Orchestrator:

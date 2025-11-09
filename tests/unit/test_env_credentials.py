@@ -7,7 +7,8 @@ from unittest.mock import Mock, patch
 import pytest
 import yaml
 
-from infrafoundry.core.env_credentials import _decrypt_sops_file, load_environment_credentials
+from infrafoundry.core.env_credentials import (_decrypt_sops_file,
+                                               load_environment_credentials)
 
 
 class TestLoadEnvironmentCredentials:

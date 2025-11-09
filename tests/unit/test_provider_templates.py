@@ -644,7 +644,6 @@ class TestKubernetesTemplates:
         # Kubernetes playbook uses Ansible loop constructs (item variable)
         # which are only available at Ansible runtime. We need to provide
         # a mock 'item' object for the template to render.
-
         # Add Ansible-specific functions to Jinja2 environment
         def lookup_filter(plugin: str, *args, **kwargs) -> str:
             """Lookup filter (mimics Ansible lookup)."""

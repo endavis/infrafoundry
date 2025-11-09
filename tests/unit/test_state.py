@@ -5,13 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from infrafoundry.core.state import (
-    Deployment,
-    DeploymentStatus,
-    Resource,
-    ResourceState,
-    StateManager,
-)
+from infrafoundry.core.state import (Deployment, DeploymentStatus, Resource,
+                                     ResourceState, StateManager)
 
 
 @pytest.fixture

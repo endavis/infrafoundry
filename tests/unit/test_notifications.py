@@ -4,12 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
-from infrafoundry.core.notifications import (
-    NotificationChannel,
-    NotificationManager,
-    SlackNotifier,
-    WebhookNotifier,
-)
+from infrafoundry.core.notifications import (NotificationChannel,
+                                             NotificationManager,
+                                             SlackNotifier, WebhookNotifier)
 
 
 @pytest.mark.unit
