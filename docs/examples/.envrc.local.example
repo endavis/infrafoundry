@@ -27,8 +27,9 @@
 # Path to your configuration repository
 export INFRAFOUNDRY_CONFIG_REPO=/path/to/my-infrastructure-config
 
-# SOPS age key location (needed to decrypt secrets/{env}/*.yaml files)
-export SOPS_AGE_KEY_FILE=${INFRAFOUNDRY_CONFIG_REPO}/secrets/age.key
+# Note: SOPS age key is automatically set per-environment from:
+# secrets/{env}/age.key (e.g., secrets/dev/age.key, secrets/prod/age.key)
+# This allows each environment to have its own encryption key
 
 # ============================================================================
 # Optional Settings

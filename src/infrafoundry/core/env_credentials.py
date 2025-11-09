@@ -42,6 +42,12 @@ def load_environment_credentials(env_name: str, config_dir: Path | None = None) 
         # No environment-specific secrets, fall back to environment variables
         return {}
 
+    # Set per-environment SOPS age key if it exists
+    # This allows each environment to have its own encryption key
+    env_age_key = secrets_dir / "age.key"
+    if env_age_key.exists():
+        os.environ["SOPS_AGE_KEY_FILE"] = str(env_age_key)
+
     env_vars = {}
 
     # Load Proxmox credentials

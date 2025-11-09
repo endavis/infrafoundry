@@ -39,42 +39,68 @@ Store credentials in SOPS-encrypted files per environment.
 ```
 config-repo/
 ├── secrets/
-│   ├── age.key                    # Shared encryption key (git-ignored)
 │   ├── .sops.yaml                 # SOPS config
 │   ├── dev/                       # Dev environment secrets
-│   │   ├── proxmox.yaml           # Encrypted
-│   │   ├── opnsense.yaml          # Encrypted
-│   │   └── kubernetes.yaml        # Encrypted
+│   │   ├── age.key                # Dev encryption key (git-ignored)
+│   │   ├── proxmox.yaml           # Encrypted with dev age.key
+│   │   ├── opnsense.yaml          # Encrypted with dev age.key
+│   │   └── kubernetes.yaml        # Encrypted with dev age.key
 │   ├── staging/                   # Staging environment secrets
-│   │   ├── proxmox.yaml
-│   │   ├── opnsense.yaml
-│   │   └── kubernetes.yaml
+│   │   ├── age.key                # Staging encryption key (git-ignored)
+│   │   ├── proxmox.yaml           # Encrypted with staging age.key
+│   │   ├── opnsense.yaml          # Encrypted with staging age.key
+│   │   └── kubernetes.yaml        # Encrypted with staging age.key
 │   └── prod/                      # Production secrets
-│       ├── proxmox.yaml
-│       ├── opnsense.yaml
-│       └── kubernetes.yaml
+│       ├── age.key                # Production encryption key (git-ignored)
+│       ├── proxmox.yaml           # Encrypted with prod age.key
+│       ├── opnsense.yaml          # Encrypted with prod age.key
+│       └── kubernetes.yaml        # Encrypted with prod age.key
 └── .envrc.local
 ```
 
+**Benefits of per-environment keys:**
+- **Security isolation**: Compromising one environment's key doesn't expose others
+- **Access control**: Give team members only the keys they need (devs get dev key, ops get prod key)
+- **Automatic key selection**: InfraFoundry automatically uses the correct key based on `--env` flag
+
 #### Setup
 
-**1. Update `.sops.yaml` for subdirectories:**
+**1. Generate age keys for each environment:**
+
+```bash
+# Create age keys per environment
+age-keygen -o secrets/dev/age.key
+age-keygen -o secrets/staging/age.key
+age-keygen -o secrets/prod/age.key  # Keep this highly restricted!
+
+# Add to .gitignore
+echo "secrets/*/age.key" >> .gitignore
+```
+
+**2. Update `.sops.yaml` for per-environment keys:**
 
 ```yaml
 # secrets/.sops.yaml
 creation_rules:
-  - path_regex: .*\.yaml$
-    age: age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - path_regex: dev/.*\.yaml$
+    age: age1xxx...dev-public-key...xxx  # Public key from secrets/dev/age.key
+  
+  - path_regex: staging/.*\.yaml$
+    age: age1xxx...staging-public-key...xxx  # Public key from secrets/staging/age.key
+  
+  - path_regex: prod/.*\.yaml$
+    age: age1xxx...prod-public-key...xxx  # Public key from secrets/prod/age.key
 ```
 
-**2. Create environment-specific secrets:**
+**3. Create environment-specific secrets:**
 
 ```bash
 # Dev credentials
 cat > secrets/dev/proxmox.yaml <<EOF
-proxmox_api_url: https://proxmox-dev.example.com:8006/api2/json
-proxmox_token_id: terraform@pve!dev-token
-proxmox_token_secret: dev-secret-here
+proxmox:
+  api_url: https://proxmox-dev.example.com:8006/api2/json
+  api_token_id: terraform@pve!dev-token
+  api_token_secret: dev-secret-here
 EOF
 
 # Staging credentials
@@ -222,31 +248,44 @@ age-keygen -o secrets/staging/age.key
 age-keygen -o secrets/prod/age.key
 ```
 
-**3. Update `.envrc.local`:**
+**3. Encrypt secrets with environment-specific keys:**
+
+```bash
+# Encrypt dev secrets with dev key
+export SOPS_AGE_KEY_FILE="secrets/dev/age.key"
+sops --encrypt --in-place secrets/dev/proxmox.yaml
+
+# Encrypt staging secrets with staging key
+export SOPS_AGE_KEY_FILE="secrets/staging/age.key"
+sops --encrypt --in-place secrets/staging/proxmox.yaml
+
+# Encrypt prod secrets with prod key
+export SOPS_AGE_KEY_FILE="secrets/prod/age.key"
+sops --encrypt --in-place secrets/prod/proxmox.yaml
+```
+
+**4. Update `.envrc.local` (simplified!):**
 
 ```bash
 # .envrc.local
 export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 
-# Set environment (default to dev)
-export INFRA_ENV="${INFRA_ENV:-dev}"
-
-# Point to environment-specific age key
-export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/${INFRA_ENV}/age.key"
-
-# Load credentials for current environment
-if [[ -f "${SOPS_AGE_KEY_FILE}" ]]; then
-    echo "Using ${INFRA_ENV} credentials"
-else
-    echo "Warning: No age key found for ${INFRA_ENV}"
-fi
+# Note: SOPS age key is automatically set per-environment!
+# InfraFoundry will use secrets/{env}/age.key based on --env flag
+# No need to manually set SOPS_AGE_KEY_FILE
 ```
 
-**4. Usage:**
+**5. Usage:**
 
 ```bash
-# Dev work (default)
+# Dev work - automatically uses secrets/dev/age.key
 infra plan --env dev
+
+# Staging - automatically uses secrets/staging/age.key
+infra apply --env staging
+
+# Production - automatically uses secrets/prod/age.key (if you have the key!)
+infra plan --env prod
 
 # Staging work (need staging age key)
 export INFRA_ENV=staging
