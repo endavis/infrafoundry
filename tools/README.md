@@ -44,6 +44,21 @@ To add a new tool:
 4. Add example usage to main README
 5. Include tests if applicable
 
+## Development Environment
+
+For VS Code users, the workspace includes recommended extensions and debug configurations:
+
+```bash
+# Install recommended VS Code extensions
+make setup-vscode
+```
+
+The workspace is configured with:
+- Python debugging with proper path resolution
+- Pytest integration for testing tools
+- Code formatting (Black, Ruff)
+- YAML/Terraform syntax highlighting
+
 ## Tool Requirements
 
 - Keep tools self-contained and minimal dependencies
