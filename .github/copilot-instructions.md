@@ -89,7 +89,7 @@ YAML configs → ConfigManager → Orchestrator → Providers → Jinja2 → gen
 ```bash
 # Setup
 uv pip install -e .              # Install package in editable mode
-cp .envrc.local.example .envrc.local  # Set up direnv
+cp docs/examples/.envrc.local.example .envrc.local  # Set up direnv
 direnv allow                     # Load environment
 
 # Development
@@ -228,7 +228,7 @@ infra secrets decrypt file.yaml  # Decrypt and display
 - Decodes `SOPS_AGE_KEY` secret to `secrets/age.key`
 - Runs: `infra plan` → `infra apply --auto-approve`
 
-**GitLab CI** (`.gitlab-ci.yml.example`):
+**GitLab CI** (`docs/examples/.gitlab-ci.yml.example`):
 - Stages: validate → plan → apply
 - Manual approval for apply stages
 - Environment-specific jobs (dev, prod)
@@ -330,7 +330,7 @@ def get_dependencies(self) -> dict[str, list[str]]:
 
 **CI/CD Changes:**
 - `.github/workflows/` - GitHub Actions
-- `.gitlab-ci.yml.example` - GitLab CI
+- `docs/examples/.gitlab-ci.yml.example` - GitLab CI
 - `ci/setup-ci.sh` - CI environment setup
 
 ### Contact & Resources

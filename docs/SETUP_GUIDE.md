@@ -9,7 +9,7 @@ This guide walks you through setting up InfraFoundry for your environment with P
 Run the interactive setup wizard:
 
 ```bash
-./setup-config.sh
+../scripts/setup-config.sh
 ```
 
 The wizard will ask you questions and generate all configuration files automatically.

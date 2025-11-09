@@ -97,7 +97,7 @@ cd infrafoundry
 uv pip install -e .
 
 # Run the interactive setup wizard
-./setup-config.sh
+./scripts/setup-config.sh
 
 # The wizard will:
 # - Check for and install uv if needed
@@ -123,7 +123,7 @@ cp -r example-config ../my-infrastructure-config
 cd ../my-infrastructure-config
 
 # Set up environment to point to your config repo
-cp .envrc.local.example .envrc.local
+cp docs/examples/.envrc.local.example .envrc.local
 # Edit .envrc.local and add:
 # export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 direnv allow
@@ -149,7 +149,7 @@ cd infrafoundry
 uv pip install -e .
 
 # Set up direnv (recommended)
-cp .envrc.local.example .envrc.local
+cp docs/examples/.envrc.local.example .envrc.local
 # Edit .envrc.local with your credentials
 direnv allow
 
@@ -160,7 +160,7 @@ infra secrets init
 infra --version
 ```
 
-> **Note:** The interactive setup wizard (`setup-config.sh`) is the easiest way to get started. It automates configuration creation, secret management setup, and environment variable configuration. For manual setup or CI/CD environments, use Option 2 (separate config repo) or Option 3 (embedded).
+> **Note:** The interactive setup wizard (`scripts/setup-config.sh`) is the easiest way to get started. It automates configuration creation, secret management setup, and environment variable configuration. For manual setup or CI/CD environments, use Option 2 (separate config repo) or Option 3 (embedded).
 
 ## How It Works
 
@@ -438,11 +438,11 @@ infrafoundry/
 ├── example-config/            # Example configuration repository
 │   ├── envs/                  # Example environments
 │   ├── secrets/               # Example secrets setup
-│   ├── .envrc.local.example   # Environment template
 │   ├── .gitignore             # Config repo gitignore
 │   └── README.md              # Config repo documentation
 ├── ci/                        # CI/CD integration helpers
 ├── docs/                      # Documentation
+│   ├── examples/              # Example configuration files
 │   ├── separate-config-repo.md # Config repo guide
 │   ├── plugin-development.md  # Provider development guide
 │   └── direnv.md              # direnv setup guide
@@ -714,7 +714,7 @@ jobs:
 
 ### GitLab CI
 
-See `.gitlab-ci.yml.example` for complete configuration.
+See `docs/examples/.gitlab-ci.yml.example` for complete configuration.
 
 ### Required CI Secrets
 
@@ -940,7 +940,7 @@ We welcome contributions! Please follow these guidelines:
 - Mock external dependencies (Terraform, Ansible, APIs)
 - Check `htmlcov/index.html` for coverage gaps
 
-See [TESTING_STATUS.md](TESTING_STATUS.md) for testing status and [docs/ci-cd-testing.md](docs/ci-cd-testing.md) for testing guide.
+See [docs/TESTING_STATUS.md](docs/TESTING_STATUS.md) for testing status and [docs/ci-cd-testing.md](docs/ci-cd-testing.md) for testing guide.
 
 ## License
 

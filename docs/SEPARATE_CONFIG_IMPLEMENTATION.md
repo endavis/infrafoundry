@@ -141,7 +141,7 @@ infra plan --env dev
 
 3. **Set up environment:**
    ```bash
-   cp .envrc.local.example .envrc.local
+   cp ../infrafoundry/docs/examples/.envrc.local.example .envrc.local
    # Edit and add: export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
    ```
 
