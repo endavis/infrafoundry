@@ -52,7 +52,7 @@ InfraFoundry automatically uses the correct key based on `--env`:
 # Uses secrets/dev/age.key
 infra plan --env dev
 
-# Uses secrets/staging/age.key  
+# Uses secrets/staging/age.key
 infra apply --env staging
 
 # Uses secrets/prod/age.key (if you have it!)
@@ -184,7 +184,7 @@ cat secrets/dev/age.key | base64 -w0
     mkdir -p secrets/dev
     echo "${{ secrets.SOPS_AGE_KEY_DEV }}" | base64 -d > secrets/dev/age.key
     chmod 600 secrets/dev/age.key
-    
+
 - name: Run InfraFoundry
   run: infra plan --env dev
 ```
@@ -225,10 +225,10 @@ Add the public key to `.sops.yaml`:
 creation_rules:
   - path_regex: dev/.*\.yaml$
     age: age1xxx...dev-public-key...xxx
-  
+
   - path_regex: staging/.*\.yaml$
     age: age1xxx...staging-public-key...xxx
-  
+
   - path_regex: prod/.*\.yaml$
     age: age1xxx...prod-public-key...xxx
 ```
