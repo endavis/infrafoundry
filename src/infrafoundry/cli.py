@@ -356,7 +356,7 @@ def impact(env: str, resource: str) -> None:
                 "will be affected[/bold red]"
             )
             console.print(
-                "  [bold red]  Critical risk - changes may cause " "widespread impact[/bold red]"
+                "  [bold red]  Critical risk - changes may cause widespread impact[/bold red]"
             )
 
     except Exception as e:

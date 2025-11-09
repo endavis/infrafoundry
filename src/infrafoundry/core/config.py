@@ -169,13 +169,12 @@ class ConfigManager:
                 if "provider" not in item:
                     resource_name = item.get("name", "unnamed")
                     raise ValueError(
-                        f"Missing 'provider' field in resource in {config_file}: "
-                        f"{resource_name}"
+                        f"Missing 'provider' field in resource in {config_file}: {resource_name}"
                     )
                 if "type" not in item:
                     resource_name = item.get("name", "unnamed")
                     raise ValueError(
-                        f"Missing 'type' field in resource in {config_file}: " f"{resource_name}"
+                        f"Missing 'type' field in resource in {config_file}: {resource_name}"
                     )
                 if "name" not in item:
                     raise ValueError(f"Missing 'name' field in resource in {config_file}")
@@ -307,8 +306,7 @@ class ConfigManager:
                     if "type" not in item:
                         resource_name = item.get("name", "unnamed")
                         raise ValueError(
-                            f"Missing 'type' field in resource in {config_file}: "
-                            f"{resource_name}"
+                            f"Missing 'type' field in resource in {config_file}: {resource_name}"
                         )
                     if "name" not in item:
                         raise ValueError(f"Missing 'name' field in resource in {config_file}")

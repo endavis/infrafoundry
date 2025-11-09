@@ -159,7 +159,7 @@ def mock_config():
         resource = Mock()
         resource.provider = "proxmox"
         resource.type = "vm"
-        resource.name = f"web-0{i+1}"
+        resource.name = f"web-0{i + 1}"
         resource.config = {"cores": 2, "memory": 4096}
         resources.append(resource)
 
