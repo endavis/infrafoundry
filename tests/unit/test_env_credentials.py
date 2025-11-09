@@ -522,4 +522,3 @@ class TestIntegration:
         finally:
             os.environ.clear()
             os.environ.update(original_env)
-
