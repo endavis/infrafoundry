@@ -111,7 +111,7 @@ git push -u origin main
 
 ```bash
 # Create local environment file
-cp .envrc.local.example .envrc.local
+cp docs/examples/.envrc.local.example .envrc.local
 
 # Edit .envrc.local
 vim .envrc.local
@@ -475,7 +475,7 @@ apply:prod:
 ```bash
 git clone <config-repo-url>
 cd <config-repo>
-cp .envrc.local.example .envrc.local
+cp ../infrafoundry/docs/examples/.envrc.local.example .envrc.local
 ```
 
 **2. Get age key securely:**
@@ -574,7 +574,7 @@ git commit -m "Initial config repository"
 
 4. **Update .envrc.local:**
 ```bash
-cp .envrc.local.example .envrc.local
+cp ../infrafoundry/docs/examples/.envrc.local.example .envrc.local
 # Edit and add:
 export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 ```
