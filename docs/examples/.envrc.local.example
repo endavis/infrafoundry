@@ -1,20 +1,49 @@
 # .envrc.local - Personal settings (git-ignored)
-# Copy this to .envrc.local and customize with your credentials and preferences
+# Copy this to .envrc.local and customize for your setup
+#
+# ============================================================================
+# CREDENTIALS ARE NOT STORED HERE!
+# ============================================================================
+# The InfraFoundry CLI automatically loads credentials from your config repo
+# based on the --env flag:
+#
+#   infra plan --env dev      # Loads secrets/dev/*.yaml
+#   infra apply --env staging # Loads secrets/staging/*.yaml
+#   infra plan --env prod     # Loads secrets/prod/*.yaml
+#
+# Store credentials in: {INFRAFOUNDRY_CONFIG_REPO}/secrets/{env}/
+#   - secrets/dev/proxmox.yaml (encrypted with SOPS)
+#   - secrets/dev/opnsense.yaml (encrypted with SOPS)
+#   - secrets/staging/proxmox.yaml (encrypted with SOPS)
+#   - etc.
+#
+# See: docs/per-environment-credentials.md for setup instructions
+# ============================================================================
 
-# Configuration repository location (if different from default)
-# export INFRAFOUNDRY_CONFIG_REPO=/path/to/my-infrastructure-config
+# ============================================================================
+# Required Settings
+# ============================================================================
+
+# Path to your configuration repository
+export INFRAFOUNDRY_CONFIG_REPO=/path/to/my-infrastructure-config
+
+# SOPS age key location (needed to decrypt secrets/{env}/*.yaml files)
+export SOPS_AGE_KEY_FILE=${INFRAFOUNDRY_CONFIG_REPO}/secrets/age.key
+
+# ============================================================================
+# Optional Settings
+# ============================================================================
 
 # Output directory for generated Terraform/Ansible files
-# Default: ./generated (relative to current directory)
-# Each environment gets its own subdirectory: generated/{env}/terraform/, generated/{env}/ansible/
+# Default: ./generated (relative to framework directory)
 # export INFRAFOUNDRY_OUTPUT_DIR=/path/to/custom/output
-# export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"  # If using separate config repo
+# export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"
 
-# Personal preferences
+# Development preferences
 # export INFRAFOUNDRY_LOG_LEVEL=DEBUG
 # export TF_LOG=DEBUG
 
-# State management (deployment tracking and resource state)
+# State management (deployment tracking)
 # Default: SQLite at ~/.infrafoundry/state.db
 # export INFRAFOUNDRY_STATE_BACKEND=sqlite
 # export INFRAFOUNDRY_STATE_CONNECTION=sqlite:////home/user/.infrafoundry/state.db
@@ -23,40 +52,7 @@
 # export INFRAFOUNDRY_STATE_BACKEND=postgresql
 # export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
 
-# ============================================================================
-# CREDENTIALS - Automatic Loading by CLI
-# ============================================================================
-# The InfraFoundry CLI automatically loads credentials based on --env flag!
-#
-# If using a separate config repo with encrypted secrets:
-#   config-repo/secrets/dev/proxmox.yaml
-#   config-repo/secrets/staging/proxmox.yaml
-#   config-repo/secrets/prod/proxmox.yaml
-#
-# Just use --env flag:
-#   infra plan --env dev      # Automatically uses secrets/dev/
-#   infra apply --env staging # Automatically uses secrets/staging/
-#   infra plan --env prod     # Automatically uses secrets/prod/
-#
-# See: docs/per-environment-credentials.md for setup instructions
-# ============================================================================
-
-# Optional: Direct environment variables (for simple setups or testing)
-# NOTE: CLI auto-loading from secrets/{env}/ is recommended for production
-# Proxmox credentials
-export PROXMOX_API_URL=https://proxmox.example.com:8006/api2/json
-export PROXMOX_API_TOKEN_ID=user@pam!token
-export PROXMOX_API_TOKEN_SECRET=your-secret-here
-
-# OPNsense credentials
-export OPNSENSE_API_URL=https://opnsense.example.com
-export OPNSENSE_API_KEY=your-api-key
-export OPNSENSE_API_SECRET=your-api-secret
-
-# Kubernetes config (if not using default ~/.kube/config)
-# export KUBECONFIG=/path/to/custom/kubeconfig
-
-# Terraform backend configuration (if using remote state)
+# Terraform backend configuration (for remote state)
 # export INFRAFOUNDRY_TF_BACKEND_TYPE=s3
 # export INFRAFOUNDRY_TF_BACKEND_BUCKET=my-terraform-state
 # export INFRAFOUNDRY_TF_BACKEND_REGION=us-east-1
@@ -66,5 +62,5 @@ export OPNSENSE_API_SECRET=your-api-secret
 # export ANSIBLE_HOST_KEY_CHECKING=False
 # export ANSIBLE_STDOUT_CALLBACK=yaml
 
-# Python virtual environment (uncomment to auto-activate)
-# layout python python3.11
+# Kubernetes config (if not using default ~/.kube/config)
+# export KUBECONFIG=/path/to/custom/kubeconfig
