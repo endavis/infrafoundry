@@ -432,3 +432,94 @@ class TestIntegration:
         finally:
             os.environ.clear()
             os.environ.update(original_env)
+
+    def test_per_environment_age_key(self, tmp_path):
+        """Test that SOPS_AGE_KEY_FILE is set per environment."""
+        # Setup directory structure with age keys
+        dev_secrets = tmp_path / "secrets" / "dev"
+        prod_secrets = tmp_path / "secrets" / "prod"
+        dev_secrets.mkdir(parents=True)
+        prod_secrets.mkdir(parents=True)
+
+        # Create age keys
+        dev_age_key = dev_secrets / "age.key"
+        prod_age_key = prod_secrets / "age.key"
+        dev_age_key.write_text("dev-key-content")
+        prod_age_key.write_text("prod-key-content")
+
+        # Create encrypted credential files
+        proxmox_dev = dev_secrets / "proxmox.yaml"
+        proxmox_prod = prod_secrets / "proxmox.yaml"
+        proxmox_dev.write_text("encrypted-dev")
+        proxmox_prod.write_text("encrypted-prod")
+
+        original_env = os.environ.copy()
+        try:
+            # Clear SOPS_AGE_KEY_FILE
+            os.environ.pop("SOPS_AGE_KEY_FILE", None)
+
+            with patch("infrafoundry.core.env_credentials._decrypt_sops_file") as mock_decrypt:
+                mock_decrypt.return_value = {
+                    "proxmox": {
+                        "api_url": "https://proxmox-dev.example.com",
+                        "api_token_id": "dev@pam!token",
+                        "api_token_secret": "dev-secret",
+                    }
+                }
+
+                # Load dev credentials
+                load_environment_credentials("dev", config_dir=tmp_path)
+
+                # Verify SOPS_AGE_KEY_FILE was set to dev key
+                assert os.environ.get("SOPS_AGE_KEY_FILE") == str(dev_age_key)
+
+            # Clear again
+            os.environ.pop("SOPS_AGE_KEY_FILE", None)
+
+            with patch("infrafoundry.core.env_credentials._decrypt_sops_file") as mock_decrypt:
+                mock_decrypt.return_value = {
+                    "proxmox": {
+                        "api_url": "https://proxmox-prod.example.com",
+                        "api_token_id": "prod@pam!token",
+                        "api_token_secret": "prod-secret",
+                    }
+                }
+
+                # Load prod credentials
+                load_environment_credentials("prod", config_dir=tmp_path)
+
+                # Verify SOPS_AGE_KEY_FILE was set to prod key
+                assert os.environ.get("SOPS_AGE_KEY_FILE") == str(prod_age_key)
+
+        finally:
+            os.environ.clear()
+            os.environ.update(original_env)
+
+    def test_missing_age_key_does_not_set_env_var(self, tmp_path):
+        """Test that SOPS_AGE_KEY_FILE is not set if age.key doesn't exist."""
+        # Setup directory without age key
+        secrets_dir = tmp_path / "secrets" / "dev"
+        secrets_dir.mkdir(parents=True)
+
+        # Create encrypted file but no age key
+        proxmox_file = secrets_dir / "proxmox.yaml"
+        proxmox_file.write_text("encrypted")
+
+        original_env = os.environ.copy()
+        try:
+            # Set a different SOPS key
+            os.environ["SOPS_AGE_KEY_FILE"] = "/some/other/path/age.key"
+
+            with patch("infrafoundry.core.env_credentials._decrypt_sops_file") as mock_decrypt:
+                mock_decrypt.return_value = {}
+
+                # Load credentials
+                load_environment_credentials("dev", config_dir=tmp_path)
+
+                # SOPS_AGE_KEY_FILE should not have been changed
+                assert os.environ.get("SOPS_AGE_KEY_FILE") == "/some/other/path/age.key"
+
+        finally:
+            os.environ.clear()
+            os.environ.update(original_env)
+
