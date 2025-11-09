@@ -3,8 +3,7 @@
 import pytest
 import yaml
 
-from infrafoundry.core.policy import (PolicyEngine, PolicyLevel, PolicyType,
-                                      PolicyViolation)
+from infrafoundry.core.policy import PolicyEngine, PolicyLevel, PolicyType, PolicyViolation
 from infrafoundry.core.provider import ResourceConfig
 
 

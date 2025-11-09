@@ -9,8 +9,7 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.orchestrator import Orchestrator
 from infrafoundry.core.secrets import SecretManager
-from infrafoundry.core.state import (DeploymentStatus, ResourceState,
-                                     StateManager)
+from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
 from infrafoundry.providers.proxmox import ProxmoxProvider
 
 

@@ -2,8 +2,7 @@
 
 import pytest
 
-from infrafoundry.core.dependencies import (CircularDependencyError,
-                                            DependencyGraph, ResourceNode)
+from infrafoundry.core.dependencies import CircularDependencyError, DependencyGraph, ResourceNode
 
 
 class TestResourceNode:
