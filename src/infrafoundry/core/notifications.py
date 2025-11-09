@@ -120,8 +120,6 @@ class SlackNotifier(Notifier):
         self, event_type: str, environment: str, data: dict[str, Any]
     ) -> list[dict]:
         """Format message using Slack Block Kit."""
-        # Determine color based on event type
-        color = self._get_event_color(event_type)
         emoji = self._get_event_emoji(event_type)
 
         blocks = [
@@ -151,13 +149,16 @@ class SlackNotifier(Notifier):
                 }
             )
         elif event_type == EventType.DRIFT_DETECTED:
+            changes_text = (
+                f"*Changes Detected:*\n"
+                f"• Add: {data.get('to_add', 0)}\n"
+                f"• Change: {data.get('to_change', 0)}\n"
+                f"• Destroy: {data.get('to_destroy', 0)}"
+            )
             blocks.append(
                 {
                     "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*Changes Detected:*\n• Add: {data.get('to_add', 0)}\n• Change: {data.get('to_change', 0)}\n• Destroy: {data.get('to_destroy', 0)}",
-                    },
+                    "text": {"type": "mrkdwn", "text": changes_text},
                 }
             )
         elif event_type == EventType.POLICY_VIOLATION:

@@ -13,6 +13,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.dependencies import DependencyGraph
 from infrafoundry.core.events import Event, EventManager, EventType
 from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.policy import PolicyEngine, PolicyLevel
@@ -116,7 +117,7 @@ class Orchestrator:
                     f"Supported types: {', '.join(supported_types)}"
                 )
 
-    def build_dependency_graph(self, env_name: str) -> "DependencyGraph":
+    def build_dependency_graph(self, env_name: str) -> DependencyGraph:
         """Build dependency graph for an environment.
 
         Args:
@@ -125,8 +126,6 @@ class Orchestrator:
         Returns:
             DependencyGraph with all resources and dependencies
         """
-        from infrafoundry.core.dependencies import DependencyGraph
-
         graph = DependencyGraph()
 
         # Get all resources for the environment

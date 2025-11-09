@@ -78,7 +78,7 @@ class TestOrchestratorInit:
 
         assert not output_dir.exists()
 
-        orchestrator = Orchestrator(
+        Orchestrator(
             config_manager=config_manager,
             secret_manager=secret_manager,
             output_dir=output_dir,
