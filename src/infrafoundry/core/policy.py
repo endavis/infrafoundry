@@ -158,8 +158,7 @@ class PolicyEngine:
                             resource_name=resource.name,
                             provider=resource.provider,
                             message=(
-                                f"Memory ({memory}MB) exceeds limit "
-                                f"({limits['max_memory_mb']}MB)"
+                                f"Memory ({memory}MB) exceeds limit ({limits['max_memory_mb']}MB)"
                             ),
                             details={
                                 "actual": memory,

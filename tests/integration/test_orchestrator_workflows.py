@@ -241,7 +241,6 @@ class TestApplyWorkflow:
             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
             patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
         ):
-
             result = orchestrator.apply(env_name="dev", auto_approve=True)
 
             # Verify apply completed
@@ -254,7 +253,6 @@ class TestApplyWorkflow:
             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
             patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
         ):
-
             orchestrator.apply(env_name="dev", auto_approve=True)
 
             # Check deployment was created
@@ -271,7 +269,6 @@ class TestApplyWorkflow:
             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
             patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
         ):
-
             orchestrator.apply(env_name="dev", auto_approve=True)
 
             # Check that deployment has rollback data
@@ -286,7 +283,6 @@ class TestApplyWorkflow:
             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
             patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
         ):
-
             result = orchestrator.apply(
                 env_name="dev", auto_approve=True, resource_filter=["web-01"]
             )
@@ -309,7 +305,6 @@ class TestApplyWorkflow:
             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
             patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
         ):
-
             orchestrator.apply(env_name="dev", auto_approve=True)
 
         assert EventType.BEFORE_APPLY in events_received
@@ -342,7 +337,6 @@ class TestApplyWorkflow:
             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
             patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
         ):
-
             # Make terraform fail during apply (not plan)
             mock_tf.side_effect = [{"success": True}, RuntimeError("Apply failed")]
 
@@ -511,7 +505,6 @@ class TestMultiProviderWorkflow:
             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
             patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
         ):
-
             result = orchestrator.apply(env_name="dev", auto_approve=True, parallel=False)
 
             # Both providers should be processed
@@ -556,7 +549,6 @@ class TestWorkflowStateManagement:
             patch.object(orchestrator, "_get_terraform_resource_ids", return_value={}),
             patch.object(orchestrator, "_run_ansible", return_value={"success": True}),
         ):
-
             # Plan
             orchestrator.plan(env_name="dev", dry_run=False)
             plan_deployments = orchestrator.state_manager.get_deployment_history(
