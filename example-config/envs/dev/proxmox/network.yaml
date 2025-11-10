@@ -1,0 +1,14 @@
+network:
+  - name: dev-vlan-100
+    bridge: vmbr0
+    vlan: 100
+    cidr: 192.168.100.0/24
+    gateway: 192.168.100.1
+    description: Development network for application servers
+
+  - name: dev-vlan-200
+    bridge: vmbr0
+    vlan: 200
+    cidr: 192.168.200.0/24
+    gateway: 192.168.200.1
+    description: Development network for database servers
