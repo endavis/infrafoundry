@@ -1,5 +1,90 @@
 {% for template in templates %}
 # Template: {{ template.config.name }}
+{% if template.config.download_image is defined %}
+# Download image and create template from scratch
+# Step 1: Download and prepare image
+resource "null_resource" "download_image_{{ template.config.name | replace('-', '_') }}" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      ssh root@{{ template.config.target_node }} "
+        cd /var/lib/vz/template/iso
+        if [ ! -f {{ template.config.download_image.filename }} ]; then
+          echo 'Downloading {{ template.config.download_image.url }}...'
+          wget -O {{ template.config.download_image.filename }}.tmp '{{ template.config.download_image.url }}'
+          mv {{ template.config.download_image.filename }}.tmp {{ template.config.download_image.filename }}
+          {% if template.config.download_image.extract is defined and template.config.download_image.extract %}
+          echo 'Extracting image...'
+          {% if template.config.download_image.filename.endswith('.xz') %}
+          xz -d {{ template.config.download_image.filename }}
+          {% elif template.config.download_image.filename.endswith('.gz') %}
+          gunzip {{ template.config.download_image.filename }}
+          {% endif %}
+          {% endif %}
+        else
+          echo 'Image already exists, skipping download'
+        fi
+      "
+    EOT
+  }
+
+  triggers = {
+    url = "{{ template.config.download_image.url }}"
+  }
+}
+
+# Step 2: Create VM and import disk
+resource "null_resource" "create_template_vm_{{ template.config.name | replace('-', '_') }}" {
+  depends_on = [null_resource.download_image_{{ template.config.name | replace('-', '_') }}]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      ssh root@{{ template.config.target_node }} "
+        # Create VM with cloud-init
+        qm create {{ template.config.vmid }} \
+          --name {{ template.config.name }} \
+          --memory {{ template.config.memory | default(2048) }} \
+          --cores {{ template.config.cores | default(2) }} \
+          --net0 virtio,bridge={{ template.config.network.bridge | default('vmbr0') }}{% if template.config.network.tag is defined %},tag={{ template.config.network.tag }}{% endif %} \
+          --ide2 local:cloudinit \
+          --boot order=scsi0 \
+          --agent 1
+        
+        # Import disk
+        {% if template.config.download_image.extract is defined and template.config.download_image.extract %}
+        {% set image_file = template.config.download_image.filename | replace('.xz', '') | replace('.gz', '') %}
+        {% else %}
+        {% set image_file = template.config.download_image.filename %}
+        {% endif %}
+        qm importdisk {{ template.config.vmid }} /var/lib/vz/template/iso/{{ image_file }} {{ template.config.disk.storage | default('local-lvm') }}
+        
+        # Attach disk
+        qm set {{ template.config.vmid }} --scsi0 {{ template.config.disk.storage | default('local-lvm') }}:vm-{{ template.config.vmid }}-disk-0
+        
+        {% if template.config.cloud_init is defined and template.config.cloud_init %}
+        # Configure cloud-init
+        {% if template.config.ciuser is defined %}
+        qm set {{ template.config.vmid }} --ciuser {{ template.config.ciuser }}
+        {% endif %}
+        {% if template.config.sshkeys is defined %}
+        qm set {{ template.config.vmid }} --sshkeys '{{ template.config.sshkeys }}'
+        {% endif %}
+        qm set {{ template.config.vmid }} --ipconfig0 ip=dhcp
+        {% endif %}
+        
+        # Convert to template
+        qm template {{ template.config.vmid }}
+      "
+    EOT
+  }
+
+  triggers = {
+    vmid = "{{ template.config.vmid }}"
+    name = "{{ template.config.name }}"
+  }
+}
+
+{% else %}
+# Create template from clone or manual creation
 # Note: VM will be converted to template after creation using local-exec provisioner
 resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | replace('-', '_') }}" {
   name      = "{{ template.config.name }}"
@@ -122,4 +207,5 @@ resource "null_resource" "convert_to_template_{{ template.config.name | replace(
   }
 }
 
+{% endif %}
 {% endfor %}
