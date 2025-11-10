@@ -108,9 +108,7 @@ class ProviderBase(ABC):
         """
         return {}
 
-    def validate_connectivity(
-        self, env_config: dict[str, Any], report: Any
-    ) -> None:
+    def validate_connectivity(self, env_config: dict[str, Any], report: Any) -> None:
         """Validate connectivity to provider API.
 
         Optional method for providers to implement API connectivity checks.

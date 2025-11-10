@@ -20,7 +20,7 @@ infra validate --env dev [OPTIONS]
 Checks are categorized by severity:
 
 - **ERROR** 🔴 - Blocks deployment, must be fixed
-- **WARNING** ⚠️ - Should be reviewed but won't block deployment  
+- **WARNING** ⚠️ - Should be reviewed but won't block deployment
 - **INFO** ℹ️ - Informational only
 
 ## What Gets Validated
@@ -137,11 +137,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Validate infrastructure
         run: |
           infra validate --env prod --check-api --check-refs
-      
+
       - name: Apply if validation passes
         if: success()
         run: |
@@ -155,7 +155,7 @@ validate:
   stage: validate
   script:
     - infra validate --env $CI_ENVIRONMENT_NAME --check-api --check-refs
-  
+
 deploy:
   stage: deploy
   dependencies:
@@ -178,7 +178,7 @@ class MyProvider(ProviderBase):
     ) -> None:
         """Check API connectivity."""
         api_url = env_config.get("provider_settings", {}).get("myprovider", {}).get("api_url")
-        
+
         try:
             response = requests.get(f"{api_url}/health")
             if response.status_code == 200:

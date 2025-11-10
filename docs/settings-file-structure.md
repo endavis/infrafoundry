@@ -55,11 +55,11 @@ provider_settings:
     # API credentials
     api_url: https://pve01.example.com:8006
     api_token: pve-token-id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-    
+
     # Provider defaults
     node: pve01
     storage: local-zfs
-    
+
   opnsense:
     # API credentials
     api_url: https://fw.example.com
