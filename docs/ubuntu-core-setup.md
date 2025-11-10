@@ -11,84 +11,9 @@ Ubuntu Core is a minimal, containerized version of Ubuntu designed for IoT and e
 
 ## Creating Ubuntu Core Template in Proxmox
 
-### Step 1: Download Ubuntu Core Image
+### Fully Automated Method (Recommended - Use InfraFoundry!)
 
-```bash
-# On your workstation or Proxmox host
-wget https://cdimage.ubuntu.com/ubuntu-core/24/stable/current/ubuntu-core-24-amd64.img.xz
-xz -d ubuntu-core-24-amd64.img.xz
-```
-
-### Step 2: Upload to Proxmox
-
-Option A - Via Web UI:
-1. Go to Proxmox node (pve1) > local > ISO Images
-2. Upload `ubuntu-core-24-amd64.img`
-
-Option B - Via SCP:
-```bash
-scp ubuntu-core-24-amd64.img root@pve1:/var/lib/vz/template/iso/
-```
-
-### Step 3: Create VM Manually
-
-```bash
-# SSH to Proxmox host
-ssh root@pve1
-
-# Create VM
-qm create 201 \
-  --name ubuntu-core-24-template \
-  --memory 2048 \
-  --cores 2 \
-  --net0 virtio,bridge=vmbr1,tag=30 \
-  --scsi0 share01:20 \
-  --cdrom local:iso/ubuntu-core-24-amd64.img \
-  --boot order=scsi0 \
-  --agent 1
-
-# Start VM and complete installation
-qm start 201
-```
-
-### Step 4: Complete Ubuntu Core Installation
-
-1. Open console: `qm terminal 201` or use Proxmox web UI
-2. Select installation language
-3. Connect to network (DHCP on VLAN 30)
-4. **Important:** Link to Ubuntu SSO account (required for SSH access)
-5. Wait for installation to complete
-6. Reboot when prompted
-
-### Step 5: Post-Installation Configuration
-
-```bash
-# SSH to the Ubuntu Core VM (use your SSO username)
-ssh <your-ubuntu-sso-username>@<vm-ip>
-
-# Install QEMU guest agent
-sudo snap install qemu-guest-agent
-
-# Configure cloud-init for future clones
-sudo snap install cloud-init
-
-# Clean up for templating
-sudo cloud-init clean
-sudo rm -rf /var/lib/cloud/instances
-sudo sync
-```
-
-### Step 6: Convert to Template
-
-```bash
-# On Proxmox host
-qm shutdown 201
-qm template 201
-```
-
-## Using the Template with InfraFoundry
-
-Once the template is created, update the configuration:
+InfraFoundry can now download the ISO and build the template automatically via Terraform:
 
 ```yaml
 # envs/test/resources/ubuntu-core-template.yaml
@@ -98,11 +23,71 @@ resources:
     name: ubuntu-core-24-template
     config:
       vmid: 201
-      # Template is already created manually, no need to clone
-      # InfraFoundry will just track it
+      target_node: pve1
+      
+      # Download Ubuntu Core image and create template automatically
+      download_image:
+        url: "https://cdimage.ubuntu.com/ubuntu-core/24/stable/current/ubuntu-core-24-amd64.img.xz"
+        filename: "ubuntu-core-24-amd64.img.xz"
+        extract: true  # Extract .xz file after download
+      
+      cores: 2
+      memory: 2048
+      
+      disk:
+        storage: share01
+      
+      network:
+        bridge: vmbr1
+        tag: 30
+      
+      # Cloud-init support - Add YOUR SSH keys (NO SSO REQUIRED!)
+      cloud_init: true
+      ciuser: ubuntu
+      sshkeys: "ssh-ed25519 AAAAC3... user@host"
+      
+      agent: 1
 ```
 
-## Cloning VMs from Template
+Then just run:
+```bash
+# Create the template
+infra apply --env test --resource ubuntu-core-24-template
+
+# That's it! The template is ready to use
+```
+
+**What happens behind the scenes:**
+1. InfraFoundry SSHs to your Proxmox host
+2. Downloads Ubuntu Core image directly to Proxmox (no local download!)
+3. Extracts the .xz file
+4. Creates a VM with cloud-init configuration
+5. Imports the Ubuntu Core disk image
+6. Attaches the disk and configures cloud-init with your SSH key
+7. Converts the VM to a template
+
+**No manual steps, no SSO account needed!**
+
+### Manual Method (If You Need Custom Setup)
+
+If you want more control over the installation:
+
+**Note:** The automated method above is much easier and doesn't require SSO!
+
+If you still want to do manual installation:
+
+1. Go to Proxmox UI → pve1 → local → ISO Images → "Download from URL"
+2. URL: `https://cdimage.ubuntu.com/ubuntu-core/24/stable/current/ubuntu-core-24-amd64.img.xz`
+3. Create VM with the ISO attached as CDROM
+4. Complete interactive installation (requires Ubuntu SSO account)
+
+**We recommend the automated method instead** - it's faster and uses cloud-init for SSH keys.
+
+---
+
+## Using the Template
+
+### Clone VMs from Template
 
 ```yaml
 # envs/test/resources/my-ubuntu-core-vm.yaml
@@ -127,7 +112,7 @@ resources:
         tag: 30
         macaddr: "BC:24:11:1E:01:2C"
       
-      ipconfig: ip=dhcp
+      cloud_init:      ipconfig: ip=dhcp
       ssh_user: your-ubuntu-sso-username
 ```
 
