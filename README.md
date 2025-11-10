@@ -9,6 +9,8 @@
 
 InfraFoundry generates Terraform and Ansible configurations from YAML definitions, then optionally orchestrates their execution. It enables reproducible, multi-provider infrastructure deployment with a focus on simplicity, security, and CI/CD integration.
 
+**🎯 YAML-Only Configuration:** You write only YAML - InfraFoundry automatically generates all Terraform `.tf` files and Ansible playbooks. No HCL knowledge required!
+
 ## What InfraFoundry Does
 
 **Primary: Infrastructure as Code Generation**
@@ -457,16 +459,15 @@ infrafoundry/
 my-infrastructure-config/
 ├── envs/                      # Environment configurations
 │   ├── dev/                   # Development environment
-│   │   ├── environment.yaml   # Environment definition
+│   │   ├── settings.yaml      # Environment definition + secrets
 │   │   ├── proxmox/           # Proxmox resources
 │   │   ├── opnsense/          # OPNsense resources
 │   │   └── kubernetes/        # Kubernetes resources
 │   ├── staging/               # Staging environment
 │   └── prod/                  # Production environment
-├── secrets/                   # Encrypted secrets (git-ignored keys)
+├── secrets/                   # Encryption keys (git-ignored keys)
 │   ├── age.key                # Encryption key (DO NOT COMMIT)
-│   ├── .sops.yaml             # SOPS configuration (committed)
-│   └── *.yaml                 # Encrypted credential files (committed)
+│   └── .sops.yaml             # SOPS configuration (committed)
 ├── generated/                 # Generated files (git-ignored)
 │   ├── terraform/             # Generated .tf files
 │   └── ansible/               # Generated playbooks
@@ -479,18 +480,45 @@ my-infrastructure-config/
 
 ### Environment Structure
 
-Each environment (dev, staging, prod) has:
+Each environment (dev, staging, prod) uses a `settings.yaml` file containing all configuration and credentials:
 
 ```yaml
-# envs/dev/environment.yaml
+# envs/dev/settings.yaml (encrypt with SOPS)
 name: dev
 description: Development environment
 variables:
   environment: development
   region: us-east
+
+# Optional: Global SSH configuration (all providers)
+ssh:
+  user: your-username
+  key_path: /path/to/ssh/key
+  port: 22  # Optional, defaults to 22
+
+# Optional: Per-provider SSH configuration (overrides global)
+provider_ssh:
+  proxmox:
+    user: proxmox-admin
+    key_path: /path/to/proxmox/key
+    port: 2222
+
+# Optional: Provider-specific settings (credentials, endpoints)
+provider_settings:
+  proxmox:
+    api_url: https://pve01.example.com:8006
+    api_token: your-api-token
+    node: pve01
+    storage: local-lvm
+  opnsense:
+    api_url: https://opn.example.com
+    api_key: your-api-key
+    api_secret: your-api-secret
 ```
 
-**Note:** Providers are auto-discovered from resource files. No need to declare them in `environment.yaml`.
+**Note:** Providers are auto-discovered from resource files. No need to declare them in `settings.yaml`.
+
+**SSH Configuration**: Some Proxmox operations (extracting compressed images, disk imports) require SSH access. Configure per-environment SSH settings in `settings.yaml`. Supports both global and per-provider configurations. InfraFoundry will automatically generate the needed Terraform variables. See [docs/ssh-authentication.md](docs/ssh-authentication.md) for details.
 
 ### Provider Resources
 

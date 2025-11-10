@@ -24,28 +24,28 @@ resources:
     config:
       vmid: 201
       target_node: pve1
-      
+
       # Download Ubuntu Core image and create template automatically
       download_image:
         url: "https://cdimage.ubuntu.com/ubuntu-core/24/stable/current/ubuntu-core-24-amd64.img.xz"
         filename: "ubuntu-core-24-amd64.img.xz"
         extract: true  # Extract .xz file after download
-      
+
       cores: 2
       memory: 2048
-      
+
       disk:
         storage: share01
-      
+
       network:
         bridge: vmbr1
         tag: 30
-      
+
       # Cloud-init support - Add YOUR SSH keys (NO SSO REQUIRED!)
       cloud_init: true
       ciuser: ubuntu
       sshkeys: "ssh-ed25519 AAAAC3... user@host"
-      
+
       agent: 1
 ```
 
@@ -99,19 +99,19 @@ resources:
       vmid: 301
       target_node: pve1
       clone: 201  # Ubuntu Core template VMID
-      
+
       cores: 2
       memory: 2048
-      
+
       disk:
         size: 20G
         storage: share01
-      
+
       network:
         bridge: vmbr1
         tag: 30
         macaddr: "BC:24:11:1E:01:2C"
-      
+
       cloud_init:      ipconfig: ip=dhcp
       ssh_user: your-ubuntu-sso-username
 ```

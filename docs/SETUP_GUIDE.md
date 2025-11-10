@@ -83,14 +83,11 @@ mkdir -p envs/$ENV_NAME/opnsense
 
 ### Step 4: Configure Environment Settings
 
-Create `envs/$ENV_NAME/environment.yaml`:
+Create `envs/$ENV_NAME/settings.yaml`:
 
 ```yaml
 name: homelab
 description: Home lab environment
-providers:
-  - proxmox
-  - opnsense
 
 variables:
   environment: homelab
@@ -396,8 +393,8 @@ echo $INFRAFOUNDRY_CONFIG_REPO
 # List environments
 ls -la example-config/envs/  # or your config repo path
 
-# Verify environment.yaml exists
-cat example-config/envs/homelab/environment.yaml
+# Verify settings.yaml exists
+cat example-config/envs/homelab/settings.yaml
 ```
 
 ### Terraform errors

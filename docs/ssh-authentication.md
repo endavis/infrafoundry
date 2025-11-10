@@ -13,30 +13,53 @@ By default, InfraFoundry uses:
 
 ## Per-Environment SSH Configuration
 
-You can configure SSH settings per environment in your config repo:
+Configure SSH settings in `settings.yaml`:
 
-```bash
-# endavis-infra/envs/test/.ssh-config (example)
-SSH_USER=endavis
-SSH_KEY_PATH=~/.ssh/id_ed25519
-SSH_PORT=22
+### Global SSH Config (All Providers)
 
-# endavis-infra/envs/prod/.ssh-config
-SSH_USER=automation
-SSH_KEY_PATH=/secure/keys/prod_infra
-SSH_PORT=2222
+```yaml
+# endavis-infra/envs/test/settings.yaml
+name: test
+description: Test environment
+
+ssh:
+  user: endavis
+  key_path: /home/endavis/.ssh/id_ed25519
+  port: 22  # Optional, defaults to 22
 ```
 
-Or use Terraform variables:
+### Per-Provider SSH Config
 
-```bash
-# endavis-infra/envs/test/terraform.tfvars
-proxmox_ssh_user     = "endavis"
-proxmox_ssh_key_path = "/home/endavis/.ssh/id_ed25519"
-proxmox_ssh_port     = 22
+When different providers need different credentials:
+
+```yaml
+# endavis-infra/envs/prod/settings.yaml
+name: prod
+description: Production environment
+
+# Global default (fallback if provider-specific not set)
+ssh:
+  user: automation
+  key_path: /home/automation/.ssh/id_ed25519
+
+# Provider-specific SSH configs (override global)
+provider_ssh:
+  proxmox:
+    user: proxmox-admin
+    key_path: /secure/keys/proxmox_prod
+    port: 2222
+  opnsense:
+    user: opnsense-admin
+    key_path: /secure/keys/opnsense_prod
+    port: 22
 ```
 
-These will be automatically copied to the generated Terraform directory.
+InfraFoundry will:
+1. Check for provider-specific config first (`provider_ssh.proxmox`)
+2. Fall back to global config (`ssh`) if not found
+3. Use defaults (current user, ssh-agent, port 22) if neither exists
+
+InfraFoundry will automatically generate `terraform.tfvars` from these YAML settings. No HCL configuration needed!
 
 ## Authentication Options
 

@@ -50,16 +50,16 @@ resources:
     config:
       target_node: pve1
       clone: ubuntu-template
-      
+
       # Network with SAME MAC as DHCP mapping
       network:
         bridge: vmbr1
         tag: 10
         macaddr: "BC:24:11:10:00:96"  # Must match DHCP mapping
-      
+
       # Use DHCP - will get reserved IP
       ipconfig: ip=dhcp
-      
+
       # Don't start on creation (optional)
       oncreate: false
 ```

@@ -17,10 +17,10 @@ This repository contains your infrastructure configurations, environment definit
 .
 ├── envs/                    # Environment configurations
 │   ├── dev/                 # Development environment
-│   │   ├── environment.yaml # Environment definition
-│   │   ├── proxmox/         # Proxmox resources
-│   │   ├── opnsense/        # OPNsense resources
-│   │   └── kubernetes/      # Kubernetes resources
+│   │   ├── settings.yaml    # Environment definition + secrets
+│   │   ├── proxmox/         # Proxmox resources (YAML only)
+│   │   ├── opnsense/        # OPNsense resources (YAML only)
+│   │   └── kubernetes/      # Kubernetes resources (YAML only)
 │   ├── staging/             # Staging environment
 │   └── prod/                # Production environment
 ├── secrets/                 # Encrypted secrets (SOPS + age)
@@ -31,7 +31,7 @@ This repository contains your infrastructure configurations, environment definit
 └── README.md                # This file
 ```
 
-**Note:** Credentials and environment-specific settings are configured in the **framework repository's** `.envrc.local` file, not in this config repository.
+**Note:** All configuration is YAML. InfraFoundry automatically generates Terraform `.tf` files and Ansible playbooks from your YAML definitions - you never need to write HCL or Terraform code directly.
 
 ## Setup
 
@@ -151,7 +151,7 @@ Create a new environment:
 mkdir -p envs/staging
 ```
 
-Create `envs/staging/environment.yaml`:
+Create `envs/staging/settings.yaml`:
 
 ```yaml
 name: staging
@@ -159,6 +159,12 @@ description: Staging environment
 variables:
   cluster_name: staging-cluster
   domain: staging.example.com
+
+# Optional: SSH configuration for Proxmox template operations
+ssh:
+  user: automation
+  key_path: /home/automation/.ssh/id_ed25519
+  port: 22
 ```
 
 **Note:** Providers are auto-discovered from resource files - no need to declare them explicitly.
@@ -332,7 +338,7 @@ export INFRAFOUNDRY_CONFIG_REPO="/path/to/config/repo"
 
 ### Environment not found
 - Check directory structure: `ls envs/`
-- Verify `environment.yaml` exists in environment directory
+- Verify `settings.yaml` exists in environment directory
 - List available environments: `infra envs`
 
 ## Maintaining This Repository
