@@ -174,13 +174,12 @@ infra plan --env dev --dry-run
 my-config-repo/
 ├── envs/
 │   └── dev/
-│       ├── environment.yaml
+│       ├── settings.yaml
 │       └── proxmox/
 │           └── vms.yaml
 ├── secrets/
 │   ├── age.key                    # Git-ignored
-│   ├── .sops.yaml                 # SOPS config
-│   └── proxmox.yaml               # Encrypted
+│   └── .sops.yaml                 # SOPS config
 ├── .envrc.local                   # Git-ignored
 ├── .gitignore
 └── README.md
@@ -192,7 +191,7 @@ my-config-repo/
 my-config-repo/
 ├── envs/
 │   ├── dev/
-│   │   ├── environment.yaml
+│   │   ├── settings.yaml
 │   │   ├── proxmox/
 │   │   │   ├── vms.yaml
 │   │   │   ├── templates.yaml

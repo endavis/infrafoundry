@@ -276,18 +276,19 @@ servers:
       application: database
 ```
 
-### 6. Update Environment Configuration
+### 6. Create Test Resources
 
-Edit `envs/dev/environment.yaml`:
+Create test resource file `envs/dev/yourprovider/test.yaml`:
 
 ```yaml
-name: dev
-description: Development environment
-providers:
-  - proxmox
-  - opnsense
-  - kubernetes
-  - yourprovider  # Add your provider
+test_resource:
+  - name: test-01
+    config:
+      field1: value1
+      field2: value2
+```
+
+**Note:** Providers are auto-discovered from resource files, no need to declare them in `settings.yaml`.
 ```
 
 ### 7. Add Credentials to .envrc.local
