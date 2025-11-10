@@ -33,7 +33,7 @@ def advanced_orchestrator(tmp_path):
     (config_dir / "envs" / "dev" / "proxmox").mkdir(parents=True)
 
     # Create environment file
-    env_file = config_dir / "envs" / "dev" / "environment.yaml"
+    env_file = config_dir / "envs" / "dev" / "settings.yaml"
     env_file.write_text(
         """
 name: dev

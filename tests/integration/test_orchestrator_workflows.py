@@ -42,7 +42,7 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     (config_dir / "secrets").mkdir(parents=True)
 
     # Create environment file
-    env_file = config_dir / "envs" / "dev" / "environment.yaml"
+    env_file = config_dir / "envs" / "dev" / "settings.yaml"
     env_file.write_text("name: dev\ndescription: Development environment\n")
 
     # Create mock ConfigManager

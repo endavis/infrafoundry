@@ -77,7 +77,7 @@ class TestConfigManager:
         good_env.mkdir()
         import yaml
 
-        with open(good_env / "environment.yaml", "w") as f:
+        with open(good_env / "settings.yaml", "w") as f:
             yaml.dump({"name": "good", "description": "Good env"}, f)
 
         # Now validate should pass
@@ -92,7 +92,7 @@ class TestConfigManager:
 
         import yaml
 
-        with open(empty_env / "environment.yaml", "w") as f:
+        with open(empty_env / "settings.yaml", "w") as f:
             yaml.dump({"name": "empty", "description": "Empty environment"}, f)
 
         config = ConfigManager(envs_dir)
@@ -141,7 +141,7 @@ class TestConfigManager:
         bad_env.mkdir()
 
         # Create invalid YAML
-        (bad_env / "environment.yaml").write_text("invalid: yaml: content::")
+        (bad_env / "settings.yaml").write_text("invalid: yaml: content::")
 
         config = ConfigManager(envs_dir)
 
@@ -188,14 +188,14 @@ class TestConfigManager:
         assert config.base_dir == custom_dir
 
     def test_get_resources_with_plural_type(self, temp_dir):
-        """Test resource loading with plural type format (backwards compatibility)."""
+        """Test resource loading with plural type format (e.g., 'vms:' instead of 'vm:')."""
         import yaml
 
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True)
 
         # Create env config
-        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_file.write_text("name: dev\ndescription: Test\n")
 
         # Create resource file with plural type key (vms instead of vm)
@@ -218,7 +218,7 @@ class TestConfigManager:
         envs_dir.mkdir(parents=True)
 
         # Create env config
-        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_file.write_text("name: dev\ndescription: Test\n")
 
         # Create resource file with dict instead of list
@@ -239,7 +239,7 @@ class TestConfigManager:
         envs_dir.mkdir(parents=True)
 
         # Create env config
-        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_file.write_text("name: dev\ndescription: Test\n")
 
         # Create resource file as direct list (invalid format)
@@ -272,8 +272,8 @@ class TestConfigManager:
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create environment.yaml
-        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        # Create settings.yaml
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
         with open(env_file, "w") as f:
             yaml.dump(env_data, f)
@@ -301,8 +301,8 @@ class TestConfigManager:
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create environment.yaml
-        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        # Create settings.yaml
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
         with open(env_file, "w") as f:
             yaml.dump(env_data, f)
@@ -330,8 +330,8 @@ class TestConfigManager:
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create environment.yaml
-        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        # Create settings.yaml
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
         with open(env_file, "w") as f:
             yaml.dump(env_data, f)
@@ -360,8 +360,8 @@ class TestConfigManager:
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create environment.yaml
-        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        # Create settings.yaml
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
         with open(env_file, "w") as f:
             yaml.dump(env_data, f)
@@ -396,13 +396,13 @@ class TestConfigManager:
         config = ConfigManager(envs_dir)
         assert not config.validate_environment("nonexistent")
 
-    def test_get_resources_skips_environment_yaml_in_provider_dir(self, temp_dir):
-        """Test that environment.yaml in provider directory is skipped."""
+    def test_get_resources_skips_settings_yaml_in_provider_dir(self, temp_dir):
+        """Test that settings.yaml in provider directory is skipped."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create environment.yaml in provider directory (should be skipped)
-        wrong_env_file = envs_dir / "environment.yaml"
+        # Create settings.yaml in provider directory (should be skipped)
+        wrong_env_file = envs_dir / "settings.yaml"
         wrong_env_data = {"invalid": "data"}
         with open(wrong_env_file, "w") as f:
             yaml.dump(wrong_env_data, f)
@@ -415,7 +415,7 @@ class TestConfigManager:
 
         config = ConfigManager(temp_dir / "envs")
         resources = config.get_all_resources("dev", "proxmox")
-        # Should get only the vm, not fail on environment.yaml
+        # Should get only the vm, not fail on settings.yaml
         assert len(resources) == 1
         assert resources[0].name == "test-vm"
 
@@ -505,19 +505,19 @@ class TestConfigManager:
         assert len(resources) == 1
         assert resources[0].name == "web-01"
 
-    def test_get_all_resources_all_providers_skips_environment_yaml(self, temp_dir):
-        """Test that get_all_resources_all_providers skips environment.yaml."""
+    def test_get_all_resources_all_providers_skips_settings_yaml(self, temp_dir):
+        """Test that get_all_resources_all_providers skips settings.yaml."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create environment.yaml in main dir
-        env_file = temp_dir / "envs" / "dev" / "environment.yaml"
+        # Create settings.yaml in main dir
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
         with open(env_file, "w") as f:
             yaml.dump(env_data, f)
 
-        # Create environment.yaml in provider directory (should be skipped)
-        wrong_env_file = envs_dir / "environment.yaml"
+        # Create settings.yaml in provider directory (should be skipped)
+        wrong_env_file = envs_dir / "settings.yaml"
         wrong_env_data = {"invalid": "data"}
         with open(wrong_env_file, "w") as f:
             yaml.dump(wrong_env_data, f)
@@ -530,7 +530,7 @@ class TestConfigManager:
 
         config = ConfigManager(temp_dir / "envs")
         resources = config.get_all_resources_all_providers("dev")
-        # Should get only the vm, not fail on environment.yaml
+        # Should get only the vm, not fail on settings.yaml
         assert len(resources) == 1
         assert resources[0].name == "test-vm"
 
@@ -637,7 +637,7 @@ class TestConfigManager:
         envs_dir = temp_dir / "envs" / "dev"
         envs_dir.mkdir(parents=True, exist_ok=True)
 
-        env_file = envs_dir / "environment.yaml"
+        env_file = envs_dir / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
         with open(env_file, "w") as f:
             yaml.dump(env_data, f)
@@ -658,3 +658,101 @@ class TestConfigManager:
         resources = config.get_all_resources_all_providers("dev")
         # Should handle empty files and files without resources key
         assert len(resources) == 0
+
+    def test_provider_settings_basic(self, temp_dir):
+        """Test provider_settings configuration."""
+        envs_dir = temp_dir / "envs" / "test"
+        envs_dir.mkdir(parents=True)
+        settings_file = envs_dir / "settings.yaml"
+        settings_file.write_text(
+            """
+name: test
+description: Test environment
+provider_settings:
+  proxmox:
+    api_url: https://pve01.example.com:8006
+    api_token: secret-token
+    node: pve01
+    storage: local-lvm
+  opnsense:
+    api_url: https://opn.example.com
+    api_key: test-key
+"""
+        )
+
+        config = ConfigManager(temp_dir / "envs")
+        env = config.load_environment("test")
+
+        # Test Proxmox settings
+        proxmox_settings = env.get_provider_settings("proxmox")
+        assert proxmox_settings is not None
+        assert proxmox_settings["api_url"] == "https://pve01.example.com:8006"
+        assert proxmox_settings["api_token"] == "secret-token"
+        assert proxmox_settings["node"] == "pve01"
+        assert proxmox_settings["storage"] == "local-lvm"
+
+        # Test OPNsense settings
+        opnsense_settings = env.get_provider_settings("opnsense")
+        assert opnsense_settings is not None
+        assert opnsense_settings["api_url"] == "https://opn.example.com"
+        assert opnsense_settings["api_key"] == "test-key"
+
+        # Test non-existent provider
+        k8s_settings = env.get_provider_settings("kubernetes")
+        assert k8s_settings is None
+
+    def test_provider_settings_empty(self, temp_dir):
+        """Test environment with no provider_settings."""
+        envs_dir = temp_dir / "envs" / "test"
+        envs_dir.mkdir(parents=True)
+        settings_file = envs_dir / "settings.yaml"
+        settings_file.write_text(
+            """
+name: test
+description: Test environment
+"""
+        )
+
+        config = ConfigManager(temp_dir / "envs")
+        env = config.load_environment("test")
+
+        # Should return None for any provider
+        assert env.get_provider_settings("proxmox") is None
+        assert env.get_provider_settings("opnsense") is None
+
+    def test_provider_settings_combined_with_ssh(self, temp_dir):
+        """Test provider_settings and provider_ssh together."""
+        envs_dir = temp_dir / "envs" / "test"
+        envs_dir.mkdir(parents=True)
+        settings_file = envs_dir / "settings.yaml"
+        settings_file.write_text(
+            """
+name: test
+description: Test environment
+ssh:
+  user: default-user
+provider_ssh:
+  proxmox:
+    user: proxmox-user
+    port: 2222
+provider_settings:
+  proxmox:
+    api_url: https://pve01.example.com:8006
+    node: pve01
+"""
+        )
+
+        config = ConfigManager(temp_dir / "envs")
+        env = config.load_environment("test")
+
+        # Test SSH config
+        ssh = env.get_ssh_config("proxmox")
+        assert ssh is not None
+        assert ssh.user == "proxmox-user"
+        assert ssh.port == 2222
+
+        # Test provider settings
+        settings = env.get_provider_settings("proxmox")
+        assert settings is not None
+        assert settings["api_url"] == "https://pve01.example.com:8006"
+        assert settings["node"] == "pve01"
