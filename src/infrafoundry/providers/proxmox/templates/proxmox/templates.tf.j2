@@ -68,6 +68,8 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
   {% if template.config.cloud_init is defined and template.config.cloud_init %}
   # Cloud-init Configuration
   initialization {
+    datastore_id = "{{ template.config.cloud_init_datastore | default(template.config.disk.storage) | default('local-lvm') }}"
+    
     {% if template.config.ciuser is defined %}
     user_account {
       username = "{{ template.config.ciuser }}"
