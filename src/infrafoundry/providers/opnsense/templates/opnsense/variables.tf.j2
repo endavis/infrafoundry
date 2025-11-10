@@ -1,6 +1,20 @@
 # OPNsense Provider Variables
-# Credentials are loaded from environment variables by the provider:
-# - OPNSENSE_API_URL
-# - OPNSENSE_API_KEY
-# - OPNSENSE_API_SECRET
-# No Terraform variables needed
+# Populated from settings.yaml via terraform.tfvars
+
+variable "opnsense_api_url" {
+  description = "OPNsense API URL (e.g., https://opnsense.example.com)"
+  type        = string
+  sensitive   = false
+}
+
+variable "opnsense_api_key" {
+  description = "OPNsense API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "opnsense_api_secret" {
+  description = "OPNsense API secret"
+  type        = string
+  sensitive   = true
+}

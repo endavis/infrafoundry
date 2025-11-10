@@ -60,7 +60,7 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   # Cloud-init Configuration
   initialization {
     datastore_id = "{{ vm.config.cloud_init_datastore | default(vm.config.disk.storage) | default('local-lvm') }}"
-    
+
     {% if vm.config.ipconfig is defined %}
     ip_config {
       {% if 'dhcp' in vm.config.ipconfig %}
