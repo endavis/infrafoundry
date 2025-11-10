@@ -2,6 +2,21 @@
 
 This module provides functionality to automatically discover command modules
 in the commands/ directory and register them with the main CLI application.
+
+Architecture:
+    - One file per command in commands/ directory (e.g., init.py, plan.py, apply.py)
+    - Each file should contain a Click command or group
+    - Commands are auto-discovered and registered at import time
+
+Example command file (commands/example.py):
+    ```python
+    import click
+
+    @click.command()
+    def example():
+        '''Example command description.'''
+        click.echo('Hello!')
+    ```
 """
 
 import importlib
