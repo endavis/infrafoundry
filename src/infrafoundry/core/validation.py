@@ -69,15 +69,11 @@ class ValidationReport:
 
     def has_errors(self) -> bool:
         """Check if report contains any errors."""
-        return any(
-            not r.passed and r.level == ValidationLevel.ERROR for r in self.results
-        )
+        return any(not r.passed and r.level == ValidationLevel.ERROR for r in self.results)
 
     def has_warnings(self) -> bool:
         """Check if report contains any warnings."""
-        return any(
-            not r.passed and r.level == ValidationLevel.WARNING for r in self.results
-        )
+        return any(not r.passed and r.level == ValidationLevel.WARNING for r in self.results)
 
     def get_summary(self) -> dict[str, int]:
         """Get summary counts of validation results.
@@ -89,19 +85,13 @@ class ValidationReport:
             "total": len(self.results),
             "passed": sum(1 for r in self.results if r.passed),
             "errors": sum(
-                1
-                for r in self.results
-                if not r.passed and r.level == ValidationLevel.ERROR
+                1 for r in self.results if not r.passed and r.level == ValidationLevel.ERROR
             ),
             "warnings": sum(
-                1
-                for r in self.results
-                if not r.passed and r.level == ValidationLevel.WARNING
+                1 for r in self.results if not r.passed and r.level == ValidationLevel.WARNING
             ),
             "info": sum(
-                1
-                for r in self.results
-                if not r.passed and r.level == ValidationLevel.INFO
+                1 for r in self.results if not r.passed and r.level == ValidationLevel.INFO
             ),
         }
 
@@ -109,7 +99,7 @@ class ValidationReport:
         """String representation of validation report."""
         summary = self.get_summary()
         lines = [
-            f"\nValidation Report:",
+            "\nValidation Report:",
             f"  Total checks: {summary['total']}",
             f"  ✓ Passed: {summary['passed']}",
         ]

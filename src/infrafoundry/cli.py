@@ -808,9 +808,7 @@ def status(ctx: click.Context, env: str) -> None:
     help="Validate resource references (templates, networks, etc.)",
 )
 @click.pass_context
-def validate(
-    ctx: click.Context, env: str, check_api: bool, check_refs: bool
-) -> None:
+def validate(ctx: click.Context, env: str, check_api: bool, check_refs: bool) -> None:
     """Validate infrastructure configuration before deployment.
 
     Performs pre-flight checks including:
@@ -832,7 +830,7 @@ def validate(
 
         # Load environment config
         env_config_dict = orchestrator.config.load_environment(env)
-        console.print(f"[green]✓[/green] Loaded environment configuration")
+        console.print("[green]✓[/green] Loaded environment configuration")
 
         # Load resources
         resources = orchestrator.config.get_all_resources_all_providers(env)
@@ -841,7 +839,7 @@ def validate(
         # Validate resources have supported providers
         try:
             orchestrator.validate_resources(resources)
-            console.print(f"[green]✓[/green] All resources have registered providers")
+            console.print("[green]✓[/green] All resources have registered providers")
         except ValueError as e:
             console.print(f"[red]✗[/red] {e}")
             sys.exit(1)
@@ -863,17 +861,18 @@ def validate(
                 continue
 
             console.print(
-                f"\n[bold cyan]Validating {provider_name}:[/bold cyan] {len(provider_resources)} resource(s)"
+                f"\n[bold cyan]Validating {provider_name}:[/bold cyan] "
+                f"{len(provider_resources)} resource(s)"
             )
 
             # API connectivity check
             if check_api:
-                console.print(f"  Checking API connectivity...")
+                console.print("  Checking API connectivity...")
                 provider.validate_connectivity(env_config_dict.model_dump(), report)
 
             # Reference validation
             if check_refs:
-                console.print(f"  Validating resource references...")
+                console.print("  Validating resource references...")
                 provider.validate_references(
                     provider_resources, env_config_dict.model_dump(), report
                 )
@@ -883,18 +882,12 @@ def validate(
 
         # Exit with error if validation failed
         if report.has_errors():
-            console.print(
-                "\n[bold red]❌ Validation failed with errors[/bold red]"
-            )
+            console.print("\n[bold red]❌ Validation failed with errors[/bold red]")
             sys.exit(1)
         elif report.has_warnings():
-            console.print(
-                "\n[bold yellow]⚠️  Validation passed with warnings[/bold yellow]"
-            )
+            console.print("\n[bold yellow]⚠️  Validation passed with warnings[/bold yellow]")
         else:
-            console.print(
-                "\n[bold green]✅ Validation passed successfully[/bold green]"
-            )
+            console.print("\n[bold green]✅ Validation passed successfully[/bold green]")
 
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")

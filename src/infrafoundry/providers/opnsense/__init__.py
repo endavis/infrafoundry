@@ -169,9 +169,7 @@ class OPNsenseProvider(ProviderBase):
         }
 
     @override
-    def validate_connectivity(
-        self, env_config: dict[str, Any], report: ValidationReport
-    ) -> None:
+    def validate_connectivity(self, env_config: dict[str, Any], report: ValidationReport) -> None:
         """Validate connectivity to OPNsense API.
 
         Args:
@@ -181,16 +179,16 @@ class OPNsenseProvider(ProviderBase):
         provider_settings = env_config.get("provider_settings", {}).get("opnsense", {})
         api_url = provider_settings.get("api_url") or os.getenv("OPNSENSE_API_URL")
         api_key = provider_settings.get("api_key") or os.getenv("OPNSENSE_API_KEY")
-        api_secret = provider_settings.get("api_secret") or os.getenv(
-            "OPNSENSE_API_SECRET"
-        )
+        api_secret = provider_settings.get("api_secret") or os.getenv("OPNSENSE_API_SECRET")
 
         # Check if credentials are configured
         if not all([api_url, api_key, api_secret]):
             report.add_check(
                 check_name="opnsense_credentials",
                 passed=False,
-                message="OPNsense credentials not configured (api_url, api_key, api_secret required)",
+                message=(
+                    "OPNsense credentials not configured (api_url, api_key, api_secret required)"
+                ),
                 level=ValidationLevel.ERROR,
             )
             return
@@ -277,7 +275,10 @@ class OPNsenseProvider(ProviderBase):
                 report.add_check(
                     check_name=f"firewall_rule_{rule.name}_source_alias",
                     passed=False,
-                    message=f"Firewall rule '{rule.name}' references undefined source alias '{source_alias}'",
+                    message=(
+                        f"Firewall rule '{rule.name}' references "
+                        f"undefined source alias '{source_alias}'"
+                    ),
                     level=ValidationLevel.ERROR,
                     details={"rule": rule.name, "missing_alias": source_alias},
                 )
@@ -286,7 +287,10 @@ class OPNsenseProvider(ProviderBase):
                 report.add_check(
                     check_name=f"firewall_rule_{rule.name}_dest_alias",
                     passed=False,
-                    message=f"Firewall rule '{rule.name}' references undefined destination alias '{dest_alias}'",
+                    message=(
+                        f"Firewall rule '{rule.name}' references "
+                        f"undefined destination alias '{dest_alias}'"
+                    ),
                     level=ValidationLevel.ERROR,
                     details={"rule": rule.name, "missing_alias": dest_alias},
                 )
@@ -299,7 +303,9 @@ class OPNsenseProvider(ProviderBase):
                 report.add_check(
                     check_name=f"dhcp_static_map_{dhcp_map.name}_interface",
                     passed=False,
-                    message=f"DHCP static map '{dhcp_map.name}' references undefined VLAN '{interface}'",
+                    message=(
+                        f"DHCP static map '{dhcp_map.name}' references undefined VLAN '{interface}'"
+                    ),
                     level=ValidationLevel.WARNING,
                     details={"dhcp_map": dhcp_map.name, "missing_vlan": interface},
                 )
@@ -309,6 +315,10 @@ class OPNsenseProvider(ProviderBase):
             report.add_check(
                 check_name="opnsense_references",
                 passed=True,
-                message=f"All OPNsense resource references valid ({len(firewall_rules)} rules, {len(aliases)} aliases, {len(vlans)} VLANs)",
+                message=(
+                    f"All OPNsense resource references valid "
+                    f"({len(firewall_rules)} rules, {len(aliases)} aliases, "
+                    f"{len(vlans)} VLANs)"
+                ),
                 level=ValidationLevel.INFO,
             )

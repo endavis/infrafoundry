@@ -653,7 +653,8 @@ class OPNsenseParser:
             f.write("## Next Steps\n\n")
             f.write("1. **Review the generated files** - Check all configurations\n")
             f.write(
-                "2. **Copy to InfraFoundry** - `cp -r opnsense/ $INFRAFOUNDRY_CONFIG_REPO/envs/prod/`\n"
+                "2. **Copy to InfraFoundry** - "
+                "`cp -r opnsense/ $INFRAFOUNDRY_CONFIG_REPO/envs/prod/`\n"
             )
             f.write(
                 "3. **Add sensitive data** - Create `secrets/opnsense.yaml` for VPN credentials\n"
