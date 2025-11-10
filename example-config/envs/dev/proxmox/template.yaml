@@ -1,0 +1,31 @@
+template:
+  - name: ubuntu-22-04-template
+    target_node: pve01
+    iso: local:iso/ubuntu-22.04-server-amd64.iso
+    cores: 2
+    sockets: 1
+    memory: 2048
+    disk:
+      size: 32G
+      type: scsi
+      storage: local-lvm
+    network:
+      model: virtio
+      bridge: vmbr0
+    cloud_init: true
+    cicustom: user=local:snippets/user-data.yml
+
+  - name: debian-12-template
+    target_node: pve01
+    iso: local:iso/debian-12-generic-amd64.iso
+    cores: 2
+    sockets: 1
+    memory: 2048
+    disk:
+      size: 32G
+      type: scsi
+      storage: local-lvm
+    network:
+      model: virtio
+      bridge: vmbr0
+    cloud_init: true
