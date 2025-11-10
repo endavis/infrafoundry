@@ -212,92 +212,59 @@ class ProxmoxProvider(ProviderBase):
         - Authentication credentials are valid
         - Can retrieve cluster status
         """
-        from infrafoundry.core.validation import ValidationLevel
+        from infrafoundry.core.validation_helpers import BaseProviderValidator
 
-        # Get Proxmox credentials from provider settings
-        provider_settings = env_config.get("provider_settings", {}).get("proxmox", {})
-        api_url = provider_settings.get("api_url")
-        api_token = provider_settings.get("api_token")
-        node = provider_settings.get("node")
+        validator = BaseProviderValidator(
+            provider_name="proxmox",
+            env_config=env_config,
+            report=report,
+        )
 
-        # Check if credentials are configured
-        if not all([api_url, api_token, node]):
-            report.add_check(
-                check_name="proxmox_credentials",
-                passed=False,
-                message=("Proxmox credentials not configured (api_url, api_token, node required)"),
-                level=ValidationLevel.ERROR,
-            )
+        # Validate credentials
+        credentials = validator.validate_credentials(
+            required_fields=["api_url", "api_token", "node"]
+        )
+        if not credentials:
             return
+
+        # Parse Proxmox API token (format: "PVEAPIToken=USER@REALM!TOKENID=UUID")
+        api_token = credentials["api_token"]
+        if "=" in api_token:
+            # Extract token value after the =
+            token_parts = api_token.split("=", 1)
+            auth_header = f"PVEAPIToken={token_parts[1]}" if len(token_parts) == 2 else api_token
+        else:
+            auth_header = f"PVEAPIToken={api_token}"
 
         # Test API connectivity
-        try:
-            import requests
-        except ImportError:
-            report.add_check(
-                check_name="proxmox_connectivity",
-                passed=False,
-                message="requests library not installed (required for API validation)",
-                level=ValidationLevel.ERROR,
-            )
-            return
+        import requests
 
-        try:
-            # Parse token (format: "PVEAPIToken=USER@REALM!TOKENID=UUID")
-            if "=" in api_token:
-                # Extract token value after the =
-                token_parts = api_token.split("=", 1)
-                if len(token_parts) == 2:
-                    auth_header = f"PVEAPIToken={token_parts[1]}"
-                else:
-                    auth_header = api_token
-            else:
-                auth_header = f"PVEAPIToken={api_token}"
+        version_url = f"{credentials['api_url']}/api2/json/version"
+        response_ok = validator.check_api_connectivity(
+            url=version_url,
+            headers={"Authorization": auth_header},
+            verify_ssl=False,
+        )
 
-            headers = {"Authorization": auth_header}
-
-            # Test connection with version endpoint (doesn't require authentication)
-            version_url = f"{api_url}/api2/json/version"
-            response = requests.get(version_url, headers=headers, timeout=10, verify=False)
-
-            if response.status_code == 200:
-                version_data = response.json().get("data", {})
-                version = version_data.get("version", "unknown")
-                report.add_check(
-                    check_name="proxmox_connectivity",
-                    passed=True,
-                    message=f"Successfully connected to Proxmox at {api_url} (v{version})",
-                    level=ValidationLevel.INFO,
+        # If connection succeeded, get version info
+        if response_ok:
+            try:
+                response = requests.get(
+                    version_url,
+                    headers={"Authorization": auth_header},
+                    verify=False,
+                    timeout=10,
                 )
-            else:
-                report.add_check(
-                    check_name="proxmox_connectivity",
-                    passed=False,
-                    message=f"Failed to connect to Proxmox API: HTTP {response.status_code}",
-                    level=ValidationLevel.ERROR,
-                )
-
-        except requests.exceptions.Timeout:
-            report.add_check(
-                check_name="proxmox_connectivity",
-                passed=False,
-                message=f"Connection to {api_url} timed out",
-                level=ValidationLevel.ERROR,
-            )
-        except requests.exceptions.ConnectionError as e:
-            report.add_check(
-                check_name="proxmox_connectivity",
-                passed=False,
-                message=f"Cannot connect to {api_url}: {e}",
-                level=ValidationLevel.ERROR,
-            )
-        except Exception as e:
-            report.add_check(
-                check_name="proxmox_connectivity",
-                passed=False,
-                message=f"Proxmox API error: {e}",
-                level=ValidationLevel.ERROR,
-            )
+                if response.status_code == 200:
+                    version_data = response.json().get("data", {})
+                    version = version_data.get("version", "unknown")
+                    # Update success message with version
+                    validator.add_success_check(
+                        check_name="proxmox_version",
+                        message=f"Proxmox VE version: {version}",
+                    )
+            except Exception:
+                pass  # Version info is optional, connectivity already validated
 
     @override
     def validate_references(
