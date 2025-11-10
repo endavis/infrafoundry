@@ -53,9 +53,7 @@ class TestCLICredentialLoading:
             "PROXMOX_API_TOKEN_SECRET": "dev-secret",
         }
 
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader"
-        ) as mock_loader_class:
+        with patch("infrafoundry.core.credential_loader.CredentialLoader") as mock_loader_class:
             mock_loader = MagicMock()
             mock_loader.load_and_apply.return_value = mock_creds
             mock_loader_class.return_value = mock_loader

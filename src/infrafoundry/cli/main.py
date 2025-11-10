@@ -1102,5 +1102,11 @@ def secrets_decrypt(file: str) -> None:
         sys.exit(1)
 
 
+# Auto-discover and register commands from commands/ directory
+from infrafoundry.cli.command_loader import load_commands  # noqa: E402
+
+load_commands(main)
+
+
 if __name__ == "__main__":
     main()
