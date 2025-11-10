@@ -1,110 +1,94 @@
 {% for template in templates %}
 # Template: {{ template.config.name }}
-# Note: To convert to template, run: qm template <vmid> on Proxmox host
-# Or use the Proxmox UI to convert this VM to a template
-resource "proxmox_vm_qemu" "template_{{ template.config.name | replace('-', '_') }}" {
-  name        = "{{ template.config.name }}"
-  target_node = "{{ template.config.target_node }}"
+# Note: VM will be converted to template after creation using local-exec provisioner
+resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | replace('-', '_') }}" {
+  name      = "{{ template.config.name }}"
+  node_name = "{{ template.config.target_node }}"
+  {% if template.config.vmid is defined %}
+  vm_id     = {{ template.config.vmid }}
+  {% endif %}
 
   {% if template.config.clone is defined %}
   # Clone from existing template/VM
-  clone       = "{{ template.config.clone }}"
-  full_clone  = {{ template.config.full_clone | default(true) | lower }}
-  {% elif template.config.iso is defined %}
-  # Create from ISO
-  iso         = "{{ template.config.iso }}"
-  {% endif %}
-
-  {% if template.config.vmid is defined %}
-  vmid = {{ template.config.vmid }}
+  clone {
+    vm_id = {{ template.config.clone }}
+    {% if template.config.full_clone is defined %}
+    full = {{ template.config.full_clone | lower }}
+    {% endif %}
+  }
   {% endif %}
 
   # CPU Configuration
-  cores   = {{ template.config.cores | default(2) }}
-  sockets = {{ template.config.sockets | default(1) }}
-  cpu     = "{{ template.config.cpu | default('host') }}"
+  cpu {
+    cores   = {{ template.config.cores | default(2) }}
+    sockets = {{ template.config.sockets | default(1) }}
+    {% if template.config.cpu is defined %}
+    type    = "{{ template.config.cpu }}"
+    {% endif %}
+  }
 
   # Memory Configuration
-  memory  = {{ template.config.memory | default(2048) }}
-  balloon = {{ template.config.balloon | default(0) }}
+  memory {
+    dedicated = {{ template.config.memory | default(2048) }}
+  }
 
-  {% if template.config.scsihw is defined %}
-  # SCSI Controller
-  scsihw = "{{ template.config.scsihw }}"
+  {% if template.config.agent is defined %}
+  # Guest Agent
+  agent {
+    enabled = {{ 'true' if template.config.agent == 1 else 'false' }}
+  }
   {% endif %}
 
   {% if template.config.disk is defined %}
   # Disk Configuration
   disk {
-    size    = "{{ template.config.disk.size | default('32G') }}"
-    type    = "{{ template.config.disk.type | default('scsi') }}"
-    storage = "{{ template.config.disk.storage | default('local-lvm') }}"
-    {% if template.config.disk.cache is defined %}
-    cache   = "{{ template.config.disk.cache }}"
-    {% endif %}
-    {% if template.config.disk.format is defined %}
-    format  = "{{ template.config.disk.format }}"
+    datastore_id = "{{ template.config.disk.storage | default('local-lvm') }}"
+    size         = {{ template.config.disk.size | default('32') | replace('G', '') }}
+    interface    = "{{ 'scsi0' if template.config.disk.type == 'scsi' else 'virtio0' }}"
+    {% if template.config.disk.file_format is defined %}
+    file_format  = "{{ template.config.disk.file_format }}"
     {% endif %}
   }
   {% endif %}
 
   {% if template.config.network is defined %}
   # Network Configuration
-  network {
-    model  = "{{ template.config.network.model | default('virtio') }}"
+  network_device {
     bridge = "{{ template.config.network.bridge | default('vmbr0') }}"
     {% if template.config.network.tag is defined %}
-    tag    = {{ template.config.network.tag }}
-    {% endif %}
-    {% if template.config.network.firewall is defined %}
-    firewall = {{ template.config.network.firewall | lower }}
+    vlan_id = {{ template.config.network.tag }}
     {% endif %}
   }
   {% endif %}
 
-  # Guest agent
-  agent = {{ template.config.agent | default(1) }}
-
   # Don't start the VM (templates should not run)
-  onboot = false
-  oncreate = false
-
-  {% if template.config.boot is defined %}
-  # Boot order
-  boot = "{{ template.config.boot }}"
-  {% endif %}
-
-  {% if template.config.bios is defined %}
-  bios = "{{ template.config.bios }}"
-  {% endif %}
-
-  {% if template.config.machine is defined %}
-  machine = "{{ template.config.machine }}"
-  {% endif %}
+  on_boot = false
+  started = false
 
   {% if template.config.cloud_init is defined and template.config.cloud_init %}
   # Cloud-init Configuration
-  {% if template.config.cicustom is defined %}
-  cicustom = "{{ template.config.cicustom }}"
-  {% endif %}
-  {% if template.config.ciuser is defined %}
-  ciuser = "{{ template.config.ciuser }}"
-  {% endif %}
-  {% if template.config.sshkeys is defined %}
-  sshkeys = <<-EOT
-  {{ template.config.sshkeys }}
-  EOT
-  {% endif %}
+  initialization {
+    {% if template.config.ciuser is defined %}
+    user_account {
+      username = "{{ template.config.ciuser }}"
+      {% if template.config.sshkeys is defined %}
+      keys = [
+        "{{ template.config.sshkeys }}"
+      ]
+      {% endif %}
+    }
+    {% endif %}
+  }
   {% endif %}
 
   {% if template.config.description is defined %}
   # Description
-  desc = "{{ template.config.description }}"
+  description = "{{ template.config.description }}"
   {% endif %}
 
   {% if template.config.tags is defined %}
   # Tags
-  tags = "{{ template.config.tags | join(',') }}"
+  tags = {{ template.config.tags | tojson }}
   {% endif %}
 
   {% if template.config.prevent_destroy | default(true) %}
@@ -115,24 +99,24 @@ resource "proxmox_vm_qemu" "template_{{ template.config.name | replace('-', '_')
   {% endif %}
 }
 
-# Convert VM to template using null_resource and local-exec provisioner
+# Convert VM to template using local-exec provisioner
 resource "null_resource" "convert_to_template_{{ template.config.name | replace('-', '_') }}" {
-  depends_on = [proxmox_vm_qemu.template_{{ template.config.name | replace('-', '_') }}]
+  depends_on = [proxmox_virtual_environment_vm.template_{{ template.config.name | replace('-', '_') }}]
 
   provisioner "local-exec" {
     command = <<-EOT
       # Wait for VM to be fully created
-      sleep 10
-      # Convert to template via API
+      sleep 5
+      # Convert to template via API using bpg provider auth
       curl -k -X POST \
-        -H "Authorization: PVEAPIToken=$PM_API_TOKEN_ID=$PM_API_TOKEN_SECRET" \
-        "https://$PM_API_URL/api2/json/nodes/{{ template.config.target_node }}/qemu/${proxmox_vm_qemu.template_{{ template.config.name | replace('-', '_') }}.vmid}/template"
+        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
+        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/${proxmox_virtual_environment_vm.template_{{ template.config.name | replace('-', '_') }}.vm_id}/template"
     EOT
   }
 
   # Trigger on changes to the VM
   triggers = {
-    vm_id = proxmox_vm_qemu.template_{{ template.config.name | replace('-', '_') }}.id
+    vm_id = proxmox_virtual_environment_vm.template_{{ template.config.name | replace('-', '_') }}.id
   }
 }
 
