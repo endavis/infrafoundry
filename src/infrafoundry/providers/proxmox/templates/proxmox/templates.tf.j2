@@ -70,9 +70,6 @@ resource "null_resource" "create_template_vm_{{ template.config.name | replace('
         {% endif %}
         qm set {{ template.config.vmid }} --ipconfig0 ip=dhcp
         {% endif %}
-        
-        # Convert to template
-        qm template {{ template.config.vmid }}
       "
     EOT
   }
@@ -80,6 +77,26 @@ resource "null_resource" "create_template_vm_{{ template.config.name | replace('
   triggers = {
     vmid = "{{ template.config.vmid }}"
     name = "{{ template.config.name }}"
+  }
+}
+
+# Step 3: Convert VM to template using Proxmox API
+resource "null_resource" "convert_to_template_{{ template.config.name | replace('-', '_') }}" {
+  depends_on = [null_resource.create_template_vm_{{ template.config.name | replace('-', '_') }}]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Wait for VM to be fully created
+      sleep 5
+      # Convert to template via API using bpg provider auth
+      curl -k -X POST \
+        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
+        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/template"
+    EOT
+  }
+
+  triggers = {
+    vmid = "{{ template.config.vmid }}"
   }
 }
 
