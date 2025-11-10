@@ -87,9 +87,7 @@ class TestProxmoxValidation:
         assert report.has_errors()
 
     @patch("requests.get")
-    def test_validate_connectivity_connection_error(
-        self, mock_get, proxmox_provider, env_config
-    ):
+    def test_validate_connectivity_connection_error(self, mock_get, proxmox_provider, env_config):
         """Test validation handles connection errors."""
         import requests
 
@@ -101,9 +99,7 @@ class TestProxmoxValidation:
         assert report.has_errors()
 
     @patch("requests.get")
-    def test_validate_references_template_exists(
-        self, mock_get, proxmox_provider, env_config
-    ):
+    def test_validate_references_template_exists(self, mock_get, proxmox_provider, env_config):
         """Test validation passes when referenced template exists."""
         # Mock API response with templates
         mock_response = Mock()
@@ -133,9 +129,7 @@ class TestProxmoxValidation:
         assert not report.has_errors()
 
     @patch("requests.get")
-    def test_validate_references_template_missing(
-        self, mock_get, proxmox_provider, env_config
-    ):
+    def test_validate_references_template_missing(self, mock_get, proxmox_provider, env_config):
         """Test validation fails when referenced template doesn't exist."""
         # Mock API response without the required template
         mock_response = Mock()
@@ -185,9 +179,7 @@ class TestProxmoxValidation:
         assert summary["total"] == 0
 
     @patch("requests.get")
-    def test_validate_references_multiple_templates(
-        self, mock_get, proxmox_provider, env_config
-    ):
+    def test_validate_references_multiple_templates(self, mock_get, proxmox_provider, env_config):
         """Test validation of multiple template references."""
         # Mock API response with templates
         mock_response = Mock()
