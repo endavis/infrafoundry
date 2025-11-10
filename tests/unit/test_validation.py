@@ -1,7 +1,5 @@
 """Tests for validation framework."""
 
-import pytest
-
 from infrafoundry.core.validation import (
     ValidationLevel,
     ValidationReport,
