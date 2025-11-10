@@ -6,6 +6,12 @@ from typing import Any
 
 from pydantic import BaseModel
 
+# Import validation types if validation module exists
+try:
+    from infrafoundry.core.validation import ValidationReport
+except ImportError:
+    ValidationReport = None  # type: ignore
+
 
 class ResourceConfig(BaseModel):
     """Base configuration for infrastructure resources."""
@@ -31,7 +37,7 @@ class ProviderBase(ABC):
         self.name = name
         self.config_dir = config_dir
         self.base_output_dir = output_dir  # Store base, use set_environment() for actual paths
-        self.output_dir = output_dir  # Legacy compatibility
+        self.output_dir = output_dir  # Will be updated by set_environment()
         self.terraform_dir = output_dir / "terraform" / name
         self.ansible_dir = output_dir / "ansible" / name
         self._current_environment: str | None = None
@@ -101,3 +107,34 @@ class ProviderBase(ABC):
             Dict mapping resource types to their dependencies
         """
         return {}
+
+    def validate_connectivity(
+        self, env_config: dict[str, Any], report: Any
+    ) -> None:
+        """Validate connectivity to provider API.
+
+        Optional method for providers to implement API connectivity checks.
+        Should add results to the validation report.
+
+        Args:
+            env_config: Environment configuration including credentials
+            report: ValidationReport to add results to
+        """
+        # Default: no connectivity validation
+        pass
+
+    def validate_references(
+        self, resources: list[ResourceConfig], env_config: dict[str, Any], report: Any
+    ) -> None:
+        """Validate that referenced resources exist in the provider.
+
+        Optional method for providers to check that templates, networks,
+        aliases, etc. referenced in configs actually exist.
+
+        Args:
+            resources: Resources to validate
+            env_config: Environment configuration including credentials
+            report: ValidationReport to add results to
+        """
+        # Default: no reference validation
+        pass
