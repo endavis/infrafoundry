@@ -44,10 +44,16 @@ class ProxmoxProvider(ProviderBase):
         provider_content = provider_template.render()
         (self.terraform_dir / "provider.tf").write_text(provider_content)
 
-        # Generate variables file
+        # Generate variables file with environment context
+        import os
         variables_template = self.jinja_env.get_template("proxmox/variables.tf.j2")
-        variables_content = variables_template.render()
+        variables_content = variables_template.render(
+            default_ssh_user=os.getenv("USER", "root"),
+        )
         (self.terraform_dir / "variables.tf").write_text(variables_content)
+
+        # Copy environment-specific terraform.tfvars if it exists
+        self._copy_tfvars_if_exists()
 
         # Generate resources by type
         if "vm" in resources_by_type:
@@ -83,6 +89,18 @@ class ProxmoxProvider(ProviderBase):
         template = self.jinja_env.get_template("proxmox/networks.tf.j2")
         content = template.render(networks=networks)
         (self.terraform_dir / "networks.tf").write_text(content)
+
+    def _copy_tfvars_if_exists(self) -> None:
+        """Copy environment-specific terraform.tfvars if it exists."""
+        import shutil
+        
+        # Look for terraform.tfvars in the config directory
+        # The config_dir points to envs/{env}, so we need to go up and check
+        potential_tfvars = self.config_dir / "terraform.tfvars"
+        
+        if potential_tfvars.exists():
+            dest = self.terraform_dir / "terraform.tfvars"
+            shutil.copy2(potential_tfvars, dest)
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:

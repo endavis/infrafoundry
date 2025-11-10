@@ -25,9 +25,9 @@ variable "proxmox_tls_insecure" {
 
 # SSH Configuration for template creation operations
 variable "proxmox_ssh_user" {
-  description = "SSH user for Proxmox host operations (disk import, file extraction)"
+  description = "SSH user for Proxmox host operations (disk import, file extraction). Defaults to current user ({{ default_ssh_user }})."
   type        = string
-  default     = "root"
+  default     = "{{ default_ssh_user }}"
 }
 
 variable "proxmox_ssh_key_path" {
