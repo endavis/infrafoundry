@@ -45,13 +45,19 @@ class TestProxmoxValidation:
         summary = report.get_summary()
         assert summary["errors"] == 1
 
+    @patch("requests.request")
     @patch("requests.get")
-    def test_validate_connectivity_success(self, mock_get, proxmox_provider, env_config):
+    def test_validate_connectivity_success(
+        self, mock_get, mock_request, proxmox_provider, env_config
+    ):
         """Test successful API connectivity validation."""
-        # Mock successful API response
+        # Mock successful API responses
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": {"version": "7.4"}}
+
+        # Both request (from helper) and get (from version check) return success
+        mock_request.return_value = mock_response
         mock_get.return_value = mock_response
 
         report = ValidationReport()
