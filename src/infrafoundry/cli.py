@@ -107,15 +107,11 @@ def _load_env_credentials(env_name: str, config_dir: Path | None = None) -> None
         env_name: Environment name (dev, staging, prod, etc.)
         config_dir: Configuration directory (defaults to context config_dir)
     """
-    from infrafoundry.core.env_credentials import load_environment_credentials
+    from infrafoundry.core.credential_loader import CredentialLoader
 
     try:
-        env_vars = load_environment_credentials(env_name, config_dir)
-        if env_vars:
-            os.environ.update(env_vars)
-            # Debug logging (only if LOG_LEVEL=DEBUG)
-            if os.getenv("INFRAFOUNDRY_LOG_LEVEL") == "DEBUG":
-                console.print(f"[dim]Loaded credentials for environment: {env_name}[/dim]")
+        loader = CredentialLoader(config_dir=config_dir)
+        loader.load_and_apply(env_name)
     except Exception as e:
         # Silently fail - credentials might be in environment already
         if os.getenv("INFRAFOUNDRY_LOG_LEVEL") == "DEBUG":
