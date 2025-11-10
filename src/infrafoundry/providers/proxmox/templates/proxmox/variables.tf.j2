@@ -18,7 +18,32 @@ variable "proxmox_api_token_secret" {
 }
 
 variable "proxmox_tls_insecure" {
-  description = "Skip TLS verification"
+  description = "Skip TLS verification (can also use PM_TLS_INSECURE or PROXMOX_TLS_INSECURE environment variable)"
   type        = bool
-  default     = true
+  default     = false
+}
+
+# SSH Configuration for template creation operations
+variable "proxmox_ssh_user" {
+  description = "SSH user for Proxmox host operations (disk import, file extraction)"
+  type        = string
+  default     = "root"
+}
+
+variable "proxmox_ssh_key_path" {
+  description = "Path to SSH private key for Proxmox host access (optional if using ssh-agent)"
+  type        = string
+  default     = ""
+}
+
+variable "proxmox_ssh_port" {
+  description = "SSH port for Proxmox host"
+  type        = number
+  default     = 22
+}
+
+locals {
+  # SSH command prefix based on configuration
+  ssh_opts = var.proxmox_ssh_key_path != "" ? "-i ${var.proxmox_ssh_key_path} -p ${var.proxmox_ssh_port}" : "-p ${var.proxmox_ssh_port}"
+  ssh_cmd  = "ssh ${local.ssh_opts} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 }
