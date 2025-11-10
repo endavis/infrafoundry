@@ -29,6 +29,18 @@ def mock_credentials_setup(tmp_path):
     return tmp_path
 
 
+@pytest.fixture
+def mock_credential_loader():
+    """Create a mock CredentialLoader that returns predetermined credentials."""
+
+    def _create_mock(return_value=None):
+        mock_loader = MagicMock()
+        mock_loader.load_and_apply.return_value = return_value or {}
+        return mock_loader
+
+    return _create_mock
+
+
 @pytest.mark.integration
 class TestCLICredentialLoading:
     """Tests for automatic credential loading in CLI commands."""
@@ -42,9 +54,12 @@ class TestCLICredentialLoading:
         }
 
         with patch(
-            "infrafoundry.core.env_credentials.load_environment_credentials",
-            return_value=mock_creds,
-        ) as mock_load:
+            "infrafoundry.core.credential_loader.CredentialLoader"
+        ) as mock_loader_class:
+            mock_loader = MagicMock()
+            mock_loader.load_and_apply.return_value = mock_creds
+            mock_loader_class.return_value = mock_loader
+
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
                 mock_orch = MagicMock()
                 mock_orchestrator.return_value = mock_orch
@@ -55,9 +70,8 @@ class TestCLICredentialLoading:
                 )
 
                 # Verify credential loading was called
-                # Verify called with correct environment (path type may vary)
-                assert mock_load.call_count == 1
-                assert mock_load.call_args[0][0] == "dev"
+                assert mock_loader.load_and_apply.call_count == 1
+                assert mock_loader.load_and_apply.call_args[0][0] == "dev"
 
     def test_apply_command_loads_credentials(self, cli_runner, mock_credentials_setup):
         """Test that apply command loads credentials automatically."""
@@ -68,7 +82,7 @@ class TestCLICredentialLoading:
         }
 
         with patch(
-            "infrafoundry.core.env_credentials.load_environment_credentials",
+            "infrafoundry.core.credential_loader.CredentialLoader",
             return_value=mock_creds,
         ) as mock_load:
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
@@ -97,7 +111,7 @@ class TestCLICredentialLoading:
         mock_creds = {"PROXMOX_API_URL": "https://proxmox-staging.example.com:8006"}
 
         with patch(
-            "infrafoundry.core.env_credentials.load_environment_credentials",
+            "infrafoundry.core.credential_loader.CredentialLoader",
             return_value=mock_creds,
         ) as mock_load:
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
@@ -126,7 +140,7 @@ class TestCLICredentialLoading:
         mock_creds = {"PROXMOX_API_URL": "https://proxmox-dev.example.com:8006"}
 
         with patch(
-            "infrafoundry.core.env_credentials.load_environment_credentials",
+            "infrafoundry.core.credential_loader.CredentialLoader",
             return_value=mock_creds,
         ) as mock_load:
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
@@ -148,7 +162,7 @@ class TestCLICredentialLoading:
         mock_creds = {"PROXMOX_API_URL": "https://proxmox-prod.example.com:8006"}
 
         with patch(
-            "infrafoundry.core.env_credentials.load_environment_credentials",
+            "infrafoundry.core.credential_loader.CredentialLoader",
             return_value=mock_creds,
         ) as mock_load:
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
@@ -184,7 +198,7 @@ class TestCLICredentialLoading:
 
         try:
             with patch(
-                "infrafoundry.core.env_credentials.load_environment_credentials",
+                "infrafoundry.core.credential_loader.CredentialLoader",
                 side_effect=mock_load_creds,
             ):
                 with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
@@ -209,7 +223,7 @@ class TestCLICredentialLoading:
         """Test that credential loading failures don't crash the CLI."""
         # Mock credential loading to raise an exception
         with patch(
-            "infrafoundry.core.env_credentials.load_environment_credentials",
+            "infrafoundry.core.credential_loader.CredentialLoader",
             side_effect=Exception("SOPS failed"),
         ):
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
@@ -251,7 +265,7 @@ class TestCLICredentialLoading:
             return {}
 
         with patch(
-            "infrafoundry.core.env_credentials.load_environment_credentials",
+            "infrafoundry.core.credential_loader.CredentialLoader",
             side_effect=mock_load_env,
         ) as mock_load:
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
@@ -285,7 +299,7 @@ class TestCLICredentialLoading:
         secrets_dir.mkdir(parents=True)
         (secrets_dir / "proxmox.yaml").write_text("encrypted")
 
-        with patch("infrafoundry.core.env_credentials.load_environment_credentials") as mock_load:
+        with patch("infrafoundry.core.credential_loader.CredentialLoader") as mock_load:
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
                 mock_orch = MagicMock()
                 mock_orchestrator.return_value = mock_orch
@@ -302,7 +316,7 @@ class TestCLICredentialLoading:
 
     def test_no_config_dir_uses_default(self, cli_runner, mock_credentials_setup):
         """Test that not specifying --config-dir uses default behavior."""
-        with patch("infrafoundry.core.env_credentials.load_environment_credentials") as mock_load:
+        with patch("infrafoundry.core.credential_loader.CredentialLoader") as mock_load:
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
                 mock_orch = MagicMock()
                 mock_orchestrator.return_value = mock_orch
@@ -325,7 +339,7 @@ class TestCredentialLoadingDebugLogging:
         mock_creds = {"PROXMOX_API_URL": "https://proxmox.example.com:8006"}
 
         with patch(
-            "infrafoundry.core.env_credentials.load_environment_credentials",
+            "infrafoundry.core.credential_loader.CredentialLoader",
             return_value=mock_creds,
         ):
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
@@ -347,7 +361,7 @@ class TestCredentialLoadingDebugLogging:
         mock_creds = {"PROXMOX_API_URL": "https://proxmox.example.com:8006"}
 
         with patch(
-            "infrafoundry.core.env_credentials.load_environment_credentials",
+            "infrafoundry.core.credential_loader.CredentialLoader",
             return_value=mock_creds,
         ):
             with patch("infrafoundry.cli._get_orchestrator") as mock_orchestrator:
