@@ -10,6 +10,14 @@ from pydantic import BaseModel, Field
 from infrafoundry.core.provider import ResourceConfig
 
 
+class SSHConfig(BaseModel):
+    """SSH configuration for provider operations."""
+
+    user: str | None = None
+    key_path: str | None = None
+    port: int = 22
+
+
 class EnvironmentConfig(BaseModel):
     """Environment-specific configuration."""
 
@@ -17,6 +25,25 @@ class EnvironmentConfig(BaseModel):
     description: str | None = None
     providers: list[str] = Field(default_factory=list)
     variables: dict[str, Any] = Field(default_factory=dict)
+    ssh: SSHConfig | None = None  # Global SSH config
+    provider_ssh: dict[str, SSHConfig] = Field(default_factory=dict)  # Per-provider SSH
+    # Provider-specific settings (credentials, api_url, etc.)
+    provider_settings: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+    def get_ssh_config(self, provider_name: str) -> SSHConfig | None:
+        """Get SSH config for a specific provider.
+
+        Args:
+            provider_name: Provider name (e.g., 'proxmox', 'opnsense')
+
+        Returns:
+            Provider-specific SSH config if exists, otherwise global SSH config
+        """
+        return self.provider_ssh.get(provider_name, self.ssh)
+
+    def get_provider_settings(self, provider_name: str) -> dict[str, Any] | None:
+        """Return provider-specific settings dict if present."""
+        return self.provider_settings.get(provider_name)
 
 
 class ConfigManager:
@@ -52,12 +79,17 @@ class ConfigManager:
         Raises:
             FileNotFoundError: If environment config doesn't exist
         """
-        env_file = self.base_dir / env_name / "environment.yaml"
-        if not env_file.exists():
-            raise FileNotFoundError(f"Environment config not found: {env_file}")
+        settings_file = self.base_dir / env_name / "settings.yaml"
 
-        with open(env_file) as f:
+        if not settings_file.exists():
+            raise FileNotFoundError(f"Environment config not found: {settings_file}")
+
+        with open(settings_file) as f:
             data = yaml.safe_load(f)
+
+        if not data:
+            # Ensure we return an empty but valid EnvironmentConfig if file is empty
+            data = {}
 
         return EnvironmentConfig(**data)
 
@@ -92,10 +124,10 @@ class ConfigManager:
         resource_type = resource_file.split("-")[0] if "-" in resource_file else resource_file
 
         # Get the resource list - handle both dict and direct list formats
-        # Try singular first, then plural for backwards compatibility
+        # Support both singular and plural forms (e.g., 'vm' or 'vms')
         if isinstance(data, dict):
             resource_list = data.get(resource_type, [])
-            # Try plural form if singular not found (backwards compatibility)
+            # Try plural form if singular not found
             if not resource_list and not resource_type.endswith("s"):
                 plural_type = f"{resource_type}s"
                 resource_list = data.get(plural_type, [])
@@ -181,7 +213,7 @@ class ConfigManager:
 
                 # Extract config dict (everything except provider/type/name)
                 config = item.get("config", {})
-                # Also include name in config for backwards compatibility
+                # Include name in config for template convenience
                 config["name"] = item["name"]
 
                 all_resources.append(
@@ -215,7 +247,7 @@ class ConfigManager:
         provider_dir = self.base_dir / env_name / provider
         if provider_dir.exists():
             for config_file in provider_dir.glob("*.yaml"):
-                if config_file.name == "environment.yaml":
+                if config_file.name == "settings.yaml":
                     continue
 
                 # Use the filename without extension
@@ -261,7 +293,7 @@ class ConfigManager:
             provider_dir = self.base_dir / env_name / provider_name
             if provider_dir.exists():
                 for config_file in provider_dir.glob("*.yaml"):
-                    if config_file.name == "environment.yaml":
+                    if config_file.name == "settings.yaml":
                         continue
                     resource_file = config_file.stem
                     resources = self.load_resources(env_name, provider_name, resource_file)
@@ -313,7 +345,7 @@ class ConfigManager:
 
                     # Extract config dict (everything except provider/type/name)
                     config = item.get("config", {})
-                    # Also include name in config for backwards compatibility
+                    # Include name in config for template convenience
                     config["name"] = item["name"]
 
                     resource = ResourceConfig(
@@ -370,5 +402,5 @@ class ConfigManager:
         if not env_dir.exists():
             return False
 
-        env_file = env_dir / "environment.yaml"
+        env_file = env_dir / "settings.yaml"
         return env_file.exists()

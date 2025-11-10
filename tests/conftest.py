@@ -34,7 +34,7 @@ def mock_config_dir(temp_dir):
         "description": "Development environment",
         "variables": {"datacenter": "dc1", "network": "vmbr0"},
     }
-    with open(dev_dir / "environment.yaml", "w") as f:
+    with open(dev_dir / "settings.yaml", "w") as f:
         yaml.dump(env_config, f)
 
     # Proxmox provider directory

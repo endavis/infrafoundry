@@ -660,7 +660,7 @@ class OPNsenseParser:
             )
             f.write("4. **Encrypt secrets** - `infra secrets encrypt secrets/opnsense.yaml`\n")
             f.write(
-                "5. **Update environment** - Add OPNsense provider to `envs/prod/environment.yaml`\n"
+                "5. **Update environment** - Add OPNsense provider to `envs/prod/settings.yaml`\n"
             )
             f.write("6. **Generate Terraform** - `infra plan --env prod`\n")
             f.write("7. **Apply changes** - `infra apply --env prod`\n\n")

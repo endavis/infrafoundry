@@ -46,14 +46,15 @@ class ProxmoxProvider(ProviderBase):
 
         # Generate variables file with environment context
         import os
+
         variables_template = self.jinja_env.get_template("proxmox/variables.tf.j2")
         variables_content = variables_template.render(
             default_ssh_user=os.getenv("USER", "root"),
         )
         (self.terraform_dir / "variables.tf").write_text(variables_content)
 
-        # Copy environment-specific terraform.tfvars if it exists
-        self._copy_tfvars_if_exists()
+        # Copy or generate terraform.tfvars from environment config
+        self._generate_tfvars()
 
         # Generate resources by type
         if "vm" in resources_by_type:
@@ -93,14 +94,67 @@ class ProxmoxProvider(ProviderBase):
     def _copy_tfvars_if_exists(self) -> None:
         """Copy environment-specific terraform.tfvars if it exists."""
         import shutil
-        
+
         # Look for terraform.tfvars in the config directory
         # The config_dir points to envs/{env}, so we need to go up and check
         potential_tfvars = self.config_dir / "terraform.tfvars"
-        
+
         if potential_tfvars.exists():
             dest = self.terraform_dir / "terraform.tfvars"
             shutil.copy2(potential_tfvars, dest)
+
+    def _generate_tfvars(self) -> None:
+        """Generate terraform.tfvars from settings.yaml (SSH config + provider settings)."""
+        from infrafoundry.core.config import ConfigManager
+
+        if not self._current_environment:
+            return
+
+        env_name = self._current_environment
+        config_manager = ConfigManager(self.config_dir)
+
+        try:
+            env_config = config_manager.load_environment(env_name)
+        except FileNotFoundError:
+            return
+
+        tfvars_lines = ["# Configuration from settings.yaml\n"]
+
+        # Get provider-specific settings (API credentials, endpoints, etc.)
+        provider_settings = env_config.get_provider_settings("proxmox")
+        if provider_settings:
+            # API endpoint
+            if "api_url" in provider_settings:
+                tfvars_lines.append(f'proxmox_api_url = "{provider_settings["api_url"]}"\n')
+
+            # API token (preferred for bpg/proxmox provider)
+            if "api_token" in provider_settings:
+                tfvars_lines.append(f'proxmox_api_token = "{provider_settings["api_token"]}"\n')
+
+            # Default node
+            if "node" in provider_settings:
+                tfvars_lines.append(f'proxmox_node = "{provider_settings["node"]}"\n')
+
+            # Default storage
+            if "storage" in provider_settings:
+                tfvars_lines.append(f'proxmox_storage = "{provider_settings["storage"]}"\n')
+
+        # Get SSH config for this provider (provider-specific or global)
+        ssh_config = env_config.get_ssh_config("proxmox")
+        if ssh_config:
+            if ssh_config.user:
+                tfvars_lines.append(f'proxmox_ssh_user = "{ssh_config.user}"\n')
+
+            if ssh_config.key_path:
+                tfvars_lines.append(f'proxmox_ssh_key_path = "{ssh_config.key_path}"\n')
+
+            if ssh_config.port and ssh_config.port != 22:
+                tfvars_lines.append(f"proxmox_ssh_port = {ssh_config.port}\n")
+
+        # Generate tfvars if we have more than just the header comment
+        if len(tfvars_lines) > 1:
+            dest = self.terraform_dir / "terraform.tfvars"
+            dest.write_text("".join(tfvars_lines))
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
