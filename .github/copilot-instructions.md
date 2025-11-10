@@ -56,10 +56,9 @@ InfraFoundry is an infrastructure code generator and orchestration framework tha
 - Templates live in `src/infrafoundry/providers/{name}/templates/{name}/`
 
 **Configurations** (separate repo or `example-config/`):
-- `envs/{env}/environment.yaml` - environment name, description, and variables
+- `envs/{env}/settings.yaml` - environment config + provider credentials (supports SOPS encryption)
 - **Provider-centric** (original): `envs/{env}/{provider}/{resource_type}.yaml` - resource definitions
 - **Resource-centric** (new): `envs/{env}/resources/*.yaml` - multi-provider resource definitions
-- `secrets/` - Encrypted credentials with SOPS
 - **Note:** Providers are auto-discovered from resources; no need to declare them
 
 **Data flow:**
@@ -324,7 +323,7 @@ def get_dependencies(self) -> dict[str, list[str]]:
 - `providers/{name}/templates/` - Terraform/Ansible templates
 
 **Configuration Changes:**
-- `envs/{env}/environment.yaml` - Environment definition
+- `envs/{env}/settings.yaml` - Environment definition + provider settings
 - `envs/{env}/{provider}/*.yaml` - Provider-centric resource definitions
 - `envs/{env}/resources/*.yaml` - Resource-centric resource definitions
 

@@ -199,16 +199,18 @@ openvpn:
   nordvpn_password: "your-password"
 EOF
 
-# 4. Encrypt secrets
-infra secrets encrypt secrets/opnsense.yaml
+# 4. Update environment settings with OPNsense credentials
+vim $INFRAFOUNDRY_CONFIG_REPO/envs/prod/settings.yaml
+# Add to provider_settings:
+# opnsense:
+#   api_url: https://opn.example.com
+#   api_key: your-key
+#   api_secret: your-secret
 
-# 5. Update environment
-vim $INFRAFOUNDRY_CONFIG_REPO/envs/prod/environment.yaml
-# Add:
-# providers:
-#   - opnsense
+# Encrypt with SOPS
+sops --encrypt --in-place $INFRAFOUNDRY_CONFIG_REPO/envs/prod/settings.yaml
 
-# 6. Generate and apply
+# 5. Generate and apply
 infra plan --env prod
 infra apply --env prod
 ```
