@@ -2,50 +2,54 @@
 # Template: {{ template.config.name }}
 {% if template.config.download_image is defined %}
 # Download image and create template from scratch using Proxmox API
-# Step 1: Download image to Proxmox storage
-resource "null_resource" "download_image_{{ template.config.name | replace('-', '_') }}" {
+# Step 1: Download image to Proxmox storage using Terraform provider
+resource "proxmox_virtual_environment_download_file" "image_{{ template.config.name | replace('-', '_') }}" {
+  node_name    = "{{ template.config.target_node }}"
+  content_type = "iso"
+  datastore_id = "local"
+  file_name    = "{{ template.config.download_image.filename }}"
+  url          = "{{ template.config.download_image.url }}"
+  
+  {% if template.config.download_image.checksum is defined %}
+  checksum           = "{{ template.config.download_image.checksum }}"
+  checksum_algorithm = "{{ template.config.download_image.checksum_algorithm | default('sha256') }}"
+  {% endif %}
+  
+  overwrite = false
+}
+
+{% if template.config.download_image.extract is defined and template.config.download_image.extract %}
+# Step 1b: Extract compressed file
+# Note: Proxmox provider doesn't support automatic decompression yet
+resource "null_resource" "extract_image_{{ template.config.name | replace('-', '_') }}" {
+  depends_on = [proxmox_virtual_environment_download_file.image_{{ template.config.name | replace('-', '_') }}]
+  
   provisioner "local-exec" {
     command = <<-EOT
-      # Download image to Proxmox ISO storage using API
-      {% if template.config.download_image.extract is defined and template.config.download_image.extract %}
-      # Note: Proxmox API doesn't support automatic extraction, so we use pvesh
-      curl -k -X POST \
-        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
-        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/storage/local/download-url" \
-        -d "content=iso" \
-        -d "filename={{ template.config.download_image.filename }}" \
-        -d "url={{ template.config.download_image.url }}"
-      
-      # Wait for download to complete
-      sleep 10
-      
-      # Extract the file via SSH (Proxmox API doesn't support extraction)
+      # Extract the file via SSH
       ssh root@{{ template.config.target_node }} "cd /var/lib/vz/template/iso && \
         {% if template.config.download_image.filename.endswith('.xz') %}
-        xz -d {{ template.config.download_image.filename }}
+        [ ! -f {{ template.config.download_image.filename | replace('.xz', '') }} ] && xz -d {{ template.config.download_image.filename }} || true
         {% elif template.config.download_image.filename.endswith('.gz') %}
-        gunzip {{ template.config.download_image.filename }}
+        [ ! -f {{ template.config.download_image.filename | replace('.gz', '') }} ] && gunzip {{ template.config.download_image.filename }} || true
         {% endif %}"
-      {% else %}
-      # Download without extraction
-      curl -k -X POST \
-        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
-        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/storage/local/download-url" \
-        -d "content=iso" \
-        -d "filename={{ template.config.download_image.filename }}" \
-        -d "url={{ template.config.download_image.url }}"
-      {% endif %}
     EOT
   }
 
   triggers = {
-    url = "{{ template.config.download_image.url }}"
+    file_id = proxmox_virtual_environment_download_file.image_{{ template.config.name | replace('-', '_') }}.id
   }
 }
+{% endif %}
 
 # Step 2: Create VM using Proxmox API
 resource "null_resource" "create_vm_{{ template.config.name | replace('-', '_') }}" {
-  depends_on = [null_resource.download_image_{{ template.config.name | replace('-', '_') }}]
+  depends_on = [
+    proxmox_virtual_environment_download_file.image_{{ template.config.name | replace('-', '_') }}
+    {% if template.config.download_image.extract is defined and template.config.download_image.extract %}
+    , null_resource.extract_image_{{ template.config.name | replace('-', '_') }}
+    {% endif %}
+  ]
 
   provisioner "local-exec" {
     command = <<-EOT
