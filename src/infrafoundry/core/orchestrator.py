@@ -738,11 +738,11 @@ class Orchestrator:
         # Providers earlier in the list are applied first
         # This ensures network/DHCP config is ready before VMs
         provider_order = ["opnsense", "proxmox", "kubernetes"]
-        
+
         # Sort providers by defined order, putting undefined ones at the end
         sorted_providers = sorted(
             resources_by_provider.keys(),
-            key=lambda p: provider_order.index(p) if p in provider_order else len(provider_order)
+            key=lambda p: provider_order.index(p) if p in provider_order else len(provider_order),
         )
 
         for provider_name in sorted_providers:
@@ -750,7 +750,7 @@ class Orchestrator:
                 continue
 
             provider = self.providers[provider_name]
-            
+
             # Get resources for this provider
             resources = resources_by_provider[provider_name]
 
