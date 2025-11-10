@@ -27,7 +27,7 @@ resource "null_resource" "extract_image_{{ template.config.name | replace('-', '
   provisioner "local-exec" {
     command = <<-EOT
       # Extract the file via SSH
-      ssh root@{{ template.config.target_node }} "cd /var/lib/vz/template/iso && \
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ template.config.target_node }} "cd /var/lib/vz/template/iso && \
         {% if template.config.download_image.filename.endswith('.xz') %}
         [ ! -f {{ template.config.download_image.filename | replace('.xz', '') }} ] && xz -d {{ template.config.download_image.filename }} || true
         {% elif template.config.download_image.filename.endswith('.gz') %}
@@ -91,7 +91,7 @@ resource "null_resource" "configure_vm_{{ template.config.name | replace('-', '_
       
       # Import disk - this is one operation that Proxmox requires CLI for
       # The API doesn't expose a direct importdisk endpoint
-      ssh root@{{ template.config.target_node }} "qm importdisk {{ template.config.vmid }} /var/lib/vz/template/iso/{{ image_file }} {{ template.config.disk.storage | default('local-lvm') }}"
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ template.config.target_node }} "qm importdisk {{ template.config.vmid }} /var/lib/vz/template/iso/{{ image_file }} {{ template.config.disk.storage | default('local-lvm') }}"
       
       # All subsequent operations use API only
       sleep 2
