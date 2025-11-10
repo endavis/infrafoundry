@@ -1,7 +1,4 @@
-"""System-level commands for InfraFoundry.
-
-Commands for initializing and configuring the InfraFoundry system.
-"""
+"""Init command - Initialize InfraFoundry state database."""
 
 import os
 import sys
@@ -47,12 +44,3 @@ def init() -> None:
     except Exception as e:
         console.print(f"[bold red]Error initializing state database:[/bold red] {e}")
         sys.exit(1)
-
-
-def register_commands(main_group: click.Group) -> None:
-    """Register system commands with the main CLI group.
-
-    Args:
-        main_group: The main Click group to register commands to
-    """
-    main_group.add_command(init)
