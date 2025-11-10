@@ -9,12 +9,12 @@ resource "proxmox_virtual_environment_download_file" "image_{{ template.config.n
   datastore_id = "local"
   file_name    = "{{ template.config.download_image.filename }}"
   url          = "{{ template.config.download_image.url }}"
-  
+
   {% if template.config.download_image.checksum is defined %}
   checksum           = "{{ template.config.download_image.checksum }}"
   checksum_algorithm = "{{ template.config.download_image.checksum_algorithm | default('sha256') }}"
   {% endif %}
-  
+
   overwrite = false
 }
 
@@ -23,7 +23,7 @@ resource "proxmox_virtual_environment_download_file" "image_{{ template.config.n
 # Note: Proxmox provider doesn't support automatic decompression yet
 resource "null_resource" "extract_image_{{ template.config.name | replace('-', '_') }}" {
   depends_on = [proxmox_virtual_environment_download_file.image_{{ template.config.name | replace('-', '_') }}]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       # Extract the file via SSH
@@ -88,20 +88,20 @@ resource "null_resource" "configure_vm_{{ template.config.name | replace('-', '_
       {% else %}
       {% set image_file = template.config.download_image.filename %}
       {% endif %}
-      
+
       # Import disk - this is one operation that Proxmox requires CLI for
       # The API doesn't expose a direct importdisk endpoint
       ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ template.config.target_node }} "qm importdisk {{ template.config.vmid }} /var/lib/vz/template/iso/{{ image_file }} {{ template.config.disk.storage | default('local-lvm') }}"
-      
+
       # All subsequent operations use API only
       sleep 2
-      
+
       # Attach disk via API
       curl -k -X PUT \
         -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
         "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/config" \
         -d "scsi0={{ template.config.disk.storage | default('local-lvm') }}:vm-{{ template.config.vmid }}-disk-0"
-      
+
       {% if template.config.cloud_init is defined and template.config.cloud_init %}
       # Configure cloud-init via API
       {% if template.config.ciuser is defined %}
@@ -110,14 +110,14 @@ resource "null_resource" "configure_vm_{{ template.config.name | replace('-', '_
         "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/config" \
         -d "ciuser={{ template.config.ciuser }}"
       {% endif %}
-      
+
       {% if template.config.sshkeys is defined %}
       curl -k -X PUT \
         -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
         "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/config" \
         --data-urlencode "sshkeys={{ template.config.sshkeys }}"
       {% endif %}
-      
+
       curl -k -X PUT \
         -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
         "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/config" \
@@ -222,7 +222,7 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
   # Cloud-init Configuration
   initialization {
     datastore_id = "{{ template.config.cloud_init_datastore | default(template.config.disk.storage) | default('local-lvm') }}"
-    
+
     {% if template.config.ciuser is defined %}
     user_account {
       username = "{{ template.config.ciuser }}"
