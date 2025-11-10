@@ -1,5 +1,6 @@
 """OPNsense provider for InfraFoundry."""
 
+import base64
 from pathlib import Path
 from typing import Any, override
 
@@ -20,6 +21,8 @@ class OPNsenseProvider(ProviderBase):
             trim_blocks=True,
             lstrip_blocks=True,
         )
+        # Add base64 encoding filter for Ansible templates
+        self.jinja_env.filters["b64encode"] = lambda s: base64.b64encode(s.encode()).decode()
 
     @override
     def validate_config(self, config: dict[str, Any]) -> bool:
@@ -59,6 +62,9 @@ class OPNsenseProvider(ProviderBase):
         if "aliases" in resources_by_type:
             self._generate_aliases_terraform(resources_by_type["aliases"])
 
+        if "dhcp_static_maps" in resources_by_type:
+            self._generate_dhcp_static_maps_terraform(resources_by_type["dhcp_static_maps"])
+
         # Generate outputs
         outputs_template = self.jinja_env.get_template("opnsense/outputs.tf.j2")
         outputs_content = outputs_template.render(
@@ -84,6 +90,12 @@ class OPNsenseProvider(ProviderBase):
         content = template.render(aliases=aliases)
         (self.terraform_dir / "aliases.tf").write_text(content)
 
+    def _generate_dhcp_static_maps_terraform(self, static_maps: list[ResourceConfig]) -> None:
+        """Generate Terraform for OPNsense DHCP static mappings."""
+        template = self.jinja_env.get_template("opnsense/dhcp_static_maps.tf.j2")
+        content = template.render(static_maps=static_maps)
+        (self.terraform_dir / "dhcp_static_maps.tf").write_text(content)
+
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
         """Generate Ansible playbooks for OPNsense configuration."""
@@ -102,7 +114,7 @@ class OPNsenseProvider(ProviderBase):
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["firewall_rules", "vlans", "aliases"]
+        return ["firewall_rules", "vlans", "aliases", "dhcp_static_maps"]
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
@@ -111,4 +123,5 @@ class OPNsenseProvider(ProviderBase):
             "firewall_rules": ["aliases", "vlans"],
             "vlans": [],
             "aliases": [],
+            "dhcp_static_maps": ["vlans"],
         }
