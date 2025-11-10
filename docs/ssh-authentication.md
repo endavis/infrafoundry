@@ -4,6 +4,40 @@ InfraFoundry uses SSH for certain Proxmox operations that don't have direct API 
 - Extracting compressed image files (`.xz`, `.gz`)
 - Importing disk images (`qm importdisk`)
 
+## Default Configuration
+
+By default, InfraFoundry uses:
+- **SSH User**: Your current username (`$USER`)
+- **SSH Key**: ssh-agent or `~/.ssh/config` settings
+- **SSH Port**: 22
+
+## Per-Environment SSH Configuration
+
+You can configure SSH settings per environment in your config repo:
+
+```bash
+# endavis-infra/envs/test/.ssh-config (example)
+SSH_USER=endavis
+SSH_KEY_PATH=~/.ssh/id_ed25519
+SSH_PORT=22
+
+# endavis-infra/envs/prod/.ssh-config
+SSH_USER=automation
+SSH_KEY_PATH=/secure/keys/prod_infra
+SSH_PORT=2222
+```
+
+Or use Terraform variables:
+
+```bash
+# endavis-infra/envs/test/terraform.tfvars
+proxmox_ssh_user     = "endavis"
+proxmox_ssh_key_path = "/home/endavis/.ssh/id_ed25519"
+proxmox_ssh_port     = 22
+```
+
+These will be automatically copied to the generated Terraform directory.
+
 ## Authentication Options
 
 ### Option 1: SSH Agent (Recommended for Development)
