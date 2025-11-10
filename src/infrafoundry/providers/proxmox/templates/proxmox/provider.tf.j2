@@ -1,18 +1,17 @@
 terraform {
   required_providers {
     proxmox = {
-      source  = "Telmate/proxmox"
-      version = "~> 2.9"
+      source  = "bpg/proxmox"
+      version = "~> 0.86"
     }
   }
 }
 
 provider "proxmox" {
   # Credentials are read from environment variables:
-  # - PM_API_URL
-  # - PM_API_TOKEN_ID
-  # - PM_API_TOKEN_SECRET
-  # - PM_TLS_INSECURE (optional, defaults to false)
+  # - PROXMOX_VE_ENDPOINT
+  # - PROXMOX_VE_API_TOKEN
+  # - PROXMOX_VE_INSECURE (optional, defaults to false)
 
   # All configuration via environment variables - no explicit values needed
 }
