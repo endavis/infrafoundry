@@ -1,25 +1,26 @@
 """Core orchestration for infrastructure deployment."""
 
-import json
 import os
-import subprocess
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
+from infrafoundry.core.ansible_runner import AnsibleRunner
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.dependencies import DependencyGraph
+from infrafoundry.core.deployment_executor import DeploymentExecutor
+from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import Event, EventManager, EventType
 from infrafoundry.core.notifications import NotificationManager
-from infrafoundry.core.policy import PolicyEngine, PolicyLevel
+from infrafoundry.core.policy import PolicyEngine
+from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
+from infrafoundry.core.terraform_runner import TerraformRunner
 
 
 class Orchestrator:
@@ -59,6 +60,26 @@ class Orchestrator:
         self.event_manager = event_manager or EventManager()
         self.policy_engine = PolicyEngine(policy_dir)
         self.notification_manager = NotificationManager(notifications_config)
+
+        # Initialize helper classes for orchestration tasks
+        self.terraform_runner = TerraformRunner(self.secret_manager, self.console)
+        self.ansible_runner = AnsibleRunner(self.console)
+        self.policy_checker = PolicyChecker(self.policy_engine, self.event_manager, self.console)
+        self.drift_detector = DriftDetector(
+            self.config_manager,
+            self.terraform_runner,
+            self.event_manager,
+            self.providers,
+            self.console,
+        )
+        self.deployment_executor = DeploymentExecutor(
+            self.terraform_runner,
+            self.ansible_runner,
+            self.state_manager,
+            self.event_manager,
+            self.providers,
+            self.console,
+        )
 
         # Subscribe notification manager to events
         self._setup_notifications()
@@ -175,6 +196,8 @@ class Orchestrator:
     ) -> tuple[bool, list]:
         """Check resources against policies.
 
+        Delegates to PolicyChecker.
+
         Args:
             env_name: Environment name
             resources: List of resources to check
@@ -186,89 +209,7 @@ class Orchestrator:
         Raises:
             Exception: If enforce=True and ERROR-level violations exist
         """
-        self.event_manager.emit_event(
-            EventType.POLICY_CHECK_STARTED,
-            env_name,
-            {"resource_count": len(resources)},
-        )
-
-        violations = self.policy_engine.evaluate_resources(resources, env_name)
-
-        # Group violations by level
-        errors = [v for v in violations if v.level == PolicyLevel.ERROR]
-        warnings = [v for v in violations if v.level == PolicyLevel.WARNING]
-        infos = [v for v in violations if v.level == PolicyLevel.INFO]
-
-        # Display violations
-        if violations:
-            self.console.print("\n[bold yellow]Policy Violations:[/bold yellow]")
-
-            if errors:
-                self.console.print(f"\n[bold red]Errors ({len(errors)}):[/bold red]")
-                for v in errors:
-                    self.console.print(
-                        f"  [red]✗[/red] {v.resource_name} ({v.provider}): {v.message}"
-                    )
-                    self.event_manager.emit_event(
-                        EventType.POLICY_VIOLATION,
-                        env_name,
-                        {
-                            "policy": v.policy_name,
-                            "resource": v.resource_name,
-                            "level": "error",
-                            "message": v.message,
-                        },
-                    )
-
-            if warnings:
-                self.console.print(f"\n[bold yellow]Warnings ({len(warnings)}):[/bold yellow]")
-                for v in warnings:
-                    self.console.print(
-                        f"  [yellow]⚠[/yellow] {v.resource_name} ({v.provider}): {v.message}"
-                    )
-                    self.event_manager.emit_event(
-                        EventType.POLICY_VIOLATION,
-                        env_name,
-                        {
-                            "policy": v.policy_name,
-                            "resource": v.resource_name,
-                            "level": "warning",
-                            "message": v.message,
-                        },
-                    )
-
-            if infos:
-                self.console.print(f"\n[dim]Info ({len(infos)}):[/dim]")
-                for v in infos:
-                    self.console.print(
-                        f"  [dim]ℹ[/dim] {v.resource_name} ({v.provider}): {v.message}"
-                    )
-
-        # Check if policies passed
-        passed = len(errors) == 0
-
-        if passed:
-            self.event_manager.emit_event(
-                EventType.POLICY_CHECK_PASSED,
-                env_name,
-                {"violations": len(violations)},
-            )
-            if not violations:
-                self.console.print("\n[green]✓ All policies passed[/green]")
-        else:
-            self.event_manager.emit_event(
-                EventType.POLICY_CHECK_FAILED,
-                env_name,
-                {"errors": len(errors), "warnings": len(warnings)},
-            )
-
-            if enforce:
-                raise Exception(
-                    f"Policy check failed with {len(errors)} error(s). "
-                    "Fix violations or use --skip-policies to bypass."
-                )
-
-        return passed, violations
+        return self.policy_checker.check(env_name, resources, enforce)
 
     def detect_drift(self, env_name: str) -> dict[str, Any]:
         """Detect infrastructure drift from declared configuration.
