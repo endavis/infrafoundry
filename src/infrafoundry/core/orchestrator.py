@@ -1209,18 +1209,54 @@ class Orchestrator:
         """
         tf_dir = provider.terraform_dir
 
+        # Load credentials and set environment variables
+        env = os.environ.copy()
+        try:
+            # Try provider-specific secrets file first (e.g., proxmox.yaml)
+            secrets_file = f"{provider.name}.yaml"
+            creds = self.secret_manager.decrypt_file(secrets_file)
+        except FileNotFoundError:
+            # Fall back to shared credentials file
+            try:
+                creds = self.secret_manager.decrypt_file("credentials.yaml")
+            except Exception:
+                creds = {}
+
+        # Set provider-specific environment variables
+        if provider.name == "proxmox":
+            if "proxmox_api_url" in creds:
+                # bpg/proxmox provider uses PROXMOX_VE_ENDPOINT
+                env["PROXMOX_VE_ENDPOINT"] = creds["proxmox_api_url"]
+            if "proxmox_api_token_id" in creds and "proxmox_api_token_secret" in creds:
+                # bpg/proxmox uses PROXMOX_VE_API_TOKEN in format "user@realm!tokenid=secret"
+                token_id = creds["proxmox_api_token_id"]
+                token_secret = creds["proxmox_api_token_secret"]
+                env["PROXMOX_VE_API_TOKEN"] = f"{token_id}={token_secret}"
+            # Allow insecure TLS for self-signed certs
+            env["PROXMOX_VE_INSECURE"] = "true"
+        elif provider.name == "opnsense":
+            if "opnsense_api_url" in creds:
+                env["OPNSENSE_API_URL"] = creds["opnsense_api_url"]
+                env["TF_VAR_opnsense_api_url"] = creds["opnsense_api_url"]
+            if "opnsense_api_key" in creds:
+                env["OPNSENSE_API_KEY"] = creds["opnsense_api_key"]
+                env["TF_VAR_opnsense_api_key"] = creds["opnsense_api_key"]
+            if "opnsense_api_secret" in creds:
+                env["OPNSENSE_API_SECRET"] = creds["opnsense_api_secret"]
+                env["TF_VAR_opnsense_api_secret"] = creds["opnsense_api_secret"]
+
         # Initialize if needed
         if not (tf_dir / ".terraform").exists():
             self.console.print("[dim]Initializing Terraform...[/dim]")
-            subprocess.run(["terraform", "init"], cwd=tf_dir, check=True)
+            subprocess.run(["terraform", "init"], cwd=tf_dir, check=True, env=env)
 
         # Build command
         cmd = ["terraform", command]
         if auto_approve and command in {"apply", "destroy"}:
             cmd.append("-auto-approve")
 
-        # Run command
-        result = subprocess.run(cmd, cwd=tf_dir, capture_output=False)
+        # Run command with environment variables
+        result = subprocess.run(cmd, cwd=tf_dir, capture_output=False, env=env)
 
         return {"exit_code": result.returncode, "success": result.returncode == 0}
 
