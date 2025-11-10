@@ -108,6 +108,9 @@ class Orchestrator:
             provider: Provider instance to register
         """
         self.providers[provider.name] = provider
+        # Sync providers to helper classes that need them
+        self.deployment_executor.providers = self.providers
+        self.drift_detector.providers = self.providers
 
     def validate_resources(self, resources: list[Any]) -> None:
         """Validate that all resources have providers that support their types.
@@ -214,9 +217,7 @@ class Orchestrator:
     def detect_drift(self, env_name: str) -> dict[str, Any]:
         """Detect infrastructure drift from declared configuration.
 
-        Compares the actual infrastructure state (from Terraform state) with
-        the declared configuration to identify resources that have been
-        modified, added, or deleted outside of InfraFoundry.
+        Delegates to DriftDetector.
 
         Args:
             env_name: Environment name
@@ -224,150 +225,9 @@ class Orchestrator:
         Returns:
             Dict with drift detection results per provider
         """
-        # Emit drift check started event
-        self.event_manager.emit_event(
-            EventType.DRIFT_CHECK_STARTED,
-            env_name,
-            {"environment": env_name},
-        )
-
-        self.console.print(f"\n[bold cyan]Checking for drift in: {env_name}[/bold cyan]")
-
-        results = {}
-        drift_detected = False
-
-        try:
-            # Get all resources and discover providers dynamically
-            all_resources = self.config_manager.get_all_resources_all_providers(env_name)
-
-            # Group resources by provider
-            resources_by_provider: dict[str, list[Any]] = {}
-            for resource in all_resources:
-                if resource.provider not in resources_by_provider:
-                    resources_by_provider[resource.provider] = []
-                resources_by_provider[resource.provider].append(resource)
-
-            for provider_name, resources in resources_by_provider.items():
-                if provider_name not in self.providers:
-                    continue
-
-                provider = self.providers[provider_name]
-
-                self.console.print(f"\n[bold]Checking {provider_name}...[/bold]")
-
-                # Run terraform plan to detect drift
-                # This will compare current state with declared config
-                plan_result = self._run_terraform(provider, "plan", auto_approve=False)
-
-                # Parse the plan output to detect changes
-                drift_info = self._parse_terraform_plan_for_drift(plan_result)
-
-                if drift_info["has_changes"]:
-                    drift_detected = True
-                    self.console.print(
-                        f"  [yellow]⚠ Drift detected: {drift_info['summary']}[/yellow]"
-                    )
-
-                    # Emit drift detected event
-                    self.event_manager.emit_event(
-                        EventType.DRIFT_DETECTED,
-                        env_name,
-                        {
-                            "provider": provider_name,
-                            "changes": drift_info,
-                        },
-                    )
-                else:
-                    self.console.print("  [green]✓ No drift detected[/green]")
-
-                results[provider_name] = drift_info
-
-            # Emit drift check completed event
-            self.event_manager.emit_event(
-                EventType.DRIFT_CHECK_COMPLETED,
-                env_name,
-                {
-                    "drift_detected": drift_detected,
-                    "results": results,
-                },
-            )
-
-            if not drift_detected:
-                self.console.print(
-                    "\n[bold green]✓ All infrastructure matches declared configuration[/bold green]"
-                )
-
-        except Exception as e:
-            self.console.print(f"\n[bold red]Error detecting drift:[/bold red] {e}")
-            raise
-
-        return results
-
-    def _parse_terraform_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
-        """Parse Terraform plan output to detect drift.
-
-        Args:
-            plan_result: Result dictionary from _run_terraform
-
-        Returns:
-            Dict with drift information
-        """
-        output = plan_result.get("output", "")
-
-        # Look for Terraform's plan summary line
-        # Example: "Plan: 1 to add, 2 to change, 0 to destroy."
-        import re
-
-        plan_pattern = r"Plan: (\d+) to add, (\d+) to change, (\d+) to destroy"
-        match = re.search(plan_pattern, output)
-
-        if match:
-            to_add = int(match.group(1))
-            to_change = int(match.group(2))
-            to_destroy = int(match.group(3))
-
-            has_changes = (to_add + to_change + to_destroy) > 0
-
-            # Build summary message
-            parts = []
-            if to_add > 0:
-                parts.append(f"{to_add} to add")
-            if to_change > 0:
-                parts.append(f"{to_change} to change")
-            if to_destroy > 0:
-                parts.append(f"{to_destroy} to destroy")
-
-            summary = ", ".join(parts) if parts else "No changes"
-
-            return {
-                "has_changes": has_changes,
-                "to_add": to_add,
-                "to_change": to_change,
-                "to_destroy": to_destroy,
-                "summary": summary,
-                "raw_output": output,
-            }
-
-        # If no plan line found, check for "No changes" message
-        if "No changes" in output or "no changes are needed" in output.lower():
-            return {
-                "has_changes": False,
-                "to_add": 0,
-                "to_change": 0,
-                "to_destroy": 0,
-                "summary": "No changes",
-                "raw_output": output,
-            }
-
-        # Unknown state
-        return {
-            "has_changes": None,
-            "to_add": None,
-            "to_change": None,
-            "to_destroy": None,
-            "summary": "Unable to parse plan output",
-            "raw_output": output,
-        }
+        # Update drift detector's provider references
+        self.drift_detector.providers = self.providers
+        return self.drift_detector.detect(env_name)
 
     def plan(
         self,
@@ -501,7 +361,7 @@ class Orchestrator:
 
                 # Run terraform plan
                 self.console.print("  [dim]Running terraform plan...[/dim]")
-                tf_result = self._run_terraform(provider, "plan", auto_approve=False)
+                tf_result = self.terraform_runner.run(provider, "plan", auto_approve=False)
 
                 results[provider_name] = {
                     "resources": len(resources),
@@ -661,62 +521,11 @@ class Orchestrator:
         resource_filter: list[str] | None,
         auto_approve: bool,
     ) -> dict[str, Any]:
-        """Apply providers sequentially.
-
-        Args:
-            env_name: Environment name
-            deployment_id: Deployment ID
-            resources_by_provider: Dict mapping provider names to resources
-            resource_filter: Optional list of resource names to target
-            auto_approve: If True, skip confirmation prompts
-
-        Returns:
-            Dict with apply results per provider
-        """
-        results = {}
-
-        # Define provider execution order
-        # Providers earlier in the list are applied first
-        # This ensures network/DHCP config is ready before VMs
-        provider_order = ["opnsense", "proxmox", "kubernetes"]
-
-        # Sort providers by defined order, putting undefined ones at the end
-        sorted_providers = sorted(
-            resources_by_provider.keys(),
-            key=lambda p: provider_order.index(p) if p in provider_order else len(provider_order),
+        """Apply providers sequentially."""
+        self.deployment_executor.providers = self.providers
+        return self.deployment_executor.apply_serial(
+            env_name, deployment_id, resources_by_provider, resource_filter, auto_approve
         )
-
-        for provider_name in sorted_providers:
-            if provider_name not in self.providers:
-                continue
-
-            provider = self.providers[provider_name]
-
-            # Get resources for this provider
-            resources = resources_by_provider[provider_name]
-
-            # Check if any resources match filter for this provider
-            if resource_filter:
-                resources = [r for r in resources if r.name in resource_filter]
-                if not resources:
-                    continue  # Skip provider if no matching resources
-
-            self.console.print(f"\n[bold]Applying {provider_name}...[/bold]")
-
-            # Set environment for provider to ensure correct output directory
-            provider.set_environment(env_name)
-
-            result = self._apply_single_provider(
-                env_name=env_name,
-                deployment_id=deployment_id,
-                provider_name=provider_name,
-                provider=provider,
-                resources=resources,
-                auto_approve=auto_approve,
-            )
-            results[provider_name] = result
-
-        return results
 
     def _apply_providers_parallel(
         self,
@@ -727,74 +536,16 @@ class Orchestrator:
         auto_approve: bool,
         max_workers: int,
     ) -> dict[str, Any]:
-        """Apply providers in parallel.
-
-        Args:
-            env_name: Environment name
-            deployment_id: Deployment ID
-            resources_by_provider: Dict mapping provider names to resources
-            resource_filter: Optional list of resource names to target
-            auto_approve: If True, skip confirmation prompts
-            max_workers: Maximum number of parallel workers
-
-        Returns:
-            Dict with apply results per provider
-        """
-        results = {}
-        self.console.print(
-            f"\n[bold cyan]Applying {len(resources_by_provider)} providers in parallel "
-            f"(max {max_workers} workers)...[/bold cyan]"
+        """Apply providers in parallel."""
+        self.deployment_executor.providers = self.providers
+        return self.deployment_executor.apply_parallel(
+            env_name,
+            deployment_id,
+            resources_by_provider,
+            resource_filter,
+            auto_approve,
+            max_workers,
         )
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all provider apply tasks
-            future_to_provider = {}
-            for provider_name, resources in resources_by_provider.items():
-                if provider_name not in self.providers:
-                    continue
-
-                provider = self.providers[provider_name]
-
-                # Set environment for provider to ensure correct output directory
-                provider.set_environment(env_name)
-
-                # Check if any resources match filter for this provider
-                if resource_filter:
-                    resources = [r for r in resources if r.name in resource_filter]
-                    if not resources:
-                        continue  # Skip provider if no matching resources
-
-                future = executor.submit(
-                    self._apply_single_provider,
-                    env_name=env_name,
-                    deployment_id=deployment_id,
-                    provider_name=provider_name,
-                    provider=provider,
-                    resources=resources,
-                    auto_approve=auto_approve,
-                )
-                future_to_provider[future] = provider_name
-
-            # Collect results as they complete
-            with Progress(
-                SpinnerColumn(), TextColumn("[progress.description]{task.description}")
-            ) as progress:
-                task = progress.add_task(
-                    "[cyan]Applying providers...", total=len(future_to_provider)
-                )
-
-                for future in as_completed(future_to_provider):
-                    provider_name = future_to_provider[future]
-                    try:
-                        result = future.result()
-                        results[provider_name] = result
-                        self.console.print(f"[green]✓ {provider_name} completed[/green]")
-                    except Exception as e:
-                        self.console.print(f"[red]✗ {provider_name} failed: {e}[/red]")
-                        results[provider_name] = {"error": str(e)}
-                    progress.update(task, advance=1)
-
-        return results
 
     def _apply_single_provider(
         self,
@@ -805,79 +556,11 @@ class Orchestrator:
         resources: list[Any],
         auto_approve: bool,
     ) -> dict[str, Any]:
-        """Apply a single provider's resources.
-
-        Args:
-            env_name: Environment name
-            deployment_id: Deployment ID
-            provider_name: Provider name
-            provider: Provider instance
-            resources: List of resources to apply
-            auto_approve: If True, skip confirmation prompts
-
-        Returns:
-            Dict with apply results
-        """
-        # Track resources being applied and store their IDs
-        resource_ids = {}
-        for resource in resources:
-            tracked_resource = self.state_manager.track_resource(
-                deployment_id=deployment_id,
-                environment=env_name,
-                provider=provider_name,
-                resource_type=resource.type,
-                name=resource.name,
-                state=ResourceState.CREATING,
-                config=resource.config,
-            )
-            resource_ids[resource.name] = tracked_resource.id
-            self.event_manager.emit_event(
-                EventType.RESOURCE_CREATING,
-                env_name,
-                {
-                    "resource_id": tracked_resource.id,
-                    "provider": provider_name,
-                    "name": resource.name,
-                },
-            )
-
-        # Run Terraform apply
-        tf_result = self._run_terraform(provider, "apply", auto_approve)
-
-        # Extract Terraform resource IDs from state if apply was successful
-        if tf_result["success"]:
-            terraform_ids = self._get_terraform_resource_ids(provider)
-
-            # Update tracked resources with Terraform IDs
-            for resource_name, terraform_id in terraform_ids.items():
-                if resource_name in resource_ids:
-                    db_resource_id = resource_ids[resource_name]
-                    # Update resource with Terraform ID
-                    self.state_manager.update_resource(
-                        resource_id=db_resource_id,
-                        terraform_id=terraform_id,
-                    )
-
-        # Run Ansible playbook (check mode for dry run)
-        ansible_result = self._run_ansible(provider, check_mode=not auto_approve)
-
-        # Update resource states to ACTIVE after successful apply
-        for resource in resources:
-            if resource.name in resource_ids:
-                self.state_manager.update_resource_state(
-                    resource_id=resource_ids[resource.name],
-                    state=ResourceState.ACTIVE,
-                )
-                self.event_manager.emit_event(
-                    EventType.RESOURCE_CREATED,
-                    env_name,
-                    {"provider": provider_name, "name": resource.name},
-                )
-
-        return {
-            "terraform": tf_result,
-            "ansible": ansible_result,
-        }
+        """Apply a single provider's resources."""
+        self.deployment_executor.providers = self.providers
+        return self.deployment_executor.apply_single_provider(
+            env_name, deployment_id, provider_name, provider, resources, auto_approve
+        )
 
     def destroy(
         self,
@@ -985,7 +668,7 @@ class Orchestrator:
                     )
 
                 # Run Terraform destroy
-                tf_result = self._run_terraform(provider, "destroy", auto_approve)
+                tf_result = self.terraform_runner.run(provider, "destroy", auto_approve)
 
                 # Update resource states to DELETED after successful destroy
                 for resource in resources:
@@ -1107,149 +790,6 @@ class Orchestrator:
             )
             self.console.print(f"\n[bold red]✗ Rollback failed: {e}[/bold red]")
             raise
-
-    def _get_terraform_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
-        """Extract Terraform resource IDs from state.
-
-        Args:
-            provider: Provider instance
-
-        Returns:
-            Dict mapping resource names to Terraform resource addresses
-        """
-        tf_dir = provider.terraform_dir
-
-        try:
-            # Run terraform show -json to get state
-            result = subprocess.run(
-                ["terraform", "show", "-json"],
-                cwd=tf_dir,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-
-            state = json.loads(result.stdout)
-            resource_ids = {}
-
-            # Extract resource addresses from state
-            if "values" in state and "root_module" in state["values"]:
-                root = state["values"]["root_module"]
-                if "resources" in root:
-                    for resource in root["resources"]:
-                        # Resource address format: provider_type.resource_name
-                        address = resource.get("address")
-                        name = resource.get("name")
-                        if address and name:
-                            resource_ids[name] = address
-
-            return resource_ids
-
-        except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError) as e:
-            self.console.print(f"[yellow]Warning: Could not extract Terraform IDs: {e}[/yellow]")
-            return {}
-
-    def _run_terraform(
-        self, provider: ProviderBase, command: str, auto_approve: bool = False
-    ) -> dict[str, Any]:
-        """Run Terraform command for a provider.
-
-        Args:
-            provider: Provider instance
-            command: Terraform command (plan, apply, destroy)
-            auto_approve: If True, add -auto-approve flag
-
-        Returns:
-            Dict with command results
-        """
-        tf_dir = provider.terraform_dir
-
-        # Load credentials and set environment variables
-        env = os.environ.copy()
-        try:
-            # Try provider-specific secrets file first (e.g., proxmox.yaml)
-            secrets_file = f"{provider.name}.yaml"
-            creds = self.secret_manager.decrypt_file(secrets_file)
-        except FileNotFoundError:
-            # Fall back to shared credentials file
-            try:
-                creds = self.secret_manager.decrypt_file("credentials.yaml")
-            except Exception:
-                creds = {}
-
-        # Set provider-specific environment variables
-        if provider.name == "proxmox":
-            if "proxmox_api_url" in creds:
-                # bpg/proxmox provider uses PROXMOX_VE_ENDPOINT
-                env["PROXMOX_VE_ENDPOINT"] = creds["proxmox_api_url"]
-            if "proxmox_api_token_id" in creds and "proxmox_api_token_secret" in creds:
-                # bpg/proxmox uses PROXMOX_VE_API_TOKEN in format "user@realm!tokenid=secret"
-                token_id = creds["proxmox_api_token_id"]
-                token_secret = creds["proxmox_api_token_secret"]
-                env["PROXMOX_VE_API_TOKEN"] = f"{token_id}={token_secret}"
-            # Allow insecure TLS for self-signed certs
-            env["PROXMOX_VE_INSECURE"] = "true"
-        elif provider.name == "opnsense":
-            if "opnsense_api_url" in creds:
-                env["OPNSENSE_API_URL"] = creds["opnsense_api_url"]
-                env["TF_VAR_opnsense_api_url"] = creds["opnsense_api_url"]
-            if "opnsense_api_key" in creds:
-                env["OPNSENSE_API_KEY"] = creds["opnsense_api_key"]
-                env["TF_VAR_opnsense_api_key"] = creds["opnsense_api_key"]
-            if "opnsense_api_secret" in creds:
-                env["OPNSENSE_API_SECRET"] = creds["opnsense_api_secret"]
-                env["TF_VAR_opnsense_api_secret"] = creds["opnsense_api_secret"]
-
-        # Initialize if needed
-        if not (tf_dir / ".terraform").exists():
-            self.console.print("[dim]Initializing Terraform...[/dim]")
-            subprocess.run(["terraform", "init"], cwd=tf_dir, check=True, env=env)
-
-        # Build command
-        cmd = ["terraform", command]
-        if auto_approve and command in {"apply", "destroy"}:
-            cmd.append("-auto-approve")
-
-        # Run command with environment variables
-        result = subprocess.run(cmd, cwd=tf_dir, capture_output=False, env=env)
-
-        return {"exit_code": result.returncode, "success": result.returncode == 0}
-
-    def _run_ansible(self, provider: ProviderBase, check_mode: bool = True) -> dict[str, Any]:
-        """Run Ansible playbook for a provider.
-
-        Args:
-            provider: Provider instance
-            check_mode: If True, run in check mode (dry run)
-
-        Returns:
-            Dict with command results
-        """
-        ansible_dir = provider.ansible_dir
-        playbook = ansible_dir / "playbook.yml"
-        inventory = ansible_dir / "inventory.yml"
-
-        if not playbook.exists():
-            self.console.print("[dim]No Ansible playbook found, skipping...[/dim]")
-            return {"skipped": True}
-
-        # Build command
-        cmd = ["ansible-playbook", "-i", str(inventory), str(playbook)]
-        if check_mode:
-            cmd.append("--check")
-            self.console.print("[dim]Running Ansible in check mode (dry run)...[/dim]")
-        else:
-            self.console.print("[dim]Running Ansible playbook...[/dim]")
-
-        # Run command
-        try:
-            result = subprocess.run(cmd, cwd=ansible_dir, capture_output=False)
-            return {"exit_code": result.returncode, "success": result.returncode == 0}
-        except FileNotFoundError:
-            self.console.print(
-                "[yellow]ansible-playbook not found. Install Ansible to use this feature.[/yellow]"
-            )
-            return {"error": "ansible-playbook not found", "success": False}
 
     def status(self, env_name: str) -> None:
         """Show status of infrastructure.
