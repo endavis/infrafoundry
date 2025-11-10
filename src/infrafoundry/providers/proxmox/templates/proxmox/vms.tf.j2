@@ -56,20 +56,50 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   }
   {% endif %}
 
-  {% if vm.config.ipconfig is defined %}
-  # IP Configuration
+  {% if vm.config.ipconfig is defined or vm.config.ssh_user is defined or vm.config.ssh_keys is defined %}
+  # Cloud-init Configuration
   initialization {
+    {% if vm.config.ipconfig is defined %}
     ip_config {
       {% if 'dhcp' in vm.config.ipconfig %}
       ipv4 {
         address = "dhcp"
       }
-      {% else %}
+      {% elif vm.config.ipconfig.startswith('ip=') %}
       ipv4 {
-        address = "{{ vm.config.ipconfig.split('=')[1] }}"
+        address = "{{ vm.config.ipconfig.split('ip=')[1].split(',')[0] }}"
+        {% if 'gw=' in vm.config.ipconfig %}
+        gateway = "{{ vm.config.ipconfig.split('gw=')[1].split(',')[0] }}"
+        {% endif %}
       }
       {% endif %}
     }
+    {% endif %}
+
+    {% if vm.config.ssh_user is defined %}
+    user_account {
+      username = "{{ vm.config.ssh_user }}"
+      {% if vm.config.ssh_keys is defined %}
+      keys = [
+        {% for key in vm.config.ssh_keys %}
+        "{{ key }}",
+        {% endfor %}
+      ]
+      {% endif %}
+      {% if vm.config.ssh_password is defined %}
+      password = "{{ vm.config.ssh_password }}"
+      {% endif %}
+    }
+    {% endif %}
+
+    {% if vm.config.cloud_init_dns is defined %}
+    dns {
+      servers = {{ vm.config.cloud_init_dns.servers | tojson }}
+      {% if vm.config.cloud_init_dns.domain is defined %}
+      domain = "{{ vm.config.cloud_init_dns.domain }}"
+      {% endif %}
+    }
+    {% endif %}
   }
   {% endif %}
 
