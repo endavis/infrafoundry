@@ -8,6 +8,8 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any
 
+from infrafoundry.core.base_manager import BaseManager
+
 
 class EventType(str, Enum):
     """Types of events that can be emitted."""
@@ -81,13 +83,17 @@ class Event:
 EventHandler = Callable[[Event], None]
 
 
-class EventManager:
+class EventManager(BaseManager):
     """Manages event subscriptions and emission."""
 
     def __init__(self):
         """Initialize event manager."""
+        # Initialize base manager with logging
+        super().__init__()
+
         self._handlers: dict[EventType, list[EventHandler]] = defaultdict(list)
         self._global_handlers: list[EventHandler] = []
+        self._log_debug("EventManager initialized")
 
     def subscribe(self, event_type: EventType, handler: EventHandler) -> None:
         """Subscribe to a specific event type.
@@ -97,6 +103,7 @@ class EventManager:
             handler: Callback function to invoke when event occurs
         """
         self._handlers[event_type].append(handler)
+        self._log_debug(f"Handler subscribed to {event_type}")
 
     def subscribe_all(self, handler: EventHandler) -> None:
         """Subscribe to all events.
@@ -122,20 +129,24 @@ class EventManager:
         Args:
             event: Event to emit
         """
+        self._log_debug(f"Emitting event: {event.event_type}")
+
         # Call specific handlers
         for handler in self._handlers[event.event_type]:
             try:
                 handler(event)
             except Exception as e:
                 # Log error but don't stop other handlers
-                print(f"Error in event handler for {event.event_type}: {e}")
+                error_msg = f"Error in event handler for {event.event_type}"
+                self._log_error(error_msg, e)
 
         # Call global handlers
         for handler in self._global_handlers:
             try:
                 handler(event)
             except Exception as e:
-                print(f"Error in global event handler: {e}")
+                error_msg = "Error in global event handler"
+                self._log_error(error_msg, e)
 
     def emit_event(
         self,
@@ -155,8 +166,10 @@ class EventManager:
 
     def clear(self) -> None:
         """Clear all event handlers."""
+        handler_count = self.handler_count()
         self._handlers.clear()
         self._global_handlers.clear()
+        self._log_debug(f"Cleared {handler_count} event handlers")
 
     def handler_count(self, event_type: EventType | None = None) -> int:
         """Get count of registered handlers.
@@ -172,3 +185,11 @@ class EventManager:
         return sum(len(handlers) for handlers in self._handlers.values()) + len(
             self._global_handlers
         )
+
+    def cleanup(self) -> None:
+        """Cleanup resources (required by BaseManager).
+
+        Clears all event handlers.
+        """
+        self.clear()
+        self._log_debug("EventManager cleanup complete")

@@ -80,3 +80,4 @@ output/
 *.log
 *-PLAINTEXT.yaml
 *-decrypted.yaml
+REFACTORING_TODO.md

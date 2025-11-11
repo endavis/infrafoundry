@@ -1,17 +1,17 @@
 """Refactored configuration manager - coordinates between loaders."""
 
-import os
 from pathlib import Path
 
 import yaml
 
+from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
 from infrafoundry.core.provider import ResourceConfig
 
 
-class ConfigManager:
+class ConfigManager(PathBasedManager):
     """Manages configuration loading and validation.
 
     Coordinates between ProviderCentricLoader and ResourceCentricLoader
@@ -25,17 +25,25 @@ class ConfigManager:
             base_dir: Base directory for configs
                 (defaults to INFRAFOUNDRY_CONFIG_REPO/envs or ./envs)
         """
+        # Initialize base manager with logging
+        super().__init__()
+
+        # Resolve base directory using PathBasedManager pattern
         if base_dir is None:
-            # Check for separate config repo first
-            config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
+            config_repo = self._get_env_var("INFRAFOUNDRY_CONFIG_REPO")
             if config_repo:
+                # Config repo is specified - use its envs subdirectory
                 base_dir = Path(config_repo) / "envs"
             else:
-                # Fall back to local envs directory
-                config_dir = os.getenv("INFRAFOUNDRY_CONFIG_DIR", "envs")
-                base_dir = Path.cwd() / config_dir
+                # No config repo - use local envs directory
+                base_dir = self._resolve_path(
+                    path=None,
+                    env_var="INFRAFOUNDRY_CONFIG_DIR",
+                    default="envs",
+                )
 
-        self.base_dir = base_dir
+        self.base_dir: Path = base_dir  # Type assertion - base_dir is always Path here
+        self._log_debug(f"Initialized ConfigManager with base_dir: {self.base_dir}")
 
         # Initialize loaders
         self.provider_centric = ProviderCentricLoader(base_dir)
@@ -56,8 +64,11 @@ class ConfigManager:
         settings_file = self.base_dir / env_name / "settings.yaml"
 
         if not settings_file.exists():
-            raise FileNotFoundError(f"Environment config not found: {settings_file}")
+            error_msg = f"Environment config not found: {settings_file}"
+            self._log_error(error_msg)
+            raise FileNotFoundError(error_msg)
 
+        self._log_debug(f"Loading environment config: {env_name}")
         with open(settings_file) as f:
             data = yaml.safe_load(f)
 
@@ -65,6 +76,7 @@ class ConfigManager:
             # Ensure we return an empty but valid EnvironmentConfig if file is empty
             data = {}
 
+        self._log_debug(f"Loaded environment config: {env_name}")
         return EnvironmentConfig(**data)
 
     def load_resources(
@@ -215,7 +227,23 @@ class ConfigManager:
         """
         env_dir = self.base_dir / env_name
         if not env_dir.exists():
+            self._log_warning(f"Environment directory not found: {env_dir}")
             return False
 
         env_file = env_dir / "settings.yaml"
-        return env_file.exists()
+        is_valid = env_file.exists()
+
+        if is_valid:
+            self._log_debug(f"Environment {env_name} is valid")
+        else:
+            self._log_warning(f"Environment {env_name} missing settings.yaml")
+
+        return is_valid
+
+    def cleanup(self) -> None:
+        """Cleanup resources (required by BaseManager).
+
+        No cleanup needed for ConfigManager as it doesn't maintain
+        persistent connections or file handles.
+        """
+        self._log_debug("ConfigManager cleanup complete")
