@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.state.deployment_repository import DeploymentRepository
 from infrafoundry.core.state.models import (
     Base,
@@ -17,7 +18,7 @@ from infrafoundry.core.state.models import (
 from infrafoundry.core.state.resource_repository import ResourceRepository
 
 
-class StateManager:
+class StateManager(BaseManager):
     """Manages infrastructure state and deployment history.
 
     Coordinates between DeploymentRepository and ResourceRepository.
@@ -30,21 +31,28 @@ class StateManager:
         Args:
             connection_string: Database connection string. If None, uses SQLite in default location.
         """
+        # Initialize base manager with logging
+        super().__init__()
+
         if connection_string is None:
             state_dir = Path.home() / ".infrafoundry"
             state_dir.mkdir(parents=True, exist_ok=True)
             connection_string = f"sqlite:///{state_dir / 'state.db'}"
 
+        self._log_debug(f"Initializing StateManager with connection: {connection_string}")
         self.engine = create_engine(connection_string)
         self.SessionLocal = sessionmaker(bind=self.engine)
 
         # Initialize repositories
         self.deployments = DeploymentRepository(self.SessionLocal)
         self.resources = ResourceRepository(self.SessionLocal)
+        self._log_debug("StateManager initialized successfully")
 
     def initialize(self) -> None:
         """Initialize database schema."""
+        self._log_debug("Initializing database schema")
         Base.metadata.create_all(self.engine)
+        self._log_info("Database schema initialized")
 
     # Deployment operations - delegate to DeploymentRepository
     def create_deployment(
@@ -277,3 +285,13 @@ class StateManager:
             Resource object or None
         """
         return self.resources.get_by_name(environment, provider, name)
+
+    def cleanup(self) -> None:
+        """Cleanup database resources (required by BaseManager).
+
+        Closes database engine and releases connections.
+        """
+        if hasattr(self, "engine"):
+            self._log_debug("Disposing database engine")
+            self.engine.dispose()
+            self._log_debug("StateManager cleanup complete")

@@ -10,6 +10,7 @@ from typing import Any
 import requests
 import yaml
 
+from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.events import EventType
 
 
@@ -209,7 +210,7 @@ class SlackNotifier(Notifier):
             return "ℹ️"
 
 
-class NotificationManager:
+class NotificationManager(PathBasedManager):
     """Manages notification channels and dispatches events."""
 
     def __init__(self, config_file: Path | None = None):
@@ -218,12 +219,18 @@ class NotificationManager:
         Args:
             config_file: Path to notifications config file (default: ./notifications.yaml)
         """
+        # Initialize base manager with logging
+        super().__init__()
+
         self.config_file = config_file or Path("notifications.yaml")
         self.channels: list[NotificationChannel] = []
         self.notifiers: dict[str, Notifier] = {}
 
         if self.config_file.exists():
+            self._log_debug(f"Loading notification config from: {self.config_file}")
             self._load_config()
+        else:
+            self._log_debug("No notification config file found")
 
     def _load_config(self) -> None:
         """Load notification configuration from file."""
@@ -231,6 +238,7 @@ class NotificationManager:
             with open(self.config_file) as f:
                 config = yaml.safe_load(f)
                 if not config or "channels" not in config:
+                    self._log_debug("No channels found in config")
                     return
 
                 for channel_config in config["channels"]:
@@ -250,8 +258,11 @@ class NotificationManager:
                             self.notifiers[channel.name] = WebhookNotifier(channel.config)
                         elif channel.type == "slack":
                             self.notifiers[channel.name] = SlackNotifier(channel.config)
+
+                self._log_info(f"Loaded {len(self.channels)} notification channels")
         except Exception as e:
-            print(f"Warning: Failed to load notification config: {e}")
+            error_msg = "Failed to load notification config"
+            self._log_error(error_msg, e)
 
     def notify(self, event_type: str, environment: str, data: dict[str, Any]) -> None:
         """Send notifications for an event.
@@ -273,9 +284,11 @@ class NotificationManager:
             notifier = self.notifiers.get(channel.name)
             if notifier:
                 try:
+                    self._log_debug(f"Sending notification via {channel.name}")
                     notifier.send(event_type, environment, data)
                 except Exception as e:
-                    print(f"Error sending notification via {channel.name}: {e}")
+                    error_msg = f"Error sending notification via {channel.name}"
+                    self._log_error(error_msg, e)
 
     def add_channel(self, channel: NotificationChannel) -> None:
         """Add a notification channel dynamically."""
@@ -286,3 +299,13 @@ class NotificationManager:
                 self.notifiers[channel.name] = WebhookNotifier(channel.config)
             elif channel.type == "slack":
                 self.notifiers[channel.name] = SlackNotifier(channel.config)
+
+        self._log_info(f"Added notification channel: {channel.name}")
+
+    def cleanup(self) -> None:
+        """Cleanup resources (required by BaseManager).
+
+        No cleanup needed for NotificationManager as it doesn't maintain
+        persistent connections.
+        """
+        self._log_debug("NotificationManager cleanup complete")
