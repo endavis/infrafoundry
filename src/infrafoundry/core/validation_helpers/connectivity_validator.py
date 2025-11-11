@@ -113,10 +113,7 @@ class ConnectivityValidator:
             True if successful (200), False otherwise
         """
         if response.status_code == 200:
-            msg = (
-                success_message
-                or f"Successfully connected to {self.provider_name} API at {url}"
-            )
+            msg = success_message or f"Successfully connected to {self.provider_name} API at {url}"
             self.report.add_check(
                 check_name=f"{self.provider_name}_connectivity",
                 passed=True,

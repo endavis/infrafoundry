@@ -63,8 +63,7 @@ class SecretManager(PathBasedManager):
         age_key_file = self._get_env_var("SOPS_AGE_KEY_FILE")
         if not age_key_file:
             error_msg = (
-                "SOPS_AGE_KEY_FILE not set. "
-                "Generate a key with: age-keygen -o secrets/age.key"
+                "SOPS_AGE_KEY_FILE not set. Generate a key with: age-keygen -o secrets/age.key"
             )
             self._log_error(error_msg)
             raise ValueError(error_msg)

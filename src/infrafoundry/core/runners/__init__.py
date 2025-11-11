@@ -11,9 +11,9 @@ from infrafoundry.core.runners.runner_registry import (
 )
 from infrafoundry.core.runners.terraform_runner import TerraformRunner
 
-# Auto-register built-in runners with explicit tool names
-register_runner(TerraformRunner, "terraform")
-register_runner(AnsibleRunner, "ansible")
+# Auto-register built-in runners
+register_runner(TerraformRunner)
+register_runner(AnsibleRunner)
 
 __all__ = [
     "BaseRunner",

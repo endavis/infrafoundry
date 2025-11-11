@@ -257,8 +257,7 @@ class ResourceGrouperMixin:
                 invalid.append(resource)
                 if hasattr(self, "_logger"):
                     self._logger.warning(
-                        f"Unsupported resource type: {resource.type} "
-                        f"for resource {resource.name}"
+                        f"Unsupported resource type: {resource.type} for resource {resource.name}"
                     )
 
         return valid, invalid
