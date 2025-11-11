@@ -107,17 +107,36 @@ class TestProxmoxValidation:
     @patch("requests.get")
     def test_validate_references_template_exists(self, mock_get, proxmox_provider, env_config):
         """Test validation passes when referenced template exists."""
-        # Mock API response with templates
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [
-                {"name": "ubuntu-22.04", "template": 1},
-                {"name": "debian-12", "template": 1},
-                {"name": "running-vm", "template": 0},
-            ]
-        }
-        mock_get.return_value = mock_response
+
+        # Mock different API responses based on URL
+        def mock_get_side_effect(url, **kwargs):
+            mock_response = Mock()
+            mock_response.status_code = 200
+
+            if "/nodes/pve01/status" in url:
+                # Node status - data is dict
+                mock_response.json.return_value = {"data": {"uptime": 12345}}
+            elif "/nodes/pve01/storage" in url:
+                # Storage list - data is list
+                mock_response.json.return_value = {"data": []}
+            elif "/nodes/pve01/network" in url:
+                # Network bridges - data is list
+                mock_response.json.return_value = {"data": []}
+            elif "/cluster/resources?type=vm" in url:
+                # Templates and VMs - data is list
+                mock_response.json.return_value = {
+                    "data": [
+                        {"name": "ubuntu-22.04", "template": 1, "vmid": 100},
+                        {"name": "debian-12", "template": 1, "vmid": 101},
+                        {"name": "running-vm", "template": 0, "vmid": 102},
+                    ]
+                }
+            else:
+                mock_response.json.return_value = {"data": []}
+
+            return mock_response
+
+        mock_get.side_effect = mock_get_side_effect
 
         # Create resources that reference templates
         resources = [
@@ -125,7 +144,7 @@ class TestProxmoxValidation:
                 provider="proxmox",
                 type="vm",
                 name="web-01",
-                config={"template": "ubuntu-22.04", "cores": 2},
+                config={"clone": "ubuntu-22.04", "cores": 2},
             ),
         ]
 
@@ -137,15 +156,31 @@ class TestProxmoxValidation:
     @patch("requests.get")
     def test_validate_references_template_missing(self, mock_get, proxmox_provider, env_config):
         """Test validation fails when referenced template doesn't exist."""
-        # Mock API response without the required template
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [
-                {"name": "ubuntu-22.04", "template": 1},
-            ]
-        }
-        mock_get.return_value = mock_response
+
+        # Mock different API responses based on URL
+        def mock_get_side_effect(url, **kwargs):
+            mock_response = Mock()
+            mock_response.status_code = 200
+
+            if "/nodes/pve01/status" in url:
+                mock_response.json.return_value = {"data": {"uptime": 12345}}
+            elif "/nodes/pve01/storage" in url:
+                mock_response.json.return_value = {"data": []}
+            elif "/nodes/pve01/network" in url:
+                mock_response.json.return_value = {"data": []}
+            elif "/cluster/resources?type=vm" in url:
+                # Only ubuntu template, missing centos
+                mock_response.json.return_value = {
+                    "data": [
+                        {"name": "ubuntu-22.04", "template": 1, "vmid": 100},
+                    ]
+                }
+            else:
+                mock_response.json.return_value = {"data": []}
+
+            return mock_response
+
+        mock_get.side_effect = mock_get_side_effect
 
         # Create resources that reference missing template
         resources = [
@@ -153,7 +188,7 @@ class TestProxmoxValidation:
                 provider="proxmox",
                 type="vm",
                 name="web-01",
-                config={"template": "centos-9", "cores": 2},
+                config={"clone": "centos-9", "cores": 2},
             ),
         ]
 
@@ -173,7 +208,7 @@ class TestProxmoxValidation:
                 provider="proxmox",
                 type="vm",
                 name="web-01",
-                config={"template": "ubuntu-22.04"},
+                config={"clone": "ubuntu-22.04"},
             ),
         ]
 
@@ -187,16 +222,31 @@ class TestProxmoxValidation:
     @patch("requests.get")
     def test_validate_references_multiple_templates(self, mock_get, proxmox_provider, env_config):
         """Test validation of multiple template references."""
-        # Mock API response with templates
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [
-                {"name": "ubuntu-22.04", "template": 1},
-                {"name": "debian-12", "template": 1},
-            ]
-        }
-        mock_get.return_value = mock_response
+
+        # Mock different API responses based on URL
+        def mock_get_side_effect(url, **kwargs):
+            mock_response = Mock()
+            mock_response.status_code = 200
+
+            if "/nodes/pve01/status" in url:
+                mock_response.json.return_value = {"data": {"uptime": 12345}}
+            elif "/nodes/pve01/storage" in url:
+                mock_response.json.return_value = {"data": []}
+            elif "/nodes/pve01/network" in url:
+                mock_response.json.return_value = {"data": []}
+            elif "/cluster/resources?type=vm" in url:
+                mock_response.json.return_value = {
+                    "data": [
+                        {"name": "ubuntu-22.04", "template": 1, "vmid": 100},
+                        {"name": "debian-12", "template": 1, "vmid": 101},
+                    ]
+                }
+            else:
+                mock_response.json.return_value = {"data": []}
+
+            return mock_response
+
+        mock_get.side_effect = mock_get_side_effect
 
         # Create multiple VMs with different templates
         resources = [
@@ -204,19 +254,19 @@ class TestProxmoxValidation:
                 provider="proxmox",
                 type="vm",
                 name="web-01",
-                config={"template": "ubuntu-22.04"},
+                config={"clone": "ubuntu-22.04"},
             ),
             ResourceConfig(
                 provider="proxmox",
                 type="vm",
                 name="db-01",
-                config={"template": "debian-12"},
+                config={"clone": "debian-12"},
             ),
             ResourceConfig(
                 provider="proxmox",
                 type="vm",
                 name="app-01",
-                config={"template": "ubuntu-22.04"},  # Duplicate reference
+                config={"clone": "ubuntu-22.04"},  # Duplicate reference
             ),
         ]
 
@@ -231,17 +281,34 @@ class TestProxmoxValidation:
     @patch("requests.get")
     def test_validate_references_api_error(self, mock_get, proxmox_provider, env_config):
         """Test validation handles API errors gracefully."""
-        # Mock failed API response
-        mock_response = Mock()
-        mock_response.status_code = 500
-        mock_get.return_value = mock_response
+
+        # Mock different API responses based on URL
+        def mock_get_side_effect(url, **kwargs):
+            mock_response = Mock()
+
+            if "/nodes/pve01/status" in url:
+                # Node check succeeds
+                mock_response.status_code = 200
+                mock_response.json.return_value = {"data": {"uptime": 12345}}
+            elif "/cluster/resources?type=vm" in url:
+                # Template check fails
+                mock_response.status_code = 500
+                mock_response.json.return_value = {}
+            else:
+                # Other checks succeed
+                mock_response.status_code = 200
+                mock_response.json.return_value = {"data": []}
+
+            return mock_response
+
+        mock_get.side_effect = mock_get_side_effect
 
         resources = [
             ResourceConfig(
                 provider="proxmox",
                 type="vm",
                 name="web-01",
-                config={"template": "ubuntu-22.04"},
+                config={"clone": "ubuntu-22.04"},
             ),
         ]
 
