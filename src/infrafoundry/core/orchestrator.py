@@ -228,6 +228,151 @@ class Orchestrator:
         self.drift_detector.providers = self.providers
         return self.drift_detector.detect(env_name)
 
+    def validate(
+        self,
+        env_name: str,
+        resource_filter: list[str] | None = None,
+        verbose: bool = False,
+    ) -> dict[str, Any]:
+        """Validate infrastructure configuration against provider APIs.
+
+        Performs pre-flight validation checks:
+        - Connectivity to provider APIs
+        - Referenced resources exist (templates, networks, storage, etc.)
+        - No conflicts (duplicate VMIDs, MAC addresses, etc.)
+
+        Args:
+            env_name: Environment name
+            resource_filter: Optional list of resource names to validate
+            verbose: If True, show detailed validation output
+
+        Returns:
+            Dict with validation results per provider:
+            {
+                "provider_name": {
+                    "passed": bool,
+                    "report": ValidationReport,
+                    "errors": int,
+                    "warnings": int
+                }
+            }
+        """
+        from infrafoundry.core.validation import ValidationReport
+
+        self.console.print(f"\n[bold cyan]Validating configuration for: {env_name}[/bold cyan]\n")
+
+        # Load environment configuration
+        env_config = self.config_manager.load_environment(env_name)
+        if not env_config:
+            self.console.print(f"[red]✗ Environment '{env_name}' not found[/red]")
+            return {}
+
+        # Load resources
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+        # Filter resources if specified
+        if resource_filter:
+            all_resources = [r for r in all_resources if r.name in resource_filter]
+            self.console.print(
+                f"[yellow]Validating {len(all_resources)} resources: "
+                f"{', '.join(resource_filter)}[/yellow]\n"
+            )
+
+        # Group resources by provider
+        resources_by_provider: dict[str, list] = {}
+        for resource in all_resources:
+            if resource.provider not in resources_by_provider:
+                resources_by_provider[resource.provider] = []
+            resources_by_provider[resource.provider].append(resource)
+
+        results = {}
+
+        # Run validation for each provider
+        for provider_name, resources in resources_by_provider.items():
+            if provider_name not in self.providers:
+                self.console.print(f"[yellow]⚠ Provider '{provider_name}' not loaded[/yellow]")
+                continue
+
+            provider = self.providers[provider_name]
+            report = ValidationReport()
+
+            self.console.print(f"[bold]Validating {provider_name}...[/bold]")
+
+            # Validate connectivity
+            try:
+                provider.validate_connectivity(env_config.model_dump(), report)
+            except Exception as e:
+                self.console.print(f"[red]✗ Connectivity validation failed: {e}[/red]")
+
+            # Validate resource references
+            try:
+                provider.validate_references(resources, env_config.model_dump(), report)
+            except Exception as e:
+                self.console.print(f"[red]✗ Reference validation failed: {e}[/red]")
+
+            # Collect results
+            summary = report.get_summary()
+            passed = not report.has_errors()
+
+            results[provider_name] = {
+                "passed": passed,
+                "report": report,
+                "errors": summary["errors"],
+                "warnings": summary["warnings"],
+                "checks": summary["total"],
+            }
+
+            # Print results
+            if passed:
+                self.console.print(
+                    f"[green]✓ {provider_name}: {summary['passed']}/{summary['total']} "
+                    f"checks passed[/green]"
+                )
+                if summary["warnings"] > 0:
+                    self.console.print(f"  [yellow]⚠ {summary['warnings']} warnings[/yellow]")
+            else:
+                self.console.print(
+                    f"[red]✗ {provider_name}: {summary['errors']} errors, "
+                    f"{summary['warnings']} warnings[/red]"
+                )
+
+            # Print detailed report if verbose or if there are issues
+            if verbose or not passed:
+                self.console.print("\nDetailed Results:")
+                for result in report.results:
+                    if result.passed:
+                        if verbose:
+                            self.console.print(f"  [green]✓[/green] {result.message}")
+                    else:
+                        symbol = "⚠" if result.level.value == "warning" else "✗"
+                        color = "yellow" if result.level.value == "warning" else "red"
+                        self.console.print(f"  [{color}]{symbol}[/{color}] {result.message}")
+                        if verbose and result.details:
+                            for key, value in result.details.items():
+                                self.console.print(f"      {key}: {value}")
+
+            self.console.print()
+
+        # Print overall summary
+        total_errors = sum(r["errors"] for r in results.values())
+        total_warnings = sum(r["warnings"] for r in results.values())
+        all_passed = all(r["passed"] for r in results.values())
+
+        self.console.print("[bold]Validation Summary:[/bold]")
+        if all_passed:
+            self.console.print("[green]✓ All validation checks passed[/green]")
+            if total_warnings:
+                self.console.print(
+                    f"[yellow]  {total_warnings} warnings (review recommended)[/yellow]"
+                )
+        else:
+            self.console.print(
+                f"[red]✗ Validation failed: {total_errors} errors, {total_warnings} warnings[/red]"
+            )
+            self.console.print("[yellow]  Fix errors before deploying[/yellow]")
+
+        return results
+
     def plan(
         self,
         env_name: str,
