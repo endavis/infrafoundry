@@ -73,7 +73,8 @@ class TestCLICredentialLoading:
 
     def test_apply_command_loads_credentials(self, cli_runner, mock_credentials_setup):
         """Test that apply command loads credentials automatically."""
-        mock_creds = {
+        # Credentials defined for test setup reference
+        _ = {
             "PROXMOX_API_URL": "https://proxmox-prod.example.com:8006",
             "PROXMOX_API_TOKEN_ID": "prod@pam!token",
             "PROXMOX_API_TOKEN_SECRET": "prod-secret",
@@ -104,7 +105,9 @@ class TestCLICredentialLoading:
 
     def test_destroy_command_loads_credentials(self, cli_runner, mock_credentials_setup):
         """Test that destroy command loads credentials automatically."""
-        with patch("infrafoundry.core.credential_loader.CredentialLoader.load_and_apply") as mock_load:
+        with patch(
+            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+        ) as mock_load:
             with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
                 mock_orch = MagicMock()
                 mock_orchestrator.return_value = mock_orch
@@ -128,7 +131,9 @@ class TestCLICredentialLoading:
 
     def test_status_command_loads_credentials(self, cli_runner, mock_credentials_setup):
         """Test that status command loads credentials automatically."""
-        with patch("infrafoundry.core.credential_loader.CredentialLoader.load_and_apply") as mock_load:
+        with patch(
+            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+        ) as mock_load:
             with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
                 mock_orch = MagicMock()
                 mock_orchestrator.return_value = mock_orch
@@ -145,7 +150,9 @@ class TestCLICredentialLoading:
 
     def test_drift_command_loads_credentials(self, cli_runner, mock_credentials_setup):
         """Test that drift command loads credentials automatically."""
-        with patch("infrafoundry.core.credential_loader.CredentialLoader.load_and_apply") as mock_load:
+        with patch(
+            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+        ) as mock_load:
             with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
                 mock_orch = MagicMock()
                 mock_orch.detect_drift.return_value = {}
@@ -281,7 +288,9 @@ class TestCLICredentialLoading:
         secrets_dir.mkdir(parents=True)
         (secrets_dir / "proxmox.yaml").write_text("encrypted")
 
-        with patch("infrafoundry.core.credential_loader.CredentialLoader.load_and_apply") as mock_load:
+        with patch(
+            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+        ) as mock_load:
             with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
                 mock_orch = MagicMock()
                 mock_orchestrator.return_value = mock_orch
@@ -298,7 +307,9 @@ class TestCLICredentialLoading:
 
     def test_no_config_dir_uses_default(self, cli_runner, mock_credentials_setup):
         """Test that not specifying --config-dir uses default behavior."""
-        with patch("infrafoundry.core.credential_loader.CredentialLoader.load_and_apply") as mock_load:
+        with patch(
+            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+        ) as mock_load:
             with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
                 mock_orch = MagicMock()
                 mock_orchestrator.return_value = mock_orch
