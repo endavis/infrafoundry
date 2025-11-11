@@ -8,7 +8,6 @@ from typing import Any
 from rich.console import Console
 from rich.table import Table
 
-from infrafoundry.core.ansible_runner import AnsibleRunner
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.dependencies import DependencyGraph
 from infrafoundry.core.deployment_executor import DeploymentExecutor
@@ -18,9 +17,9 @@ from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
-from infrafoundry.core.terraform_runner import TerraformRunner
 
 
 class Orchestrator:
