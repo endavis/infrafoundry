@@ -1,26 +1,22 @@
-"""Credential loading and management for InfraFoundry.
-
-This module provides a CredentialLoader class for loading environment-specific
-credentials from encrypted secret files and managing environment variables.
-"""
+"""Refactored credential loader - factory pattern for provider-specific loaders."""
 
 import logging
 import os
-import subprocess
 from pathlib import Path
-from typing import Any
 
-import yaml
+from infrafoundry.core.credential_loader.base_loader import BaseCredentialLoader
+from infrafoundry.core.credential_loader.kubernetes_loader import KubernetesCredentialLoader
+from infrafoundry.core.credential_loader.opnsense_loader import OPNsenseCredentialLoader
+from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
 
 logger = logging.getLogger(__name__)
 
 
 class CredentialLoader:
-    """Load and manage environment-specific credentials.
+    """Load and manage environment-specific credentials using provider-specific loaders.
 
-    Handles loading credentials from SOPS-encrypted files in the secrets/
-    directory and updating environment variables. Supports per-environment
-    encryption keys and automatic fallback to existing environment variables.
+    Uses factory pattern to instantiate appropriate credential loaders for each provider.
+    Handles loading credentials from SOPS-encrypted files and managing environment variables.
 
     Example:
         >>> loader = CredentialLoader(config_dir=Path("/path/to/config"))
@@ -35,31 +31,27 @@ class CredentialLoader:
         # Credentials are restored
     """
 
-    # Provider credential mapping
-    PROVIDER_CREDENTIALS = {
-        "proxmox": {
-            "file": "proxmox.yaml",
-            "fields": {
-                "proxmox_api_url": "PROXMOX_API_URL",
-                "proxmox_token_id": "PROXMOX_API_TOKEN_ID",
-                "proxmox_token_secret": "PROXMOX_API_TOKEN_SECRET",
-            },
-        },
-        "opnsense": {
-            "file": "opnsense.yaml",
-            "fields": {
-                "opnsense_api_url": "OPNSENSE_API_URL",
-                "opnsense_api_key": "OPNSENSE_API_KEY",
-                "opnsense_api_secret": "OPNSENSE_API_SECRET",
-            },
-        },
-        "kubernetes": {
-            "file": "kubernetes.yaml",
-            "fields": {
-                "kubeconfig": "KUBECONFIG",
-            },
-        },
+    # Registry of available provider loaders
+    PROVIDER_LOADERS = {
+        "proxmox": ProxmoxCredentialLoader,
+        "opnsense": OPNsenseCredentialLoader,
+        "kubernetes": KubernetesCredentialLoader,
     }
+
+    # Legacy attribute for backward compatibility with tests
+    @property
+    def provider_credentials(self) -> dict:
+        """Return provider credentials in old format for backward compatibility."""
+        result = {}
+        for name, loader_class in self.PROVIDER_LOADERS.items():
+            # Create a temporary instance to get properties
+            temp_secrets_dir = Path("/tmp")
+            loader = loader_class(temp_secrets_dir, False)
+            result[name] = {
+                "file": loader.credential_file,
+                "fields": loader.field_mapping,
+            }
+        return result
 
     def __init__(self, config_dir: Path | None = None):
         """Initialize credential loader.
@@ -112,11 +104,11 @@ class CredentialLoader:
         self._set_age_key(secrets_dir)
 
         # Determine which providers to load
-        providers_to_load = providers or list(self.PROVIDER_CREDENTIALS.keys())
+        providers_to_load = providers or list(self.PROVIDER_LOADERS.keys())
 
         env_vars = {}
         for provider in providers_to_load:
-            if provider not in self.PROVIDER_CREDENTIALS:
+            if provider not in self.PROVIDER_LOADERS:
                 logger.warning(f"Unknown provider for credentials: {provider}")
                 continue
 
@@ -141,7 +133,7 @@ class CredentialLoader:
                 logger.debug(f"Using environment-specific age key: {env_age_key}")
 
     def _load_provider_credentials(self, provider: str, secrets_dir: Path) -> dict[str, str]:
-        """Load credentials for a specific provider.
+        """Load credentials for a specific provider using factory pattern.
 
         Args:
             provider: Provider name (proxmox, opnsense, kubernetes)
@@ -150,62 +142,9 @@ class CredentialLoader:
         Returns:
             Dictionary of environment variables for this provider
         """
-        provider_config = self.PROVIDER_CREDENTIALS[provider]
-        file_path = secrets_dir / provider_config["file"]
-
-        if not file_path.exists():
-            return {}
-
-        try:
-            decrypted_data = self._decrypt_sops_file(file_path)
-            if not decrypted_data:
-                return {}
-
-            # Map credential fields to environment variables
-            env_vars = {}
-            for secret_key, env_var_name in provider_config["fields"].items():
-                if value := decrypted_data.get(secret_key):
-                    env_vars[env_var_name] = value
-
-            if self._debug_mode and env_vars:
-                logger.debug(f"Loaded {len(env_vars)} credentials for {provider}")
-
-            return env_vars
-
-        except Exception as e:
-            if self._debug_mode:
-                logger.debug(f"Failed to load {provider} credentials: {e}")
-            return {}
-
-    def _decrypt_sops_file(self, file_path: Path) -> dict[str, Any]:
-        """Decrypt a SOPS-encrypted YAML file.
-
-        Args:
-            file_path: Path to encrypted file
-
-        Returns:
-            Decrypted data as dictionary (empty dict if decryption fails)
-        """
-        try:
-            result = subprocess.run(
-                ["sops", "--decrypt", str(file_path)],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return yaml.safe_load(result.stdout) or {}
-        except subprocess.CalledProcessError as e:
-            if self._debug_mode:
-                logger.debug(f"SOPS decryption failed for {file_path}: {e}")
-            return {}
-        except FileNotFoundError:
-            if self._debug_mode:
-                logger.debug("SOPS command not found")
-            return {}
-        except yaml.YAMLError as e:
-            if self._debug_mode:
-                logger.debug(f"YAML parsing failed for {file_path}: {e}")
-            return {}
+        loader_class = self.PROVIDER_LOADERS[provider]
+        loader = loader_class(secrets_dir, self._debug_mode)
+        return loader.load_credentials()
 
     def apply_to_environment(self, credentials: dict[str, str]) -> None:
         """Apply credentials to the current process environment.
@@ -256,31 +195,64 @@ class CredentialLoader:
         return _TemporaryCredentials(self, env_name, providers)
 
     def register_provider(
-        self, provider_name: str, filename: str, field_mapping: dict[str, str]
+        self,
+        provider_name: str,
+        loader_class_or_filename: type[BaseCredentialLoader] | str,
+        field_mapping: dict[str, str] | None = None,
     ) -> None:
-        """Register a custom provider credential mapping.
+        """Register a custom provider credential loader.
 
         Allows extending CredentialLoader with custom providers at runtime.
+        Supports both new (loader class) and old (filename + mapping) APIs for
+        backward compatibility.
 
         Args:
             provider_name: Name of the provider
-            filename: YAML filename in secrets/{env}/ directory
-            field_mapping: Dict mapping secret keys to env var names
+            loader_class_or_filename: Either a BaseCredentialLoader subclass or filename (old API)
+            field_mapping: Field mapping dict (only for old API with filename)
 
-        Example:
+        Example (new API):
+            >>> class AWSCredentialLoader(BaseCredentialLoader):
+            ...     @property
+            ...     def provider_name(self) -> str:
+            ...         return "aws"
+            ...     # ... implement other methods
+            >>>
             >>> loader = CredentialLoader()
+            >>> loader.register_provider("aws", AWSCredentialLoader)
+
+        Example (old API - backward compatible):
             >>> loader.register_provider(
             ...     "aws",
             ...     "aws.yaml",
-            ...     {"access_key": "AWS_ACCESS_KEY_ID", "secret_key": "AWS_SECRET_ACCESS_KEY"}
+            ...     {"access_key": "AWS_ACCESS_KEY_ID"}
             ... )
         """
-        self.PROVIDER_CREDENTIALS[provider_name] = {
-            "file": filename,
-            "fields": field_mapping,
-        }
+        # Handle old API (filename + field_mapping)
+        if isinstance(loader_class_or_filename, str) and field_mapping is not None:
+            # Create dynamic loader class for backward compatibility
+            filename = loader_class_or_filename
+
+            class DynamicLoader(BaseCredentialLoader):
+                @property
+                def provider_name(self) -> str:
+                    return provider_name
+
+                @property
+                def credential_file(self) -> str:
+                    return filename
+
+                @property
+                def field_mapping(self) -> dict[str, str]:
+                    return field_mapping
+
+            self.PROVIDER_LOADERS[provider_name] = DynamicLoader
+        else:
+            # New API (loader class)
+            self.PROVIDER_LOADERS[provider_name] = loader_class_or_filename
+
         if self._debug_mode:
-            logger.debug(f"Registered custom provider: {provider_name}")
+            logger.debug(f"Registered custom provider loader: {provider_name}")
 
 
 class _TemporaryCredentials:

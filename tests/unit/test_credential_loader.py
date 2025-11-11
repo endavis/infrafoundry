@@ -67,7 +67,10 @@ class TestCredentialLoader:
             "proxmox_token_secret": "secret123",
         }
 
-        with patch.object(loader, "_decrypt_sops_file", return_value=mock_data) as mock_decrypt:
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            return_value=mock_data,
+        ) as mock_decrypt:
             # Create the file so exists() check passes
             proxmox_file = secrets_dir / "proxmox.yaml"
             proxmox_file.write_text("encrypted")
@@ -91,7 +94,10 @@ class TestCredentialLoader:
             "opnsense_api_secret": "secret456",
         }
 
-        with patch.object(loader, "_decrypt_sops_file", return_value=mock_data):
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            return_value=mock_data,
+        ):
             opnsense_file = secrets_dir / "opnsense.yaml"
             opnsense_file.write_text("encrypted")
 
@@ -109,7 +115,10 @@ class TestCredentialLoader:
 
         mock_data = {"kubeconfig": "/path/to/kubeconfig"}
 
-        with patch.object(loader, "_decrypt_sops_file", return_value=mock_data):
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            return_value=mock_data,
+        ):
             k8s_file = secrets_dir / "kubernetes.yaml"
             k8s_file.write_text("encrypted")
 
@@ -135,7 +144,10 @@ class TestCredentialLoader:
                 return {"kubeconfig": "/path/to/kubeconfig"}
             return {}
 
-        with patch.object(loader, "_decrypt_sops_file", side_effect=mock_decrypt):
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            side_effect=mock_decrypt,
+        ):
             credentials = loader.load("dev")
 
             assert "PROXMOX_API_URL" in credentials
@@ -149,7 +161,10 @@ class TestCredentialLoader:
         # Only some fields present
         mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
 
-        with patch.object(loader, "_decrypt_sops_file", return_value=mock_data):
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            return_value=mock_data,
+        ):
             proxmox_file = secrets_dir / "proxmox.yaml"
             proxmox_file.write_text("encrypted")
 
@@ -161,13 +176,18 @@ class TestCredentialLoader:
 
     def test_load_unknown_provider(self, loader):
         """Test loading credentials for unknown provider."""
-        with patch("infrafoundry.core.credential_loader.logger") as mock_logger:
+        with patch("infrafoundry.core.credential_loader.credential_loader.logger") as mock_logger:
             credentials = loader.load("dev", providers=["unknown_provider"])
             assert credentials == {}
             mock_logger.warning.assert_called_once()
 
-    def test_decrypt_sops_file_success(self, loader, tmp_path):
+    def test_decrypt_sops_file_success(self, temp_config_dir, tmp_path):
         """Test successful SOPS file decryption."""
+        from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
+
+        secrets_dir = temp_config_dir / "secrets" / "dev"
+        test_loader = ProxmoxCredentialLoader(secrets_dir, debug_mode=False)
+
         test_file = tmp_path / "test.yaml"
         test_file.write_text("encrypted: data")
 
@@ -175,7 +195,7 @@ class TestCredentialLoader:
         mock_result.stdout = "decrypted_key: decrypted_value\n"
 
         with patch("subprocess.run", return_value=mock_result) as mock_run:
-            result = loader._decrypt_sops_file(test_file)
+            result = test_loader._decrypt_sops_file(test_file)
 
             assert result == {"decrypted_key": "decrypted_value"}
             mock_run.assert_called_once_with(
@@ -185,26 +205,41 @@ class TestCredentialLoader:
                 check=True,
             )
 
-    def test_decrypt_sops_file_command_failure(self, loader, tmp_path):
+    def test_decrypt_sops_file_command_failure(self, temp_config_dir, tmp_path):
         """Test SOPS decryption when command fails."""
+        from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
+
+        secrets_dir = temp_config_dir / "secrets" / "dev"
+        test_loader = ProxmoxCredentialLoader(secrets_dir, debug_mode=False)
+
         test_file = tmp_path / "test.yaml"
         test_file.write_text("encrypted: data")
 
         with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sops")):
-            result = loader._decrypt_sops_file(test_file)
+            result = test_loader._decrypt_sops_file(test_file)
             assert result == {}
 
-    def test_decrypt_sops_file_not_installed(self, loader, tmp_path):
+    def test_decrypt_sops_file_not_installed(self, temp_config_dir, tmp_path):
         """Test SOPS decryption when sops command not found."""
+        from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
+
+        secrets_dir = temp_config_dir / "secrets" / "dev"
+        test_loader = ProxmoxCredentialLoader(secrets_dir, debug_mode=False)
+
         test_file = tmp_path / "test.yaml"
         test_file.write_text("encrypted: data")
 
         with patch("subprocess.run", side_effect=FileNotFoundError):
-            result = loader._decrypt_sops_file(test_file)
+            result = test_loader._decrypt_sops_file(test_file)
             assert result == {}
 
-    def test_decrypt_sops_file_invalid_yaml(self, loader, tmp_path):
+    def test_decrypt_sops_file_invalid_yaml(self, temp_config_dir, tmp_path):
         """Test SOPS decryption when output is invalid YAML."""
+        from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
+
+        secrets_dir = temp_config_dir / "secrets" / "dev"
+        test_loader = ProxmoxCredentialLoader(secrets_dir, debug_mode=False)
+
         test_file = tmp_path / "test.yaml"
         test_file.write_text("encrypted: data")
 
@@ -212,7 +247,7 @@ class TestCredentialLoader:
         mock_result.stdout = "invalid: yaml: data:"
 
         with patch("subprocess.run", return_value=mock_result):
-            result = loader._decrypt_sops_file(test_file)
+            result = test_loader._decrypt_sops_file(test_file)
             # Should return empty dict on YAML parse error
             assert result == {}
 
@@ -259,7 +294,10 @@ class TestCredentialLoader:
 
         mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
 
-        with patch.object(loader, "_decrypt_sops_file", return_value=mock_data):
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            return_value=mock_data,
+        ):
             proxmox_file = secrets_dir / "proxmox.yaml"
             proxmox_file.write_text("encrypted")
 
@@ -275,7 +313,10 @@ class TestCredentialLoader:
 
         mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
 
-        with patch.object(loader, "_decrypt_sops_file", return_value=mock_data):
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            return_value=mock_data,
+        ):
             proxmox_file = secrets_dir / "proxmox.yaml"
             proxmox_file.write_text("encrypted")
 
@@ -296,7 +337,10 @@ class TestCredentialLoader:
 
         mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
 
-        with patch.object(loader, "_decrypt_sops_file", return_value=mock_data):
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            return_value=mock_data,
+        ):
             proxmox_file = secrets_dir / "proxmox.yaml"
             proxmox_file.write_text("encrypted")
 
@@ -315,9 +359,9 @@ class TestCredentialLoader:
             {"access_key": "AWS_ACCESS_KEY_ID", "secret_key": "AWS_SECRET_ACCESS_KEY"},
         )
 
-        assert "aws" in loader.PROVIDER_CREDENTIALS
-        assert loader.PROVIDER_CREDENTIALS["aws"]["file"] == "aws.yaml"
-        assert loader.PROVIDER_CREDENTIALS["aws"]["fields"]["access_key"] == "AWS_ACCESS_KEY_ID"
+        assert "aws" in loader.provider_credentials
+        assert loader.provider_credentials["aws"]["file"] == "aws.yaml"
+        assert loader.provider_credentials["aws"]["fields"]["access_key"] == "AWS_ACCESS_KEY_ID"
 
     def test_load_custom_provider(self, loader, temp_config_dir):
         """Test loading credentials for a custom registered provider."""
@@ -329,7 +373,10 @@ class TestCredentialLoader:
 
         mock_data = {"api_key": "secret123"}
 
-        with patch.object(loader, "_decrypt_sops_file", return_value=mock_data):
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            return_value=mock_data,
+        ):
             credentials = loader.load("dev", providers=["custom"])
             assert credentials == {"CUSTOM_API_KEY": "secret123"}
 
@@ -351,7 +398,10 @@ class TestCredentialLoader:
         proxmox_file = secrets_dir / "proxmox.yaml"
         proxmox_file.write_text("encrypted")
 
-        with patch.object(loader, "_decrypt_sops_file", side_effect=Exception("Decryption failed")):
+        with patch(
+            "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
+            side_effect=Exception("Decryption failed"),
+        ):
             credentials = loader.load("dev", providers=["proxmox"])
             # Should return empty dict, not raise exception
             assert credentials == {}
