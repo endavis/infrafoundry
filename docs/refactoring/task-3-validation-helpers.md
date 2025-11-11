@@ -20,7 +20,7 @@ A reusable validation helper class that extracts common validation patterns from
 - `validate_resource_exists()` - Validates resource references
 
 #### Features:
-- **Credential Management**: 
+- **Credential Management**:
   - Checks provider_settings first
   - Falls back to environment variables
   - Reports missing fields clearly
@@ -66,7 +66,7 @@ try:
     import requests
 except ImportError:
     # manual error reporting
-    
+
 # Manual HTTP status code checking
 if response.status_code == 200:
     # success
