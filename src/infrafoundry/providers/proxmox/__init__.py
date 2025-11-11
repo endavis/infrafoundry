@@ -5,6 +5,9 @@ from typing import Any, override
 
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import ResourceGrouperMixin, TemplateRendererMixin
+from infrafoundry.core.validation import ValidationReport
+
+from .validator import ProxmoxValidator
 
 
 class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin):
@@ -21,6 +24,20 @@ class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin)
         """Validate Proxmox configuration."""
         required_fields = ["name"]
         return all(field in config for field in required_fields)
+
+    @override
+    def validate_connectivity(self, env_config: dict[str, Any], report: ValidationReport) -> None:
+        """Validate connectivity to Proxmox API."""
+        validator = ProxmoxValidator(env_config, report)
+        validator.validate_connectivity()
+
+    @override
+    def validate_references(
+        self, resources: list[ResourceConfig], env_config: dict[str, Any], report: ValidationReport
+    ) -> None:
+        """Validate that referenced Proxmox resources exist."""
+        validator = ProxmoxValidator(env_config, report)
+        validator.validate_references(resources)
 
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
@@ -186,169 +203,3 @@ class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin)
             "template": [],
             "network": [],
         }
-
-    @override
-    def validate_connectivity(self, env_config: dict[str, Any], report: Any) -> None:
-        """Validate connectivity to Proxmox API.
-
-        Checks:
-        - API endpoint is reachable
-        - Authentication credentials are valid
-        - Can retrieve cluster status
-        """
-        from infrafoundry.core.validation_helpers import BaseProviderValidator
-
-        validator = BaseProviderValidator(
-            provider_name="proxmox",
-            env_config=env_config,
-            report=report,
-        )
-
-        # Validate credentials
-        credentials = validator.validate_credentials(
-            required_fields=["api_url", "api_token", "node"]
-        )
-        if not credentials:
-            return
-
-        # Parse Proxmox API token (format: "PVEAPIToken=USER@REALM!TOKENID=UUID")
-        api_token = credentials["api_token"]
-        if "=" in api_token:
-            # Extract token value after the =
-            token_parts = api_token.split("=", 1)
-            auth_header = f"PVEAPIToken={token_parts[1]}" if len(token_parts) == 2 else api_token
-        else:
-            auth_header = f"PVEAPIToken={api_token}"
-
-        # Test API connectivity
-        import requests
-
-        version_url = f"{credentials['api_url']}/api2/json/version"
-        response_ok = validator.check_api_connectivity(
-            url=version_url,
-            headers={"Authorization": auth_header},
-            verify_ssl=False,
-        )
-
-        # If connection succeeded, get version info
-        if response_ok:
-            try:
-                response = requests.get(
-                    version_url,
-                    headers={"Authorization": auth_header},
-                    verify=False,
-                    timeout=10,
-                )
-                if response.status_code == 200:
-                    version_data = response.json().get("data", {})
-                    version = version_data.get("version", "unknown")
-                    # Update success message with version
-                    validator.add_success_check(
-                        check_name="proxmox_version",
-                        message=f"Proxmox VE version: {version}",
-                    )
-            except Exception:
-                pass  # Version info is optional, connectivity already validated
-
-    @override
-    def validate_references(
-        self, resources: list[ResourceConfig], env_config: dict[str, Any], report: Any
-    ) -> None:
-        """Validate that referenced Proxmox resources exist.
-
-        Checks:
-        - VM templates exist on the target node
-        - Network bridges are available
-        - Storage pools exist
-        """
-        from infrafoundry.core.validation import ValidationLevel
-
-        # Get Proxmox credentials
-        provider_settings = env_config.get("provider_settings", {}).get("proxmox", {})
-        api_url = provider_settings.get("api_url")
-        api_token = provider_settings.get("api_token")
-        node = provider_settings.get("node")
-
-        if not all([api_url, api_token, node]):
-            return  # Already reported in validate_connectivity
-
-        # Group resources by type
-        vms = [r for r in resources if r.type == "vm"]
-
-        # Get list of template names referenced in VMs
-        template_refs = set()
-        for vm in vms:
-            vm_config = vm.config or {}
-            if template := vm_config.get("template"):
-                template_refs.add(template)
-
-        # Validate templates exist
-        if template_refs:
-            try:
-                import requests
-
-                # Parse token
-                if "=" in api_token:
-                    token_parts = api_token.split("=", 1)
-                    auth_header = (
-                        f"PVEAPIToken={token_parts[1]}" if len(token_parts) == 2 else api_token
-                    )
-                else:
-                    auth_header = f"PVEAPIToken={api_token}"
-
-                headers = {"Authorization": auth_header}
-
-                # Get list of VMs/templates on node
-                vms_url = f"{api_url}/api2/json/nodes/{node}/qemu"
-                response = requests.get(vms_url, headers=headers, timeout=10, verify=False)
-
-                if response.status_code == 200:
-                    vms_data = response.json().get("data", [])
-                    # Get template names (VMs with template=1)
-                    existing_templates = {vm["name"] for vm in vms_data if vm.get("template") == 1}
-
-                    # Check each referenced template
-                    for template_name in template_refs:
-                        if template_name in existing_templates:
-                            report.add_check(
-                                check_name=f"proxmox_template_{template_name}",
-                                passed=True,
-                                message=f"Template '{template_name}' exists on node {node}",
-                                level=ValidationLevel.INFO,
-                            )
-                        else:
-                            report.add_check(
-                                check_name=f"proxmox_template_{template_name}",
-                                passed=False,
-                                message=f"Template '{template_name}' not found on node {node}",
-                                level=ValidationLevel.ERROR,
-                                details={
-                                    "template": template_name,
-                                    "node": node,
-                                    "existing_templates": list(existing_templates),
-                                },
-                            )
-                else:
-                    report.add_check(
-                        check_name="proxmox_templates",
-                        passed=False,
-                        message=f"Failed to query templates: HTTP {response.status_code}",
-                        level=ValidationLevel.WARNING,
-                    )
-
-            except Exception as e:
-                report.add_check(
-                    check_name="proxmox_templates",
-                    passed=False,
-                    message=f"Error validating templates: {e}",
-                    level=ValidationLevel.WARNING,
-                )
-
-        # If all checks passed, add success message
-        if not report.has_errors() and template_refs:
-            report.add_check(
-                check_name="proxmox_references",
-                passed=True,
-                message=f"All Proxmox resource references valid ({len(template_refs)} templates)",
-                level=ValidationLevel.INFO,
-            )
