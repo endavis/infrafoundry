@@ -8,10 +8,15 @@ terraform {
 }
 
 provider "proxmox" {
-  # Credentials are read from environment variables:
+  # API credentials are read from environment variables:
   # - PROXMOX_VE_ENDPOINT
   # - PROXMOX_VE_API_TOKEN
   # - PROXMOX_VE_INSECURE (optional, defaults to false)
 
-  # All configuration via environment variables - no explicit values needed
+  # SSH connection for operations requiring host access
+  # (e.g., template creation, disk import)
+  ssh {
+    agent = true
+    username = var.proxmox_ssh_user
+  }
 }

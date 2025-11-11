@@ -2,69 +2,53 @@
 # Template: {{ template.config.name }}
 {% if template.config.download_image is defined %}
 # Download image and create template from scratch using Proxmox API
-# Step 1: Download image to Proxmox storage using Terraform provider
-resource "proxmox_virtual_environment_download_file" "image_{{ template.config.name | replace('-', '_') }}" {
-  node_name    = "{{ template.config.target_node }}"
-  content_type = "iso"
-  datastore_id = "local"
-  file_name    = "{{ template.config.download_image.filename }}"
-  url          = "{{ template.config.download_image.url }}"
-
-  {% if template.config.download_image.checksum is defined %}
-  checksum           = "{{ template.config.download_image.checksum }}"
-  checksum_algorithm = "{{ template.config.download_image.checksum_algorithm | default('sha256') }}"
-  {% endif %}
-
-  overwrite = false
-}
-
-{% if template.config.download_image.extract is defined and template.config.download_image.extract %}
-# Step 1b: Extract compressed file
-# Note: Proxmox provider doesn't support automatic decompression yet
-resource "null_resource" "extract_image_{{ template.config.name | replace('-', '_') }}" {
-  depends_on = [proxmox_virtual_environment_download_file.image_{{ template.config.name | replace('-', '_') }}]
-
+# Step 1: Download image to Proxmox storage via SSH
+# Note: Proxmox download_file provider only accepts ISOs, not disk images
+resource "null_resource" "download_image_{{ template.config.name | replace('-', '_') }}" {
   provisioner "local-exec" {
     command = <<-EOT
-      # Extract the file via SSH
-      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ template.config.target_node }} "cd /var/lib/vz/template/iso && \
-        {% if template.config.download_image.filename.endswith('.xz') %}
-        [ ! -f {{ template.config.download_image.filename | replace('.xz', '') }} ] && xz -d {{ template.config.download_image.filename }} || true
-        {% elif template.config.download_image.filename.endswith('.gz') %}
-        [ ! -f {{ template.config.download_image.filename | replace('.gz', '') }} ] && gunzip {{ template.config.download_image.filename }} || true
-        {% endif %}"
+      # Download and extract image via SSH in one operation
+      {% if template.config.download_image.extract is defined and template.config.download_image.extract %}
+      {% if template.config.download_image.filename.endswith('.xz') %}
+      {% set image_file = template.config.download_image.filename | replace('.xz', '') %}
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "cd /var/lib/vz/template/iso && \
+        ([ -f {{ image_file }} ] || (wget -O {{ template.config.download_image.filename }} {{ template.config.download_image.url }} && xz -d {{ template.config.download_image.filename }}))"
+      {% elif template.config.download_image.filename.endswith('.gz') %}
+      {% set image_file = template.config.download_image.filename | replace('.gz', '') %}
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "cd /var/lib/vz/template/iso && \
+        ([ -f {{ image_file }} ] || (wget -O {{ template.config.download_image.filename }} {{ template.config.download_image.url }} && gunzip {{ template.config.download_image.filename }}))"
+      {% endif %}
+      {% else %}
+      # Download without extraction
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "cd /var/lib/vz/template/iso && \
+        [ -f {{ template.config.download_image.filename }} ] || wget -O {{ template.config.download_image.filename }} {{ template.config.download_image.url }}"
+      {% endif %}
     EOT
   }
 
   triggers = {
-    file_id = proxmox_virtual_environment_download_file.image_{{ template.config.name | replace('-', '_') }}.id
+    url = "{{ template.config.download_image.url }}"
+    filename = "{{ template.config.download_image.filename }}"
   }
 }
-{% endif %}
 
-# Step 2: Create VM using Proxmox API
+# Step 2: Create VM using qm command via SSH
 resource "null_resource" "create_vm_{{ template.config.name | replace('-', '_') }}" {
-  depends_on = [
-    proxmox_virtual_environment_download_file.image_{{ template.config.name | replace('-', '_') }}
-    {% if template.config.download_image.extract is defined and template.config.download_image.extract %}
-    , null_resource.extract_image_{{ template.config.name | replace('-', '_') }}
-    {% endif %}
-  ]
+  depends_on = [null_resource.download_image_{{ template.config.name | replace('-', '_') }}]
 
   provisioner "local-exec" {
     command = <<-EOT
-      # Create VM via API
-      curl -k -X POST \
-        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
-        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu" \
-        -d "vmid={{ template.config.vmid }}" \
-        -d "name={{ template.config.name }}" \
-        -d "memory={{ template.config.memory | default(2048) }}" \
-        -d "cores={{ template.config.cores | default(2) }}" \
-        -d "net0=virtio,bridge={{ template.config.network.bridge | default('vmbr0') }}{% if template.config.network.tag is defined %},tag={{ template.config.network.tag }}{% endif %}" \
-        -d "ide2=local:cloudinit" \
-        -d "boot=order=scsi0" \
-        -d "agent=1"
+      # Create VM using qm command
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "qm create {{ template.config.vmid }} \
+        --name {{ template.config.name }} \
+        --memory {{ template.config.memory | default(2048) }} \
+        --cores {{ template.config.cores | default(2) }} \
+        {% if template.config.bios is defined %}--bios {{ template.config.bios }} \
+        {% endif %}{% if template.config.machine is defined %}--machine {{ template.config.machine }} \
+        {% endif %}--scsihw virtio-scsi-pci \
+        --net0 virtio,bridge={{ template.config.network.bridge | default('vmbr0') }}{% if template.config.network.tag is defined %},tag={{ template.config.network.tag }}{% endif %} \
+        --boot order=scsi0 \
+        --agent 1"
     EOT
   }
 
@@ -74,55 +58,42 @@ resource "null_resource" "create_vm_{{ template.config.name | replace('-', '_') 
   }
 }
 
-# Step 3: Import disk and configure cloud-init
+# Step 3: Import disk and configure cloud-init using qm commands
 resource "null_resource" "configure_vm_{{ template.config.name | replace('-', '_') }}" {
   depends_on = [null_resource.create_vm_{{ template.config.name | replace('-', '_') }}]
 
   provisioner "local-exec" {
     command = <<-EOT
-      # Import disk using Proxmox disk import API
-      # Note: qm importdisk is a CLI wrapper - the underlying operation can be done via API
-      # but it's complex and requires multiple steps. For now, we minimize SSH usage.
       {% if template.config.download_image.extract is defined and template.config.download_image.extract %}
       {% set image_file = template.config.download_image.filename | replace('.xz', '') | replace('.gz', '') %}
       {% else %}
       {% set image_file = template.config.download_image.filename %}
       {% endif %}
 
-      # Import disk - this is one operation that Proxmox requires CLI for
-      # The API doesn't expose a direct importdisk endpoint
-      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ template.config.target_node }} "qm importdisk {{ template.config.vmid }} /var/lib/vz/template/iso/{{ image_file }} {{ template.config.disk.storage | default('local-lvm') }}"
+      # Import disk and configure VM using qm commands
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "
+        # Import disk
+        qm importdisk {{ template.config.vmid }} /var/lib/vz/template/iso/{{ image_file }} {{ template.config.disk.storage | default('local-lvm') }}
 
-      # All subsequent operations use API only
-      sleep 2
+        # Attach disk
+        qm set {{ template.config.vmid }} --scsi0 {{ template.config.disk.storage | default('local-lvm') }}:vm-{{ template.config.vmid }}-disk-0
 
-      # Attach disk via API
-      curl -k -X PUT \
-        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
-        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/config" \
-        -d "scsi0={{ template.config.disk.storage | default('local-lvm') }}:vm-{{ template.config.vmid }}-disk-0"
+        {% if template.config.efi_disk is defined %}
+        # Add EFI disk for UEFI boot
+        qm set {{ template.config.vmid }} --efidisk0 {{ template.config.efi_disk.storage | default(template.config.disk.storage) | default('local-lvm') }}:1,format=raw,efitype={{ template.config.efi_disk.type | default('4m') }},pre-enrolled-keys=0
+        {% endif %}
 
-      {% if template.config.cloud_init is defined and template.config.cloud_init %}
-      # Configure cloud-init via API
-      {% if template.config.ciuser is defined %}
-      curl -k -X PUT \
-        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
-        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/config" \
-        -d "ciuser={{ template.config.ciuser }}"
-      {% endif %}
-
-      {% if template.config.sshkeys is defined %}
-      curl -k -X PUT \
-        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
-        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/config" \
-        --data-urlencode "sshkeys={{ template.config.sshkeys }}"
-      {% endif %}
-
-      curl -k -X PUT \
-        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
-        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/config" \
-        -d "ipconfig0=ip=dhcp"
-      {% endif %}
+        {% if template.config.cloud_init is defined and template.config.cloud_init %}
+        # Configure cloud-init
+        {% if template.config.ciuser is defined %}
+        qm set {{ template.config.vmid }} --ciuser {{ template.config.ciuser }}
+        {% endif %}
+        {% if template.config.sshkeys is defined %}
+        qm set {{ template.config.vmid }} --sshkeys \"{{ template.config.sshkeys | replace(' ', '%20') }}\"
+        {% endif %}
+        qm set {{ template.config.vmid }} --ipconfig0 ip=dhcp
+        {% endif %}
+      "
     EOT
   }
 
@@ -131,18 +102,14 @@ resource "null_resource" "configure_vm_{{ template.config.name | replace('-', '_
   }
 }
 
-# Step 4: Convert VM to template using Proxmox API
+# Step 4: Convert VM to template using qm command
 resource "null_resource" "convert_to_template_{{ template.config.name | replace('-', '_') }}" {
   depends_on = [null_resource.configure_vm_{{ template.config.name | replace('-', '_') }}]
 
   provisioner "local-exec" {
     command = <<-EOT
-      # Wait for VM to be fully configured
-      sleep 5
-      # Convert to template via API
-      curl -k -X POST \
-        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
-        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/{{ template.config.vmid }}/template"
+      # Convert to template
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "qm template {{ template.config.vmid }}"
     EOT
   }
 

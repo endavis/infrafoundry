@@ -1,4 +1,104 @@
 {% for vm in vms %}
+{% if vm.config.cloud_init_users is defined %}
+# Cloud-init user-data file for multiple users
+resource "proxmox_virtual_environment_file" "cloud_init_user_data_{{ vm.name | replace('-', '_') }}" {
+  content_type = "snippets"
+  datastore_id = "{{ vm.config.cloud_init_snippets_storage | default('nas01') }}"
+  node_name    = "{{ vm.config.target_node }}"
+
+  source_raw {
+    data = <<-EOF
+      #cloud-config
+      {% if vm.config.cloud_init_hostname is defined %}
+      hostname: {{ vm.config.cloud_init_hostname }}
+      fqdn: {{ vm.config.cloud_init_hostname }}
+      {% endif %}
+      users:
+      {% for user in vm.config.cloud_init_users %}
+        - name: {{ user.name }}
+          {% if user.groups is defined %}
+          groups: {{ user.groups | join(',') }}
+          {% endif %}
+          {% if user.sudo is defined %}
+          sudo: {{ user.sudo }}
+          {% endif %}
+          {% if user.shell is defined %}
+          shell: {{ user.shell }}
+          {% endif %}
+          {% if user.ssh_authorized_keys is defined %}
+          ssh_authorized_keys:
+          {% for key in user.ssh_authorized_keys %}
+            - {{ key }}
+          {% endfor %}
+          {% endif %}
+          {% if user.lock_passwd is defined %}
+          lock_passwd: {{ user.lock_passwd | lower }}
+          {% endif %}
+      {% endfor %}
+      {% if vm.config.cloud_init_packages is defined %}
+      packages:
+      {% for package in vm.config.cloud_init_packages %}
+        - {{ package }}
+      {% endfor %}
+      {% endif %}
+      {% if vm.config.cloud_init_runcmd is defined %}
+      runcmd:
+      {% for cmd in vm.config.cloud_init_runcmd %}
+        - {{ cmd }}
+      {% endfor %}
+      {% endif %}
+      {% if vm.config.cloud_init_network is defined %}
+      # Network configuration from snippet
+      network:
+        version: {{ vm.config.cloud_init_network.version }}
+        ethernets:
+      {% for iface_name, iface_config in vm.config.cloud_init_network.ethernets.items() %}
+          {{ iface_name }}:
+        {% if iface_config.match is defined %}
+            match:
+          {% for match_key, match_value in iface_config.match.items() %}
+              {{ match_key }}: {{ match_value }}
+          {% endfor %}
+        {% endif %}
+        {% if iface_config.dhcp4 is defined %}
+            dhcp4: {{ iface_config.dhcp4 | lower }}
+        {% endif %}
+        {% if iface_config.dhcp6 is defined %}
+            dhcp6: {{ iface_config.dhcp6 | lower }}
+        {% endif %}
+        {% if iface_config.addresses is defined %}
+            addresses:
+          {% for addr in iface_config.addresses %}
+              - {{ addr }}
+          {% endfor %}
+        {% endif %}
+        {% if iface_config.gateway4 is defined %}
+            gateway4: {{ iface_config.gateway4 }}
+        {% endif %}
+        {% if iface_config.nameservers is defined %}
+            nameservers:
+              addresses:
+          {% for ns in iface_config.nameservers.addresses %}
+                - {{ ns }}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      {% else %}
+      # Default DHCP network configuration
+      network:
+        version: 2
+        ethernets:
+          ens18:
+            dhcp4: true
+            dhcp6: false
+      {% endif %}
+    EOF
+
+    file_name = "cloud-init-user-data-{{ vm.name }}.yml"
+  }
+}
+{% endif %}
+
 resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_') }}" {
   name        = "{{ vm.config.name }}"
   node_name   = "{{ vm.config.target_node }}"
@@ -14,6 +114,16 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
     full = {{ vm.config.full_clone | lower }}
     {% endif %}
   }
+  {% endif %}
+
+  {% if vm.config.bios is defined %}
+  # BIOS Configuration (seabios or ovmf for UEFI)
+  bios = "{{ vm.config.bios }}"
+  {% endif %}
+
+  {% if vm.config.machine is defined %}
+  # Machine type
+  machine = "{{ vm.config.machine }}"
   {% endif %}
 
   # CPU Configuration
@@ -34,12 +144,22 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   }
   {% endif %}
 
-  {% if vm.config.disk is defined %}
-  # Disk Configuration
+  {% if vm.config.disk is defined and vm.config.clone is not defined %}
+  # Disk Configuration (only for new VMs, not clones)
   disk {
     datastore_id = "{{ vm.config.disk.storage | default('local-lvm') }}"
     size         = {{ vm.config.disk.size | default('32') | replace('G', '') }}
     interface    = "{{ 'scsi0' if vm.config.disk.type == 'scsi' else 'virtio0' }}"
+  }
+  {% endif %}
+
+  {% if vm.config.efi_disk is defined and vm.config.clone is not defined %}
+  # EFI Disk for UEFI boot (only for new VMs, not clones)
+  efi_disk {
+    datastore_id = "{{ vm.config.efi_disk.storage | default(vm.config.disk.storage if vm.config.disk is defined else 'local-lvm') }}"
+    {% if vm.config.efi_disk.type is defined %}
+    type = "{{ vm.config.efi_disk.type }}"
+    {% endif %}
   }
   {% endif %}
 
@@ -56,12 +176,13 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   }
   {% endif %}
 
-  {% if vm.config.ipconfig is defined or vm.config.ssh_user is defined or vm.config.ssh_keys is defined %}
+  {% if vm.config.ipconfig is defined or vm.config.ssh_user is defined or vm.config.ssh_keys is defined or vm.config.cloud_init_users is defined %}
   # Cloud-init Configuration
   initialization {
-    datastore_id = "{{ vm.config.cloud_init_datastore | default(vm.config.disk.storage) | default('local-lvm') }}"
+    datastore_id = "{{ vm.config.cloud_init_datastore | default((vm.config.disk.storage if vm.config.disk is defined else 'local-lvm')) }}"
 
-    {% if vm.config.ipconfig is defined %}
+    {% if vm.config.cloud_init_users is not defined and vm.config.ipconfig is defined %}
+    # Network configuration via ip_config (only when NOT using custom user-data)
     ip_config {
       {% if 'dhcp' in vm.config.ipconfig %}
       ipv4 {
@@ -90,6 +211,22 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
       {% endif %}
       {% if vm.config.ssh_password is defined %}
       password = "{{ vm.config.ssh_password }}"
+      {% endif %}
+    }
+    {% endif %}
+
+    {% if vm.config.cloud_init_users is defined %}
+    # Advanced cloud-init user-data for multiple users via custom snippet
+    user_data_file_id = proxmox_virtual_environment_file.cloud_init_user_data_{{ vm.name | replace('-', '_') }}.id
+    {% endif %}
+
+    {% if vm.config.ipconfig is defined and vm.config.cloud_init_users is defined %}
+    # IP configuration alongside custom user-data
+    ip_config {
+      {% if 'dhcp' in vm.config.ipconfig %}
+      ipv4 {
+        address = "dhcp"
+      }
       {% endif %}
     }
     {% endif %}
