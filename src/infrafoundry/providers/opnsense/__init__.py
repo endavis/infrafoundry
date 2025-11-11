@@ -1,15 +1,14 @@
 """OPNsense provider for InfraFoundry."""
 
 import base64
-import os
 from pathlib import Path
 from typing import Any, override
 
-import requests
-
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import ResourceGrouperMixin, TemplateRendererMixin
-from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.core.validation import ValidationReport
+
+from .validator import OPNsenseValidator
 
 
 class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin):
@@ -156,155 +155,14 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
 
     @override
     def validate_connectivity(self, env_config: dict[str, Any], report: ValidationReport) -> None:
-        """Validate connectivity to OPNsense API.
-
-        Args:
-            env_config: Environment configuration with provider_settings
-            report: ValidationReport to add results to
-        """
-        provider_settings = env_config.get("provider_settings", {}).get("opnsense", {})
-        api_url = provider_settings.get("api_url") or os.getenv("OPNSENSE_API_URL")
-        api_key = provider_settings.get("api_key") or os.getenv("OPNSENSE_API_KEY")
-        api_secret = provider_settings.get("api_secret") or os.getenv("OPNSENSE_API_SECRET")
-
-        # Check if credentials are configured
-        if not all([api_url, api_key, api_secret]):
-            report.add_check(
-                check_name="opnsense_credentials",
-                passed=False,
-                message=(
-                    "OPNsense credentials not configured (api_url, api_key, api_secret required)"
-                ),
-                level=ValidationLevel.ERROR,
-            )
-            return
-
-        # Test API connectivity
-        try:
-            response = requests.get(
-                f"{api_url}/api/core/system/status",
-                auth=(api_key, api_secret),
-                verify=False,  # OPNsense often uses self-signed certs
-                timeout=10,
-            )
-            if response.status_code == 200:
-                report.add_check(
-                    check_name="opnsense_connectivity",
-                    passed=True,
-                    message=f"Successfully connected to OPNsense at {api_url}",
-                    level=ValidationLevel.INFO,
-                )
-            elif response.status_code == 401:
-                report.add_check(
-                    check_name="opnsense_connectivity",
-                    passed=False,
-                    message="OPNsense API credentials invalid (401 Unauthorized)",
-                    level=ValidationLevel.ERROR,
-                )
-            else:
-                report.add_check(
-                    check_name="opnsense_connectivity",
-                    passed=False,
-                    message=f"OPNsense API returned status {response.status_code}",
-                    level=ValidationLevel.WARNING,
-                )
-        except requests.exceptions.ConnectionError:
-            report.add_check(
-                check_name="opnsense_connectivity",
-                passed=False,
-                message=f"Cannot connect to OPNsense at {api_url} (connection refused)",
-                level=ValidationLevel.ERROR,
-            )
-        except requests.exceptions.Timeout:
-            report.add_check(
-                check_name="opnsense_connectivity",
-                passed=False,
-                message=f"Connection to OPNsense at {api_url} timed out",
-                level=ValidationLevel.ERROR,
-            )
-        except Exception as e:
-            report.add_check(
-                check_name="opnsense_connectivity",
-                passed=False,
-                message=f"Error connecting to OPNsense: {e}",
-                level=ValidationLevel.ERROR,
-            )
+        """Validate connectivity to OPNsense API."""
+        validator = OPNsenseValidator(env_config, report)
+        validator.validate_connectivity()
 
     @override
     def validate_references(
         self, resources: list[ResourceConfig], env_config: dict[str, Any], report: ValidationReport
     ) -> None:
-        """Validate that referenced OPNsense resources exist.
-
-        Checks that aliases referenced in firewall rules actually exist, etc.
-
-        Args:
-            resources: Resources to validate
-            env_config: Environment configuration
-            report: ValidationReport to add results to
-        """
-        # Group resources by type
-        aliases = [r for r in resources if r.type == "aliases"]
-        vlans = [r for r in resources if r.type == "vlans"]
-        firewall_rules = [r for r in resources if r.type == "firewall_rules"]
-
-        alias_names = {a.name for a in aliases}
-        vlan_names = {v.name for v in vlans}
-
-        # Check firewall rules reference valid aliases
-        for rule in firewall_rules:
-            rule_config = rule.config
-            source_alias = rule_config.get("source", {}).get("alias")
-            dest_alias = rule_config.get("destination", {}).get("alias")
-
-            if source_alias and source_alias not in alias_names:
-                report.add_check(
-                    check_name=f"firewall_rule_{rule.name}_source_alias",
-                    passed=False,
-                    message=(
-                        f"Firewall rule '{rule.name}' references "
-                        f"undefined source alias '{source_alias}'"
-                    ),
-                    level=ValidationLevel.ERROR,
-                    details={"rule": rule.name, "missing_alias": source_alias},
-                )
-
-            if dest_alias and dest_alias not in alias_names:
-                report.add_check(
-                    check_name=f"firewall_rule_{rule.name}_dest_alias",
-                    passed=False,
-                    message=(
-                        f"Firewall rule '{rule.name}' references "
-                        f"undefined destination alias '{dest_alias}'"
-                    ),
-                    level=ValidationLevel.ERROR,
-                    details={"rule": rule.name, "missing_alias": dest_alias},
-                )
-
-        # Check DHCP static maps reference valid VLANs
-        dhcp_maps = [r for r in resources if r.type == "dhcp_static_maps"]
-        for dhcp_map in dhcp_maps:
-            interface = dhcp_map.config.get("interface")
-            if interface and interface not in vlan_names:
-                report.add_check(
-                    check_name=f"dhcp_static_map_{dhcp_map.name}_interface",
-                    passed=False,
-                    message=(
-                        f"DHCP static map '{dhcp_map.name}' references undefined VLAN '{interface}'"
-                    ),
-                    level=ValidationLevel.WARNING,
-                    details={"dhcp_map": dhcp_map.name, "missing_vlan": interface},
-                )
-
-        # If all checks passed, add a success message
-        if not report.has_errors():
-            report.add_check(
-                check_name="opnsense_references",
-                passed=True,
-                message=(
-                    f"All OPNsense resource references valid "
-                    f"({len(firewall_rules)} rules, {len(aliases)} aliases, "
-                    f"{len(vlans)} VLANs)"
-                ),
-                level=ValidationLevel.INFO,
-            )
+        """Validate that referenced OPNsense resources exist."""
+        validator = OPNsenseValidator(env_config, report)
+        validator.validate_references(resources)
