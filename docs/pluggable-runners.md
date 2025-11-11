@@ -284,19 +284,18 @@ Potential runners to add:
 - **Salt** - Configuration management
 - **CloudFormation** - AWS native IaC
 
-## Migration from Old System
+## Usage
 
-Old code:
+Import runners from the runners package:
+
 ```python
-from infrafoundry.core.terraform_runner import TerraformRunner
+from infrafoundry.core.runners import TerraformRunner, AnsibleRunner
 
-runner = TerraformRunner(secret_manager, console)
-```
+# Direct instantiation
+terraform = TerraformRunner(secret_manager, console)
+ansible = AnsibleRunner(console)
 
-New code (backward compatible):
-```python
-from infrafoundry.core.runners import TerraformRunner
-# Or use registry:
+# Or use registry for dynamic loading
 from infrafoundry.core.runners import create_runner
 
 runner = create_runner("terraform", 
@@ -311,4 +310,3 @@ runner = create_runner("terraform",
 ✅ **Consistent** - All runners follow same interface
 ✅ **Testable** - Easy to mock and test runners
 ✅ **Discoverable** - Registry shows all available tools
-✅ **Backward Compatible** - Old imports still work

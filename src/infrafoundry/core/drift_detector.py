@@ -1,4 +1,4 @@
-"""Infrastructure drift detection."""
+"""Drift detection for infrastructure resources."""
 
 from typing import Any
 
@@ -7,7 +7,7 @@ from rich.console import Console
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.provider import ProviderBase
-from infrafoundry.core.terraform_runner import TerraformRunner
+from infrafoundry.core.runners import TerraformRunner
 
 
 class DriftDetector:

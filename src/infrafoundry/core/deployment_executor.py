@@ -6,11 +6,10 @@ from typing import Any
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from infrafoundry.core.ansible_runner import AnsibleRunner
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
 from infrafoundry.core.state import ResourceState, StateManager
-from infrafoundry.core.terraform_runner import TerraformRunner
 
 
 class DeploymentExecutor:
