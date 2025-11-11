@@ -56,47 +56,47 @@ All major workflows (`plan`, `apply`, `destroy`) follow this pattern:
 def workflow(self, env_name, **kwargs):
     # 1. Create deployment record
     deployment_id = self.state_manager.create_deployment(...)
-    
+
     # 2. Emit before event
     self.event_manager.emit_event(EventType.BEFORE_*, ...)
-    
+
     try:
         # 3. Load and validate resources
         resources = self.config_manager.get_all_resources_all_providers(env_name)
         self.validate_resources(resources)
-        
+
         # 4. Check policies (optional)
         if self.policy_engine.policies:
             self.check_policies(env_name, resources)
-        
+
         # 5. Group resources by provider
         resources_by_provider = {...}
-        
+
         # 6. For each provider:
         for provider_name, provider_resources in resources_by_provider.items():
             provider = self.providers[provider_name]
-            
+
             # 7. Track resources in state
             for resource in provider_resources:
                 self.state_manager.track_resource(...)
-            
+
             # 8. Generate configs
             provider.set_environment(env_name)
             provider.generate_terraform(provider_resources)
             provider.generate_ansible(provider_resources)
-            
+
             # 9. Export secrets
             self.secret_manager.export_for_terraform(...)
-            
+
             # 10. Execute (delegate to DeploymentExecutor/runners)
             self.deployment_executor.execute(...)
-        
+
         # 11. Update deployment status
         self.state_manager.update_deployment_status(...)
-        
+
         # 12. Emit after event
         self.event_manager.emit_event(EventType.AFTER_*, ...)
-        
+
     except Exception as e:
         # Handle failure
         self.state_manager.update_deployment_status(..., FAILED)
@@ -200,8 +200,8 @@ def _finalize_workflow(self, deployment_id, env_name, results):
     self.event_manager.emit_event(...)
 ```
 
-**Impact:** Save ~30-40 lines by reducing duplication  
-**Risk:** Low - simple refactoring  
+**Impact:** Save ~30-40 lines by reducing duplication
+**Risk:** Low - simple refactoring
 **Benefit:** Minimal - workflows are already clear
 
 ### 2. Strategy Pattern for Workflows (Medium Priority)
@@ -215,8 +215,8 @@ class PlanWorkflow(WorkflowStrategy): ...
 class ApplyWorkflow(WorkflowStrategy): ...
 ```
 
-**Impact:** Enable new workflow types without modifying Orchestrator  
-**Risk:** Medium - significant abstraction  
+**Impact:** Enable new workflow types without modifying Orchestrator
+**Risk:** Medium - significant abstraction
 **Benefit:** High if we need 5+ workflow types, Low otherwise
 
 ### 3. Resource Loading Helper (Low Priority)
@@ -229,13 +229,13 @@ class ResourceLoader:
         return grouped
 ```
 
-**Impact:** Save ~20 lines per workflow  
-**Risk:** Low - simple extraction  
+**Impact:** Save ~20 lines per workflow
+**Risk:** Low - simple extraction
 **Benefit:** Minimal - current code is already clear
 
 ## Conclusion
 
-**The Orchestrator is well-designed as-is.** 
+**The Orchestrator is well-designed as-is.**
 
 It's large (827 lines) but:
 - ✅ Follows clear patterns

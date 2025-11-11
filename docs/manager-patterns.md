@@ -57,21 +57,21 @@ All managers follow this initialization order:
 class MyManager(BaseManager):  # or PathBasedManager
     def __init__(self, param: Type):
         """Initialize manager.
-        
+
         Args:
             param: Description
         """
         # 1. ALWAYS call super().__init__() FIRST
         super().__init__()
-        
+
         # 2. Set instance variables
         self.param = param
         self.state = {}
-        
+
         # 3. Perform initialization/validation
         self._validate_config()
         self._load_data()
-        
+
         # 4. Log completion
         self._log_debug("MyManager initialized successfully")
 ```
@@ -134,13 +134,13 @@ Managers follow this standard error handling pattern:
 ```python
 def load_config(self, path: Path) -> dict:
     """Load configuration from file.
-    
+
     Args:
         path: Path to config file
-        
+
     Returns:
         Configuration dictionary
-        
+
     Raises:
         FileNotFoundError: If config file doesn't exist
         yaml.YAMLError: If config file is invalid
@@ -150,7 +150,7 @@ def load_config(self, path: Path) -> dict:
         error_msg = f"Config file not found: {path}"
         self._log_error(error_msg)
         raise FileNotFoundError(error_msg)
-    
+
     # Try operation with error handling
     try:
         with open(path) as f:
@@ -176,14 +176,14 @@ All managers must implement the `cleanup()` method:
 ```python
 def cleanup(self) -> None:
     """Cleanup resources (required by BaseManager).
-    
+
     [Describe what needs cleanup, or explicitly state if none needed]
     """
     # Close connections, release locks, etc.
     if hasattr(self, "engine"):
         self._log_debug("Disposing database engine")
         self.engine.dispose()
-    
+
     self._log_debug("MyManager cleanup complete")
 ```
 
@@ -201,7 +201,7 @@ def cleanup(self) -> None:
 ```python
 def cleanup(self) -> None:
     """Cleanup database resources (required by BaseManager).
-    
+
     Closes database engine and releases connections.
     """
     if hasattr(self, "engine"):
@@ -214,7 +214,7 @@ def cleanup(self) -> None:
 ```python
 def cleanup(self) -> None:
     """Cleanup resources (required by BaseManager).
-    
+
     No cleanup needed for ConfigManager as it doesn't maintain
     persistent connections or state.
     """
@@ -256,7 +256,7 @@ class Orchestrator:
     def __init__(self):
         self.config = ConfigManager()  # Long-lived
         self.state = StateManager()    # Long-lived
-        
+
     def cleanup(self):
         """Orchestrator cleanup calls manager cleanup."""
         self.config.cleanup()
@@ -272,7 +272,7 @@ class Orchestrator:
 ```python
 def __init__(self, base_dir: Path | None = None):
     super().__init__()
-    
+
     # Resolve path with fallback chain:
     # 1. Explicit path parameter
     # 2. Environment variable
@@ -322,24 +322,24 @@ from infrafoundry.core.base_manager import PathBasedManager
 
 class MyManager(PathBasedManager):
     """Manages my resources with consistent patterns.
-    
+
     This manager demonstrates all standard patterns:
     - Proper initialization
     - Consistent logging
     - Error handling
     - Resource cleanup
     """
-    
+
     def __init__(self, config_dir: Path | None = None):
         """Initialize manager.
-        
+
         Args:
             config_dir: Configuration directory
                 (defaults to INFRAFOUNDRY_MY_CONFIG or ./my_config)
         """
         # 1. Initialize base manager
         super().__init__()
-        
+
         # 2. Resolve paths
         self.config_dir = self._resolve_path(
             path=config_dir,
@@ -347,24 +347,24 @@ class MyManager(PathBasedManager):
             default="my_config",
             create=True
         )
-        
+
         # 3. Initialize state
         self.data: dict[str, Any] = {}
-        
+
         # 4. Load configuration
         self._load_config()
-        
+
         # 5. Log completion
         self._log_debug(f"MyManager initialized with config_dir: {self.config_dir}")
-    
+
     def _load_config(self) -> None:
         """Load configuration from file."""
         config_file = self.config_dir / "config.yaml"
-        
+
         if not config_file.exists():
             self._log_warning(f"Config file not found: {config_file}, using defaults")
             return
-        
+
         try:
             self._log_debug(f"Loading config from: {config_file}")
             with open(config_file) as f:
@@ -374,16 +374,16 @@ class MyManager(PathBasedManager):
             error_msg = "Invalid YAML in config file"
             self._log_error(error_msg, exception=e)
             raise
-    
+
     def get_value(self, key: str) -> Any:
         """Get configuration value.
-        
+
         Args:
             key: Configuration key
-            
+
         Returns:
             Configuration value
-            
+
         Raises:
             KeyError: If key not found
         """
@@ -391,12 +391,12 @@ class MyManager(PathBasedManager):
             error_msg = f"Configuration key not found: {key}"
             self._log_error(error_msg)
             raise KeyError(error_msg)
-        
+
         return self.data[key]
-    
+
     def cleanup(self) -> None:
         """Cleanup resources (required by BaseManager).
-        
+
         No cleanup needed for MyManager as it doesn't maintain
         persistent connections or resources.
         """

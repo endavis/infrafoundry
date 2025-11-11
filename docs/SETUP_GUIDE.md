@@ -81,20 +81,55 @@ mkdir -p envs/$ENV_NAME/proxmox
 mkdir -p envs/$ENV_NAME/opnsense
 ```
 
-### Step 4: Configure Environment Settings
+### Step 4: Configure Environment Settings and Credentials
 
-Create `envs/$ENV_NAME/settings.yaml`:
+Create `envs/$ENV_NAME/settings.yaml` with **all** configuration including credentials:
 
 ```yaml
 name: homelab
 description: Home lab environment
 
+# Providers to enable
+providers:
+  - proxmox
+  - opnsense
+
+# Environment variables
 variables:
   environment: homelab
   domain: homelab.local
   network_cidr: 192.168.1.0/24
   gateway_ip: 192.168.1.1
+
+# Global SSH configuration (applies to all providers)
+ssh:
+  user: root
+  port: 22
+  # key_path: /home/user/.ssh/id_ed25519  # Optional
+
+# Provider-specific settings (credentials, endpoints, defaults)
+provider_settings:
+  proxmox:
+    # API credentials
+    api_url: https://192.168.1.100:8006/api2/json
+    api_token_id: root@pam!terraform
+    api_token_secret: your-secret-token-here
+
+    # Default settings
+    node: pve01
+    storage: local-lvm
+
+  opnsense:
+    # API credentials
+    api_url: https://192.168.1.1
+    api_key: your-api-key-here
+    api_secret: your-api-secret-here
 ```
+
+**IMPORTANT**: This file contains credentials. Keep it secure:
+- Add to `.gitignore` if not using SOPS encryption
+- Or encrypt it with SOPS (see encryption section below)
+- Never commit unencrypted credentials to git
 
 ### Step 5: Configure Proxmox Resources
 
@@ -169,7 +204,11 @@ firewall_rules:
 
 **Note**: For now, you can leave this file mostly empty until you're ready to manage firewall rules.
 
-### Step 7: Store Credentials Securely
+### Step 7: (Optional) Encrypt Settings with SOPS
+
+**Note**: SOPS encryption of `settings.yaml` is currently **in documentation only**. The code does not yet support automatic decryption of encrypted `settings.yaml` files. For now, keep `settings.yaml` unencrypted and secured via file permissions and `.gitignore`.
+
+If you want to encrypt credentials separately, use the traditional `secrets/` directory approach:
 
 Create `secrets/credentials.yaml`:
 
@@ -185,17 +224,31 @@ opnsense_api_key: your-api-key-here
 opnsense_api_secret: your-api-secret-here
 ```
 
-**IMPORTANT**: Encrypt this file immediately:
+**Encrypt it**:
 
 ```bash
 # Initialize age encryption (first time only)
 infra secrets init
 
+# Create .sops.yaml configuration
+cat > .sops.yaml << EOF
+creation_rules:
+  - path_regex: secrets/.*\.yaml$
+    age: $(age-keygen -y secrets/age.key)
+EOF
+
 # Encrypt the credentials file
-infra secrets encrypt secrets/credentials.yaml
+sops --encrypt --in-place secrets/credentials.yaml
 
 # Verify it's encrypted
 cat secrets/credentials.yaml  # Should show encrypted content
+```
+
+**Future**: When `settings.yaml` SOPS support is implemented, you'll be able to:
+```bash
+# This will work in a future version
+sops --encrypt --in-place envs/$ENV_NAME/settings.yaml
+infra plan --env $ENV_NAME  # Will automatically decrypt
 ```
 
 ### Step 8: Configure Environment Variables
