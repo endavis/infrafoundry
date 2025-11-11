@@ -3,8 +3,6 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy.orm import Session
-
 from infrafoundry.core.state.models import Deployment, DeploymentEvent, DeploymentStatus
 
 
@@ -75,9 +73,7 @@ class DeploymentRepository:
                     deployment.error_message = error_message
                 session.commit()
 
-    def update_rollback_data(
-        self, deployment_id: int, rollback_data: dict[str, Any]
-    ) -> None:
+    def update_rollback_data(self, deployment_id: int, rollback_data: dict[str, Any]) -> None:
         """Update deployment with rollback data.
 
         Args:

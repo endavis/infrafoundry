@@ -7,7 +7,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from infrafoundry.core.state.deployment_repository import DeploymentRepository
-from infrafoundry.core.state.models import Base, Deployment, DeploymentStatus, Resource, ResourceState
+from infrafoundry.core.state.models import (
+    Base,
+    Deployment,
+    DeploymentStatus,
+    Resource,
+    ResourceState,
+)
 from infrafoundry.core.state.resource_repository import ResourceRepository
 
 
