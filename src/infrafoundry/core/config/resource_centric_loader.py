@@ -115,15 +115,11 @@ class ResourceCentricLoader:
                 f"Missing 'provider' field in resource in {config_file}: {resource_name}"
             )
         if "type" not in item:
-            raise ValueError(
-                f"Missing 'type' field in resource in {config_file}: {resource_name}"
-            )
+            raise ValueError(f"Missing 'type' field in resource in {config_file}: {resource_name}")
         if "name" not in item:
             raise ValueError(f"Missing 'name' field in resource in {config_file}")
 
-    def get_resources_for_provider(
-        self, env_name: str, provider: str
-    ) -> list[ResourceConfig]:
+    def get_resources_for_provider(self, env_name: str, provider: str) -> list[ResourceConfig]:
         """Load resources for a specific provider from resource-centric files.
 
         Args:
