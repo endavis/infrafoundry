@@ -175,11 +175,11 @@ Runners integrate seamlessly with the orchestrator:
 class Orchestrator:
     def __init__(self, ...):
         # Get runners from registry
-        self.terraform_runner = create_runner("terraform", 
+        self.terraform_runner = create_runner("terraform",
                                             secret_manager=secret_manager,
                                             console=console)
         self.ansible_runner = create_runner("ansible", console=console)
-        
+
         # Or use custom runners
         if get_runner("pulumi"):
             self.pulumi_runner = create_runner("pulumi", stack="prod")
@@ -216,7 +216,7 @@ def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
     init_result = self.initialize(provider.output_dir)
     if not init_result["success"]:
         return init_result
-    
+
     # Run command
     ...
 ```
@@ -298,7 +298,7 @@ ansible = AnsibleRunner(console)
 # Or use registry for dynamic loading
 from infrafoundry.core.runners import create_runner
 
-runner = create_runner("terraform", 
+runner = create_runner("terraform",
                       secret_manager=secret_manager,
                       console=console)
 ```

@@ -76,14 +76,13 @@ class RunnerRegistry:
 _registry = RunnerRegistry()
 
 
-def register_runner(runner_class: type[BaseRunner], tool_name: str | None = None) -> None:
+def register_runner(runner_class: type[BaseRunner]) -> None:
     """Register a runner class with the global registry.
 
     Args:
         runner_class: Runner class to register
-        tool_name: Optional tool name (if None, will be determined from class)
     """
-    _registry.register(runner_class, tool_name)
+    _registry.register(runner_class)
 
 
 def get_runner(tool_name: str) -> type[BaseRunner] | None:

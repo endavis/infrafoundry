@@ -3,23 +3,18 @@
 from pathlib import Path
 from typing import Any, override
 
-from jinja2 import Environment, FileSystemLoader
-
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider_mixins import ResourceGrouperMixin, TemplateRendererMixin
 
 
-class ProxmoxProvider(ProviderBase):
+class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin):
     """Proxmox VE provider for managing VMs, templates, and networks."""
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize Proxmox provider."""
         super().__init__("proxmox", config_dir, output_dir)
-        self.template_dir = Path(__file__).parent / "templates"
-        self.jinja_env = Environment(
-            loader=FileSystemLoader(str(self.template_dir)),
-            trim_blocks=True,
-            lstrip_blocks=True,
-        )
+        # Use TemplateRendererMixin to set up Jinja2 environment
+        self._setup_template_environment()
 
     @override
     def validate_config(self, config: dict[str, Any]) -> bool:
@@ -32,26 +27,21 @@ class ProxmoxProvider(ProviderBase):
         """Generate Terraform configuration for Proxmox resources."""
         self.ensure_directories()
 
-        # Group resources by type
-        resources_by_type: dict[str, list[ResourceConfig]] = {}
-        for resource in resources:
-            if resource.type not in resources_by_type:
-                resources_by_type[resource.type] = []
-            resources_by_type[resource.type].append(resource)
+        # Use ResourceGrouperMixin to group resources by type
+        resources_by_type = self.group_resources_by_type(resources)
 
         # Generate provider configuration
-        provider_template = self.jinja_env.get_template("proxmox/provider.tf.j2")
-        provider_content = provider_template.render()
-        (self.terraform_dir / "provider.tf").write_text(provider_content)
+        content = self.render_template("proxmox/provider.tf.j2", {})
+        self._write_terraform_file("provider.tf", content)
 
         # Generate variables file with environment context
         import os
 
-        variables_template = self.jinja_env.get_template("proxmox/variables.tf.j2")
-        variables_content = variables_template.render(
-            default_ssh_user=os.getenv("USER", "root"),
+        content = self.render_template(
+            "proxmox/variables.tf.j2",
+            {"default_ssh_user": os.getenv("USER", "root")},
         )
-        (self.terraform_dir / "variables.tf").write_text(variables_content)
+        self._write_terraform_file("variables.tf", content)
 
         # Copy or generate terraform.tfvars from environment config
         self._generate_tfvars()
@@ -67,29 +57,26 @@ class ProxmoxProvider(ProviderBase):
             self._generate_networks_terraform(resources_by_type["network"])
 
         # Generate outputs
-        outputs_template = self.jinja_env.get_template("proxmox/outputs.tf.j2")
-        outputs_content = outputs_template.render(
-            resources_by_type=resources_by_type,
+        content = self.render_template(
+            "proxmox/outputs.tf.j2",
+            {"resources_by_type": resources_by_type},
         )
-        (self.terraform_dir / "outputs.tf").write_text(outputs_content)
+        self._write_terraform_file("outputs.tf", content)
 
     def _generate_vms_terraform(self, vms: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox VMs."""
-        template = self.jinja_env.get_template("proxmox/vms.tf.j2")
-        content = template.render(vms=vms)
-        (self.terraform_dir / "vms.tf").write_text(content)
+        content = self.render_template("proxmox/vms.tf.j2", {"vms": vms})
+        self._write_terraform_file("vms.tf", content)
 
     def _generate_templates_terraform(self, templates: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox templates."""
-        template = self.jinja_env.get_template("proxmox/templates.tf.j2")
-        content = template.render(templates=templates)
-        (self.terraform_dir / "templates.tf").write_text(content)
+        content = self.render_template("proxmox/templates.tf.j2", {"templates": templates})
+        self._write_terraform_file("templates.tf", content)
 
     def _generate_networks_terraform(self, networks: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox networks."""
-        template = self.jinja_env.get_template("proxmox/networks.tf.j2")
-        content = template.render(networks=networks)
-        (self.terraform_dir / "networks.tf").write_text(content)
+        content = self.render_template("proxmox/networks.tf.j2", {"networks": networks})
+        self._write_terraform_file("networks.tf", content)
 
     def _copy_tfvars_if_exists(self) -> None:
         """Copy environment-specific terraform.tfvars if it exists."""
@@ -162,14 +149,12 @@ class ProxmoxProvider(ProviderBase):
         self.ensure_directories()
 
         # Generate main playbook
-        playbook_template = self.jinja_env.get_template("proxmox/playbook.yml.j2")
-        playbook_content = playbook_template.render(resources=resources)
-        (self.ansible_dir / "playbook.yml").write_text(playbook_content)
+        content = self.render_template("proxmox/playbook.yml.j2", {"resources": resources})
+        self._write_ansible_file("playbook.yml", content)
 
         # Generate inventory
-        inventory_template = self.jinja_env.get_template("proxmox/inventory.yml.j2")
-        inventory_content = inventory_template.render(resources=resources)
-        (self.ansible_dir / "inventory.yml").write_text(inventory_content)
+        content = self.render_template("proxmox/inventory.yml.j2", {"resources": resources})
+        self._write_ansible_file("inventory.yml", content)
 
         # Create roles directory structure
         roles_dir = self.ansible_dir / "roles"
@@ -185,9 +170,8 @@ class ProxmoxProvider(ProviderBase):
         tasks_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate main tasks
-        tasks_template = self.jinja_env.get_template("proxmox/roles/common/main.yml.j2")
-        tasks_content = tasks_template.render()
-        (tasks_dir / "main.yml").write_text(tasks_content)
+        content = self.render_template("proxmox/roles/common/main.yml.j2", {})
+        (tasks_dir / "main.yml").write_text(content)
 
     @override
     def get_resource_types(self) -> list[str]:
