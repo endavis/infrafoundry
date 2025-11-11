@@ -46,6 +46,23 @@ def apply(
         _load_env_credentials(env, ctx.obj.get("config_dir"))
 
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
+
+        # If not auto-approve, ask for confirmation at InfraFoundry level
+        if not auto_approve:
+            resource_desc = f" (resources: {', '.join(resource)})" if resource else ""
+            console.print(
+                f"\n[yellow]About to apply infrastructure for environment: "
+                f"{env}{resource_desc}[/yellow]"
+            )
+            console.print("[yellow]This will make real changes to your infrastructure.[/yellow]")
+
+            if not click.confirm("Do you want to continue?", default=False):
+                console.print("[yellow]Apply cancelled.[/yellow]")
+                sys.exit(0)
+
+            # User confirmed, so pass auto_approve=True to Terraform
+            auto_approve = True
+
         orchestrator.apply(
             env,
             auto_approve=auto_approve,
