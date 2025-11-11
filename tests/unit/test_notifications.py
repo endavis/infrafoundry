@@ -35,7 +35,7 @@ class TestWebhookNotifier:
 
     def test_send_failure(self):
         """Test webhook send failure."""
-        with patch("infrafoundry.core.notifications.requests.post") as mock_post:
+        with patch("infrafoundry.core.notifications.notifiers.webhook.requests.post") as mock_post:
             import requests
 
             mock_post.side_effect = requests.RequestException("Network error")
