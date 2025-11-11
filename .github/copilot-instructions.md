@@ -195,6 +195,11 @@ infra secrets decrypt file.yaml  # Decrypt and display
 **8. Terminal Commands:**
 - Use `cat -pp` or `batcat -pp` for displaying file contents (user has batcat installed)
 - Plain output without decorations for piping/viewing
+- Never use plain `cat` - always include `-pp` flag
+
+**8. Terminal Commands:**
+- Use `cat -pp` or `batcat -pp` for displaying file contents (user has batcat installed)
+- Plain output without decorations for piping/viewing
 
 ### Integration Points & Dependencies
 
