@@ -111,3 +111,63 @@ class TestSecretsCommands:
         result = runner.invoke(cli, ["secrets", "decrypt"])
 
         assert result.exit_code != 0
+
+    def test_reset_command_requires_env(self):
+        """Test reset command requires --env flag."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["reset"])
+
+        assert result.exit_code != 0
+
+    def test_reset_command_requires_provider(self):
+        """Test reset command requires --provider flag."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["reset", "--env", "test"])
+
+        assert result.exit_code != 0
+
+    def test_reset_command_requires_component(self):
+        """Test reset command requires --component flag."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["reset", "--env", "test", "--provider", "opnsense"])
+
+        assert result.exit_code != 0
+
+    def test_reset_command_help(self):
+        """Test reset command help output."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["reset", "--help"])
+
+        assert result.exit_code == 0
+        assert "reset" in result.output.lower()
+        assert "kea/dhcp" in result.output
+
+    def test_migrate_command_requires_env(self):
+        """Test migrate command requires --env flag."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["migrate"])
+
+        assert result.exit_code != 0
+
+    def test_migrate_command_requires_provider(self):
+        """Test migrate command requires --provider flag."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["migrate", "--env", "test"])
+
+        assert result.exit_code != 0
+
+    def test_migrate_command_requires_component(self):
+        """Test migrate command requires --component flag."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["migrate", "--env", "test", "--provider", "opnsense"])
+
+        assert result.exit_code != 0
+
+    def test_migrate_command_help(self):
+        """Test migrate command help output."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["migrate", "--help"])
+
+        assert result.exit_code == 0
+        assert "migrate" in result.output.lower()
+        assert "kea/dhcp" in result.output
