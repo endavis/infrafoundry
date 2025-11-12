@@ -81,3 +81,9 @@ output/
 *-PLAINTEXT.yaml
 *-decrypted.yaml
 REFACTORING_TODO.md
+
+# Manual test scripts
+test_*.py
+
+# Temporary files
+tmp/
