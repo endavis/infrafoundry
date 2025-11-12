@@ -378,43 +378,10 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
         Args:
             env_name: Environment name to reset
         """
-        from infrafoundry.core.config import ConfigManager
+        from .components.kea_dhcp import KeaDHCPManager
 
-        config_manager = ConfigManager(self.config_dir)
-        env_config = config_manager.load_environment(env_name)
-        provider_settings = env_config.get_provider_settings("opnsense")
-
-        if not provider_settings:
-            raise ValueError(f"No OPNsense provider settings found for environment {env_name}")
-
-        # Initialize API client
-        from .api_client import OPNsenseClient
-
-        client = OPNsenseClient(
-            api_key=provider_settings.get("api_key", ""),
-            api_secret=provider_settings.get("api_secret", ""),
-            base_url=provider_settings.get("api_url", ""),
-            verify_ssl=provider_settings.get("verify_ssl", True),
-        )
-
-        # Delete all Kea DHCPv4 reservations
-        reservations_response = client.request("GET", "kea/dhcpv4/searchReservation")
-        if reservations_response and "rows" in reservations_response:
-            for reservation in reservations_response["rows"]:
-                uuid = reservation.get("uuid")
-                if uuid:
-                    client.request("POST", f"kea/dhcpv4/delReservation/{uuid}")
-
-        # Delete all Kea DHCPv4 subnets
-        subnets_response = client.request("GET", "kea/dhcpv4/searchSubnet")
-        if subnets_response and "rows" in subnets_response:
-            for subnet in subnets_response["rows"]:
-                uuid = subnet.get("uuid")
-                if uuid:
-                    client.request("POST", f"kea/dhcpv4/delSubnet/{uuid}")
-
-        # Reconfigure service to apply changes
-        client.request("POST", "kea/service/reconfigure")
+        manager = KeaDHCPManager(self.config_dir)
+        manager.reset_dhcpv4(env_name, "opnsense")
 
     def reset_kea_dhcpv6(self, env_name: str) -> None:
         """Reset (delete) all Kea DHCPv6 configuration.
@@ -425,42 +392,10 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
         Args:
             env_name: Environment name to reset
         """
-        from infrafoundry.core.config import ConfigManager
+        from .components.kea_dhcp import KeaDHCPManager
 
-        config_manager = ConfigManager(self.config_dir)
-        env_config = config_manager.load_environment(env_name)
-        provider_settings = env_config.get_provider_settings("opnsense")
-
-        if not provider_settings:
-            raise ValueError(f"No OPNsense provider settings found for environment {env_name}")
-
-        # Initialize API client
-        from .api_client import KeaClient, OPNsenseClient
-
-        client = OPNsenseClient(
-            api_key=provider_settings.get("api_key", ""),
-            api_secret=provider_settings.get("api_secret", ""),
-            base_url=provider_settings.get("api_url", ""),
-            verify_ssl=provider_settings.get("verify_ssl", True),
-        )
-        kea = KeaClient(client)
-
-        # Delete all DHCPv6 reservations
-        reservations = kea.search_dhcp6_reservations()
-        for reservation in reservations:
-            uuid = reservation.get("uuid")
-            if uuid:
-                kea.delete_dhcp6_reservation(uuid)
-
-        # Delete all DHCPv6 subnets
-        subnets = kea.search_dhcp6_subnets()
-        for subnet in subnets:
-            uuid = subnet.get("uuid")
-            if uuid:
-                kea.delete_dhcp6_subnet(uuid)
-
-        # Reconfigure service to apply changes
-        kea.reconfigure_service()
+        manager = KeaDHCPManager(self.config_dir)
+        manager.reset_dhcpv6(env_name, "opnsense")
 
     def migrate_kea_dhcp(self, env_name: str) -> str:
         """Migrate current Kea DHCP configuration to InfraFoundry YAML.
@@ -474,130 +409,7 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
         Returns:
             YAML configuration as a string
         """
-        from infrafoundry.core.config import ConfigManager
+        from .components.kea_dhcp import KeaDHCPManager
 
-        config_manager = ConfigManager(self.config_dir)
-        env_config = config_manager.load_environment(env_name)
-        provider_settings = env_config.get_provider_settings("opnsense")
-
-        if not provider_settings:
-            raise ValueError(f"No OPNsense provider settings found for environment {env_name}")
-
-        # Initialize API client for DHCPv4
-        from .api_client import OPNsenseClient
-
-        client = OPNsenseClient(
-            api_key=provider_settings.get("api_key", ""),
-            api_secret=provider_settings.get("api_secret", ""),
-            base_url=provider_settings.get("api_url", ""),
-            verify_ssl=provider_settings.get("verify_ssl", True),
-        )
-
-        # Initialize KeaClient for DHCPv6
-        from .api_client import KeaClient
-
-        kea = KeaClient(client)
-
-        resources = []
-
-        # Fetch DHCPv4 subnets
-        dhcpv4_subnets = client.request("GET", "kea/dhcpv4/searchSubnet")
-        if dhcpv4_subnets and "rows" in dhcpv4_subnets:
-            for subnet in dhcpv4_subnets["rows"]:
-                resource = {
-                    "provider": "opnsense",
-                    "type": "kea_subnet",
-                    "name": subnet.get("description", "").lower().replace(" ", "_"),
-                    "config": {
-                        "subnet": subnet.get("subnet", ""),
-                        "pools": subnet.get("pools", []),
-                        "description": subnet.get("description", ""),
-                    },
-                }
-                # Add optional fields if present
-                if subnet.get("option_data_autocollect") == "1":
-                    resource["config"]["auto_collect"] = True
-                if dns_servers := subnet.get("option_data_dns_servers"):
-                    resource["config"]["dns_servers"] = [s.strip() for s in dns_servers.split(",")]
-                if routers := subnet.get("option_data_routers"):
-                    resource["config"]["routers"] = [r.strip() for r in routers.split(",")]
-                if domain_name := subnet.get("option_data_domain_name"):
-                    resource["config"]["domain_name"] = domain_name
-                if ntp_servers := subnet.get("option_data_ntp_servers"):
-                    resource["config"]["ntp_servers"] = [n.strip() for n in ntp_servers.split(",")]
-
-                resources.append(resource)
-
-        # Fetch DHCPv4 reservations
-        dhcpv4_reservations = client.request("GET", "kea/dhcpv4/searchReservation")
-        if dhcpv4_reservations and "rows" in dhcpv4_reservations:
-            for reservation in dhcpv4_reservations["rows"]:
-                hostname = reservation.get("hostname", "")
-                name = hostname.lower().replace(" ", "_").replace("-", "_")
-                resource = {
-                    "provider": "opnsense",
-                    "type": "kea_reservation",
-                    "name": name,
-                    "config": {
-                        "subnet": reservation.get("subnet", ""),
-                        "hw_address": reservation.get("hw_address", ""),
-                        "ip_address": reservation.get("ip_address", ""),
-                    },
-                }
-                if hostname := reservation.get("hostname"):
-                    resource["config"]["hostname"] = hostname
-                if description := reservation.get("description"):
-                    resource["config"]["description"] = description
-
-                resources.append(resource)
-
-        # Fetch DHCPv6 subnets
-        dhcpv6_subnets = kea.search_dhcp6_subnets()
-        for subnet in dhcpv6_subnets:
-            resource = {
-                "provider": "opnsense",
-                "type": "kea_dhcp6_subnet",
-                "name": f"{subnet.get('description', '').lower().replace(' ', '_')}_v6",
-                "config": {
-                    "subnet": subnet.get("subnet", ""),
-                    "description": subnet.get("description", ""),
-                },
-            }
-            # Add optional fields if present
-            if subnet.get("option_data_autocollect") == "1":
-                resource["config"]["auto_collect"] = True
-            if dns_servers := subnet.get("option_data_dns_servers"):
-                resource["config"]["dns_servers"] = [s.strip() for s in dns_servers.split(",")]
-            if domain_search := subnet.get("option_data_domain_search"):
-                resource["config"]["domain_search"] = [d.strip() for d in domain_search.split(",")]
-
-            resources.append(resource)
-
-        # Fetch DHCPv6 reservations
-        dhcpv6_reservations = kea.search_dhcp6_reservations()
-        for reservation in dhcpv6_reservations:
-            hostname = reservation.get("hostname", "")
-            name = f"{hostname.lower().replace(' ', '_').replace('-', '_')}_v6"
-            resource = {
-                "provider": "opnsense",
-                "type": "kea_dhcp6_reservation",
-                "name": name,
-                "config": {
-                    "subnet": reservation.get("subnet", ""),
-                    "ip_address": reservation.get("ip_address", ""),
-                },
-            }
-            if duid := reservation.get("duid"):
-                resource["config"]["duid"] = duid
-            if hostname := reservation.get("hostname"):
-                resource["config"]["hostname"] = hostname
-            if description := reservation.get("description"):
-                resource["config"]["description"] = description
-
-            resources.append(resource)
-
-        # Generate YAML
-        import yaml
-
-        config = {"resources": resources}
-        return yaml.dump(config, default_flow_style=False, sort_keys=False)
+        manager = KeaDHCPManager(self.config_dir)
+        return manager.migrate(env_name, "opnsense")
