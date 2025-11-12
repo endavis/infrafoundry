@@ -56,8 +56,7 @@ class OPNsenseValidator:
                 check_name="opnsense_credentials",
                 passed=False,
                 message=(
-                    "OPNsense credentials not configured. Required: "
-                    "api_url, api_key, api_secret"
+                    "OPNsense credentials not configured. Required: api_url, api_key, api_secret"
                 ),
                 level=ValidationLevel.ERROR,
             )
@@ -178,9 +177,7 @@ class OPNsenseValidator:
                 level=ValidationLevel.WARNING,
             )
 
-    def _collect_resource_references(
-        self, resources: list[ResourceConfig]
-    ) -> dict[str, Any]:
+    def _collect_resource_references(self, resources: list[ResourceConfig]) -> dict[str, Any]:
         """Collect all resource references from configurations.
 
         Args:
@@ -206,9 +203,7 @@ class OPNsenseValidator:
             "dhcp_maps": dhcp_maps,
         }
 
-    def _get_existing_aliases(
-        self, api_url: str, api_key: str, api_secret: str
-    ) -> dict[str, Any]:
+    def _get_existing_aliases(self, api_url: str, api_key: str, api_secret: str) -> dict[str, Any]:
         """Get existing aliases from OPNsense API.
 
         Args:
@@ -400,8 +395,7 @@ class OPNsenseValidator:
                     check_name=f"vlan_{vlan.name}_parent",
                     passed=False,
                     message=(
-                        f"VLAN '{vlan.name}' references "
-                        f"undefined parent interface '{parent_if}'"
+                        f"VLAN '{vlan.name}' references undefined parent interface '{parent_if}'"
                     ),
                     level=ValidationLevel.ERROR,
                 )

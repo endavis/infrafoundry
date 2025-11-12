@@ -1,6 +1,19 @@
 # OPNsense Provider Variables
-# Provider uses environment variables for authentication:
-# - OPNSENSE_API_URL
-# - OPNSENSE_API_KEY
-# - OPNSENSE_API_SECRET
 
+variable "opnsense_api_url" {
+  description = "OPNsense API URL (e.g., https://opnsense.example.com)"
+  type        = string
+  sensitive   = false
+}
+
+variable "opnsense_api_key" {
+  description = "OPNsense API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "opnsense_api_secret" {
+  description = "OPNsense API secret"
+  type        = string
+  sensitive   = true
+}
