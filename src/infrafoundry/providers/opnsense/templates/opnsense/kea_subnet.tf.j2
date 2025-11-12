@@ -1,0 +1,63 @@
+# Kea DHCP Subnets
+{% for subnet in subnets %}
+
+resource "opnsense_kea_subnet" "{{ subnet.name | replace('-', '_') }}" {
+  subnet = "{{ subnet.config.subnet }}"
+
+  {% if subnet.config.get('pools') %}
+  pools = [
+    {% for pool in subnet.config.pools %}
+    "{{ pool }}",
+    {% endfor %}
+  ]
+  {% endif %}
+
+  {% if subnet.config.get('match_client_id') is not none %}
+  match_client_id = {{ subnet.config.match_client_id | lower }}
+  {% endif %}
+
+  {% if subnet.config.get('auto_collect') is not none %}
+  auto_collect = {{ subnet.config.auto_collect | lower }}
+  {% endif %}
+
+  {% if subnet.config.get('routers') %}
+  routers = [
+    {% for router in subnet.config.routers %}
+    "{{ router }}",
+    {% endfor %}
+  ]
+  {% endif %}
+
+  {% if subnet.config.get('dns_servers') %}
+  dns_servers = [
+    {% for dns in subnet.config.dns_servers %}
+    "{{ dns }}",
+    {% endfor %}
+  ]
+  {% endif %}
+
+  {% if subnet.config.get('domain_name') %}
+  domain_name = "{{ subnet.config.domain_name }}"
+  {% endif %}
+
+  {% if subnet.config.get('domain_search') %}
+  domain_search = [
+    {% for domain in subnet.config.domain_search %}
+    "{{ domain }}",
+    {% endfor %}
+  ]
+  {% endif %}
+
+  {% if subnet.config.get('ntp_servers') %}
+  ntp_servers = [
+    {% for ntp in subnet.config.ntp_servers %}
+    "{{ ntp }}",
+    {% endfor %}
+  ]
+  {% endif %}
+
+  {% if subnet.config.get('description') %}
+  description = "{{ subnet.config.description }}"
+  {% endif %}
+}
+{% endfor %}
