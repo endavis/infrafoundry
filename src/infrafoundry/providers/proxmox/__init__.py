@@ -87,7 +87,7 @@ class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin)
         for vm in vms:
             processed_vm = self._process_cloud_init_snippets(vm)
             processed_vms.append(processed_vm)
-        
+
         content = self.render_template("proxmox/vms.tf.j2", {"vms": processed_vms})
         self._write_terraform_file("vms.tf", content)
 
@@ -136,9 +136,7 @@ class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin)
 
                 # Substitute variables
                 for var_name, var_value in cloud_init_vars.items():
-                    snippet_content = snippet_content.replace(
-                        f"${{{var_name}}}", str(var_value)
-                    )
+                    snippet_content = snippet_content.replace(f"${{{var_name}}}", str(var_value))
 
                 snippet_data = yaml.safe_load(snippet_content)
 
@@ -207,11 +205,7 @@ class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin)
                 pass
 
         content = self.render_template(
-            "proxmox/templates.tf.j2",
-            {
-                "templates": templates,
-                "ssh_hostname": ssh_hostname
-            }
+            "proxmox/templates.tf.j2", {"templates": templates, "ssh_hostname": ssh_hostname}
         )
         self._write_terraform_file("templates.tf", content)
 
