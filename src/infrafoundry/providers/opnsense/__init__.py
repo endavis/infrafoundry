@@ -413,3 +413,23 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
 
         manager = KeaDHCPManager(self.config_dir)
         return manager.migrate(env_name, "opnsense")
+
+    def migrate_isc_to_kea(
+        self, env_name: str, interfaces: list[str] | None = None
+    ) -> str:
+        """Migrate ISC DHCP configuration to Kea DHCP format.
+
+        Reads the legacy ISC DHCP configuration and generates InfraFoundry YAML
+        with Kea DHCP resources (both DHCPv4 and DHCPv6).
+
+        Args:
+            env_name: Environment name
+            interfaces: List of interfaces to migrate (None = all)
+
+        Returns:
+            YAML configuration as a string with Kea DHCP resources
+        """
+        from .components.isc_to_kea_migration import ISCToKeaMigrationManager
+
+        manager = ISCToKeaMigrationManager(self.config_dir)
+        return manager.export_to_yaml(env_name, "opnsense", interfaces)

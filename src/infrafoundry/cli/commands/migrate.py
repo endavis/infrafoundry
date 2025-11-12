@@ -22,8 +22,14 @@ console = Console()
     "--component",
     "-c",
     required=True,
-    type=click.Choice(["kea/dhcp"], case_sensitive=False),
+    type=click.Choice(["kea/dhcp", "isc-to-kea"], case_sensitive=False),
     help="Component to migrate",
+)
+@click.option(
+    "--interfaces",
+    "-i",
+    multiple=True,
+    help="Specific interfaces to migrate (can be specified multiple times)",
 )
 @click.option(
     "--output",
@@ -39,6 +45,7 @@ def migrate(
     component: str,
     output: str | None,
     dry_run: bool,
+    interfaces: tuple[str, ...],
 ) -> None:
     """Migrate existing infrastructure to InfraFoundry configuration.
 
@@ -46,9 +53,15 @@ def migrate(
     and generates InfraFoundry YAML configuration files.
 
     Examples:
+        # Migrate existing Kea DHCP configuration
         infra migrate --env prod --provider opnsense --component kea/dhcp
-        infra migrate --env prod --provider opnsense --component kea/dhcp --dry-run
-        infra migrate --env prod --provider opnsense --component kea/dhcp -o my-config.yaml
+
+        # Migrate ISC DHCP to Kea DHCP format
+        infra migrate --env prod --provider opnsense --component isc-to-kea
+        infra migrate --env prod --provider opnsense --component isc-to-kea -i lan -i wan
+
+        # Dry-run mode
+        infra migrate --env prod --provider opnsense --component isc-to-kea --dry-run
     """
     try:
         # Import helper functions from main module
@@ -89,6 +102,38 @@ def migrate(
             if component.lower() == "kea/dhcp":
                 console.print("[cyan]Migrating Kea DHCP configuration from OPNsense...[/cyan]")
                 yaml_content = provider_instance.migrate_kea_dhcp(env)
+
+                if dry_run:
+                    console.print(
+                        "\n[bold yellow]Dry-run mode - "
+                        "configuration would be written to:[/bold yellow]"
+                    )
+                    console.print(f"[yellow]{output}[/yellow]\n")
+                    console.print("[bold cyan]Generated configuration:[/bold cyan]")
+                    console.print(yaml_content)
+                else:
+                    # Write to file
+                    output_path = Path(output)
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    output_path.write_text(yaml_content)
+                    console.print(f"[green]✓ Configuration written to: {output}[/green]")
+
+            elif component.lower() == "isc-to-kea":
+                console.print(
+                    "[cyan]Migrating ISC DHCP to Kea DHCP configuration from OPNsense...[/cyan]"
+                )
+
+                # Convert tuple to list or None
+                interfaces_list = list(interfaces) if interfaces else None
+
+                if interfaces_list:
+                    console.print(
+                        f"[dim]Targeting interfaces: {', '.join(interfaces_list)}[/dim]"
+                    )
+                else:
+                    console.print("[dim]Migrating all interfaces with ISC DHCP enabled[/dim]")
+
+                yaml_content = provider_instance.migrate_isc_to_kea(env, interfaces_list)
 
                 if dry_run:
                     console.print(
