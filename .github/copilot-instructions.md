@@ -344,8 +344,29 @@ def get_dependencies(self) -> dict[str, list[str]]:
 - CI/CD guide: `ci/README.md`
 - Example configs: `envs/dev/`
 
+### Important: Root Directory Management
+
+**DO NOT place files in the root directory unless they are essential project files:**
+
+**Allowed in root:**
+- Configuration files: `pyproject.toml`, `.gitignore`, `.envrc.local.example`, etc.
+- Documentation: `README.md`, `LICENSE`, `CHANGELOG.md`
+- Build/tooling: `Makefile`, `pytest.ini`, etc.
+- CI/CD: `.github/`, `.gitlab-ci.yml`
+
+**NOT allowed in root:**
+- Test scripts (`test_*.py`) → Use `tmp/` directory (gitignored)
+- Temporary files → Use `tmp/` directory (gitignored)
+- Example/demo scripts → Use `examples/` or `docs/examples/`
+- Development notes → Use `docs/` directory
+
+The root directory should remain clean and only contain files that are part of the project
+structure or essential for project operations. All temporary or experimental files belong
+in `tmp/` which is already in `.gitignore`.
+
 When making changes, always:
 1. Run `make format` and `make lint`
 2. Test with `infra plan --env dev --dry-run` first
 3. Update documentation if adding features
 4. Add example configs for new resource types
+5. Keep the root directory clean - use `tmp/` for temporary files
