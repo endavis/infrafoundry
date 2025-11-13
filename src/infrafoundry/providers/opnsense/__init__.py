@@ -66,13 +66,11 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
         if "kea_reservation" in resources_by_type:
             self._generate_kea_reservation_terraform(resources_by_type["kea_reservation"])
 
-        if "kea_dhcp6_subnet" in resources_by_type:
-            self._generate_kea_dhcp6_subnet_terraform(resources_by_type["kea_dhcp6_subnet"])
-
-        if "kea_dhcp6_reservation" in resources_by_type:
-            self._generate_kea_dhcp6_reservation_terraform(
-                resources_by_type["kea_dhcp6_reservation"]
-            )
+        # Batch DHCPv6 subnets and reservations together for optimal performance
+        kea_dhcp6_subnets = resources_by_type.get("kea_dhcp6_subnet", [])
+        kea_dhcp6_reservations = resources_by_type.get("kea_dhcp6_reservation", [])
+        if kea_dhcp6_subnets or kea_dhcp6_reservations:
+            self._generate_kea_dhcp6_resources(kea_dhcp6_subnets, kea_dhcp6_reservations)
 
         # Generate outputs
         content = self.render_template(
@@ -115,13 +113,27 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
         )
         self._write_terraform_file("kea_reservation.tf", content)
 
-    def _generate_kea_dhcp6_subnet_terraform(self, subnets: list[ResourceConfig]) -> None:
-        """Generate DHCPv6 subnet configuration using OPNsense API.
+    def _generate_kea_dhcp6_resources(
+        self, subnets: list[ResourceConfig], reservations: list[ResourceConfig]
+    ) -> None:
+        """Generate DHCPv6 subnet and reservation configuration using OPNsense API.
+
+        This method batches all DHCPv6 operations (subnets + reservations) to minimize
+        API calls. It creates a single API client, searches existing resources once,
+        processes all resources, and reconfigures the service once at the end.
 
         Since the Terraform provider doesn't support Kea DHCPv6 resources,
-        this method uses the OPNsense API directly to manage DHCPv6 subnets.
+        this method uses the OPNsense API directly to manage DHCPv6 configuration.
+
+        Args:
+            subnets: List of DHCPv6 subnet resources to configure
+            reservations: List of DHCPv6 reservation resources to configure
         """
         from infrafoundry.core.config import ConfigManager
+
+        # Early return if no resources to process
+        if not subnets and not reservations:
+            return
 
         if not self._current_environment:
             return
@@ -134,7 +146,7 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
         if not provider_settings:
             raise ValueError(f"No OPNsense provider settings found for environment {env_name}")
 
-        # Initialize API client
+        # Initialize API client ONCE
         from .api_client import KeaClient, OPNsenseClient
 
         client = OPNsenseClient(
@@ -145,22 +157,28 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
         )
         kea = KeaClient(client)
 
-        # Process each subnet
+        # Search existing resources ONCE
+        existing_subnets = kea.search_dhcp6_subnets() if subnets else []
+        existing_reservations = kea.search_dhcp6_reservations() if reservations else []
+
+        # Create lookup maps for efficient searching
+        existing_subnets_map = {s.get("subnet"): s.get("uuid") for s in existing_subnets}
+        existing_reservations_map = {
+            (r.get("duid"), r.get("subnet_id")): r.get("uuid") for r in existing_reservations
+        }
+
+        # Process all subnets
         for subnet_resource in subnets:
             config = subnet_resource.config
             subnet_name = subnet_resource.name
+            subnet_address = config.get("subnet")
 
-            # Search for existing subnet by name/subnet
-            existing_subnets = kea.search_dhcp6_subnets()
-            existing_uuid = None
-            for existing in existing_subnets:
-                if existing.get("subnet") == config.get("subnet"):
-                    existing_uuid = existing.get("uuid")
-                    break
+            # Look up existing subnet
+            existing_uuid = existing_subnets_map.get(subnet_address)
 
             # Prepare subnet data
             subnet_data = {
-                "subnet": config.get("subnet"),
+                "subnet": subnet_address,
                 "interface": config.get("interface"),
                 "option_data_autocollect": str(int(config.get("auto_collect", True))),
             }
@@ -188,55 +206,19 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
             else:
                 print(f"Creating DHCPv6 subnet {subnet_name}")
                 response = kea.add_dhcp6_subnet(subnet_data)
-                print(f"Created with UUID: {response.get('uuid')}")
+                created_uuid = response.get("uuid")
+                print(f"Created with UUID: {created_uuid}")
+                # Update map for use in reservations
+                existing_subnets_map[subnet_address] = created_uuid
 
-        # Reconfigure service to apply changes
-        print("Reconfiguring Kea service...")
-        kea.reconfigure_service()
-        print("DHCPv6 subnet configuration applied")
-
-    def _generate_kea_dhcp6_reservation_terraform(self, reservations: list[ResourceConfig]) -> None:
-        """Generate DHCPv6 reservation configuration using OPNsense API.
-
-        Since the Terraform provider doesn't support Kea DHCPv6 resources,
-        this method uses the OPNsense API directly to manage DHCPv6 reservations.
-        """
-        from infrafoundry.core.config import ConfigManager
-
-        if not self._current_environment:
-            return
-
-        env_name = self._current_environment
-        config_manager = ConfigManager(self.config_dir)
-        env_config = config_manager.load_environment(env_name)
-        provider_settings = env_config.get_provider_settings("opnsense")
-
-        if not provider_settings:
-            raise ValueError(f"No OPNsense provider settings found for environment {env_name}")
-
-        # Initialize API client
-        from .api_client import KeaClient, OPNsenseClient
-
-        client = OPNsenseClient(
-            api_key=provider_settings.get("api_key", ""),
-            api_secret=provider_settings.get("api_secret", ""),
-            base_url=provider_settings.get("api_url", ""),
-            verify_ssl=provider_settings.get("verify_ssl", True),
-        )
-        kea = KeaClient(client)
-
-        # Get all subnets to map subnet references
-        all_subnets = kea.search_dhcp6_subnets()
-        subnet_map = {s.get("subnet"): s.get("uuid") for s in all_subnets}
-
-        # Process each reservation
+        # Process all reservations
         for reservation_resource in reservations:
             config = reservation_resource.config
             reservation_name = reservation_resource.name
 
-            # Resolve subnet_id
+            # Resolve subnet_id from updated subnet map
             subnet_ref = config.get("subnet")
-            subnet_id = subnet_map.get(subnet_ref)
+            subnet_id = existing_subnets_map.get(subnet_ref)
             if not subnet_id:
                 print(
                     f"Warning: Subnet {subnet_ref} not found, "
@@ -244,21 +226,14 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
                 )
                 continue
 
-            # Search for existing reservation by DUID
-            existing_reservations = kea.search_dhcp6_reservations()
-            existing_uuid = None
-            for existing in existing_reservations:
-                if (
-                    existing.get("duid") == config.get("duid")
-                    and existing.get("subnet_id") == subnet_id
-                ):
-                    existing_uuid = existing.get("uuid")
-                    break
+            # Look up existing reservation by DUID and subnet_id
+            duid = config.get("duid")
+            existing_uuid = existing_reservations_map.get((duid, subnet_id))
 
             # Prepare reservation data
             reservation_data = {
                 "subnet_id": subnet_id,
-                "duid": config.get("duid"),
+                "duid": duid,
                 "ip_addresses": config.get("ip_address"),
                 "hostname": config.get("hostname", ""),
                 "description": config.get("description", ""),
@@ -273,10 +248,34 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
                 response = kea.add_dhcp6_reservation(reservation_data)
                 print(f"Created with UUID: {response.get('uuid')}")
 
-        # Reconfigure service to apply changes
+        # Reconfigure service ONCE to apply all changes
         print("Reconfiguring Kea service...")
         kea.reconfigure_service()
-        print("DHCPv6 reservation configuration applied")
+        print("DHCPv6 configuration applied")
+
+    def _generate_kea_dhcp6_subnet_terraform(self, subnets: list[ResourceConfig]) -> None:
+        """Generate DHCPv6 subnet configuration using OPNsense API.
+
+        This method is deprecated in favor of _generate_kea_dhcp6_resources which
+        batches subnets and reservations together for better performance.
+
+        Since the Terraform provider doesn't support Kea DHCPv6 resources,
+        this method uses the OPNsense API directly to manage DHCPv6 subnets.
+        """
+        # Delegate to the batched method with empty reservations
+        self._generate_kea_dhcp6_resources(subnets, [])
+
+    def _generate_kea_dhcp6_reservation_terraform(self, reservations: list[ResourceConfig]) -> None:
+        """Generate DHCPv6 reservation configuration using OPNsense API.
+
+        This method is deprecated in favor of _generate_kea_dhcp6_resources which
+        batches subnets and reservations together for better performance.
+
+        Since the Terraform provider doesn't support Kea DHCPv6 resources,
+        this method uses the OPNsense API directly to manage DHCPv6 reservations.
+        """
+        # Delegate to the batched method with empty subnets
+        self._generate_kea_dhcp6_resources([], reservations)
 
     def _generate_tfvars(self) -> None:
         """Generate terraform.tfvars from settings.yaml (provider settings)."""
