@@ -260,51 +260,104 @@ export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafound
 - SQLite database: `~/.infrafoundry/state.db`
 - Auto-created on first `infra init`
 
-## Future Enhancements
+## Implemented Advanced Features
 
-The infrastructure foundation enables:
+These features are fully implemented and available via CLI:
 
-### Drift Detection
+### Drift Detection ✅
 Compare actual infrastructure state vs declared configuration:
 ```bash
 infra drift --env prod
 # Shows: resources modified outside Terraform, manual changes, missing resources
 ```
 
-### Impact Analysis
+**Implementation:** `core/drift_detector.py` (140 lines)
+- Uses Terraform plan to detect changes
+- Parses output for add/change/destroy counts
+- Rich console output with tables
+- Event integration: DRIFT_CHECK_STARTED, DRIFT_DETECTED, DRIFT_CHECK_COMPLETED
+
+### Impact Analysis ✅
 Preview downstream effects before making changes:
 ```bash
-infra impact --resource template:ubuntu-22-04
+infra impact --env prod --resource db-template
 # Shows: All VMs using this template, risk level, suggested actions
 ```
 
-### Automated Rollback
+**Implementation:** Built into `core/dependencies/` package
+- Dependency graph with topological sorting
+- Risk levels: LOW (0), MEDIUM (1-5), HIGH (6-20), CRITICAL (21+)
+- Transitive dependency analysis
+- CLI command: `cli/commands/impact.py`
+
+### Automated Rollback ✅
 Revert to previous known-good state:
 ```bash
 infra rollback --env prod --to-deployment 42
 # Reverts infrastructure to deployment #42 state
+
+infra rollback-points --env prod
+# Lists available rollback points
 ```
 
-### Parallel Execution
+**Implementation:** `cli/commands/rollback.py` and state management
+- Tracks all deployment history in state database
+- Can rollback to any previous deployment
+- State restoration from deployment records
+
+### Parallel Execution ✅
 Optimize deployment time using dependency graph:
 ```bash
-infra apply --env prod --parallel
-# Executes independent resources simultaneously
+# Parallel execution is built into DeploymentExecutor
+# Providers run in parallel by default where safe
 ```
 
-### Policy Enforcement
-Validate before deployment using event hooks:
+**Implementation:** `core/deployment_executor.py` (269 lines)
+- `apply_parallel()` with ThreadPoolExecutor
+- Configurable max workers
+- Provider ordering for dependencies (opnsense → proxmox → kubernetes)
+- Progress tracking with rich console
+
+### Policy Enforcement ✅
+Validate before deployment using policy engine:
 ```bash
-infra validate --env prod
+infra policies list
+# Lists available policies
+
+infra policies check --env prod
 # Checks: resource limits, naming conventions, security policies
 ```
 
-### Testing Framework
-Automated post-deployment verification:
+**Implementation:** `core/policy/` package (complete)
+- PolicyEngine with pluggable evaluators
+- Policy types: RESOURCE_LIMIT, NAMING_CONVENTION, SECURITY, COMPLIANCE
+- Policy levels: ERROR (blocks), WARNING (warns), INFO (logs)
+- Event integration throughout orchestrator
+- CLI commands: `cli/commands/policies.py`
+
+### Pre-flight Validation ✅
+Comprehensive configuration validation:
 ```bash
-infra test --env dev
-# Runs: connectivity tests, service health checks, integration tests
+infra validate --env test
+# Checks: API connectivity, resources exist, no conflicts
+
+infra validate --env test --verbose
+# Shows detailed validation output including passing checks
 ```
+
+**Implementation:** `core/validation_helpers/` package (complete)
+- BaseValidator, ConnectivityValidator, CredentialValidator, ResourceValidator
+- ValidationReport with error/warning/info levels
+- Rich console output
+- CLI command: `cli/commands/validate.py`
+
+### Provider Auto-Discovery ✅
+Automatic provider registration:
+
+**Implementation:** `core/provider_registry.py` (149 lines)
+- Scans `providers/` directory
+- Dynamically imports and instantiates providers
+- No manual registration needed in CLI
 
 ## Design Principles
 

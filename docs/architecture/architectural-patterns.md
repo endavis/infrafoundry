@@ -1,5 +1,35 @@
 # Architectural Patterns Documentation
 
+## Core Module Organization
+
+InfraFoundry uses a modular package structure for better organization:
+
+### Package Structure
+
+- **`core/config/`** - Configuration management package (was `config.py`)
+  - Exports: `ConfigManager`, configuration loaders
+- **`core/state/`** - State management package (was `state.py`)
+  - Exports: `StateManager`, `ResourceState`, database models
+- **`core/dependencies/`** - Dependency resolution package (was `dependencies.py`)
+  - Exports: `DependencyGraph`, topological sorting
+- **`core/notifications/`** - Notification management package (was `notifications.py`)
+  - Exports: `NotificationManager`
+- **`core/policy/`** - Policy enforcement package
+  - Exports: `PolicyEngine`, `Policy`, `PolicyViolation`, `PolicyLevel`, `PolicyType`
+- **`core/validation_helpers/`** - Validation framework package
+  - Exports: `BaseValidator`, `ConnectivityValidator`, `CredentialValidator`, `ResourceValidator`
+- **`core/runners/`** - Pluggable runner system
+  - Exports: `BaseRunner`, `TerraformRunner`, `AnsibleRunner`, `PulumiRunner`
+
+**Backward Compatibility:** All packages re-export their public APIs from `__init__.py`, so existing imports continue to work.
+
+**Example:**
+```python
+# Both work identically
+from infrafoundry.core.config import ConfigManager  # Package import
+from infrafoundry.core.config.config_manager import ConfigManager  # Direct import
+```
+
 ## Manager Pattern Standardization
 
 All manager classes now inherit from `BaseManager` to ensure consistent behavior across the codebase.
