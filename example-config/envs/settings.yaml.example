@@ -14,12 +14,12 @@ provider_settings:
     token_secret: your-secret-here
     # Optional: node for operations
     node: pve01
-  
+
   opnsense:
     api_url: https://firewall.example.com
     api_key: your-api-key
     api_secret: your-api-secret
-  
+
   kubernetes:
     # Path to kubeconfig file
     config_path: ~/.kube/config

@@ -1,5 +1,6 @@
 #!/bin/bash
 # CI/CD setup script - Run this before infrastructure deployment in CI/CD
+# Updated for per-environment secrets architecture
 
 set -e
 
