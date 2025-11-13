@@ -1,5 +1,5 @@
 # .envrc.local - Personal settings for configuration repository (git-ignored)
-# Copy this to .envrc.local and customize with your credentials and preferences
+# Copy this to .envrc.local and customize with your preferences
 
 # Point to this configuration repository
 export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
@@ -9,11 +9,15 @@ export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 # Each environment gets isolated directories with separate Terraform state
 export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"
 
-# SOPS age encryption key
+# SOPS age encryption key for the environment you're working with
+# Switch this when working on different environments
 export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/envs/dev/age.key"
 
+# Or dynamically set based on INFRA_ENV:
+# export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/envs/${INFRA_ENV}/age.key"
+
 # Environment selection (dev, staging, prod)
-# Default to dev if not specified
+# This is just a default for convenience - CLI uses --env flag
 export INFRA_ENV="${INFRA_ENV:-dev}"
 
 # Personal preferences
@@ -30,43 +34,32 @@ export INFRA_ENV="${INFRA_ENV:-dev}"
 # export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
 
 # ============================================================================
-# CREDENTIALS - Automatic Loading by CLI
+# CREDENTIALS - Stored in Encrypted settings.yaml
 # ============================================================================
-# The InfraFoundry CLI automatically loads credentials based on --env flag!
+# Provider credentials are stored in envs/{env}/settings.yaml under provider_settings
+# section and encrypted with SOPS.
 #
-# Just create encrypted secrets files:
-#   secrets/dev/proxmox.yaml, secrets/staging/proxmox.yaml, secrets/prod/proxmox.yaml
+# The InfraFoundry CLI automatically loads credentials based on --env flag:
+#   infra plan --env dev      # Uses envs/dev/settings.yaml
+#   infra apply --env staging # Uses envs/staging/settings.yaml
+#   infra plan --env prod     # Uses envs/prod/settings.yaml
 #
-# Then use with --env flag:
-#   infra plan --env dev      # Automatically uses secrets/dev/
-#   infra apply --env staging # Automatically uses secrets/staging/
-#   infra plan --env prod     # Automatically uses secrets/prod/
+# To edit credentials:
+#   export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
+#   sops envs/dev/settings.yaml
 #
-# See: docs/per-environment-credentials.md for setup instructions
+# See: docs/per-environment-credentials.md for full guide
 # ============================================================================
 
-# Optional: Set default environment for display/reference purposes
-# (Not required - CLI loads credentials based on --env flag)
-export INFRA_ENV="${INFRA_ENV:-dev}"
-
-# Optional: Direct environment variables (for solo developers or testing)
-# NOTE: CLI auto-loading from secrets/{env}/ is recommended for production use
-# Proxmox credentials
-# export PROXMOX_API_URL=https://proxmox.example.com:8006/api2/json
-# export PROXMOX_API_TOKEN_ID=user@pam!token
-# export PROXMOX_API_TOKEN_SECRET=your-secret-here
-
-# OPNsense credentials
-# export OPNSENSE_API_URL=https://opnsense.example.com
-# export OPNSENSE_API_KEY=your-api-key
-# export OPNSENSE_API_SECRET=your-api-secret
-
-# Kubernetes config (if not using default ~/.kube/config)
-# export KUBECONFIG="${INFRAFOUNDRY_CONFIG_REPO}/kubeconfig"
+# ============================================================================
+# OPTIONAL OVERRIDES
+# ============================================================================
+# These are typically NOT needed since credentials come from settings.yaml
+# Only use for special cases or local testing
 
 # Terraform backend configuration (for remote state)
 # Local state (default): Stored in generated/{env}/terraform/{provider}/.terraform/
-# Remote state (production): Use S3, Terraform Cloud, or other backend
+# Remote state (production): Configure in settings.yaml terraform_backend section
 # export INFRAFOUNDRY_TF_BACKEND_TYPE=s3
 # export INFRAFOUNDRY_TF_BACKEND_BUCKET=my-terraform-state
 # export INFRAFOUNDRY_TF_BACKEND_REGION=us-east-1
