@@ -206,11 +206,9 @@ firewall_rules:
 
 ### Step 7: (Optional) Encrypt Settings with SOPS
 
-**Note**: SOPS encryption of `settings.yaml` is currently **in documentation only**. The code does not yet support automatic decryption of encrypted `settings.yaml` files. For now, keep `settings.yaml` unencrypted and secured via file permissions and `.gitignore`.
+InfraFoundry supports SOPS encryption for protecting sensitive credentials. You can encrypt the entire `settings.yaml` file or use the per-environment settings.yaml files approach for credential management.
 
-If you want to encrypt credentials separately, use the traditional `secrets/` directory approach:
-
-Create `secrets/credentials.yaml`:
+Create `envs/dev/settings.yaml`:
 
 ```yaml
 # Proxmox credentials
@@ -228,20 +226,35 @@ opnsense_api_secret: your-api-secret-here
 
 ```bash
 # Initialize age encryption (first time only)
+# This creates envs/dev/age.key, envs/prod/age.key, etc.
 infra secrets init
 
-# Create .sops.yaml configuration
+# Create .sops.yaml configuration for per-environment secrets
 cat > .sops.yaml << EOF
 creation_rules:
-  - path_regex: secrets/.*\.yaml$
-    age: $(age-keygen -y secrets/age.key)
+  - path_regex: envs/dev/.*\.yaml$
+    age: $(age-keygen -y envs/dev/age.key)
+  - path_regex: envs/prod/.*\.yaml$
+    age: $(age-keygen -y envs/prod/age.key)
 EOF
 
-# Encrypt the credentials file
-sops --encrypt --in-place secrets/credentials.yaml
+# Move credentials to environment-specific directory
+mkdir -p envs/dev envs/prod
+mv envs/dev/settings.yaml envs/dev/credentials.yaml
+cp envs/dev/credentials.yaml envs/prod/credentials.yaml  # Edit for prod!
 
-# Verify it's encrypted
-cat secrets/credentials.yaml  # Should show encrypted content
+# Encrypt the credentials files
+sops --encrypt --in-place envs/dev/credentials.yaml
+sops --encrypt --in-place envs/prod/credentials.yaml
+
+# Verify they're encrypted
+cat envs/dev/credentials.yaml  # Should show encrypted content
+```
+
+**Note**: Credentials are now organized per-environment in `envs/{env}/`. Use `--env` flag to automatically load the right credentials:
+```bash
+infra plan --env dev   # Uses envs/dev/credentials.yaml
+infra apply --env prod # Uses envs/prod/credentials.yaml
 ```
 
 **Future**: When `settings.yaml` SOPS support is implemented, you'll be able to:
@@ -408,7 +421,7 @@ Add to `envs/$ENV_NAME/proxmox/vms.yaml`:
       tailscale_auth_key: "{{ vault_tailscale_auth_key }}"
 ```
 
-Don't forget to add the Tailscale auth key to `secrets/credentials.yaml`:
+Don't forget to add the Tailscale auth key to `envs/dev/settings.yaml`:
 
 ```yaml
 vault_tailscale_auth_key: tskey-auth-xxxxxxxxxxxxx

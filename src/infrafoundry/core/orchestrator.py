@@ -28,7 +28,6 @@ class Orchestrator:
     def __init__(
         self,
         config_manager: ConfigManager,
-        secret_manager: SecretManager,
         output_dir: Path | None = None,
         state_manager: StateManager | None = None,
         event_manager: EventManager | None = None,
@@ -39,7 +38,6 @@ class Orchestrator:
 
         Args:
             config_manager: Configuration manager instance
-            secret_manager: Secret manager instance
             output_dir: Directory for generated files (defaults to ./generated)
             state_manager: State manager instance (creates default if None)
             event_manager: Event manager instance (creates default if None)
@@ -47,7 +45,6 @@ class Orchestrator:
             notifications_config: Path to notifications config file
         """
         self.config_manager = config_manager
-        self.secret_manager = secret_manager
         self.output_dir = output_dir or Path.cwd() / "generated"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.console = Console()
@@ -60,8 +57,8 @@ class Orchestrator:
         self.policy_engine = PolicyEngine(policy_dir)
         self.notification_manager = NotificationManager(notifications_config)
 
-        # Initialize helper classes for orchestration tasks
-        self.terraform_runner = TerraformRunner(self.secret_manager, self.console)
+        # Initialize helper classes for orchestration tasks (no secret_manager at init)
+        self.terraform_runner = TerraformRunner(console=self.console)
         self.ansible_runner = AnsibleRunner(self.console)
         self.policy_checker = PolicyChecker(self.policy_engine, self.event_manager, self.console)
         self.drift_detector = DriftDetector(
@@ -495,13 +492,17 @@ class Orchestrator:
                 provider.generate_terraform(resources)
                 provider.generate_ansible(resources)
 
-                # Export secrets for this provider
+                # Export secrets for this provider (create SecretManager per-operation)
                 try:
+                    secret_manager = SecretManager(env_name=env_name)
                     secrets_file = f"{provider_name}.yaml"
                     tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
-                    self.secret_manager.export_for_terraform(secrets_file, tf_vars)
+                    secret_manager.export_for_terraform(secrets_file, tf_vars)
                 except FileNotFoundError:
                     self.console.print(f"[yellow]No secrets file for {provider_name}[/yellow]")
+                except ValueError as e:
+                    # INFRAFOUNDRY_CONFIG_REPO not set or secrets dir doesn't exist
+                    self.console.print(f"[dim]Skipping secrets export: {e}[/dim]")
 
                 # Run terraform plan
                 self.console.print("  [dim]Running terraform plan...[/dim]")

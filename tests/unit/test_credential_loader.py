@@ -49,7 +49,7 @@ class TestCredentialLoader:
     def test_get_secrets_dir(self, loader, temp_config_dir):
         """Test getting secrets directory for environment."""
         secrets_dir = loader.get_secrets_dir("dev")
-        assert secrets_dir == temp_config_dir / "secrets" / "dev"
+        assert secrets_dir == temp_config_dir / "envs" / "dev"
 
     def test_load_no_secrets_dir(self, loader):
         """Test loading when secrets directory doesn't exist."""
@@ -57,24 +57,33 @@ class TestCredentialLoader:
         assert credentials == {}
 
     def test_load_proxmox_credentials(self, loader, temp_config_dir):
-        """Test loading Proxmox credentials."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        """Test loading Proxmox credentials from settings.yaml."""
+        env_dir = temp_config_dir / "envs" / "dev"
+        env_dir.mkdir(parents=True)
 
-        # Mock SOPS decryption
+        # Mock SOPS decryption of settings.yaml with provider_settings
         mock_data = {
-            "proxmox_api_url": "https://pve.example.com:8006",
-            "proxmox_token_id": "user@pam!token",
-            "proxmox_token_secret": "secret123",
+            "provider_settings": {
+                "proxmox": {
+                    "api_url": "https://pve.example.com:8006",
+                    "token_id": "user@pam!token",
+                    "token_secret": "secret123",
+                }
+            }
         }
+
+        # Create proxmox.yaml for backward compatibility (tests still look for it)
+        proxmox_yaml = env_dir / "proxmox.yaml"
+        proxmox_yaml.write_text("encrypted")
 
         with patch(
             "infrafoundry.core.credential_loader.base_loader.BaseCredentialLoader._decrypt_sops_file",
-            return_value=mock_data,
+            return_value={
+                "proxmox_api_url": "https://pve.example.com:8006",
+                "proxmox_token_id": "user@pam!token",
+                "proxmox_token_secret": "secret123",
+            },
         ) as mock_decrypt:
-            # Create the file so exists() check passes
-            proxmox_file = secrets_dir / "proxmox.yaml"
-            proxmox_file.write_text("encrypted")
-
             credentials = loader.load("dev", providers=["proxmox"])
 
             assert credentials == {
@@ -86,7 +95,8 @@ class TestCredentialLoader:
 
     def test_load_opnsense_credentials(self, loader, temp_config_dir):
         """Test loading OPNsense credentials."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
 
         mock_data = {
             "opnsense_api_url": "https://fw.example.com",
@@ -111,7 +121,8 @@ class TestCredentialLoader:
 
     def test_load_kubernetes_credentials(self, loader, temp_config_dir):
         """Test loading Kubernetes credentials."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
 
         mock_data = {"kubeconfig": "/path/to/kubeconfig"}
 
@@ -128,7 +139,8 @@ class TestCredentialLoader:
 
     def test_load_all_providers(self, loader, temp_config_dir):
         """Test loading credentials for all providers."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
 
         # Create all credential files
         (secrets_dir / "proxmox.yaml").write_text("encrypted")
@@ -156,7 +168,8 @@ class TestCredentialLoader:
 
     def test_load_partial_credentials(self, loader, temp_config_dir):
         """Test loading when some credential fields are missing."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
 
         # Only some fields present
         mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
@@ -174,8 +187,12 @@ class TestCredentialLoader:
             assert credentials == {"PROXMOX_API_URL": "https://pve.example.com:8006"}
             assert "PROXMOX_API_TOKEN_ID" not in credentials
 
-    def test_load_unknown_provider(self, loader):
+    def test_load_unknown_provider(self, loader, temp_config_dir):
         """Test loading credentials for unknown provider."""
+        # Create secrets dir so it passes exists() check
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
+
         with patch("infrafoundry.core.credential_loader.credential_loader.logger") as mock_logger:
             credentials = loader.load("dev", providers=["unknown_provider"])
             assert credentials == {}
@@ -185,7 +202,8 @@ class TestCredentialLoader:
         """Test successful SOPS file decryption."""
         from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
 
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
         test_loader = ProxmoxCredentialLoader(secrets_dir, debug_mode=False)
 
         test_file = tmp_path / "test.yaml"
@@ -209,7 +227,8 @@ class TestCredentialLoader:
         """Test SOPS decryption when command fails."""
         from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
 
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
         test_loader = ProxmoxCredentialLoader(secrets_dir, debug_mode=False)
 
         test_file = tmp_path / "test.yaml"
@@ -223,7 +242,8 @@ class TestCredentialLoader:
         """Test SOPS decryption when sops command not found."""
         from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
 
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
         test_loader = ProxmoxCredentialLoader(secrets_dir, debug_mode=False)
 
         test_file = tmp_path / "test.yaml"
@@ -237,7 +257,8 @@ class TestCredentialLoader:
         """Test SOPS decryption when output is invalid YAML."""
         from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
 
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
         test_loader = ProxmoxCredentialLoader(secrets_dir, debug_mode=False)
 
         test_file = tmp_path / "test.yaml"
@@ -253,7 +274,8 @@ class TestCredentialLoader:
 
     def test_set_age_key(self, loader, temp_config_dir):
         """Test setting per-environment age key."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
         age_key_file = secrets_dir / "age.key"
         age_key_file.write_text("AGE-SECRET-KEY-1...")
 
@@ -263,7 +285,8 @@ class TestCredentialLoader:
 
     def test_set_age_key_not_exists(self, loader, temp_config_dir):
         """Test setting age key when file doesn't exist."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
 
         with patch.dict(os.environ, {}, clear=True):
             loader._set_age_key(secrets_dir)
@@ -290,7 +313,8 @@ class TestCredentialLoader:
 
     def test_load_and_apply(self, loader, temp_config_dir):
         """Test convenience method that loads and applies."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
 
         mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
 
@@ -309,7 +333,8 @@ class TestCredentialLoader:
 
     def test_temporary_credentials_context_manager(self, loader, temp_config_dir):
         """Test temporary credentials context manager."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
 
         mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
 
@@ -333,7 +358,8 @@ class TestCredentialLoader:
 
     def test_temporary_credentials_new_vars_removed(self, loader, temp_config_dir):
         """Test that new vars added by context manager are removed after."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
 
         mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
 
@@ -367,7 +393,8 @@ class TestCredentialLoader:
         """Test loading credentials for a custom registered provider."""
         loader.register_provider("custom", "custom.yaml", {"api_key": "CUSTOM_API_KEY"})
 
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
         custom_file = secrets_dir / "custom.yaml"
         custom_file.write_text("encrypted")
 
@@ -394,7 +421,8 @@ class TestCredentialLoader:
 
     def test_load_with_decryption_error(self, loader, temp_config_dir):
         """Test graceful handling of decryption errors."""
-        secrets_dir = temp_config_dir / "secrets" / "dev"
+        secrets_dir = temp_config_dir / "envs" / "dev"
+        secrets_dir.mkdir(parents=True)
         proxmox_file = secrets_dir / "proxmox.yaml"
         proxmox_file.write_text("encrypted")
 

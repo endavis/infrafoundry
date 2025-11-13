@@ -68,15 +68,15 @@ class CredentialLoader:
         self._debug_mode = os.getenv("INFRAFOUNDRY_LOG_LEVEL") == "DEBUG"
 
     def get_secrets_dir(self, env_name: str) -> Path:
-        """Get the secrets directory for an environment.
+        """Get the environment directory containing secrets.
 
         Args:
             env_name: Environment name (e.g., 'dev', 'staging', 'prod')
 
         Returns:
-            Path to secrets/{env_name} directory
+            Path to envs/{env_name} directory (where settings.yaml and age.key live)
         """
-        return self.config_dir / "secrets" / env_name
+        return self.config_dir / "envs" / env_name
 
     def load(self, env_name: str, providers: list[str] | None = None) -> dict[str, str]:
         """Load environment-specific credentials from encrypted secrets.

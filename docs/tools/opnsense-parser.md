@@ -193,7 +193,7 @@ python tools/opnsense-parser.py config.xml -o temp-export
 cp -r temp-export/opnsense $INFRAFOUNDRY_CONFIG_REPO/envs/prod/
 
 # 3. Add sensitive data (VPN credentials, etc.)
-cat > $INFRAFOUNDRY_CONFIG_REPO/secrets/opnsense.yaml <<EOF
+cat > $INFRAFOUNDRY_CONFIG_REPO/envs/opnsense.yaml <<EOF
 openvpn:
   examplevpn_username: "your-username"
   examplevpn_password: "your-password"

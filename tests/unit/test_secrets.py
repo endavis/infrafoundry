@@ -40,29 +40,30 @@ class TestSecretManager:
 
     def test_init_default_location(self, mock_sops_age, mock_age_key):
         """Test initialization with default secrets directory."""
-        manager = SecretManager()
+        manager = SecretManager(env_name="dev")
         assert manager.secrets_dir is not None
-        assert "secrets" in str(manager.secrets_dir)
+        assert "envs" in str(manager.secrets_dir) and "dev" in str(manager.secrets_dir)
 
     def test_init_custom_directory(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test initialization with custom secrets directory."""
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
         assert manager.secrets_dir == temp_secrets_dir
 
     def test_init_with_config_repo_env(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test initialization uses INFRAFOUNDRY_CONFIG_REPO environment variable."""
         config_repo = temp_secrets_dir / "config-repo"
         config_repo.mkdir()
+        (config_repo / "envs" / "dev").mkdir(parents=True)
 
         with patch.dict("os.environ", {"INFRAFOUNDRY_CONFIG_REPO": str(config_repo)}):
-            manager = SecretManager()
-            assert manager.secrets_dir == config_repo / "secrets"
+            manager = SecretManager(env_name="dev")
+            assert manager.secrets_dir == config_repo / "envs" / "dev"
 
     def test_init_sops_not_installed(self, mock_age_key):
         """Test initialization fails when sops is not installed."""
         with patch("subprocess.run", side_effect=FileNotFoundError()):
             with pytest.raises(RuntimeError, match="sops not found"):
-                SecretManager()
+                SecretManager(env_name="dev")
 
     def test_init_sops_command_fails(self, mock_age_key):
         """Test initialization fails when sops command fails."""
@@ -70,23 +71,25 @@ class TestSecretManager:
 
         with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sops")):
             with pytest.raises(RuntimeError, match="sops not found"):
-                SecretManager()
+                SecretManager(env_name="dev")
 
-    def test_init_no_age_key_env(self, mock_sops_age):
+    def test_init_no_age_key_env(self, mock_sops_age, temp_secrets_dir):
         """Test initialization fails when SOPS_AGE_KEY_FILE is not set."""
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict(
+            "os.environ", {"INFRAFOUNDRY_CONFIG_REPO": str(temp_secrets_dir)}, clear=True
+        ):
             with pytest.raises(ValueError, match="SOPS_AGE_KEY_FILE not set"):
-                SecretManager()
+                SecretManager(env_name="dev")
 
     def test_init_age_key_file_missing(self, mock_sops_age):
         """Test initialization fails when age key file doesn't exist."""
         with patch.dict("os.environ", {"SOPS_AGE_KEY_FILE": "/nonexistent/age.key"}):
             with pytest.raises(FileNotFoundError, match="Age key file not found"):
-                SecretManager()
+                SecretManager(env_name="dev")
 
     def test_decrypt_file(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test decrypting a SOPS-encrypted file."""
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         # Create encrypted file
         encrypted_file = temp_secrets_dir / "proxmox.yaml"
@@ -109,7 +112,7 @@ class TestSecretManager:
 
     def test_decrypt_file_not_found(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test decrypting non-existent file raises error."""
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         with pytest.raises(FileNotFoundError, match="Encrypted file not found"):
             manager.decrypt_file("nonexistent.yaml")
@@ -118,7 +121,7 @@ class TestSecretManager:
         """Test decryption failure when sops command fails."""
         import subprocess
 
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         # Create encrypted file
         encrypted_file = temp_secrets_dir / "proxmox.yaml"
@@ -134,7 +137,7 @@ class TestSecretManager:
 
     def test_encrypt_file(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test encrypting data and saving to file."""
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         data = {"api_url": "https://proxmox.example.com", "api_token": "secret123"}
 
@@ -157,7 +160,7 @@ class TestSecretManager:
     def test_encrypt_file_creates_directory(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test encrypt_file creates secrets directory if it doesn't exist."""
         secrets_dir = temp_secrets_dir / "nested" / "secrets"
-        manager = SecretManager(secrets_dir=secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=secrets_dir)
 
         data = {"key": "value"}
 
@@ -179,7 +182,7 @@ class TestSecretManager:
         """Test encryption failure when sops command fails."""
         import subprocess
 
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         data = {"key": "value"}
 
@@ -196,7 +199,7 @@ class TestSecretManager:
 
     def test_get_secret(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test retrieving a specific secret value."""
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         # Create encrypted file
         encrypted_file = temp_secrets_dir / "config.yaml"
@@ -219,7 +222,7 @@ class TestSecretManager:
 
     def test_get_secret_key_not_found(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test get_secret raises KeyError when key doesn't exist."""
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         encrypted_file = temp_secrets_dir / "config.yaml"
         encrypted_file.write_text("encrypted")
@@ -232,7 +235,7 @@ class TestSecretManager:
 
     def test_create_sops_config(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test creating .sops.yaml configuration file."""
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         age_public_key = "age1abcdefghijklmnopqrstuvwxyz1234567890"
         manager.create_sops_config(age_public_key)
@@ -246,7 +249,7 @@ class TestSecretManager:
 
     def test_export_for_terraform(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test exporting secrets as Terraform variables file."""
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         # Create encrypted file
         encrypted_file = temp_secrets_dir / "secrets.yaml"
@@ -271,7 +274,7 @@ class TestSecretManager:
 
     def test_export_for_ansible(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test exporting secrets as Ansible vars file."""
-        manager = SecretManager(secrets_dir=temp_secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         # Create encrypted file
         encrypted_file = temp_secrets_dir / "secrets.yaml"

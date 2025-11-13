@@ -427,8 +427,9 @@ sudo firewall-cmd --reload
 - **Set key expiry**: Short expiry for security
 
 ```yaml
-# secrets/tailscale.yaml (encrypted with SOPS)
-vault_tailscale_auth_key: "tskey-auth-xxxxx-xxxxxxxxxxxxx"
+# envs/prod/settings.yaml (encrypted with SOPS)
+ansible_vars:
+  vault_tailscale_auth_key: "tskey-auth-xxxxx-xxxxxxxxxxxxx"
 ```
 
 ### Firewall Best Practices

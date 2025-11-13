@@ -176,7 +176,7 @@ class TestConfigManager:
         assert config.base_dir == envs_dir
 
     def test_init_with_config_dir_env(self, temp_dir, monkeypatch):
-        """Test initialization with INFRAFOUNDRY_CONFIG_DIR environment variable."""
+        """Test that CONFIG_DIR is no longer supported (must use CONFIG_REPO)."""
         custom_dir = temp_dir / "custom-envs"
         custom_dir.mkdir()
 
@@ -184,8 +184,11 @@ class TestConfigManager:
         monkeypatch.setenv("INFRAFOUNDRY_CONFIG_DIR", str(custom_dir))
         monkeypatch.chdir(temp_dir)
 
-        config = ConfigManager()
-        assert config.base_dir == custom_dir
+        # Should raise ValueError because CONFIG_REPO is not set
+        with pytest.raises(
+            ValueError, match="INFRAFOUNDRY_CONFIG_REPO environment variable must be set"
+        ):
+            ConfigManager()
 
     def test_get_resources_with_plural_type(self, temp_dir):
         """Test resource loading with plural type format (e.g., 'vms:' instead of 'vm:')."""

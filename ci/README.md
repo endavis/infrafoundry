@@ -22,8 +22,8 @@ InfraFoundry includes comprehensive CI/CD workflows for both **testing** and **i
 **Jobs:**
 
 1. **Main Test Suite**
-   - Runs 286 unit tests with coverage
-   - Enforces 69% coverage threshold
+   - Runs comprehensive unit tests with coverage
+   - Enforces coverage threshold
    - Uploads coverage to Codecov
    - Comments coverage on PRs
    - Generates HTML/XML reports
@@ -50,7 +50,7 @@ make lint          # Run linting
 make format        # Format code
 ```
 
-**See [docs/ci-cd-testing.md](../docs/ci-cd-testing.md) for complete testing guide.**
+**See [docs/development/ci-cd-testing.md](../docs/development/ci-cd-testing.md) for complete testing guide.**
 
 ---
 
@@ -107,14 +107,13 @@ See `docs/examples/.gitlab-ci.yml.example` for GitLab CI/CD configuration.
 - `SOPS_AGE_KEY_FILE` - Path to age key (alternative to SOPS_AGE_KEY)
 
 **Optional Environment Variables:**
-- `INFRAFOUNDRY_CONFIG_REPO` - Path to configuration repository (default: `envs`)
-- `INFRAFOUNDRY_SECRETS_DIR` - Secrets directory (default: `secrets`)
+- `INFRAFOUNDRY_CONFIG_REPO` - Path to configuration repository (required if not using --config-dir)
 - `INFRAFOUNDRY_LOG_LEVEL` - Logging level (default: `INFO`)
 
 **Example:**
 ```bash
 # Set required secrets
-export SOPS_AGE_KEY=$(cat secrets/age.key | base64 -w 0)
+export SOPS_AGE_KEY=$(cat envs/dev/age.key | base64 -w 0)
 
 # Run setup
 ./ci/setup-ci.sh dev

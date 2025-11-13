@@ -8,16 +8,17 @@ Different environments (dev, staging, prod) typically need different credentials
 
 ```bash
 # Just use --env flag - credentials are loaded automatically!
-infra plan --env dev      # Uses secrets/dev/proxmox.yaml, etc.
-infra apply --env staging # Uses secrets/staging/proxmox.yaml, etc.
-infra plan --env prod     # Uses secrets/prod/proxmox.yaml, etc.
+infra plan --env dev      # Uses envs/dev/settings.yaml
+infra apply --env staging # Uses envs/staging/settings.yaml
+infra plan --env prod     # Uses envs/prod/settings.yaml
 ```
 
 When you run a command with `--env`, InfraFoundry:
-1. Looks for encrypted secrets in `secrets/{env}/proxmox.yaml`, `secrets/{env}/opnsense.yaml`, etc.
-2. Decrypts them using SOPS
-3. Sets the appropriate environment variables (`PROXMOX_API_URL`, `OPNSENSE_API_KEY`, etc.)
-4. Proceeds with the operation using the correct credentials
+1. Looks for encrypted settings in `envs/{env}/settings.yaml`
+2. Decrypts them using SOPS with the environment's age key
+3. Extracts credentials from `provider_settings` section
+4. Sets the appropriate environment variables (`PROXMOX_API_URL`, `OPNSENSE_API_KEY`, etc.)
+5. Proceeds with the operation using the correct credentials
 
 **No manual environment switching required!** ✨
 
@@ -30,184 +31,212 @@ Each environment needs its own set of credentials:
 
 ## Recommended Approaches
 
-### Approach 1: Environment-Specific Secrets Files (Recommended)
+### Approach 1: Per-Environment Settings Files (Recommended)
 
-Store credentials in SOPS-encrypted files per environment.
+Store all configuration and credentials in SOPS-encrypted `settings.yaml` per environment.
 
 #### Structure
 
 ```
 config-repo/
-├── secrets/
-│   ├── .sops.yaml                 # SOPS config
-│   ├── dev/                       # Dev environment secrets
+├── .sops.yaml                     # SOPS config with per-environment rules
+├── envs/
+│   ├── dev/                       # Dev environment
 │   │   ├── age.key                # Dev encryption key (git-ignored)
-│   │   ├── proxmox.yaml           # Encrypted with dev age.key
-│   │   ├── opnsense.yaml          # Encrypted with dev age.key
-│   │   └── kubernetes.yaml        # Encrypted with dev age.key
-│   ├── staging/                   # Staging environment secrets
+│   │   ├── settings.yaml          # Encrypted config + credentials
+│   │   └── resources/             # Resource definitions (not encrypted)
+│   │       └── vms.yaml
+│   ├── staging/                   # Staging environment
 │   │   ├── age.key                # Staging encryption key (git-ignored)
-│   │   ├── proxmox.yaml           # Encrypted with staging age.key
-│   │   ├── opnsense.yaml          # Encrypted with staging age.key
-│   │   └── kubernetes.yaml        # Encrypted with staging age.key
-│   └── prod/                      # Production secrets
+│   │   ├── settings.yaml          # Encrypted config + credentials
+│   │   └── resources/
+│   │       └── vms.yaml
+│   └── prod/                      # Production environment
 │       ├── age.key                # Production encryption key (git-ignored)
-│       ├── proxmox.yaml           # Encrypted with prod age.key
-│       ├── opnsense.yaml          # Encrypted with prod age.key
-│       └── kubernetes.yaml        # Encrypted with prod age.key
-└── .envrc.local
+│       ├── settings.yaml          # Encrypted config + credentials
+│       └── resources/
+│           └── vms.yaml
+└── .envrc.local                   # Local environment variables
 ```
 
-**Benefits of per-environment keys:**
-- **Security isolation**: Compromising one environment's key doesn't expose others
+**Benefits of per-environment structure:**
+- **Security isolation**: Each environment has its own encryption key
 - **Access control**: Give team members only the keys they need (devs get dev key, ops get prod key)
 - **Automatic key selection**: InfraFoundry automatically uses the correct key based on `--env` flag
+- **Consolidated configuration**: All settings and credentials in one encrypted file per environment
 
 #### Setup
 
 **1. Generate age keys for each environment:**
 
 ```bash
-# Create age keys per environment
-age-keygen -o secrets/dev/age.key
-age-keygen -o secrets/staging/age.key
-age-keygen -o secrets/prod/age.key  # Keep this highly restricted!
+# Create age keys in each environment directory
+age-keygen -o envs/dev/age.key
+age-keygen -o envs/staging/age.key
+age-keygen -o envs/prod/age.key  # Keep this highly restricted!
 
 # Add to .gitignore
-echo "secrets/*/age.key" >> .gitignore
+echo "envs/*/age.key" >> .gitignore
 ```
 
 **2. Update `.sops.yaml` for per-environment keys:**
 
 ```yaml
-# secrets/.sops.yaml
+# .sops.yaml (in config repo root)
 creation_rules:
-  - path_regex: dev/.*\.yaml$
-    age: age1xxx...dev-public-key...xxx  # Public key from secrets/dev/age.key
+  - path_regex: envs/dev/settings\.yaml$
+    age: age1xxx...dev-public-key...xxx  # From: age-keygen -y envs/dev/age.key
 
-  - path_regex: staging/.*\.yaml$
-    age: age1xxx...staging-public-key...xxx  # Public key from secrets/staging/age.key
+  - path_regex: envs/staging/settings\.yaml$
+    age: age1xxx...staging-public-key...xxx  # From: age-keygen -y envs/staging/age.key
 
-  - path_regex: prod/.*\.yaml$
-    age: age1xxx...prod-public-key...xxx  # Public key from secrets/prod/age.key
+  - path_regex: envs/prod/settings\.yaml$
+    age: age1xxx...prod-public-key...xxx  # From: age-keygen -y envs/prod/age.key
 ```
 
-**3. Create environment-specific secrets:**
+**3. Add credentials to settings.yaml and encrypt:**
 
 ```bash
-# Dev credentials
-cat > secrets/dev/proxmox.yaml <<EOF
-proxmox:
+# Edit your settings file to add credentials
+vim envs/dev/settings.yaml
+```
+
+Add provider credentials to `provider_settings`:
+```yaml
+# envs/dev/settings.yaml
+name: dev
+description: Development environment
+
+provider_settings:
+  proxmox:
+    api_url: https://pve-dev.example.com:8006
+    api_token_id: terraform@pve!dev
+    api_token_secret: your-dev-secret
+
+  opnsense:
+    api_url: https://fw-dev.example.com
+    api_key: dev-api-key
+    api_secret: dev-api-secret
+```
+
+**4. Encrypt the settings file:**
+
+```bash
+# Encrypt settings.yaml
+sops --encrypt --in-place envs/dev/settings.yaml
+sops --encrypt --in-place envs/staging/settings.yaml
+sops --encrypt --in-place envs/prod/settings.yaml
+
+# Verify encryption
+head envs/dev/settings.yaml  # Should show ENC[...] values
+```
+
+**5. Set age key for each environment:**
+
+```bash
+# In .envrc.local, point to the environment-specific age key
+# The --env flag will automatically use the right key
+export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/envs/dev/age.key"  # For dev work
+
+# Or set per-command:
+SOPS_AGE_KEY_FILE=envs/prod/age.key infra plan --env prod
+```
   api_url: https://proxmox-dev.example.com:8006/api2/json
   api_token_id: terraform@pve!dev-token
   api_token_secret: dev-secret-here
 EOF
 
 # Staging credentials
-cat > secrets/staging/proxmox.yaml <<EOF
+cat > envs/staging/proxmox.yaml <<EOF
 proxmox_api_url: https://proxmox-staging.example.com:8006/api2/json
 proxmox_token_id: terraform@pve!staging-token
 proxmox_token_secret: staging-secret-here
 EOF
 
 # Production credentials
-cat > secrets/prod/proxmox.yaml <<EOF
+cat > envs/prod/proxmox.yaml <<EOF
 proxmox_api_url: https://proxmox.example.com:8006/api2/json
 proxmox_token_id: terraform@pve!prod-token
 proxmox_token_secret: prod-secret-here
 EOF
 
 # Encrypt all
-sops --encrypt --in-place secrets/dev/proxmox.yaml
-sops --encrypt --in-place secrets/staging/proxmox.yaml
-sops --encrypt --in-place secrets/prod/proxmox.yaml
+sops --encrypt --in-place envs/dev/proxmox.yaml
+sops --encrypt --in-place envs/staging/proxmox.yaml
+sops --encrypt --in-place envs/prod/proxmox.yaml
 ```
 
 **3. Use with InfraFoundry:**
 
 ```bash
 # Credentials are loaded automatically based on --env flag!
-infra plan --env dev       # Automatically uses secrets/dev/proxmox.yaml
-infra apply --env staging  # Automatically uses secrets/staging/proxmox.yaml
-infra plan --env prod      # Automatically uses secrets/prod/proxmox.yaml
+infra plan --env dev       # Automatically uses envs/dev/settings.yaml
+infra apply --env staging  # Automatically uses envs/staging/settings.yaml
+infra plan --env prod      # Automatically uses envs/prod/settings.yaml
 ```
 
 **That's it!** No need to manually load environment variables or switch contexts. The CLI handles everything automatically.
 
-#### Optional: Manual Loading in .envrc.local
+#### Optional: Manual Age Key Setup for Local Development
 
-For advanced use cases (debugging, testing, CI/CD), you can still manually load credentials in `.envrc.local`:
+For local development, set the age key in `.envrc.local`:
 
 ```bash
 # .envrc.local
 export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
-export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/age.key"
 
-# Optional: Set default environment for direnv-based workflows
-export INFRA_ENV="${INFRA_ENV:-dev}"
+# Point to your default environment's age key
+export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/envs/dev/age.key"
 
-# Optional: Function to manually load environment secrets
-load_env_secrets() {
-    local env=$1
-    local secrets_dir="${INFRAFOUNDRY_CONFIG_REPO}/secrets/${env}"
-
-    if [[ -f "${secrets_dir}/proxmox.yaml" ]]; then
-        # Decrypt and export Proxmox credentials
-        eval "$(sops --decrypt "${secrets_dir}/proxmox.yaml" | \
-            yq eval '.proxmox_api_url, .proxmox_token_id, .proxmox_token_secret' - | \
-            awk '{print "export PROXMOX_" toupper($1) "=" $2}')"
-    fi
-
-    if [[ -f "${secrets_dir}/opnsense.yaml" ]]; then
-        # Decrypt and export OPNsense credentials
-        eval "$(sops --decrypt "${secrets_dir}/opnsense.yaml" | \
-            yq eval '.opnsense_api_url, .opnsense_api_key, .opnsense_api_secret' - | \
-            awk '{print "export OPNSENSE_" toupper($1) "=" $2}')"
-    fi
-}
-
-# Uncomment to auto-load on direnv reload (not needed for normal CLI usage)
-# load_env_secrets "$INFRA_ENV"
-# echo "Loaded credentials for environment: $INFRA_ENV"
+# Or dynamically set based on environment variable
+# export INFRA_ENV="${INFRA_ENV:-dev}"
+# export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/envs/${INFRA_ENV}/age.key"
 ```
 
-**Note:** Manual loading is **optional** and rarely needed. The CLI loads credentials automatically.
+**Note:** The CLI automatically handles credential loading when you use `--env`. Manual setup is only needed for:
+- Running `sops --encrypt` or `sops --decrypt` commands directly
+- Debugging credential issues
+- CI/CD pipelines
 
 #### Pros & Cons
 
 **Pros:**
 - ✅ Automatic credential loading - no manual environment switching
-- ✅ All secrets version controlled (encrypted)
-- ✅ Single age key for all environments
+- ✅ All settings and credentials in one encrypted file per environment
+- ✅ Per-environment encryption keys for better security isolation
 - ✅ Easy to add new environments
-- ✅ Credentials stored with infrastructure configs
-- ✅ Team can share encrypted secrets
+- ✅ Settings stored with infrastructure configs
+- ✅ Team can share encrypted settings
 - ✅ Simple workflow: just use `--env` flag
+- ✅ Clear separation between environments
 
 **Cons:**
-- ❌ All team members have access to all env secrets (if shared key)
 - ⚠️  Requires SOPS and age for encryption/decryption
+- ⚠️  Need to manage separate age keys per environment (but better security!)
 
 ---
 
-### Approach 2: Separate Age Keys Per Environment
+### Approach 2: Alternative - Separate Provider Credential Files (Legacy)
 
-Use different encryption keys for each environment, granting access per environment.
+**Note:** This approach is supported but not recommended. Use consolidated `settings.yaml` instead.
+
+You can still store credentials in separate files per provider if needed:
 
 #### Structure
 
 ```
 config-repo/
-├── secrets/
-│   ├── .sops.yaml                 # SOPS config with per-env keys
+├── envs/
 │   ├── dev/
 │   │   ├── age.key                # Dev encryption key (git-ignored)
-│   │   ├── proxmox.yaml           # Encrypted with dev key
-│   │   └── opnsense.yaml
+│   │   ├── settings.yaml          # Main config (encrypted with dev key)
+│   │   ├── proxmox-alt.yaml       # Optional separate provider file
+│   │   └── opnsense-alt.yaml
 │   ├── staging/
 │   │   ├── age.key                # Staging key (git-ignored)
-│   │   ├── proxmox.yaml           # Encrypted with staging key
-│   │   └── opnsense.yaml
+│   │   ├── settings.yaml          # Main config
+│   │   ├── proxmox-alt.yaml       # Encrypted with staging key
+│   │   └── opnsense-alt.yaml
 │   └── prod/
 │       ├── age.key                # Prod key (git-ignored)
 │       ├── proxmox.yaml           # Encrypted with prod key
@@ -220,18 +249,18 @@ config-repo/
 **1. Create `.sops.yaml` with per-environment keys:**
 
 ```yaml
-# secrets/.sops.yaml
+# .sops.yaml (in config repo root)
 creation_rules:
   # Dev secrets - dev team members
-  - path_regex: dev/.*\.yaml$
+  - path_regex: envs/dev/settings\.yaml$
     age: age1dev_public_key_here...
 
   # Staging secrets - senior devs + ops
-  - path_regex: staging/.*\.yaml$
+  - path_regex: envs/staging/settings\.yaml$
     age: age1staging_public_key_here...
 
   # Production secrets - ops team only
-  - path_regex: prod/.*\.yaml$
+  - path_regex: envs/prod/settings\.yaml$
     age: age1prod_public_key_here...
 ```
 
@@ -239,29 +268,29 @@ creation_rules:
 
 ```bash
 # Dev key
-age-keygen -o secrets/dev/age.key
+age-keygen -o envs/dev/age.key
 
 # Staging key
-age-keygen -o secrets/staging/age.key
+age-keygen -o envs/staging/age.key
 
 # Production key (kept by ops team)
-age-keygen -o secrets/prod/age.key
+age-keygen -o envs/prod/age.key
 ```
 
 **3. Encrypt secrets with environment-specific keys:**
 
 ```bash
 # Encrypt dev secrets with dev key
-export SOPS_AGE_KEY_FILE="secrets/dev/age.key"
-sops --encrypt --in-place secrets/dev/proxmox.yaml
+export SOPS_AGE_KEY_FILE="envs/dev/age.key"
+sops --encrypt --in-place envs/dev/proxmox.yaml
 
 # Encrypt staging secrets with staging key
-export SOPS_AGE_KEY_FILE="secrets/staging/age.key"
-sops --encrypt --in-place secrets/staging/proxmox.yaml
+export SOPS_AGE_KEY_FILE="envs/staging/age.key"
+sops --encrypt --in-place envs/staging/proxmox.yaml
 
 # Encrypt prod secrets with prod key
-export SOPS_AGE_KEY_FILE="secrets/prod/age.key"
-sops --encrypt --in-place secrets/prod/proxmox.yaml
+export SOPS_AGE_KEY_FILE="envs/prod/age.key"
+sops --encrypt --in-place envs/prod/proxmox.yaml
 ```
 
 **4. Update `.envrc.local` (simplified!):**
@@ -271,20 +300,20 @@ sops --encrypt --in-place secrets/prod/proxmox.yaml
 export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 
 # Note: SOPS age key is automatically set per-environment!
-# InfraFoundry will use secrets/{env}/age.key based on --env flag
+# InfraFoundry will use envs/{env}/age.key based on --env flag
 # No need to manually set SOPS_AGE_KEY_FILE
 ```
 
 **5. Usage:**
 
 ```bash
-# Dev work - automatically uses secrets/dev/age.key
+# Dev work - automatically uses envs/dev/age.key
 infra plan --env dev
 
-# Staging - automatically uses secrets/staging/age.key
+# Staging - automatically uses envs/staging/age.key
 infra apply --env staging
 
-# Production - automatically uses secrets/prod/age.key (if you have the key!)
+# Production - automatically uses envs/prod/age.key (if you have the key!)
 infra plan --env prod
 
 # Staging work (need staging age key)
@@ -313,296 +342,105 @@ infra apply --env prod
 
 ---
 
-### Approach 3: Environment Variable Override
-
-Use `.envrc.local` with environment detection or manual override.
-
-#### Structure
-
-```
-config-repo/
-├── secrets/
-│   ├── age.key                    # Single key
-│   ├── .sops.yaml
-│   └── credentials.yaml           # All environments in one file (encrypted)
-└── .envrc.local
-```
-
-#### Setup
-
-**1. Create multi-environment secrets file:**
-
-```yaml
-# secrets/credentials.yaml (before encryption)
-dev:
-  proxmox:
-    api_url: https://proxmox-dev.example.com:8006/api2/json
-    token_id: terraform@pve!dev
-    token_secret: dev-secret
-  opnsense:
-    api_url: https://firewall-dev.example.com
-    api_key: dev-key
-    api_secret: dev-secret
-
-staging:
-  proxmox:
-    api_url: https://proxmox-staging.example.com:8006/api2/json
-    token_id: terraform@pve!staging
-    token_secret: staging-secret
-  opnsense:
-    api_url: https://firewall-staging.example.com
-    api_key: staging-key
-    api_secret: staging-secret
-
-prod:
-  proxmox:
-    api_url: https://proxmox.example.com:8006/api2/json
-    token_id: terraform@pve!prod
-    token_secret: prod-secret
-  opnsense:
-    api_url: https://firewall.example.com
-    api_key: prod-key
-    api_secret: prod-secret
-```
-
-**2. Encrypt:**
-
-```bash
-sops --encrypt --in-place secrets/credentials.yaml
-```
-
-**3. Update `.envrc.local`:**
-
-```bash
-# .envrc.local
-export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
-export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/age.key"
-
-# Determine environment (default to dev)
-export INFRA_ENV="${INFRA_ENV:-dev}"
-
-# Decrypt and load credentials for current environment
-SECRETS_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/credentials.yaml"
-
-if [[ -f "$SECRETS_FILE" ]]; then
-    # Extract credentials for current environment
-    CREDS=$(sops --decrypt "$SECRETS_FILE" | yq eval ".${INFRA_ENV}" -)
-
-    # Proxmox
-    export PROXMOX_API_URL=$(echo "$CREDS" | yq eval '.proxmox.api_url' -)
-    export PROXMOX_API_TOKEN_ID=$(echo "$CREDS" | yq eval '.proxmox.token_id' -)
-    export PROXMOX_API_TOKEN_SECRET=$(echo "$CREDS" | yq eval '.proxmox.token_secret' -)
-
-    # OPNsense
-    export OPNSENSE_API_URL=$(echo "$CREDS" | yq eval '.opnsense.api_url' -)
-    export OPNSENSE_API_KEY=$(echo "$CREDS" | yq eval '.opnsense.api_key' -)
-    export OPNSENSE_API_SECRET=$(echo "$CREDS" | yq eval '.opnsense.api_secret' -)
-
-    echo "Loaded ${INFRA_ENV} credentials"
-fi
-```
-
-**4. Usage:**
-
-```bash
-# Dev (default)
-infra plan --env dev
-
-# Staging
-INFRA_ENV=staging infra plan --env staging
-
-# Production
-INFRA_ENV=prod infra apply --env prod
-
-# Or export and reload
-export INFRA_ENV=prod
-direnv reload
-infra apply --env prod
-```
-
-#### Pros & Cons
-
-**Pros:**
-- ✅ Single secrets file
-- ✅ Easy environment switching
-- ✅ Simple setup
-
-**Cons:**
-- ❌ All environments visible in one file
-- ❌ Everyone with age key can decrypt all environments
-- ❌ No separation of duties
-
----
-
-### Approach 4: CI/CD with External Secret Management
-
-For production deployments, use external secret managers.
-
-#### Setup
-
-**GitHub Actions:**
-
-```yaml
-# .github/workflows/deploy-prod.yml
-name: Deploy Production
-
-on:
-  workflow_dispatch:
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    environment: production  # GitHub environment protection
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up secrets
-        env:
-          # From GitHub Secrets
-          PROXMOX_API_URL: ${{ secrets.PROD_PROXMOX_API_URL }}
-          PROXMOX_API_TOKEN_ID: ${{ secrets.PROD_PROXMOX_TOKEN_ID }}
-          PROXMOX_API_TOKEN_SECRET: ${{ secrets.PROD_PROXMOX_TOKEN_SECRET }}
-          OPNSENSE_API_URL: ${{ secrets.PROD_OPNSENSE_API_URL }}
-          OPNSENSE_API_KEY: ${{ secrets.PROD_OPNSENSE_API_KEY }}
-          OPNSENSE_API_SECRET: ${{ secrets.PROD_OPNSENSE_API_SECRET }}
-        run: |
-          # Credentials available as environment variables
-          infra apply --env prod --auto-approve
-```
-
-**AWS Secrets Manager:**
-
-```bash
-# .envrc.local
-export INFRA_ENV="${INFRA_ENV:-dev}"
-
-# Fetch from AWS Secrets Manager
-fetch_aws_secrets() {
-    local env=$1
-    local secret_name="infrafoundry/${env}/credentials"
-
-    # Fetch and parse secrets
-    aws secretsmanager get-secret-value \
-        --secret-id "$secret_name" \
-        --query SecretString \
-        --output text | jq -r 'to_entries[] | "export \(.key)=\(.value)"'
-}
-
-# Load secrets
-eval "$(fetch_aws_secrets "$INFRA_ENV")"
-```
-
-**HashiCorp Vault:**
-
-```bash
-# .envrc.local
-export INFRA_ENV="${INFRA_ENV:-dev}"
-export VAULT_ADDR="https://vault.example.com"
-
-# Fetch from Vault
-fetch_vault_secrets() {
-    local env=$1
-    local path="secret/infrafoundry/${env}"
-
-    # Read secrets from Vault
-    vault kv get -format=json "$path" | \
-        jq -r '.data.data | to_entries[] | "export \(.key)=\(.value)"'
-}
-
-# Authenticate to Vault (assumes token in VAULT_TOKEN)
-if [[ -n "$VAULT_TOKEN" ]]; then
-    eval "$(fetch_vault_secrets "$INFRA_ENV")"
-fi
-```
-
-#### Pros & Cons
-
-**Pros:**
-- ✅ Enterprise-grade secret management
-- ✅ Audit logging built-in
-- ✅ Fine-grained access control
-- ✅ Automatic rotation support
-- ✅ Integration with existing systems
-
-**Cons:**
-- ❌ Requires external infrastructure
-- ❌ More complex setup
-- ❌ Additional costs
-- ❌ Network dependency
-
----
-
 ## Comparison Matrix
 
 | Approach | Access Control | Complexity | Cost | Best For |
 |----------|---------------|------------|------|----------|
 | **Env-Specific Files** | Shared key | Low | Free | Small teams, simple projects |
 | **Separate Keys** | Per-environment | Medium | Free | Medium teams, compliance needs |
-| **Single File** | Shared key | Low | Free | Solo developers |
-| **External Secret Manager** | Fine-grained | High | $$$ | Enterprises, production systems |
 
 ## Recommended Setup by Team Size
 
-### Solo Developer / Hobby Projects
-**Use:** Approach 3 (Single File)
+### Solo Developer / Small Team (1-10 people)
+**Use:** Approach 1 (Environment-Specific Files in settings.yaml)
 - Simple, easy to manage
-- Quick environment switching
+- Credentials in encrypted settings.yaml
+- All config in one file per environment
 - Minimal overhead
 
-### Small Team (2-10 people)
-**Use:** Approach 1 (Env-Specific Files)
-- Balances simplicity and organization
-- Easy to add new environments
-- Team can collaborate on encrypted secrets
-
-### Medium Team (10-50 people)
-**Use:** Approach 2 (Separate Keys)
+### Medium/Large Team (10+ people)
+**Use:** Approach 2 (Separate Keys per Environment)
 - Control who can access prod
 - Developers only get dev/staging keys
 - Ops team manages prod keys
+- Security isolation between environments
 
-### Enterprise / Production Systems
-**Use:** Approach 4 (External Secret Manager)
-- Integrate with existing secret management
-- Full audit trail
-- Automated rotation
-- Compliance requirements met
+---
+
+## Working with settings.yaml
+
+All credentials are stored in the `provider_settings` section of each environment's `settings.yaml` file:
+
+```yaml
+# envs/dev/settings.yaml (SOPS-encrypted)
+name: dev
+description: Development environment
+
+providers:
+  - proxmox
+  - opnsense
+
+provider_settings:
+  proxmox:
+    api_url: https://proxmox-dev.example.com:8006
+    token_id: terraform@pve!dev
+    token_secret: dev-secret-here
+  opnsense:
+    api_url: https://firewall-dev.example.com
+    api_key: dev-key-here
+    api_secret: dev-secret-here
+```
+
+### Encrypting settings.yaml
+
+```bash
+# Encrypt a settings file
+sops --encrypt --in-place envs/dev/settings.yaml
+
+# Decrypt to view
+sops --decrypt envs/dev/settings.yaml
+
+# Edit encrypted file
+sops envs/dev/settings.yaml
+```
+
+---
 
 ## Migration Example
 
-Migrating from single `.envrc.local` to environment-specific secrets:
+If you have credentials in environment variables, migrate them to settings.yaml:
 
 ```bash
-# 1. Create directory structure
-mkdir -p secrets/{dev,staging,prod}
+# 1. Create environment directories
+mkdir -p envs/{dev,staging,prod}
 
-# 2. Move existing credentials to dev
-cat > secrets/dev/proxmox.yaml <<EOF
-proxmox_api_url: $PROXMOX_API_URL
-proxmox_token_id: $PROXMOX_API_TOKEN_ID
-proxmox_token_secret: $PROXMOX_API_TOKEN_SECRET
+# 2. Create settings.yaml with credentials in provider_settings
+cat > envs/dev/settings.yaml <<EOF
+provider_settings:
+  proxmox:
+    api_url: $PROXMOX_API_URL
+    token_id: $PROXMOX_API_TOKEN_ID
+    token_secret: $PROXMOX_API_TOKEN_SECRET
 EOF
 
 # 3. Create staging/prod with different values
-cat > secrets/staging/proxmox.yaml <<EOF
-proxmox_api_url: https://proxmox-staging.example.com:8006/api2/json
-proxmox_token_id: terraform@pve!staging-token
-proxmox_token_secret: staging-secret-here
+cat > envs/staging/settings.yaml <<EOF
+provider_settings:
+  proxmox:
+    api_url: https://proxmox-staging.example.com:8006/api2/json
+    token_id: terraform@pve!staging-token
+    token_secret: staging-secret-here
 EOF
 
-# 4. Encrypt all
+# 4. Encrypt all settings files
 for env in dev staging prod; do
-    sops --encrypt --in-place secrets/${env}/proxmox.yaml
+    sops --encrypt --in-place envs/${env}/settings.yaml
 done
 
-# 5. Update .envrc.local to load from secrets/
-# (See Approach 1 above)
-
-# 6. Test each environment
-INFRA_ENV=dev infra plan --env dev
-INFRA_ENV=staging infra plan --env staging
-INFRA_ENV=prod infra plan --env prod --dry-run
+# 5. Test each environment
+infra plan --env dev
+infra plan --env staging
+infra plan --env prod --dry-run
 ```
 
 ## Security Best Practices
@@ -610,19 +448,18 @@ INFRA_ENV=prod infra plan --env prod --dry-run
 1. **Never commit unencrypted secrets**
    ```bash
    # .gitignore
-   secrets/*.key
-   secrets/**/*.key
+   envs/*/age.key
    .envrc.local
+   generated/
    ```
 
 2. **Rotate credentials regularly**
    ```bash
    # Update secret
-   sops secrets/prod/proxmox.yaml
-   # Change proxmox_token_secret
+   sops envs/prod/settings.yaml
+   # Change credentials in provider_settings section
 
-   # Re-encrypt
-   sops --encrypt --in-place secrets/prod/proxmox.yaml
+   # Save (SOPS re-encrypts automatically)
    ```
 
 3. **Use principle of least privilege**
@@ -633,7 +470,7 @@ INFRA_ENV=prod infra plan --env prod --dry-run
 4. **Backup age keys securely**
    ```bash
    # Encrypt age key with GPG
-   gpg --encrypt --recipient your-email@example.com secrets/age.key
+   gpg --encrypt --recipient your-email@example.com envs/prod/age.key
 
    # Store encrypted backup in password manager
    ```
@@ -657,16 +494,11 @@ INFRA_ENV=prod infra plan --env prod --dry-run
 
 **Solution:**
 ```bash
-# Check current environment
-echo $INFRA_ENV
+# Check which environment you're using
+infra plan --env prod --dry-run
 
-# Verify loaded credentials (without exposing secrets)
-echo $PROXMOX_API_URL
-
-# Should show prod URL
-# If not, reload environment
-export INFRA_ENV=prod
-direnv reload
+# Verify credentials are correct in settings.yaml
+sops --decrypt envs/prod/settings.yaml | grep api_url
 ```
 
 ### Cannot decrypt secrets
@@ -675,31 +507,29 @@ direnv reload
 
 **Solution:**
 ```bash
-# Verify age key exists
-ls -l $SOPS_AGE_KEY_FILE
+# Verify age key exists for this environment
+ls -l envs/prod/age.key
 
-# Check if key matches encrypted file
-sops --decrypt secrets/dev/proxmox.yaml
+# Set SOPS_AGE_KEY_FILE if needed
+export SOPS_AGE_KEY_FILE="$(pwd)/envs/prod/age.key"
 
-# If wrong key, check INFRA_ENV
-echo $INFRA_ENV
-export INFRA_ENV=dev
+# Try to decrypt
+sops --decrypt envs/prod/settings.yaml
 ```
 
 ### Missing credentials
 
-**Problem:** Variables not set after direnv reload
+**Problem:** Provider credentials not found
 
 **Solution:**
 ```bash
-# Check if secrets file exists
-ls -l secrets/${INFRA_ENV}/
+# Check if settings file exists
+ls -l envs/prod/settings.yaml
 
-# Manually decrypt to debug
-sops --decrypt secrets/${INFRA_ENV}/proxmox.yaml
+# Verify provider_settings structure
+sops --decrypt envs/prod/settings.yaml | grep -A 5 provider_settings
 
-# Check .envrc.local syntax
-bash -n .envrc.local
+# Ensure credentials are in the provider_settings section
 ```
 
 ## Related Documentation

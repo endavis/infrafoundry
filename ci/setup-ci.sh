@@ -41,9 +41,9 @@ if [ -z "$SOPS_AGE_KEY_FILE" ]; then
     if [ -n "$SOPS_AGE_KEY" ]; then
         echo "📝 Creating age key from SOPS_AGE_KEY environment variable..."
         mkdir -p secrets
-        echo "$SOPS_AGE_KEY" | base64 -d > secrets/age.key
-        chmod 600 secrets/age.key
-        export SOPS_AGE_KEY_FILE="$(pwd)/secrets/age.key"
+        echo "$SOPS_AGE_KEY" | base64 -d > envs/dev/age.key
+        chmod 600 envs/dev/age.key
+        export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
         echo "✅ Age key configured"
     else
         echo "❌ Neither SOPS_AGE_KEY_FILE nor SOPS_AGE_KEY is set"

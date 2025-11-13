@@ -20,21 +20,23 @@ At https://login.tailscale.com/admin/settings/keys:
 
 ### 2. Store Auth Key Securely
 
-Create `secrets/tailscale.yaml`:
+Add auth key to your environment's `settings.yaml`:
 
 ```yaml
-vault_tailscale_auth_key: "tskey-auth-xxxxx-xxxxxxxxxxxxxxxx"
+# envs/dev/settings.yaml (add to ansible_vars section)
+ansible_vars:
+  vault_tailscale_auth_key: "tskey-auth-xxxxx-xxxxxxxxxxxxxxxx"
 ```
 
-Encrypt it:
+Encrypt it if not already encrypted:
 
 ```bash
-infra secrets encrypt secrets/tailscale.yaml
+sops --encrypt --in-place envs/dev/settings.yaml
 ```
 
 ### 3. Add Exit Node to Configuration
 
-In `envs/dev/proxmox/vms.yaml`:
+In `envs/dev/resources/vms.yaml`:
 
 ```yaml
 vms:
@@ -94,22 +96,24 @@ At https://login.tailscale.com/admin/settings/oauth:
 
 ### 2. Store OAuth Credentials Securely
 
-Create `secrets/tailscale.yaml`:
+Add to your environment's `settings.yaml`:
 
 ```yaml
-vault_tailscale_oauth_client_id: "xxxxxxxxxxxxx"
-vault_tailscale_oauth_client_secret: "tskey-client-xxxxxxxxxxxxx"
+# envs/dev/settings.yaml (add to ansible_vars section)
+ansible_vars:
+  vault_tailscale_oauth_client_id: "xxxxxxxxxxxxx"
+  vault_tailscale_oauth_client_secret: "tskey-client-xxxxxxxxxxxxx"
 ```
 
-Encrypt it:
+Encrypt it if not already encrypted:
 
 ```bash
-infra secrets encrypt secrets/tailscale.yaml
+sops --encrypt --in-place envs/dev/settings.yaml
 ```
 
 ### 3. Add Exit Node to Configuration
 
-In `envs/dev/proxmox/vms.yaml`:
+In `envs/dev/resources/vms.yaml`:
 
 ```yaml
 vms:
@@ -391,9 +395,13 @@ sudo sysctl -p
 4. **Encrypt in SOPS** - never commit plaintext keys
 
 ```yaml
-# secrets/tailscale.yaml (encrypted)
-vault_tailscale_auth_key_dev: "tskey-auth-dev-xxxxx"
-vault_tailscale_auth_key_prod: "tskey-auth-prod-xxxxx"
+# envs/dev/settings.yaml (encrypted with SOPS)
+ansible_vars:
+  vault_tailscale_auth_key: "tskey-auth-dev-xxxxx"
+
+# envs/prod/settings.yaml (encrypted with SOPS)
+ansible_vars:
+  vault_tailscale_auth_key: "tskey-auth-prod-xxxxx"
 ```
 
 ### Access Control Lists (ACLs)

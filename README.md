@@ -137,32 +137,7 @@ infra secrets init
 infra envs
 ```
 
-**Option 3: Embedded Configuration (Legacy)**
-
-```bash
-# Install uv if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Clone the repository
-git clone https://github.com/yourusername/infrafoundry.git
-cd infrafoundry
-
-# Install dependencies with uv
-uv pip install -e .
-
-# Set up direnv (recommended)
-cp docs/examples/.envrc.local.example .envrc.local
-# Edit .envrc.local with your credentials
-direnv allow
-
-# Generate encryption key for secrets
-infra secrets init
-
-# Verify installation
-infra --version
-```
-
-> **Note:** The interactive setup wizard (`scripts/setup-config.sh`) is the easiest way to get started. It automates configuration creation, secret management setup, and environment variable configuration. For manual setup or CI/CD environments, use Option 2 (separate config repo) or Option 3 (embedded).
+> **Note:** The interactive setup wizard (`scripts/setup-config.sh`) is the easiest way to get started. It automates configuration creation, secret management setup, and environment variable configuration. For manual setup or CI/CD environments, use Option 2 (separate config repo).
 
 ## How It Works
 
@@ -300,18 +275,6 @@ infra status --env dev
 infra destroy --env dev
 ```
 
-**With embedded configuration (legacy):**
-
-```bash
-# Initialize state tracking
-infra init
-
-# Commands work the same, configs are in ./envs/
-infra envs
-infra plan --env dev
-infra apply --env dev
-```
-
 ## CLI Commands
 
 ### Resource Management
@@ -397,11 +360,63 @@ infra status --env dev
 infra secrets init
 
 # Encrypt a secrets file
-infra secrets encrypt secrets/proxmox.yaml
+infra secrets encrypt envs/dev/settings.yaml
 
 # Decrypt and view a secrets file
-infra secrets decrypt secrets/proxmox.yaml
+infra secrets decrypt envs/dev/settings.yaml
 ```
+
+### Reset Operations
+
+Reset (wipe) specific infrastructure components for clean redeployment:
+
+```bash
+# Reset Kea DHCPv4 configuration
+infra reset --env prod --provider opnsense --component kea/dhcpv4
+
+# Reset Kea DHCPv6 configuration
+infra reset --env prod --provider opnsense --component kea/dhcpv6
+
+# Reset both DHCPv4 and DHCPv6
+infra reset --env prod --provider opnsense --component kea/dhcp
+
+# Skip confirmation prompt
+infra reset --env prod --provider opnsense --component kea/dhcp --auto-approve
+```
+
+**Use Cases:**
+- Clear existing DHCP config before applying InfraFoundry-managed configuration
+- Resolve configuration drift by wiping and reapplying
+- Clean slate for testing configuration changes
+
+### Migration Tools
+
+InfraFoundry includes tools to migrate existing infrastructure to code:
+
+```bash
+# Migrate existing Kea DHCP configuration from OPNsense
+infra migrate --env prod --provider opnsense --component kea/dhcp
+
+# Migrate legacy ISC DHCP to Kea DHCP format (both DHCPv4 and DHCPv6)
+infra migrate --env prod --provider opnsense --component isc-to-kea
+
+# Migrate specific interfaces only
+infra migrate --env prod --provider opnsense --component isc-to-kea -i lan -i wan
+
+# Preview migration without writing files
+infra migrate --env prod --provider opnsense --component isc-to-kea --dry-run
+
+# Custom output location
+infra migrate --env prod --provider opnsense --component isc-to-kea \
+    -o custom/path/dhcp-config.yaml
+```
+
+**ISC to Kea Migration:**
+- Converts legacy ISC DHCP (deprecated) to modern Kea DHCP
+- Migrates DHCPv4 and DHCPv6 configurations
+- Preserves all settings: subnets, pools, DNS, gateway, NTP, static reservations
+- Generates InfraFoundry YAML ready for deployment
+- See [docs/isc-to-kea-migration.md](docs/isc-to-kea-migration.md) for complete guide
 
 ### Multiple Configuration Files
 
@@ -439,7 +454,7 @@ infrafoundry/
 │   └── cli.py                 # Command-line interface
 ├── example-config/            # Example configuration repository
 │   ├── envs/                  # Example environments
-│   ├── secrets/               # Example secrets setup
+│   ├── envs/               # Example environment configurations
 │   ├── .gitignore             # Config repo gitignore
 │   └── README.md              # Config repo documentation
 ├── ci/                        # CI/CD integration helpers
@@ -465,7 +480,7 @@ my-infrastructure-config/
 │   │   └── kubernetes/        # Kubernetes resources
 │   ├── staging/               # Staging environment
 │   └── prod/                  # Production environment
-├── secrets/                   # Encryption keys (git-ignored keys)
+├── envs/                   # Environment configs with encrypted settings (git-ignored keys)
 │   ├── age.key                # Encryption key (DO NOT COMMIT)
 │   └── .sops.yaml             # SOPS configuration (committed)
 ├── generated/                 # Generated files (git-ignored)
@@ -678,10 +693,10 @@ InfraFoundry uses SOPS with age encryption for secrets:
 infra secrets init
 
 # Encrypt a secrets file
-infra secrets encrypt secrets/proxmox.yaml
+infra secrets encrypt envs/dev/settings.yaml
 
 # Decrypt and view
-infra secrets decrypt secrets/proxmox.yaml
+infra secrets decrypt envs/dev/settings.yaml
 
 # Secrets are automatically decrypted during deployment
 ```
@@ -689,7 +704,7 @@ infra secrets decrypt secrets/proxmox.yaml
 ### Example Secrets File
 
 ```yaml
-# secrets/proxmox.yaml (before encryption)
+# envs/dev/settings.yaml (before encryption)
 proxmox_api_url: https://proxmox.example.com:8006/api2/json
 proxmox_api_token_id: user@pam!token
 proxmox_api_token_secret: your-secret-token
@@ -866,7 +881,7 @@ python tools/opnsense-parser.py config.xml \
 ls -la $SOPS_AGE_KEY_FILE
 
 # Test decryption
-sops --decrypt secrets/proxmox.yaml
+sops --decrypt envs/dev/settings.yaml
 ```
 
 ### Terraform State
@@ -931,7 +946,8 @@ YAML Configs → ConfigManager → Providers → Jinja2 Templates → Generated 
 - **[Separate Configuration Repository](docs/separate-config-repo.md)** - Best practices for organizing infrastructure configs
 - **[State Management Strategies](docs/state-management.md)** - Understanding and managing Terraform state, InfraFoundry state, and generated files
 - **[Per-Environment Credentials](docs/per-environment-credentials.md)** - Managing different credentials for dev, staging, and production
-- **[Plugin Development](docs/plugin-development.md)** - Creating custom provider plugins
+- **[ISC to Kea DHCP Migration](docs/isc-to-kea-migration.md)** - Complete guide for migrating from legacy ISC DHCP to Kea DHCP
+- **[Plugin Development](docs/development/plugin-development.md)** - Creating custom provider plugins
 - **[direnv Setup](docs/direnv.md)** - Environment variable management
 
 ### Tool Documentation
@@ -968,7 +984,7 @@ We welcome contributions! Please follow these guidelines:
 - Mock external dependencies (Terraform, Ansible, APIs)
 - Check `htmlcov/index.html` for coverage gaps
 
-See [docs/TESTING_STATUS.md](docs/TESTING_STATUS.md) for testing status and [docs/ci-cd-testing.md](docs/ci-cd-testing.md) for testing guide.
+See [docs/development/TESTING_STATUS.md](docs/development/TESTING_STATUS.md) for testing status and [docs/development/ci-cd-testing.md](docs/development/ci-cd-testing.md) for testing guide.
 
 ## License
 

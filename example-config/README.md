@@ -23,7 +23,7 @@ This repository contains your infrastructure configurations, environment definit
 │   │   └── kubernetes/      # Kubernetes resources (YAML only)
 │   ├── staging/             # Staging environment
 │   └── prod/                # Production environment
-├── secrets/                 # Encrypted secrets (SOPS + age)
+├── envs/                 # Encrypted secrets (SOPS + age)
 │   ├── age.key              # Age encryption key (DO NOT COMMIT)
 │   ├── .sops.yaml           # SOPS configuration
 │   └── *.yaml               # Encrypted secret files
@@ -80,7 +80,7 @@ From the framework repository:
 infra secrets init
 ```
 
-This creates `secrets/age.key` and `secrets/.sops.yaml` in this config repository. The age key is automatically set up for decryption.
+This creates `envs/age.key` and `envs/.sops.yaml` in this config repository. The age key is automatically set up for decryption.
 
 ### 4. Add encrypted secrets
 
@@ -88,24 +88,24 @@ Create a secrets file and encrypt it:
 
 ```bash
 # Create secrets file (in config repo)
-cat > secrets/proxmox.yaml <<EOF
+cat > envs/proxmox.yaml <<EOF
 proxmox_api_url: https://proxmox.example.com:8006
 proxmox_token_id: terraform@pve!token
 proxmox_token_secret: your-secret-here
 EOF
 
 # Encrypt it
-infra secrets encrypt secrets/proxmox.yaml
+infra secrets encrypt envs/proxmox.yaml
 ```
 
 The original file will be encrypted in place. Commit the encrypted file:
 
 ```bash
-git add secrets/proxmox.yaml secrets/.sops.yaml
+git add envs/proxmox.yaml envs/.sops.yaml
 git commit -m "Add encrypted Proxmox credentials"
 ```
 
-⚠️ **NEVER commit `secrets/age.key` or `.envrc.local`!** These are git-ignored.
+⚠️ **NEVER commit `envs/age.key` or `.envrc.local`!** These are git-ignored.
 
 ## Usage
 
@@ -246,14 +246,14 @@ jobs:
         working-directory: config
         run: |
           mkdir -p secrets
-          echo "${{ secrets.SOPS_AGE_KEY }}" | base64 -d > secrets/age.key
-          chmod 600 secrets/age.key
+          echo "${{ secrets.SOPS_AGE_KEY }}" | base64 -d > envs/age.key
+          chmod 600 envs/age.key
 
       - name: Set environment variables
         working-directory: config
         run: |
           echo "INFRAFOUNDRY_CONFIG_REPO=$(pwd)" >> $GITHUB_ENV
-          echo "SOPS_AGE_KEY_FILE=$(pwd)/secrets/age.key" >> $GITHUB_ENV
+          echo "SOPS_AGE_KEY_FILE=$(pwd)/envs/age.key" >> $GITHUB_ENV
           echo "PROXMOX_API_URL=${{ secrets.PROXMOX_API_URL }}" >> $GITHUB_ENV
           echo "PROXMOX_API_TOKEN_ID=${{ secrets.PROXMOX_API_TOKEN_ID }}" >> $GITHUB_ENV
           echo "PROXMOX_API_TOKEN_SECRET=${{ secrets.PROXMOX_API_TOKEN_SECRET }}" >> $GITHUB_ENV
@@ -270,7 +270,7 @@ jobs:
 ### Required Secrets
 
 In GitHub repository settings, add these secrets:
-- `SOPS_AGE_KEY` - Base64-encoded age key: `cat secrets/age.key | base64 -w0`
+- `SOPS_AGE_KEY` - Base64-encoded age key: `cat envs/age.key | base64 -w0`
 - `PROXMOX_API_URL` - Proxmox API URL
 - `PROXMOX_API_TOKEN_ID` - Proxmox token ID
 - `PROXMOX_API_TOKEN_SECRET` - Proxmox token secret
@@ -303,10 +303,10 @@ In GitHub repository settings, add these secrets:
 age-keygen -o ~/.age/personal.key
 
 # Admin encrypts shared key
-age -r <team-member-public-key> -o age.key.encrypted secrets/age.key
+age -r <team-member-public-key> -o age.key.encrypted envs/age.key
 
 # Team member decrypts
-age -d -i ~/.age/personal.key age.key.encrypted > secrets/age.key
+age -d -i ~/.age/personal.key age.key.encrypted > envs/age.key
 ```
 
 **Option 3: Per-user SOPS setup** (Most secure)
@@ -314,7 +314,7 @@ age -d -i ~/.age/personal.key age.key.encrypted > secrets/age.key
 - Add all public keys to `.sops.yaml`
 - SOPS encrypts for all keys
 
-Edit `secrets/.sops.yaml`:
+Edit `envs/.sops.yaml`:
 ```yaml
 creation_rules:
   - path_regex: .*\.yaml$
@@ -334,7 +334,7 @@ export INFRAFOUNDRY_CONFIG_REPO="/path/to/config/repo"
 ### Decryption fails
 - Check `SOPS_AGE_KEY_FILE` points to correct key
 - Verify age.key is readable: `ls -l $SOPS_AGE_KEY_FILE`
-- Test manually: `sops -d secrets/proxmox.yaml`
+- Test manually: `sops -d envs/proxmox.yaml`
 
 ### Environment not found
 - Check directory structure: `ls envs/`
@@ -372,8 +372,8 @@ git push -u origin update-dev-vms
 ### Backup important files
 
 Regularly backup:
-- `secrets/age.key` - Encryption key (store securely offline)
-- `secrets/.sops.yaml` - SOPS configuration
+- `envs/age.key` - Encryption key (store securely offline)
+- `envs/.sops.yaml` - SOPS configuration
 - `.envrc.local` - Local environment settings (keep private)
 - `generated/` - Generated Terraform state files (for each environment)
 

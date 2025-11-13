@@ -56,15 +56,9 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     state_manager = StateManager(connection_string="sqlite:///:memory:")
     state_manager.initialize()  # Initialize database schema
 
-    # Mock SecretManager
-    secret_manager = Mock(spec=SecretManager)
-    secret_manager.export_for_terraform = Mock()
-    secret_manager.export_for_ansible = Mock()
-
     # Create orchestrator with correct constructor signature
     orchestrator = Orchestrator(
         config_manager=config_manager,
-        secret_manager=secret_manager,
         output_dir=output_dir,
         state_manager=state_manager,
         event_manager=event_manager,
@@ -166,24 +160,15 @@ class TestPlanWorkflow:
             assert len(resources) > 0
             assert resources[0].state == ResourceState.PLANNED
 
-    def test_plan_exports_secrets(self, orchestrator):
-        """Test that plan exports secrets for providers."""
-        with patch.object(orchestrator.terraform_runner, "run"):
-            orchestrator.plan(env_name="dev", dry_run=False)
+    # NOTE: Secrets are now handled per-environment via CredentialLoader in CLI
+    # Not directly by orchestrator, so these tests are no longer applicable
+    # def test_plan_exports_secrets(self, orchestrator):
+    #     """Test that plan exports secrets for providers."""
+    #     ...
 
-            # Verify secrets were exported
-            orchestrator.secret_manager.export_for_terraform.assert_called()
-
-    def test_plan_handles_missing_secrets(self, orchestrator):
-        """Test that plan handles missing secrets gracefully."""
-        orchestrator.secret_manager.export_for_terraform.side_effect = FileNotFoundError(
-            "No secrets"
-        )
-
-        with patch.object(orchestrator.terraform_runner, "run"):
-            # Should not raise, just print warning
-            result = orchestrator.plan(env_name="dev", dry_run=False)
-            assert "proxmox" in result
+    # def test_plan_handles_missing_secrets(self, orchestrator):
+    #     """Test that plan handles missing secrets gracefully."""
+    #     ...
 
     def test_plan_failure_updates_deployment_status(self, orchestrator):
         """Test that plan failure marks deployment as failed."""

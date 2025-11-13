@@ -9,7 +9,6 @@ from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.orchestrator import Orchestrator
-from infrafoundry.core.secrets import SecretManager
 
 # Load environment variables
 load_dotenv()
@@ -24,35 +23,15 @@ def _get_orchestrator(config_repo: Path | None = None) -> Orchestrator:
         config_repo: Path to configuration repository
             (overrides INFRAFOUNDRY_CONFIG_REPO)
     """
-    # Determine config and secrets directories
+    # Determine config directory
     if config_repo:
         config_dir = config_repo / "envs"
-        secrets_dir = config_repo / "secrets"
         config_manager = ConfigManager(base_dir=config_dir)
-
-        def secret_manager_init() -> SecretManager:
-            return SecretManager(secrets_dir=secrets_dir)
-
     else:
         config_manager = ConfigManager()
 
-        def secret_manager_init() -> SecretManager:
-            return SecretManager()
-
-    # Check if secrets are needed
-    try:
-        secret_manager = secret_manager_init()
-    except (RuntimeError, ValueError) as e:
-        if "SOPS_AGE_KEY_FILE" in str(e):
-            console.print(
-                "[yellow]Warning: Secrets not configured. "
-                "Set SOPS_AGE_KEY_FILE to use encrypted secrets.[/yellow]"
-            )
-            secret_manager = None
-        else:
-            raise
-
-    orchestrator = Orchestrator(config_manager, secret_manager)
+    # Create orchestrator (SecretManager is created per-operation now)
+    orchestrator = Orchestrator(config_manager)
 
     # Dynamically register available providers
     try:

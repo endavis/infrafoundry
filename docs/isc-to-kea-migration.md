@@ -280,7 +280,7 @@ The migration logic is fully implemented - only the ISC config reading needs a d
 
 **Cause:** MAC address format or DUID mismatch
 
-**Solution:** 
+**Solution:**
 - DHCPv4: Verify MAC address format (colon-separated)
 - DHCPv6: Get correct DUID from OPNsense DHCP leases
 

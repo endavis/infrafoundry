@@ -127,9 +127,9 @@ class TestProxmoxTemplates:
         assert "sockets" in content
         assert "memory" in content and "8192" in content
 
-        # Check disk configuration
-        assert "50" in content  # Size without G suffix
-        assert "scsi" in content
+        # Disk configuration is NOT generated when cloning (handled by template)
+        # Only new VMs (without clone) get explicit disk blocks
+        # So no "scsi" or disk size should be in the generated content
         assert "local-lvm" in content
 
         # Check network configuration

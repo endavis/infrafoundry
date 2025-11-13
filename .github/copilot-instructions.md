@@ -93,8 +93,8 @@ direnv allow                     # Load environment
 
 # Development
 make dev                         # Install with dev dependencies (uses uv)
-make test                        # Run pytest (286 tests)
-make coverage                    # Run tests with full coverage report (70%)
+make test                        # Run pytest
+make coverage                    # Run tests with full coverage report
 make lint                        # Run ruff
 make format                      # Format with black
 
@@ -156,7 +156,7 @@ infra secrets decrypt file.yaml  # Decrypt and display
   - Organize by service/application instead of provider
   - See all infrastructure for a service in one file
 
-- Config repo structure: `envs/`, `secrets/`, `.envrc.local`, `.gitignore`, `README.md`
+- Config repo structure: `envs/`, `.envrc.local`, `.gitignore`, `README.md`
 - Both formats can be used simultaneously
 
 **3. Provider Implementation:**
@@ -175,8 +175,8 @@ infra secrets decrypt file.yaml  # Decrypt and display
 
 **5. Secret Management:**
 - ALL secrets encrypted with SOPS + age
-- Age key location: `$INFRAFOUNDRY_CONFIG_REPO/secrets/age.key` or `./secrets/age.key`
-- Encrypted files: `secrets/*.yaml` (committed to config repo)
+- Age key location: `$INFRAFOUNDRY_CONFIG_REPO/envs/{env}/age.key` or `./envs/{env}/age.key`
+- Encrypted files: `envs/{env}/settings.yaml` (provider_settings section, committed to config repo)
 - Export for Terraform: `.tfvars` files (git-ignored)
 - CI: Base64-encode age key, store as `SOPS_AGE_KEY`
 
@@ -229,7 +229,7 @@ infra secrets decrypt file.yaml  # Decrypt and display
 **GitHub Actions** (`.github/workflows/infra-deploy.yml`):
 - Triggered on: push to main, manual workflow_dispatch
 - Sets up: Python, uv, Terraform, Ansible, SOPS
-- Decodes `SOPS_AGE_KEY` secret to `secrets/age.key`
+- Decodes `SOPS_AGE_KEY` secret to `envs/{env}/age.key`
 - Runs: `infra plan` → `infra apply --auto-approve`
 
 **GitLab CI** (`docs/examples/.gitlab-ci.yml.example`):
@@ -283,7 +283,7 @@ terraform plan                   # Review Terraform plan
 
 **Secret decryption issues:**
 - Verify `SOPS_AGE_KEY_FILE` points to correct key: `echo $SOPS_AGE_KEY_FILE`
-- Test SOPS manually: `sops --decrypt secrets/proxmox.yaml`
+- Test SOPS manually: `sops --decrypt envs/dev/settings.yaml`
 - Check `.sops.yaml` has correct age public key
 
 **Provider not found:**
@@ -297,6 +297,44 @@ terraform plan                   # Review Terraform plan
 - Validate with `terraform validate` in generated directory
 
 ### Important Patterns
+
+**OPNsense 3-Layer Architecture:**
+The OPNsense provider uses a modern 3-layer architecture for complex API operations:
+
+1. **Service Layer** (`providers/opnsense/services/`):
+   - Low-level API operations
+   - Classes: `BaseService`, `KeaDHCPService`, `ISCDHCPService`
+   - Factory pattern: `from_environment()` creates service with credentials
+   - Example: `search_dhcpv4_subnets()`, `delete_dhcpv4_subnet(uuid)`
+
+2. **Component Manager** (`providers/opnsense/components/`):
+   - Business logic and orchestration
+   - Classes: `BaseComponentManager`, `KeaDHCPManager`, `ISCToKeaMigrationManager`
+   - Coordinates multiple service calls
+   - Example: `reset_dhcpv4()` - gets all subnets, deletes each, reconfigures
+
+3. **Provider Layer** (`providers/opnsense/__init__.py`):
+   - Thin delegation (3-4 lines per method)
+   - Exposes operations to framework
+   - Example: `reset_kea_dhcpv4()` creates manager, calls `reset_dhcpv4()`
+
+**When to use 3-layer architecture:**
+- Complex API operations (multiple calls, error handling)
+- Operations need business logic beyond API calls
+- Want to reuse API operations across features
+- Need detailed unit testing of orchestration
+
+**When to keep provider simple:**
+- Straightforward template rendering
+- No complex API interactions (Proxmox, Kubernetes use this)
+
+**Type handling with factories:**
+```python
+# Factory returns base type but we need concrete type
+service: KeaDHCPService = KeaDHCPService.from_environment(  # type: ignore[assignment]
+    env_name, provider_name, self.config_dir
+)
+```
 
 **Resource dependencies:** Providers can declare dependencies via `get_dependencies()`:
 ```python
@@ -313,7 +351,7 @@ def get_dependencies(self) -> dict[str, list[str]]:
 3. `generate_ansible()` creates post-config playbooks
 4. Ansible runs after Terraform apply
 
-**Secret sharing:** Secrets in `secrets/*.yaml` are decrypted and exported to both Terraform (`.tfvars`) and Ansible (`vars.yml`) automatically by `SecretManager`.
+**Secret sharing:** Credentials in `envs/{env}/settings.yaml` (provider_settings section) are decrypted and exported to both Terraform (`.tfvars`) and Ansible (`vars.yml`) automatically by `SecretManager`.
 
 ### When to Edit Which Files
 
