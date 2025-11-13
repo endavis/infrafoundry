@@ -521,6 +521,196 @@ infra history --env dev
 
 ---
 
+## Git Commit Conventions
+
+### Commit Message Format
+
+This project follows **Conventional Commits** format:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+### Commit Types
+- `feat`: New feature
+- `fix`: Bug fix
+- `refactor`: Code refactoring (no functional changes)
+- `docs`: Documentation changes
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks (deps, config, etc.)
+- `perf`: Performance improvements
+- `style`: Code style/formatting changes
+
+### Scope (Optional)
+- Component or module affected: `opnsense`, `proxmox`, `cli`, `orchestrator`, etc.
+
+### Commit Message Style
+
+**Short commits (simple changes):**
+```bash
+git commit -m "chore: update uv.lock"
+git commit -m "fix(cli): handle missing environment gracefully"
+git commit -m "docs: fix typo in README"
+```
+
+**Detailed commits (significant changes):**
+```bash
+git commit -m "$(cat <<'EOF'
+refactor(opnsense): batch DHCPv6 API calls for 98% performance improvement
+
+### Problem
+- Created API client inside loop for EVERY subnet/reservation
+- Called search functions N times instead of once
+- Result: 60x performance overhead
+
+### Solution
+- Created batched method that processes all resources together
+- Single API client creation
+- Single search per resource type
+- Single service reconfiguration
+
+### Performance Improvements
+- API clients: 60 → 1 (98% reduction)
+- Searches: 60 → 2 (97% reduction)
+- Reconfigs: 2 → 1 (50% reduction)
+
+### Testing
+- All 449 tests passing
+- Backward compatible
+- No breaking changes
+
+Addresses REFACTORING_TODO.md #1
+EOF
+)"
+```
+
+### Commit Structure for Significant Changes
+
+Use markdown formatting in commit body:
+
+1. **Problem Statement**
+   - Describe what was wrong or missing
+   - Include metrics/impact if applicable
+
+2. **Solution**
+   - Explain the approach taken
+   - List key implementation details
+
+3. **Changes/Impact**
+   - List specific changes made
+   - Document any breaking changes
+
+4. **Testing**
+   - Test results
+   - Backward compatibility notes
+   - Risk assessment
+
+5. **References** (optional)
+   - Link to issues, docs, or TODO items
+
+### Examples from Project History
+
+**Refactoring:**
+```
+refactor: per-environment secrets migration complete
+
+### Architecture Changes
+- ConfigManager now requires INFRAFOUNDRY_CONFIG_REPO
+- SecretManager takes env_name parameter
+- Updated all paths from secrets/ to envs/{env}/
+
+### Test Fixes (453 tests passing)
+- Updated all test instantiations
+- Fixed path references
+
+### Documentation Updates
+- Removed deprecated secrets/ references
+- Updated security best practices
+```
+
+**Feature:**
+```
+feat(opnsense): add Kea DHCP support and reset/migrate methods
+
+- Add reset_kea_dhcpv4() and reset_kea_dhcpv6()
+- Add migrate_kea_dhcp() for config export
+- Delegate to KeaDHCPManager component
+- All tests passing
+```
+
+**Documentation:**
+```
+docs: update documentation to reflect fully implemented features
+
+### Overview
+Updated docs to show advanced features are production-ready
+
+### Changes
+- README.md: Added "Advanced Operations" section
+- CLI_REFERENCE.md: Complete CLI command reference
+- Architecture docs updated
+
+### Impact
+- Improves feature discoverability
+- Clarifies production-ready status
+```
+
+### Multi-Commit Strategy
+
+When working on related changes, create separate commits for:
+
+1. **Core refactoring** - The main code changes
+2. **Documentation** - Doc updates related to the refactoring
+3. **Tests** - New or updated tests (if not part of refactoring)
+4. **Cleanup** - Formatting, minor fixes
+5. **Dependencies** - uv.lock, package updates
+
+**Example sequence:**
+```bash
+# 1. Main refactoring
+git add src/infrafoundry/providers/opnsense/__init__.py
+git commit -m "refactor(opnsense): batch DHCPv6 API calls..."
+
+# 2. Documentation
+git add .claude/ REFACTORING_TODO.md
+git commit -m "docs: add Claude context and update refactoring status..."
+
+# 3. Related docs
+git add README.md docs/
+git commit -m "docs: update feature documentation..."
+
+# 4. Cleanup
+git add example-config/ ci/
+git commit -m "chore: update CI script and example configs..."
+
+# 5. Dependencies
+git add uv.lock
+git commit -m "chore: update uv.lock"
+```
+
+### Tips for Good Commits
+
+✅ **Do:**
+- Use present tense ("add feature" not "added feature")
+- Be specific in scope (component/module affected)
+- Include metrics for performance improvements
+- Reference related issues or docs
+- Use markdown formatting for complex commits
+- Keep each commit focused on one logical change
+
+❌ **Don't:**
+- Mix unrelated changes in one commit
+- Use vague messages ("fix stuff", "updates")
+- Skip the body for significant changes
+- Include work-in-progress commits in main branches
+- Commit without running tests
+
+---
+
 ## Quick Reference: File Sizes
 
 ```
