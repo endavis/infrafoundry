@@ -131,7 +131,7 @@ vms:
   - Installs Tailscale snap from specified channel
   - Connects required snap interfaces (network-control, firewall-control)
   - Sets service and binary paths for snap
-  
+
 - **Native** (Regular Linux):
   - Adds Tailscale repository (APT/YUM/DNF)
   - Installs Tailscale package
@@ -143,7 +143,7 @@ vms:
   - Enables IPv6 forwarding (`net.ipv6.conf.all.forwarding=1`)
   - Persistent configuration on regular systems
   - Runtime configuration on immutable systems
-  
+
 - **Firewall**:
   - Opens Tailscale UDP port (41641)
   - Configures forwarding rules for Tailscale interface

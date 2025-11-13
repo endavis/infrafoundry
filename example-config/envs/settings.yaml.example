@@ -1,0 +1,63 @@
+# Example settings.yaml for an environment
+# Copy to envs/{env}/settings.yaml and customize
+# Then encrypt with: sops --encrypt --in-place envs/{env}/settings.yaml
+
+name: dev
+description: Development environment for testing InfraFoundry
+
+# Provider credentials (will be encrypted with SOPS)
+# These are automatically loaded when running infra commands
+provider_settings:
+  proxmox:
+    api_url: https://proxmox.example.com:8006
+    token_id: terraform@pve!token
+    token_secret: your-secret-here
+    # Optional: node for operations
+    node: pve01
+  
+  opnsense:
+    api_url: https://firewall.example.com
+    api_key: your-api-key
+    api_secret: your-api-secret
+  
+  kubernetes:
+    # Path to kubeconfig file
+    config_path: ~/.kube/config
+    # Or use config_content for inline kubeconfig
+    # config_content: |
+    #   apiVersion: v1
+    #   kind: Config
+    #   ...
+
+# Environment-specific variables
+# These are available in templates as {{ environment }}, {{ domain }}, etc.
+variables:
+  environment: development
+  region: us-east
+  domain: dev.example.com
+  cluster_name: dev-cluster
+
+# Optional: Ansible variables (passed to all playbooks)
+ansible_vars:
+  ansible_user: ubuntu
+  ansible_python_interpreter: /usr/bin/python3
+  # Custom variables for your playbooks
+  app_version: "1.0.0"
+  enable_monitoring: true
+
+# Optional: SSH configuration for Proxmox template operations
+ssh:
+  user: automation
+  key_path: /home/automation/.ssh/id_ed25519
+  port: 22
+  # known_hosts_file: ~/.ssh/known_hosts
+
+# Optional: Terraform backend configuration
+# By default uses local backend in generated/{env}/terraform/{provider}/
+# terraform_backend:
+#   type: s3
+#   config:
+#     bucket: my-terraform-state
+#     key: infrafoundry/{env}.tfstate
+#     region: us-east-1
+#     dynamodb_table: terraform-locks
