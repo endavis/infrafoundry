@@ -13,11 +13,11 @@ creation_rules:
   # Development environment
   - path_regex: envs/dev/settings\.yaml$
     age: age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # Replace with: cat envs/dev/age.key | age-keygen -y
-  
+
   # Staging environment
   - path_regex: envs/staging/settings\.yaml$
     age: age1yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy  # Replace with: cat envs/staging/age.key | age-keygen -y
-  
+
   # Production environment (most restrictive)
   - path_regex: envs/prod/settings\.yaml$
     age: age1zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz  # Replace with: cat envs/prod/age.key | age-keygen -y
@@ -32,7 +32,7 @@ creation_rules:
 #       age1dev_alice...,
 #       age1dev_bob...,
 #       age1dev_charlie...
-#   
+#
 #   - path_regex: envs/prod/settings\.yaml$
 #     age: >-
 #       age1prod_admin1...,
