@@ -27,6 +27,7 @@ InfraFoundry generates Terraform and Ansible configurations from YAML definition
 
 ## Features
 
+### Core Infrastructure Management
 - 🔌 **Pluggable Providers**: Proxmox, OPNsense, Kubernetes (extensible to ESXi, Docker, cloud providers)
 - 🔐 **Secure Secrets**: SOPS with age encryption for secrets shared between Terraform and Ansible
 - 📝 **Declarative Config**: YAML configuration files separated by resource type
@@ -35,10 +36,18 @@ InfraFoundry generates Terraform and Ansible configurations from YAML definition
 - 🐍 **Modern Python**: Built with Python 3.12+, uv package manager, type hints
 - 🔄 **Reproducible**: Complete environment definition in version control
 - 🎯 **Developer Friendly**: direnv integration, rich CLI with colored output
-- 📊 **State Tracking**: Full deployment history and resource lifecycle tracking
+
+### Advanced Operations (Fully Implemented)
+- 📊 **State Tracking**: Full deployment history and resource lifecycle tracking (SQLite/PostgreSQL)
 - 🔍 **Event System**: Hook into any point in the deployment lifecycle
-- 🌐 **Dependency Resolution**: Smart dependency graphs with circular detection
-- 📈 **Foundation for Advanced Features**: Drift detection, impact analysis, automated rollback
+- 🌐 **Dependency Resolution**: Smart dependency graphs with circular detection and impact analysis
+- 🔎 **Drift Detection**: Detect infrastructure changes made outside InfraFoundry
+- 📊 **Impact Analysis**: Analyze downstream effects before making changes
+- ✅ **Pre-flight Validation**: Comprehensive validation before deployment (connectivity, resources, credentials)
+- 🛡️ **Policy Enforcement**: Pluggable policy engine for resource limits, naming conventions, and compliance
+- ⚡ **Parallel Execution**: Deploy independent providers simultaneously for faster operations
+- 🔄 **Automated Rollback**: Revert to previous known-good deployments
+- 🔧 **Migration Tools**: ISC to Kea DHCP migration, configuration imports
 
 ## Architecture
 
@@ -341,7 +350,7 @@ State is stored in `~/.infrafoundry/state.db` by default. This enables:
 - **Deployment tracking**: See who deployed what and when
 - **Resource tracking**: Monitor resource lifecycle and state
 - **Audit trails**: Full history of infrastructure changes
-- **Future features**: Drift detection, impact analysis, rollback
+- **Advanced operations**: Drift detection, impact analysis, rollback (all implemented)
 
 ### Environment Management
 
@@ -364,6 +373,94 @@ infra secrets encrypt envs/dev/settings.yaml
 
 # Decrypt and view a secrets file
 infra secrets decrypt envs/dev/settings.yaml
+```
+
+### Advanced Operations
+
+#### Drift Detection
+
+Detect infrastructure changes made outside InfraFoundry:
+
+```bash
+# Detect drift in environment
+infra drift --env prod
+
+# Shows:
+# - Resources added outside InfraFoundry
+# - Resources modified manually
+# - Resources deleted unexpectedly
+```
+
+#### Impact Analysis
+
+Analyze downstream effects before making changes:
+
+```bash
+# Analyze impact of changing a resource
+infra impact --env prod --resource db-template
+
+# Shows:
+# - All resources that depend on the specified resource
+# - Risk level (LOW, MEDIUM, HIGH, CRITICAL)
+# - Suggested actions
+```
+
+#### Pre-flight Validation
+
+Validate configuration before deployment:
+
+```bash
+# Validate entire environment
+infra validate --env test
+
+# Validate specific resources
+infra validate --env test --resource vm-01 --resource vm-02
+
+# Show detailed output including passing checks
+infra validate --env test --verbose
+```
+
+**Validation Checks:**
+- API connectivity to all providers
+- Nodes/hosts exist and are online
+- Storage pools exist and are active
+- Network bridges are configured
+- Templates/images exist for cloning
+- VMIDs/resource IDs are available
+- No MAC address conflicts
+- Referenced resources exist
+
+#### Policy Enforcement
+
+Enforce organizational policies on infrastructure:
+
+```bash
+# List available policies
+infra policies list
+
+# Check resources against policies
+infra policies check --env prod
+
+# Policies can enforce:
+# - Resource limits (CPU, memory, disk)
+# - Naming conventions
+# - Security requirements
+# - Compliance rules
+```
+
+#### Rollback Operations
+
+Revert to previous deployments:
+
+```bash
+# List available rollback points
+infra rollback-points --env prod
+
+# Rollback to specific deployment
+infra rollback --env prod --to-deployment 42
+
+# Rollback to previous deployment
+infra rollback --env prod --to-previous
 ```
 
 ### Reset Operations
@@ -942,13 +1039,27 @@ YAML Configs → ConfigManager → Providers → Jinja2 Templates → Generated 
 
 ## Documentation
 
+### Getting Started
+- **[CLI Reference](docs/CLI_REFERENCE.md)** - Complete command reference with examples
+- **[Setup Guide](docs/SETUP_GUIDE.md)** - Initial configuration and setup walkthrough
+
 ### Core Guides
 - **[Separate Configuration Repository](docs/separate-config-repo.md)** - Best practices for organizing infrastructure configs
 - **[State Management Strategies](docs/state-management.md)** - Understanding and managing Terraform state, InfraFoundry state, and generated files
 - **[Per-Environment Credentials](docs/per-environment-credentials.md)** - Managing different credentials for dev, staging, and production
 - **[ISC to Kea DHCP Migration](docs/isc-to-kea-migration.md)** - Complete guide for migrating from legacy ISC DHCP to Kea DHCP
-- **[Plugin Development](docs/development/plugin-development.md)** - Creating custom provider plugins
 - **[direnv Setup](docs/direnv.md)** - Environment variable management
+
+### Development
+- **[Plugin Development](docs/development/plugin-development.md)** - Creating custom provider plugins
+- **[Manager Patterns](docs/development/manager-patterns.md)** - Standard patterns for managers and 3-layer architecture
+- **[Architectural Patterns](docs/architecture/architectural-patterns.md)** - Core patterns and best practices
+
+### Architecture
+- **[Architecture Overview](docs/architecture/ARCHITECTURE.md)** - System architecture, state management, and implemented features
+- **[Orchestrator Architecture](docs/architecture/orchestrator-architecture.md)** - Orchestrator design and delegation pattern
+- **[Service Layer Refactoring](docs/architecture/service-layer-refactoring.md)** - 3-layer architecture pattern
+- **[Pluggable Runners](docs/architecture/pluggable-runners.md)** - Runner system for Terraform, Ansible, and custom tools
 
 ### Tool Documentation
 - **[OPNsense Parser](docs/tools/opnsense-parser.md)** - Converting OPNsense XML configs to YAML
