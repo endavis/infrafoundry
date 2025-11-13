@@ -103,14 +103,14 @@ jobs:
         run: |
           cd config
           mkdir -p secrets
-          echo "${{ secrets.SOPS_AGE_KEY }}" | base64 -d > secrets/age.key
-          chmod 600 secrets/age.key
+          echo "${{ secrets.SOPS_AGE_KEY }}" | base64 -d > envs/dev/age.key
+          chmod 600 envs/dev/age.key
 
       - name: Set environment variables
         run: |
           cd config
           echo "INFRAFOUNDRY_CONFIG_REPO=$(pwd)" >> $GITHUB_ENV
-          echo "SOPS_AGE_KEY_FILE=$(pwd)/secrets/age.key" >> $GITHUB_ENV
+          echo "SOPS_AGE_KEY_FILE=$(pwd)/envs/dev/age.key" >> $GITHUB_ENV
           echo "INFRAFOUNDRY_LOG_LEVEL=INFO" >> $GITHUB_ENV
 
           # Provider credentials
@@ -206,12 +206,12 @@ variables:
 
     # Set up age key
     - mkdir -p secrets
-    - echo "$SOPS_AGE_KEY" | base64 -d > secrets/age.key
-    - chmod 600 secrets/age.key
+    - echo "$SOPS_AGE_KEY" | base64 -d > envs/dev/age.key
+    - chmod 600 envs/dev/age.key
 
     # Set environment variables
     - export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
-    - export SOPS_AGE_KEY_FILE="$(pwd)/secrets/age.key"
+    - export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
     - export INFRAFOUNDRY_LOG_LEVEL=INFO
 
 validate:
@@ -309,7 +309,7 @@ In your **config repository** settings, add:
 **Encryption:**
 - `SOPS_AGE_KEY` - Base64-encoded age key
   ```bash
-  cat secrets/age.key | base64 -w0
+  cat envs/dev/age.key | base64 -w0
   ```
 
 **Proxmox:**
@@ -409,7 +409,7 @@ ref: ${{ env.INFRAFOUNDRY_VERSION }}
 Check `SOPS_AGE_KEY` secret:
 ```bash
 # Encode correctly
-cat secrets/age.key | base64 -w0
+cat envs/dev/age.key | base64 -w0
 
 # Add as secret without newlines
 ```
@@ -432,16 +432,6 @@ Always ensure you're in the config repo:
   working-directory: config  # or use 'cd config' in script
   run: infra plan --env dev
 ```
-
-## Migration from Embedded Config
-
-If migrating from embedded config in framework repo:
-
-1. Keep old workflow as `.github/workflows/legacy-deploy.yml`
-2. Create new workflow using separate config pattern
-3. Test new workflow in dev environment
-4. Switch production to new workflow
-5. Archive old workflow
 
 ## Additional Resources
 

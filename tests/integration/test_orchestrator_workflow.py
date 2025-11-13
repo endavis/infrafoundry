@@ -16,7 +16,7 @@ def mock_secret_manager(mock_secrets_dir):
     """Create a mock SecretManager."""
     with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
         with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
-            manager = SecretManager(secrets_dir=mock_secrets_dir)
+            manager = SecretManager(env_name="dev", secrets_dir=mock_secrets_dir)
             # Mock decrypt to return simple data
             manager.decrypt_file = MagicMock(return_value={"api_token": "test-token"})
             return manager
@@ -42,7 +42,6 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
             state_manager=state_manager,
             event_manager=EventManager(),
@@ -63,7 +62,6 @@ class TestOrchestratorWorkflow:
 
         Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
         )
 
@@ -81,7 +79,6 @@ class TestOrchestratorWorkflow:
 
         Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
         )
 
@@ -108,7 +105,6 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
             event_manager=event_manager,
             policy_dir=mock_policy_dir,
@@ -127,7 +123,6 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
             policy_dir=mock_policy_dir,
         )
@@ -155,7 +150,6 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
             state_manager=state_manager,
         )
@@ -183,7 +177,6 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
         )
 
@@ -199,7 +192,6 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
         )
 
@@ -213,7 +205,6 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
         )
 
@@ -227,7 +218,6 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
         )
 
@@ -241,7 +231,6 @@ class TestOrchestratorWorkflow:
 
         orchestrator = Orchestrator(
             config_manager=config,
-            secret_manager=mock_secret_manager,
             output_dir=output_dir,
         )
 

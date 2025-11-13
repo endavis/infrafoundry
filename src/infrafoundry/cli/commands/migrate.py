@@ -127,9 +127,7 @@ def migrate(
                 interfaces_list = list(interfaces) if interfaces else None
 
                 if interfaces_list:
-                    console.print(
-                        f"[dim]Targeting interfaces: {', '.join(interfaces_list)}[/dim]"
-                    )
+                    console.print(f"[dim]Targeting interfaces: {', '.join(interfaces_list)}[/dim]")
                 else:
                     console.print("[dim]Migrating all interfaces with ISC DHCP enabled[/dim]")
 

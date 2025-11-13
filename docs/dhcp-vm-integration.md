@@ -110,7 +110,7 @@ Example:
 
 ### DHCP Mapping Not Created
 
-- Check OPNsense credentials in `secrets/credentials.yaml`
+- Check OPNsense credentials in `envs/credentials.yaml`
 - Verify interface name (e.g., `opt1`) matches OPNsense configuration
 - Check Terraform apply output for errors
 

@@ -26,11 +26,9 @@ class TestOrchestratorInit:
 
         orchestrator = Orchestrator(
             config_manager=config_manager,
-            secret_manager=secret_manager,
         )
 
         assert orchestrator.config_manager == config_manager
-        assert orchestrator.secret_manager == secret_manager
         assert orchestrator.output_dir == Path.cwd() / "generated"
         assert isinstance(orchestrator.state_manager, StateManager)
         assert isinstance(orchestrator.event_manager, EventManager)
@@ -46,7 +44,6 @@ class TestOrchestratorInit:
 
         orchestrator = Orchestrator(
             config_manager=config_manager,
-            secret_manager=secret_manager,
             output_dir=output_dir,
         )
 
@@ -62,7 +59,6 @@ class TestOrchestratorInit:
 
         orchestrator = Orchestrator(
             config_manager=config_manager,
-            secret_manager=secret_manager,
             state_manager=state_manager,
             event_manager=event_manager,
         )
@@ -80,7 +76,6 @@ class TestOrchestratorInit:
 
         Orchestrator(
             config_manager=config_manager,
-            secret_manager=secret_manager,
             output_dir=output_dir,
         )
 
@@ -94,7 +89,6 @@ class TestOrchestratorInit:
         with patch.dict(os.environ, {"USER": "testuser"}):
             orchestrator = Orchestrator(
                 config_manager=config_manager,
-                secret_manager=secret_manager,
             )
             assert orchestrator._current_user == "testuser"
 
@@ -111,7 +105,6 @@ class TestOrchestratorInit:
         with patch.dict(os.environ, env, clear=True):
             orchestrator = Orchestrator(
                 config_manager=config_manager,
-                secret_manager=secret_manager,
             )
             assert orchestrator._current_user == "unknown"
 
@@ -132,7 +125,6 @@ class TestOrchestratorNotifications:
         with patch.object(Orchestrator, "_setup_notifications") as mock_setup:
             orchestrator = Orchestrator(
                 config_manager=config_manager,
-                secret_manager=secret_manager,
                 event_manager=event_manager,
             )
             orchestrator.notification_manager = notification_manager
@@ -147,7 +139,6 @@ class TestOrchestratorNotifications:
 
         orchestrator = Orchestrator(
             config_manager=config_manager,
-            secret_manager=secret_manager,
         )
 
         # Should not raise error when no channels
@@ -161,7 +152,7 @@ class TestOrchestratorProviderManagement:
         """Test registering a provider."""
         config_manager = Mock(spec=ConfigManager)
         secret_manager = Mock(spec=SecretManager)
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         provider = Mock(spec=ProviderBase)
         provider.name = "test_provider"
@@ -175,7 +166,7 @@ class TestOrchestratorProviderManagement:
         """Test registering multiple providers."""
         config_manager = Mock(spec=ConfigManager)
         secret_manager = Mock(spec=SecretManager)
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         provider1 = Mock(spec=ProviderBase)
         provider1.name = "proxmox"
@@ -193,7 +184,7 @@ class TestOrchestratorProviderManagement:
         """Test that registering a provider with same name overwrites."""
         config_manager = Mock(spec=ConfigManager)
         secret_manager = Mock(spec=SecretManager)
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         provider1 = Mock(spec=ProviderBase)
         provider1.name = "test"
@@ -213,7 +204,7 @@ class TestOrchestratorValidateResources:
         """Test validation succeeds when all resources are valid."""
         config_manager = Mock(spec=ConfigManager)
         secret_manager = Mock(spec=SecretManager)
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         # Register provider
         provider = Mock(spec=ProviderBase)
@@ -239,7 +230,7 @@ class TestOrchestratorValidateResources:
         """Test validation fails when provider not registered."""
         config_manager = Mock(spec=ConfigManager)
         secret_manager = Mock(spec=SecretManager)
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         resource = Mock()
         resource.provider = "nonexistent"
@@ -253,7 +244,7 @@ class TestOrchestratorValidateResources:
         """Test validation fails when resource type not supported."""
         config_manager = Mock(spec=ConfigManager)
         secret_manager = Mock(spec=SecretManager)
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         provider = Mock(spec=ProviderBase)
         provider.name = "proxmox"
@@ -275,7 +266,7 @@ class TestOrchestratorValidateResources:
         """Test validation succeeds with empty resource list."""
         config_manager = Mock(spec=ConfigManager)
         secret_manager = Mock(spec=SecretManager)
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         # Should not raise
         orchestrator.validate_resources([])
@@ -288,7 +279,7 @@ class TestOrchestratorBuildDependencyGraph:
         """Test building a basic dependency graph."""
         config_manager = Mock(spec=ConfigManager)
         secret_manager = Mock(spec=SecretManager)
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         # Register provider with dependencies
         provider = Mock(spec=ProviderBase)
@@ -320,7 +311,7 @@ class TestOrchestratorBuildDependencyGraph:
         """Test building dependency graph with multiple providers."""
         config_manager = Mock(spec=ConfigManager)
         secret_manager = Mock(spec=SecretManager)
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         # Register multiple providers
         proxmox = Mock(spec=ProviderBase)
@@ -364,7 +355,7 @@ class TestOrchestratorStatus:
         secret_manager = Mock(spec=SecretManager)
         config_manager.get_all_resources_all_providers.return_value = []
 
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         orchestrator.status("dev")
 
@@ -384,7 +375,7 @@ class TestOrchestratorStatus:
 
         config_manager.get_all_resources_all_providers.return_value = [vm]
 
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
 
         # Register provider with terraform_dir
         provider = Mock(spec=ProviderBase)
@@ -409,7 +400,7 @@ class TestOrchestratorStatus:
 
         config_manager.get_all_resources_all_providers.return_value = [vm]
 
-        orchestrator = Orchestrator(config_manager, secret_manager)
+        orchestrator = Orchestrator(config_manager)
         # Don't register the provider
 
         orchestrator.status("dev")

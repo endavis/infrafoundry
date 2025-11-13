@@ -20,6 +20,16 @@ BaseManager (ABC)
     ├── ConfigManager
     ├── SecretManager
     └── NotificationManager
+
+Component Managers (3-Layer Architecture)
+├── BaseComponentManager
+    ├── KeaDHCPManager (OPNsense Kea DHCP operations)
+    └── ISCToKeaMigrationManager (ISC → Kea migration)
+
+Services (API Layer)
+├── BaseService
+    ├── KeaDHCPService (Kea DHCP API operations)
+    └── ISCDHCPService (ISC DHCP configuration reading)
 ```
 
 ## When to Use Each Base Class
@@ -46,7 +56,7 @@ Use `PathBasedManager` for managers that:
 
 **Example managers:**
 - `ConfigManager` - Loads YAML configs from `envs/` directory
-- `SecretManager` - Manages encrypted files in `secrets/` directory
+- `SecretManager` - Manages encrypted files in `envs/` directory
 - `NotificationManager` - Loads config from `notifications.yaml`
 
 ## Standard Initialization Pattern
@@ -273,16 +283,14 @@ class Orchestrator:
 def __init__(self, base_dir: Path | None = None):
     super().__init__()
 
-    # Resolve path with fallback chain:
-    # 1. Explicit path parameter
-    # 2. Environment variable
-    # 3. Default path
-    self.base_dir = self._resolve_path(
-        path=base_dir,
-        env_var="INFRAFOUNDRY_CONFIG_DIR",
-        default="envs",
-        create=True  # Create if doesn't exist
-    )
+    # Must use INFRAFOUNDRY_CONFIG_REPO
+    if base_dir is None:
+        config_repo = self._get_env_var("INFRAFOUNDRY_CONFIG_REPO")
+        if not config_repo:
+            raise ValueError("INFRAFOUNDRY_CONFIG_REPO must be set")
+        base_dir = Path(config_repo) / "envs"
+
+    self.base_dir = base_dir
 ```
 
 ### Environment Variable Access
@@ -456,8 +464,206 @@ When creating or reviewing a manager, verify:
 - [ ] Has comprehensive unit tests
 - [ ] Follows initialization order: super → vars → logic → log
 
+## 3-Layer Architecture Pattern (Provider → Manager → Service)
+
+For complex provider operations (OPNsense DHCP, migrations), InfraFoundry uses a 3-layer architecture:
+
+### Layer 1: Provider (Thin Delegation)
+
+Providers stay thin by delegating to component managers:
+
+```python
+class OPNsenseProvider(ProviderBase):
+    def reset_kea_dhcpv4(self, env_name: str) -> None:
+        """Reset Kea DHCPv4 configuration."""
+        from .components.kea_dhcp import KeaDHCPManager
+
+        manager = KeaDHCPManager(self.config_dir)
+        manager.reset_dhcpv4(env_name, "opnsense")
+```
+
+**Benefits:**
+- Provider stays focused on core responsibilities
+- Complex logic moved to specialized managers
+- Easy to test (mock the manager)
+
+### Layer 2: Component Manager (Business Logic)
+
+Component managers orchestrate operations using services:
+
+```python
+class KeaDHCPManager(BaseComponentManager):
+    def reset_dhcpv4(self, env_name: str, provider_name: str) -> None:
+        """Reset all Kea DHCPv4 configuration."""
+        kea_service: KeaDHCPService = KeaDHCPService.from_environment(
+            env_name, provider_name, self.config_dir
+        )
+
+        # Business logic: delete all subnets, then all reservations
+        subnets = kea_service.search_dhcpv4_subnets()
+        for subnet in subnets:
+            kea_service.delete_dhcpv4_subnet(subnet["uuid"])
+
+        reservations = kea_service.search_dhcpv4_reservations()
+        for reservation in reservations:
+            kea_service.delete_dhcpv4_reservation(reservation["uuid"])
+
+        kea_service.reconfigure_service()
+```
+
+**Benefits:**
+- Encapsulates business logic (order of operations, error handling)
+- Reusable across providers
+- Testable with mocked services
+
+### Layer 3: Service (API Operations)
+
+Services handle low-level API calls:
+
+```python
+class KeaDHCPService(BaseService):
+    def __init__(self, client: OPNsenseClient):
+        super().__init__(client)
+
+    def search_dhcpv4_subnets(self) -> list[dict]:
+        """Search for DHCPv4 subnets."""
+        response = self.client.request("GET", "kea/dhcpv4/searchSubnet")
+        return response.get("rows", [])
+
+    def delete_dhcpv4_subnet(self, uuid: str) -> dict:
+        """Delete a DHCPv4 subnet."""
+        return self.client.request("POST", f"kea/dhcpv4/delSubnet/{uuid}")
+```
+
+**Benefits:**
+- Single responsibility (API communication only)
+- Easy to mock for testing
+- Reusable API operations
+
+### Factory Pattern for Services
+
+Services use a factory method for environment-based initialization:
+
+```python
+class BaseService:
+    @classmethod
+    def from_environment(
+        cls,
+        env_name: str,
+        provider_name: str,
+        config_dir: Path,
+    ):
+        """Create service from environment configuration."""
+        # Load credentials from settings.yaml
+        config_manager = ConfigManager(config_dir)
+        env_config = config_manager.load_environment(env_name)
+        provider_settings = env_config.get_provider_settings(provider_name)
+
+        # Initialize API client
+        client = OPNsenseClient(
+            api_key=provider_settings.get("api_key"),
+            api_secret=provider_settings.get("api_secret"),
+            base_url=provider_settings.get("api_url"),
+        )
+
+        # Return service instance
+        return cls(client)
+```
+
+**Benefits:**
+- Consistent initialization across services
+- No credential management in component managers
+- Easy to test (provide mock client directly)
+
+### Example: ISC to Kea Migration
+
+Complete example showing all three layers:
+
+```python
+# Provider (3 lines)
+def migrate_isc_to_kea(self, env_name: str, interfaces: list[str] | None = None) -> str:
+    manager = ISCToKeaMigrationManager(self.config_dir)
+    return manager.export_to_yaml(env_name, "opnsense", interfaces)
+
+# Component Manager (orchestration)
+class ISCToKeaMigrationManager(BaseComponentManager):
+    def migrate_dhcpv4(self, env_name: str, provider_name: str, interfaces: list[str] | None) -> dict:
+        isc_service = ISCDHCPService.from_environment(env_name, provider_name, self.config_dir)
+
+        # Get ISC config
+        isc_config = isc_service.get_dhcpv4_config()
+        static_maps = isc_service.get_dhcpv4_static_maps()
+
+        # Transform to Kea format
+        subnets = []
+        reservations = []
+        for interface, config in isc_config.items():
+            subnet = self._convert_dhcpv4_subnet(interface, config)
+            if subnet:
+                subnets.append(subnet)
+
+        return {"subnets": subnets, "reservations": reservations}
+
+# Service (API operations)
+class ISCDHCPService(BaseService):
+    def get_dhcpv4_config(self, interface: str | None = None) -> dict[str, dict]:
+        """Get ISC DHCPv4 configuration for interfaces."""
+        # API call or config parsing
+        return {}
+```
+
+### When to Use 3-Layer Architecture
+
+Use this pattern when:
+- Operations are complex (multiple API calls, transformations)
+- Logic is reusable across providers
+- Clear separation helps testing
+- API operations need abstraction
+
+Don't use for:
+- Simple, single-purpose operations
+- Pure Terraform/Ansible generation
+- One-off utility functions
+
+### Testing Strategy
+
+Each layer tested independently:
+
+```python
+# Test service (mock API client)
+def test_service():
+    mock_client = MagicMock()
+    mock_client.request.return_value = {"rows": [{"uuid": "123"}]}
+
+    service = KeaDHCPService(mock_client)
+    result = service.search_dhcpv4_subnets()
+
+    assert len(result) == 1
+    assert result[0]["uuid"] == "123"
+
+# Test component manager (mock service)
+def test_manager():
+    mock_service = MagicMock()
+    mock_service.search_dhcpv4_subnets.return_value = [{"uuid": "123"}]
+
+    with patch.object(KeaDHCPService, 'from_environment', return_value=mock_service):
+        manager = KeaDHCPManager(Path("."))
+        manager.reset_dhcpv4("dev", "opnsense")
+
+    mock_service.delete_dhcpv4_subnet.assert_called_with("123")
+
+# Test provider (mock manager)
+def test_provider():
+    with patch('infrafoundry.providers.opnsense.components.kea_dhcp.KeaDHCPManager') as MockManager:
+        provider = OPNsenseProvider(Path("."), Path("."))
+        provider.reset_kea_dhcpv4("dev")
+
+    MockManager.assert_called_once()
+```
+
 ## Related Documentation
 
 - `base_manager.py` - Implementation of BaseManager and PathBasedManager
-- `docs/testing-guide.md` - Testing patterns for managers
-- `docs/architecture.md` - Overall architecture including manager roles
+- `docs/development/testing-guide.md` - Testing patterns for managers
+- `docs/architecture/ARCHITECTURE.md` - Overall architecture including manager roles
+- `docs/isc-to-kea-migration.md` - Example of 3-layer architecture in practice

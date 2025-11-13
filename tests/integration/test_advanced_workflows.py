@@ -69,7 +69,6 @@ vms:
     # Create orchestrator
     orchestrator = Orchestrator(
         config_manager=config_manager,
-        secret_manager=secret_manager,
         output_dir=output_dir,
     )
 

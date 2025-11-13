@@ -174,12 +174,12 @@ This checks:
 
 ## Example Configurations
 
-Two complete examples are provided in `example-config/envs/dev/proxmox/vms.yaml`:
+Two complete examples are provided in `example-config/envs/dev/resources/vms.yaml`:
 
 1. **exit-node-01**: Regular Ubuntu 22.04 exit node
 2. **exit-node-core-01**: Ubuntu Core 22 exit node (immutable)
 
-Example secrets template: `example-config/secrets/tailscale.yaml.example`
+Store Tailscale auth keys in `envs/{env}/settings.yaml` under `ansible_vars` section (encrypted with SOPS).
 
 ## Post-Deployment
 

@@ -10,7 +10,7 @@ export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"
 
 # SOPS age encryption key
-export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/secrets/age.key"
+export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/envs/dev/age.key"
 
 # Environment selection (dev, staging, prod)
 # Default to dev if not specified

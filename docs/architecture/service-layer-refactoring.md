@@ -139,17 +139,17 @@ class BaseService(ABC):
         config_manager = ConfigManager(config_dir)
         env_config = config_manager.load_environment(env_name)
         provider_settings = env_config.get_provider_settings(provider_name)
-        
+
         if not provider_settings:
             raise ValueError(f"No {provider_name} provider settings...")
-        
+
         client = OPNsenseClient(
             api_key=provider_settings.get("api_key", ""),
             api_secret=provider_settings.get("api_secret", ""),
             base_url=provider_settings.get("api_url", ""),
             verify_ssl=provider_settings.get("verify_ssl", True),
         )
-        
+
         return cls(client)
 ```
 

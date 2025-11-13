@@ -10,6 +10,11 @@ Each provider is a Python module that:
 3. Validates resource configurations
 4. Declares resource types and dependencies
 
+**Advanced Features:**
+- For complex operations (migrations, DHCP management), consider using the **3-layer architecture** (Provider → Component Manager → Service)
+- See `docs/development/manager-patterns.md` for the 3-layer architecture pattern
+- See `docs/isc-to-kea-migration.md` for a complete example
+
 ## Step-by-Step: Creating a New Provider
 
 ### 1. Create Provider Module
@@ -304,14 +309,14 @@ export YOURPROVIDER_API_SECRET=your-secret
 
 ```bash
 # Create secrets file
-cat > secrets/yourprovider.yaml <<EOF
+cat > envs/yourprovider.yaml <<EOF
 yourprovider_api_url: https://api.example.com
 yourprovider_api_key: your-key-here
 yourprovider_api_secret: your-secret-here
 EOF
 
 # Encrypt it
-infra secrets encrypt secrets/yourprovider.yaml
+infra secrets encrypt envs/yourprovider.yaml
 ```
 
 ## Testing Your Provider

@@ -251,5 +251,3 @@ If SSH is not feasible in your environment, consider:
 2. **Use pre-created templates** instead of `download_image`
 3. **Create templates via Proxmox UI** and reference them in configs
 4. **Request API support** from Proxmox team for missing functionality
-
-See `docs/ubuntu-core-setup.md` for manual template creation steps.

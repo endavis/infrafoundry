@@ -1,8 +1,8 @@
 # Secrets and sensitive data
-secrets/*.key
-secrets/*.yaml
-!secrets/.gitkeep
-!secrets/*.yaml.example
+envs/*.key
+envs/*.yaml
+!envs/.gitkeep
+!envs/*.yaml.example
 
 # Terraform state and variables
 *.tfvars

@@ -243,7 +243,7 @@ Ansible variable precedence (lowest to highest):
 Use SOPS-encrypted secrets:
 
 ```yaml
-# secrets/ansible.yaml (encrypted)
+# envs/ansible.yaml (encrypted)
 vault_db_password: "super_secret"
 vault_api_key: "api_key_here"
 ```

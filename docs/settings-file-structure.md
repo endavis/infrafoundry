@@ -148,10 +148,10 @@ The entire `settings.yaml` file should be encrypted with SOPS using age encrypti
 
 ```bash
 # Create age key (one-time setup)
-age-keygen -o secrets/age.key
+age-keygen -o envs/age.key
 
 # Get public key for .sops.yaml
-age-keygen -y secrets/age.key
+age-keygen -y envs/age.key
 
 # Create .sops.yaml configuration
 cat > .sops.yaml << EOF
@@ -167,7 +167,7 @@ sops --encrypt --age <PUBLIC_KEY> envs/prod/settings.yaml.plain > envs/prod/sett
 sops envs/prod/settings.yaml
 
 # Decrypt for InfraFoundry (automatic)
-export SOPS_AGE_KEY_FILE=secrets/age.key
+export SOPS_AGE_KEY_FILE=envs/age.key
 infra plan --env prod
 ```
 
@@ -196,13 +196,13 @@ provider_settings:
     # ... provider config
 ```
 
-### From secrets/ directory to settings.yaml
+### From envs/ directory to settings.yaml
 
 Old structure:
 ```
 envs/prod/
 ├── environment.yaml
-└── ../../secrets/
+└── ../../envs/
     ├── proxmox.yaml (encrypted)
     └── opnsense.yaml (encrypted)
 ```
@@ -213,10 +213,10 @@ envs/prod/
 └── settings.yaml (encrypted, contains everything)
 ```
 
-Merge credentials from `secrets/*.yaml` into `provider_settings`:
+Merge credentials from `envs/*.yaml` into `provider_settings`:
 
 ```yaml
-# Old: secrets/proxmox.yaml
+# Old: envs/proxmox.yaml
 api_url: https://pve01.example.com:8006
 api_token: token-value
 

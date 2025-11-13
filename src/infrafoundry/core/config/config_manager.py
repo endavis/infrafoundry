@@ -23,7 +23,10 @@ class ConfigManager(PathBasedManager):
 
         Args:
             base_dir: Base directory for configs
-                (defaults to INFRAFOUNDRY_CONFIG_REPO/envs or ./envs)
+                (defaults to INFRAFOUNDRY_CONFIG_REPO/envs)
+
+        Raises:
+            ValueError: If base_dir is None and INFRAFOUNDRY_CONFIG_REPO is not set
         """
         # Initialize base manager with logging
         super().__init__()
@@ -31,16 +34,14 @@ class ConfigManager(PathBasedManager):
         # Resolve base directory using PathBasedManager pattern
         if base_dir is None:
             config_repo = self._get_env_var("INFRAFOUNDRY_CONFIG_REPO")
-            if config_repo:
-                # Config repo is specified - use its envs subdirectory
-                base_dir = Path(config_repo) / "envs"
-            else:
-                # No config repo - use local envs directory
-                base_dir = self._resolve_path(
-                    path=None,
-                    env_var="INFRAFOUNDRY_CONFIG_DIR",
-                    default="envs",
+            if not config_repo:
+                raise ValueError(
+                    "INFRAFOUNDRY_CONFIG_REPO environment variable must be set. "
+                    "Please point it to your configuration repository. "
+                    "See docs/separate-config-repo.md for setup instructions."
                 )
+            # Config repo is specified - use its envs subdirectory
+            base_dir = Path(config_repo) / "envs"
 
         self.base_dir: Path = base_dir  # Type assertion - base_dir is always Path here
         self._log_debug(f"Initialized ConfigManager with base_dir: {self.base_dir}")

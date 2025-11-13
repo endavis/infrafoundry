@@ -12,21 +12,18 @@ from rich.console import Console
 
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners.base_runner import BaseRunner
-from infrafoundry.core.secrets import SecretManager
 
 
 class TerraformRunner(BaseRunner):
     """Handles Terraform command execution and state management."""
 
-    def __init__(self, secret_manager: SecretManager, console: Console | None = None) -> None:
+    def __init__(self, console: Console | None = None) -> None:
         """Initialize Terraform runner.
 
         Args:
-            secret_manager: Secret manager for loading credentials
             console: Rich console for output (creates default if None)
         """
         super().__init__(console)
-        self.secret_manager = secret_manager
 
     @property
     @override
@@ -308,43 +305,18 @@ class TerraformRunner(BaseRunner):
     def _prepare_environment(self, provider: ProviderBase) -> dict[str, str]:
         """Prepare environment variables for Terraform execution.
 
+        Note: Credentials should be loaded via CredentialLoader before calling this.
+        This method uses environment variables that are already set.
+
         Args:
             provider: Provider instance
 
         Returns:
-            Environment variables dict with credentials loaded
+            Environment variables dict (credentials come from os.environ)
         """
         env = os.environ.copy()
 
-        try:
-            # Try provider-specific secrets file first (e.g., proxmox.yaml)
-            secrets_file = f"{provider.name}.yaml"
-            creds = self.secret_manager.decrypt_file(secrets_file)
-        except FileNotFoundError:
-            # Fall back to shared credentials file
-            try:
-                creds = self.secret_manager.decrypt_file("credentials.yaml")
-            except Exception:
-                creds = {}
-
-        # Set provider-specific environment variables
-        if provider.name == "proxmox":
-            if "proxmox_api_url" in creds:
-                env["PROXMOX_VE_ENDPOINT"] = creds["proxmox_api_url"]
-            if "proxmox_api_token_id" in creds and "proxmox_api_token_secret" in creds:
-                token_id = creds["proxmox_api_token_id"]
-                token_secret = creds["proxmox_api_token_secret"]
-                env["PROXMOX_VE_API_TOKEN"] = f"{token_id}={token_secret}"
-            env["PROXMOX_VE_INSECURE"] = "true"
-        elif provider.name == "opnsense":
-            if "opnsense_api_url" in creds:
-                env["OPNSENSE_API_URL"] = creds["opnsense_api_url"]
-                env["TF_VAR_opnsense_api_url"] = creds["opnsense_api_url"]
-            if "opnsense_api_key" in creds:
-                env["OPNSENSE_API_KEY"] = creds["opnsense_api_key"]
-                env["TF_VAR_opnsense_api_key"] = creds["opnsense_api_key"]
-            if "opnsense_api_secret" in creds:
-                env["OPNSENSE_API_SECRET"] = creds["opnsense_api_secret"]
-                env["TF_VAR_opnsense_api_secret"] = creds["opnsense_api_secret"]
+        # Credentials are already set by CredentialLoader in CLI
+        # No need to decrypt secrets here - they're loaded per-environment
 
         return env

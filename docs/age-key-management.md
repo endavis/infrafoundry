@@ -13,8 +13,8 @@ Age keys are used to encrypt/decrypt your infrastructure secrets with SOPS. This
 Your `.gitignore` should always include:
 ```gitignore
 *.key
-secrets/*/age.key
-secrets/**/age.key
+envs/*/age.key
+envs/**/age.key
 ```
 
 ## Per-Environment Keys (Recommended)
@@ -23,7 +23,7 @@ InfraFoundry supports per-environment age keys for enhanced security:
 
 ```
 config-repo/
-├── secrets/
+├── envs/
 │   ├── dev/
 │   │   ├── age.key          # Development key (git-ignored)
 │   │   ├── proxmox.yaml     # Encrypted with dev key
@@ -49,13 +49,13 @@ config-repo/
 InfraFoundry automatically uses the correct key based on `--env`:
 
 ```bash
-# Uses secrets/dev/age.key
+# Uses envs/dev/age.key
 infra plan --env dev
 
-# Uses secrets/staging/age.key
+# Uses envs/staging/age.key
 infra apply --env staging
 
-# Uses secrets/prod/age.key (if you have it!)
+# Uses envs/prod/age.key (if you have it!)
 infra plan --env prod
 ```
 
@@ -84,11 +84,11 @@ Store keys in a dedicated key management system:
 **Example (HashiCorp Vault):**
 ```bash
 # Store key
-vault kv put secret/infrafoundry/prod-age-key content=@secrets/prod/age.key
+vault kv put secret/infrafoundry/prod-age-key content=@envs/prod/age.key
 
 # Retrieve key
-vault kv get -field=content secret/infrafoundry/prod-age-key > secrets/prod/age.key
-chmod 600 secrets/prod/age.key
+vault kv get -field=content secret/infrafoundry/prod-age-key > envs/prod/age.key
+chmod 600 envs/prod/age.key
 ```
 
 ### Method 2: Encrypted Channel (Good for Small Teams)
@@ -114,12 +114,12 @@ Share keys via secure, encrypted channels:
 **Example (Password-protected ZIP):**
 ```bash
 # Sender: Create encrypted archive
-zip -e -P "$(openssl rand -base64 32)" keys.zip secrets/prod/age.key
+zip -e -P "$(openssl rand -base64 32)" keys.zip envs/prod/age.key
 # Send keys.zip via one channel, password via another (Signal/phone)
 
 # Receiver: Extract
 unzip keys.zip
-install -m 600 age.key secrets/prod/age.key
+install -m 600 age.key envs/prod/age.key
 rm keys.zip age.key
 ```
 
@@ -137,7 +137,7 @@ infrastructure-keys/    # Private repo, restricted access
     └── age.key
 
 infrastructure-config/  # Main repo, team access
-├── secrets/
+├── envs/
 │   ├── dev/
 │   │   └── *.yaml      # Encrypted files only
 │   └── prod/
@@ -151,7 +151,7 @@ git clone git@github.com:company/infrastructure-config.git
 git clone git@github.com:company/infrastructure-keys.git  # Requires special access
 
 # Symlink keys
-ln -s ../infrastructure-keys/dev/age.key infrastructure-config/secrets/dev/age.key
+ln -s ../infrastructure-keys/dev/age.key infrastructure-config/envs/dev/age.key
 ```
 
 **Pros:**
@@ -172,7 +172,7 @@ Store base64-encoded keys as repository secrets:
 
 ```bash
 # Generate secret value
-cat secrets/dev/age.key | base64 -w0
+cat envs/dev/age.key | base64 -w0
 # Copy output to GitHub Settings → Secrets → Actions → New repository secret
 # Name: SOPS_AGE_KEY_DEV
 ```
@@ -181,9 +181,9 @@ cat secrets/dev/age.key | base64 -w0
 ```yaml
 - name: Setup SOPS age key
   run: |
-    mkdir -p secrets/dev
-    echo "${{ secrets.SOPS_AGE_KEY_DEV }}" | base64 -d > secrets/dev/age.key
-    chmod 600 secrets/dev/age.key
+    mkdir -p envs/dev
+    echo "${{ secrets.SOPS_AGE_KEY_DEV }}" | base64 -d > envs/dev/age.key
+    chmod 600 envs/dev/age.key
 
 - name: Run InfraFoundry
   run: infra plan --env dev
@@ -196,9 +196,9 @@ variables:
   SOPS_AGE_KEY_DEV: $SOPS_AGE_KEY_DEV  # Set in GitLab CI/CD Variables
 
 before_script:
-  - mkdir -p secrets/dev
-  - echo "$SOPS_AGE_KEY_DEV" | base64 -d > secrets/dev/age.key
-  - chmod 600 secrets/dev/age.key
+  - mkdir -p envs/dev
+  - echo "$SOPS_AGE_KEY_DEV" | base64 -d > envs/dev/age.key
+  - chmod 600 envs/dev/age.key
 ```
 
 ## Key Generation
@@ -207,13 +207,13 @@ before_script:
 
 ```bash
 # Generate new age key
-age-keygen -o secrets/new-env/age.key
+age-keygen -o envs/new-env/age.key
 
 # Secure permissions
-chmod 600 secrets/new-env/age.key
+chmod 600 envs/new-env/age.key
 
 # Extract public key for .sops.yaml
-grep "public key:" secrets/new-env/age.key
+grep "public key:" envs/new-env/age.key
 # Example output: public key: age1ep57rqlyy6awft8sterut0kfqjn62pv6yutpwv0vp6xmpwvtdgpqwj8afs
 ```
 
@@ -237,14 +237,14 @@ creation_rules:
 
 ```bash
 # Set the correct key for the environment
-export SOPS_AGE_KEY_FILE="secrets/dev/age.key"
+export SOPS_AGE_KEY_FILE="envs/dev/age.key"
 
 # Encrypt files
-sops --encrypt --in-place secrets/dev/proxmox.yaml
-sops --encrypt --in-place secrets/dev/opnsense.yaml
+sops --encrypt --in-place envs/dev/proxmox.yaml
+sops --encrypt --in-place envs/dev/opnsense.yaml
 
 # Verify encryption worked (should see ENC[...])
-head -n 3 secrets/dev/proxmox.yaml
+head -n 3 envs/dev/proxmox.yaml
 ```
 
 ## Key Rotation
@@ -253,30 +253,30 @@ Rotate keys periodically (quarterly recommended for production):
 
 ```bash
 # 1. Generate new key
-age-keygen -o secrets/prod/age-new.key
+age-keygen -o envs/prod/age-new.key
 
 # 2. Update .sops.yaml with new public key
 
 # 3. Re-encrypt all secrets
-export SOPS_AGE_KEY_FILE="secrets/prod/age.key"  # Old key to decrypt
-for file in secrets/prod/*.yaml; do
+export SOPS_AGE_KEY_FILE="envs/prod/age.key"  # Old key to decrypt
+for file in envs/prod/*.yaml; do
   # Decrypt with old key, encrypt with new key
   sops --decrypt "$file" | \
-  SOPS_AGE_KEY_FILE="secrets/prod/age-new.key" sops --encrypt /dev/stdin > "${file}.new"
+  SOPS_AGE_KEY_FILE="envs/prod/age-new.key" sops --encrypt /dev/stdin > "${file}.new"
   mv "${file}.new" "$file"
 done
 
 # 4. Replace old key
-mv secrets/prod/age.key secrets/prod/age-old.key.backup
-mv secrets/prod/age-new.key secrets/prod/age.key
+mv envs/prod/age.key envs/prod/age-old.key.backup
+mv envs/prod/age-new.key envs/prod/age.key
 
 # 5. Test decryption works
-sops --decrypt secrets/prod/proxmox.yaml
+sops --decrypt envs/prod/proxmox.yaml
 
 # 6. Distribute new key to team via secure channel
 
 # 7. After confirmation, delete old key backup
-rm secrets/prod/age-old.key.backup
+rm envs/prod/age-old.key.backup
 ```
 
 ## Backup and Recovery
@@ -290,13 +290,13 @@ rm secrets/prod/age-old.key.backup
 **Example (Encrypted backup):**
 ```bash
 # Create encrypted backup
-gpg --symmetric --cipher-algo AES256 secrets/prod/age.key
+gpg --symmetric --cipher-algo AES256 envs/prod/age.key
 # Outputs: age.key.gpg
 
 # Store age.key.gpg in separate secure location
 # Restore when needed:
-gpg --decrypt secrets/prod/age.key.gpg > secrets/prod/age.key
-chmod 600 secrets/prod/age.key
+gpg --decrypt envs/prod/age.key.gpg > envs/prod/age.key
+chmod 600 envs/prod/age.key
 ```
 
 ### Recovery Plan
@@ -313,9 +313,9 @@ Document your key recovery plan:
 ### For Developers
 
 - [ ] I understand private keys are NEVER committed to git
-- [ ] My `.gitignore` includes `*.key` and `secrets/*/age.key`
-- [ ] I have the age keys I need stored in `secrets/*/age.key`
-- [ ] I can decrypt secrets: `sops --decrypt secrets/dev/proxmox.yaml`
+- [ ] My `.gitignore` includes `*.key` and `envs/*/age.key`
+- [ ] I have the age keys I need stored in `envs/*/age.key`
+- [ ] I can decrypt secrets: `sops --decrypt envs/dev/proxmox.yaml`
 - [ ] I don't have production keys (unless I'm ops)
 
 ### For Ops/Admins
@@ -340,27 +340,27 @@ Document your key recovery plan:
 
 ```bash
 # Check key file exists
-ls -la secrets/dev/age.key
+ls -la envs/dev/age.key
 
 # Verify it's the right key (public key should match .sops.yaml)
-grep "public key:" secrets/dev/age.key
+grep "public key:" envs/dev/age.key
 
 # Try manual decryption
-SOPS_AGE_KEY_FILE=secrets/dev/age.key sops --decrypt secrets/dev/proxmox.yaml
+SOPS_AGE_KEY_FILE=envs/dev/age.key sops --decrypt envs/dev/proxmox.yaml
 ```
 
 ### "Permission denied" error
 
 ```bash
 # Keys must have 600 permissions
-chmod 600 secrets/*/age.key
+chmod 600 envs/*/age.key
 ```
 
 ### Key was lost
 
 1. Check backup locations (encrypted backups, key vault, etc.)
 2. If no backup: Need to re-encrypt all secrets with new key
-3. Generate new key: `age-keygen -o secrets/prod/age.key`
+3. Generate new key: `age-keygen -o envs/prod/age.key`
 4. Create new secrets files with new credentials (old secrets are lost)
 
 ## References

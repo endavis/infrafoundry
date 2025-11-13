@@ -32,7 +32,7 @@ Framework Repository (infrafoundry)     Config Repository (infrafoundry-config)
 │   ├── core/                           │   ├── dev/
 │   │   ├── provider.py                 │   ├── staging/
 │   │   ├── config.py                   │   └── prod/
-│   │   └── secrets.py                  ├── secrets/
+│   │   └── secrets.py                  ├── envs/
 │   └── providers/                      │   ├── age.key (ignored)
 │       ├── proxmox/                    │   ├── .sops.yaml
 │       ├── opnsense/                   │   └── *.yaml (encrypted)
@@ -82,7 +82,7 @@ Keep configs in framework repo (original behavior):
 ```
 infrafoundry/
 ├── envs/
-├── secrets/
+├── envs/
 └── src/
 ```
 
@@ -123,7 +123,7 @@ Add your settings:
 export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 
 # SOPS age key
-export SOPS_AGE_KEY_FILE="$(pwd)/secrets/age.key"
+export SOPS_AGE_KEY_FILE="$(pwd)/envs/age.key"
 
 # Provider credentials
 export PROXMOX_API_URL="https://proxmox.example.com:8006"
@@ -144,13 +144,13 @@ export KUBECONFIG="$(pwd)/kubeconfig"
 infra secrets init
 
 # Create and encrypt secrets
-cat > secrets/proxmox.yaml <<EOF
+cat > envs/proxmox.yaml <<EOF
 proxmox_api_url: https://proxmox.example.com:8006
 proxmox_token_id: terraform@pve!token
 proxmox_token_secret: your-secret-here
 EOF
 
-infra secrets encrypt secrets/proxmox.yaml
+infra secrets encrypt envs/proxmox.yaml
 ```
 
 ### Step 4: Verify Setup
@@ -177,7 +177,7 @@ my-config-repo/
 │       ├── settings.yaml
 │       └── proxmox/
 │           └── vms.yaml
-├── secrets/
+├── envs/
 │   ├── age.key                    # Git-ignored
 │   └── .sops.yaml                 # SOPS config
 ├── .envrc.local                   # Git-ignored
@@ -209,7 +209,7 @@ my-config-repo/
 │   │   └── ...
 │   └── prod/
 │       └── ...
-├── secrets/
+├── envs/
 │   ├── age.key                    # Git-ignored
 │   ├── .sops.yaml
 │   ├── proxmox.yaml               # Encrypted
@@ -247,7 +247,7 @@ on:
     branches: [main]
     paths:
       - 'envs/**'
-      - 'secrets/**'
+      - 'envs/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -319,14 +319,14 @@ jobs:
         run: |
           cd config
           mkdir -p secrets
-          echo "${{ secrets.SOPS_AGE_KEY }}" | base64 -d > secrets/age.key
-          chmod 600 secrets/age.key
+          echo "${{ secrets.SOPS_AGE_KEY }}" | base64 -d > envs/age.key
+          chmod 600 envs/age.key
 
       - name: Set environment variables
         run: |
           cd config
           echo "INFRAFOUNDRY_CONFIG_REPO=$(pwd)" >> $GITHUB_ENV
-          echo "SOPS_AGE_KEY_FILE=$(pwd)/secrets/age.key" >> $GITHUB_ENV
+          echo "SOPS_AGE_KEY_FILE=$(pwd)/envs/age.key" >> $GITHUB_ENV
 
           # Provider credentials from secrets
           echo "PROXMOX_API_URL=${{ secrets.PROXMOX_API_URL }}" >> $GITHUB_ENV
@@ -401,9 +401,9 @@ variables:
 
     # Set up secrets
     - mkdir -p secrets
-    - echo "$SOPS_AGE_KEY" | base64 -d > secrets/age.key
-    - chmod 600 secrets/age.key
-    - export SOPS_AGE_KEY_FILE="$(pwd)/secrets/age.key"
+    - echo "$SOPS_AGE_KEY" | base64 -d > envs/age.key
+    - chmod 600 envs/age.key
+    - export SOPS_AGE_KEY_FILE="$(pwd)/envs/age.key"
     - export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 
 validate:
@@ -482,7 +482,7 @@ cp ../infrafoundry/docs/examples/.envrc.local.example .envrc.local
 Option A: From password manager/vault
 ```bash
 # Store in 1Password, Vault, etc.
-# Retrieve and save to secrets/age.key
+# Retrieve and save to envs/age.key
 ```
 
 Option B: Encrypted transfer
@@ -491,11 +491,11 @@ Option B: Encrypted transfer
 age-keygen -o ~/.ssh/id_age.key
 
 # Admin encrypts shared key
-age -r <team-member-public-key> -o age.key.enc secrets/age.key
+age -r <team-member-public-key> -o age.key.enc envs/age.key
 
 # Team member decrypts
-age -d -i ~/.ssh/id_age.key age.key.enc > secrets/age.key
-chmod 600 secrets/age.key
+age -d -i ~/.ssh/id_age.key age.key.enc > envs/age.key
+chmod 600 envs/age.key
 ```
 
 **3. Set up provider credentials:**
@@ -529,7 +529,7 @@ creation_rules:
 
 3. **Re-encrypt all secrets:**
 ```bash
-for file in secrets/*.yaml; do
+for file in envs/*.yaml; do
   sops updatekeys -y "$file"
 done
 ```
@@ -538,59 +538,6 @@ done
 ```bash
 # In .envrc.local
 export SOPS_AGE_KEY_FILE="$HOME/.ssh/infra_age.key"
-```
-
-## Migration Guide
-
-### From Embedded to Separate Config
-
-If you have configs in the framework repo, migrate them:
-
-1. **Create config repository:**
-```bash
-mkdir ../infrafoundry-config
-cd ../infrafoundry-config
-git init
-```
-
-2. **Copy configurations:**
-```bash
-cp -r ../infrafoundry/envs .
-cp -r ../infrafoundry/secrets .
-cp ../infrafoundry/.envrc.local.example .
-```
-
-3. **Set up config repository:**
-```bash
-# Copy gitignore from example-config
-cp ../infrafoundry/example-config/.gitignore .
-cp ../infrafoundry/example-config/README.md .
-
-# Initialize
-git add .
-git commit -m "Initial config repository"
-```
-
-4. **Update .envrc.local:**
-```bash
-cp ../infrafoundry/docs/examples/.envrc.local.example .envrc.local
-# Edit and add:
-export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
-```
-
-5. **Test:**
-```bash
-direnv allow
-infra envs
-infra plan --env dev --dry-run
-```
-
-6. **Clean up framework repo:**
-```bash
-cd ../infrafoundry
-rm -rf envs/ secrets/
-git add -u
-git commit -m "Move configs to separate repository"
 ```
 
 ## Best Practices
@@ -658,13 +605,13 @@ config-repo/
 ```bash
 # Check SOPS_AGE_KEY_FILE points to key in config repo
 echo $SOPS_AGE_KEY_FILE
-# Should be: /path/to/config-repo/secrets/age.key
+# Should be: /path/to/config-repo/envs/age.key
 
 # Verify key exists
 ls -l $SOPS_AGE_KEY_FILE
 
 # Test decryption
-sops -d secrets/proxmox.yaml
+sops -d envs/proxmox.yaml
 ```
 
 ### Generated files location
@@ -702,7 +649,7 @@ ls generated/dev/terraform/
 ├── infrafoundry/           # Framework (git pull to update)
 └── my-homelab/             # Config repo (your infrastructure)
     ├── envs/dev/
-    ├── secrets/
+    ├── envs/
     └── .envrc.local        # export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
 ```
 
@@ -734,7 +681,7 @@ Each client config has their own:
     │   ├── prod-us-east/
     │   ├── prod-us-west/
     │   └── prod-eu/
-    ├── secrets/
+    ├── envs/
     │   ├── dev/
     │   ├── staging/
     │   └── prod/

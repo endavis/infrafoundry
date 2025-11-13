@@ -24,7 +24,8 @@ def envs(ctx: click.Context) -> None:
 
         if not environments:
             console.print(
-                "[yellow]No environments found. Create one in the envs/ directory.[/yellow]"
+                "[yellow]No environments found. "
+                "Check that INFRAFOUNDRY_CONFIG_REPO is set correctly.[/yellow]"
             )
             return
 

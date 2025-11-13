@@ -67,23 +67,24 @@ This guide explains how to use OAuth authentication with the Tailscale exit node
 
 ### Step 2: Store Credentials Securely
 
-Create or update `secrets/tailscale.yaml`:
+Add OAuth credentials to your environment's `settings.yaml`:
 
 ```yaml
-# OAuth credentials
-vault_tailscale_oauth_client_id: "kxxxxxxxxxxxxxx"
-vault_tailscale_oauth_client_secret: "tskey-client-kxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# envs/prod/settings.yaml (add to provider_settings or ansible_vars)
+ansible_vars:
+  vault_tailscale_oauth_client_id: "kxxxxxxxxxxxxxx"
+  vault_tailscale_oauth_client_secret: "tskey-client-kxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
-Encrypt the file:
+Encrypt the file if not already encrypted:
 
 ```bash
-infra secrets encrypt secrets/tailscale.yaml
+sops --encrypt --in-place envs/prod/settings.yaml
 ```
 
 ### Step 3: Configure VM with OAuth
 
-In your VM configuration (e.g., `envs/prod/proxmox/vms.yaml`):
+In your VM configuration (e.g., `envs/prod/resources/vms.yaml`):
 
 ```yaml
 vms:
@@ -281,11 +282,11 @@ Always use SOPS encryption:
 
 ```bash
 # Check file is encrypted
-file secrets/tailscale.yaml
-# Should show: ASCII text (encrypted)
+file envs/prod/settings.yaml
+# Should show: ASCII text (encrypted with SOPS)
 
 # Not encrypted? Fix it:
-infra secrets encrypt secrets/tailscale.yaml
+sops --encrypt --in-place envs/prod/settings.yaml
 ```
 
 ### Audit Trail

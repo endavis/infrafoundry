@@ -11,34 +11,46 @@ from infrafoundry.core.base_manager import PathBasedManager
 
 
 class SecretManager(PathBasedManager):
-    """Manages encrypted secrets using SOPS and age."""
+    """Manages encrypted secrets using SOPS and age.
 
-    def __init__(self, secrets_dir: Path | None = None) -> None:
+    Uses per-environment secrets stored in secrets/{env}/ directories.
+    """
+
+    def __init__(self, env_name: str, secrets_dir: Path | None = None) -> None:
         """Initialize secret manager.
 
         Args:
-            secrets_dir: Directory containing encrypted secrets
-                (defaults to INFRAFOUNDRY_CONFIG_REPO/secrets or ./secrets)
+            env_name: Environment name (e.g., 'dev', 'prod') - used to determine
+                     environment directory (envs/{env}/)
+            secrets_dir: Base directory containing environment folders
+                (defaults to INFRAFOUNDRY_CONFIG_REPO/envs/{env})
+
+        Raises:
+            ValueError: If secrets_dir is None and INFRAFOUNDRY_CONFIG_REPO is not set
         """
         # Initialize base manager with logging
         super().__init__()
 
+        self.env_name = env_name
+
         # Resolve secrets directory using PathBasedManager pattern
         if secrets_dir is None:
             config_repo = self._get_env_var("INFRAFOUNDRY_CONFIG_REPO")
-            if config_repo:
-                # Config repo is specified - use its secrets subdirectory
-                secrets_dir = Path(config_repo) / "secrets"
-            else:
-                # No config repo - use local secrets directory
-                secrets_dir = self._resolve_path(
-                    path=None,
-                    env_var="INFRAFOUNDRY_SECRETS_DIR",
-                    default="secrets",
+            if not config_repo:
+                raise ValueError(
+                    "INFRAFOUNDRY_CONFIG_REPO environment variable must be set. "
+                    "Please point it to your configuration repository. "
+                    "See docs/separate-config-repo.md for setup instructions."
                 )
+            # Config repo is specified - use environment directory (envs/{env}/)
+            # This is where settings.yaml and age.key live together
+            secrets_dir = Path(config_repo) / "envs" / env_name
 
         self.secrets_dir: Path = secrets_dir  # Type assertion - secrets_dir is always Path here
-        self._log_debug(f"Initialized SecretManager with secrets_dir: {self.secrets_dir}")
+        self._log_debug(
+            f"Initialized SecretManager for environment '{env_name}' "
+            f"with secrets_dir: {self.secrets_dir}"
+        )
 
         # Validate SOPS and age setup
         self._check_sops_installed()
@@ -63,7 +75,8 @@ class SecretManager(PathBasedManager):
         age_key_file = self._get_env_var("SOPS_AGE_KEY_FILE")
         if not age_key_file:
             error_msg = (
-                "SOPS_AGE_KEY_FILE not set. Generate a key with: age-keygen -o secrets/age.key"
+                f"SOPS_AGE_KEY_FILE not set. Generate a key with: "
+                f"age-keygen -o envs/{self.env_name}/age.key"
             )
             self._log_error(error_msg)
             raise ValueError(error_msg)
