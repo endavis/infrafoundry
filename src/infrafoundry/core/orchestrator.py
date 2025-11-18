@@ -1,6 +1,7 @@
 """Core orchestration for infrastructure deployment."""
 
 import os
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,15 @@ from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
+
+
+@dataclass(slots=True)
+class ProviderResourceBatch:
+    """Represents the resources for a single provider after optional filtering."""
+
+    name: str
+    resources: list[Any]
+    original_count: int
 
 
 class Orchestrator:
@@ -107,6 +117,37 @@ class Orchestrator:
         # Sync providers to helper classes that need them
         self.deployment_executor.providers = self.providers
         self.drift_detector.providers = self.providers
+
+    def _load_resources(self, env_name: str) -> tuple[list[Any], dict[str, list[Any]]]:
+        """Load all resources for an environment and group them by provider."""
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+        resources_by_provider: dict[str, list[Any]] = {}
+        for resource in all_resources:
+            resources_by_provider.setdefault(resource.provider, []).append(resource)
+        return all_resources, resources_by_provider
+
+    def _iter_provider_batches(
+        self,
+        resources_by_provider: dict[str, list[Any]],
+        resource_filter: list[str] | None,
+    ) -> list[ProviderResourceBatch]:
+        """Yield provider batches applying an optional resource name filter."""
+        batches: list[ProviderResourceBatch] = []
+        for provider_name, resources in resources_by_provider.items():
+            original_count = len(resources)
+            filtered_resources = resources
+            if resource_filter:
+                filtered_resources = [r for r in resources if r.name in resource_filter]
+                if not filtered_resources:
+                    continue
+            batches.append(
+                ProviderResourceBatch(
+                    name=provider_name,
+                    resources=filtered_resources,
+                    original_count=original_count,
+                )
+            )
+        return batches
 
     def validate_resources(self, resources: list[Any]) -> None:
         """Validate that all resources have providers that support their types.
@@ -264,28 +305,21 @@ class Orchestrator:
             self.console.print(f"[red]✗ Environment '{env_name}' not found[/red]")
             return {}
 
-        # Load resources
-        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
-
-        # Filter resources if specified
+        all_resources, resources_by_provider = self._load_resources(env_name)
+        filtered_resources = all_resources
         if resource_filter:
-            all_resources = [r for r in all_resources if r.name in resource_filter]
+            filtered_resources = [r for r in all_resources if r.name in resource_filter]
             self.console.print(
-                f"[yellow]Validating {len(all_resources)} resources: "
+                f"[yellow]Validating {len(filtered_resources)} resources: "
                 f"{', '.join(resource_filter)}[/yellow]\n"
             )
-
-        # Group resources by provider
-        resources_by_provider: dict[str, list] = {}
-        for resource in all_resources:
-            if resource.provider not in resources_by_provider:
-                resources_by_provider[resource.provider] = []
-            resources_by_provider[resource.provider].append(resource)
 
         results = {}
 
         # Run validation for each provider
-        for provider_name, resources in resources_by_provider.items():
+        for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
+            provider_name = batch.name
+            resources = batch.resources
             if provider_name not in self.providers:
                 self.console.print(f"[yellow]⚠ Provider '{provider_name}' not loaded[/yellow]")
                 continue
@@ -418,20 +452,15 @@ class Orchestrator:
                 )
 
             # Get all resources and discover providers dynamically
-            all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+            all_resources, resources_by_provider = self._load_resources(env_name)
 
             # Check policies if there are any defined
             if self.policy_engine.policies:
                 self.check_policies(env_name, all_resources, enforce=enforce_policies)
 
-            # Group resources by provider
-            resources_by_provider: dict[str, list[Any]] = {}
-            for resource in all_resources:
-                if resource.provider not in resources_by_provider:
-                    resources_by_provider[resource.provider] = []
-                resources_by_provider[resource.provider].append(resource)
-
-            for provider_name, resources in resources_by_provider.items():
+            for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
+                provider_name = batch.name
+                provider_resources = batch.resources
                 if provider_name not in self.providers:
                     self.console.print(
                         f"[yellow]Warning: Provider '{provider_name}' not registered[/yellow]"
@@ -441,25 +470,20 @@ class Orchestrator:
                 provider = self.providers[provider_name]
 
                 # Validate resources before processing
-                self.validate_resources(resources)
+                self.validate_resources(provider_resources)
 
-                # Filter resources if specified
                 if resource_filter:
-                    original_count = len(resources)
-                    resources = [r for r in resources if r.name in resource_filter]
-                    if not resources:
-                        continue  # Skip provider if no matching resources
                     self.console.print(
-                        f"\n[bold]{provider_name}[/bold]: {len(resources)} of "
-                        f"{original_count} resources (filtered)"
+                        f"\n[bold]{provider_name}[/bold]: {len(provider_resources)} of "
+                        f"{batch.original_count} resources (filtered)"
                     )
                 else:
                     self.console.print(
-                        f"\n[bold]{provider_name}[/bold]: {len(resources)} resources"
+                        f"\n[bold]{provider_name}[/bold]: {len(provider_resources)} resources"
                     )
 
                 # Track resources in state
-                for resource in resources:
+                for resource in provider_resources:
                     tracked_resource = self.state_manager.track_resource(
                         deployment_id=deployment_id,
                         environment=env_name,
@@ -481,7 +505,10 @@ class Orchestrator:
 
                 if dry_run:
                     self.console.print("  [dim]Would generate Terraform and Ansible files[/dim]")
-                    results[provider_name] = {"resources": len(resources), "dry_run": True}
+                    results[provider_name] = {
+                        "resources": len(provider_resources),
+                        "dry_run": True,
+                    }
                     continue
 
                 # Set environment for provider to ensure correct output directory
@@ -489,8 +516,8 @@ class Orchestrator:
 
                 # Generate Terraform and Ansible files
                 provider.ensure_directories()
-                provider.generate_terraform(resources)
-                provider.generate_ansible(resources)
+                provider.generate_terraform(provider_resources)
+                provider.generate_ansible(provider_resources)
 
                 # Export secrets for this provider (create SecretManager per-operation)
                 try:
@@ -509,7 +536,7 @@ class Orchestrator:
                 tf_result = self.terraform_runner.run(provider, "plan", auto_approve=False)
 
                 results[provider_name] = {
-                    "resources": len(resources),
+                    "resources": len(provider_resources),
                     "terraform_plan": tf_result,
                 }
 
@@ -588,7 +615,7 @@ class Orchestrator:
                 )
 
             # Get all resources and discover providers dynamically
-            all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+            all_resources, resources_by_provider = self._load_resources(env_name)
 
             # Capture configuration snapshot for rollback
             rollback_snapshot = {
@@ -609,13 +636,6 @@ class Orchestrator:
             self.state_manager.update_deployment_rollback_data(
                 deployment_id=deployment_id, rollback_data=rollback_snapshot
             )
-
-            # Group resources by provider
-            resources_by_provider: dict[str, list[Any]] = {}
-            for resource in all_resources:
-                if resource.provider not in resources_by_provider:
-                    resources_by_provider[resource.provider] = []
-                resources_by_provider[resource.provider].append(resource)
 
             # Apply providers (parallel or serial based on flag)
             if parallel and len(resources_by_provider) > 1:
@@ -762,27 +782,16 @@ class Orchestrator:
                     )
                     return {}
 
-            # Get all resources and discover providers dynamically
-            all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+            # Get all resources grouped by provider
+            _, resources_by_provider = self._load_resources(env_name)
 
-            # Group resources by provider
-            resources_by_provider: dict[str, list[Any]] = {}
-            for resource in all_resources:
-                if resource.provider not in resources_by_provider:
-                    resources_by_provider[resource.provider] = []
-                resources_by_provider[resource.provider].append(resource)
-
-            for provider_name, resources in resources_by_provider.items():
+            for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
+                provider_name = batch.name
+                resources = batch.resources
                 if provider_name not in self.providers:
                     continue
 
                 provider = self.providers[provider_name]
-
-                # Check if any resources match filter for this provider
-                if resource_filter:
-                    resources = [r for r in resources if r.name in resource_filter]
-                    if not resources:
-                        continue  # Skip provider if no matching resources
 
                 self.console.print(f"\n[bold]Destroying {provider_name}...[/bold]")
 
