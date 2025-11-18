@@ -43,6 +43,7 @@ secrets/
 !example-config/**/*.yaml
 !src/**/*.yaml
 !.sops.yaml
+!.pre-commit-config.yaml
 .env
 *.tfvars
 !*.tfvars.example
@@ -87,3 +88,4 @@ test_*.py
 
 # Temporary files
 tmp/
+.venv
