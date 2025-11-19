@@ -18,6 +18,7 @@ from infrafoundry.core.orchestrator_workflows import (
     DestroyWorkflow,
     PlanWorkflow,
     ProviderResourceBatch,
+    RollbackWorkflow,
     ValidationWorkflow,
 )
 from infrafoundry.core.policy import PolicyEngine
@@ -25,7 +26,7 @@ from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
 from infrafoundry.core.secrets import SecretManager
-from infrafoundry.core.state import DeploymentStatus, StateManager
+from infrafoundry.core.state import StateManager
 
 
 class Orchestrator:
@@ -122,6 +123,12 @@ class Orchestrator:
             get_providers=lambda: self.providers,
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
+            get_current_user=lambda: self._current_user,
+        )
+        self.rollback_workflow = RollbackWorkflow(
+            console=self.console,
+            state_manager=self.state_manager,
+            apply_workflow=self.apply_workflow,
             get_current_user=lambda: self._current_user,
         )
 
@@ -465,74 +472,7 @@ class Orchestrator:
         Raises:
             ValueError: If deployment not found or has no rollback data
         """
-        # Get deployment with rollback data
-        deployment = self.state_manager.get_deployment_by_id(deployment_id)
-        if not deployment:
-            raise ValueError(f"Deployment {deployment_id} not found")
-
-        if not deployment.rollback_data:
-            raise ValueError(f"Deployment {deployment_id} has no rollback data")
-
-        rollback_data = deployment.rollback_data
-        env_name = rollback_data["environment"]
-
-        self.console.print(
-            f"\n[bold yellow]Rolling back {env_name} to deployment {deployment_id}[/bold yellow]"
-        )
-        self.console.print(
-            f"[dim]Deployment from: {deployment.started_at.strftime('%Y-%m-%d %H:%M:%S')}[/dim]"
-        )
-        self.console.print(f"[dim]Resources: {len(rollback_data.get('resources', []))}[/dim]\n")
-
-        if not auto_approve:
-            confirm = input("Are you sure you want to rollback? (yes/no): ")
-            if confirm.lower() != "yes":
-                self.console.print("[yellow]Rollback cancelled.[/yellow]")
-                return {}
-
-        # Create deployment record for rollback
-        rollback_deployment_id = self.state_manager.create_deployment(
-            environment=env_name,
-            command="apply",
-            user=self._current_user,
-            dry_run=False,
-            metadata={"rollback_from": deployment_id, "rollback": True},
-        )
-
-        try:
-            # Write rollback configurations to temporary files
-            # For now, we'll use the current config structure and rely on users
-            # having the correct configuration in their repo
-            # In a production system, you'd want to write the configs to temp files
-
-            self.console.print(
-                f"\n[bold yellow]⚠ Note: Rollback requires the configuration "
-                f"repository to be at the state from deployment {deployment_id}[/bold yellow]"
-            )
-            self.console.print(
-                "[dim]Consider using git to checkout the appropriate commit if needed.[/dim]\n"
-            )
-
-            # Apply the infrastructure using current configuration
-            # This assumes the user has set their config repo to the correct state
-            results = self.apply(env_name, auto_approve=True, resource_filter=None)
-
-            self.state_manager.update_deployment_status(
-                rollback_deployment_id, DeploymentStatus.COMPLETED
-            )
-
-            self.console.print(
-                f"\n[bold green]✓ Rollback to deployment {deployment_id} completed![/bold green]"
-            )
-
-            return results
-
-        except Exception as e:
-            self.state_manager.update_deployment_status(
-                rollback_deployment_id, DeploymentStatus.FAILED, str(e)
-            )
-            self.console.print(f"\n[bold red]✗ Rollback failed: {e}[/bold red]")
-            raise
+        return self.rollback_workflow.run(deployment_id, auto_approve)
 
     def status(self, env_name: str) -> None:
         """Show status of infrastructure.

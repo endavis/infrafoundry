@@ -365,6 +365,98 @@ class PlanWorkflow:
             self.console.print(f"[dim]Skipping secrets export: {exc}[/dim]")
 
 
+class RollbackWorkflow:
+    """Handle rollbacks by orchestrating confirmation and apply execution."""
+
+    def __init__(
+        self,
+        console: Console,
+        state_manager: StateManager,
+        apply_workflow: ApplyWorkflow,
+        get_current_user: Callable[[], str],
+    ) -> None:
+        self.console = console
+        self.state_manager = state_manager
+        self.apply_workflow = apply_workflow
+        self._get_current_user = get_current_user
+
+    def run(self, deployment_id: int, auto_approve: bool) -> dict[str, Any]:
+        deployment = self.state_manager.get_deployment_by_id(deployment_id)
+        if not deployment:
+            raise ValueError(f"Deployment {deployment_id} not found")
+
+        if not deployment.rollback_data:
+            raise ValueError(f"Deployment {deployment_id} has no rollback data")
+
+        rollback_data = deployment.rollback_data
+        env_name = rollback_data["environment"]
+        self._print_header(env_name, deployment_id, deployment, rollback_data)
+
+        if not auto_approve and not self._confirm_rollback():
+            self.console.print("[yellow]Rollback cancelled.[/yellow]")
+            return {}
+
+        rollback_deployment_id = self.state_manager.create_deployment(
+            environment=env_name,
+            command="apply",
+            user=self._get_current_user(),
+            dry_run=False,
+            metadata={"rollback_from": deployment_id, "rollback": True},
+        )
+
+        try:
+            self._print_note(deployment_id)
+            results = self.apply_workflow.run(
+                env_name=env_name,
+                resource_filter=None,
+                auto_approve=True,
+                parallel=False,
+                max_workers=4,
+            )
+            self.state_manager.update_deployment_status(
+                rollback_deployment_id, DeploymentStatus.COMPLETED
+            )
+            self.console.print(
+                f"\n[bold green]✓ Rollback to deployment {deployment_id} completed![/bold green]"
+            )
+            return results
+        except Exception as exc:
+            self.state_manager.update_deployment_status(
+                rollback_deployment_id, DeploymentStatus.FAILED, str(exc)
+            )
+            self.console.print(f"\n[bold red]✗ Rollback failed: {exc}[/bold red]")
+            raise
+
+    def _print_header(
+        self,
+        env_name: str,
+        deployment_id: int,
+        deployment: Any,
+        rollback_data: dict[str, Any],
+    ) -> None:
+        self.console.print(
+            f"\n[bold yellow]Rolling back {env_name} to deployment {deployment_id}[/bold yellow]"
+        )
+        if deployment.started_at:
+            self.console.print(
+                f"[dim]Deployment from: {deployment.started_at.strftime('%Y-%m-%d %H:%M:%S')}[/dim]"
+            )
+        self.console.print(f"[dim]Resources: {len(rollback_data.get('resources', []))}[/dim]\n")
+
+    def _confirm_rollback(self) -> bool:
+        response = input("Are you sure you want to rollback? (yes/no): ")
+        return response.lower() == "yes"
+
+    def _print_note(self, deployment_id: int) -> None:
+        self.console.print(
+            f"\n[bold yellow]⚠ Note: Rollback requires the configuration "
+            f"repository to be at the state from deployment {deployment_id}[/bold yellow]"
+        )
+        self.console.print(
+            "[dim]Consider using git to checkout the appropriate commit if needed.[/dim]\n"
+        )
+
+
 class ApplyWorkflow:
     """Coordinate apply deployments after planning."""
 
