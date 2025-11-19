@@ -14,14 +14,14 @@ from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import Event, EventManager, EventType
 from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.orchestrator_workflows import (
-    ApplyWorkflow,
-    DestroyWorkflow,
-    DriftWorkflow,
-    PlanWorkflow,
+    ApplyOrchestrator,
+    DestroyOrchestrator,
+    DriftOrchestrator,
+    PlanOrchestrator,
     ProviderResourceBatch,
-    RollbackWorkflow,
-    StatusWorkflow,
-    ValidationWorkflow,
+    RollbackOrchestrator,
+    StatusOrchestrator,
+    ValidationOrchestrator,
 )
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.policy_checker import PolicyChecker
@@ -101,14 +101,14 @@ class Orchestrator:
             self.providers,
             self.console,
         )
-        self.validation_workflow = ValidationWorkflow(
+        self.validation_orchestrator = ValidationOrchestrator(
             config_manager=self.config_manager,
             console=self.console,
             get_providers=lambda: self.providers,
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
         )
-        self.plan_workflow = PlanWorkflow(
+        self.plan_orchestrator = PlanOrchestrator(
             console=self.console,
             state_manager=self.state_manager,
             event_manager=self.event_manager,
@@ -125,7 +125,7 @@ class Orchestrator:
             get_current_user=lambda: self._current_user,
             fail_on_missing_secrets=self.strict_config.fail_on_missing_secrets,
         )
-        self.apply_workflow = ApplyWorkflow(
+        self.apply_orchestrator = ApplyOrchestrator(
             console=self.console,
             state_manager=self.state_manager,
             event_manager=self.event_manager,
@@ -134,7 +134,7 @@ class Orchestrator:
             apply_parallel=self._apply_providers_parallel,
             get_current_user=lambda: self._current_user,
         )
-        self.destroy_workflow = DestroyWorkflow(
+        self.destroy_orchestrator = DestroyOrchestrator(
             console=self.console,
             state_manager=self.state_manager,
             event_manager=self.event_manager,
@@ -144,17 +144,17 @@ class Orchestrator:
             iter_provider_batches=self._iter_provider_batches,
             get_current_user=lambda: self._current_user,
         )
-        self.rollback_workflow = RollbackWorkflow(
+        self.rollback_orchestrator = RollbackOrchestrator(
             console=self.console,
             state_manager=self.state_manager,
-            apply_workflow=self.apply_workflow,
+            apply_orchestrator=self.apply_orchestrator,
             get_current_user=lambda: self._current_user,
         )
-        self.drift_workflow = DriftWorkflow(
+        self.drift_orchestrator = DriftOrchestrator(
             drift_detector=self.drift_detector,
             get_providers=lambda: self.providers,
         )
-        self.status_workflow = StatusWorkflow(
+        self.status_orchestrator = StatusOrchestrator(
             console=self.console,
             config_manager=self.config_manager,
             get_providers=lambda: self.providers,
@@ -337,7 +337,7 @@ class Orchestrator:
         Returns:
             Dict with drift detection results per provider
         """
-        return self.drift_workflow.run(env_name)
+        return self.drift_orchestrator.detect(env_name)
 
     def validate(
         self,
@@ -368,7 +368,7 @@ class Orchestrator:
                 }
             }
         """
-        return self.validation_workflow.run(env_name, resource_filter, verbose)
+        return self.validation_orchestrator.validate(env_name, resource_filter, verbose)
 
     def plan(
         self,
@@ -388,7 +388,7 @@ class Orchestrator:
         Returns:
             Dict with plan results per provider
         """
-        return self.plan_workflow.run(env_name, dry_run, resource_filter, enforce_policies)
+        return self.plan_orchestrator.plan(env_name, dry_run, resource_filter, enforce_policies)
 
     def apply(
         self,
@@ -412,7 +412,7 @@ class Orchestrator:
         """
         # First, generate the plans
         self.plan(env_name, dry_run=False, resource_filter=resource_filter)
-        return self.apply_workflow.run(
+        return self.apply_orchestrator.apply(
             env_name=env_name,
             resource_filter=resource_filter,
             auto_approve=auto_approve,
@@ -485,7 +485,7 @@ class Orchestrator:
         Returns:
             Dict with destroy results per provider
         """
-        return self.destroy_workflow.run(env_name, resource_filter, auto_approve)
+        return self.destroy_orchestrator.destroy(env_name, resource_filter, auto_approve)
 
     def rollback(self, deployment_id: int, auto_approve: bool = False) -> dict[str, Any]:
         """Rollback infrastructure to a previous deployment state.
@@ -500,7 +500,7 @@ class Orchestrator:
         Raises:
             ValueError: If deployment not found or has no rollback data
         """
-        return self.rollback_workflow.run(deployment_id, auto_approve)
+        return self.rollback_orchestrator.rollback(deployment_id, auto_approve)
 
     def status(self, env_name: str) -> None:
         """Show status of infrastructure.
@@ -508,4 +508,4 @@ class Orchestrator:
         Args:
             env_name: Environment name
         """
-        self.status_workflow.run(env_name)
+        self.status_orchestrator.show(env_name)

@@ -8,7 +8,6 @@ import pytest
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.orchestrator import Orchestrator
-from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
 from infrafoundry.providers.proxmox import ProxmoxProvider
 
@@ -80,7 +79,7 @@ def mock_apply_methods(orchestrator):
                 yield
 
 
-class TestPlanWorkflow:
+class TestPlanOrchestrator:
     """Tests for plan workflow."""
 
     def test_plan_basic_workflow(self, orchestrator, mock_providers):
@@ -201,7 +200,7 @@ class TestPlanWorkflow:
         assert EventType.PLAN_FAILED in events_received
 
 
-class TestApplyWorkflow:
+class TestApplyOrchestrator:
     """Tests for apply workflow."""
 
     def test_apply_runs_plan_first(self, orchestrator):
@@ -331,7 +330,7 @@ class TestApplyWorkflow:
         assert EventType.APPLY_FAILED in events_received
 
 
-class TestDestroyWorkflow:
+class TestDestroyOrchestrator:
     """Tests for destroy workflow."""
 
     def test_destroy_basic_workflow(self, orchestrator, mock_providers):

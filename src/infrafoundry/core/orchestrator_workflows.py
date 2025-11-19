@@ -29,7 +29,7 @@ class ProviderResourceBatch:
     original_count: int
 
 
-class DriftWorkflow:
+class DriftOrchestrator:
     """Wrap drift detection to keep orchestrator slim."""
 
     def __init__(
@@ -40,13 +40,13 @@ class DriftWorkflow:
         self.drift_detector = drift_detector
         self._get_providers = get_providers
 
-    def run(self, env_name: str) -> dict[str, Any]:
+    def detect(self, env_name: str) -> dict[str, Any]:
         """Detect drift for the provided environment."""
         self.drift_detector.providers = self._get_providers()
         return self.drift_detector.detect(env_name)
 
 
-class StatusWorkflow:
+class StatusOrchestrator:
     """Render provider/resource status tables."""
 
     def __init__(
@@ -59,7 +59,7 @@ class StatusWorkflow:
         self.config_manager = config_manager
         self._get_providers = get_providers
 
-    def run(self, env_name: str) -> None:
+    def show(self, env_name: str) -> None:
         """Print infrastructure status table."""
         table = Table(title=f"Infrastructure Status: {env_name}")
         table.add_column("Provider", style="cyan")
@@ -88,7 +88,7 @@ class StatusWorkflow:
         self.console.print(table)
 
 
-class ValidationWorkflow:
+class ValidationOrchestrator:
     """Handle per-provider validation, keeping Orchestrator lean."""
 
     def __init__(
@@ -107,7 +107,7 @@ class ValidationWorkflow:
         self._load_resources = load_resources
         self._iter_provider_batches = iter_provider_batches
 
-    def run(
+    def validate(
         self,
         env_name: str,
         resource_filter: list[str] | None,
@@ -237,7 +237,7 @@ class ValidationWorkflow:
             self.console.print("[yellow]  Fix errors before deploying[/yellow]")
 
 
-class PlanWorkflow:
+class PlanOrchestrator:
     """Handle plan execution for each provider."""
 
     def __init__(
@@ -272,7 +272,7 @@ class PlanWorkflow:
         self._get_current_user = get_current_user
         self._fail_on_missing_secrets = fail_on_missing_secrets
 
-    def run(
+    def plan(
         self,
         env_name: str,
         dry_run: bool,
@@ -433,22 +433,22 @@ class PlanWorkflow:
             self.console.print(f"[dim]Skipping secrets export: {exc}[/dim]")
 
 
-class RollbackWorkflow:
+class RollbackOrchestrator:
     """Handle rollbacks by orchestrating confirmation and apply execution."""
 
     def __init__(
         self,
         console: Console,
         state_manager: StateManager,
-        apply_workflow: ApplyWorkflow,
+        apply_orchestrator: ApplyOrchestrator,
         get_current_user: Callable[[], str],
     ) -> None:
         self.console = console
         self.state_manager = state_manager
-        self.apply_workflow = apply_workflow
+        self.apply_orchestrator = apply_orchestrator
         self._get_current_user = get_current_user
 
-    def run(self, deployment_id: int, auto_approve: bool) -> dict[str, Any]:
+    def rollback(self, deployment_id: int, auto_approve: bool) -> dict[str, Any]:
         deployment = self.state_manager.get_deployment_by_id(deployment_id)
         if not deployment:
             raise ValueError(f"Deployment {deployment_id} not found")
@@ -474,7 +474,7 @@ class RollbackWorkflow:
 
         try:
             self._print_note(deployment_id)
-            results = self.apply_workflow.run(
+            results = self.apply_orchestrator.apply(
                 env_name=env_name,
                 resource_filter=None,
                 auto_approve=True,
@@ -525,7 +525,7 @@ class RollbackWorkflow:
         )
 
 
-class ApplyWorkflow:
+class ApplyOrchestrator:
     """Coordinate apply deployments after planning."""
 
     def __init__(
@@ -550,7 +550,7 @@ class ApplyWorkflow:
         self._apply_parallel = apply_parallel
         self._get_current_user = get_current_user
 
-    def run(
+    def apply(
         self,
         env_name: str,
         resource_filter: list[str] | None,
@@ -646,7 +646,7 @@ class ApplyWorkflow:
             self.console.print(f"\n[{style}]{label} infrastructure for: {env_name}[/{style}]")
 
 
-class DestroyWorkflow:
+class DestroyOrchestrator:
     """Handle destroy operations with consistent tracking."""
 
     def __init__(
@@ -671,7 +671,7 @@ class DestroyWorkflow:
         self._iter_provider_batches = iter_provider_batches
         self._get_current_user = get_current_user
 
-    def run(
+    def destroy(
         self,
         env_name: str,
         resource_filter: list[str] | None,

@@ -50,6 +50,13 @@ Orchestrator (Thin Coordinator)
 
 ## Workflow Pattern
 
+> **Update (2025-01-13):** The primary workflows now live in dedicated coordinator classes:
+> `ValidationOrchestrator`, `PlanOrchestrator`, `ApplyOrchestrator`, `DestroyOrchestrator`,
+> `RollbackOrchestrator`, `DriftOrchestrator`, and `StatusOrchestrator`
+> (`src/infrafoundry/core/orchestrator_workflows.py`). Each orchestrator encapsulates the workflow
+> steps below while the top-level `Orchestrator` acts as a thin facade that wires dependencies and
+> delegates to the appropriate orchestrator method.
+
 All major workflows (`plan`, `apply`, `destroy`) follow this pattern:
 
 ```python
@@ -211,8 +218,8 @@ class WorkflowStrategy(ABC):
     @abstractmethod
     def execute(self, orchestrator, env_name, **kwargs): pass
 
-class PlanWorkflow(WorkflowStrategy): ...
-class ApplyWorkflow(WorkflowStrategy): ...
+class PlanOrchestrator(WorkflowStrategy): ...
+class ApplyOrchestrator(WorkflowStrategy): ...
 ```
 
 **Impact:** Enable new workflow types without modifying Orchestrator
