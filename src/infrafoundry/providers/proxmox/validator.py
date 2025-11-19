@@ -1,18 +1,39 @@
-"""Validation logic for Proxmox provider.
+"""Validation logic for Proxmox provider."""
 
-This module contains all validation methods for checking Proxmox infrastructure
-configurations against live API state before deployment.
-"""
+from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from typing import TypedDict, cast
 
 import urllib3
 
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.validation import ValidationLevel
+from infrafoundry.core.types import ProxmoxEnvironmentConfig, ProxmoxProviderSettings
+from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+class ClusterVM(TypedDict, total=False):
+    """Typed representation of a VM entry in the Proxmox cluster listing."""
+
+    vmid: int
+    name: str
+    template: int
+    type: str
+
+
+@dataclass
+class ProxmoxResourceReferences:
+    """Aggregated references extracted from resource configs."""
+
+    nodes: set[str]
+    storage_pools: set[tuple[str, str]]
+    bridges: set[tuple[str, str]]
+    template_refs: dict[str, list[str]]
+    vmids: dict[int, str]
+    mac_addresses: dict[str, str]
 
 
 class ProxmoxValidator:
@@ -28,7 +49,7 @@ class ProxmoxValidator:
     - MAC address conflicts
     """
 
-    def __init__(self, env_config: dict[str, Any], report: Any):
+    def __init__(self, env_config: ProxmoxEnvironmentConfig, report: ValidationReport):
         """Initialize Proxmox validator.
 
         Args:
@@ -38,8 +59,8 @@ class ProxmoxValidator:
         self.env_config = env_config
         self.report = report
         self.api_validator = BaseAPIValidator("proxmox", env_config, report)
-        self.provider_settings = self.api_validator.provider_settings
-        self._cluster_vm_cache: list[dict[str, Any]] | None = None
+        self.provider_settings = cast(ProxmoxProviderSettings, self.api_validator.provider_settings)
+        self._cluster_vm_cache: list[ClusterVM] | None = None
         self._cluster_vm_cache_populated = False
 
     def validate_connectivity(self) -> None:
@@ -130,11 +151,11 @@ class ProxmoxValidator:
             resource_refs = self._collect_resource_references(resources, default_node)
 
             # Validate each type of reference
-            self._validate_nodes(api_url, headers, resource_refs["nodes"])
-            self._validate_storage(api_url, headers, resource_refs["storage_pools"])
-            self._validate_bridges(api_url, headers, resource_refs["bridges"])
-            self._validate_templates(api_url, headers, resource_refs["template_refs"])
-            self._validate_vmids(api_url, headers, resource_refs["vmids"])
+            self._validate_nodes(api_url, headers, resource_refs.nodes)
+            self._validate_storage(api_url, headers, resource_refs.storage_pools)
+            self._validate_bridges(api_url, headers, resource_refs.bridges)
+            self._validate_templates(api_url, headers, resource_refs.template_refs)
+            self._validate_vmids(api_url, headers, resource_refs.vmids)
 
         except Exception as e:
             self.report.add_check(
@@ -164,26 +185,12 @@ class ProxmoxValidator:
 
     def _collect_resource_references(
         self, resources: list[ResourceConfig], default_node: str | None
-    ) -> dict[str, Any]:
-        """Collect all resource references from configurations.
-
-        Args:
-            resources: List of resources to scan
-            default_node: Default node name
-
-        Returns:
-            Dict with collected references:
-            - nodes: Set of node names
-            - storage_pools: Set of (node, storage) tuples
-            - bridges: Set of (node, bridge) tuples
-            - template_refs: Dict of {vmid_or_name: [resource_names]}
-            - vmids: Dict of {vmid: resource_name}
-            - mac_addresses: Dict of {mac: resource_name}
-        """
-        nodes = set()
-        storage_pools = set()
-        bridges = set()
-        template_refs: dict[Any, list[str]] = {}
+    ) -> ProxmoxResourceReferences:
+        """Collect all resource references from configurations."""
+        nodes: set[str] = set()
+        storage_pools: set[tuple[str, str]] = set()
+        bridges: set[tuple[str, str]] = set()
+        template_refs: dict[str, list[str]] = {}
         vmids: dict[int, str] = {}
         mac_addresses: dict[str, str] = {}
 
@@ -210,9 +217,8 @@ class ProxmoxValidator:
 
             # Collect template references (for VMs that clone)
             if resource.type == "vm" and (clone_ref := config.get("clone")):
-                if clone_ref not in template_refs:
-                    template_refs[clone_ref] = []
-                template_refs[clone_ref].append(resource_name)
+                key = str(clone_ref)
+                template_refs.setdefault(key, []).append(resource_name)
 
             # Collect VMIDs and check for duplicates
             if vmid := config.get("vmid"):
@@ -244,14 +250,14 @@ class ProxmoxValidator:
                         )
                     mac_addresses[mac_upper] = resource_name
 
-        return {
-            "nodes": nodes,
-            "storage_pools": storage_pools,
-            "bridges": bridges,
-            "template_refs": template_refs,
-            "vmids": vmids,
-            "mac_addresses": mac_addresses,
-        }
+        return ProxmoxResourceReferences(
+            nodes=nodes,
+            storage_pools=storage_pools,
+            bridges=bridges,
+            template_refs=template_refs,
+            vmids=vmids,
+            mac_addresses=mac_addresses,
+        )
 
     def _get_cluster_vms(
         self,
@@ -259,7 +265,7 @@ class ProxmoxValidator:
         headers: dict[str, str],
         *,
         check_name: str,
-    ) -> list[dict[str, Any]] | None:
+    ) -> list[ClusterVM] | None:
         """Fetch and cache cluster VM data for template/vmid checks."""
         if self._cluster_vm_cache_populated:
             return self._cluster_vm_cache
@@ -457,7 +463,7 @@ class ProxmoxValidator:
                 )
 
     def _validate_templates(
-        self, api_url: str, headers: dict[str, str], template_refs: dict[Any, list[str]]
+        self, api_url: str, headers: dict[str, str], template_refs: dict[str, list[str]]
     ) -> None:
         """Validate that templates exist (by VMID or name).
 
