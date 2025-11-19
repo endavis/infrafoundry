@@ -20,6 +20,7 @@ from infrafoundry.core.state.models import (
     ResourceState,
 )
 from infrafoundry.core.state.resource_repository import ResourceRepository
+from infrafoundry.core.types import DeploymentMetadata, ResourceTrackingMetadata
 
 
 class StateManager(BaseManager):
@@ -65,7 +66,7 @@ class StateManager(BaseManager):
         user: str | None = None,
         commit_sha: str | None = None,
         dry_run: bool = False,
-        metadata: dict[str, Any] | None = None,
+        metadata: DeploymentMetadata | None = None,
     ) -> int:
         """Create a new deployment record.
 
@@ -169,7 +170,7 @@ class StateManager(BaseManager):
         event_type: str,
         message: str,
         resource_name: str | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: ResourceTrackingMetadata | None = None,
     ) -> None:
         """Log a deployment event.
 

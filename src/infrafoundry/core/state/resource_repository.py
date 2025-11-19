@@ -3,6 +3,7 @@
 from typing import Any
 
 from infrafoundry.core.state.models import Resource, ResourceDependency, ResourceState
+from infrafoundry.core.types import ResourceTrackingMetadata
 
 
 class ResourceRepository:
@@ -26,7 +27,7 @@ class ResourceRepository:
         state: ResourceState,
         config: dict[str, Any] | None = None,
         terraform_id: str | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: ResourceTrackingMetadata | None = None,
     ) -> Resource:
         """Track a resource.
 

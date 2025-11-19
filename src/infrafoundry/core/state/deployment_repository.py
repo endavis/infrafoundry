@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from infrafoundry.core.state.models import Deployment, DeploymentEvent, DeploymentStatus
+from infrafoundry.core.types import DeploymentMetadata
 
 
 class DeploymentRepository:
@@ -24,7 +25,7 @@ class DeploymentRepository:
         user: str | None = None,
         commit_sha: str | None = None,
         dry_run: bool = False,
-        metadata: dict[str, Any] | None = None,
+        metadata: DeploymentMetadata | None = None,
     ) -> int:
         """Create a new deployment record.
 

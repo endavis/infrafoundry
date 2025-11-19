@@ -55,6 +55,63 @@ class EnvironmentData(TypedDict, total=False):
     provider_settings: dict[str, dict[str, Any]]
 
 
+class PlanDeploymentMetadata(TypedDict, total=False):
+    """Metadata recorded for plan deployments."""
+
+    resource_filter: list[str] | None
+
+
+class ApplyDeploymentMetadata(PlanDeploymentMetadata, total=False):
+    """Metadata recorded for apply deployments."""
+
+    auto_approve: bool
+
+
+class DestroyDeploymentMetadata(PlanDeploymentMetadata, total=False):
+    """Metadata recorded for destroy deployments."""
+
+    auto_approve: bool
+
+
+class RollbackDeploymentMetadata(TypedDict, total=False):
+    """Metadata recorded when performing a rollback deployment."""
+
+    rollback_from: int
+    rollback: bool
+
+
+DeploymentMetadata = (
+    PlanDeploymentMetadata
+    | ApplyDeploymentMetadata
+    | DestroyDeploymentMetadata
+    | RollbackDeploymentMetadata
+)
+
+
+class ResourceTrackingMetadata(TypedDict, total=False):
+    """Metadata stored with tracked resources."""
+
+    depends_on: list[str]
+    custom_tags: dict[str, str]
+
+
+class ResourceEventData(TypedDict, total=False):
+    """Event payload for resource lifecycle events."""
+
+    resource_id: int | None
+    provider: str
+    name: str
+    terraform_id: str | None
+
+
+class DeploymentEventData(TypedDict, total=False):
+    """Event payload for deployment-level events."""
+
+    deployment_id: int
+    results: dict[str, Any] | None
+    error: str | None
+
+
 __all__ = [
     "EnvironmentData",
     "ProxmoxEnvironmentConfig",
@@ -62,4 +119,12 @@ __all__ = [
     "OPNsenseEnvironmentConfig",
     "OPNsenseProviderSettings",
     "SSHConfigData",
+    "PlanDeploymentMetadata",
+    "ApplyDeploymentMetadata",
+    "DestroyDeploymentMetadata",
+    "RollbackDeploymentMetadata",
+    "DeploymentMetadata",
+    "ResourceTrackingMetadata",
+    "ResourceEventData",
+    "DeploymentEventData",
 ]
