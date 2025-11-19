@@ -52,12 +52,16 @@ class OPNsenseProvider(
         resources_by_type = self.group_resources_by_type(resources)
 
         # Generate provider configuration
-        content = self.render_template("opnsense/provider.tf.j2", {})
-        self._write_terraform_file("provider.tf", content)
+        self.render_and_write_terraform(
+            "opnsense/provider.tf.j2",
+            output_name="provider.tf",
+        )
 
         # Generate variables file
-        content = self.render_template("opnsense/variables.tf.j2", {})
-        self._write_terraform_file("variables.tf", content)
+        self.render_and_write_terraform(
+            "opnsense/variables.tf.j2",
+            output_name="variables.tf",
+        )
 
         # Generate terraform.tfvars from settings.yaml
         self.generate_provider_tfvars(
@@ -91,45 +95,59 @@ class OPNsenseProvider(
             self._generate_kea_dhcp6_resources(kea_dhcp6_subnets, kea_dhcp6_reservations)
 
         # Generate outputs
-        content = self.render_template(
+        self.render_and_write_terraform(
             "opnsense/outputs.tf.j2",
-            {"resources_by_type": resources_by_type},
+            context={"resources_by_type": resources_by_type},
+            output_name="outputs.tf",
         )
-        self._write_terraform_file("outputs.tf", content)
 
     def _generate_firewall_rules_terraform(self, rules: list[ResourceConfig]) -> None:
         """Generate Terraform for OPNsense firewall rules."""
-        content = self.render_template("opnsense/firewall_rules.tf.j2", {"rules": rules})
-        self._write_terraform_file("firewall_rules.tf", content)
+        self.render_and_write_terraform(
+            "opnsense/firewall_rules.tf.j2",
+            context={"rules": rules},
+            output_name="firewall_rules.tf",
+        )
 
     def _generate_vlans_terraform(self, vlans: list[ResourceConfig]) -> None:
         """Generate Terraform for OPNsense VLANs."""
-        content = self.render_template("opnsense/vlans.tf.j2", {"vlans": vlans})
-        self._write_terraform_file("vlans.tf", content)
+        self.render_and_write_terraform(
+            "opnsense/vlans.tf.j2",
+            context={"vlans": vlans},
+            output_name="vlans.tf",
+        )
 
     def _generate_aliases_terraform(self, aliases: list[ResourceConfig]) -> None:
         """Generate Terraform for OPNsense aliases."""
-        content = self.render_template("opnsense/aliases.tf.j2", {"aliases": aliases})
-        self._write_terraform_file("aliases.tf", content)
+        self.render_and_write_terraform(
+            "opnsense/aliases.tf.j2",
+            context={"aliases": aliases},
+            output_name="aliases.tf",
+        )
 
     def _generate_dhcp_static_maps_terraform(self, static_maps: list[ResourceConfig]) -> None:
         """Generate Terraform for OPNsense DHCP static mappings."""
-        content = self.render_template(
-            "opnsense/dhcp_static_maps.tf.j2", {"static_maps": static_maps}
+        self.render_and_write_terraform(
+            "opnsense/dhcp_static_maps.tf.j2",
+            context={"static_maps": static_maps},
+            output_name="dhcp_static_maps.tf",
         )
-        self._write_terraform_file("dhcp_static_maps.tf", content)
 
     def _generate_kea_subnet_terraform(self, subnets: list[ResourceConfig]) -> None:
         """Generate Terraform for Kea DHCP subnets."""
-        content = self.render_template("opnsense/kea_subnet.tf.j2", {"subnets": subnets})
-        self._write_terraform_file("kea_subnet.tf", content)
+        self.render_and_write_terraform(
+            "opnsense/kea_subnet.tf.j2",
+            context={"subnets": subnets},
+            output_name="kea_subnet.tf",
+        )
 
     def _generate_kea_reservation_terraform(self, reservations: list[ResourceConfig]) -> None:
         """Generate Terraform for Kea DHCP reservations."""
-        content = self.render_template(
-            "opnsense/kea_reservation.tf.j2", {"reservations": reservations}
+        self.render_and_write_terraform(
+            "opnsense/kea_reservation.tf.j2",
+            context={"reservations": reservations},
+            output_name="kea_reservation.tf",
         )
-        self._write_terraform_file("kea_reservation.tf", content)
 
     def _generate_kea_dhcp6_resources(
         self, subnets: list[ResourceConfig], reservations: list[ResourceConfig]

@@ -65,17 +65,19 @@ class ProxmoxProvider(
         resources_by_type = self.group_resources_by_type(resources)
 
         # Generate provider configuration
-        content = self.render_template("proxmox/provider.tf.j2", {})
-        self._write_terraform_file("provider.tf", content)
+        self.render_and_write_terraform(
+            "proxmox/provider.tf.j2",
+            output_name="provider.tf",
+        )
 
         # Generate variables file with environment context
         import os
 
-        content = self.render_template(
+        self.render_and_write_terraform(
             "proxmox/variables.tf.j2",
-            {"default_ssh_user": os.getenv("USER", "root")},
+            context={"default_ssh_user": os.getenv("USER", "root")},
+            output_name="variables.tf",
         )
-        self._write_terraform_file("variables.tf", content)
 
         # Copy or generate terraform.tfvars from environment config
         self.generate_provider_tfvars(
@@ -96,11 +98,11 @@ class ProxmoxProvider(
             self._generate_networks_terraform(resources_by_type["network"])
 
         # Generate outputs
-        content = self.render_template(
+        self.render_and_write_terraform(
             "proxmox/outputs.tf.j2",
-            {"resources_by_type": resources_by_type},
+            context={"resources_by_type": resources_by_type},
+            output_name="outputs.tf",
         )
-        self._write_terraform_file("outputs.tf", content)
 
     def _generate_vms_terraform(self, vms: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox VMs."""
@@ -110,8 +112,11 @@ class ProxmoxProvider(
             processed_vm = self._process_cloud_init_snippets(vm)
             processed_vms.append(processed_vm)
 
-        content = self.render_template("proxmox/vms.tf.j2", {"vms": processed_vms})
-        self._write_terraform_file("vms.tf", content)
+        self.render_and_write_terraform(
+            "proxmox/vms.tf.j2",
+            context={"vms": processed_vms},
+            output_name="vms.tf",
+        )
 
     def _process_cloud_init_snippets(self, vm: ResourceConfig) -> ResourceConfig:
         """Process cloud-init snippets and merge them into VM config."""
@@ -229,15 +234,19 @@ class ProxmoxProvider(
             except FileNotFoundError:
                 pass
 
-        content = self.render_template(
-            "proxmox/templates.tf.j2", {"templates": templates, "ssh_hostname": ssh_hostname}
+        self.render_and_write_terraform(
+            "proxmox/templates.tf.j2",
+            context={"templates": templates, "ssh_hostname": ssh_hostname},
+            output_name="templates.tf",
         )
-        self._write_terraform_file("templates.tf", content)
 
     def _generate_networks_terraform(self, networks: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox networks."""
-        content = self.render_template("proxmox/networks.tf.j2", {"networks": networks})
-        self._write_terraform_file("networks.tf", content)
+        self.render_and_write_terraform(
+            "proxmox/networks.tf.j2",
+            context={"networks": networks},
+            output_name="networks.tf",
+        )
 
     def _copy_tfvars_if_exists(self) -> None:
         """Copy environment-specific terraform.tfvars if it exists."""
