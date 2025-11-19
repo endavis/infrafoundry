@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
-from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.dependencies import DependencyGraph
@@ -17,9 +16,11 @@ from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.orchestrator_workflows import (
     ApplyWorkflow,
     DestroyWorkflow,
+    DriftWorkflow,
     PlanWorkflow,
     ProviderResourceBatch,
     RollbackWorkflow,
+    StatusWorkflow,
     ValidationWorkflow,
 )
 from infrafoundry.core.policy import PolicyEngine
@@ -148,6 +149,15 @@ class Orchestrator:
             state_manager=self.state_manager,
             apply_workflow=self.apply_workflow,
             get_current_user=lambda: self._current_user,
+        )
+        self.drift_workflow = DriftWorkflow(
+            drift_detector=self.drift_detector,
+            get_providers=lambda: self.providers,
+        )
+        self.status_workflow = StatusWorkflow(
+            console=self.console,
+            config_manager=self.config_manager,
+            get_providers=lambda: self.providers,
         )
 
         # Subscribe notification manager to events
@@ -327,9 +337,7 @@ class Orchestrator:
         Returns:
             Dict with drift detection results per provider
         """
-        # Update drift detector's provider references
-        self.drift_detector.providers = self.providers
-        return self.drift_detector.detect(env_name)
+        return self.drift_workflow.run(env_name)
 
     def validate(
         self,
@@ -500,32 +508,4 @@ class Orchestrator:
         Args:
             env_name: Environment name
         """
-        table = Table(title=f"Infrastructure Status: {env_name}")
-        table.add_column("Provider", style="cyan")
-        table.add_column("Resources", style="magenta")
-        table.add_column("Status", style="green")
-
-        # Get all resources and discover providers dynamically
-        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
-
-        # Group resources by provider
-        resources_by_provider: dict[str, list[Any]] = {}
-        for resource in all_resources:
-            if resource.provider not in resources_by_provider:
-                resources_by_provider[resource.provider] = []
-            resources_by_provider[resource.provider].append(resource)
-
-        for provider_name, resources in sorted(resources_by_provider.items()):
-            if provider_name not in self.providers:
-                table.add_row(provider_name, "N/A", "[yellow]Not registered[/yellow]")
-                continue
-
-            provider = self.providers[provider_name]
-
-            # Check if Terraform state exists
-            state_file = provider.terraform_dir / "terraform.tfstate"
-            status = "[green]Deployed[/green]" if state_file.exists() else "[dim]Not deployed[/dim]"
-
-            table.add_row(provider_name, str(len(resources)), status)
-
-        self.console.print(table)
+        self.status_workflow.run(env_name)

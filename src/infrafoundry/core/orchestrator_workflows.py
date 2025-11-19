@@ -8,8 +8,10 @@ from datetime import datetime
 from typing import Any
 
 from rich.console import Console
+from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventType
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import TerraformRunner
@@ -25,6 +27,65 @@ class ProviderResourceBatch:
     name: str
     resources: list[Any]
     original_count: int
+
+
+class DriftWorkflow:
+    """Wrap drift detection to keep orchestrator slim."""
+
+    def __init__(
+        self,
+        drift_detector: DriftDetector,
+        get_providers: Callable[[], dict[str, ProviderBase]],
+    ) -> None:
+        self.drift_detector = drift_detector
+        self._get_providers = get_providers
+
+    def run(self, env_name: str) -> dict[str, Any]:
+        """Detect drift for the provided environment."""
+        self.drift_detector.providers = self._get_providers()
+        return self.drift_detector.detect(env_name)
+
+
+class StatusWorkflow:
+    """Render provider/resource status tables."""
+
+    def __init__(
+        self,
+        console: Console,
+        config_manager: ConfigManager,
+        get_providers: Callable[[], dict[str, ProviderBase]],
+    ) -> None:
+        self.console = console
+        self.config_manager = config_manager
+        self._get_providers = get_providers
+
+    def run(self, env_name: str) -> None:
+        """Print infrastructure status table."""
+        table = Table(title=f"Infrastructure Status: {env_name}")
+        table.add_column("Provider", style="cyan")
+        table.add_column("Resources", style="magenta")
+        table.add_column("Status", style="green")
+
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+        resources_by_provider: dict[str, list[Any]] = {}
+        for resource in all_resources:
+            resources_by_provider.setdefault(resource.provider, []).append(resource)
+
+        providers = self._get_providers()
+        for provider_name in sorted(resources_by_provider.keys()):
+            resources = resources_by_provider[provider_name]
+            provider = providers.get(provider_name)
+            if not provider:
+                table.add_row(provider_name, "N/A", "[yellow]Not registered[/yellow]")
+                continue
+
+            state_file = provider.terraform_dir / "terraform.tfstate"
+            status_message = (
+                "[green]Deployed[/green]" if state_file.exists() else "[dim]Not deployed[/dim]"
+            )
+            table.add_row(provider_name, str(len(resources)), status_message)
+
+        self.console.print(table)
 
 
 class ValidationWorkflow:
