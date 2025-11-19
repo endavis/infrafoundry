@@ -5,13 +5,22 @@ from pathlib import Path
 from typing import Any, override
 
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.provider_mixins import ResourceGrouperMixin, TemplateRendererMixin
+from infrafoundry.core.provider_mixins import (
+    ResourceGrouperMixin,
+    TemplateRendererMixin,
+    TerraformGeneratorMixin,
+)
 from infrafoundry.core.validation import ValidationReport
 
 from .validator import OPNsenseValidator
 
 
-class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin):
+class OPNsenseProvider(
+    ProviderBase,
+    TemplateRendererMixin,
+    ResourceGrouperMixin,
+    TerraformGeneratorMixin,
+):
     """OPNsense provider for managing firewall rules, VLANs, and routing."""
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
@@ -278,40 +287,13 @@ class OPNsenseProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin
         self._generate_kea_dhcp6_resources([], reservations)
 
     def _generate_tfvars(self) -> None:
-        """Generate terraform.tfvars from settings.yaml (provider settings)."""
-        from infrafoundry.core.config import ConfigManager
-
-        if not self._current_environment:
-            return
-
-        env_name = self._current_environment
-        config_manager = ConfigManager(self.config_dir)
-
-        try:
-            env_config = config_manager.load_environment(env_name)
-        except FileNotFoundError:
-            return
-
-        tfvars_lines = ["# Configuration from settings.yaml\n"]
-
-        # Get provider-specific settings (API credentials, endpoints, etc.)
-        provider_settings = env_config.get_provider_settings("opnsense")
-        if provider_settings:
-            # API endpoint
-            if "api_url" in provider_settings:
-                tfvars_lines.append(f'opnsense_api_url = "{provider_settings["api_url"]}"\n')
-
-            # API credentials
-            if "api_key" in provider_settings:
-                tfvars_lines.append(f'opnsense_api_key = "{provider_settings["api_key"]}"\n')
-
-            if "api_secret" in provider_settings:
-                tfvars_lines.append(f'opnsense_api_secret = "{provider_settings["api_secret"]}"\n')
-
-        # Write terraform.tfvars if we have any variables
-        if len(tfvars_lines) > 1:
-            tfvars_path = self.terraform_dir / "terraform.tfvars"
-            tfvars_path.write_text("".join(tfvars_lines))
+        """Generate terraform.tfvars from provider settings."""
+        mapping = {
+            "api_url": "opnsense_api_url",
+            "api_key": "opnsense_api_key",
+            "api_secret": "opnsense_api_secret",
+        }
+        self._generate_tfvars_with_mapping("opnsense", mapping)
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:

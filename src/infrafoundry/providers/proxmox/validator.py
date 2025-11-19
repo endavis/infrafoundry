@@ -11,7 +11,7 @@ import urllib3
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel
-from infrafoundry.core.validation_helpers import BaseProviderValidator
+from infrafoundry.core.validation_helpers import BaseAPIValidator
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -38,7 +38,8 @@ class ProxmoxValidator:
         """
         self.env_config = env_config
         self.report = report
-        self.provider_settings = env_config.get("provider_settings", {}).get("proxmox", {})
+        self.api_validator = BaseAPIValidator("proxmox", env_config, report)
+        self.provider_settings = self.api_validator.provider_settings
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to Proxmox API.
@@ -48,14 +49,8 @@ class ProxmoxValidator:
         - Authentication credentials are valid
         - Can retrieve cluster status
         """
-        validator = BaseProviderValidator(
-            provider_name="proxmox",
-            env_config=self.env_config,
-            report=self.report,
-        )
-
         # Validate credentials - api_url and node are required
-        credentials = validator.validate_credentials(required_fields=["api_url", "node"])
+        credentials = self.api_validator.get_credentials(required_fields=["api_url", "node"])
         if not credentials:
             return
 
@@ -64,7 +59,7 @@ class ProxmoxValidator:
         # Format 2: api_token_id + api_token_secret (Terraform provider format)
         api_token = self._get_api_token()
         if not api_token:
-            validator.add_error_check(
+            self.api_validator.add_error(
                 check_name="proxmox_credentials",
                 message=(
                     "Missing API token. Provide either 'api_token' or both "
@@ -79,7 +74,7 @@ class ProxmoxValidator:
 
         # Test API connectivity
         version_url = f"{credentials['api_url']}/version"
-        response_ok = validator.check_api_connectivity(
+        response_ok = self.api_validator.check_api_connectivity(
             url=version_url,
             headers={"Authorization": auth_header},
             verify_ssl=False,
@@ -98,7 +93,7 @@ class ProxmoxValidator:
                     version_data = response.json().get("data", {})
                     version = version_data.get("version", "unknown")
                     # Update success message with version
-                    validator.add_success_check(
+                    self.api_validator.add_success(
                         check_name="proxmox_version",
                         message=f"Proxmox VE version: {version}",
                     )

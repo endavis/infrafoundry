@@ -21,6 +21,7 @@ Example:
     ...     validator.check_api_connectivity(credentials['api_url'])
 """
 
+from infrafoundry.core.validation_helpers.api_validator import BaseAPIValidator
 from infrafoundry.core.validation_helpers.base_validator import BaseProviderValidator
 from infrafoundry.core.validation_helpers.connectivity_validator import ConnectivityValidator
 from infrafoundry.core.validation_helpers.credential_validator import CredentialValidator
@@ -28,6 +29,7 @@ from infrafoundry.core.validation_helpers.report_helper import ValidationReportH
 from infrafoundry.core.validation_helpers.resource_validator import ResourceValidator
 
 __all__ = [
+    "BaseAPIValidator",
     "BaseProviderValidator",
     "ConnectivityValidator",
     "CredentialValidator",
