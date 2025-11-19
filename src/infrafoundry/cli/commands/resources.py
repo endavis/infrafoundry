@@ -1,10 +1,10 @@
 """List tracked infrastructure resources command."""
 
-import sys
-
 import click
 from rich.console import Console
 from rich.table import Table
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -44,10 +44,11 @@ def resources(
 
             try:
                 resource_state = ResourceState[state.upper()]
-            except KeyError:
-                console.print(f"[bold red]Invalid state:[/bold red] {state}")
-                console.print("Valid states: PLANNED, CREATING, ACTIVE, DELETING, DELETED, FAILED")
-                sys.exit(1)
+            except KeyError as exc:
+                raise click.ClickException(
+                    f"Invalid state '{state}'. Valid: PLANNED, CREATING, ACTIVE, "
+                    "DELETING, DELETED, FAILED"
+                ) from exc
 
         # Get resources
         resources_list = orchestrator.state_manager.get_resources(
@@ -98,9 +99,5 @@ def resources(
         console.print(table)
         console.print(f"\n[dim]Total: {len(resources_list)} resource(s)[/dim]")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        import traceback
-
-        console.print(traceback.format_exc())
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Failed to list resources", exc)

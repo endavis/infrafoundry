@@ -1,9 +1,9 @@
 """Destroy infrastructure command."""
 
-import sys
-
 import click
 from rich.console import Console
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -32,6 +32,5 @@ def destroy(ctx: click.Context, env: str, auto_approve: bool, resource: tuple[st
             env, auto_approve=auto_approve, resource_filter=list(resource) if resource else None
         )
         console.print("\n[bold green]Destroy complete![/bold green]")
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Destroy failed", exc)
