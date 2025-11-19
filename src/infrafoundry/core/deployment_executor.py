@@ -10,6 +10,7 @@ from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
 from infrafoundry.core.state import ResourceState, StateManager
+from infrafoundry.core.types import ResourceEventData
 
 
 class DeploymentExecutor:
@@ -207,7 +208,7 @@ class DeploymentExecutor:
             Dict with apply results including terraform and ansible outcomes
         """
         # Track resources being applied and store their IDs
-        resource_ids = {}
+        resource_ids: dict[str, int] = {}
         for resource in resources:
             tracked_resource = self.state_manager.track_resource(
                 deployment_id=deployment_id,
@@ -219,18 +220,21 @@ class DeploymentExecutor:
                 config=resource.config,
             )
             resource_ids[resource.name] = tracked_resource.id
+            creating_event: ResourceEventData = {
+                "resource_id": tracked_resource.id,
+                "provider": provider_name,
+                "name": resource.name,
+                "terraform_id": tracked_resource.terraform_id,
+            }
             self.event_manager.emit_event(
                 EventType.RESOURCE_CREATING,
                 env_name,
-                {
-                    "resource_id": tracked_resource.id,
-                    "provider": provider_name,
-                    "name": resource.name,
-                },
+                creating_event,
             )
 
         # Run Terraform apply
         tf_result = self.terraform_runner.run(provider, "apply", auto_approve)
+        terraform_ids: dict[str, str] = {}
 
         # Extract Terraform resource IDs from state if apply was successful
         if tf_result["success"]:
@@ -256,10 +260,16 @@ class DeploymentExecutor:
                     resource_id=resource_ids[resource.name],
                     state=ResourceState.ACTIVE,
                 )
+                created_event: ResourceEventData = {
+                    "resource_id": resource_ids[resource.name],
+                    "provider": provider_name,
+                    "name": resource.name,
+                    "terraform_id": terraform_ids.get(resource.name),
+                }
                 self.event_manager.emit_event(
                     EventType.RESOURCE_CREATED,
                     env_name,
-                    {"provider": provider_name, "name": resource.name},
+                    created_event,
                 )
 
         return {
