@@ -9,6 +9,9 @@ from enum import Enum
 from typing import Any
 
 from infrafoundry.core.base_manager import BaseManager
+from infrafoundry.core.types import DeploymentEventData, ResourceEventData
+
+EventPayload = ResourceEventData | DeploymentEventData | dict[str, Any]
 
 
 class EventType(str, Enum):
@@ -63,7 +66,7 @@ class Event:
         self,
         event_type: EventType,
         environment: str,
-        data: dict[str, Any] | None = None,
+        data: EventPayload | None = None,
     ):
         """Initialize event.
 
@@ -178,7 +181,7 @@ class EventManager(BaseManager):
         self,
         event_type: EventType,
         environment: str,
-        data: dict[str, Any] | None = None,
+        data: EventPayload | None = None,
     ) -> None:
         """Convenience method to create and emit an event.
 

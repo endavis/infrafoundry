@@ -17,7 +17,13 @@ from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import TerraformRunner
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
-from infrafoundry.core.types import EnvironmentData
+from infrafoundry.core.types import (
+    ApplyDeploymentMetadata,
+    DestroyDeploymentMetadata,
+    EnvironmentData,
+    PlanDeploymentMetadata,
+    RollbackDeploymentMetadata,
+)
 from infrafoundry.core.validation import ValidationReport
 
 
@@ -281,12 +287,13 @@ class PlanOrchestrator:
         enforce_policies: bool,
     ) -> dict[str, Any]:
         """Execute the plan workflow for the requested environment."""
+        plan_metadata: PlanDeploymentMetadata = {"resource_filter": resource_filter}
         deployment_id = self.state_manager.create_deployment(
             environment=env_name,
             command="plan",
             user=self._get_current_user(),
             dry_run=dry_run,
-            metadata={"resource_filter": resource_filter},
+            metadata=plan_metadata,
         )
         self.event_manager.emit_event(
             EventType.BEFORE_PLAN,
@@ -414,6 +421,7 @@ class PlanOrchestrator:
                     "resource_id": tracked_resource.id,
                     "provider": provider_name,
                     "name": resource.name,
+                    "terraform_id": tracked_resource.terraform_id,
                 },
             )
 
@@ -465,12 +473,16 @@ class RollbackOrchestrator:
             self.console.print("[yellow]Rollback cancelled.[/yellow]")
             return {}
 
+        rollback_metadata: RollbackDeploymentMetadata = {
+            "rollback_from": deployment_id,
+            "rollback": True,
+        }
         rollback_deployment_id = self.state_manager.create_deployment(
             environment=env_name,
             command="apply",
             user=self._get_current_user(),
             dry_run=False,
-            metadata={"rollback_from": deployment_id, "rollback": True},
+            metadata=rollback_metadata,
         )
 
         try:
@@ -560,12 +572,16 @@ class ApplyOrchestrator:
         max_workers: int,
     ) -> dict[str, Any]:
         """Apply infrastructure across providers."""
+        apply_metadata: ApplyDeploymentMetadata = {
+            "resource_filter": resource_filter,
+            "auto_approve": auto_approve,
+        }
         deployment_id = self.state_manager.create_deployment(
             environment=env_name,
             command="apply",
             user=self._get_current_user(),
             dry_run=False,
-            metadata={"resource_filter": resource_filter, "auto_approve": auto_approve},
+            metadata=apply_metadata,
         )
         self.event_manager.emit_event(
             EventType.BEFORE_APPLY,
@@ -679,12 +695,16 @@ class DestroyOrchestrator:
         auto_approve: bool,
     ) -> dict[str, Any]:
         """Destroy all requested resources."""
+        destroy_metadata: DestroyDeploymentMetadata = {
+            "resource_filter": resource_filter,
+            "auto_approve": auto_approve,
+        }
         deployment_id = self.state_manager.create_deployment(
             environment=env_name,
             command="destroy",
             user=self._get_current_user(),
             dry_run=False,
-            metadata={"resource_filter": resource_filter, "auto_approve": auto_approve},
+            metadata=destroy_metadata,
         )
         self.event_manager.emit_event(
             EventType.BEFORE_DESTROY,
@@ -772,6 +792,7 @@ class DestroyOrchestrator:
                     "resource_id": tracked_resource.id,
                     "provider": provider_name,
                     "name": resource.name,
+                    "terraform_id": tracked_resource.terraform_id,
                 },
             )
         return resource_ids
@@ -790,7 +811,7 @@ class DestroyOrchestrator:
             self.event_manager.emit_event(
                 EventType.RESOURCE_DELETED,
                 env_name,
-                {"provider": provider_name, "name": resource_name},
+                {"resource_id": resource_id, "provider": provider_name, "name": resource_name},
             )
 
     def _print_header(
