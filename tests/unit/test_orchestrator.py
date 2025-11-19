@@ -11,7 +11,7 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager
 from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.orchestrator import Orchestrator, OrchestratorStrictConfig
-from infrafoundry.core.orchestrator_workflows import PlanWorkflow
+from infrafoundry.core.orchestrator_workflows import PlanOrchestrator
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.secrets import SecretManager
@@ -406,13 +406,13 @@ class TestOrchestratorStatus:
         config_manager.get_all_resources_all_providers.assert_called_once_with("dev")
 
 
-class TestPlanWorkflowStrictMode:
-    """Tests for PlanWorkflow strict-mode behavior."""
+class TestPlanOrchestratorStrictMode:
+    """Tests for PlanOrchestrator strict-mode behavior."""
 
-    def _make_plan_workflow(self, tmp_path, fail_on_missing_secrets: bool) -> PlanWorkflow:
+    def _make_plan_workflow(self, tmp_path, fail_on_missing_secrets: bool) -> PlanOrchestrator:
         secret_manager = Mock(spec=SecretManager)
         secret_manager.export_for_terraform.side_effect = FileNotFoundError("missing")
-        return PlanWorkflow(
+        return PlanOrchestrator(
             console=Mock(),
             state_manager=Mock(),
             event_manager=Mock(),
