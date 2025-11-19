@@ -71,7 +71,12 @@ class ProxmoxProvider(
         self._write_terraform_file("variables.tf", content)
 
         # Copy or generate terraform.tfvars from environment config
-        self._generate_tfvars()
+        self.generate_provider_tfvars(
+            provider_name="proxmox",
+            mapping=self._PROXMOX_TFVARS_MAPPING,
+            include_ssh=True,
+            ssh_prefix="proxmox",
+        )
 
         # Generate resources by type
         if "vm" in resources_by_type:
@@ -238,21 +243,6 @@ class ProxmoxProvider(
         if potential_tfvars.exists():
             dest = self.terraform_dir / "terraform.tfvars"
             shutil.copy2(potential_tfvars, dest)
-
-    def _generate_tfvars(self) -> None:
-        """Generate terraform.tfvars from provider and SSH settings."""
-        mapping = {
-            "api_url": "proxmox_api_url",
-            "api_token": "proxmox_api_token",
-            "node": "proxmox_node",
-            "storage": "proxmox_storage",
-        }
-        self._generate_tfvars_with_mapping(
-            provider_name="proxmox",
-            mapping=mapping,
-            include_ssh=True,
-            ssh_prefix="proxmox",
-        )
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:

@@ -54,7 +54,10 @@ class OPNsenseProvider(
         self._write_terraform_file("variables.tf", content)
 
         # Generate terraform.tfvars from settings.yaml
-        self._generate_tfvars()
+        self.generate_provider_tfvars(
+            provider_name="opnsense",
+            mapping=self._OPNSENSE_TFVARS_MAPPING,
+        )
 
         # Generate resources by type
         if "firewall_rules" in resources_by_type:
@@ -285,15 +288,6 @@ class OPNsenseProvider(
         """
         # Delegate to the batched method with empty subnets
         self._generate_kea_dhcp6_resources([], reservations)
-
-    def _generate_tfvars(self) -> None:
-        """Generate terraform.tfvars from provider settings."""
-        mapping = {
-            "api_url": "opnsense_api_url",
-            "api_key": "opnsense_api_key",
-            "api_secret": "opnsense_api_secret",
-        }
-        self._generate_tfvars_with_mapping("opnsense", mapping)
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:

@@ -364,10 +364,11 @@ class TerraformGeneratorMixin:
         tfvars_path = Path(self.terraform_dir) / "terraform.tfvars"
         tfvars_path.write_text("".join(lines))
 
-    def _generate_tfvars_with_mapping(
+    def generate_provider_tfvars(
         self,
         provider_name: str,
         mapping: dict[str, str],
+        *,
         include_ssh: bool = False,
         ssh_prefix: str | None = None,
     ) -> None:
