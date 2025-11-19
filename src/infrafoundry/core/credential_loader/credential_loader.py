@@ -4,7 +4,10 @@ import logging
 import os
 from pathlib import Path
 
-from infrafoundry.core.credential_loader.base_loader import BaseCredentialLoader
+from infrafoundry.core.credential_loader.base_loader import (
+    BaseCredentialLoader,
+    CredentialLoaderError,
+)
 from infrafoundry.core.credential_loader.kubernetes_loader import KubernetesCredentialLoader
 from infrafoundry.core.credential_loader.opnsense_loader import OPNsenseCredentialLoader
 from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
@@ -144,7 +147,11 @@ class CredentialLoader:
         """
         loader_class = self.PROVIDER_LOADERS[provider]
         loader = loader_class(secrets_dir, self._debug_mode)
-        return loader.load_credentials()
+        try:
+            return loader.load_credentials()
+        except CredentialLoaderError as exc:
+            logger.error(f"Failed to load {provider} credentials: {exc}")
+            return {}
 
     def apply_to_environment(self, credentials: dict[str, str]) -> None:
         """Apply credentials to the current process environment.

@@ -11,6 +11,10 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
+class CredentialLoaderError(Exception):
+    """Raised when provider credentials cannot be loaded."""
+
+
 class BaseCredentialLoader(ABC):
     """Abstract base class for provider-specific credential loaders."""
 
@@ -64,24 +68,22 @@ class BaseCredentialLoader(ABC):
 
         try:
             decrypted_data = self._decrypt_sops_file(file_path)
-            if not decrypted_data:
-                return {}
-
-            # Map credential fields to environment variables
-            env_vars = {}
-            for secret_key, env_var_name in self.field_mapping.items():
-                if value := decrypted_data.get(secret_key):
-                    env_vars[env_var_name] = value
-
-            if self.debug_mode and env_vars:
-                logger.debug(f"Loaded {len(env_vars)} credentials for {self.provider_name}")
-
-            return env_vars
-
-        except Exception as e:
-            if self.debug_mode:
-                logger.debug(f"Failed to load {self.provider_name} credentials: {e}")
+        except CredentialLoaderError:
+            raise
+        except Exception as exc:  # pragma: no cover - defensive
+            raise CredentialLoaderError(f"Unexpected error reading {file_path}: {exc}") from exc
+        if not decrypted_data:
             return {}
+
+        env_vars = {}
+        for secret_key, env_var_name in self.field_mapping.items():
+            if value := decrypted_data.get(secret_key):
+                env_vars[env_var_name] = value
+
+        if self.debug_mode and env_vars:
+            logger.debug(f"Loaded {len(env_vars)} credentials for {self.provider_name}")
+
+        return env_vars
 
     def _decrypt_sops_file(self, file_path: Path) -> dict[str, Any]:
         """Decrypt a SOPS-encrypted YAML file.
@@ -112,3 +114,5 @@ class BaseCredentialLoader(ABC):
             if self.debug_mode:
                 logger.debug(f"YAML parsing failed for {file_path}: {e}")
             return {}
+        except Exception as exc:  # pragma: no cover - unexpected failure path
+            raise CredentialLoaderError(f"Unexpected error decrypting {file_path}: {exc}") from exc

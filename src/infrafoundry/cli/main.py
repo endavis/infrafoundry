@@ -85,14 +85,15 @@ def _load_env_credentials(env_name: str, config_dir: Path | None = None) -> None
         config_dir: Configuration directory (defaults to context config_dir)
     """
     from infrafoundry.core.credential_loader import CredentialLoader
+    from infrafoundry.core.credential_loader.base_loader import CredentialLoaderError
 
     try:
         loader = CredentialLoader(config_dir=config_dir)
         loader.load_and_apply(env_name)
-    except Exception as e:
+    except CredentialLoaderError as exc:
         # Silently fail - credentials might be in environment already
         if os.getenv("INFRAFOUNDRY_LOG_LEVEL") == "DEBUG":
-            console.print(f"[dim]Could not load env-specific credentials: {e}[/dim]")
+            console.print(f"[dim]Could not load env-specific credentials: {exc}[/dim]")
 
 
 @click.group()
