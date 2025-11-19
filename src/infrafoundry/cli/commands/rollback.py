@@ -1,9 +1,9 @@
 """Rollback infrastructure to previous deployment command."""
 
-import sys
-
 import click
 from rich.console import Console
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -27,9 +27,5 @@ def rollback(ctx: click.Context, deployment_id: int, auto_approve: bool) -> None
         # Perform rollback
         orchestrator.rollback(deployment_id=deployment_id, auto_approve=auto_approve)
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        import traceback
-
-        console.print(traceback.format_exc())
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Rollback command failed", exc)

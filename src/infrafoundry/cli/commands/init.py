@@ -1,11 +1,12 @@
 """Init command - Initialize InfraFoundry state database."""
 
 import os
-import sys
 from pathlib import Path
 
 import click
 from rich.console import Console
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -41,6 +42,5 @@ def init() -> None:
         console.print("\n[bold]State tracking is now enabled.[/bold]")
         console.print("Deployment history and resource state will be recorded.")
 
-    except Exception as e:
-        console.print(f"[bold red]Error initializing state database:[/bold red] {e}")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Init command failed", exc)

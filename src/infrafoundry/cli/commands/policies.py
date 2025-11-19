@@ -1,10 +1,10 @@
 """List infrastructure policies command."""
 
-import sys
-
 import click
 from rich.console import Console
 from rich.table import Table
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -60,9 +60,5 @@ def policies(ctx: click.Context, env: str | None) -> None:
         console.print(table)
         console.print(f"\n[dim]Total: {len(policies_list)} policy/policies[/dim]")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        import traceback
-
-        console.print(traceback.format_exc())
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Policy listing failed", exc)

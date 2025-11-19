@@ -1,13 +1,14 @@
 """Manage encrypted secrets commands."""
 
 import os
-import sys
 from pathlib import Path
 
 import click
 from rich.console import Console
 
 from infrafoundry.core.secrets import SecretManager
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -40,8 +41,7 @@ def secrets_init(key_file: str) -> None:
     )
 
     if result.returncode != 0:
-        console.print(f"[red]Failed to generate key: {result.stderr}[/red]")
-        sys.exit(1)
+        raise click.ClickException(f"Failed to generate key: {result.stderr}")
 
     # Extract public key from output
     for line in result.stderr.split("\n"):
@@ -58,8 +58,7 @@ def secrets_init(key_file: str) -> None:
             console.print(f"SOPS_AGE_KEY_FILE={key_path}")
             return
 
-    console.print("[red]Failed to extract public key[/red]")
-    sys.exit(1)
+    raise click.ClickException("Failed to extract age public key from age-keygen output")
 
 
 @secrets.command("encrypt")
@@ -69,7 +68,6 @@ def secrets_encrypt(file: str) -> None:
     try:
         import subprocess
 
-        # Resolve path relative to config repo if set
         config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
         if config_repo and not Path(file).is_absolute():
             file_path = Path(config_repo) / file
@@ -79,10 +77,8 @@ def secrets_encrypt(file: str) -> None:
             config_dir = file_path.parent.parent if "secrets" in file_path.parts else Path.cwd()
 
         if not file_path.exists():
-            console.print(f"[red]File not found: {file_path}[/red]")
-            sys.exit(1)
+            raise click.ClickException(f"File not found: {file_path}")
 
-        # Run sops from config directory so it finds .sops.yaml
         result = subprocess.run(
             ["sops", "--encrypt", "--in-place", str(file_path)],
             capture_output=True,
@@ -91,13 +87,11 @@ def secrets_encrypt(file: str) -> None:
         )
 
         if result.returncode != 0:
-            console.print(f"[red]Encryption failed: {result.stderr}[/red]")
-            sys.exit(1)
+            raise click.ClickException(f"Encryption failed: {result.stderr}")
 
         console.print(f"[green]Encrypted: {file_path}[/green]")
-    except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Encryption failed", exc)
 
 
 @secrets.command("decrypt")
@@ -107,7 +101,6 @@ def secrets_decrypt(file: str) -> None:
     try:
         import subprocess
 
-        # Resolve path relative to config repo if set
         config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
         if config_repo and not Path(file).is_absolute():
             file_path = Path(config_repo) / file
@@ -115,8 +108,7 @@ def secrets_decrypt(file: str) -> None:
             file_path = Path(file)
 
         if not file_path.exists():
-            console.print(f"[red]File not found: {file_path}[/red]")
-            sys.exit(1)
+            raise click.ClickException(f"File not found: {file_path}")
 
         result = subprocess.run(
             ["sops", "--decrypt", str(file_path)],
@@ -125,10 +117,8 @@ def secrets_decrypt(file: str) -> None:
         )
 
         if result.returncode != 0:
-            console.print(f"[red]Decryption failed: {result.stderr}[/red]")
-            sys.exit(1)
+            raise click.ClickException(f"Decryption failed: {result.stderr}")
 
         console.print(result.stdout)
-    except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Decryption failed", exc)

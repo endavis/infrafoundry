@@ -1,9 +1,9 @@
 """Reset infrastructure components command."""
 
-import sys
-
 import click
 from rich.console import Console
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -59,8 +59,7 @@ def reset(
             provider_instance = orchestrator.providers.get("opnsense")
 
             if not provider_instance or not isinstance(provider_instance, OPNsenseProvider):
-                console.print("[bold red]Error:[/bold red] OPNsense provider not found")
-                sys.exit(1)
+                raise click.ClickException("OPNsense provider not found")
 
             # Set the current environment on the provider
             provider_instance._current_environment = env
@@ -96,12 +95,7 @@ def reset(
             )
 
         else:
-            console.print(f"[bold red]Error:[/bold red] Unsupported provider: {provider}")
-            sys.exit(1)
+            raise click.ClickException(f"Unsupported provider: {provider}")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        import traceback
-
-        console.print(f"[dim]{traceback.format_exc()}[/dim]")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Reset command failed", exc)

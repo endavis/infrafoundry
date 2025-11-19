@@ -1,9 +1,9 @@
 """Show infrastructure status command."""
 
-import sys
-
 import click
 from rich.console import Console
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -22,6 +22,5 @@ def status(ctx: click.Context, env: str) -> None:
 
         orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
         orchestrator.status(env)
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Status failed", exc)

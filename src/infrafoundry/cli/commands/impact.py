@@ -1,10 +1,10 @@
 """Analyze impact of resource changes command."""
 
-import sys
-
 import click
 from rich.console import Console
 from rich.panel import Panel
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -93,9 +93,5 @@ def impact(env: str, resource: str) -> None:
                 "  [bold red]  Critical risk - changes may cause widespread impact[/bold red]"
             )
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        import traceback
-
-        traceback.print_exc()
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Impact analysis failed", exc)
