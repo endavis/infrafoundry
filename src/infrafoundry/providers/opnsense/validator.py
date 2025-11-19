@@ -4,15 +4,29 @@ This module contains all validation methods for checking OPNsense firewall
 configurations against live API state before deployment.
 """
 
-from typing import Any
+from typing import Any, TypedDict, cast
 
 import urllib3
 
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.types import OPNsenseEnvironmentConfig, OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+class AliasRow(TypedDict, total=False):
+    """Partial representation of an alias row."""
+
+    name: str
+
+
+class InterfaceData(TypedDict, total=False):
+    """Partial interface data exported by OPNsense."""
+
+    if_type: str
+    device: str
 
 
 class OPNsenseValidator:
@@ -26,7 +40,7 @@ class OPNsenseValidator:
     - DHCP configuration validity
     """
 
-    def __init__(self, env_config: dict[str, Any], report: ValidationReport):
+    def __init__(self, env_config: OPNsenseEnvironmentConfig, report: ValidationReport):
         """Initialize OPNsense validator.
 
         Args:
@@ -41,7 +55,9 @@ class OPNsenseValidator:
             report,
             env_prefix="OPNSENSE",
         )
-        self.provider_settings = self.api_validator.provider_settings
+        self.provider_settings = cast(
+            OPNsenseProviderSettings, self.api_validator.provider_settings
+        )
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -189,7 +205,9 @@ class OPNsenseValidator:
             "dhcp_maps": dhcp_maps,
         }
 
-    def _get_existing_aliases(self, api_url: str, api_key: str, api_secret: str) -> dict[str, Any]:
+    def _get_existing_aliases(
+        self, api_url: str, api_key: str, api_secret: str
+    ) -> dict[str, AliasRow]:
         """Get existing aliases from OPNsense API.
 
         Args:
@@ -212,7 +230,7 @@ class OPNsenseValidator:
         if not data:
             return {}
 
-        aliases = {}
+        aliases: dict[str, AliasRow] = {}
         for row in data.get("rows", []):
             name = row.get("name")
             if name:
@@ -221,7 +239,7 @@ class OPNsenseValidator:
 
     def _get_existing_interfaces(
         self, api_url: str, api_key: str, api_secret: str
-    ) -> dict[str, Any]:
+    ) -> dict[str, InterfaceData]:
         """Get existing interfaces and VLANs from OPNsense API.
 
         Args:
@@ -244,7 +262,7 @@ class OPNsenseValidator:
         if not data:
             return {}
 
-        interfaces: dict[str, Any] = {}
+        interfaces: dict[str, InterfaceData] = {}
         for iface_name, iface_data in data.items():
             if isinstance(iface_data, dict):
                 interfaces[iface_name] = iface_data
