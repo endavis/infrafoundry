@@ -1,11 +1,11 @@
 """List resources in an environment command."""
 
-import sys
-
 import click
 from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -61,6 +61,5 @@ def list_resources(ctx: click.Context, env: str, provider: str | None, type: str
 
         console.print(f"\n[dim]Total: {len(all_resources)} resources[/dim]")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Failed to list resources", exc)

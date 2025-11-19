@@ -1,11 +1,11 @@
 """Envs command - List available environments."""
 
-import sys
-
 import click
 from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -35,6 +35,5 @@ def envs(ctx: click.Context) -> None:
             console.print(f"  • {env_name}: {env_config.description or 'No description'}")
             console.print(f"    Providers: {', '.join(env_config.providers)}")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Failed to list environments", exc)

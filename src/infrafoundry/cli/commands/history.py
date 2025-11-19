@@ -1,12 +1,12 @@
 """Show deployment history command."""
 
-import sys
-
 import click
 from rich.console import Console
 from rich.table import Table
 
 from infrafoundry.core.state import DeploymentStatus, StateManager
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -99,8 +99,7 @@ def history(
 
         console.print(table)
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        if "no such table" in str(e).lower():
+    except Exception as exc:
+        if "no such table" in str(exc).lower():
             console.print("\n[dim]Run 'infra init' to initialize state tracking.[/dim]")
-        sys.exit(1)
+        raise_cli_error("Failed to show history", exc)
