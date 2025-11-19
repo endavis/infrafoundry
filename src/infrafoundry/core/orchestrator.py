@@ -1,6 +1,7 @@
 """Core orchestration for infrastructure deployment."""
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,20 @@ from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import StateManager
 
 
+@dataclass(slots=True)
+class OrchestratorStrictConfig:
+    """Configuration for strict-mode safeguards."""
+
+    strict_mode: bool = False
+    fail_on_missing_secrets: bool = False
+    fail_on_missing_snippets: bool = False
+
+    def __post_init__(self) -> None:
+        if self.strict_mode:
+            self.fail_on_missing_secrets = True
+            self.fail_on_missing_snippets = True
+
+
 class Orchestrator:
     """Orchestrates infrastructure deployment across providers."""
 
@@ -40,6 +55,7 @@ class Orchestrator:
         event_manager: EventManager | None = None,
         policy_dir: Path | None = None,
         notifications_config: Path | None = None,
+        strict_config: OrchestratorStrictConfig | None = None,
     ) -> None:
         """Initialize orchestrator.
 
@@ -56,6 +72,7 @@ class Orchestrator:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.console = Console()
         self.providers: dict[str, ProviderBase] = {}
+        self.strict_config = strict_config or OrchestratorStrictConfig()
 
         # Initialize state, event, policy, and notification managers
         self.state_manager = state_manager or StateManager()
@@ -105,6 +122,7 @@ class Orchestrator:
             ),
             secret_manager_factory=lambda env: SecretManager(env_name=env),
             get_current_user=lambda: self._current_user,
+            fail_on_missing_secrets=self.strict_config.fail_on_missing_secrets,
         )
         self.apply_workflow = ApplyWorkflow(
             console=self.console,
@@ -159,6 +177,8 @@ class Orchestrator:
             provider: Provider instance to register
         """
         self.providers[provider.name] = provider
+        if hasattr(provider, "fail_on_missing_snippets"):
+            provider.fail_on_missing_snippets = self.strict_config.fail_on_missing_snippets
         # Sync providers to helper classes that need them
         self.deployment_executor.providers = self.providers
         self.drift_detector.providers = self.providers
