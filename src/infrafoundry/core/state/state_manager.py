@@ -1,5 +1,9 @@
 """Refactored state manager - thin coordinator delegating to repositories."""
 
+from __future__ import annotations
+
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -35,8 +39,7 @@ class StateManager(BaseManager):
         super().__init__()
 
         if connection_string is None:
-            state_dir = Path.home() / ".infrafoundry"
-            state_dir.mkdir(parents=True, exist_ok=True)
+            state_dir = self._determine_state_dir()
             connection_string = f"sqlite:///{state_dir / 'state.db'}"
 
         self._log_debug(f"Initializing StateManager with connection: {connection_string}")
@@ -295,3 +298,32 @@ class StateManager(BaseManager):
             self._log_debug("Disposing database engine")
             self.engine.dispose()
             self._log_debug("StateManager cleanup complete")
+
+    def _determine_state_dir(self) -> Path:
+        """Determine a writable directory for SQLite state when no DSN provided."""
+        env_override = os.getenv("INFRAFOUNDRY_STATE_HOME")
+        candidates: list[Path] = []
+        if env_override:
+            candidates.append(Path(env_override))
+        candidates.append(Path.home() / ".infrafoundry")
+        candidates.append(Path.cwd() / ".infrafoundry")
+        candidates.append(Path(tempfile.gettempdir()) / "infrafoundry")
+
+        for candidate in candidates:
+            try:
+                candidate.mkdir(parents=True, exist_ok=True)
+                probe = candidate / ".write_test"
+                with probe.open("w", encoding="utf-8"):
+                    pass
+                probe.unlink(missing_ok=True)
+                if env_override and candidate != Path(env_override):
+                    self._log_warning(
+                        "Falling back to writable state directory %s despite "
+                        "INFRAFOUNDRY_STATE_HOME setting",
+                        chosen=str(candidate),
+                    )
+                return candidate
+            except OSError as exc:
+                self._log_warning(f"Unable to use state directory {candidate}: {exc}")
+
+        raise RuntimeError("Unable to locate writable directory for InfraFoundry state database.")
