@@ -8,6 +8,10 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers.base_validator import BaseProviderValidator
 
 
+class APIConnectivityError(Exception):
+    """Raised when API connectivity validation fails."""
+
+
 class BaseAPIValidator:
     """Convenience wrapper around BaseProviderValidator for API providers."""
 
