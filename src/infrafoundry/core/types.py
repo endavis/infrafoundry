@@ -35,9 +35,31 @@ class OPNsenseEnvironmentConfig(TypedDict, total=False):
     provider_settings: dict[str, OPNsenseProviderSettings | dict[str, Any]]
 
 
+class SSHConfigData(TypedDict, total=False):
+    """Raw SSH config data stored in environment configs."""
+
+    user: str
+    key_path: str
+    port: int
+
+
+class EnvironmentData(TypedDict, total=False):
+    """Structured representation of EnvironmentConfig.model_dump()."""
+
+    name: str
+    description: str | None
+    providers: list[str]
+    variables: dict[str, Any]
+    ssh: SSHConfigData | None
+    provider_ssh: dict[str, SSHConfigData]
+    provider_settings: dict[str, dict[str, Any]]
+
+
 __all__ = [
+    "EnvironmentData",
     "ProxmoxEnvironmentConfig",
     "ProxmoxProviderSettings",
     "OPNsenseEnvironmentConfig",
     "OPNsenseProviderSettings",
+    "SSHConfigData",
 ]

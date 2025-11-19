@@ -10,7 +10,7 @@ from infrafoundry.core.provider_mixins import (
     TemplateRendererMixin,
     TerraformGeneratorMixin,
 )
-from infrafoundry.core.types import OPNsenseEnvironmentConfig
+from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 
 from .validator import OPNsenseValidator
@@ -356,9 +356,7 @@ class OPNsenseProvider(
         }
 
     @override
-    def validate_connectivity(
-        self, env_config: OPNsenseEnvironmentConfig, report: ValidationReport
-    ) -> None:
+    def validate_connectivity(self, env_config: EnvironmentData, report: ValidationReport) -> None:
         """Validate connectivity to OPNsense API."""
         validator = OPNsenseValidator(env_config, report)
         validator.validate_connectivity()
@@ -367,7 +365,7 @@ class OPNsenseProvider(
     def validate_references(
         self,
         resources: list[ResourceConfig],
-        env_config: OPNsenseEnvironmentConfig,
+        env_config: EnvironmentData,
         report: ValidationReport,
     ) -> None:
         """Validate that referenced OPNsense resources exist."""
