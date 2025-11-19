@@ -1,7 +1,6 @@
 """Core orchestration for infrastructure deployment."""
 
 import os
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -15,21 +14,16 @@ from infrafoundry.core.deployment_executor import DeploymentExecutor
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import Event, EventManager, EventType
 from infrafoundry.core.notifications import NotificationManager
+from infrafoundry.core.orchestrator_workflows import (
+    ProviderResourceBatch,
+    ValidationWorkflow,
+)
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
-
-
-@dataclass(slots=True)
-class ProviderResourceBatch:
-    """Represents the resources for a single provider after optional filtering."""
-
-    name: str
-    resources: list[Any]
-    original_count: int
 
 
 class Orchestrator:
@@ -85,6 +79,13 @@ class Orchestrator:
             self.event_manager,
             self.providers,
             self.console,
+        )
+        self.validation_workflow = ValidationWorkflow(
+            config_manager=self.config_manager,
+            console=self.console,
+            get_providers=lambda: self.providers,
+            load_resources=self._load_resources,
+            iter_provider_batches=self._iter_provider_batches,
         )
 
         # Subscribe notification manager to events
@@ -290,119 +291,12 @@ class Orchestrator:
                 "provider_name": {
                     "passed": bool,
                     "report": ValidationReport,
-                    "errors": int,
-                    "warnings": int
+                "errors": int,
+                "warnings": int
                 }
             }
         """
-        from infrafoundry.core.validation import ValidationReport
-
-        self.console.print(f"\n[bold cyan]Validating configuration for: {env_name}[/bold cyan]\n")
-
-        # Load environment configuration
-        env_config = self.config_manager.load_environment(env_name)
-        if not env_config:
-            self.console.print(f"[red]✗ Environment '{env_name}' not found[/red]")
-            return {}
-
-        all_resources, resources_by_provider = self._load_resources(env_name)
-        filtered_resources = all_resources
-        if resource_filter:
-            filtered_resources = [r for r in all_resources if r.name in resource_filter]
-            self.console.print(
-                f"[yellow]Validating {len(filtered_resources)} resources: "
-                f"{', '.join(resource_filter)}[/yellow]\n"
-            )
-
-        results = {}
-
-        # Run validation for each provider
-        for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
-            provider_name = batch.name
-            resources = batch.resources
-            if provider_name not in self.providers:
-                self.console.print(f"[yellow]⚠ Provider '{provider_name}' not loaded[/yellow]")
-                continue
-
-            provider = self.providers[provider_name]
-            report = ValidationReport()
-
-            self.console.print(f"[bold]Validating {provider_name}...[/bold]")
-
-            # Validate connectivity
-            try:
-                provider.validate_connectivity(env_config.model_dump(), report)
-            except Exception as e:
-                self.console.print(f"[red]✗ Connectivity validation failed: {e}[/red]")
-
-            # Validate resource references
-            try:
-                provider.validate_references(resources, env_config.model_dump(), report)
-            except Exception as e:
-                self.console.print(f"[red]✗ Reference validation failed: {e}[/red]")
-
-            # Collect results
-            summary = report.get_summary()
-            passed = not report.has_errors()
-
-            results[provider_name] = {
-                "passed": passed,
-                "report": report,
-                "errors": summary["errors"],
-                "warnings": summary["warnings"],
-                "checks": summary["total"],
-            }
-
-            # Print results
-            if passed:
-                self.console.print(
-                    f"[green]✓ {provider_name}: {summary['passed']}/{summary['total']} "
-                    f"checks passed[/green]"
-                )
-                if summary["warnings"] > 0:
-                    self.console.print(f"  [yellow]⚠ {summary['warnings']} warnings[/yellow]")
-            else:
-                self.console.print(
-                    f"[red]✗ {provider_name}: {summary['errors']} errors, "
-                    f"{summary['warnings']} warnings[/red]"
-                )
-
-            # Print detailed report if verbose or if there are issues
-            if verbose or not passed:
-                self.console.print("\nDetailed Results:")
-                for result in report.results:
-                    if result.passed:
-                        if verbose:
-                            self.console.print(f"  [green]✓[/green] {result.message}")
-                    else:
-                        symbol = "⚠" if result.level.value == "warning" else "✗"
-                        color = "yellow" if result.level.value == "warning" else "red"
-                        self.console.print(f"  [{color}]{symbol}[/{color}] {result.message}")
-                        if verbose and result.details:
-                            for key, value in result.details.items():
-                                self.console.print(f"      {key}: {value}")
-
-            self.console.print()
-
-        # Print overall summary
-        total_errors = sum(r["errors"] for r in results.values())
-        total_warnings = sum(r["warnings"] for r in results.values())
-        all_passed = all(r["passed"] for r in results.values())
-
-        self.console.print("[bold]Validation Summary:[/bold]")
-        if all_passed:
-            self.console.print("[green]✓ All validation checks passed[/green]")
-            if total_warnings:
-                self.console.print(
-                    f"[yellow]  {total_warnings} warnings (review recommended)[/yellow]"
-                )
-        else:
-            self.console.print(
-                f"[red]✗ Validation failed: {total_errors} errors, {total_warnings} warnings[/red]"
-            )
-            self.console.print("[yellow]  Fix errors before deploying[/yellow]")
-
-        return results
+        return self.validation_workflow.run(env_name, resource_filter, verbose)
 
     def plan(
         self,
