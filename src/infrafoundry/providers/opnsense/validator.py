@@ -4,7 +4,6 @@ This module contains all validation methods for checking OPNsense firewall
 configurations against live API state before deployment.
 """
 
-import os
 from typing import Any
 
 import requests
@@ -12,6 +11,7 @@ import urllib3
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.core.validation_helpers import BaseAPIValidator
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -36,7 +36,13 @@ class OPNsenseValidator:
         """
         self.env_config = env_config
         self.report = report
-        self.provider_settings = env_config.get("provider_settings", {}).get("opnsense", {})
+        self.api_validator = BaseAPIValidator(
+            "opnsense",
+            env_config,
+            report,
+            env_prefix="OPNSENSE",
+        )
+        self.provider_settings = self.api_validator.provider_settings
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -46,21 +52,21 @@ class OPNsenseValidator:
         - Authentication credentials are valid
         - Can retrieve system status
         """
-        api_url = self.provider_settings.get("api_url") or os.getenv("OPNSENSE_API_URL")
-        api_key = self.provider_settings.get("api_key") or os.getenv("OPNSENSE_API_KEY")
-        api_secret = self.provider_settings.get("api_secret") or os.getenv("OPNSENSE_API_SECRET")
-
-        # Check if credentials are configured
-        if not all([api_url, api_key, api_secret]):
-            self.report.add_check(
-                check_name="opnsense_credentials",
-                passed=False,
-                message=(
-                    "OPNsense credentials not configured. Required: api_url, api_key, api_secret"
-                ),
-                level=ValidationLevel.ERROR,
-            )
+        env_map = {
+            "api_url": "OPNSENSE_API_URL",
+            "api_key": "OPNSENSE_API_KEY",
+            "api_secret": "OPNSENSE_API_SECRET",
+        }
+        credentials = self.api_validator.get_credentials(
+            ["api_url", "api_key", "api_secret"],
+            env_vars=env_map,
+        )
+        if not credentials:
             return
+
+        api_url = credentials["api_url"]
+        api_key = credentials["api_key"]
+        api_secret = credentials["api_secret"]
 
         # Test API connectivity
         try:
@@ -73,58 +79,45 @@ class OPNsenseValidator:
 
             if response.status_code == 200:
                 data = response.json()
-                self.report.add_check(
+                self.api_validator.add_success(
                     check_name="opnsense_api_connection",
-                    passed=True,
                     message=f"Successfully connected to OPNsense API at {api_url}",
-                    level=ValidationLevel.INFO,
                 )
 
                 # Get system info if available
                 if "product_version" in data:
                     version = data.get("product_version", "unknown")
-                    self.report.add_check(
+                    self.api_validator.add_success(
                         check_name="opnsense_version",
-                        passed=True,
                         message=f"OPNsense version: {version}",
-                        level=ValidationLevel.INFO,
                     )
 
             elif response.status_code == 401:
-                self.report.add_check(
+                self.api_validator.add_error(
                     check_name="opnsense_api_connection",
-                    passed=False,
                     message="OPNsense API credentials invalid (401 Unauthorized)",
-                    level=ValidationLevel.ERROR,
                 )
             else:
-                self.report.add_check(
+                self.api_validator.add_error(
                     check_name="opnsense_api_connection",
-                    passed=False,
                     message=f"OPNsense API returned status {response.status_code}",
                     level=ValidationLevel.WARNING,
                 )
 
         except requests.exceptions.ConnectionError:
-            self.report.add_check(
+            self.api_validator.add_error(
                 check_name="opnsense_api_connection",
-                passed=False,
                 message=f"Cannot connect to OPNsense at {api_url} (connection refused)",
-                level=ValidationLevel.ERROR,
             )
         except requests.exceptions.Timeout:
-            self.report.add_check(
+            self.api_validator.add_error(
                 check_name="opnsense_api_connection",
-                passed=False,
                 message=f"Connection to OPNsense at {api_url} timed out",
-                level=ValidationLevel.ERROR,
             )
         except Exception as e:
-            self.report.add_check(
+            self.api_validator.add_error(
                 check_name="opnsense_api_connection",
-                passed=False,
                 message=f"Error connecting to OPNsense: {e}",
-                level=ValidationLevel.ERROR,
             )
 
     def validate_references(self, resources: list[ResourceConfig]) -> None:
@@ -139,12 +132,21 @@ class OPNsenseValidator:
         Args:
             resources: List of resources to validate
         """
-        api_url = self.provider_settings.get("api_url") or os.getenv("OPNSENSE_API_URL")
-        api_key = self.provider_settings.get("api_key") or os.getenv("OPNSENSE_API_KEY")
-        api_secret = self.provider_settings.get("api_secret") or os.getenv("OPNSENSE_API_SECRET")
+        env_map = {
+            "api_url": "OPNSENSE_API_URL",
+            "api_key": "OPNSENSE_API_KEY",
+            "api_secret": "OPNSENSE_API_SECRET",
+        }
+        credentials = self.api_validator.get_credentials(
+            ["api_url", "api_key", "api_secret"],
+            env_vars=env_map,
+        )
+        if not credentials:
+            return
 
-        if not all([api_url, api_key, api_secret]):
-            return  # Already reported in validate_connectivity
+        api_url = credentials["api_url"]
+        api_key = credentials["api_key"]
+        api_secret = credentials["api_secret"]
 
         # Collect resources by type
         resource_refs = self._collect_resource_references(resources)

@@ -4,13 +4,22 @@ from pathlib import Path
 from typing import Any, override
 
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.provider_mixins import ResourceGrouperMixin, TemplateRendererMixin
+from infrafoundry.core.provider_mixins import (
+    ResourceGrouperMixin,
+    TemplateRendererMixin,
+    TerraformGeneratorMixin,
+)
 from infrafoundry.core.validation import ValidationReport
 
 from .validator import ProxmoxValidator
 
 
-class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin):
+class ProxmoxProvider(
+    ProviderBase,
+    TemplateRendererMixin,
+    ResourceGrouperMixin,
+    TerraformGeneratorMixin,
+):
     """Proxmox VE provider for managing VMs, templates, and networks."""
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
@@ -231,57 +240,19 @@ class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin)
             shutil.copy2(potential_tfvars, dest)
 
     def _generate_tfvars(self) -> None:
-        """Generate terraform.tfvars from settings.yaml (SSH config + provider settings)."""
-        from infrafoundry.core.config import ConfigManager
-
-        if not self._current_environment:
-            return
-
-        env_name = self._current_environment
-        config_manager = ConfigManager(self.config_dir)
-
-        try:
-            env_config = config_manager.load_environment(env_name)
-        except FileNotFoundError:
-            return
-
-        tfvars_lines = ["# Configuration from settings.yaml\n"]
-
-        # Get provider-specific settings (API credentials, endpoints, etc.)
-        provider_settings = env_config.get_provider_settings("proxmox")
-        if provider_settings:
-            # API endpoint
-            if "api_url" in provider_settings:
-                tfvars_lines.append(f'proxmox_api_url = "{provider_settings["api_url"]}"\n')
-
-            # API token (preferred for bpg/proxmox provider)
-            if "api_token" in provider_settings:
-                tfvars_lines.append(f'proxmox_api_token = "{provider_settings["api_token"]}"\n')
-
-            # Default node
-            if "node" in provider_settings:
-                tfvars_lines.append(f'proxmox_node = "{provider_settings["node"]}"\n')
-
-            # Default storage
-            if "storage" in provider_settings:
-                tfvars_lines.append(f'proxmox_storage = "{provider_settings["storage"]}"\n')
-
-        # Get SSH config for this provider (provider-specific or global)
-        ssh_config = env_config.get_ssh_config("proxmox")
-        if ssh_config:
-            if ssh_config.user:
-                tfvars_lines.append(f'proxmox_ssh_user = "{ssh_config.user}"\n')
-
-            if ssh_config.key_path:
-                tfvars_lines.append(f'proxmox_ssh_key_path = "{ssh_config.key_path}"\n')
-
-            if ssh_config.port and ssh_config.port != 22:
-                tfvars_lines.append(f"proxmox_ssh_port = {ssh_config.port}\n")
-
-        # Generate tfvars if we have more than just the header comment
-        if len(tfvars_lines) > 1:
-            dest = self.terraform_dir / "terraform.tfvars"
-            dest.write_text("".join(tfvars_lines))
+        """Generate terraform.tfvars from provider and SSH settings."""
+        mapping = {
+            "api_url": "proxmox_api_url",
+            "api_token": "proxmox_api_token",
+            "node": "proxmox_node",
+            "storage": "proxmox_storage",
+        }
+        self._generate_tfvars_with_mapping(
+            provider_name="proxmox",
+            mapping=mapping,
+            include_ssh=True,
+            ssh_prefix="proxmox",
+        )
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:

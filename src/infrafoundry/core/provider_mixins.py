@@ -4,6 +4,7 @@ These mixins extract repeated patterns from provider implementations,
 reducing code duplication and standardizing provider behavior.
 """
 
+import json
 import logging
 from collections import defaultdict
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
+from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -293,3 +295,97 @@ class ResourceGrouperMixin:
         for resource in resources:
             counts[resource.type] += 1
         return dict(counts)
+
+
+class TerraformGeneratorMixin:
+    """Mixin providing helpers for generating terraform.tfvars files."""
+
+    _TFVARS_HEADER = "# Configuration from settings.yaml\n"
+
+    def _load_environment_config(self) -> Any | None:
+        """Load current environment configuration if available."""
+        env_name = getattr(self, "_current_environment", None)
+        if not env_name:
+            return None
+
+        config_manager = ConfigManager(self.config_dir)
+        try:
+            return config_manager.load_environment(env_name)
+        except FileNotFoundError:
+            return None
+
+    def _format_tfvar_line(self, name: str, value: Any) -> str:
+        """Format a tfvar assignment."""
+        return f"{name} = {json.dumps(value)}\n"
+
+    def _append_tfvars_from_mapping(
+        self,
+        lines: list[str],
+        provider_settings: dict[str, Any] | None,
+        mapping: dict[str, str],
+    ) -> None:
+        """Append tfvar lines based on a settings-to-tfvar mapping."""
+        if not provider_settings:
+            return
+
+        for source_key, tfvar_name in mapping.items():
+            value = provider_settings.get(source_key)
+            if value not in (None, ""):
+                lines.append(self._format_tfvar_line(tfvar_name, value))
+
+    def _append_ssh_tfvars(
+        self,
+        lines: list[str],
+        env_config: Any,
+        provider_name: str,
+        prefix: str,
+    ) -> None:
+        """Append SSH-specific tfvar lines if configured."""
+        ssh_config = env_config.get_ssh_config(provider_name)
+        if not ssh_config:
+            return
+
+        if getattr(ssh_config, "user", None):
+            lines.append(self._format_tfvar_line(f"{prefix}_ssh_user", ssh_config.user))
+
+        if getattr(ssh_config, "key_path", None):
+            lines.append(
+                self._format_tfvar_line(f"{prefix}_ssh_key_path", str(ssh_config.key_path))
+            )
+
+        if getattr(ssh_config, "port", None) and ssh_config.port != 22:
+            lines.append(self._format_tfvar_line(f"{prefix}_ssh_port", ssh_config.port))
+
+    def _write_tfvars_lines(self, lines: list[str]) -> None:
+        """Write tfvars lines to terraform.tfvars."""
+        if len(lines) <= 1:
+            return
+
+        tfvars_path = Path(self.terraform_dir) / "terraform.tfvars"
+        tfvars_path.write_text("".join(lines))
+
+    def _generate_tfvars_with_mapping(
+        self,
+        provider_name: str,
+        mapping: dict[str, str],
+        include_ssh: bool = False,
+        ssh_prefix: str | None = None,
+    ) -> None:
+        """Generate tfvars content using provided mappings."""
+        env_config = self._load_environment_config()
+        if not env_config:
+            return
+
+        lines = [self._TFVARS_HEADER]
+        provider_settings = env_config.get_provider_settings(provider_name)
+        self._append_tfvars_from_mapping(lines, provider_settings, mapping)
+
+        if include_ssh:
+            self._append_ssh_tfvars(
+                lines,
+                env_config,
+                provider_name,
+                prefix=ssh_prefix or provider_name,
+            )
+
+        self._write_tfvars_lines(lines)
