@@ -195,6 +195,7 @@ class PlanWorkflow:
         check_policies: Callable[[str, list[Any], bool], None],
         secret_manager_factory: Callable[[str], SecretManager],
         get_current_user: Callable[[], str],
+        fail_on_missing_secrets: bool,
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -208,6 +209,7 @@ class PlanWorkflow:
         self._check_policies = check_policies
         self._secret_manager_factory = secret_manager_factory
         self._get_current_user = get_current_user
+        self._fail_on_missing_secrets = fail_on_missing_secrets
 
     def run(
         self,
@@ -359,9 +361,14 @@ class PlanWorkflow:
             secrets_file = f"{provider_name}.yaml"
             tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
             secret_manager.export_for_terraform(secrets_file, tf_vars)
-        except FileNotFoundError:
-            self.console.print(f"[yellow]No secrets file for {provider_name}[/yellow]")
+        except FileNotFoundError as exc:
+            message = f"No secrets file for {provider_name}"
+            if self._fail_on_missing_secrets:
+                raise FileNotFoundError(message) from exc
+            self.console.print(f"[yellow]{message}[/yellow]")
         except ValueError as exc:
+            if self._fail_on_missing_secrets:
+                raise
             self.console.print(f"[dim]Skipping secrets export: {exc}[/dim]")
 
 

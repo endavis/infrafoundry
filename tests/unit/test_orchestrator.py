@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -9,7 +10,8 @@ import pytest
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager
 from infrafoundry.core.notifications import NotificationManager
-from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.orchestrator import Orchestrator, OrchestratorStrictConfig
+from infrafoundry.core.orchestrator_workflows import PlanWorkflow
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.secrets import SecretManager
@@ -22,7 +24,6 @@ class TestOrchestratorInit:
     def test_init_with_defaults(self, tmp_path):
         """Test initialization with default parameters."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
 
         orchestrator = Orchestrator(
             config_manager=config_manager,
@@ -39,7 +40,6 @@ class TestOrchestratorInit:
     def test_init_with_custom_output_dir(self, tmp_path):
         """Test initialization with custom output directory."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         output_dir = tmp_path / "custom_output"
 
         orchestrator = Orchestrator(
@@ -53,7 +53,6 @@ class TestOrchestratorInit:
     def test_init_with_custom_managers(self, tmp_path):
         """Test initialization with custom manager instances."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         state_manager = Mock(spec=StateManager)
         event_manager = Mock(spec=EventManager)
 
@@ -69,7 +68,6 @@ class TestOrchestratorInit:
     def test_init_creates_output_directory(self, tmp_path):
         """Test that initialization creates output directory if it doesn't exist."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         output_dir = tmp_path / "nested" / "output" / "dir"
 
         assert not output_dir.exists()
@@ -84,7 +82,6 @@ class TestOrchestratorInit:
     def test_init_sets_current_user(self, tmp_path):
         """Test that initialization captures current user from environment."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
 
         with patch.dict(os.environ, {"USER": "testuser"}):
             orchestrator = Orchestrator(
@@ -95,7 +92,6 @@ class TestOrchestratorInit:
     def test_init_fallback_user(self, tmp_path):
         """Test user fallback when USER env var not set."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
 
         # Clear USER and USERNAME
         env = os.environ.copy()
@@ -115,7 +111,6 @@ class TestOrchestratorNotifications:
     def test_setup_notifications_with_channels(self, tmp_path):
         """Test that notifications are set up when channels exist."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         event_manager = Mock(spec=EventManager)
 
         # Mock notification manager with channels
@@ -135,7 +130,6 @@ class TestOrchestratorNotifications:
     def test_setup_notifications_without_channels(self, tmp_path):
         """Test that notifications are skipped when no channels configured."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
 
         orchestrator = Orchestrator(
             config_manager=config_manager,
@@ -151,7 +145,6 @@ class TestOrchestratorProviderManagement:
     def test_register_provider(self, tmp_path):
         """Test registering a provider."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         orchestrator = Orchestrator(config_manager)
 
         provider = Mock(spec=ProviderBase)
@@ -165,7 +158,6 @@ class TestOrchestratorProviderManagement:
     def test_register_multiple_providers(self, tmp_path):
         """Test registering multiple providers."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         orchestrator = Orchestrator(config_manager)
 
         provider1 = Mock(spec=ProviderBase)
@@ -183,7 +175,6 @@ class TestOrchestratorProviderManagement:
     def test_register_provider_overwrites_existing(self, tmp_path):
         """Test that registering a provider with same name overwrites."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         orchestrator = Orchestrator(config_manager)
 
         provider1 = Mock(spec=ProviderBase)
@@ -196,6 +187,21 @@ class TestOrchestratorProviderManagement:
 
         assert orchestrator.providers["test"] == provider2
 
+    def test_register_provider_applies_strict_snippet_flag(self, tmp_path):
+        """Provider inherits strict snippet config when registered."""
+        config_manager = Mock(spec=ConfigManager)
+        orchestrator = Orchestrator(
+            config_manager,
+            strict_config=OrchestratorStrictConfig(fail_on_missing_snippets=True),
+        )
+        provider = Mock()
+        provider.name = "proxmox"
+        provider.fail_on_missing_snippets = False
+
+        orchestrator.register_provider(provider)
+
+        assert provider.fail_on_missing_snippets is True
+
 
 class TestOrchestratorValidateResources:
     """Tests for resource validation."""
@@ -203,7 +209,6 @@ class TestOrchestratorValidateResources:
     def test_validate_resources_all_valid(self, tmp_path):
         """Test validation succeeds when all resources are valid."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         orchestrator = Orchestrator(config_manager)
 
         # Register provider
@@ -229,7 +234,6 @@ class TestOrchestratorValidateResources:
     def test_validate_resources_provider_not_registered(self, tmp_path):
         """Test validation fails when provider not registered."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         orchestrator = Orchestrator(config_manager)
 
         resource = Mock()
@@ -243,7 +247,6 @@ class TestOrchestratorValidateResources:
     def test_validate_resources_type_not_supported(self, tmp_path):
         """Test validation fails when resource type not supported."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         orchestrator = Orchestrator(config_manager)
 
         provider = Mock(spec=ProviderBase)
@@ -265,7 +268,6 @@ class TestOrchestratorValidateResources:
     def test_validate_resources_empty_list(self, tmp_path):
         """Test validation succeeds with empty resource list."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         orchestrator = Orchestrator(config_manager)
 
         # Should not raise
@@ -278,7 +280,6 @@ class TestOrchestratorBuildDependencyGraph:
     def test_build_dependency_graph_basic(self, tmp_path):
         """Test building a basic dependency graph."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         orchestrator = Orchestrator(config_manager)
 
         # Register provider with dependencies
@@ -310,7 +311,6 @@ class TestOrchestratorBuildDependencyGraph:
     def test_build_dependency_graph_multi_provider(self, tmp_path):
         """Test building dependency graph with multiple providers."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         orchestrator = Orchestrator(config_manager)
 
         # Register multiple providers
@@ -352,7 +352,6 @@ class TestOrchestratorStatus:
     def test_status_no_resources(self, tmp_path, capsys):
         """Test status when no resources exist."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
         config_manager.get_all_resources_all_providers.return_value = []
 
         orchestrator = Orchestrator(config_manager)
@@ -365,7 +364,6 @@ class TestOrchestratorStatus:
     def test_status_with_resources(self, tmp_path):
         """Test status with resources."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
 
         # Mock resource
         vm = Mock()
@@ -390,7 +388,6 @@ class TestOrchestratorStatus:
     def test_status_with_unregistered_provider(self, tmp_path):
         """Test status with resource from unregistered provider."""
         config_manager = Mock(spec=ConfigManager)
-        secret_manager = Mock(spec=SecretManager)
 
         # Mock resource from unregistered provider
         vm = Mock()
@@ -407,3 +404,41 @@ class TestOrchestratorStatus:
 
         # Should still work, just show "Not registered"
         config_manager.get_all_resources_all_providers.assert_called_once_with("dev")
+
+
+class TestPlanWorkflowStrictMode:
+    """Tests for PlanWorkflow strict-mode behavior."""
+
+    def _make_plan_workflow(self, tmp_path, fail_on_missing_secrets: bool) -> PlanWorkflow:
+        secret_manager = Mock(spec=SecretManager)
+        secret_manager.export_for_terraform.side_effect = FileNotFoundError("missing")
+        return PlanWorkflow(
+            console=Mock(),
+            state_manager=Mock(),
+            event_manager=Mock(),
+            terraform_runner=Mock(),
+            get_providers=lambda: {},
+            load_resources=lambda env: ([], {}),
+            iter_provider_batches=lambda *_args, **_kwargs: [],
+            validate_resources=lambda resources: None,
+            has_policies=lambda: False,
+            check_policies=lambda env, resources, enforce: None,
+            secret_manager_factory=lambda env: secret_manager,
+            get_current_user=lambda: "tester",
+            fail_on_missing_secrets=fail_on_missing_secrets,
+        )
+
+    def test_export_secrets_strict_mode_raises(self, tmp_path):
+        """Strict mode should raise when secrets are missing."""
+        workflow = self._make_plan_workflow(tmp_path, fail_on_missing_secrets=True)
+        provider = SimpleNamespace(terraform_dir=tmp_path)
+
+        with pytest.raises(FileNotFoundError):
+            workflow._export_secrets("proxmox", "dev", provider)
+
+    def test_export_secrets_permissive_mode_warns(self, tmp_path):
+        """Permissive mode should not raise when secrets are missing."""
+        workflow = self._make_plan_workflow(tmp_path, fail_on_missing_secrets=False)
+        provider = SimpleNamespace(terraform_dir=tmp_path)
+
+        workflow._export_secrets("proxmox", "dev", provider)

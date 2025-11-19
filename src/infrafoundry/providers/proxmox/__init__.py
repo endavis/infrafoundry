@@ -16,6 +16,7 @@ class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin)
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize Proxmox provider."""
         super().__init__("proxmox", config_dir, output_dir)
+        self.fail_on_missing_snippets = False
         # Use TemplateRendererMixin to set up Jinja2 environment
         self._setup_template_environment()
 
@@ -127,7 +128,10 @@ class ProxmoxProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin)
                 )
 
             if not snippet_path.exists():
-                print(f"Warning: Cloud-init snippet not found: {snippet_path}")
+                message = f"Cloud-init snippet not found: {snippet_path}"
+                if self.fail_on_missing_snippets:
+                    raise FileNotFoundError(message)
+                print(f"Warning: {message}")
                 continue
 
             # Load snippet YAML
