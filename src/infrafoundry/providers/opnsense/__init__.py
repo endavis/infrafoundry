@@ -23,6 +23,12 @@ class OPNsenseProvider(
 ):
     """OPNsense provider for managing firewall rules, VLANs, and routing."""
 
+    _OPNSENSE_TFVARS_MAPPING = {
+        "api_url": "opnsense_api_url",
+        "api_key": "opnsense_api_key",
+        "api_secret": "opnsense_api_secret",
+    }
+
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize OPNsense provider."""
         super().__init__("opnsense", config_dir, output_dir)

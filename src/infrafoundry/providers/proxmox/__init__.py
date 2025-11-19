@@ -22,6 +22,13 @@ class ProxmoxProvider(
 ):
     """Proxmox VE provider for managing VMs, templates, and networks."""
 
+    _PROXMOX_TFVARS_MAPPING = {
+        "api_url": "proxmox_api_url",
+        "api_token": "proxmox_api_token",
+        "node": "proxmox_node",
+        "storage": "proxmox_storage",
+    }
+
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize Proxmox provider."""
         super().__init__("proxmox", config_dir, output_dir)
