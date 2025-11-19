@@ -1,7 +1,260 @@
 """ISC to Kea DHCP migration component manager."""
 
+from __future__ import annotations
+
+from typing import Any
+
 from ..services.isc_dhcp import ISCDHCPService
 from .base import BaseComponentManager
+
+
+class _BaseDHCPConverter:
+    """Shared helpers for converting ISC DHCP config to Kea resources."""
+
+    subnet_suffix = ""
+
+    def convert_subnet(self, interface: str, isc_config: dict[str, Any]) -> dict[str, Any] | None:
+        if not self._is_enabled(isc_config):
+            return None
+
+        subnet_cidr = self._subnet_cidr(isc_config)
+        if not subnet_cidr:
+            return None
+
+        kea_config: dict[str, Any] = {
+            "subnet": subnet_cidr,
+            "interface": interface,
+            "pools": self._build_pools(isc_config),
+        }
+        kea_config.update(self._common_subnet_fields(isc_config))
+        kea_config.update(self._version_specific_subnet_fields(isc_config))
+
+        return {
+            "name": f"{interface}{self.subnet_suffix}",
+            "config": kea_config,
+        }
+
+    def convert_reservation(
+        self,
+        interface: str,
+        static_map: dict[str, Any],
+        subnet_config: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        identifier = self._reservation_identifier(static_map)
+        address = self._reservation_address(static_map)
+        if not identifier or not address:
+            return None
+
+        subnet_cidr = self._reservation_subnet(subnet_config, static_map, address)
+        if not subnet_cidr:
+            return None
+
+        kea_config = {"subnet": subnet_cidr}
+        kea_config.update(self._reservation_core_fields(identifier, address))
+        kea_config.update(self._reservation_extra_fields(static_map))
+
+        name = self._reservation_name(interface, static_map, identifier)
+        return {"name": name, "config": kea_config}
+
+    def _is_enabled(self, isc_config: dict[str, Any]) -> bool:
+        return isc_config.get("enable") == "1"
+
+    def _build_pools(self, isc_config: dict[str, Any]) -> list[dict[str, str]]:
+        pools: list[dict[str, str]] = []
+        range_config = isc_config.get("range")
+        if isinstance(range_config, dict):
+            range_from = range_config.get("from")
+            range_to = range_config.get("to")
+            if range_from and range_to:
+                pools.append({"range": f"{range_from} - {range_to}"})
+        return pools
+
+    def _common_subnet_fields(self, isc_config: dict[str, Any]) -> dict[str, Any]:
+        fields: dict[str, Any] = {}
+
+        dns_servers = self._as_list(isc_config.get("dnsserver"))
+        if dns_servers:
+            fields["dns_servers"] = dns_servers
+
+        if "defaultleasetime" in isc_config:
+            try:
+                fields["valid_lifetime"] = int(isc_config["defaultleasetime"])
+            except (TypeError, ValueError):
+                pass
+
+        if "maxleasetime" in isc_config:
+            try:
+                fields["max_lifetime"] = int(isc_config["maxleasetime"])
+            except (TypeError, ValueError):
+                pass
+
+        return fields
+
+    def _as_list(self, value: Any) -> list[Any]:
+        if value is None or value == "":
+            return []
+        if isinstance(value, list):
+            return [item for item in value if item not in (None, "")]
+        return [value]
+
+    def _subnet_cidr(self, isc_config: dict[str, Any]) -> str | None:
+        raise NotImplementedError
+
+    def _version_specific_subnet_fields(self, isc_config: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    def _reservation_identifier(self, static_map: dict[str, Any]) -> str | None:
+        raise NotImplementedError
+
+    def _reservation_address(self, static_map: dict[str, Any]) -> str | None:
+        raise NotImplementedError
+
+    def _reservation_core_fields(self, identifier: str, address: str) -> dict[str, Any]:
+        raise NotImplementedError
+
+    def _reservation_extra_fields(self, static_map: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    def _reservation_name(
+        self,
+        interface: str,
+        static_map: dict[str, Any],
+        identifier: str,
+    ) -> str:
+        raise NotImplementedError
+
+    def _reservation_subnet(
+        self,
+        subnet_config: dict[str, Any],
+        static_map: dict[str, Any],
+        address: str,
+    ) -> str | None:
+        return self._subnet_cidr(subnet_config)
+
+
+class _DHCPv4Converter(_BaseDHCPConverter):
+    subnet_suffix = "-dhcp"
+
+    def _subnet_cidr(self, isc_config: dict[str, Any]) -> str | None:
+        subnet = isc_config.get("subnet")
+        if not subnet:
+            return None
+        subnet_bits = isc_config.get("subnet_bits", "24")
+        return f"{subnet}/{subnet_bits}"
+
+    def _version_specific_subnet_fields(self, isc_config: dict[str, Any]) -> dict[str, Any]:
+        fields: dict[str, Any] = {}
+        if gateway := isc_config.get("gateway"):
+            fields["router"] = gateway
+        if domain := isc_config.get("domain"):
+            fields["domain"] = domain
+        ntp_servers = self._as_list(isc_config.get("ntpserver"))
+        if ntp_servers:
+            fields["ntp_servers"] = ntp_servers
+        return fields
+
+    def _reservation_identifier(self, static_map: dict[str, Any]) -> str | None:
+        return static_map.get("mac")
+
+    def _reservation_address(self, static_map: dict[str, Any]) -> str | None:
+        return static_map.get("ipaddr")
+
+    def _reservation_core_fields(self, identifier: str, address: str) -> dict[str, Any]:
+        return {"hw_address": identifier, "ip_address": address}
+
+    def _reservation_extra_fields(self, static_map: dict[str, Any]) -> dict[str, Any]:
+        fields: dict[str, Any] = {}
+        if hostname := static_map.get("hostname"):
+            fields["hostname"] = hostname
+        if description := static_map.get("descr"):
+            fields["description"] = description
+        return fields
+
+    def _reservation_name(
+        self,
+        interface: str,
+        static_map: dict[str, Any],
+        identifier: str,
+    ) -> str:
+        hostname = static_map.get("hostname")
+        if hostname:
+            return hostname
+        compact_mac = identifier.replace(":", "")
+        return f"{interface}-{compact_mac[:8]}"
+
+
+class _DHCPv6Converter(_BaseDHCPConverter):
+    subnet_suffix = "-dhcpv6"
+
+    def _prefix_length(self, isc_config: dict[str, Any]) -> str:
+        prefix_range = isc_config.get("prefixrange", {}) or {}
+        return prefix_range.get("prefixlength", "64")
+
+    def _subnet_cidr(self, isc_config: dict[str, Any]) -> str | None:
+        subnet = isc_config.get("subnet")
+        if not subnet:
+            return None
+        prefix_length = self._prefix_length(isc_config)
+        return f"{subnet}/{prefix_length}"
+
+    def _version_specific_subnet_fields(self, isc_config: dict[str, Any]) -> dict[str, Any]:
+        fields: dict[str, Any] = {}
+
+        domain = isc_config.get("domain")
+        domain_search = self._as_list(isc_config.get("domainsearchlist"))
+        if domain_search:
+            fields["dns_search_list"] = domain_search
+        elif domain:
+            fields["dns_search_list"] = [domain]
+
+        if description := isc_config.get("descr"):
+            fields["description"] = description
+
+        return fields
+
+    def _reservation_identifier(self, static_map: dict[str, Any]) -> str | None:
+        return static_map.get("duid")
+
+    def _reservation_address(self, static_map: dict[str, Any]) -> str | None:
+        return static_map.get("ipaddrv6")
+
+    def _reservation_core_fields(self, identifier: str, address: str) -> dict[str, Any]:
+        return {"duid": identifier, "ip_address": address}
+
+    def _reservation_extra_fields(self, static_map: dict[str, Any]) -> dict[str, Any]:
+        fields: dict[str, Any] = {}
+        if hostname := static_map.get("hostname"):
+            fields["hostname"] = hostname
+        if description := static_map.get("descr"):
+            fields["description"] = description
+        return fields
+
+    def _reservation_name(
+        self,
+        interface: str,
+        static_map: dict[str, Any],
+        identifier: str,
+    ) -> str:
+        hostname = static_map.get("hostname")
+        if hostname:
+            return hostname
+        return f"{interface}-{identifier[:16]}"
+
+    def _reservation_subnet(
+        self,
+        subnet_config: dict[str, Any],
+        static_map: dict[str, Any],
+        address: str,
+    ) -> str | None:
+        subnet_cidr = self._subnet_cidr(subnet_config)
+        if subnet_cidr:
+            return subnet_cidr
+
+        prefix_length = self._prefix_length(subnet_config)
+        if ":" in address:
+            network_prefix = address.rsplit(":", 1)[0]
+            return f"{network_prefix}::/{prefix_length}"
+        return f"{address}/{prefix_length}"
 
 
 class ISCToKeaMigrationManager(BaseComponentManager):
@@ -27,168 +280,14 @@ class ISCToKeaMigrationManager(BaseComponentManager):
         Returns:
             Dictionary with 'subnets' and 'reservations' keys containing resource configs
         """
-        isc_service: ISCDHCPService = ISCDHCPService.from_environment(  # type: ignore[assignment]
-            env_name, provider_name, self.config_dir
+        return self._migrate_dhcp(
+            env_name=env_name,
+            provider_name=provider_name,
+            interfaces=interfaces,
+            converter=_DHCPv4Converter(),
+            config_attr="get_dhcpv4_config",
+            static_attr="get_dhcpv4_static_maps",
         )
-
-        # Get ISC DHCP configuration
-        isc_config = isc_service.get_dhcpv4_config()
-        static_maps = isc_service.get_dhcpv4_static_maps()
-
-        # Filter interfaces if specified
-        if interfaces:
-            isc_config = {iface: cfg for iface, cfg in isc_config.items() if iface in interfaces}
-            static_maps = {
-                iface: maps for iface, maps in static_maps.items() if iface in interfaces
-            }
-
-        subnets = []
-        reservations = []
-
-        # Transform ISC config to Kea format
-        for interface, config in isc_config.items():
-            # Convert ISC subnet to Kea subnet
-            subnet_config = self._convert_dhcpv4_subnet(interface, config)
-            if subnet_config:
-                subnets.append(subnet_config)
-
-            # Convert ISC static maps to Kea reservations
-            if interface in static_maps:
-                for static_map in static_maps[interface]:
-                    reservation_config = self._convert_dhcpv4_reservation(
-                        interface, static_map, config
-                    )
-                    if reservation_config:
-                        reservations.append(reservation_config)
-
-        return {"subnets": subnets, "reservations": reservations}
-
-    def _convert_dhcpv4_subnet(self, interface: str, isc_config: dict) -> dict | None:
-        """Convert ISC DHCPv4 subnet configuration to Kea format.
-
-        Args:
-            interface: Interface name (e.g., 'lan', 'opt1')
-            isc_config: ISC DHCP configuration dictionary
-
-        Returns:
-            Dictionary with 'name' and 'config' keys for Kea subnet, or None if invalid
-        """
-        # Check if DHCP is enabled (ISC uses "1" for enabled, "0" or missing for disabled)
-        enabled = isc_config.get("enable")
-        if enabled != "1":
-            return None
-
-        # Extract subnet information
-        subnet = isc_config.get("subnet")
-        subnet_bits = isc_config.get("subnet_bits", "24")
-
-        if not subnet:
-            return None
-
-        # Build subnet CIDR
-        subnet_cidr = f"{subnet}/{subnet_bits}"
-
-        # Extract pool range
-        pools = []
-        range_config = isc_config.get("range", {})
-        if isinstance(range_config, dict):
-            range_from = range_config.get("from")
-            range_to = range_config.get("to")
-            if range_from and range_to:
-                pools.append({"range": f"{range_from} - {range_to}"})
-
-        # Extract DNS servers
-        dns_servers = []
-        dnsserver = isc_config.get("dnsserver", [])
-        if isinstance(dnsserver, list):
-            dns_servers = dnsserver
-        elif dnsserver:
-            dns_servers = [dnsserver]
-
-        # Extract gateway (router option)
-        gateway = isc_config.get("gateway")
-
-        # Build Kea subnet configuration
-        kea_config = {
-            "subnet": subnet_cidr,
-            "interface": interface,
-            "pools": pools,
-        }
-
-        # Add optional fields
-        if dns_servers:
-            kea_config["dns_servers"] = dns_servers
-
-        if gateway:
-            kea_config["router"] = gateway
-
-        if "domain" in isc_config:
-            kea_config["domain"] = isc_config["domain"]
-
-        if "defaultleasetime" in isc_config:
-            kea_config["valid_lifetime"] = int(isc_config["defaultleasetime"])
-
-        if "maxleasetime" in isc_config:
-            kea_config["max_lifetime"] = int(isc_config["maxleasetime"])
-
-        # NTP servers
-        if "ntpserver" in isc_config:
-            ntp_servers = isc_config["ntpserver"]
-            if isinstance(ntp_servers, list):
-                kea_config["ntp_servers"] = ntp_servers
-            elif ntp_servers:
-                kea_config["ntp_servers"] = [ntp_servers]
-
-        return {
-            "name": f"{interface}-dhcp",
-            "config": kea_config,
-        }
-
-    def _convert_dhcpv4_reservation(
-        self, interface: str, static_map: dict, subnet_config: dict
-    ) -> dict | None:
-        """Convert ISC DHCPv4 static mapping to Kea reservation.
-
-        Args:
-            interface: Interface name
-            static_map: ISC static mapping dictionary
-            subnet_config: Parent subnet configuration
-
-        Returns:
-            Dictionary with 'name' and 'config' keys for Kea reservation, or None if invalid
-        """
-        mac = static_map.get("mac")
-        ipaddr = static_map.get("ipaddr")
-        hostname = static_map.get("hostname", "")
-
-        if not mac or not ipaddr:
-            return None
-
-        # Generate subnet reference
-        subnet = subnet_config.get("subnet")
-        subnet_bits = subnet_config.get("subnet_bits", "24")
-        subnet_cidr = f"{subnet}/{subnet_bits}"
-
-        # Build Kea reservation configuration
-        kea_config = {
-            "subnet": subnet_cidr,
-            "hw_address": mac,
-            "ip_address": ipaddr,
-        }
-
-        if hostname:
-            kea_config["hostname"] = hostname
-
-        if "descr" in static_map:
-            kea_config["description"] = static_map["descr"]
-
-        # Generate a name for the reservation
-        name = hostname if hostname else f"{interface}-{mac.replace(':', '')[:8]}"
-
-        return {
-            "name": name,
-            "config": kea_config,
-        }
 
     def migrate_dhcpv6(
         self, env_name: str, provider_name: str = "opnsense", interfaces: list[str] | None = None
@@ -206,178 +305,54 @@ class ISCToKeaMigrationManager(BaseComponentManager):
         Returns:
             Dictionary with 'subnets' and 'reservations' keys containing resource configs
         """
+        return self._migrate_dhcp(
+            env_name=env_name,
+            provider_name=provider_name,
+            interfaces=interfaces,
+            converter=_DHCPv6Converter(),
+            config_attr="get_dhcpv6_config",
+            static_attr="get_dhcpv6_static_maps",
+        )
+
+    def _migrate_dhcp(
+        self,
+        env_name: str,
+        provider_name: str,
+        interfaces: list[str] | None,
+        converter: _BaseDHCPConverter,
+        *,
+        config_attr: str,
+        static_attr: str,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Shared DHCP migration implementation for v4/v6."""
         isc_service: ISCDHCPService = ISCDHCPService.from_environment(  # type: ignore[assignment]
             env_name, provider_name, self.config_dir
         )
 
-        # Get ISC DHCPv6 configuration
-        isc_config = isc_service.get_dhcpv6_config()
-        static_maps = isc_service.get_dhcpv6_static_maps()
+        isc_config = getattr(isc_service, config_attr)()
+        static_maps = getattr(isc_service, static_attr)()
 
-        # Filter interfaces if specified
         if interfaces:
-            isc_config = {iface: cfg for iface, cfg in isc_config.items() if iface in interfaces}
+            interface_set = set(interfaces)
+            isc_config = {iface: cfg for iface, cfg in isc_config.items() if iface in interface_set}
             static_maps = {
-                iface: maps for iface, maps in static_maps.items() if iface in interfaces
+                iface: maps for iface, maps in static_maps.items() if iface in interface_set
             }
 
-        subnets = []
-        reservations = []
+        subnets: list[dict[str, Any]] = []
+        reservations: list[dict[str, Any]] = []
 
-        # Transform ISC config to Kea format
         for interface, config in isc_config.items():
-            # Convert ISC subnet to Kea subnet
-            subnet_config = self._convert_dhcpv6_subnet(interface, config)
+            subnet_config = converter.convert_subnet(interface, config)
             if subnet_config:
                 subnets.append(subnet_config)
 
-            # Convert ISC static maps to Kea reservations
-            if interface in static_maps:
-                for static_map in static_maps[interface]:
-                    reservation_config = self._convert_dhcpv6_reservation(
-                        interface, static_map, config
-                    )
-                    if reservation_config:
-                        reservations.append(reservation_config)
+            for static_map in static_maps.get(interface, []):
+                reservation_config = converter.convert_reservation(interface, static_map, config)
+                if reservation_config:
+                    reservations.append(reservation_config)
 
         return {"subnets": subnets, "reservations": reservations}
-
-    def _convert_dhcpv6_subnet(self, interface: str, isc_config: dict) -> dict | None:
-        """Convert ISC DHCPv6 subnet configuration to Kea format.
-
-        Args:
-            interface: Interface name (e.g., 'lan', 'opt1')
-            isc_config: ISC DHCPv6 configuration dictionary
-
-        Returns:
-            Dictionary with 'name' and 'config' keys for Kea DHCPv6 subnet, or None if invalid
-        """
-        # Check if DHCPv6 is enabled (ISC uses "1" for enabled, "0" or missing for disabled)
-        enabled = isc_config.get("enable")
-        if enabled != "1":
-            return None
-
-        # Extract subnet/range information
-        # DHCPv6 can use range or subnet
-        range_config = isc_config.get("range", {})
-        subnet = isc_config.get("subnet")
-
-        pools = []
-        subnet_cidr = None
-
-        # Handle range-based configuration
-        if isinstance(range_config, dict):
-            range_from = range_config.get("from")
-            range_to = range_config.get("to")
-            if range_from and range_to:
-                pools.append({"range": f"{range_from} - {range_to}"})
-                # Try to derive subnet from range (simplified)
-                if subnet:
-                    prefix_length = isc_config.get("prefixrange", {}).get("prefixlength", "64")
-                    subnet_cidr = f"{subnet}/{prefix_length}"
-
-        # Handle subnet-based configuration
-        if not subnet_cidr and subnet:
-            prefix_length = isc_config.get("prefixrange", {}).get("prefixlength", "64")
-            subnet_cidr = f"{subnet}/{prefix_length}"
-
-        if not subnet_cidr:
-            return None
-
-        # Build Kea subnet configuration
-        kea_config = {
-            "subnet": subnet_cidr,
-            "interface": interface,
-            "pools": pools,
-        }
-
-        # Extract DNS servers
-        dns_servers = []
-        dnsserver = isc_config.get("dnsserver", [])
-        if isinstance(dnsserver, list):
-            dns_servers = dnsserver
-        elif dnsserver:
-            dns_servers = [dnsserver]
-
-        if dns_servers:
-            kea_config["dns_servers"] = dns_servers
-
-        # Domain search list
-        if "domain" in isc_config:
-            kea_config["dns_search_list"] = [isc_config["domain"]]
-
-        if "domainsearchlist" in isc_config:
-            search_list = isc_config["domainsearchlist"]
-            if isinstance(search_list, list):
-                kea_config["dns_search_list"] = search_list
-            elif search_list:
-                kea_config["dns_search_list"] = [search_list]
-
-        # Lease times
-        if "defaultleasetime" in isc_config:
-            kea_config["valid_lifetime"] = int(isc_config["defaultleasetime"])
-
-        if "maxleasetime" in isc_config:
-            kea_config["max_lifetime"] = int(isc_config["maxleasetime"])
-
-        # Description
-        if "descr" in isc_config:
-            kea_config["description"] = isc_config["descr"]
-
-        return {
-            "name": f"{interface}-dhcpv6",
-            "config": kea_config,
-        }
-
-    def _convert_dhcpv6_reservation(
-        self, interface: str, static_map: dict, subnet_config: dict
-    ) -> dict | None:
-        """Convert ISC DHCPv6 static mapping to Kea reservation.
-
-        Args:
-            interface: Interface name
-            static_map: ISC static mapping dictionary
-            subnet_config: Parent subnet configuration
-
-        Returns:
-            Dictionary with 'name' and 'config' keys for Kea DHCPv6 reservation, or None
-        """
-        duid = static_map.get("duid")
-        ipaddr = static_map.get("ipaddrv6")
-        hostname = static_map.get("hostname", "")
-
-        if not duid or not ipaddr:
-            return None
-
-        # Generate subnet reference
-        subnet = subnet_config.get("subnet")
-        prefix_length = subnet_config.get("prefixrange", {}).get("prefixlength", "64")
-        if subnet:
-            subnet_cidr = f"{subnet}/{prefix_length}"
-        else:
-            # Fallback: try to derive from IP address
-            subnet_cidr = f"{ipaddr.rsplit(':', 1)[0]}::/{prefix_length}"
-
-        # Build Kea reservation configuration
-        kea_config = {
-            "subnet": subnet_cidr,
-            "duid": duid,
-            "ip_address": ipaddr,
-        }
-
-        if hostname:
-            kea_config["hostname"] = hostname
-
-        if "descr" in static_map:
-            kea_config["description"] = static_map["descr"]
-
-        # Generate a name for the reservation
-        name = hostname if hostname else f"{interface}-{duid[:16]}"
-
-        return {
-            "name": name,
-            "config": kea_config,
-        }
 
     def migrate_all(
         self, env_name: str, provider_name: str = "opnsense", interfaces: list[str] | None = None

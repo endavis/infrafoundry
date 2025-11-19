@@ -7,6 +7,7 @@ import pytest
 
 from infrafoundry.providers.opnsense.components.isc_to_kea_migration import (
     ISCToKeaMigrationManager,
+    _DHCPv4Converter,
 )
 
 
@@ -226,7 +227,8 @@ class TestISCToKeaMigration:
             "subnet_bits": "16",
         }
 
-        result = manager._convert_dhcpv4_subnet("opt1", isc_config)
+        converter = _DHCPv4Converter()
+        result = converter.convert_subnet("opt1", isc_config)
 
         assert result is not None
         assert result["name"] == "opt1-dhcp"
@@ -245,7 +247,8 @@ class TestISCToKeaMigration:
             "subnet_bits": "16",
         }
 
-        result = manager._convert_dhcpv4_reservation("opt1", static_map, subnet_config)
+        converter = _DHCPv4Converter()
+        result = converter.convert_reservation("opt1", static_map, subnet_config)
 
         assert result is not None
         assert result["config"]["hw_address"] == "aa:bb:cc:dd:ee:ff"
@@ -262,7 +265,8 @@ class TestISCToKeaMigration:
             "subnet_bits": "16",
         }
 
-        result = manager._convert_dhcpv4_reservation("opt1", static_map, subnet_config)
+        converter = _DHCPv4Converter()
+        result = converter.convert_reservation("opt1", static_map, subnet_config)
 
         assert result is None
 
