@@ -390,3 +390,34 @@ class TerraformGeneratorMixin:
             )
 
         self._write_tfvars_lines(lines)
+
+    def render_and_write_terraform(
+        self,
+        template_name: str,
+        *,
+        context: dict[str, Any] | None = None,
+        output_name: str,
+    ) -> None:
+        """Render a Terraform template and write it to disk in one step.
+
+        This helper eliminates the repetitive pattern of rendering a template and
+        immediately writing it to a Terraform file. Providers that mix in both
+        TemplateRendererMixin and TerraformGeneratorMixin can call this method to
+        keep their generation logic concise.
+
+        Args:
+            template_name: Template to render, relative to the provider templates dir.
+            context: Template context (defaults to empty dict).
+            output_name: Terraform file name to write to within terraform_dir.
+        """
+        if not hasattr(self, "render_template"):
+            raise AttributeError(
+                "render_and_write_terraform requires TemplateRendererMixin-style render_template"
+            )
+        if not hasattr(self, "_write_terraform_file"):
+            raise AttributeError(
+                "render_and_write_terraform requires TemplateRendererMixin _write_terraform_file"
+            )
+
+        rendered = self.render_template(template_name, context or {})
+        self._write_terraform_file(output_name, rendered)

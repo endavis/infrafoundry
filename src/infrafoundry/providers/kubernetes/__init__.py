@@ -4,10 +4,19 @@ from pathlib import Path
 from typing import Any, override
 
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.provider_mixins import ResourceGrouperMixin, TemplateRendererMixin
+from infrafoundry.core.provider_mixins import (
+    ResourceGrouperMixin,
+    TemplateRendererMixin,
+    TerraformGeneratorMixin,
+)
 
 
-class KubernetesProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMixin):
+class KubernetesProvider(
+    ProviderBase,
+    TemplateRendererMixin,
+    ResourceGrouperMixin,
+    TerraformGeneratorMixin,
+):
     """Kubernetes provider for managing deployments, services, and configs."""
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
@@ -31,12 +40,16 @@ class KubernetesProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMix
         resources_by_type = self.group_resources_by_type(resources)
 
         # Generate provider configuration
-        content = self.render_template("kubernetes/provider.tf.j2", {})
-        self._write_terraform_file("provider.tf", content)
+        self.render_and_write_terraform(
+            "kubernetes/provider.tf.j2",
+            output_name="provider.tf",
+        )
 
         # Generate variables file
-        content = self.render_template("kubernetes/variables.tf.j2", {})
-        self._write_terraform_file("variables.tf", content)
+        self.render_and_write_terraform(
+            "kubernetes/variables.tf.j2",
+            output_name="variables.tf",
+        )
 
         # Generate resources by type
         if "deployments" in resources_by_type:
@@ -52,31 +65,43 @@ class KubernetesProvider(ProviderBase, TemplateRendererMixin, ResourceGrouperMix
             self._generate_namespaces_terraform(resources_by_type["namespaces"])
 
         # Generate outputs
-        content = self.render_template(
+        self.render_and_write_terraform(
             "kubernetes/outputs.tf.j2",
-            {"resources_by_type": resources_by_type},
+            context={"resources_by_type": resources_by_type},
+            output_name="outputs.tf",
         )
-        self._write_terraform_file("outputs.tf", content)
 
     def _generate_deployments_terraform(self, deployments: list[ResourceConfig]) -> None:
         """Generate Terraform for Kubernetes deployments."""
-        content = self.render_template("kubernetes/deployments.tf.j2", {"deployments": deployments})
-        self._write_terraform_file("deployments.tf", content)
+        self.render_and_write_terraform(
+            "kubernetes/deployments.tf.j2",
+            context={"deployments": deployments},
+            output_name="deployments.tf",
+        )
 
     def _generate_services_terraform(self, services: list[ResourceConfig]) -> None:
         """Generate Terraform for Kubernetes services."""
-        content = self.render_template("kubernetes/services.tf.j2", {"services": services})
-        self._write_terraform_file("services.tf", content)
+        self.render_and_write_terraform(
+            "kubernetes/services.tf.j2",
+            context={"services": services},
+            output_name="services.tf",
+        )
 
     def _generate_configmaps_terraform(self, configmaps: list[ResourceConfig]) -> None:
         """Generate Terraform for Kubernetes configmaps."""
-        content = self.render_template("kubernetes/configmaps.tf.j2", {"configmaps": configmaps})
-        self._write_terraform_file("configmaps.tf", content)
+        self.render_and_write_terraform(
+            "kubernetes/configmaps.tf.j2",
+            context={"configmaps": configmaps},
+            output_name="configmaps.tf",
+        )
 
     def _generate_namespaces_terraform(self, namespaces: list[ResourceConfig]) -> None:
         """Generate Terraform for Kubernetes namespaces."""
-        content = self.render_template("kubernetes/namespaces.tf.j2", {"namespaces": namespaces})
-        self._write_terraform_file("namespaces.tf", content)
+        self.render_and_write_terraform(
+            "kubernetes/namespaces.tf.j2",
+            context={"namespaces": namespaces},
+            output_name="namespaces.tf",
+        )
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
