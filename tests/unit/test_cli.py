@@ -1,8 +1,11 @@
 """Unit tests for CLI commands."""
 
+from unittest.mock import Mock, patch
+
 from click.testing import CliRunner
 
 from infrafoundry.cli import main as cli
+from infrafoundry.core.orchestrator import OrchestratorStrictConfig
 
 
 class TestCLICommands:
@@ -43,6 +46,46 @@ class TestCLICommands:
         result = runner.invoke(cli, ["plan"])
 
         assert result.exit_code != 0
+
+    def test_strict_mode_flag_passes_config(self):
+        """Test --strict-mode creates strict orchestrator config."""
+        runner = CliRunner()
+        with (
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_get,
+            patch("infrafoundry.cli.main._load_env_credentials"),
+        ):
+            mock_orchestrator = Mock()
+            mock_orchestrator.plan.return_value = {}
+            mock_get.return_value = mock_orchestrator
+
+            result = runner.invoke(cli, ["--strict-mode", "plan", "--env", "dev"])
+
+            assert result.exit_code == 0
+            call_args, _ = mock_get.call_args
+            assert len(call_args) == 2
+            strict_config = call_args[1]
+            assert isinstance(strict_config, OrchestratorStrictConfig)
+            assert strict_config.strict_mode is True
+
+    def test_strict_env_vars_applied_when_no_flags(self, monkeypatch):
+        """Test environment variables are respected for strict config."""
+        runner = CliRunner()
+        with (
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_get,
+            patch("infrafoundry.cli.main._load_env_credentials"),
+        ):
+            mock_orchestrator = Mock()
+            mock_orchestrator.plan.return_value = {}
+            mock_get.return_value = mock_orchestrator
+
+            monkeypatch.setenv("INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS", "1")
+            result = runner.invoke(cli, ["plan", "--env", "dev"])
+
+            assert result.exit_code == 0
+            call_args, _ = mock_get.call_args
+            strict_config = call_args[1]
+            assert isinstance(strict_config, OrchestratorStrictConfig)
+            assert strict_config.fail_on_missing_secrets is True
 
     def test_apply_command_requires_env(self):
         """Test apply command requires --env flag."""

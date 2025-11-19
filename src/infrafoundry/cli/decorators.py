@@ -53,7 +53,10 @@ def with_orchestrator(
 
                 from .main import _get_orchestrator
 
-                orchestrator = _get_orchestrator(config_dir)
+                orchestrator = _get_orchestrator(
+                    config_dir,
+                    (ctx.obj or {}).get("strict_config"),
+                )
                 return func(ctx, orchestrator, *args, **kwargs)
             except click.ClickException:
                 raise

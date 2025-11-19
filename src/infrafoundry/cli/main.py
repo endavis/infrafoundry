@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
-from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.orchestrator import Orchestrator, OrchestratorStrictConfig
 
 # Load environment variables
 load_dotenv()
@@ -16,7 +16,53 @@ load_dotenv()
 console = Console()
 
 
-def _get_orchestrator(config_repo: Path | None = None) -> Orchestrator:
+def _resolve_bool_option(option: bool | None, env_var: str) -> bool | None:
+    """Resolve a boolean option from CLI flag or environment variable."""
+    if option is not None:
+        return option
+
+    value = os.getenv(env_var)
+    if value is None:
+        return None
+
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_strict_config(
+    strict_mode: bool | None,
+    fail_on_missing_secrets: bool | None,
+    fail_on_missing_snippets: bool | None,
+) -> OrchestratorStrictConfig | None:
+    """Construct strict configuration based on CLI flags/environment."""
+    strict_kwargs: dict[str, bool] = {}
+
+    if (value := _resolve_bool_option(strict_mode, "INFRAFOUNDRY_STRICT_MODE")) is not None:
+        strict_kwargs["strict_mode"] = value
+
+    if (
+        value := _resolve_bool_option(
+            fail_on_missing_secrets, "INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS"
+        )
+    ) is not None:
+        strict_kwargs["fail_on_missing_secrets"] = value
+
+    if (
+        value := _resolve_bool_option(
+            fail_on_missing_snippets, "INFRAFOUNDRY_FAIL_ON_MISSING_SNIPPETS"
+        )
+    ) is not None:
+        strict_kwargs["fail_on_missing_snippets"] = value
+
+    if not strict_kwargs:
+        return None
+
+    return OrchestratorStrictConfig(**strict_kwargs)
+
+
+def _get_orchestrator(
+    config_repo: Path | None = None,
+    strict_config: OrchestratorStrictConfig | None = None,
+) -> Orchestrator:
     """Create and configure orchestrator with all providers.
 
     Args:
@@ -31,7 +77,7 @@ def _get_orchestrator(config_repo: Path | None = None) -> Orchestrator:
         config_manager = ConfigManager()
 
     # Create orchestrator (SecretManager is created per-operation now)
-    orchestrator = Orchestrator(config_manager)
+    orchestrator = Orchestrator(config_manager, strict_config=strict_config)
 
     # Dynamically register available providers
     try:
@@ -104,8 +150,29 @@ def _load_env_credentials(env_name: str, config_dir: Path | None = None) -> None
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     help="Path to configuration repository (overrides INFRAFOUNDRY_CONFIG_REPO)",
 )
+@click.option(
+    "--strict-mode/--no-strict-mode",
+    default=None,
+    help="Enable strict mode (fail on missing secrets/snippets). Env: INFRAFOUNDRY_STRICT_MODE",
+)
+@click.option(
+    "--fail-on-missing-secrets/--allow-missing-secrets",
+    default=None,
+    help="Fail when secrets files are missing. Env: INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS",
+)
+@click.option(
+    "--fail-on-missing-snippets/--allow-missing-snippets",
+    default=None,
+    help="Fail when cloud-init snippets are missing. Env: INFRAFOUNDRY_FAIL_ON_MISSING_SNIPPETS",
+)
 @click.pass_context
-def main(ctx: click.Context, config_dir: Path | None) -> None:
+def main(
+    ctx: click.Context,
+    config_dir: Path | None,
+    strict_mode: bool | None,
+    fail_on_missing_secrets: bool | None,
+    fail_on_missing_snippets: bool | None,
+) -> None:
     """InfraFoundry - Infrastructure automation framework."""
     ctx.ensure_object(dict)
     # Use --config-dir flag if provided, otherwise check environment variable
@@ -115,6 +182,13 @@ def main(ctx: click.Context, config_dir: Path | None) -> None:
         ctx.obj["config_dir"] = Path(config_repo)
     else:
         ctx.obj["config_dir"] = None
+
+    strict_config = _build_strict_config(
+        strict_mode,
+        fail_on_missing_secrets,
+        fail_on_missing_snippets,
+    )
+    ctx.obj["strict_config"] = strict_config
 
 
 # Auto-discover and register commands from commands/ directory
