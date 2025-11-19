@@ -1,9 +1,9 @@
 """Plan infrastructure changes command."""
 
-import sys
-
 import click
 from rich.console import Console
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -52,6 +52,5 @@ def plan(
             console.print("\n[bold green]Plan generated successfully![/bold green]")
             console.print("Generated files are in: [cyan]generated/[/cyan]")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Plan failed", exc)

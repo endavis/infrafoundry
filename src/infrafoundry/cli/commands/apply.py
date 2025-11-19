@@ -1,9 +1,9 @@
 """Apply infrastructure changes command."""
 
-import sys
-
 import click
 from rich.console import Console
+
+from ..utils import raise_cli_error
 
 console = Console()
 
@@ -58,7 +58,7 @@ def apply(
 
             if not click.confirm("Do you want to continue?", default=False):
                 console.print("[yellow]Apply cancelled.[/yellow]")
-                sys.exit(0)
+                return
 
             # User confirmed, so pass auto_approve=True to Terraform
             auto_approve = True
@@ -71,6 +71,5 @@ def apply(
             max_workers=max_workers,
         )
         console.print("\n[bold green]Apply complete![/bold green]")
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        sys.exit(1)
+    except Exception as exc:
+        raise_cli_error("Apply failed", exc)
