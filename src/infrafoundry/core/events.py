@@ -83,6 +83,27 @@ class Event:
 EventHandler = Callable[[Event], None]
 
 
+class EventHandlerError(Exception):
+    """Error raised when an event handler fails."""
+
+    def __init__(self, handler: EventHandler, event: Event, original: Exception) -> None:
+        self.handler = handler
+        self.event = event
+        self.original = original
+        self.handler_name = self._describe_handler(handler)
+        message = f"Handler '{self.handler_name}' failed for {event.event_type.value}: {original}"
+        super().__init__(message)
+
+    @staticmethod
+    def _describe_handler(handler: EventHandler) -> str:
+        """Return a human-friendly handler name for logging."""
+        if hasattr(handler, "__qualname__"):
+            return handler.__qualname__
+        if hasattr(handler, "__name__"):
+            return handler.__name__  # pragma: no cover - defensive
+        return repr(handler)
+
+
 class EventManager(BaseManager):
     """Manages event subscriptions and emission."""
 
@@ -133,20 +154,25 @@ class EventManager(BaseManager):
 
         # Call specific handlers
         for handler in self._handlers[event.event_type]:
-            try:
-                handler(event)
-            except Exception as e:
-                # Log error but don't stop other handlers
-                error_msg = f"Error in event handler for {event.event_type}"
-                self._log_error(error_msg, e)
+            self._invoke_handler(handler, event, scope="event")
 
         # Call global handlers
         for handler in self._global_handlers:
-            try:
-                handler(event)
-            except Exception as e:
-                error_msg = "Error in global event handler"
-                self._log_error(error_msg, e)
+            self._invoke_handler(handler, event, scope="global")
+
+    def _invoke_handler(self, handler: EventHandler, event: Event, scope: str) -> None:
+        """Invoke a handler with structured error logging."""
+        try:
+            handler(event)
+        except Exception as exc:  # pragma: no cover - defensive wrapper
+            error = EventHandlerError(handler, event, exc)
+            self._log_error(
+                f"Error in {scope} handler",
+                error,
+                handler=error.handler_name,
+                event=event.event_type.value,
+                environment=event.environment,
+            )
 
     def emit_event(
         self,
