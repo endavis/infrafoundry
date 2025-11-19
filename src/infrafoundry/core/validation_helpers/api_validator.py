@@ -120,7 +120,7 @@ class BaseAPIValidator:
         except requests.exceptions.RequestException as exc:  # pragma: no cover - network errors
             if not optional:
                 if error_message:
-                    message = error_message.format(error=str(exc))
+                    message = error_message.format(status="unknown", error=str(exc))
                 else:
                     message = f"Error calling {url}: {exc}"
                 self.add_error(
@@ -133,7 +133,7 @@ class BaseAPIValidator:
         if expect_ok and response.status_code >= 400:
             if not optional:
                 if error_message:
-                    message = error_message.format(status=response.status_code)
+                    message = error_message.format(status=response.status_code, error="")
                 else:
                     message = f"{url} returned status {response.status_code}"
                 self.add_error(
@@ -191,7 +191,7 @@ class BaseAPIValidator:
         except ValueError as exc:  # pragma: no cover - JSON errors rare
             if not optional:
                 if json_error_message:
-                    message = json_error_message.format(error=str(exc))
+                    message = json_error_message.format(status="unknown", error=str(exc))
                 else:
                     message = f"Invalid JSON response from {url}: {exc}"
                 self.add_error(
