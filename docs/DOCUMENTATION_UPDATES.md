@@ -114,6 +114,16 @@ Created comprehensive CLI reference documentation covering:
 - Exit codes
 - Related documentation links
 
+### 5. CLI Command Architecture Notes (2025-01-13)
+
+- Documented the new `with_orchestrator` decorator located at `src/infrafoundry/cli/decorators.py`.
+- Added guidance that every orchestrator-driven command should use this decorator to handle:
+  - Automatic credential loading (`_load_env_credentials`)
+  - Orchestrator construction (`_get_orchestrator`)
+  - Consistent error handling via `click.ClickException`
+- Updated contributor docs to reference `src/infrafoundry/cli/main.py` instead of the legacy `cli.py` path.
+- Clarified that read-only commands can opt out of credential loading by setting `load_credentials=False`.
+
 ## What Was Discovered
 
 ### Fully Implemented Features (Previously Under-documented)

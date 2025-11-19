@@ -238,7 +238,7 @@ all:
 
 ### 4. Register Provider in CLI
 
-Edit `src/infrafoundry/cli.py` in the `_get_orchestrator()` function:
+Edit `src/infrafoundry/cli/main.py` in the `_get_orchestrator()` function:
 
 ```python
 # Add to _get_orchestrator() function
@@ -253,6 +253,10 @@ try:
 except ImportError:
     pass
 ```
+
+> **Note:** New CLI commands live under `src/infrafoundry/cli/commands/` and should use the shared
+> `with_orchestrator` decorator (`src/infrafoundry/cli/decorators.py`) to handle orchestrator setup,
+> credential loading, and consistent error handling.
 
 ### 5. Create Example Configurations
 
