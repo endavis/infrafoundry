@@ -3,7 +3,7 @@
 import click
 from rich.console import Console
 
-from ..utils import raise_cli_error
+from ..decorators import with_orchestrator
 
 console = Console()
 
@@ -25,9 +25,10 @@ console = Console()
     help="Component to reset (kea/dhcp resets both v4 and v6)",
 )
 @click.option("--auto-approve", is_flag=True, help="Skip confirmation prompts")
-@click.pass_context
+@with_orchestrator("Reset command failed")
 def reset(
-    ctx: click.Context,
+    _ctx: click.Context,
+    orchestrator,
     env: str,
     provider: str,
     component: str,
@@ -42,60 +43,39 @@ def reset(
         infra reset --env prod --provider opnsense --component kea/dhcpv4
         infra reset --env prod --provider opnsense --component kea/dhcp --auto-approve
     """
-    try:
-        # Import helper functions from main module
-        from ..main import _get_orchestrator, _load_env_credentials
+    if provider.lower() != "opnsense":
+        raise click.ClickException(f"Unsupported provider: {provider}")
 
-        # Load environment-specific credentials
-        _load_env_credentials(env, ctx.obj.get("config_dir"))
+    from infrafoundry.providers.opnsense import OPNsenseProvider
 
-        orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
+    provider_instance = orchestrator.providers.get("opnsense")
 
-        # Get the provider instance
-        if provider.lower() == "opnsense":
-            from infrafoundry.providers.opnsense import OPNsenseProvider
+    if not provider_instance or not isinstance(provider_instance, OPNsenseProvider):
+        raise click.ClickException("OPNsense provider not found")
 
-            # Get provider from orchestrator (providers is a dict)
-            provider_instance = orchestrator.providers.get("opnsense")
+    provider_instance._current_environment = env
 
-            if not provider_instance or not isinstance(provider_instance, OPNsenseProvider):
-                raise click.ClickException("OPNsense provider not found")
+    if not auto_approve:
+        component_desc = component.upper()
+        console.print(
+            f"\n[bold yellow]Warning:[/bold yellow] This will completely remove all "
+            f"{component_desc} configuration from OPNsense."
+        )
+        console.print("[yellow]All subnets, reservations, and settings will be deleted.[/yellow]")
+        if not click.confirm("\nDo you want to continue?", default=False):
+            console.print("[yellow]Reset cancelled.[/yellow]")
+            return
 
-            # Set the current environment on the provider
-            provider_instance._current_environment = env
+    component_lower = component.lower()
+    if component_lower in ["kea/dhcpv4", "kea/dhcp"]:
+        console.print("[cyan]Resetting Kea DHCPv4 configuration...[/cyan]")
+        provider_instance.reset_kea_dhcpv4(env)
+        console.print("[green]✓ Kea DHCPv4 reset complete[/green]")
 
-            # Confirm action
-            if not auto_approve:
-                component_desc = component.upper()
-                console.print(
-                    f"\n[bold yellow]Warning:[/bold yellow] This will completely "
-                    f"remove all {component_desc} configuration from OPNsense."
-                )
-                console.print(
-                    "[yellow]All subnets, reservations, and settings will be deleted.[/yellow]"
-                )
-                if not click.confirm("\nDo you want to continue?", default=False):
-                    console.print("[yellow]Reset cancelled.[/yellow]")
-                    return
+    if component_lower in ["kea/dhcpv6", "kea/dhcp"]:
+        console.print("[cyan]Resetting Kea DHCPv6 configuration...[/cyan]")
+        provider_instance.reset_kea_dhcpv6(env)
+        console.print("[green]✓ Kea DHCPv6 reset complete[/green]")
 
-            # Execute reset based on component
-            if component.lower() in ["kea/dhcpv4", "kea/dhcp"]:
-                console.print("[cyan]Resetting Kea DHCPv4 configuration...[/cyan]")
-                provider_instance.reset_kea_dhcpv4(env)
-                console.print("[green]✓ Kea DHCPv4 reset complete[/green]")
-
-            if component.lower() in ["kea/dhcpv6", "kea/dhcp"]:
-                console.print("[cyan]Resetting Kea DHCPv6 configuration...[/cyan]")
-                provider_instance.reset_kea_dhcpv6(env)
-                console.print("[green]✓ Kea DHCPv6 reset complete[/green]")
-
-            console.print("\n[bold green]Reset complete![/bold green]")
-            console.print(
-                "\n[cyan]You can now run 'infra apply' to apply fresh configuration.[/cyan]"
-            )
-
-        else:
-            raise click.ClickException(f"Unsupported provider: {provider}")
-
-    except Exception as exc:
-        raise_cli_error("Reset command failed", exc)
+    console.print("\n[bold green]Reset complete![/bold green]")
+    console.print("\n[cyan]You can now run 'infra apply' to apply fresh configuration.[/cyan]")

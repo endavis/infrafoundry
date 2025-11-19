@@ -5,7 +5,7 @@ import sys
 import click
 from rich.console import Console
 
-from ..utils import raise_cli_error
+from ..decorators import with_orchestrator
 
 console = Console()
 
@@ -25,8 +25,14 @@ console = Console()
     default=False,
     help="Show detailed validation output including passing checks",
 )
-@click.pass_context
-def validate(ctx: click.Context, env: str, resource: tuple[str, ...], verbose: bool) -> None:
+@with_orchestrator("Validation failed")
+def validate(
+    _ctx: click.Context,
+    orchestrator,
+    env: str,
+    resource: tuple[str, ...],
+    verbose: bool,
+) -> None:
     """Validate infrastructure configuration against provider APIs.
 
     Performs comprehensive pre-flight validation checks:
@@ -54,30 +60,15 @@ def validate(ctx: click.Context, env: str, resource: tuple[str, ...], verbose: b
         # Show detailed output with all passing checks
         infra validate --env test --verbose
     """
-    try:
-        # Import helper functions from main module
-        from ..main import _get_orchestrator, _load_env_credentials
+    resource_filter = list(resource) if resource else None
 
-        # Load environment-specific credentials
-        _load_env_credentials(env, ctx.obj.get("config_dir"))
+    results = orchestrator.validate(
+        env_name=env,
+        resource_filter=resource_filter,
+        verbose=verbose,
+    )
 
-        orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
-
-        # Convert tuple to list for orchestrator
-        resource_filter = list(resource) if resource else None
-
-        # Run validation using orchestrator
-        results = orchestrator.validate(
-            env_name=env, resource_filter=resource_filter, verbose=verbose
-        )
-
-        # Determine exit code based on results
-        has_errors = any(r["errors"] > 0 for r in results.values())
-
-        if has_errors:
-            sys.exit(1)
-        else:
-            sys.exit(0)
-
-    except Exception as exc:
-        raise_cli_error("Validation failed", exc)
+    has_errors = any(r["errors"] > 0 for r in results.values())
+    if has_errors:
+        sys.exit(1)
+    sys.exit(0)
