@@ -6,7 +6,6 @@ configurations against live API state before deployment.
 
 from typing import Any
 
-import requests
 import urllib3
 
 from infrafoundry.core.provider import ResourceConfig
@@ -68,56 +67,41 @@ class OPNsenseValidator:
         api_key = credentials["api_key"]
         api_secret = credentials["api_secret"]
 
-        # Test API connectivity
-        try:
-            response = requests.get(
-                f"{api_url}/api/core/system/status",
-                auth=(api_key, api_secret),
-                verify=False,  # OPNsense often uses self-signed certs
-                timeout=10,
+        response = self.api_validator.api_request(
+            url=f"{api_url}/api/core/system/status",
+            auth=(api_key, api_secret),
+            verify_ssl=False,
+            timeout=10,
+            check_name="opnsense_api_connection",
+            expect_ok=False,
+            error_message="Error connecting to OPNsense: {error}",
+        )
+        if not response:
+            return
+
+        if response.status_code == 200:
+            data = response.json()
+            self.api_validator.add_success(
+                check_name="opnsense_api_connection",
+                message=f"Successfully connected to OPNsense API at {api_url}",
             )
 
-            if response.status_code == 200:
-                data = response.json()
+            if "product_version" in data:
+                version = data.get("product_version", "unknown")
                 self.api_validator.add_success(
-                    check_name="opnsense_api_connection",
-                    message=f"Successfully connected to OPNsense API at {api_url}",
+                    check_name="opnsense_version",
+                    message=f"OPNsense version: {version}",
                 )
-
-                # Get system info if available
-                if "product_version" in data:
-                    version = data.get("product_version", "unknown")
-                    self.api_validator.add_success(
-                        check_name="opnsense_version",
-                        message=f"OPNsense version: {version}",
-                    )
-
-            elif response.status_code == 401:
-                self.api_validator.add_error(
-                    check_name="opnsense_api_connection",
-                    message="OPNsense API credentials invalid (401 Unauthorized)",
-                )
-            else:
-                self.api_validator.add_error(
-                    check_name="opnsense_api_connection",
-                    message=f"OPNsense API returned status {response.status_code}",
-                    level=ValidationLevel.WARNING,
-                )
-
-        except requests.exceptions.ConnectionError:
+        elif response.status_code == 401:
             self.api_validator.add_error(
                 check_name="opnsense_api_connection",
-                message=f"Cannot connect to OPNsense at {api_url} (connection refused)",
+                message="OPNsense API credentials invalid (401 Unauthorized)",
             )
-        except requests.exceptions.Timeout:
+        else:
             self.api_validator.add_error(
                 check_name="opnsense_api_connection",
-                message=f"Connection to OPNsense at {api_url} timed out",
-            )
-        except Exception as e:
-            self.api_validator.add_error(
-                check_name="opnsense_api_connection",
-                message=f"Error connecting to OPNsense: {e}",
+                message=f"OPNsense API returned status {response.status_code}",
+                level=ValidationLevel.WARNING,
             )
 
     def validate_references(self, resources: list[ResourceConfig]) -> None:
@@ -216,34 +200,24 @@ class OPNsenseValidator:
         Returns:
             Dict of existing alias names
         """
-        try:
-            response = requests.get(
-                f"{api_url}/api/firewall/alias/searchItem",
-                auth=(api_key, api_secret),
-                verify=False,
-                timeout=10,
-            )
+        data = self.api_validator.fetch_json(
+            url=f"{api_url}/api/firewall/alias/searchItem",
+            auth=(api_key, api_secret),
+            verify_ssl=False,
+            timeout=10,
+            check_name="opnsense_get_aliases",
+            error_message="Could not retrieve existing aliases (status {status})",
+            error_level=ValidationLevel.WARNING,
+        )
+        if not data:
+            return {}
 
-            if response.status_code == 200:
-                data = response.json()
-                # Extract alias names from response
-                aliases = {}
-                if "rows" in data:
-                    for row in data["rows"]:
-                        name = row.get("name", "")
-                        if name:
-                            aliases[name] = row
-                return aliases
-
-        except Exception as e:
-            self.report.add_check(
-                check_name="opnsense_get_aliases",
-                passed=False,
-                message=f"Could not retrieve existing aliases: {e}",
-                level=ValidationLevel.WARNING,
-            )
-
-        return {}
+        aliases = {}
+        for row in data.get("rows", []):
+            name = row.get("name")
+            if name:
+                aliases[name] = row
+        return aliases
 
     def _get_existing_interfaces(
         self, api_url: str, api_key: str, api_secret: str
@@ -258,32 +232,23 @@ class OPNsenseValidator:
         Returns:
             Dict of existing interface names
         """
-        try:
-            response = requests.get(
-                f"{api_url}/api/interfaces/overview/export",
-                auth=(api_key, api_secret),
-                verify=False,
-                timeout=10,
-            )
+        data = self.api_validator.fetch_json(
+            url=f"{api_url}/api/interfaces/overview/export",
+            auth=(api_key, api_secret),
+            verify_ssl=False,
+            timeout=10,
+            check_name="opnsense_get_interfaces",
+            error_message="Could not retrieve existing interfaces (status {status})",
+            error_level=ValidationLevel.WARNING,
+        )
+        if not data:
+            return {}
 
-            if response.status_code == 200:
-                data = response.json()
-                interfaces = {}
-                # Parse interface data
-                for iface_name, iface_data in data.items():
-                    if isinstance(iface_data, dict):
-                        interfaces[iface_name] = iface_data
-                return interfaces
-
-        except Exception as e:
-            self.report.add_check(
-                check_name="opnsense_get_interfaces",
-                passed=False,
-                message=f"Could not retrieve existing interfaces: {e}",
-                level=ValidationLevel.WARNING,
-            )
-
-        return {}
+        interfaces: dict[str, Any] = {}
+        for iface_name, iface_data in data.items():
+            if isinstance(iface_data, dict):
+                interfaces[iface_name] = iface_data
+        return interfaces
 
     def _validate_firewall_rules(
         self, resource_refs: dict[str, Any], existing_aliases: dict[str, Any]
