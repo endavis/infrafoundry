@@ -425,6 +425,7 @@ These environment variables affect CLI behavior:
 - `INFRAFOUNDRY_OUTPUT_DIR` - Generated files output directory (default: `generated/`)
 - `INFRAFOUNDRY_STATE_BACKEND` - State backend type (`sqlite` or `postgresql`)
 - `INFRAFOUNDRY_STATE_CONNECTION` - Custom state database connection string
+- `INFRAFOUNDRY_STATE_HOME` - Override directory for the local SQLite state database
 - `INFRAFOUNDRY_LOG_LEVEL` - Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)
 - `SOPS_AGE_KEY_FILE` - Path to age encryption key for SOPS
 
