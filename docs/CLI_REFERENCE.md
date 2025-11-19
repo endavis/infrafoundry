@@ -2,6 +2,21 @@
 
 Complete reference for all InfraFoundry CLI commands.
 
+## Global Options
+
+- `--config-dir / -c PATH` – Override `INFRAFOUNDRY_CONFIG_REPO` for configs.
+- `--strict-mode / --no-strict-mode` – Toggle strict mode (fails on missing secrets/snippets).
+- `--fail-on-missing-secrets / --allow-missing-secrets` – Control behavior when secrets files are missing.
+- `--fail-on-missing-snippets / --allow-missing-snippets` – Control behavior when cloud-init snippets are missing.
+
+Environment equivalents:
+
+- `INFRAFOUNDRY_STRICT_MODE`
+- `INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS`
+- `INFRAFOUNDRY_FAIL_ON_MISSING_SNIPPETS`
+
+When strict mode is enabled, both snippet and secret warnings become errors automatically.
+
 ## Core Commands
 
 ### `infra init`

@@ -124,6 +124,13 @@ Created comprehensive CLI reference documentation covering:
 - Updated contributor docs to reference `src/infrafoundry/cli/main.py` instead of the legacy `cli.py` path.
 - Clarified that read-only commands can opt out of credential loading by setting `load_credentials=False`.
 
+### 6. CLI Strict-Mode Flags (2025-01-13)
+
+- Added global CLI options `--strict-mode`, `--fail-on-missing-secrets`, and `--fail-on-missing-snippets`.
+- Documented corresponding environment variables (`INFRAFOUNDRY_STRICT_MODE`, `INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS`,
+  `INFRAFOUNDRY_FAIL_ON_MISSING_SNIPPETS`).
+- Strict mode now surfaces missing snippet/secret issues before file generation or Terraform execution.
+
 ## What Was Discovered
 
 ### Fully Implemented Features (Previously Under-documented)
