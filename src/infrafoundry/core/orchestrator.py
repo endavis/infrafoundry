@@ -1,7 +1,6 @@
 """Core orchestration for infrastructure deployment."""
 
 import os
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +14,9 @@ from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import Event, EventManager, EventType
 from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.orchestrator_workflows import (
+    ApplyWorkflow,
+    DestroyWorkflow,
+    PlanWorkflow,
     ProviderResourceBatch,
     ValidationWorkflow,
 )
@@ -23,7 +25,7 @@ from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
 from infrafoundry.core.secrets import SecretManager
-from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
+from infrafoundry.core.state import DeploymentStatus, StateManager
 
 
 class Orchestrator:
@@ -86,6 +88,41 @@ class Orchestrator:
             get_providers=lambda: self.providers,
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
+        )
+        self.plan_workflow = PlanWorkflow(
+            console=self.console,
+            state_manager=self.state_manager,
+            event_manager=self.event_manager,
+            terraform_runner=self.terraform_runner,
+            get_providers=lambda: self.providers,
+            load_resources=self._load_resources,
+            iter_provider_batches=self._iter_provider_batches,
+            validate_resources=self.validate_resources,
+            has_policies=lambda: bool(self.policy_engine.policies),
+            check_policies=lambda env, resources, enforce: self.check_policies(
+                env, resources, enforce=enforce
+            ),
+            secret_manager_factory=lambda env: SecretManager(env_name=env),
+            get_current_user=lambda: self._current_user,
+        )
+        self.apply_workflow = ApplyWorkflow(
+            console=self.console,
+            state_manager=self.state_manager,
+            event_manager=self.event_manager,
+            load_resources=self._load_resources,
+            apply_serial=self._apply_providers_serial,
+            apply_parallel=self._apply_providers_parallel,
+            get_current_user=lambda: self._current_user,
+        )
+        self.destroy_workflow = DestroyWorkflow(
+            console=self.console,
+            state_manager=self.state_manager,
+            event_manager=self.event_manager,
+            terraform_runner=self.terraform_runner,
+            get_providers=lambda: self.providers,
+            load_resources=self._load_resources,
+            iter_provider_batches=self._iter_provider_batches,
+            get_current_user=lambda: self._current_user,
         )
 
         # Subscribe notification manager to events
@@ -316,145 +353,7 @@ class Orchestrator:
         Returns:
             Dict with plan results per provider
         """
-        # Create deployment record
-        deployment_id = self.state_manager.create_deployment(
-            environment=env_name,
-            command="plan",
-            user=self._current_user,
-            dry_run=dry_run,
-            metadata={"resource_filter": resource_filter},
-        )
-
-        # Emit before_plan event
-        self.event_manager.emit_event(
-            EventType.BEFORE_PLAN,
-            env_name,
-            {"deployment_id": deployment_id, "dry_run": dry_run},
-        )
-
-        results = {}
-
-        try:
-            if resource_filter:
-                self.console.print(
-                    f"\n[bold cyan]Planning infrastructure for: {env_name} "
-                    f"(resources: {', '.join(resource_filter)})[/bold cyan]"
-                )
-            else:
-                self.console.print(
-                    f"\n[bold cyan]Planning infrastructure for: {env_name}[/bold cyan]"
-                )
-
-            # Get all resources and discover providers dynamically
-            all_resources, resources_by_provider = self._load_resources(env_name)
-
-            # Check policies if there are any defined
-            if self.policy_engine.policies:
-                self.check_policies(env_name, all_resources, enforce=enforce_policies)
-
-            for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
-                provider_name = batch.name
-                provider_resources = batch.resources
-                if provider_name not in self.providers:
-                    self.console.print(
-                        f"[yellow]Warning: Provider '{provider_name}' not registered[/yellow]"
-                    )
-                    continue
-
-                provider = self.providers[provider_name]
-
-                # Validate resources before processing
-                self.validate_resources(provider_resources)
-
-                if resource_filter:
-                    self.console.print(
-                        f"\n[bold]{provider_name}[/bold]: {len(provider_resources)} of "
-                        f"{batch.original_count} resources (filtered)"
-                    )
-                else:
-                    self.console.print(
-                        f"\n[bold]{provider_name}[/bold]: {len(provider_resources)} resources"
-                    )
-
-                # Track resources in state
-                for resource in provider_resources:
-                    tracked_resource = self.state_manager.track_resource(
-                        deployment_id=deployment_id,
-                        environment=env_name,
-                        provider=provider_name,
-                        resource_type=resource.type,
-                        name=resource.name,
-                        state=ResourceState.PLANNED,
-                        config=resource.config,
-                    )
-                    self.event_manager.emit_event(
-                        EventType.RESOURCE_PLANNED,
-                        env_name,
-                        {
-                            "resource_id": tracked_resource.id,
-                            "provider": provider_name,
-                            "name": resource.name,
-                        },
-                    )
-
-                if dry_run:
-                    self.console.print("  [dim]Would generate Terraform and Ansible files[/dim]")
-                    results[provider_name] = {
-                        "resources": len(provider_resources),
-                        "dry_run": True,
-                    }
-                    continue
-
-                # Set environment for provider to ensure correct output directory
-                provider.set_environment(env_name)
-
-                # Generate Terraform and Ansible files
-                provider.ensure_directories()
-                provider.generate_terraform(provider_resources)
-                provider.generate_ansible(provider_resources)
-
-                # Export secrets for this provider (create SecretManager per-operation)
-                try:
-                    secret_manager = SecretManager(env_name=env_name)
-                    secrets_file = f"{provider_name}.yaml"
-                    tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
-                    secret_manager.export_for_terraform(secrets_file, tf_vars)
-                except FileNotFoundError:
-                    self.console.print(f"[yellow]No secrets file for {provider_name}[/yellow]")
-                except ValueError as e:
-                    # INFRAFOUNDRY_CONFIG_REPO not set or secrets dir doesn't exist
-                    self.console.print(f"[dim]Skipping secrets export: {e}[/dim]")
-
-                # Run terraform plan
-                self.console.print("  [dim]Running terraform plan...[/dim]")
-                tf_result = self.terraform_runner.run(provider, "plan", auto_approve=False)
-
-                results[provider_name] = {
-                    "resources": len(provider_resources),
-                    "terraform_plan": tf_result,
-                }
-
-            # Mark deployment as completed
-            self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
-
-            # Emit after_plan event
-            self.event_manager.emit_event(
-                EventType.AFTER_PLAN,
-                env_name,
-                {"deployment_id": deployment_id, "results": results},
-            )
-
-        except Exception as e:
-            # Mark deployment as failed
-            self.state_manager.update_deployment_status(
-                deployment_id, DeploymentStatus.FAILED, str(e)
-            )
-            self.event_manager.emit_event(
-                EventType.PLAN_FAILED, env_name, {"deployment_id": deployment_id, "error": str(e)}
-            )
-            raise
-
-        return results
+        return self.plan_workflow.run(env_name, dry_run, resource_filter, enforce_policies)
 
     def apply(
         self,
@@ -478,99 +377,13 @@ class Orchestrator:
         """
         # First, generate the plans
         self.plan(env_name, dry_run=False, resource_filter=resource_filter)
-
-        # Create deployment record for apply
-        deployment_id = self.state_manager.create_deployment(
-            environment=env_name,
-            command="apply",
-            user=self._current_user,
-            dry_run=False,
-            metadata={"resource_filter": resource_filter, "auto_approve": auto_approve},
+        return self.apply_workflow.run(
+            env_name=env_name,
+            resource_filter=resource_filter,
+            auto_approve=auto_approve,
+            parallel=parallel,
+            max_workers=max_workers,
         )
-
-        # Emit before_apply event
-        self.event_manager.emit_event(
-            EventType.BEFORE_APPLY,
-            env_name,
-            {"deployment_id": deployment_id, "auto_approve": auto_approve},
-        )
-
-        results = {}
-
-        try:
-            if resource_filter:
-                self.console.print(
-                    f"\n[bold green]Applying infrastructure for: {env_name} "
-                    f"(resources: {', '.join(resource_filter)})[/bold green]"
-                )
-            else:
-                self.console.print(
-                    f"\n[bold green]Applying infrastructure for: {env_name}[/bold green]"
-                )
-
-            # Get all resources and discover providers dynamically
-            all_resources, resources_by_provider = self._load_resources(env_name)
-
-            # Capture configuration snapshot for rollback
-            rollback_snapshot = {
-                "environment": env_name,
-                "timestamp": datetime.utcnow().isoformat(),
-                "resources": [
-                    {
-                        "provider": r.provider,
-                        "type": r.type,
-                        "name": r.name,
-                        "config": r.config,
-                    }
-                    for r in all_resources
-                ],
-            }
-
-            # Store rollback data in deployment
-            self.state_manager.update_deployment_rollback_data(
-                deployment_id=deployment_id, rollback_data=rollback_snapshot
-            )
-
-            # Apply providers (parallel or serial based on flag)
-            if parallel and len(resources_by_provider) > 1:
-                results = self._apply_providers_parallel(
-                    env_name=env_name,
-                    deployment_id=deployment_id,
-                    resources_by_provider=resources_by_provider,
-                    resource_filter=resource_filter,
-                    auto_approve=auto_approve,
-                    max_workers=max_workers,
-                )
-            else:
-                results = self._apply_providers_serial(
-                    env_name=env_name,
-                    deployment_id=deployment_id,
-                    resources_by_provider=resources_by_provider,
-                    resource_filter=resource_filter,
-                    auto_approve=auto_approve,
-                )
-
-            # Mark deployment as completed
-            self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
-
-            # Emit after_apply event
-            self.event_manager.emit_event(
-                EventType.AFTER_APPLY,
-                env_name,
-                {"deployment_id": deployment_id, "results": results},
-            )
-
-        except Exception as e:
-            # Mark deployment as failed
-            self.state_manager.update_deployment_status(
-                deployment_id, DeploymentStatus.FAILED, str(e)
-            )
-            self.event_manager.emit_event(
-                EventType.APPLY_FAILED, env_name, {"deployment_id": deployment_id, "error": str(e)}
-            )
-            raise
-
-        return results
 
     def _apply_providers_serial(
         self,
@@ -637,125 +450,7 @@ class Orchestrator:
         Returns:
             Dict with destroy results per provider
         """
-        # Create deployment record for destroy
-        deployment_id = self.state_manager.create_deployment(
-            environment=env_name,
-            command="destroy",
-            user=self._current_user,
-            dry_run=False,
-            metadata={"resource_filter": resource_filter, "auto_approve": auto_approve},
-        )
-
-        # Emit before_destroy event
-        self.event_manager.emit_event(
-            EventType.BEFORE_DESTROY,
-            env_name,
-            {"deployment_id": deployment_id, "auto_approve": auto_approve},
-        )
-
-        results = {}
-
-        try:
-            if resource_filter:
-                self.console.print(
-                    f"\n[bold red]Destroying infrastructure for: {env_name} "
-                    f"(resources: {', '.join(resource_filter)})[/bold red]"
-                )
-            else:
-                self.console.print(
-                    f"\n[bold red]Destroying infrastructure for: {env_name}[/bold red]"
-                )
-
-            if not auto_approve:
-                response = input("Are you sure you want to destroy? (yes/no): ")
-                if response.lower() != "yes":
-                    self.console.print("[yellow]Aborted[/yellow]")
-                    # Mark deployment as failed with abort message
-                    self.state_manager.update_deployment_status(
-                        deployment_id, DeploymentStatus.FAILED, "User aborted"
-                    )
-                    return {}
-
-            # Get all resources grouped by provider
-            _, resources_by_provider = self._load_resources(env_name)
-
-            for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
-                provider_name = batch.name
-                resources = batch.resources
-                if provider_name not in self.providers:
-                    continue
-
-                provider = self.providers[provider_name]
-
-                self.console.print(f"\n[bold]Destroying {provider_name}...[/bold]")
-
-                # Set environment for provider to ensure correct output directory
-                provider.set_environment(env_name)
-
-                # Track resources being destroyed and store their IDs
-                resource_ids = {}
-                for resource in resources:
-                    tracked_resource = self.state_manager.track_resource(
-                        deployment_id=deployment_id,
-                        environment=env_name,
-                        provider=provider_name,
-                        resource_type=resource.type,
-                        name=resource.name,
-                        state=ResourceState.DELETING,
-                        config=resource.config,
-                    )
-                    resource_ids[resource.name] = tracked_resource.id
-                    self.event_manager.emit_event(
-                        EventType.RESOURCE_DELETING,
-                        env_name,
-                        {
-                            "resource_id": tracked_resource.id,
-                            "provider": provider_name,
-                            "name": resource.name,
-                        },
-                    )
-
-                # Run Terraform destroy
-                tf_result = self.terraform_runner.run(provider, "destroy", auto_approve)
-
-                # Update resource states to DELETED after successful destroy
-                for resource in resources:
-                    if resource.name in resource_ids:
-                        self.state_manager.update_resource_state(
-                            resource_id=resource_ids[resource.name],
-                            state=ResourceState.DELETED,
-                        )
-                        self.event_manager.emit_event(
-                            EventType.RESOURCE_DELETED,
-                            env_name,
-                            {"provider": provider_name, "name": resource.name},
-                        )
-
-                results[provider_name] = {"terraform": tf_result}
-
-            # Mark deployment as completed
-            self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
-
-            # Emit after_destroy event
-            self.event_manager.emit_event(
-                EventType.AFTER_DESTROY,
-                env_name,
-                {"deployment_id": deployment_id, "results": results},
-            )
-
-        except Exception as e:
-            # Mark deployment as failed
-            self.state_manager.update_deployment_status(
-                deployment_id, DeploymentStatus.FAILED, str(e)
-            )
-            self.event_manager.emit_event(
-                EventType.DESTROY_FAILED,
-                env_name,
-                {"deployment_id": deployment_id, "error": str(e)},
-            )
-            raise
-
-        return results
+        return self.destroy_workflow.run(env_name, resource_filter, auto_approve)
 
     def rollback(self, deployment_id: int, auto_approve: bool = False) -> dict[str, Any]:
         """Rollback infrastructure to a previous deployment state.
