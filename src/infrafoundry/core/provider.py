@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from infrafoundry.core.types import EnvironmentData
+
 # Import validation types if validation module exists
 try:
     from infrafoundry.core.validation import ValidationReport
@@ -108,7 +110,7 @@ class ProviderBase(ABC):
         """
         return {}
 
-    def validate_connectivity(self, env_config: dict[str, Any], report: Any) -> None:
+    def validate_connectivity(self, env_config: EnvironmentData, report: Any) -> None:
         """Validate connectivity to provider API.
 
         Optional method for providers to implement API connectivity checks.
@@ -122,7 +124,7 @@ class ProviderBase(ABC):
         pass
 
     def validate_references(
-        self, resources: list[ResourceConfig], env_config: dict[str, Any], report: Any
+        self, resources: list[ResourceConfig], env_config: EnvironmentData, report: Any
     ) -> None:
         """Validate that referenced resources exist in the provider.
 

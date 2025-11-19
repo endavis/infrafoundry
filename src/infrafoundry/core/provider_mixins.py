@@ -13,6 +13,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -302,7 +303,7 @@ class TerraformGeneratorMixin:
 
     _TFVARS_HEADER = "# Configuration from settings.yaml\n"
 
-    def _load_environment_config(self) -> Any | None:
+    def _load_environment_config(self) -> EnvironmentConfig | None:
         """Load current environment configuration if available."""
         env_name = getattr(self, "_current_environment", None)
         if not env_name:
@@ -336,7 +337,7 @@ class TerraformGeneratorMixin:
     def _append_ssh_tfvars(
         self,
         lines: list[str],
-        env_config: Any,
+        env_config: EnvironmentConfig,
         provider_name: str,
         prefix: str,
     ) -> None:

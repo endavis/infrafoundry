@@ -9,7 +9,7 @@ from typing import Any, TypedDict, cast
 import urllib3
 
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.types import OPNsenseEnvironmentConfig, OPNsenseProviderSettings
+from infrafoundry.core.types import EnvironmentData, OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 
@@ -40,7 +40,7 @@ class OPNsenseValidator:
     - DHCP configuration validity
     """
 
-    def __init__(self, env_config: OPNsenseEnvironmentConfig, report: ValidationReport):
+    def __init__(self, env_config: EnvironmentData, report: ValidationReport):
         """Initialize OPNsense validator.
 
         Args:

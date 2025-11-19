@@ -7,6 +7,7 @@ from typing import Any
 import requests
 from requests import Response
 
+from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers.base_validator import BaseProviderValidator
 
@@ -21,7 +22,7 @@ class BaseAPIValidator:
     def __init__(
         self,
         provider_name: str,
-        env_config: dict[str, Any],
+        env_config: EnvironmentData,
         report: ValidationReport,
         env_prefix: str | None = None,
     ) -> None:

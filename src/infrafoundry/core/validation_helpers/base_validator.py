@@ -7,6 +7,7 @@ specialized validators for credentials, connectivity, resources, and reporting.
 import logging
 from typing import Any
 
+from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers.connectivity_validator import ConnectivityValidator
 from infrafoundry.core.validation_helpers.credential_validator import CredentialValidator
@@ -57,7 +58,7 @@ class BaseProviderValidator:
     def __init__(
         self,
         provider_name: str,
-        env_config: dict[str, Any],
+        env_config: EnvironmentData,
         report: ValidationReport,
     ):
         """Initialize provider validator with specialized validators.

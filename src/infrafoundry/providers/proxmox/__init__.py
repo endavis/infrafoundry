@@ -9,6 +9,7 @@ from infrafoundry.core.provider_mixins import (
     TemplateRendererMixin,
     TerraformGeneratorMixin,
 )
+from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 
 from .validator import ProxmoxValidator
@@ -43,14 +44,14 @@ class ProxmoxProvider(
         return all(field in config for field in required_fields)
 
     @override
-    def validate_connectivity(self, env_config: dict[str, Any], report: ValidationReport) -> None:
+    def validate_connectivity(self, env_config: EnvironmentData, report: ValidationReport) -> None:
         """Validate connectivity to Proxmox API."""
         validator = ProxmoxValidator(env_config, report)
         validator.validate_connectivity()
 
     @override
     def validate_references(
-        self, resources: list[ResourceConfig], env_config: dict[str, Any], report: ValidationReport
+        self, resources: list[ResourceConfig], env_config: EnvironmentData, report: ValidationReport
     ) -> None:
         """Validate that referenced Proxmox resources exist."""
         validator = ProxmoxValidator(env_config, report)

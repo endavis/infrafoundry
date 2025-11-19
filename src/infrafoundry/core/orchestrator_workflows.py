@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from rich.console import Console
 from rich.table import Table
@@ -17,6 +17,7 @@ from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import TerraformRunner
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
+from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 
 
@@ -121,7 +122,7 @@ class ValidationOrchestrator:
             self.console.print(f"[red]✗ Environment '{env_name}' not found[/red]")
             return {}
 
-        env_data = env_config.model_dump()
+        env_data = cast(EnvironmentData, env_config.model_dump())
         all_resources, resources_by_provider = self._load_resources(env_name)
         filtered_resources = all_resources
         if resource_filter:
@@ -168,7 +169,7 @@ class ValidationOrchestrator:
     def _run_validation_checks(
         self,
         provider: ProviderBase,
-        env_data: dict[str, Any],
+        env_data: EnvironmentData,
         resources: list[Any],
         report: ValidationReport,
     ) -> None:
