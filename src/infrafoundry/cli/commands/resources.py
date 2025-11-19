@@ -4,7 +4,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from ..utils import raise_cli_error
+from ..decorators import with_orchestrator
 
 console = Console()
 
@@ -22,82 +22,70 @@ console = Console()
     "-s",
     help="Filter by state (PLANNED, CREATING, ACTIVE, DELETING, DELETED, FAILED)",
 )
-@click.pass_context
+@with_orchestrator("Failed to list resources", require_env=False, load_credentials=False)
 def resources(
-    ctx: click.Context,
+    _ctx: click.Context,
+    orchestrator,
     env: str | None,
     provider: str | None,
     type: str | None,
     state: str | None,
 ) -> None:
     """List tracked infrastructure resources."""
-    try:
-        # Import helper function from main module
-        from ..main import _get_orchestrator
+    resource_state = None
+    if state:
+        from infrafoundry.core.state import ResourceState
 
-        orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
+        try:
+            resource_state = ResourceState[state.upper()]
+        except KeyError as exc:
+            raise click.ClickException(
+                f"Invalid state '{state}'. Valid: PLANNED, CREATING, ACTIVE, "
+                "DELETING, DELETED, FAILED"
+            ) from exc
 
-        # Parse state filter
-        resource_state = None
-        if state:
-            from infrafoundry.core.state import ResourceState
+    resources_list = orchestrator.state_manager.get_resources(
+        environment=env,
+        provider=provider,
+        resource_type=type,
+        state=resource_state,
+    )
 
-            try:
-                resource_state = ResourceState[state.upper()]
-            except KeyError as exc:
-                raise click.ClickException(
-                    f"Invalid state '{state}'. Valid: PLANNED, CREATING, ACTIVE, "
-                    "DELETING, DELETED, FAILED"
-                ) from exc
+    if not resources_list:
+        console.print("\n[yellow]No resources found matching filters.[/yellow]")
+        return
 
-        # Get resources
-        resources_list = orchestrator.state_manager.get_resources(
-            environment=env,
-            provider=provider,
-            resource_type=type,
-            state=resource_state,
+    table = Table(title="Infrastructure Resources", show_header=True)
+    table.add_column("Environment", style="cyan")
+    table.add_column("Provider", style="magenta")
+    table.add_column("Type", style="blue")
+    table.add_column("Name", style="green")
+    table.add_column("State", style="yellow")
+    table.add_column("Terraform ID", style="dim")
+    table.add_column("Last Updated", style="dim")
+
+    state_colors = {
+        "PLANNED": "blue",
+        "CREATING": "yellow",
+        "ACTIVE": "green",
+        "DELETING": "orange",
+        "DELETED": "red",
+        "FAILED": "bold red",
+    }
+    for resource in resources_list:
+        state_color = state_colors.get(resource.state.name, "white")
+        state_text = f"[{state_color}]{resource.state.name}[/{state_color}]"
+
+        table.add_row(
+            resource.environment,
+            resource.provider,
+            resource.resource_type,
+            resource.name,
+            state_text,
+            resource.terraform_id or "[dim]N/A[/dim]",
+            resource.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
-        if not resources_list:
-            console.print("\n[yellow]No resources found matching filters.[/yellow]")
-            return
-
-        # Display resources in a table
-        table = Table(title="Infrastructure Resources", show_header=True)
-        table.add_column("Environment", style="cyan")
-        table.add_column("Provider", style="magenta")
-        table.add_column("Type", style="blue")
-        table.add_column("Name", style="green")
-        table.add_column("State", style="yellow")
-        table.add_column("Terraform ID", style="dim")
-        table.add_column("Last Updated", style="dim")
-
-        for resource in resources_list:
-            # Color code state
-            state_colors = {
-                "PLANNED": "blue",
-                "CREATING": "yellow",
-                "ACTIVE": "green",
-                "DELETING": "orange",
-                "DELETED": "red",
-                "FAILED": "bold red",
-            }
-            state_color = state_colors.get(resource.state.name, "white")
-            state_text = f"[{state_color}]{resource.state.name}[/{state_color}]"
-
-            table.add_row(
-                resource.environment,
-                resource.provider,
-                resource.resource_type,
-                resource.name,
-                state_text,
-                resource.terraform_id or "[dim]N/A[/dim]",
-                resource.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
-            )
-
-        console.print()
-        console.print(table)
-        console.print(f"\n[dim]Total: {len(resources_list)} resource(s)[/dim]")
-
-    except Exception as exc:
-        raise_cli_error("Failed to list resources", exc)
+    console.print()
+    console.print(table)
+    console.print(f"\n[dim]Total: {len(resources_list)} resource(s)[/dim]")

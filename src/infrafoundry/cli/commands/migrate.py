@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from ..utils import raise_cli_error
+from ..decorators import with_orchestrator
 
 console = Console()
 
@@ -38,9 +38,10 @@ console = Console()
     help="Output file path (default: envs/{env}/resources/migrated-{component}.yaml)",
 )
 @click.option("--dry-run", is_flag=True, help="Show what would be generated without writing files")
-@click.pass_context
+@with_orchestrator("Migration failed")
 def migrate(
     ctx: click.Context,
+    orchestrator,
     env: str,
     provider: str,
     component: str,
@@ -64,94 +65,54 @@ def migrate(
         # Dry-run mode
         infra migrate --env prod --provider opnsense --component isc-to-kea --dry-run
     """
-    try:
-        # Import helper functions from main module
-        from ..main import _get_orchestrator, _load_env_credentials
+    provider_lower = provider.lower()
+    if provider_lower != "opnsense":
+        raise click.ClickException(f"Unsupported provider: {provider}")
 
-        # Load environment-specific credentials
-        _load_env_credentials(env, ctx.obj.get("config_dir"))
+    from infrafoundry.providers.opnsense import OPNsenseProvider
 
-        orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
+    provider_instance = orchestrator.providers.get("opnsense")
+    if not provider_instance or not isinstance(provider_instance, OPNsenseProvider):
+        raise click.ClickException("OPNsense provider not found")
 
-        # Get the provider instance
-        if provider.lower() == "opnsense":
-            from infrafoundry.providers.opnsense import OPNsenseProvider
+    provider_instance._current_environment = env
 
-            # Get provider from orchestrator (providers is a dict)
-            provider_instance = orchestrator.providers.get("opnsense")
+    if not output:
+        config_dir = ctx.obj.get("config_dir", ".")
+        component_name = component.replace("/", "-")
+        output_path = (
+            Path(config_dir) / "envs" / env / "resources" / f"migrated-{component_name}.yaml"
+        )
+    else:
+        output_path = Path(output)
 
-            if not provider_instance or not isinstance(provider_instance, OPNsenseProvider):
-                raise click.ClickException("OPNsense provider not found")
+    component_lower = component.lower()
+    if component_lower == "kea/dhcp":
+        console.print("[cyan]Migrating Kea DHCP configuration from OPNsense...[/cyan]")
+        yaml_content = provider_instance.migrate_kea_dhcp(env)
+    elif component_lower == "isc-to-kea":
+        console.print("[cyan]Migrating ISC DHCP to Kea DHCP configuration from OPNsense...[/cyan]")
+        interfaces_list = list(interfaces) if interfaces else None
 
-            # Set the current environment on the provider
-            provider_instance._current_environment = env
-
-            # Determine output path
-            if not output:
-                config_dir = ctx.obj.get("config_dir", ".")
-                component_name = component.replace("/", "-")
-                output = str(
-                    Path(config_dir)
-                    / "envs"
-                    / env
-                    / "resources"
-                    / f"migrated-{component_name}.yaml"
-                )
-
-            # Execute migration based on component
-            if component.lower() == "kea/dhcp":
-                console.print("[cyan]Migrating Kea DHCP configuration from OPNsense...[/cyan]")
-                yaml_content = provider_instance.migrate_kea_dhcp(env)
-
-                if dry_run:
-                    console.print(
-                        "\n[bold yellow]Dry-run mode - "
-                        "configuration would be written to:[/bold yellow]"
-                    )
-                    console.print(f"[yellow]{output}[/yellow]\n")
-                    console.print("[bold cyan]Generated configuration:[/bold cyan]")
-                    console.print(yaml_content)
-                else:
-                    # Write to file
-                    output_path = Path(output)
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    output_path.write_text(yaml_content)
-                    console.print(f"[green]✓ Configuration written to: {output}[/green]")
-
-            elif component.lower() == "isc-to-kea":
-                console.print(
-                    "[cyan]Migrating ISC DHCP to Kea DHCP configuration from OPNsense...[/cyan]"
-                )
-
-                # Convert tuple to list or None
-                interfaces_list = list(interfaces) if interfaces else None
-
-                if interfaces_list:
-                    console.print(f"[dim]Targeting interfaces: {', '.join(interfaces_list)}[/dim]")
-                else:
-                    console.print("[dim]Migrating all interfaces with ISC DHCP enabled[/dim]")
-
-                yaml_content = provider_instance.migrate_isc_to_kea(env, interfaces_list)
-
-                if dry_run:
-                    console.print(
-                        "\n[bold yellow]Dry-run mode - "
-                        "configuration would be written to:[/bold yellow]"
-                    )
-                    console.print(f"[yellow]{output}[/yellow]\n")
-                    console.print("[bold cyan]Generated configuration:[/bold cyan]")
-                    console.print(yaml_content)
-                else:
-                    # Write to file
-                    output_path = Path(output)
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    output_path.write_text(yaml_content)
-                    console.print(f"[green]✓ Configuration written to: {output}[/green]")
-
-            console.print("\n[bold green]Migration complete![/bold green]")
-
+        if interfaces_list:
+            console.print(f"[dim]Targeting interfaces: {', '.join(interfaces_list)}[/dim]")
         else:
-            raise click.ClickException(f"Unsupported provider: {provider}")
+            console.print("[dim]Migrating all interfaces with ISC DHCP enabled[/dim]")
 
-    except Exception as exc:
-        raise_cli_error("Migration failed", exc)
+        yaml_content = provider_instance.migrate_isc_to_kea(env, interfaces_list)
+    else:
+        raise click.ClickException(f"Unsupported component: {component}")
+
+    if dry_run:
+        console.print(
+            "\n[bold yellow]Dry-run mode - configuration would be written to:[/bold yellow]"
+        )
+        console.print(f"[yellow]{output_path}[/yellow]\n")
+        console.print("[bold cyan]Generated configuration:[/bold cyan]")
+        console.print(yaml_content)
+    else:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(yaml_content)
+        console.print(f"[green]✓ Configuration written to: {output_path}[/green]")
+
+    console.print("\n[bold green]Migration complete![/bold green]")

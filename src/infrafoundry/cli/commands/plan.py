@@ -3,7 +3,7 @@
 import click
 from rich.console import Console
 
-from ..utils import raise_cli_error
+from ..decorators import with_orchestrator
 
 console = Console()
 
@@ -22,35 +22,25 @@ console = Console()
     is_flag=True,
     help="Enforce policy checks (block on violations)",
 )
-@click.pass_context
+@with_orchestrator("Plan failed")
 def plan(
-    ctx: click.Context,
+    _ctx: click.Context,
+    orchestrator,
     env: str,
     dry_run: bool,
     resource: tuple[str, ...],
     enforce_policies: bool,
 ) -> None:
     """Plan infrastructure changes."""
-    try:
-        # Import helper functions from main module
-        from ..main import _get_orchestrator, _load_env_credentials
+    orchestrator.plan(
+        env,
+        dry_run=dry_run,
+        resource_filter=list(resource) if resource else None,
+        enforce_policies=enforce_policies,
+    )
 
-        # Load environment-specific credentials
-        _load_env_credentials(env, ctx.obj.get("config_dir"))
-
-        orchestrator = _get_orchestrator(ctx.obj.get("config_dir"))
-        orchestrator.plan(
-            env,
-            dry_run=dry_run,
-            resource_filter=list(resource) if resource else None,
-            enforce_policies=enforce_policies,
-        )
-
-        if dry_run:
-            console.print("\n[bold cyan]Dry run complete. No files generated.[/bold cyan]")
-        else:
-            console.print("\n[bold green]Plan generated successfully![/bold green]")
-            console.print("Generated files are in: [cyan]generated/[/cyan]")
-
-    except Exception as exc:
-        raise_cli_error("Plan failed", exc)
+    if dry_run:
+        console.print("\n[bold cyan]Dry run complete. No files generated.[/bold cyan]")
+    else:
+        console.print("\n[bold green]Plan generated successfully![/bold green]")
+        console.print("Generated files are in: [cyan]generated/[/cyan]")
