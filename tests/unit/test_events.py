@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrafoundry.core.events import Event, EventManager, EventType
+from infrafoundry.core.events import Event, EventHandlerError, EventManager, EventType
 
 
 @pytest.mark.unit
@@ -173,6 +173,17 @@ class TestEventManager:
         assert len(calls) == 1
         assert "handler2" in calls
         assert "handler1" not in calls
+
+    def test_handler_error_metadata(self):
+        """Ensure EventHandlerError exposes handler name and message."""
+
+        def failing_handler(event: Event) -> None:
+            raise ValueError("boom")
+
+        event = Event(EventType.BEFORE_PLAN, "dev")
+        error = EventHandlerError(failing_handler, event, ValueError("boom"))
+        assert "failing_handler" in str(error)
+        assert error.handler_name.endswith("failing_handler")
 
     def test_unsubscribe_nonexistent_handler(self):
         """Test unsubscribing a handler that was never subscribed."""
