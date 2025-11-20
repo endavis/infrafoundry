@@ -150,6 +150,10 @@ class ProxmoxValidator:
         if not all([api_url, api_token]):
             return  # Already reported in validate_connectivity
 
+        # Type narrowing: at this point we know both are not None
+        assert api_url is not None
+        assert api_token is not None
+
         try:
             # Build auth header
             auth_header = f"PVEAPIToken={api_token}"
@@ -235,14 +239,17 @@ class ProxmoxValidator:
             # Collect storage pools
             if disk_config := config.get("disk"):
                 if isinstance(disk_config, dict) and (storage := disk_config.get("storage")):
-                    storage_pools.add((target_node, storage))
+                    if target_node:
+                        storage_pools.add((target_node, storage))
             if storage := config.get("storage"):
-                storage_pools.add((target_node, storage))
+                if target_node:
+                    storage_pools.add((target_node, storage))
 
             # Collect network bridges
             if network_config := config.get("network"):
                 if isinstance(network_config, dict) and (bridge := network_config.get("bridge")):
-                    bridges.add((target_node, bridge))
+                    if target_node:
+                        bridges.add((target_node, bridge))
 
             # Collect template references (for VMs that clone)
             if resource.type == "vm" and (clone_ref := config.get("clone")):
