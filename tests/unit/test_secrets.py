@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from infrafoundry.core.secrets import SecretManager
+from infrafoundry.core.secrets.secret_manager import SecretManager
 
 
 @pytest.fixture

@@ -1,5 +1,3 @@
-"""Deployment execution for infrastructure resources."""
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -8,18 +6,17 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
+from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.state import ResourceState, StateManager
 from infrafoundry.core.types import ResourceEventData
-
+from infrafoundry.core.exceptions import InfraFoundryError
 
 class DeploymentExecutor:
     """Executes infrastructure deployments across providers."""
 
     def __init__(
         self,
-        terraform_runner: TerraformRunner,
-        ansible_runner: AnsibleRunner,
+        runner_registry: RunnerRegistry,
         state_manager: StateManager,
         event_manager: EventManager,
         providers: dict[str, ProviderBase],
@@ -28,15 +25,13 @@ class DeploymentExecutor:
         """Initialize deployment executor.
 
         Args:
-            terraform_runner: Terraform runner for infrastructure provisioning
-            ansible_runner: Ansible runner for configuration management
+            runner_registry: Registry for creating tool runners
             state_manager: State manager for tracking resources
             event_manager: Event manager for notifications
             providers: Dict of registered provider instances
             console: Rich console for output (creates default if None)
         """
-        self.terraform_runner = terraform_runner
-        self.ansible_runner = ansible_runner
+        self.runner_registry = runner_registry
         self.state_manager = state_manager
         self.event_manager = event_manager
         self.providers = providers
@@ -207,6 +202,14 @@ class DeploymentExecutor:
         Returns:
             Dict with apply results including terraform and ansible outcomes
         """
+        # Dynamically create runners
+        terraform_runner = self.runner_registry.create_runner("terraform", console=self.console)
+        if not terraform_runner:
+            raise InfraFoundryError("Could not create terraform runner")
+        ansible_runner = self.runner_registry.create_runner("ansible", console=self.console)
+        if not ansible_runner:
+            raise InfraFoundryError("Could not create ansible runner")
+
         # Track resources being applied and store their IDs
         resource_ids: dict[str, int] = {}
         for resource in resources:
@@ -233,12 +236,12 @@ class DeploymentExecutor:
             )
 
         # Run Terraform apply
-        tf_result = self.terraform_runner.run(provider, "apply", auto_approve)
+        tf_result = terraform_runner.run(provider, "apply", auto_approve)
         terraform_ids: dict[str, str] = {}
 
         # Extract Terraform resource IDs from state if apply was successful
         if tf_result["success"]:
-            terraform_ids = self.terraform_runner.get_resource_ids(provider)
+            terraform_ids = terraform_runner.get_resource_ids(provider)
 
             # Update tracked resources with Terraform IDs
             for resource_name, terraform_id in terraform_ids.items():
@@ -251,7 +254,7 @@ class DeploymentExecutor:
                     )
 
         # Run Ansible playbook (check mode for dry run)
-        ansible_result = self.ansible_runner.run(provider, check_mode=not auto_approve)
+        ansible_result = ansible_runner.run(provider, check_mode=not auto_approve)
 
         # Update resource states to ACTIVE after successful apply
         for resource in resources:
