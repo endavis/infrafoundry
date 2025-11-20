@@ -2,7 +2,7 @@
 
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -43,7 +43,7 @@ def decrypt_file(encrypted_file: Path) -> dict[str, Any]:
             check=True,
             text=True,
         )
-        return yaml.safe_load(result.stdout)
+        return cast(dict[str, Any], yaml.safe_load(result.stdout))
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Failed to decrypt {encrypted_file}: {e.stderr}")
 

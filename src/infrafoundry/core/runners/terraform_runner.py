@@ -6,7 +6,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, override
+from typing import Any, cast, override
 
 from rich.console import Console
 
@@ -121,7 +121,7 @@ class TerraformRunner(BaseRunner):
                 check=True,
             )
             data = json.loads(result.stdout)
-            return data.get("terraform_version")
+            return cast(str | None, data.get("terraform_version"))
         except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError):
             return None
 

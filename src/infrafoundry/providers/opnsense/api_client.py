@@ -12,7 +12,7 @@ References:
 import json
 import logging
 from base64 import b64encode
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -116,7 +116,7 @@ class OPNsenseClient:
             response = requests.request(**request_kwargs)
             response.raise_for_status()
 
-            result = response.json()
+            result = cast(dict[str, Any], response.json())
             logger.debug(f"Response: {json.dumps(result, indent=2)}")
             return result
 
@@ -180,7 +180,7 @@ class KeaClient:
             List of subnet dictionaries with 'uuid', 'subnet', 'interface', etc.
         """
         response = self.client.request("GET", "kea/dhcpv6/searchSubnet")
-        return response.get("rows", [])
+        return cast(list[dict[str, Any]], response.get("rows", []))
 
     def get_dhcp6_subnet(self, uuid: str) -> dict[str, Any]:
         """Get a specific DHCPv6 subnet by UUID.
@@ -246,7 +246,7 @@ class KeaClient:
             List of reservation dictionaries with 'uuid', 'subnet_id', 'duid', etc.
         """
         response = self.client.request("GET", "kea/dhcpv6/searchReservation")
-        return response.get("rows", [])
+        return cast(list[dict[str, Any]], response.get("rows", []))
 
     def get_dhcp6_reservation(self, uuid: str) -> dict[str, Any]:
         """Get a specific DHCPv6 reservation by UUID.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import requests
 from requests import Response
@@ -188,7 +188,7 @@ class BaseAPIValidator:
             return None
 
         try:
-            return response.json()
+            return cast(dict[str, Any], response.json())
         except ValueError as exc:  # pragma: no cover - JSON errors rare
             if not optional:
                 if json_error_message:
