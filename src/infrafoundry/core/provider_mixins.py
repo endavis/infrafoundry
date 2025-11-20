@@ -10,7 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, Template
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig
@@ -99,7 +99,7 @@ class TemplateRendererMixin:
         # Quote string for YAML/JSON
         self.jinja_env.filters["quote"] = lambda s: f'"{s}"'
 
-    def get_template(self, template_name: str) -> Any:
+    def get_template(self, template_name: str) -> Template:
         """Load a Jinja2 template by name.
 
         Args:
