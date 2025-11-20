@@ -21,7 +21,7 @@ class KeaDHCPManager(BaseComponentManager):
             env_name: Environment name to reset
             provider_name: Provider name (defaults to 'opnsense')
         """
-        service: KeaDHCPService = KeaDHCPService.from_environment(  # type: ignore[assignment]
+        service: KeaDHCPService = KeaDHCPService.from_environment(
             env_name, provider_name, self.config_dir
         )
 
@@ -44,7 +44,7 @@ class KeaDHCPManager(BaseComponentManager):
             env_name: Environment name to reset
             provider_name: Provider name (defaults to 'opnsense')
         """
-        service: KeaDHCPService = KeaDHCPService.from_environment(  # type: ignore[assignment]
+        service: KeaDHCPService = KeaDHCPService.from_environment(
             env_name, provider_name, self.config_dir
         )
 
@@ -80,7 +80,7 @@ class KeaDHCPManager(BaseComponentManager):
         Returns:
             YAML configuration as a string
         """
-        service: KeaDHCPService = KeaDHCPService.from_environment(  # type: ignore[assignment]
+        service: KeaDHCPService = KeaDHCPService.from_environment(
             env_name, provider_name, self.config_dir
         )
         return service.export_to_yaml()

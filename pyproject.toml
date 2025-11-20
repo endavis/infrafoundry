@@ -51,8 +51,6 @@ select = [
     "RUF",  # Ruff-specific rules
 ]
 ignore = [
-    "ANN101",  # Missing type annotation for self
-    "ANN102",  # Missing type annotation for cls
     "ANN401",  # Dynamically typed expressions (Any) - allow for now, fix incrementally
     "ANN001",  # Missing type annotation for function argument - fix incrementally
     "ANN002",  # Missing type annotation for *args

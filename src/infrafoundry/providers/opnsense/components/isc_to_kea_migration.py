@@ -325,7 +325,7 @@ class ISCToKeaMigrationManager(BaseComponentManager):
         static_attr: str,
     ) -> dict[str, list[dict[str, Any]]]:
         """Shared DHCP migration implementation for v4/v6."""
-        isc_service: ISCDHCPService = ISCDHCPService.from_environment(  # type: ignore[assignment]
+        isc_service: ISCDHCPService = ISCDHCPService.from_environment(
             env_name, provider_name, self.config_dir
         )
 

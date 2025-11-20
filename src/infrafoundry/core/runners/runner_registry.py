@@ -24,10 +24,9 @@ class RunnerRegistry:
             tool_name: Optional tool name (if None, will be determined from class)
         """
         if tool_name is None:
-            # Get tool_name from class attribute if available
-            if hasattr(runner_class, "_tool_name"):
-                tool_name = runner_class._tool_name  # type: ignore
-            else:
+            # Get tool_name from class attribute if available, otherwise derive from class name
+            tool_name = getattr(runner_class, "_tool_name", None)
+            if tool_name is None:
                 # Fallback: derive from class name (e.g., TerraformRunner -> terraform)
                 class_name = runner_class.__name__
                 if class_name.endswith("Runner"):
