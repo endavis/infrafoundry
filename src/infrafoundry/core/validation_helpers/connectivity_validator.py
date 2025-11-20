@@ -7,6 +7,7 @@ and standardized reporting.
 import logging
 from typing import Any
 
+from infrafoundry.core.exceptions import ConnectivityValidationError
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,11 @@ class ConnectivityValidator:
             self._add_connection_error(url, e)
             return False
 
+        except ConnectivityValidationError:
+            # Already handled structured validation error
+            return False
         except Exception as e:
+            # Unexpected error - log and report
             self._add_unexpected_error(url, e)
             return False
 
