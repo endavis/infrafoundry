@@ -20,7 +20,7 @@ from infrafoundry.core.state.models import (
     ResourceState,
 )
 from infrafoundry.core.state.resource_repository import ResourceRepository
-from infrafoundry.core.types import DeploymentMetadata, ResourceTrackingMetadata
+from infrafoundry.core.types import DeploymentMetadata, ResourceTrackingMetadata, RollbackData
 
 
 class StateManager(BaseManager):
@@ -103,7 +103,7 @@ class StateManager(BaseManager):
         self.deployments.update_status(deployment_id, status, error_message)
 
     def update_deployment_rollback_data(
-        self, deployment_id: int, rollback_data: dict[str, Any]
+        self, deployment_id: int, rollback_data: RollbackData
     ) -> None:
         """Update deployment with rollback data.
 

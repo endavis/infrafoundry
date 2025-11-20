@@ -13,7 +13,7 @@ from rich.table import Table
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventType
-from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import TerraformRunner
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
@@ -22,6 +22,7 @@ from infrafoundry.core.types import (
     DestroyDeploymentMetadata,
     EnvironmentData,
     PlanDeploymentMetadata,
+    RollbackData,
     RollbackDeploymentMetadata,
 )
 from infrafoundry.core.validation import ValidationReport
@@ -32,7 +33,7 @@ class ProviderResourceBatch:
     """Represents the resources for a single provider after optional filtering."""
 
     name: str
-    resources: list[Any]
+    resources: list[ResourceConfig]
     original_count: int
 
 
@@ -74,7 +75,7 @@ class StatusOrchestrator:
         table.add_column("Status", style="green")
 
         all_resources = self.config_manager.get_all_resources_all_providers(env_name)
-        resources_by_provider: dict[str, list[Any]] = {}
+        resources_by_provider: dict[str, list[ResourceConfig]] = {}
         for resource in all_resources:
             resources_by_provider.setdefault(resource.provider, []).append(resource)
 
@@ -103,9 +104,11 @@ class ValidationOrchestrator:
         config_manager: ConfigManager,
         console: Console,
         get_providers: Callable[[], dict[str, ProviderBase]],
-        load_resources: Callable[[str], tuple[list[Any], dict[str, list[Any]]]],
+        load_resources: Callable[
+            [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
+        ],
         iter_provider_batches: Callable[
-            [dict[str, list[Any]], list[str] | None], list[ProviderResourceBatch]
+            [dict[str, list[ResourceConfig]], list[str] | None], list[ProviderResourceBatch]
         ],
     ) -> None:
         self.config_manager = config_manager
@@ -176,7 +179,7 @@ class ValidationOrchestrator:
         self,
         provider: ProviderBase,
         env_data: EnvironmentData,
-        resources: list[Any],
+        resources: list[ResourceConfig],
         report: ValidationReport,
     ) -> None:
         """Invoke provider validation hooks with error protection."""
@@ -254,13 +257,15 @@ class PlanOrchestrator:
         event_manager,
         terraform_runner: TerraformRunner,
         get_providers: Callable[[], dict[str, ProviderBase]],
-        load_resources: Callable[[str], tuple[list[Any], dict[str, list[Any]]]],
-        iter_provider_batches: Callable[
-            [dict[str, list[Any]], list[str] | None], list[ProviderResourceBatch]
+        load_resources: Callable[
+            [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
         ],
-        validate_resources: Callable[[list[Any]], None],
+        iter_provider_batches: Callable[
+            [dict[str, list[ResourceConfig]], list[str] | None], list[ProviderResourceBatch]
+        ],
+        validate_resources: Callable[[list[ResourceConfig]], None],
         has_policies: Callable[[], bool],
-        check_policies: Callable[[str, list[Any], bool], None],
+        check_policies: Callable[[str, list[ResourceConfig], bool], None],
         secret_manager_factory: Callable[[str], SecretManager],
         get_current_user: Callable[[], str],
         fail_on_missing_secrets: bool,
@@ -383,7 +388,7 @@ class PlanOrchestrator:
     def _print_provider_header(
         self,
         provider_name: str,
-        provider_resources: list[Any],
+        provider_resources: list[ResourceConfig],
         batch: ProviderResourceBatch,
         resource_filter: list[str] | None,
     ) -> None:
@@ -402,7 +407,7 @@ class PlanOrchestrator:
         deployment_id: int,
         env_name: str,
         provider_name: str,
-        resources: list[Any],
+        resources: list[ResourceConfig],
     ) -> None:
         for resource in resources:
             tracked_resource = self.state_manager.track_resource(
@@ -546,12 +551,15 @@ class ApplyOrchestrator:
         console: Console,
         state_manager: StateManager,
         event_manager,
-        load_resources: Callable[[str], tuple[list[Any], dict[str, list[Any]]]],
+        load_resources: Callable[
+            [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
+        ],
         apply_serial: Callable[
-            [str, int, dict[str, list[Any]], list[str] | None, bool], dict[str, Any]
+            [str, int, dict[str, list[ResourceConfig]], list[str] | None, bool], dict[str, Any]
         ],
         apply_parallel: Callable[
-            [str, int, dict[str, list[Any]], list[str] | None, bool, int], dict[str, Any]
+            [str, int, dict[str, list[ResourceConfig]], list[str] | None, bool, int],
+            dict[str, Any],
         ],
         get_current_user: Callable[[], str],
     ) -> None:
@@ -637,9 +645,9 @@ class ApplyOrchestrator:
         self,
         deployment_id: int,
         env_name: str,
-        all_resources: list[Any],
+        all_resources: list[ResourceConfig],
     ) -> None:
-        snapshot = {
+        snapshot: RollbackData = {
             "environment": env_name,
             "timestamp": datetime.utcnow().isoformat(),
             "resources": [
@@ -673,9 +681,11 @@ class DestroyOrchestrator:
         event_manager,
         terraform_runner: TerraformRunner,
         get_providers: Callable[[], dict[str, ProviderBase]],
-        load_resources: Callable[[str], tuple[list[Any], dict[str, list[Any]]]],
+        load_resources: Callable[
+            [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
+        ],
         iter_provider_batches: Callable[
-            [dict[str, list[Any]], list[str] | None], list[ProviderResourceBatch]
+            [dict[str, list[ResourceConfig]], list[str] | None], list[ProviderResourceBatch]
         ],
         get_current_user: Callable[[], str],
     ) -> None:
@@ -771,7 +781,7 @@ class DestroyOrchestrator:
         deployment_id: int,
         env_name: str,
         provider_name: str,
-        resources: list[Any],
+        resources: list[ResourceConfig],
     ) -> dict[str, int]:
         resource_ids: dict[str, int] = {}
         for resource in resources:

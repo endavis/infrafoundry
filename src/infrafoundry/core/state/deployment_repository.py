@@ -1,10 +1,9 @@
 """Repository for deployment operations."""
 
 from datetime import datetime
-from typing import Any
 
 from infrafoundry.core.state.models import Deployment, DeploymentEvent, DeploymentStatus
-from infrafoundry.core.types import DeploymentMetadata
+from infrafoundry.core.types import DeploymentMetadata, ResourceTrackingMetadata, RollbackData
 
 
 class DeploymentRepository:
@@ -74,7 +73,7 @@ class DeploymentRepository:
                     deployment.error_message = error_message
                 session.commit()
 
-    def update_rollback_data(self, deployment_id: int, rollback_data: dict[str, Any]) -> None:
+    def update_rollback_data(self, deployment_id: int, rollback_data: RollbackData) -> None:
         """Update deployment with rollback data.
 
         Args:
@@ -170,7 +169,7 @@ class DeploymentRepository:
         event_type: str,
         message: str,
         resource_name: str | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: ResourceTrackingMetadata | None = None,
     ) -> None:
         """Log a deployment event.
 
