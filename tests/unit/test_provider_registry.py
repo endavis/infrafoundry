@@ -105,7 +105,7 @@ class TestProviderRegistry:
         mock_provider_instance.name = "proxmox"
 
         class MockProxmoxProvider(ProviderBase):
-            def __init__(self, config_dir: Path, output_dir: Path):
+            def __init__(self, config_dir: Path, output_dir: Path) -> None:
                 super().__init__("proxmox", config_dir, output_dir)
 
             def validate_config(self, config):
@@ -146,7 +146,7 @@ class TestProviderRegistry:
         mock_module = Mock()
 
         class MockProvider(ProviderBase):
-            def __init__(self, config_dir: Path, output_dir: Path):
+            def __init__(self, config_dir: Path, output_dir: Path) -> None:
                 super().__init__("mock", config_dir, output_dir)
 
             def validate_config(self, config):

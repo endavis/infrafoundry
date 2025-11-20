@@ -5,11 +5,12 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.state import ResourceState, StateManager
 from infrafoundry.core.types import ResourceEventData
-from infrafoundry.core.exceptions import InfraFoundryError
+
 
 class DeploymentExecutor:
     """Executes infrastructure deployments across providers."""

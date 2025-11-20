@@ -494,7 +494,7 @@ class TestNotificationManager:
             ("VALIDATION_PASSED", "✅"),  # passed
             ("DRIFT_DETECTED", "⚠️"),  # drift
             ("POLICY_VIOLATION", "🛡️"),  # policy
-            ("CUSTOM_EVENT", "ℹ️"),  # default (else branch)
+            ("CUSTOM_EVENT", "(i)"),  # default (else branch)
         ]
 
         for event_type, expected_emoji in test_events:

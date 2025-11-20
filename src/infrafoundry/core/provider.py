@@ -121,7 +121,7 @@ class ProviderBase(ABC):
             report: ValidationReport to add results to
         """
         # Default: no connectivity validation
-        pass
+        return None
 
     def validate_references(
         self, resources: list[ResourceConfig], env_config: EnvironmentData, report: Any
@@ -137,4 +137,4 @@ class ProviderBase(ABC):
             report: ValidationReport to add results to
         """
         # Default: no reference validation
-        pass
+        return None
