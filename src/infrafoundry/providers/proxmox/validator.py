@@ -7,6 +7,11 @@ from typing import TypedDict, cast
 
 import urllib3
 
+from infrafoundry.core.exceptions import (
+    APIError,
+    InfraFoundryError,
+    ValidationError,
+)
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import (
     EnvironmentData,
@@ -160,6 +165,27 @@ class ProxmoxValidator:
             self._validate_templates(api_url, headers, resource_refs.template_refs)
             self._validate_vmids(api_url, headers, resource_refs.vmids)
 
+        except APIError as e:
+            self.report.add_check(
+                check_name="proxmox_validation",
+                passed=False,
+                message=f"API error during validation: {e}",
+                level=ValidationLevel.ERROR,
+            )
+        except ValidationError as e:
+            self.report.add_check(
+                check_name="proxmox_validation",
+                passed=False,
+                message=f"Validation error: {e}",
+                level=ValidationLevel.ERROR,
+            )
+        except InfraFoundryError as e:
+            self.report.add_check(
+                check_name="proxmox_validation",
+                passed=False,
+                message=f"InfraFoundry error during validation: {e}",
+                level=ValidationLevel.WARNING,
+            )
         except Exception as e:
             self.report.add_check(
                 check_name="proxmox_validation",

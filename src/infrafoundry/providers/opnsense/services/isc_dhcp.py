@@ -1,5 +1,7 @@
 """ISC DHCP service for OPNsense operations."""
 
+from infrafoundry.core.exceptions import APIError
+
 from ..api_client import OPNsenseClient
 from .base import BaseService
 
@@ -31,8 +33,13 @@ class ISCDHCPService(BaseService):
             # Use the core API to get configuration
             response = self.client.request("GET", "core/menu/search")
             return response if response else {}
+        except APIError:
+            # Fallback: return empty dict if API call fails
+            # This allows graceful degradation for legacy ISC DHCP configs
+            return {}
         except Exception:
-            # Fallback: return empty dict if API is not available
+            # Fallback: return empty dict for unexpected errors
+            # This allows graceful degradation for legacy ISC DHCP configs
             return {}
 
     def _parse_dhcpd_config(self) -> dict:
