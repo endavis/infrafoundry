@@ -6,6 +6,11 @@ from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.exceptions import (
+    ConfigurationError,
+    InfraFoundryError,
+    TerraformError,
+)
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import TerraformRunner
 
@@ -132,8 +137,14 @@ class DriftDetector:
                     "\n[bold green]✓ All infrastructure matches declared configuration[/bold green]"
                 )
 
-        except Exception as e:
+        except (ConfigurationError, TerraformError) as e:
             self.console.print(f"\n[bold red]Error detecting drift:[/bold red] {e}")
+            raise
+        except InfraFoundryError as e:
+            self.console.print(f"\n[bold red]InfraFoundry error detecting drift:[/bold red] {e}")
+            raise
+        except Exception as e:
+            self.console.print(f"\n[bold red]Unexpected error detecting drift:[/bold red] {e}")
             raise
 
         return results

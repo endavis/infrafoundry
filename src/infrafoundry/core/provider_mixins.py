@@ -10,10 +10,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, Template
+from jinja2 import Environment, FileSystemLoader, Template, TemplateNotFound
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.exceptions import TemplateError
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -109,14 +110,24 @@ class TemplateRendererMixin:
             Loaded Jinja2 template
 
         Raises:
-            TemplateNotFound: If template doesn't exist
+            TemplateError: If template cannot be loaded
         """
         try:
             return self.jinja_env.get_template(template_name)
+        except TemplateNotFound as e:
+            if hasattr(self, "_logger"):
+                self._logger.error(f"Template not found: {template_name}")
+            raise TemplateError(
+                f"Template not found: {template_name}",
+                context={"template": template_name},
+            ) from e
         except Exception as e:
             if hasattr(self, "_logger"):
                 self._logger.error(f"Failed to load template {template_name}: {e}")
-            raise
+            raise TemplateError(
+                f"Failed to load template: {e}",
+                context={"template": template_name},
+            ) from e
 
     def render_template(
         self,
@@ -131,6 +142,9 @@ class TemplateRendererMixin:
 
         Returns:
             Rendered template content
+
+        Raises:
+            TemplateError: If template rendering fails
         """
         template = self.get_template(template_name)
         try:
@@ -138,7 +152,10 @@ class TemplateRendererMixin:
         except Exception as e:
             if hasattr(self, "_logger"):
                 self._logger.error(f"Failed to render template {template_name}: {e}")
-            raise
+            raise TemplateError(
+                f"Failed to render template: {e}",
+                context={"template": template_name},
+            ) from e
 
     def _write_terraform_file(self, filename: str, content: str) -> None:
         """Write content to a Terraform file.

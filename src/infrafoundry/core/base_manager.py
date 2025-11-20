@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from infrafoundry.core.exceptions import InfraFoundryError
+
 
 class BaseManager(ABC):
     """Abstract base class for all manager classes.
@@ -159,8 +161,11 @@ class BaseManager(ABC):
         """
         try:
             self.cleanup()
+        except InfraFoundryError as e:
+            self._log_error("InfraFoundry error during cleanup", e)
+            # Don't suppress original exception
         except Exception as e:
-            self._log_error("Error during cleanup", e)
+            self._log_error("Unexpected error during cleanup", e)
             # Don't suppress original exception
 
     def __repr__(self) -> str:
