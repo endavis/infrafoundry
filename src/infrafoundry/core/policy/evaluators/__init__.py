@@ -11,9 +11,9 @@ from .required_tags import RequiredTagsEvaluator
 from .resource_limits import ResourceLimitEvaluator
 
 __all__ = [
-    "PolicyEvaluator",
     "AllowedProvidersEvaluator",
     "NamingConventionEvaluator",
+    "PolicyEvaluator",
     "RequiredTagsEvaluator",
     "ResourceLimitEvaluator",
 ]

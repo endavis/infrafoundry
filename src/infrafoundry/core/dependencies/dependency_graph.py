@@ -7,7 +7,6 @@ graph algorithms and impact analysis for infrastructure resources.
 from collections import defaultdict
 
 from infrafoundry.core.dependencies.graph_algorithms import (
-    CircularDependencyError,  # noqa: F401 - re-exported for API
     GraphAlgorithms,
 )
 from infrafoundry.core.dependencies.impact_analyzer import ImpactAnalyzer, ResourceNode
@@ -29,7 +28,7 @@ class DependencyGraph:
         [['proxmox:vlan-100'], ['proxmox:web-01']]
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize empty dependency graph."""
         self.nodes: dict[str, ResourceNode] = {}
         self._adjacency: dict[str, set[str]] = defaultdict(set)

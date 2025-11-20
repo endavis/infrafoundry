@@ -40,7 +40,7 @@ class CommandLoader:
         # All commands from commands/*.py are now registered
     """
 
-    def __init__(self, main_group: click.Group):
+    def __init__(self, main_group: click.Group) -> None:
         """Initialize command loader.
 
         Args:

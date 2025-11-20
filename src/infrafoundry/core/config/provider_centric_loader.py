@@ -13,7 +13,7 @@ from infrafoundry.core.provider import ResourceConfig
 class ProviderCentricLoader:
     """Loads resources from provider-centric directory structure."""
 
-    def __init__(self, base_dir: Path):
+    def __init__(self, base_dir: Path) -> None:
         """Initialize loader.
 
         Args:

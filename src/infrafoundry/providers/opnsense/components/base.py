@@ -12,7 +12,7 @@ class BaseComponentManager(ABC):
     multiple service calls.
     """
 
-    def __init__(self, config_dir: Path):
+    def __init__(self, config_dir: Path) -> None:
         """Initialize component manager.
 
         Args:

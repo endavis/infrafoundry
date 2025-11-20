@@ -40,7 +40,7 @@ class OPNsenseValidator:
     - DHCP configuration validity
     """
 
-    def __init__(self, env_config: EnvironmentData, report: ValidationReport):
+    def __init__(self, env_config: EnvironmentData, report: ValidationReport) -> None:
         """Initialize OPNsense validator.
 
         Args:

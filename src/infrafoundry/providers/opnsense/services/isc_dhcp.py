@@ -11,7 +11,7 @@ class ISCDHCPService(BaseService):
     Note: ISC DHCP is the legacy DHCP server in OPNsense, stored in the system XML config.
     """
 
-    def __init__(self, client: OPNsenseClient):
+    def __init__(self, client: OPNsenseClient) -> None:
         """Initialize ISC DHCP service.
 
         Args:

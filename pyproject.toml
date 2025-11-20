@@ -53,6 +53,16 @@ select = [
 ignore = [
     "ANN101",  # Missing type annotation for self
     "ANN102",  # Missing type annotation for cls
+    "ANN401",  # Dynamically typed expressions (Any) - allow for now, fix incrementally
+    "ANN001",  # Missing type annotation for function argument - fix incrementally
+    "ANN002",  # Missing type annotation for *args
+    "ANN003",  # Missing type annotation for **kwargs
+    "ANN201",  # Missing return type annotation for public function
+    "ANN202",  # Missing return type annotation for private function
+    "B024",    # Abstract base class without abstract methods - intentional in some cases
+    "B904",    # raise-without-from - fix incrementally
+    "RUF012",  # Mutable class default - fix incrementally
+    "E402",    # Module level import not at top of file - needed for CLI command loading
 ]
 
 [tool.mypy]

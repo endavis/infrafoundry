@@ -185,12 +185,12 @@ class ValidationOrchestrator:
         """Invoke provider validation hooks with error protection."""
         try:
             provider.validate_connectivity(env_data, report)
-        except Exception as exc:  # noqa: BLE001 - surfacing provider errors
+        except Exception as exc:
             self.console.print(f"[red]✗ Connectivity validation failed: {exc}[/red]")
 
         try:
             provider.validate_references(resources, env_data, report)
-        except Exception as exc:  # noqa: BLE001 - surfacing provider errors
+        except Exception as exc:
             self.console.print(f"[red]✗ Reference validation failed: {exc}[/red]")
 
     def _print_summary(self, provider_name: str, summary: dict[str, Any], passed: bool) -> None:

@@ -9,9 +9,9 @@ from infrafoundry.core.notifications.notifiers import (
 )
 
 __all__ = [
-    "NotificationManager",
     "NotificationChannel",
     "NotificationLevel",
+    "NotificationManager",
     "Notifier",
     "SlackNotifier",
     "WebhookNotifier",

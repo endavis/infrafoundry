@@ -67,7 +67,7 @@ class Event:
         event_type: EventType,
         environment: str,
         data: EventPayload | None = None,
-    ):
+    ) -> None:
         """Initialize event.
 
         Args:
@@ -110,7 +110,7 @@ class EventHandlerError(Exception):
 class EventManager(BaseManager):
     """Manages event subscriptions and emission."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize event manager."""
         # Initialize base manager with logging
         super().__init__()

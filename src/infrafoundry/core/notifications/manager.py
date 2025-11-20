@@ -14,7 +14,7 @@ from infrafoundry.core.notifications.notifiers.base_notifier import Notifier
 class NotificationManager(PathBasedManager):
     """Manages notification channels and dispatches events."""
 
-    def __init__(self, config_file: Path | None = None):
+    def __init__(self, config_file: Path | None = None) -> None:
         """Initialize notification manager.
 
         Args:

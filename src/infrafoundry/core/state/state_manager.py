@@ -30,7 +30,7 @@ class StateManager(BaseManager):
     Thin wrapper that delegates most operations to specialized repositories.
     """
 
-    def __init__(self, connection_string: str | None = None):
+    def __init__(self, connection_string: str | None = None) -> None:
         """Initialize state manager.
 
         Args:

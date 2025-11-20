@@ -18,7 +18,7 @@ class CredentialLoaderError(Exception):
 class BaseCredentialLoader(ABC):
     """Abstract base class for provider-specific credential loaders."""
 
-    def __init__(self, secrets_dir: Path, debug_mode: bool = False):
+    def __init__(self, secrets_dir: Path, debug_mode: bool = False) -> None:
         """Initialize credential loader.
 
         Args:
