@@ -5,6 +5,8 @@ from typing import Any
 
 import yaml
 
+from infrafoundry.core.exceptions import PolicyError
+
 from .evaluators import (
     AllowedProvidersEvaluator,
     NamingConventionEvaluator,
@@ -62,8 +64,14 @@ class PolicyEngine:
                             environments=policy_data.get("environments"),
                         )
                         self.policies.append(policy)
+            except yaml.YAMLError as e:
+                print(f"Warning: Invalid YAML in policy file {policy_file}: {e}")
+            except (KeyError, ValueError) as e:
+                print(f"Warning: Invalid policy structure in {policy_file}: {e}")
+            except PolicyError as e:
+                print(f"Warning: Policy error in {policy_file}: {e}")
             except Exception as e:
-                print(f"Warning: Failed to load policy file {policy_file}: {e}")
+                print(f"Warning: Unexpected error loading policy file {policy_file}: {e}")
 
     def register_evaluator(self, policy_type: PolicyType, evaluator: PolicyEvaluator) -> None:
         """Register a custom evaluator for a policy type.
