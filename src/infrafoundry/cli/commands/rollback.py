@@ -3,6 +3,8 @@
 import click
 from rich.console import Console
 
+from infrafoundry.core.orchestrator import Orchestrator
+
 from ..decorators import with_orchestrator
 
 console = Console()
@@ -16,6 +18,8 @@ console = Console()
     help="Skip confirmation prompt and apply immediately",
 )
 @with_orchestrator("Rollback command failed", require_env=False, load_credentials=False)
-def rollback(_ctx: click.Context, orchestrator, deployment_id: int, auto_approve: bool) -> None:
+def rollback(
+    _ctx: click.Context, orchestrator: Orchestrator, deployment_id: int, auto_approve: bool
+) -> None:
     """Rollback infrastructure to a previous deployment state."""
     orchestrator.rollback(deployment_id=deployment_id, auto_approve=auto_approve)

@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from sqlalchemy.orm import Session, sessionmaker
+
 from infrafoundry.core.state.models import Deployment, DeploymentEvent, DeploymentStatus
 from infrafoundry.core.types import DeploymentMetadata, ResourceTrackingMetadata, RollbackData
 
@@ -9,7 +11,7 @@ from infrafoundry.core.types import DeploymentMetadata, ResourceTrackingMetadata
 class DeploymentRepository:
     """Handles all deployment-related database operations."""
 
-    def __init__(self, session_factory) -> None:
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
         """Initialize repository with SQLAlchemy session factory.
 
         Args:

@@ -5,6 +5,8 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from infrafoundry.core.orchestrator import Orchestrator
+
 from ..decorators import with_orchestrator
 
 console = Console()
@@ -41,7 +43,7 @@ console = Console()
 @with_orchestrator("Migration failed")
 def migrate(
     ctx: click.Context,
-    orchestrator,
+    orchestrator: Orchestrator,
     env: str,
     provider: str,
     component: str,

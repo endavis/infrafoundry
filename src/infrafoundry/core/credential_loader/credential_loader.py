@@ -2,7 +2,9 @@
 
 import logging
 import os
+from collections.abc import Generator
 from pathlib import Path
+from types import TracebackType
 
 from infrafoundry.core.credential_loader.base_loader import (
     BaseCredentialLoader,
@@ -180,7 +182,9 @@ class CredentialLoader:
         self.apply_to_environment(credentials)
         return credentials
 
-    def temporary_credentials(self, env_name: str, providers: list[str] | None = None):
+    def temporary_credentials(
+        self, env_name: str, providers: list[str] | None = None
+    ) -> Generator[dict[str, str], None, None]:
         """Context manager for temporary credential loading.
 
         Loads credentials, applies them, and restores original values on exit.
@@ -287,7 +291,12 @@ class _TemporaryCredentials:
 
         return self.credentials
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Restore original environment values."""
         for key, original_value in self.original_values.items():
             if original_value is None:

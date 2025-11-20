@@ -5,6 +5,8 @@ import sys
 import click
 from rich.console import Console
 
+from infrafoundry.core.orchestrator import Orchestrator
+
 from ..decorators import with_orchestrator
 
 console = Console()
@@ -28,7 +30,7 @@ console = Console()
 @with_orchestrator("Validation failed")
 def validate(
     _ctx: click.Context,
-    orchestrator,
+    orchestrator: Orchestrator,
     env: str,
     resource: tuple[str, ...],
     verbose: bool,

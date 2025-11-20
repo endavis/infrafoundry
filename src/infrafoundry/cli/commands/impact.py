@@ -4,6 +4,8 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
+from infrafoundry.core.orchestrator import Orchestrator
+
 from ..decorators import with_orchestrator
 
 console = Console()
@@ -13,7 +15,7 @@ console = Console()
 @click.option("--env", "-e", required=True, help="Environment name")
 @click.option("--resource", "-r", required=True, help="Resource name to analyze")
 @with_orchestrator("Impact analysis failed", load_credentials=False)
-def impact(_ctx: click.Context, orchestrator, env: str, resource: str) -> None:
+def impact(_ctx: click.Context, orchestrator: Orchestrator, env: str, resource: str) -> None:
     """Analyze the impact of changes to a resource.
 
     Shows what other resources depend on the specified resource and the risk level

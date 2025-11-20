@@ -4,6 +4,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from infrafoundry.core.orchestrator import Orchestrator
+
 from ..decorators import with_orchestrator
 
 console = Console()
@@ -25,7 +27,7 @@ console = Console()
 @with_orchestrator("Failed to list resources", require_env=False, load_credentials=False)
 def resources(
     _ctx: click.Context,
-    orchestrator,
+    orchestrator: Orchestrator,
     env: str | None,
     provider: str | None,
     type: str | None,
