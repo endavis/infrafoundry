@@ -274,6 +274,11 @@ class MissingDependencyError(DependencyError):
     """Required dependency is missing."""
 
 
+# Template Errors
+class TemplateError(InfraFoundryError):
+    """Template rendering or loading failed."""
+
+
 __all__ = [
     # API/Network
     "APIError",
@@ -317,6 +322,8 @@ __all__ = [
     # State
     "StateError",
     "StateInconsistencyError",
+    # Template
+    "TemplateError",
     "TerraformError",
     "TimeoutError",
     "UnsupportedResourceTypeError",
