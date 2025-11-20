@@ -137,7 +137,7 @@ class ProxmoxProvider(
         cloud_init_vars = config.get("cloud_init_vars", {})
 
         # Load and merge snippets
-        merged_cloud_init = {}
+        merged_cloud_init: dict[Any, Any] = {}
 
         for snippet_name in snippet_names:
             # Build path to snippet file

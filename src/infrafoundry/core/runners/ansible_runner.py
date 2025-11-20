@@ -135,17 +135,32 @@ class AnsibleRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"valid": False, "error": str(e)}
 
-    def run(self, provider: ProviderBase, check_mode: bool = True) -> dict[str, Any]:
-        """Run Ansible playbook for a provider (legacy compatibility).
+    @override
+    def run(
+        self, provider: ProviderBase, command: str, auto_approve: bool = False
+    ) -> dict[str, Any]:
+        """Run Ansible command for a provider.
 
         Args:
             provider: Provider instance
-            check_mode: If True, run in check mode (dry run)
+            command: Command to run ('plan' for check mode, 'apply' for actual run)
+            auto_approve: Not used for Ansible (no approval needed)
 
         Returns:
             Dict with command results including exit_code and success
         """
-        return self._run_ansible(provider, check_mode=check_mode)
+        if command == "plan":
+            return self.plan(provider)
+        elif command == "apply":
+            return self.apply(provider)
+        elif command == "destroy":
+            return self.destroy(provider)
+        else:
+            return {
+                "success": False,
+                "exit_code": 1,
+                "message": f"Unknown command: {command}",
+            }
 
     def _run_ansible(self, provider: ProviderBase, check_mode: bool = True) -> dict[str, Any]:
         """Run Ansible playbook for a provider.

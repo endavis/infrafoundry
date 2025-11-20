@@ -19,7 +19,7 @@ class AllowedProvidersEvaluator(PolicyEvaluator):
         Returns:
             List of policy violations
         """
-        violations = []
+        violations: list[PolicyViolation] = []
         allowed = policy.rules.get("allowed", [])
 
         if not allowed:

@@ -255,7 +255,8 @@ class DeploymentExecutor:
                     )
 
         # Run Ansible playbook (check mode for dry run)
-        ansible_result = ansible_runner.run(provider, check_mode=not auto_approve)
+        command = "apply" if auto_approve else "plan"
+        ansible_result = ansible_runner.run(provider, command, auto_approve=auto_approve)
 
         # Update resource states to ACTIVE after successful apply
         for resource in resources:

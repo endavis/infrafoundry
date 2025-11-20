@@ -5,6 +5,7 @@ graph algorithms and impact analysis for infrastructure resources.
 """
 
 from collections import defaultdict
+from typing import Any
 
 from infrafoundry.core.dependencies.graph_algorithms import (
     GraphAlgorithms,
@@ -161,7 +162,7 @@ class DependencyGraph:
         """
         return self.topological_sort()
 
-    def get_impact_analysis(self, resource_name: str) -> dict[str, any]:
+    def get_impact_analysis(self, resource_name: str) -> dict[str, Any]:
         """Analyze the impact of changing or deleting a resource.
 
         Args:
