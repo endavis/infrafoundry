@@ -4,6 +4,11 @@ import click
 from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.exceptions import (
+    ConfigurationError,
+    EnvironmentNotFoundError,
+    InfraFoundryError,
+)
 
 from ..utils import raise_cli_error
 
@@ -35,5 +40,11 @@ def envs(ctx: click.Context) -> None:
             console.print(f"  • {env_name}: {env_config.description or 'No description'}")
             console.print(f"    Providers: {', '.join(env_config.providers)}")
 
+    except click.ClickException:
+        raise
+    except (EnvironmentNotFoundError, ConfigurationError) as exc:
+        raise_cli_error("Failed to list environments", exc)
+    except InfraFoundryError as exc:
+        raise_cli_error("Failed to list environments", exc)
     except Exception as exc:
         raise_cli_error("Failed to list environments", exc)

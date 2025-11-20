@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from infrafoundry.core.exceptions import InfraFoundryError, SecretError
 from infrafoundry.core.secrets import SecretManager
 
 from ..utils import raise_cli_error
@@ -90,6 +91,12 @@ def secrets_encrypt(file: str) -> None:
             raise click.ClickException(f"Encryption failed: {result.stderr}")
 
         console.print(f"[green]Encrypted: {file_path}[/green]")
+    except click.ClickException:
+        raise
+    except SecretError as exc:
+        raise_cli_error("Encryption failed", exc)
+    except InfraFoundryError as exc:
+        raise_cli_error("Encryption failed", exc)
     except Exception as exc:
         raise_cli_error("Encryption failed", exc)
 
@@ -120,5 +127,11 @@ def secrets_decrypt(file: str) -> None:
             raise click.ClickException(f"Decryption failed: {result.stderr}")
 
         console.print(result.stdout)
+    except click.ClickException:
+        raise
+    except SecretError as exc:
+        raise_cli_error("Decryption failed", exc)
+    except InfraFoundryError as exc:
+        raise_cli_error("Decryption failed", exc)
     except Exception as exc:
         raise_cli_error("Decryption failed", exc)
