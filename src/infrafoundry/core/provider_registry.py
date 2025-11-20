@@ -2,6 +2,7 @@
 
 import importlib
 import logging
+import types
 from pathlib import Path
 
 from infrafoundry.core.exceptions import ProviderInitializationError
@@ -91,7 +92,9 @@ class ProviderRegistry:
                     context={"provider": provider_name, "error": str(e)},
                 ) from e
 
-    def _find_provider_class(self, module, provider_name: str) -> type[ProviderBase] | None:
+    def _find_provider_class(
+        self, module: types.ModuleType, provider_name: str
+    ) -> type[ProviderBase] | None:
         """Find the provider class in a module.
 
         Args:

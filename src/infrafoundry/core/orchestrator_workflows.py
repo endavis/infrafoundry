@@ -12,7 +12,7 @@ from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.drift_detector import DriftDetector
-from infrafoundry.core.events import EventType
+from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
@@ -255,7 +255,7 @@ class PlanOrchestrator:
         self,
         console: Console,
         state_manager: StateManager,
-        event_manager,
+        event_manager: EventManager,
         runner_registry: RunnerRegistry,
         get_providers: Callable[[], dict[str, ProviderBase]],
         load_resources: Callable[
@@ -554,7 +554,7 @@ class ApplyOrchestrator:
         self,
         console: Console,
         state_manager: StateManager,
-        event_manager,
+        event_manager: EventManager,
         load_resources: Callable[
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
         ],
@@ -682,7 +682,7 @@ class DestroyOrchestrator:
         self,
         console: Console,
         state_manager: StateManager,
-        event_manager,
+        event_manager: EventManager,
         runner_registry: RunnerRegistry,
         get_providers: Callable[[], dict[str, ProviderBase]],
         load_resources: Callable[

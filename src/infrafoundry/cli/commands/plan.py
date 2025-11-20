@@ -3,6 +3,8 @@
 import click
 from rich.console import Console
 
+from infrafoundry.core.orchestrator import Orchestrator
+
 from ..decorators import with_orchestrator
 
 console = Console()
@@ -25,7 +27,7 @@ console = Console()
 @with_orchestrator("Plan failed")
 def plan(
     _ctx: click.Context,
-    orchestrator,
+    orchestrator: Orchestrator,
     env: str,
     dry_run: bool,
     resource: tuple[str, ...],

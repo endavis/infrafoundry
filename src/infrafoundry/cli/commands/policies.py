@@ -4,6 +4,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from infrafoundry.core.orchestrator import Orchestrator
+
 from ..decorators import with_orchestrator
 
 console = Console()
@@ -12,7 +14,7 @@ console = Console()
 @click.command()
 @click.option("--env", "-e", help="Show policies for specific environment")
 @with_orchestrator("Policy listing failed", require_env=False, load_credentials=False)
-def policies(_ctx: click.Context, orchestrator, env: str | None) -> None:
+def policies(_ctx: click.Context, orchestrator: Orchestrator, env: str | None) -> None:
     """List available infrastructure policies."""
     if env:
         policies_list = orchestrator.policy_engine.get_policies_for_environment(env)

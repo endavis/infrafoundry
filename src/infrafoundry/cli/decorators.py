@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
@@ -22,7 +23,7 @@ def with_orchestrator(
     *,
     require_env: bool = True,
     load_credentials: bool = True,
-):
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Inject orchestrator + shared error handling into CLI commands.
 
     Args:
@@ -31,7 +32,7 @@ def with_orchestrator(
         load_credentials: Whether to load environment credentials automatically.
     """
 
-    def decorator(func):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         sig = inspect.signature(func)
         param_names = list(sig.parameters.keys())
         # Skip ctx + orchestrator when mapping args -> parameter names
@@ -39,7 +40,7 @@ def with_orchestrator(
 
         @click.pass_context
         @wraps(func)
-        def wrapper(ctx: click.Context, *args, **kwargs):
+        def wrapper(ctx: click.Context, *args: Any, **kwargs: Any) -> Any:
             config_dir = (ctx.obj or {}).get("config_dir")
 
             bound_params: dict[str, Any] = {}

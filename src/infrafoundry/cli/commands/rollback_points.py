@@ -4,6 +4,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from infrafoundry.core.orchestrator import Orchestrator
+
 from ..decorators import with_orchestrator
 
 console = Console()
@@ -16,7 +18,7 @@ console = Console()
     "Failed to list rollback points",
     load_credentials=False,
 )
-def rollback_points(_ctx: click.Context, orchestrator, env: str, limit: int) -> None:
+def rollback_points(_ctx: click.Context, orchestrator: Orchestrator, env: str, limit: int) -> None:
     """List available rollback points for an environment."""
     deployments = orchestrator.state_manager.get_rollback_points(env, limit=limit)
 

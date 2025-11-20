@@ -5,6 +5,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from infrafoundry.core.orchestrator import Orchestrator
+
 from ..decorators import with_orchestrator
 
 console = Console()
@@ -13,7 +15,7 @@ console = Console()
 @click.command()
 @click.option("--env", "-e", required=True, help="Environment name")
 @with_orchestrator("Drift command failed")
-def drift(_ctx: click.Context, orchestrator, env: str) -> None:
+def drift(_ctx: click.Context, orchestrator: Orchestrator, env: str) -> None:
     """Detect infrastructure drift from declared configuration.
 
     Checks if actual infrastructure state matches the declared configuration

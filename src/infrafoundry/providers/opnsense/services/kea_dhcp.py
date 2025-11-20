@@ -2,7 +2,7 @@
 
 import yaml
 
-from ..api_client import KeaClient
+from ..api_client import KeaClient, OPNsenseClient
 from .base import BaseService
 
 
@@ -13,7 +13,7 @@ class KeaDHCPService(BaseService):
     configurations including subnets, reservations, and service control.
     """
 
-    def __init__(self, client) -> None:
+    def __init__(self, client: OPNsenseClient) -> None:
         """Initialize Kea DHCP service.
 
         Args:

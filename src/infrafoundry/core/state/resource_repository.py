@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from sqlalchemy.orm import Session, sessionmaker
+
 from infrafoundry.core.state.models import Resource, ResourceDependency, ResourceState
 from infrafoundry.core.types import ResourceTrackingMetadata
 
@@ -9,7 +11,7 @@ from infrafoundry.core.types import ResourceTrackingMetadata
 class ResourceRepository:
     """Handles all resource-related database operations."""
 
-    def __init__(self, session_factory) -> None:
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
         """Initialize repository with SQLAlchemy session factory.
 
         Args:
