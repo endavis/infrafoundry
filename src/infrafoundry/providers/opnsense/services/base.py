@@ -2,6 +2,7 @@
 
 from abc import ABC
 from pathlib import Path
+from typing import Self
 
 from ..api_client import OPNsenseClient
 
@@ -27,7 +28,7 @@ class BaseService(ABC):
         env_name: str,
         provider_name: str,
         config_dir: Path,
-    ) -> "BaseService":
+    ) -> Self:
         """Create service instance from environment configuration.
 
         Args:
