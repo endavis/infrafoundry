@@ -102,8 +102,8 @@ Once in-code ignores are fixed, incrementally enable these rules by removing fro
 ### Session Progress Summary
 
 **Starting Point:** 120 mypy errors across 40 files
-**Current Status:** 85 mypy errors across 26 files
-**Total Fixed:** 35 errors (29% reduction) ✅
+**Current Status:** 57 mypy errors across 20 files
+**Total Fixed:** 63 errors (52% reduction) ✅
 
 ### Completed Work ✅
 
@@ -142,16 +142,37 @@ Once in-code ignores are fixed, incrementally enable these rules by removing fro
 - All tests passing (459/459) ✅
 - Ruff linting passes ✅
 
-### Remaining Work (85 errors)
+#### 6. Fixed "Returning Any" Errors (9 errors)
+- Added `cast()` annotations where functions return untyped Any values
+- **Files Fixed:**
+  - `sops_wrapper.py`: Cast `yaml.safe_load()` to `dict[str, Any]`
+  - `opnsense/api_client.py`: Cast `response.json()` and `dict.get()` (3 locations)
+  - `terraform_runner.py`: Cast `json.loads()` result to `str | None`
+  - `api_validator.py`: Cast `response.json()` to `dict[str, Any]`
+  - `isc_to_kea_migration.py`: Cast `dict.get()` to `str` (3 locations)
+- **Result:** Reduced errors from 66 → 57 (-9 errors)
+
+### Remaining Work (57 errors)
 
 **Top Error Categories:**
-1. **Type assignment mismatches (9 errors)** - SQLAlchemy Column types vs primitives
-2. **Returning Any (7 errors)** - Functions need proper return type annotations
-3. **Argument type issues (4 errors)** - Tuple types, unexpected kwargs
-4. **Abstract class issues (2 errors)** - BaseCredentialLoader instantiation
-5. **Other misc (63 errors)** - Various small typing issues
+1. **[arg-type] Argument type issues (34 errors)** - Type mismatches in function arguments
+   - Includes complex kwargs unpacking in api_client.py (23 related errors)
+   - Jinja2 Environment kwargs type issues (5 errors)
+   - Proxmox validator optional str vs str (5 errors)
+2. **[union-attr] Attribute access (4 errors)** - Accessing attributes on union types
+3. **[return-value] Return type mismatches (3 errors)** - Incompatible return values
+4. **[call-arg] Call argument issues (3 errors)** - Missing/incompatible call arguments
+5. **[attr-defined] Attribute undefined (3 errors)** - Missing attributes on classes
+6. **[assignment] Assignment issues (3 errors)** - Type assignment mismatches
+7. **[var-annotated] Variable annotations (2 errors)** - Missing type annotations
+8. **[abstract] Abstract class (2 errors)** - BaseCredentialLoader instantiation
+9. **[valid-type] Invalid type (1 error)** - Using "any" instead of "Any"
+10. **[override] Override signature (1 error)** - ansible_runner.run() signature mismatch
+11. **[unreachable] Unreachable code (1 error)** - Dead code path
 
 **Next Priorities:**
-- Fix SQLAlchemy Column type assignments
-- Add proper return types to functions returning Any
-- Continue incremental improvements toward strict typing
+1. Fix complex kwargs unpacking in api_client.py (largest contributor)
+2. Fix Proxmox validator optional parameter handling
+3. Fix ansible_runner.run() override signature
+4. Fix "any" vs "Any" typo in dependency_graph.py
+5. Continue incremental improvements toward strict typing
