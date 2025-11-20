@@ -4,6 +4,11 @@ import click
 from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.exceptions import (
+    ConfigurationError,
+    EnvironmentNotFoundError,
+    InfraFoundryError,
+)
 
 from ..utils import raise_cli_error
 
@@ -61,5 +66,11 @@ def list_resources(ctx: click.Context, env: str, provider: str | None, type: str
 
         console.print(f"\n[dim]Total: {len(all_resources)} resources[/dim]")
 
+    except click.ClickException:
+        raise
+    except (EnvironmentNotFoundError, ConfigurationError) as exc:
+        raise_cli_error("Failed to list resources", exc)
+    except InfraFoundryError as exc:
+        raise_cli_error("Failed to list resources", exc)
     except Exception as exc:
         raise_cli_error("Failed to list resources", exc)

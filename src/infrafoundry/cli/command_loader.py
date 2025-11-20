@@ -25,6 +25,8 @@ from pathlib import Path
 
 import click
 
+from infrafoundry.core.exceptions import InfraFoundryError
+
 logger = logging.getLogger(__name__)
 
 
@@ -107,8 +109,10 @@ class CommandLoader:
 
         except ImportError as e:
             logger.error(f"Failed to import command module '{module_name}': {e}")
+        except InfraFoundryError as e:
+            logger.error(f"InfraFoundry error loading commands from '{module_name}': {e}")
         except Exception as e:
-            logger.error(f"Error loading commands from '{module_name}': {e}")
+            logger.error(f"Unexpected error loading commands from '{module_name}': {e}")
 
     def register_module(self, module_name: str) -> None:
         """Manually register a specific module.

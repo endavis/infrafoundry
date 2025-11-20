@@ -6,6 +6,8 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from infrafoundry.core.exceptions import InfraFoundryError, StateError
+
 from ..utils import raise_cli_error
 
 console = Console()
@@ -42,5 +44,11 @@ def init() -> None:
         console.print("\n[bold]State tracking is now enabled.[/bold]")
         console.print("Deployment history and resource state will be recorded.")
 
+    except click.ClickException:
+        raise
+    except StateError as exc:
+        raise_cli_error("Init command failed", exc)
+    except InfraFoundryError as exc:
+        raise_cli_error("Init command failed", exc)
     except Exception as exc:
         raise_cli_error("Init command failed", exc)

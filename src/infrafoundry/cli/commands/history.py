@@ -4,6 +4,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from infrafoundry.core.exceptions import InfraFoundryError, StateError
 from infrafoundry.core.state import DeploymentStatus, StateManager
 
 from ..utils import raise_cli_error
@@ -99,6 +100,14 @@ def history(
 
         console.print(table)
 
+    except click.ClickException:
+        raise
+    except StateError as exc:
+        if "no such table" in str(exc).lower():
+            console.print("\n[dim]Run 'infra init' to initialize state tracking.[/dim]")
+        raise_cli_error("Failed to show history", exc)
+    except InfraFoundryError as exc:
+        raise_cli_error("Failed to show history", exc)
     except Exception as exc:
         if "no such table" in str(exc).lower():
             console.print("\n[dim]Run 'infra init' to initialize state tracking.[/dim]")
