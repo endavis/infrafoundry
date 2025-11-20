@@ -275,7 +275,7 @@ class OPNsenseValidator:
         interfaces: dict[str, InterfaceData] = {}
         for iface_name, iface_data in data.items():
             if isinstance(iface_data, dict):
-                interfaces[iface_name] = iface_data
+                interfaces[iface_name] = cast(InterfaceData, iface_data)
         return interfaces
 
     def _validate_firewall_rules(
