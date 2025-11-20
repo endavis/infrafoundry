@@ -16,6 +16,8 @@ from typing import Any
 
 import requests
 
+from infrafoundry.core.exceptions import APIError, AuthenticationError
+
 logger = logging.getLogger(__name__)
 
 
@@ -120,12 +122,30 @@ class OPNsenseClient:
 
         except requests.HTTPError as e:
             logger.error(f"HTTP error: {e}")
-            if hasattr(e, "response") and e.response:
-                logger.error(f"Response text: {e.response.text}")
-            raise
+            status_code = e.response.status_code if hasattr(e, "response") and e.response else None
+            response_text = e.response.text if hasattr(e, "response") and e.response else str(e)
+
+            if status_code == 401 or status_code == 403:
+                raise AuthenticationError(
+                    "OPNsense authentication failed",
+                    status_code=status_code,
+                    response=response_text,
+                    provider="opnsense",
+                ) from e
+            else:
+                raise APIError(
+                    f"OPNsense API request failed: {e}",
+                    status_code=status_code,
+                    response=response_text,
+                    provider="opnsense",
+                ) from e
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON response: {e}")
-            raise ValueError(f"Invalid JSON response from OPNsense: {e}")
+            raise APIError(
+                "Invalid JSON response from OPNsense",
+                response=str(e),
+                provider="opnsense",
+            ) from e
 
 
 class KeaClient:

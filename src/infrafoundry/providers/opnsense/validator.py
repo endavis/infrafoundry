@@ -8,6 +8,7 @@ from typing import Any, TypedDict, cast
 
 import urllib3
 
+from infrafoundry.core.exceptions import ReferenceValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData, OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
@@ -171,11 +172,20 @@ class OPNsenseValidator:
             # Check for duplicate names
             self._validate_unique_names(resources)
 
-        except Exception as e:
+        except ReferenceValidationError as e:
+            # Structured validation errors
             self.report.add_check(
                 check_name="opnsense_validation",
                 passed=False,
-                message=f"Error during validation: {e}",
+                message=f"Reference validation failed: {e}",
+                level=ValidationLevel.ERROR,
+            )
+        except Exception as e:
+            # Unexpected errors during validation
+            self.report.add_check(
+                check_name="opnsense_validation",
+                passed=False,
+                message=f"Unexpected error during validation: {e}",
                 level=ValidationLevel.WARNING,
             )
 
