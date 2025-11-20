@@ -112,6 +112,23 @@ class DeploymentEventData(TypedDict, total=False):
     error: str | None
 
 
+class RollbackResourceSnapshot(TypedDict):
+    """Snapshot of a single resource for rollback purposes."""
+
+    provider: str
+    type: str
+    name: str
+    config: dict[str, Any]
+
+
+class RollbackData(TypedDict):
+    """Snapshot data stored for deployment rollback."""
+
+    environment: str
+    timestamp: str  # ISO format datetime string
+    resources: list[RollbackResourceSnapshot]
+
+
 __all__ = [
     "EnvironmentData",
     "ProxmoxEnvironmentConfig",
@@ -127,4 +144,6 @@ __all__ = [
     "ResourceTrackingMetadata",
     "ResourceEventData",
     "DeploymentEventData",
+    "RollbackResourceSnapshot",
+    "RollbackData",
 ]
