@@ -8,6 +8,12 @@ from typing import Any
 
 import click
 
+from infrafoundry.core.exceptions import (
+    ConfigurationError,
+    EnvironmentNotFoundError,
+    InfraFoundryError,
+)
+
 from .utils import raise_cli_error
 
 
@@ -59,10 +65,19 @@ def with_orchestrator(
                 )
                 return func(ctx, orchestrator, *args, **kwargs)
             except click.ClickException:
+                # Already a Click exception, re-raise as-is
                 raise
             except KeyboardInterrupt as exc:
+                # User cancelled, convert to Click exception
                 raise click.ClickException("Operation cancelled") from exc
+            except (EnvironmentNotFoundError, ConfigurationError) as exc:
+                # Configuration errors - show helpful message
+                raise_cli_error(action, exc)
+            except InfraFoundryError as exc:
+                # Other InfraFoundry errors - show with context
+                raise_cli_error(action, exc)
             except Exception as exc:
+                # Unexpected errors - show message
                 raise_cli_error(action, exc)
 
         return wrapper
