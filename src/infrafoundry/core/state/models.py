@@ -3,9 +3,9 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -41,18 +41,22 @@ class Deployment(Base):
 
     __tablename__ = "deployments"
 
-    id = Column(Integer, primary_key=True)
-    environment = Column(String(100), nullable=False, index=True)
-    command = Column(String(50), nullable=False)  # plan, apply, destroy
-    status = Column(SQLEnum(DeploymentStatus), nullable=False)
-    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    completed_at = Column(DateTime)
-    user = Column(String(100))
-    commit_sha = Column(String(40))  # Git commit
-    dry_run = Column(Boolean, default=False, nullable=False)  # Whether this was a dry run
-    error_message = Column(Text)
-    extra_data = Column(JSON)  # Renamed from metadata to avoid SQLAlchemy reserved word
-    rollback_data = Column(JSON)  # Configuration snapshot for rollback
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    environment: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    command: Mapped[str] = mapped_column(String(50), nullable=False)  # plan, apply, destroy
+    status: Mapped[DeploymentStatus] = mapped_column(SQLEnum(DeploymentStatus), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    user: Mapped[str | None] = mapped_column(String(100))
+    commit_sha: Mapped[str | None] = mapped_column(String(40))  # Git commit
+    dry_run: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )  # Whether this was a dry run
+    error_message: Mapped[str | None] = mapped_column(Text)
+    extra_data: Mapped[dict | None] = mapped_column(
+        JSON
+    )  # Renamed from metadata to avoid SQLAlchemy reserved word
+    rollback_data: Mapped[dict | None] = mapped_column(JSON)  # Configuration snapshot for rollback
 
     # Relationships
     resources = relationship("Resource", back_populates="deployment")
@@ -64,19 +68,23 @@ class Resource(Base):
 
     __tablename__ = "resources"
 
-    id = Column(Integer, primary_key=True)
-    deployment_id = Column(Integer, ForeignKey("deployments.id"), nullable=False)
-    environment = Column(String(100), nullable=False, index=True)
-    provider = Column(String(50), nullable=False, index=True)
-    resource_type = Column(String(50), nullable=False)
-    name = Column(String(200), nullable=False, index=True)
-    state = Column(SQLEnum(ResourceState), nullable=False)
-    config = Column(JSON)  # Full resource configuration
-    terraform_id = Column(String(500))  # Terraform resource ID
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    deleted_at = Column(DateTime)
-    extra_data = Column(JSON)  # Additional context
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    deployment_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("deployments.id"), nullable=False
+    )
+    environment: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    state: Mapped[ResourceState] = mapped_column(SQLEnum(ResourceState), nullable=False)
+    config: Mapped[dict | None] = mapped_column(JSON)  # Full resource configuration
+    terraform_id: Mapped[str | None] = mapped_column(String(500))  # Terraform resource ID
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
+    extra_data: Mapped[dict | None] = mapped_column(JSON)  # Additional context
 
     # Relationships
     deployment = relationship("Deployment", back_populates="resources")
@@ -97,10 +105,10 @@ class ResourceDependency(Base):
 
     __tablename__ = "resource_dependencies"
 
-    id = Column(Integer, primary_key=True)
-    resource_id = Column(Integer, ForeignKey("resources.id"), nullable=False)
-    depends_on_id = Column(Integer, ForeignKey("resources.id"), nullable=False)
-    dependency_type = Column(String(50))  # implicit, explicit, data
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    resource_id: Mapped[int] = mapped_column(Integer, ForeignKey("resources.id"), nullable=False)
+    depends_on_id: Mapped[int] = mapped_column(Integer, ForeignKey("resources.id"), nullable=False)
+    dependency_type: Mapped[str | None] = mapped_column(String(50))  # implicit, explicit, data
 
     # Relationships
     resource = relationship("Resource", foreign_keys=[resource_id], back_populates="dependencies")
@@ -114,13 +122,17 @@ class DeploymentEvent(Base):
 
     __tablename__ = "deployment_events"
 
-    id = Column(Integer, primary_key=True)
-    deployment_id = Column(Integer, ForeignKey("deployments.id"), nullable=False)
-    event_type = Column(String(50), nullable=False)  # resource_created, validation_failed, etc.
-    resource_name = Column(String(200))
-    message = Column(Text)
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
-    extra_data = Column(JSON)  # Additional context
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    deployment_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("deployments.id"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )  # resource_created, validation_failed, etc.
+    resource_name: Mapped[str | None] = mapped_column(String(200))
+    message: Mapped[str | None] = mapped_column(Text)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    extra_data: Mapped[dict | None] = mapped_column(JSON)  # Additional context
 
     # Relationships
     deployment = relationship("Deployment", back_populates="events")
