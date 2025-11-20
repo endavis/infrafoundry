@@ -185,3 +185,28 @@ class AnsibleRunner(BaseRunner):
             return {"exit_code": result.returncode, "success": result.returncode == 0}
         except FileNotFoundError:
             return {"error": "ansible-playbook not found", "success": False}
+
+    def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
+        """Get resource IDs from Ansible (not applicable for Ansible).
+
+        Args:
+            provider: Provider instance
+
+        Returns:
+            Empty dict (Ansible doesn't track resource IDs like Terraform)
+        """
+        return {}
+
+    def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
+        """Parse plan for drift (not applicable for Ansible).
+
+        Args:
+            plan_result: Result from run command
+
+        Returns:
+            Dict indicating no drift detection (Ansible doesn't support drift detection)
+        """
+        return {
+            "has_changes": False,
+            "summary": "Drift detection not supported for Ansible",
+        }
