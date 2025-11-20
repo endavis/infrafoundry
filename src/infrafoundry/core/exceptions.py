@@ -94,7 +94,7 @@ class APIError(InfraFoundryError):
             response: Response body or error message
             provider: Provider name that encountered the error
         """
-        context = {}
+        context: dict[str, Any] = {}
         if status_code is not None:
             context["status_code"] = status_code
         if response is not None:
@@ -182,7 +182,7 @@ class TerraformError(DeploymentError):
             stdout: Standard output from Terraform
             stderr: Standard error from Terraform
         """
-        context = {}
+        context: dict[str, Any] = {}
         if exit_code is not None:
             context["exit_code"] = exit_code
         if stdout is not None:
