@@ -13,7 +13,7 @@ class BaseService(ABC):
     They handle direct API communication and data transformation.
     """
 
-    def __init__(self, client: OPNsenseClient):
+    def __init__(self, client: OPNsenseClient) -> None:
         """Initialize service with API client.
 
         Args:

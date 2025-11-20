@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "BaseCredentialLoader",
-    "CredentialLoaderError",
     "CredentialLoader",
+    "CredentialLoaderError",
     "KubernetesCredentialLoader",
     "OPNsenseCredentialLoader",
     "ProxmoxCredentialLoader",

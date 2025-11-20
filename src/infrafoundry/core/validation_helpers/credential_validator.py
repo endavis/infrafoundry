@@ -38,7 +38,7 @@ class CredentialValidator:
         provider_name: str,
         env_config: EnvironmentData,
         report: ValidationReport,
-    ):
+    ) -> None:
         """Initialize credential validator.
 
         Args:

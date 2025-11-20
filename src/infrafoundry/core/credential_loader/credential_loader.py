@@ -56,7 +56,7 @@ class CredentialLoader:
             }
         return result
 
-    def __init__(self, config_dir: Path | None = None):
+    def __init__(self, config_dir: Path | None = None) -> None:
         """Initialize credential loader.
 
         Args:
@@ -265,7 +265,9 @@ class CredentialLoader:
 class _TemporaryCredentials:
     """Context manager for temporary credential application."""
 
-    def __init__(self, loader: CredentialLoader, env_name: str, providers: list[str] | None):
+    def __init__(
+        self, loader: CredentialLoader, env_name: str, providers: list[str] | None
+    ) -> None:
         self.loader = loader
         self.env_name = env_name
         self.providers = providers

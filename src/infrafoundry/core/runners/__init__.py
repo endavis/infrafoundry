@@ -16,12 +16,12 @@ register_runner(TerraformRunner)
 register_runner(AnsibleRunner)
 
 __all__ = [
-    "BaseRunner",
-    "TerraformRunner",
     "AnsibleRunner",
+    "BaseRunner",
     "RunnerRegistry",
-    "register_runner",
+    "TerraformRunner",
+    "create_runner",
     "get_runner",
     "list_runners",
-    "create_runner",
+    "register_runner",
 ]

@@ -7,11 +7,11 @@ This file provides backward compatibility for existing imports.
 """
 
 # Re-export everything from the new package structure
-from infrafoundry.core.dependencies.dependency_graph import DependencyGraph  # noqa: F401
-from infrafoundry.core.dependencies.graph_algorithms import (  # noqa: F401
+from infrafoundry.core.dependencies.dependency_graph import DependencyGraph
+from infrafoundry.core.dependencies.graph_algorithms import (
     CircularDependencyError,
 )
-from infrafoundry.core.dependencies.impact_analyzer import ResourceNode  # noqa: F401
+from infrafoundry.core.dependencies.impact_analyzer import ResourceNode
 
 __all__ = [
     "CircularDependencyError",

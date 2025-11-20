@@ -49,7 +49,7 @@ class OPNsenseClient:
         base_url: str,
         verify_ssl: bool = True,
         timeout: int = 30,
-    ):
+    ) -> None:
         self.api_key = api_key
         self.api_secret = api_secret
         self.base_url = base_url.rstrip("/")
@@ -148,7 +148,7 @@ class KeaClient:
         ... })
     """
 
-    def __init__(self, client: OPNsenseClient):
+    def __init__(self, client: OPNsenseClient) -> None:
         self.client = client
 
     # DHCPv6 Subnet operations

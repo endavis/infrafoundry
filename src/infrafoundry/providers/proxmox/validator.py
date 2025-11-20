@@ -52,7 +52,7 @@ class ProxmoxValidator:
     - MAC address conflicts
     """
 
-    def __init__(self, env_config: EnvironmentData, report: ValidationReport):
+    def __init__(self, env_config: EnvironmentData, report: ValidationReport) -> None:
         """Initialize Proxmox validator.
 
         Args:

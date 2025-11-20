@@ -9,7 +9,7 @@ from infrafoundry.core.types import ResourceTrackingMetadata
 class ResourceRepository:
     """Handles all resource-related database operations."""
 
-    def __init__(self, session_factory):
+    def __init__(self, session_factory) -> None:
         """Initialize repository with SQLAlchemy session factory.
 
         Args:

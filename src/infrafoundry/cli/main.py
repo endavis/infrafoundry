@@ -192,7 +192,7 @@ def main(
 
 
 # Auto-discover and register commands from commands/ directory
-from infrafoundry.cli.command_loader import load_commands  # noqa: E402
+from infrafoundry.cli.command_loader import load_commands
 
 load_commands(main)
 

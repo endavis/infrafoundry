@@ -13,7 +13,7 @@ class KeaDHCPService(BaseService):
     configurations including subnets, reservations, and service control.
     """
 
-    def __init__(self, client):
+    def __init__(self, client) -> None:
         """Initialize Kea DHCP service.
 
         Args:

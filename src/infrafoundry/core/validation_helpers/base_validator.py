@@ -60,7 +60,7 @@ class BaseProviderValidator:
         provider_name: str,
         env_config: EnvironmentData,
         report: ValidationReport,
-    ):
+    ) -> None:
         """Initialize provider validator with specialized validators.
 
         Args:

@@ -82,7 +82,7 @@ class DriftDetector:
                     resources_by_provider[resource.provider] = []
                 resources_by_provider[resource.provider].append(resource)
 
-            for provider_name, resources in resources_by_provider.items():
+            for provider_name, _resources in resources_by_provider.items():
                 if provider_name not in self.providers:
                     continue
 

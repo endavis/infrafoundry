@@ -34,7 +34,7 @@ class ImpactAnalyzer:
         nodes: dict[str, ResourceNode],
         adjacency: dict[str, set[str]],
         reverse_adjacency: dict[str, set[str]],
-    ):
+    ) -> None:
         """Initialize impact analyzer.
 
         Args:
@@ -175,6 +175,6 @@ class ImpactAnalyzer:
             for dep in self.adjacency.get(current, set()):
                 if dep not in visited:
                     visited.add(dep)
-                    queue.append((dep, path + [dep]))
+                    queue.append((dep, [*path, dep]))
 
         return None  # No path found

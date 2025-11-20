@@ -26,7 +26,7 @@ class ResourceValidator:
         )
     """
 
-    def __init__(self, provider_name: str, report: ValidationReport):
+    def __init__(self, provider_name: str, report: ValidationReport) -> None:
         """Initialize resource validator.
 
         Args:

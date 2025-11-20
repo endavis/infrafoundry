@@ -55,7 +55,7 @@ class TemplateRendererMixin:
             )
 
         # Determine template directory
-        provider_dir = Path(__file__).parent.parent / "providers" / getattr(self, "name")
+        provider_dir = Path(__file__).parent.parent / "providers" / self.name
         if template_subdir:
             self.template_dir = provider_dir / template_subdir
         else:
@@ -150,7 +150,7 @@ class TemplateRendererMixin:
         if not hasattr(self, "terraform_dir"):
             raise AttributeError("Missing terraform_dir attribute (from ProviderBase)")
 
-        file_path = Path(getattr(self, "terraform_dir")) / filename
+        file_path = Path(self.terraform_dir) / filename
         file_path.write_text(content)
 
         if hasattr(self, "_logger"):
@@ -166,7 +166,7 @@ class TemplateRendererMixin:
         if not hasattr(self, "ansible_dir"):
             raise AttributeError("Missing ansible_dir attribute (from ProviderBase)")
 
-        file_path = Path(getattr(self, "ansible_dir")) / filename
+        file_path = Path(self.ansible_dir) / filename
         file_path.write_text(content)
 
         if hasattr(self, "_logger"):

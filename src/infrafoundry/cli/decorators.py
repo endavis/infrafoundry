@@ -37,7 +37,7 @@ def with_orchestrator(
             config_dir = (ctx.obj or {}).get("config_dir")
 
             bound_params: dict[str, Any] = {}
-            for name, value in zip(command_param_names, args):
+            for name, value in zip(command_param_names, args, strict=False):
                 bound_params[name] = value
             bound_params.update(kwargs)
 
@@ -62,7 +62,7 @@ def with_orchestrator(
                 raise
             except KeyboardInterrupt as exc:
                 raise click.ClickException("Operation cancelled") from exc
-            except Exception as exc:  # noqa: BLE001 - central error handler
+            except Exception as exc:
                 raise_cli_error(action, exc)
 
         return wrapper

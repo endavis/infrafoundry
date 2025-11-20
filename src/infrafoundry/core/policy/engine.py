@@ -22,7 +22,7 @@ class PolicyEngine:
     using pluggable evaluators for each policy type.
     """
 
-    def __init__(self, policy_dir: Path | None = None):
+    def __init__(self, policy_dir: Path | None = None) -> None:
         """Initialize policy engine.
 
         Args:

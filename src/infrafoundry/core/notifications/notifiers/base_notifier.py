@@ -8,7 +8,7 @@ from typing import Any
 class Notifier(ABC):
     """Base class for notification channels."""
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: dict[str, Any]) -> None:
         """Initialize notifier with configuration.
 
         Args:

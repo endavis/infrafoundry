@@ -31,7 +31,7 @@ class ValidationReportHelper:
         )
     """
 
-    def __init__(self, report: ValidationReport):
+    def __init__(self, report: ValidationReport) -> None:
         """Initialize report helper.
 
         Args:

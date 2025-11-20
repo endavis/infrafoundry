@@ -11,9 +11,9 @@ New code should import from infrafoundry.core.policy directly.
 from .policy import Policy, PolicyEngine, PolicyLevel, PolicyType, PolicyViolation
 
 __all__ = [
-    "PolicyEngine",
     "Policy",
-    "PolicyViolation",
+    "PolicyEngine",
     "PolicyLevel",
     "PolicyType",
+    "PolicyViolation",
 ]
