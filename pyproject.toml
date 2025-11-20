@@ -38,13 +38,39 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "W",    # pycodestyle warnings
+    "UP",   # pyupgrade
+    "ANN",  # flake8-annotations (type hints)
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "RUF",  # Ruff-specific rules
+]
+ignore = [
+    "ANN101",  # Missing type annotation for self
+    "ANN102",  # Missing type annotation for cls
+]
 
 [tool.mypy]
 python_version = "3.12"
+# Strict type checking
+disallow_untyped_defs = true
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
+warn_unused_ignores = true
+# Additional strict checks
+check_untyped_defs = true
+disallow_any_generics = false  # Can enable later for even stricter checking
+disallow_incomplete_defs = true
+disallow_subclassing_any = true
+no_implicit_optional = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unreachable = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
