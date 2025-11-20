@@ -1,4 +1,3 @@
-
 """Policy validation for infrastructure resources."""
 
 from typing import Any
