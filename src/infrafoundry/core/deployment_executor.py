@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.events import EventManager, EventType
-from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
 from infrafoundry.core.state import ResourceState, StateManager
 from infrafoundry.core.types import ResourceEventData
@@ -46,7 +46,7 @@ class DeploymentExecutor:
         self,
         env_name: str,
         deployment_id: int,
-        resources_by_provider: dict[str, list[Any]],
+        resources_by_provider: dict[str, list[ResourceConfig]],
         resource_filter: list[str] | None,
         auto_approve: bool,
     ) -> dict[str, Any]:
@@ -111,7 +111,7 @@ class DeploymentExecutor:
         self,
         env_name: str,
         deployment_id: int,
-        resources_by_provider: dict[str, list[Any]],
+        resources_by_provider: dict[str, list[ResourceConfig]],
         resource_filter: list[str] | None,
         auto_approve: bool,
         max_workers: int,
@@ -191,7 +191,7 @@ class DeploymentExecutor:
         deployment_id: int,
         provider_name: str,
         provider: ProviderBase,
-        resources: list[Any],
+        resources: list[ResourceConfig],
         auto_approve: bool,
     ) -> dict[str, Any]:
         """Apply a single provider's resources.

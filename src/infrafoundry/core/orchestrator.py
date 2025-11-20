@@ -25,7 +25,7 @@ from infrafoundry.core.orchestrator_workflows import (
 )
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.policy_checker import PolicyChecker
-from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.state import StateManager
@@ -193,17 +193,19 @@ class Orchestrator:
         self.deployment_executor.providers = self.providers
         self.drift_detector.providers = self.providers
 
-    def _load_resources(self, env_name: str) -> tuple[list[Any], dict[str, list[Any]]]:
+    def _load_resources(
+        self, env_name: str
+    ) -> tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]:
         """Load all resources for an environment and group them by provider."""
         all_resources = self.config_manager.get_all_resources_all_providers(env_name)
-        resources_by_provider: dict[str, list[Any]] = {}
+        resources_by_provider: dict[str, list[ResourceConfig]] = {}
         for resource in all_resources:
             resources_by_provider.setdefault(resource.provider, []).append(resource)
         return all_resources, resources_by_provider
 
     def _iter_provider_batches(
         self,
-        resources_by_provider: dict[str, list[Any]],
+        resources_by_provider: dict[str, list[ResourceConfig]],
         resource_filter: list[str] | None,
     ) -> list[ProviderResourceBatch]:
         """Yield provider batches applying an optional resource name filter."""
@@ -224,7 +226,7 @@ class Orchestrator:
             )
         return batches
 
-    def validate_resources(self, resources: list[Any]) -> None:
+    def validate_resources(self, resources: list[ResourceConfig]) -> None:
         """Validate that all resources have providers that support their types.
 
         Args:
@@ -269,7 +271,7 @@ class Orchestrator:
         all_resources = self.config_manager.get_all_resources_all_providers(env_name)
 
         # Build a map of resources by provider and type for dependency resolution
-        resources_by_provider: dict[str, list[Any]] = {}
+        resources_by_provider: dict[str, list[ResourceConfig]] = {}
         for resource in all_resources:
             if resource.provider not in resources_by_provider:
                 resources_by_provider[resource.provider] = []
@@ -307,7 +309,7 @@ class Orchestrator:
         return graph
 
     def check_policies(
-        self, env_name: str, resources: list[Any], enforce: bool = False
+        self, env_name: str, resources: list[ResourceConfig], enforce: bool = False
     ) -> tuple[bool, list]:
         """Check resources against policies.
 
@@ -424,7 +426,7 @@ class Orchestrator:
         self,
         env_name: str,
         deployment_id: int,
-        resources_by_provider: dict[str, list[Any]],
+        resources_by_provider: dict[str, list[ResourceConfig]],
         resource_filter: list[str] | None,
         auto_approve: bool,
     ) -> dict[str, Any]:
@@ -438,7 +440,7 @@ class Orchestrator:
         self,
         env_name: str,
         deployment_id: int,
-        resources_by_provider: dict[str, list[Any]],
+        resources_by_provider: dict[str, list[ResourceConfig]],
         resource_filter: list[str] | None,
         auto_approve: bool,
         max_workers: int,
@@ -460,7 +462,7 @@ class Orchestrator:
         deployment_id: int,
         provider_name: str,
         provider: ProviderBase,
-        resources: list[Any],
+        resources: list[ResourceConfig],
         auto_approve: bool,
     ) -> dict[str, Any]:
         """Apply a single provider's resources."""
