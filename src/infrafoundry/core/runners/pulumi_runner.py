@@ -217,3 +217,81 @@ class PulumiRunner(BaseRunner):
             return {"valid": False, "error": "Pulumi.yaml not found"}
 
         return {"valid": True, "message": "Pulumi configuration valid"}
+
+    @override
+    def run(
+        self, provider: ProviderBase, command: str, auto_approve: bool = False
+    ) -> dict[str, Any]:
+        """Run Pulumi command for a provider.
+
+        Args:
+            provider: Provider instance
+            command: Command to run ('preview', 'up', 'destroy')
+            auto_approve: Whether to auto-approve changes
+
+        Returns:
+            Dict with command results
+        """
+        if command == "plan":
+            return self.plan(provider)
+        elif command == "apply":
+            return self.apply(provider, auto_approve=auto_approve)
+        elif command == "destroy":
+            return self.destroy(provider, auto_approve=auto_approve)
+        else:
+            return {"success": False, "error": f"Unknown command: {command}"}
+
+    @override
+    def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
+        """Get resource IDs from Pulumi state.
+
+        Args:
+            provider: Provider instance
+
+        Returns:
+            Dict mapping resource names to URNs (Pulumi resource identifiers)
+        """
+        pulumi_dir = provider.output_dir / "pulumi" / provider.name
+
+        if not pulumi_dir.exists():
+            return {}
+
+        try:
+            result = subprocess.run(
+                ["pulumi", "stack", "export"],
+                cwd=pulumi_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            state = json.loads(result.stdout)
+            resources = state.get("deployment", {}).get("resources", [])
+
+            # Extract URNs as resource identifiers
+            return {res.get("type", ""): res.get("urn", "") for res in resources if res.get("urn")}
+        except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError):
+            return {}
+
+    @override
+    def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
+        """Parse Pulumi preview for drift.
+
+        Args:
+            plan_result: Result from run() with preview command
+
+        Returns:
+            Dict with drift information
+        """
+        # Check if there were any changes in the preview
+        has_changes = plan_result.get("success", False) and plan_result.get("exit_code") == 0
+        output = plan_result.get("output", "")
+
+        # Pulumi preview shows if there are changes
+        # This is a simple heuristic - could be improved
+        if "no changes" in output.lower() or "no updates" in output.lower():
+            has_changes = False
+
+        return {
+            "has_changes": has_changes,
+            "summary": "Changes detected in Pulumi preview" if has_changes else "No changes",
+        }

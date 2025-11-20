@@ -96,6 +96,46 @@ class BaseRunner(ABC):
         """
         pass
 
+    @abstractmethod
+    def run(
+        self, provider: ProviderBase, command: str, auto_approve: bool = False
+    ) -> dict[str, Any]:
+        """Run a tool command for a provider.
+
+        Args:
+            provider: Provider instance
+            command: Command to run (e.g., 'plan', 'apply', 'destroy')
+            auto_approve: Whether to auto-approve changes
+
+        Returns:
+            Dict with command results including exit_code and success
+        """
+        pass
+
+    @abstractmethod
+    def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
+        """Extract resource IDs from tool state.
+
+        Args:
+            provider: Provider instance
+
+        Returns:
+            Dict mapping resource names to their IDs in the tool's state
+        """
+        pass
+
+    @abstractmethod
+    def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
+        """Parse plan output to detect infrastructure drift.
+
+        Args:
+            plan_result: Result dictionary from run() with plan command
+
+        Returns:
+            Dict with drift information including has_changes and summary
+        """
+        pass
+
     def get_version(self) -> str | None:
         """Get the version of the installed tool.
 
