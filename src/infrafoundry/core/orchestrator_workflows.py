@@ -14,8 +14,9 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventType
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.runners import TerraformRunner
-from infrafoundry.core.secrets import SecretManager
+from infrafoundry.core.runners import RunnerRegistry
+from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
 from infrafoundry.core.types import (
     ApplyDeploymentMetadata,
@@ -255,7 +256,7 @@ class PlanOrchestrator:
         console: Console,
         state_manager: StateManager,
         event_manager,
-        terraform_runner: TerraformRunner,
+        runner_registry: RunnerRegistry,
         get_providers: Callable[[], dict[str, ProviderBase]],
         load_resources: Callable[
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
@@ -273,7 +274,7 @@ class PlanOrchestrator:
         self.console = console
         self.state_manager = state_manager
         self.event_manager = event_manager
-        self.terraform_runner = terraform_runner
+        self.runner_registry = runner_registry
         self._get_providers = get_providers
         self._load_resources = load_resources
         self._iter_provider_batches = iter_provider_batches
@@ -307,6 +308,9 @@ class PlanOrchestrator:
         )
 
         results: dict[str, Any] = {}
+        terraform_runner = self.runner_registry.create_runner("terraform", console=self.console)
+        if not terraform_runner:
+            raise InfraFoundryError("Could not create terraform runner")
 
         try:
             self._print_header("Planning", env_name, resource_filter, style="bold cyan")
@@ -349,7 +353,7 @@ class PlanOrchestrator:
                 self._export_secrets(provider_name, env_name, provider)
 
                 self.console.print("  [dim]Running terraform plan...[/dim]")
-                tf_result = self.terraform_runner.run(provider, "plan", auto_approve=False)
+                tf_result = terraform_runner.run(provider, "plan", auto_approve=False)
                 results[provider_name] = {
                     "resources": len(provider_resources),
                     "terraform_plan": tf_result,
@@ -679,7 +683,7 @@ class DestroyOrchestrator:
         console: Console,
         state_manager: StateManager,
         event_manager,
-        terraform_runner: TerraformRunner,
+        runner_registry: RunnerRegistry,
         get_providers: Callable[[], dict[str, ProviderBase]],
         load_resources: Callable[
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
@@ -692,7 +696,7 @@ class DestroyOrchestrator:
         self.console = console
         self.state_manager = state_manager
         self.event_manager = event_manager
-        self.terraform_runner = terraform_runner
+        self.runner_registry = runner_registry
         self._get_providers = get_providers
         self._load_resources = load_resources
         self._iter_provider_batches = iter_provider_batches
@@ -723,6 +727,9 @@ class DestroyOrchestrator:
         )
 
         results: dict[str, Any] = {}
+        terraform_runner = self.runner_registry.create_runner("terraform", console=self.console)
+        if not terraform_runner:
+            raise InfraFoundryError("Could not create terraform runner")
 
         try:
             self._print_header("Destroying", env_name, resource_filter, "bold red")
@@ -749,7 +756,7 @@ class DestroyOrchestrator:
                     deployment_id, env_name, provider_name, resources
                 )
 
-                tf_result = self.terraform_runner.run(provider, "destroy", auto_approve)
+                tf_result = terraform_runner.run(provider, "destroy", auto_approve)
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)
                 results[provider_name] = {"terraform": tf_result}
 

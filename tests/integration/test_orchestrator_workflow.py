@@ -7,15 +7,19 @@ import pytest
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager
 from infrafoundry.core.orchestrator import Orchestrator
-from infrafoundry.core.secrets import SecretManager
+from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
 
 
 @pytest.fixture
 def mock_secret_manager(mock_secrets_dir):
     """Create a mock SecretManager."""
-    with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-        with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+    with patch(
+        "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+    ):
+        with patch(
+            "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+        ):
             manager = SecretManager(env_name="dev", secrets_dir=mock_secrets_dir)
             # Mock decrypt to return simple data
             manager.decrypt_file = MagicMock(return_value={"api_token": "test-token"})

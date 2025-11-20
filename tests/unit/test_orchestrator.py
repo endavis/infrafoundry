@@ -14,7 +14,7 @@ from infrafoundry.core.orchestrator import Orchestrator, OrchestratorStrictConfi
 from infrafoundry.core.orchestrator_workflows import PlanOrchestrator
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.provider import ProviderBase
-from infrafoundry.core.secrets import SecretManager
+from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
 
 
@@ -416,7 +416,7 @@ class TestPlanOrchestratorStrictMode:
             console=Mock(),
             state_manager=Mock(),
             event_manager=Mock(),
-            terraform_runner=Mock(),
+            runner_registry=Mock(),
             get_providers=lambda: {},
             load_resources=lambda env: ([], {}),
             iter_provider_batches=lambda *_args, **_kwargs: [],

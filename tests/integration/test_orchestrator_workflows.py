@@ -73,9 +73,18 @@ def orchestrator(tmp_path, mock_config, mock_providers):
 
 def mock_apply_methods(orchestrator):
     """Helper to mock methods needed for apply workflow."""
-    with patch.object(orchestrator.terraform_runner, "run", return_value={"success": True}):
-        with patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}):
-            with patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}):
+    with patch(
+        "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
+        return_value={"success": True},
+    ):
+        with patch(
+            "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+            return_value={},
+        ):
+            with patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ):
                 yield
 
 
@@ -84,7 +93,7 @@ class TestPlanOrchestrator:
 
     def test_plan_basic_workflow(self, orchestrator, mock_providers):
         """Test basic plan workflow execution."""
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.return_value = {"success": True, "changes": 2}
 
             result = orchestrator.plan(env_name="dev", dry_run=False)
@@ -114,7 +123,7 @@ class TestPlanOrchestrator:
 
     def test_plan_with_resource_filter(self, orchestrator, mock_providers, mock_config):
         """Test plan with resource filter."""
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.return_value = {"success": True, "changes": 1}
 
             result = orchestrator.plan(env_name="dev", dry_run=False, resource_filter=["web-01"])
@@ -124,7 +133,7 @@ class TestPlanOrchestrator:
 
     def test_plan_creates_deployment_record(self, orchestrator):
         """Test that plan creates a deployment record in state manager."""
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             orchestrator.plan(env_name="dev", dry_run=False)
 
             # Check deployment was created
@@ -143,7 +152,7 @@ class TestPlanOrchestrator:
         orchestrator.event_manager.subscribe(EventType.BEFORE_PLAN, capture_event)
         orchestrator.event_manager.subscribe(EventType.AFTER_PLAN, capture_event)
 
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             orchestrator.plan(env_name="dev", dry_run=False)
 
         assert EventType.BEFORE_PLAN in events_received
@@ -151,7 +160,7 @@ class TestPlanOrchestrator:
 
     def test_plan_tracks_resources_in_state(self, orchestrator):
         """Test that plan tracks resources in state manager."""
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             orchestrator.plan(env_name="dev", dry_run=False)
 
             # Check resources were tracked
@@ -171,7 +180,7 @@ class TestPlanOrchestrator:
 
     def test_plan_failure_updates_deployment_status(self, orchestrator):
         """Test that plan failure marks deployment as failed."""
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.side_effect = RuntimeError("Terraform failed")
 
             with pytest.raises(RuntimeError):
@@ -191,7 +200,7 @@ class TestPlanOrchestrator:
 
         orchestrator.event_manager.subscribe(EventType.PLAN_FAILED, capture_event)
 
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.side_effect = RuntimeError("Terraform failed")
 
             with pytest.raises(RuntimeError):
@@ -207,9 +216,15 @@ class TestApplyOrchestrator:
         """Test that apply runs plan before applying."""
         with (
             patch.object(orchestrator, "plan") as mock_plan,
-            patch.object(orchestrator.terraform_runner, "run"),
-            patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}),
-            patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}),
+            patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+                return_value={},
+            ),
+            patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ),
         ):
             orchestrator.apply(env_name="dev", auto_approve=True)
 
@@ -221,9 +236,18 @@ class TestApplyOrchestrator:
     def test_apply_basic_workflow(self, orchestrator, mock_providers):
         """Test basic apply workflow execution."""
         with (
-            patch.object(orchestrator.terraform_runner, "run", return_value={"success": True}),
-            patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}),
-            patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
+                return_value={"success": True},
+            ),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+                return_value={},
+            ),
+            patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ),
         ):
             result = orchestrator.apply(env_name="dev", auto_approve=True)
 
@@ -233,9 +257,18 @@ class TestApplyOrchestrator:
     def test_apply_creates_deployment_record(self, orchestrator):
         """Test that apply creates a deployment record."""
         with (
-            patch.object(orchestrator.terraform_runner, "run", return_value={"success": True}),
-            patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}),
-            patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
+                return_value={"success": True},
+            ),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+                return_value={},
+            ),
+            patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ),
         ):
             orchestrator.apply(env_name="dev", auto_approve=True)
 
@@ -249,9 +282,18 @@ class TestApplyOrchestrator:
     def test_apply_captures_rollback_snapshot(self, orchestrator):
         """Test that apply captures configuration snapshot for rollback."""
         with (
-            patch.object(orchestrator.terraform_runner, "run", return_value={"success": True}),
-            patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}),
-            patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
+                return_value={"success": True},
+            ),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+                return_value={},
+            ),
+            patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ),
         ):
             orchestrator.apply(env_name="dev", auto_approve=True)
 
@@ -263,9 +305,18 @@ class TestApplyOrchestrator:
     def test_apply_with_resource_filter(self, orchestrator, mock_providers):
         """Test apply with resource filter."""
         with (
-            patch.object(orchestrator.terraform_runner, "run", return_value={"success": True}),
-            patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}),
-            patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
+                return_value={"success": True},
+            ),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+                return_value={},
+            ),
+            patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ),
         ):
             result = orchestrator.apply(
                 env_name="dev", auto_approve=True, resource_filter=["web-01"]
@@ -285,9 +336,18 @@ class TestApplyOrchestrator:
         orchestrator.event_manager.subscribe(EventType.AFTER_APPLY, capture_event)
 
         with (
-            patch.object(orchestrator.terraform_runner, "run", return_value={"success": True}),
-            patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}),
-            patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
+                return_value={"success": True},
+            ),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+                return_value={},
+            ),
+            patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ),
         ):
             orchestrator.apply(env_name="dev", auto_approve=True)
 
@@ -296,7 +356,7 @@ class TestApplyOrchestrator:
 
     def test_apply_failure_updates_deployment_status(self, orchestrator):
         """Test that apply failure marks deployment as failed."""
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.side_effect = RuntimeError("Apply failed")
 
             with pytest.raises(RuntimeError):
@@ -317,9 +377,15 @@ class TestApplyOrchestrator:
         orchestrator.event_manager.subscribe(EventType.APPLY_FAILED, capture_event)
 
         with (
-            patch.object(orchestrator.terraform_runner, "run") as mock_tf,
-            patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}),
-            patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}),
+            patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf,
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+                return_value={},
+            ),
+            patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ),
         ):
             # Make terraform fail during apply (not plan)
             mock_tf.side_effect = [{"success": True}, RuntimeError("Apply failed")]
@@ -335,7 +401,7 @@ class TestDestroyOrchestrator:
 
     def test_destroy_basic_workflow(self, orchestrator, mock_providers):
         """Test basic destroy workflow execution."""
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.return_value = {"success": True, "destroyed": 2}
 
             result = orchestrator.destroy(env_name="dev", auto_approve=True)
@@ -345,7 +411,7 @@ class TestDestroyOrchestrator:
 
     def test_destroy_creates_deployment_record(self, orchestrator):
         """Test that destroy creates a deployment record."""
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             orchestrator.destroy(env_name="dev", auto_approve=True)
 
             # Check deployment was created
@@ -371,7 +437,7 @@ class TestDestroyOrchestrator:
         """Test that destroy proceeds when user confirms."""
         with (
             patch("builtins.input", return_value="yes"),
-            patch.object(orchestrator.terraform_runner, "run") as mock_tf,
+            patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf,
         ):
             mock_tf.return_value = {"success": True}
 
@@ -382,7 +448,7 @@ class TestDestroyOrchestrator:
 
     def test_destroy_with_resource_filter(self, orchestrator):
         """Test destroy with resource filter."""
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             result = orchestrator.destroy(
                 env_name="dev", auto_approve=True, resource_filter=["web-01"]
             )
@@ -400,7 +466,7 @@ class TestDestroyOrchestrator:
         orchestrator.event_manager.subscribe(EventType.BEFORE_DESTROY, capture_event)
         orchestrator.event_manager.subscribe(EventType.AFTER_DESTROY, capture_event)
 
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             orchestrator.destroy(env_name="dev", auto_approve=True)
 
         assert EventType.BEFORE_DESTROY in events_received
@@ -408,7 +474,7 @@ class TestDestroyOrchestrator:
 
     def test_destroy_tracks_resources_as_destroyed(self, orchestrator):
         """Test that destroy marks resources as destroyed in state."""
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             orchestrator.destroy(env_name="dev", auto_approve=True)
 
             # Resources should be tracked (state updates happen in _run_terraform mock)
@@ -417,7 +483,7 @@ class TestDestroyOrchestrator:
 
     def test_destroy_failure_updates_deployment_status(self, orchestrator):
         """Test that destroy failure marks deployment as failed."""
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.side_effect = RuntimeError("Destroy failed")
 
             with pytest.raises(RuntimeError):
@@ -453,7 +519,7 @@ class TestMultiProviderWorkflow:
         k8s_resource.config = {}
         mock_config["resources"].append(k8s_resource)
 
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             result = orchestrator.plan(env_name="dev", dry_run=False)
 
             # Both providers should be processed
@@ -485,9 +551,18 @@ class TestMultiProviderWorkflow:
         mock_config["resources"].append(k8s_resource)
 
         with (
-            patch.object(orchestrator.terraform_runner, "run", return_value={"success": True}),
-            patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}),
-            patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
+                return_value={"success": True},
+            ),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+                return_value={},
+            ),
+            patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ),
         ):
             result = orchestrator.apply(env_name="dev", auto_approve=True, parallel=False)
 
@@ -515,7 +590,7 @@ class TestMultiProviderWorkflow:
         opn_resource.config = {}
         mock_config["resources"].append(opn_resource)
 
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             result = orchestrator.destroy(env_name="dev", auto_approve=True)
 
             # Both providers should be processed
@@ -529,9 +604,18 @@ class TestWorkflowStateManagement:
     def test_deployment_lifecycle_plan_to_apply(self, orchestrator):
         """Test complete deployment lifecycle from plan to apply."""
         with (
-            patch.object(orchestrator.terraform_runner, "run", return_value={"success": True}),
-            patch.object(orchestrator.terraform_runner, "get_resource_ids", return_value={}),
-            patch.object(orchestrator.ansible_runner, "run", return_value={"success": True}),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
+                return_value={"success": True},
+            ),
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
+                return_value={},
+            ),
+            patch(
+                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+                return_value={"success": True},
+            ),
         ):
             # Plan
             orchestrator.plan(env_name="dev", dry_run=False)
@@ -550,7 +634,7 @@ class TestWorkflowStateManagement:
 
     def test_resource_state_transitions(self, orchestrator):
         """Test resource state transitions through workflow."""
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             # Plan - resources should be PLANNED
             orchestrator.plan(env_name="dev", dry_run=False)
             resources = orchestrator.state_manager.get_resources(environment="dev")
@@ -558,7 +642,7 @@ class TestWorkflowStateManagement:
 
     def test_deployment_metadata_captured(self, orchestrator):
         """Test that deployment metadata is properly captured."""
-        with patch.object(orchestrator.terraform_runner, "run"):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run"):
             orchestrator.plan(env_name="dev", dry_run=True, resource_filter=["web-01"])
 
             deployments = orchestrator.state_manager.get_deployment_history(environment="dev")

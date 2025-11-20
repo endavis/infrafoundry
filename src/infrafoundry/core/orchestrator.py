@@ -26,10 +26,9 @@ from infrafoundry.core.orchestrator_workflows import (
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.runners import AnsibleRunner, TerraformRunner
-from infrafoundry.core.secrets import SecretManager
+from infrafoundry.core.runners import AnsibleRunner, TerraformRunner, RunnerRegistry
+from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
-
 
 @dataclass(slots=True)
 class OrchestratorStrictConfig:
@@ -82,20 +81,22 @@ class Orchestrator:
         self.policy_engine = PolicyEngine(policy_dir)
         self.notification_manager = NotificationManager(notifications_config)
 
-        # Initialize helper classes for orchestration tasks (no secret_manager at init)
-        self.terraform_runner = TerraformRunner(console=self.console)
-        self.ansible_runner = AnsibleRunner(self.console)
+        # Set up runner registry
+        self.runner_registry = RunnerRegistry()
+        self.runner_registry.register(TerraformRunner)
+        self.runner_registry.register(AnsibleRunner)
+
+        # Initialize helper classes for orchestration tasks
         self.policy_checker = PolicyChecker(self.policy_engine, self.event_manager, self.console)
         self.drift_detector = DriftDetector(
             self.config_manager,
-            self.terraform_runner,
+            self.runner_registry,
             self.event_manager,
             self.providers,
             self.console,
         )
         self.deployment_executor = DeploymentExecutor(
-            self.terraform_runner,
-            self.ansible_runner,
+            self.runner_registry,
             self.state_manager,
             self.event_manager,
             self.providers,
@@ -112,7 +113,7 @@ class Orchestrator:
             console=self.console,
             state_manager=self.state_manager,
             event_manager=self.event_manager,
-            terraform_runner=self.terraform_runner,
+            runner_registry=self.runner_registry,
             get_providers=lambda: self.providers,
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
@@ -138,7 +139,7 @@ class Orchestrator:
             console=self.console,
             state_manager=self.state_manager,
             event_manager=self.event_manager,
-            terraform_runner=self.terraform_runner,
+            runner_registry=self.runner_registry,
             get_providers=lambda: self.providers,
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,

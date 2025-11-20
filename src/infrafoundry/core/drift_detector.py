@@ -12,7 +12,7 @@ from infrafoundry.core.exceptions import (
     TerraformError,
 )
 from infrafoundry.core.provider import ProviderBase
-from infrafoundry.core.runners import TerraformRunner
+from infrafoundry.core.runners import RunnerRegistry
 
 
 class DriftDetector:
@@ -21,7 +21,7 @@ class DriftDetector:
     def __init__(
         self,
         config_manager: ConfigManager,
-        terraform_runner: TerraformRunner,
+        runner_registry: RunnerRegistry,
         event_manager: EventManager,
         providers: dict[str, ProviderBase],
         console: Console | None = None,
@@ -30,13 +30,13 @@ class DriftDetector:
 
         Args:
             config_manager: Configuration manager instance
-            terraform_runner: Terraform runner for plan execution
+            runner_registry: Registry for creating tool runners
             event_manager: Event manager for notifications
             providers: Dict of registered provider instances
             console: Rich console for output (creates default if None)
         """
         self.config_manager = config_manager
-        self.terraform_runner = terraform_runner
+        self.runner_registry = runner_registry
         self.event_manager = event_manager
         self.providers = providers
         self.console = console or Console()
@@ -76,6 +76,11 @@ class DriftDetector:
         results = {}
         drift_detected = False
 
+        # Dynamically create the runner
+        terraform_runner = self.runner_registry.create_runner("terraform", console=self.console)
+        if not terraform_runner:
+            raise InfraFoundryError("Could not create terraform runner")
+
         try:
             # Get all resources and discover providers dynamically
             all_resources = self.config_manager.get_all_resources_all_providers(env_name)
@@ -97,10 +102,10 @@ class DriftDetector:
 
                 # Run terraform plan to detect drift
                 # This will compare current state with declared config
-                plan_result = self.terraform_runner.run(provider, "plan", auto_approve=False)
+                plan_result = terraform_runner.run(provider, "plan", auto_approve=False)
 
                 # Parse the plan output to detect changes
-                drift_info = self.terraform_runner.parse_plan_for_drift(plan_result)
+                drift_info = terraform_runner.parse_plan_for_drift(plan_result)
 
                 if drift_info["has_changes"]:
                     drift_detected = True

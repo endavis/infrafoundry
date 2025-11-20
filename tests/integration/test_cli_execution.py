@@ -61,8 +61,13 @@ class TestCLIPlan:
     def test_plan_basic(self, cli_runner, test_env, mock_orchestrator):
         """Test basic plan execution."""
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-                with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
+                with patch(
+                    "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
+                    return_value=None,
+                ):
                     result = cli_runner.invoke(cli, ["plan", "--env", "dev"], env=test_env)
 
                     assert result.exit_code == 0
@@ -74,8 +79,13 @@ class TestCLIPlan:
     def test_plan_dry_run(self, cli_runner, test_env, mock_orchestrator):
         """Test plan with --dry-run."""
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-                with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
+                with patch(
+                    "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
+                    return_value=None,
+                ):
                     result = cli_runner.invoke(
                         cli, ["plan", "--env", "dev", "--dry-run"], env=test_env
                     )
@@ -87,8 +97,13 @@ class TestCLIPlan:
     def test_plan_with_policies(self, cli_runner, test_env, mock_orchestrator):
         """Test plan with --enforce-policies."""
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-                with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
+                with patch(
+                    "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
+                    return_value=None,
+                ):
                     result = cli_runner.invoke(
                         cli, ["plan", "--env", "dev", "--enforce-policies"], env=test_env
                     )
@@ -101,8 +116,13 @@ class TestCLIPlan:
         mock_orchestrator.plan.side_effect = Exception("Plan failed")
 
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-                with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
+                with patch(
+                    "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
+                    return_value=None,
+                ):
                     result = cli_runner.invoke(cli, ["plan", "--env", "dev"], env=test_env)
 
                     assert result.exit_code == 1
@@ -116,8 +136,13 @@ class TestCLIApply:
     def test_apply_auto_approve(self, cli_runner, test_env, mock_orchestrator):
         """Test apply with --auto-approve."""
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-                with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
+                with patch(
+                    "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
+                    return_value=None,
+                ):
                     result = cli_runner.invoke(
                         cli, ["apply", "--env", "dev", "--auto-approve"], env=test_env
                     )
@@ -129,8 +154,13 @@ class TestCLIApply:
     def test_apply_parallel(self, cli_runner, test_env, mock_orchestrator):
         """Test apply with --parallel."""
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-                with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
+                with patch(
+                    "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
+                    return_value=None,
+                ):
                     result = cli_runner.invoke(
                         cli,
                         ["apply", "--env", "dev", "--auto-approve", "--parallel"],
@@ -145,8 +175,13 @@ class TestCLIApply:
         mock_orchestrator.apply.side_effect = Exception("Apply failed")
 
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-                with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
+                with patch(
+                    "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
+                    return_value=None,
+                ):
                     result = cli_runner.invoke(
                         cli, ["apply", "--env", "dev", "--auto-approve"], env=test_env
                     )
@@ -162,8 +197,13 @@ class TestCLIDestroy:
     def test_destroy_auto_approve(self, cli_runner, test_env, mock_orchestrator):
         """Test destroy with --auto-approve."""
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-                with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
+                with patch(
+                    "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
+                    return_value=None,
+                ):
                     result = cli_runner.invoke(
                         cli, ["destroy", "--env", "dev", "--auto-approve"], env=test_env
                     )
@@ -177,8 +217,13 @@ class TestCLIDestroy:
         mock_orchestrator.destroy.side_effect = Exception("Destroy failed")
 
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-                with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
+                with patch(
+                    "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
+                    return_value=None,
+                ):
                     result = cli_runner.invoke(
                         cli, ["destroy", "--env", "dev", "--auto-approve"], env=test_env
                     )
@@ -192,8 +237,12 @@ class TestCLIEnvs:
 
     def test_envs_list(self, cli_runner, test_env):
         """Test listing environments."""
-        with patch("infrafoundry.core.secrets.SecretManager._check_sops_installed"):
-            with patch("infrafoundry.core.secrets.SecretManager._check_age_key"):
+        with patch(
+            "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+        ):
+            with patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ):
                 result = cli_runner.invoke(cli, ["envs"], env=test_env)
 
                 # Command should execute (exit codes may vary based on implementation)

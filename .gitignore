@@ -35,7 +35,7 @@ env/
 
 # User configuration (use example-config/ as template, or separate repo)
 envs/
-secrets/
+!src/infrafoundry/core/secrets/
 
 # Secrets and sensitive data
 *.key
@@ -83,8 +83,7 @@ output/
 *-decrypted.yaml
 REFACTORING_TODO.md
 
-# Manual test scripts
-test_*.py
+
 
 # Temporary files
 tmp/

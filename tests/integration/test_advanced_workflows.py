@@ -15,7 +15,7 @@ import pytest
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.orchestrator import Orchestrator
-from infrafoundry.core.secrets import SecretManager
+from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState
 
 
@@ -138,7 +138,7 @@ class TestDriftDetection:
         orchestrator, provider = advanced_orchestrator
 
         # Mock terraform to show no changes
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.return_value = {
                 "returncode": 0,
                 "stdout": "No changes. Infrastructure is up-to-date.",
@@ -155,7 +155,7 @@ class TestDriftDetection:
         orchestrator, provider = advanced_orchestrator
 
         # Mock terraform to show changes
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.return_value = {
                 "returncode": 0,
                 "stdout": "Plan: 0 to add, 2 to change, 0 to destroy.",
@@ -183,7 +183,7 @@ class TestDriftDetection:
 
         orchestrator.register_provider(opnsense_provider)
 
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.return_value = {"returncode": 0, "stdout": "No changes."}
 
             with patch.object(provider, "generate_terraform"):
@@ -246,7 +246,7 @@ class TestRollbackScenarios:
         with patch("subprocess.run") as mock_subprocess:
             mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
-            with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+            with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
                 mock_tf.return_value = {"exit_code": 0, "success": True}
 
                 # Perform rollback
@@ -264,7 +264,7 @@ class TestRollbackScenarios:
             environment="dev", command="apply", user="test", metadata={}
         )
 
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             # Simulate terraform failure
             mock_tf.return_value = {"exit_code": 1, "success": False}
 
@@ -277,9 +277,9 @@ class TestRollbackScenarios:
 
     def test_rollback_nonexistent_deployment(self, advanced_orchestrator):
         """Test rollback with invalid deployment ID."""
-        orchestrator, provider = advanced_orchestrator
+        orchestrator, _provider = advanced_orchestrator
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             # Should raise error for nonexistent deployment
             orchestrator.rollback(99999, auto_approve=True)
 
@@ -333,10 +333,12 @@ firewall_rules:
         with patch("subprocess.run") as mock_subprocess:
             mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
-            with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+            with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
                 mock_tf.return_value = {"exit_code": 0, "success": True}
 
-                with patch.object(orchestrator.ansible_runner, "run") as mock_ansible:
+                with patch(
+                    "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run"
+                ) as mock_ansible:
                     mock_ansible.return_value = {"exit_code": 0, "success": True}
 
                     # Apply should handle provider ordering
@@ -390,7 +392,7 @@ deployments:
         with patch("subprocess.run") as mock_subprocess:
             mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
-            with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+            with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
                 mock_tf.return_value = {"exit_code": 0, "success": True}
 
                 # Apply with parallel execution
@@ -404,7 +406,7 @@ deployments:
         """Test handling when one provider fails during apply."""
         orchestrator, provider = advanced_orchestrator
 
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             # Simulate failure
             mock_tf.return_value = {"exit_code": 1, "success": False}
 
@@ -442,7 +444,7 @@ class TestErrorRecoveryAndCleanup:
         """Test cleanup after apply failure."""
         orchestrator, provider = advanced_orchestrator
 
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.side_effect = Exception("Terraform crashed")
 
             with patch.object(provider, "generate_terraform"):
@@ -459,7 +461,7 @@ class TestErrorRecoveryAndCleanup:
         initial_deployments = orchestrator.state_manager.get_deployment_history("dev", limit=10)
         initial_count = len(initial_deployments)
 
-        with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.side_effect = Exception("Infrastructure error")
 
             with patch.object(provider, "generate_terraform"):
@@ -484,7 +486,7 @@ class TestErrorRecoveryAndCleanup:
         with patch("subprocess.run") as mock_subprocess:
             mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
-            with patch.object(orchestrator.terraform_runner, "run") as mock_tf:
+            with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
                 mock_tf.return_value = {"exit_code": 0, "success": True}
 
                 with patch.object(provider, "generate_terraform"):
