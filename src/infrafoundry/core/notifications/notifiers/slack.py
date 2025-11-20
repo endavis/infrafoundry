@@ -156,4 +156,4 @@ class SlackNotifier(Notifier):
         elif "policy" in event_type.lower():
             return "🛡️"
         else:
-            return "ℹ️"
+            return "(i)"

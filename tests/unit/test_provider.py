@@ -10,7 +10,7 @@ from infrafoundry.core.provider import ProviderBase, ResourceConfig
 class TestProviderImplementation(ProviderBase):
     """Test implementation of ProviderBase for testing."""
 
-    def __init__(self, name: str, config_dir: Path, output_dir: Path):
+    def __init__(self, name: str, config_dir: Path, output_dir: Path) -> None:
         """Initialize test provider."""
         super().__init__(name, config_dir, output_dir)
 

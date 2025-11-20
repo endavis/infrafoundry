@@ -1,3 +1,4 @@
+
 """Policy validation for infrastructure resources."""
 
 from typing import Any
@@ -101,7 +102,7 @@ class PolicyChecker:
                 self.console.print(f"\n[dim]Info ({len(infos)}):[/dim]")
                 for v in infos:
                     self.console.print(
-                        f"  [dim]ℹ[/dim] {v.resource_name} ({v.provider}): {v.message}"
+                        f"  [dim](i)[/dim] {v.resource_name} ({v.provider}): {v.message}"
                     )
 
         # Check if policies passed

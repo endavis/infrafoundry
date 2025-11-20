@@ -108,7 +108,7 @@ class ValidationReport:
         if summary["warnings"]:
             lines.append(f"  ⚠ Warnings: {summary['warnings']}")
         if summary["info"]:
-            lines.append(f"  ℹ Info: {summary['info']}")
+            lines.append(f"  (i) Info: {summary['info']}")
 
         lines.append("\nDetails:")
         for result in self.results:

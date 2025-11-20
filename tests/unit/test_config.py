@@ -4,6 +4,7 @@ import pytest
 import yaml
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.exceptions import InfraFoundryError
 
 
 @pytest.mark.unit
@@ -145,7 +146,7 @@ class TestConfigManager:
 
         config = ConfigManager(envs_dir)
 
-        with pytest.raises(Exception):  # Should raise some exception
+        with pytest.raises(InfraFoundryError):  # Should raise some exception
             config.load_environment("bad-yaml")
 
     def test_list_environments_empty_directory(self, temp_dir):

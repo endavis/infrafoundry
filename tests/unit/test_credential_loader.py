@@ -61,8 +61,7 @@ class TestCredentialLoader:
         env_dir = temp_config_dir / "envs" / "dev"
         env_dir.mkdir(parents=True)
 
-        # Mock SOPS decryption of settings.yaml with provider_settings
-        mock_data = {
+        _mock_data = {
             "provider_settings": {
                 "proxmox": {
                     "api_url": "https://pve.example.com:8006",
