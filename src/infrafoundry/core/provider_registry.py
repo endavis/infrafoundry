@@ -4,6 +4,7 @@ import importlib
 import logging
 from pathlib import Path
 
+from infrafoundry.core.exceptions import ProviderInitializationError
 from infrafoundry.core.provider import ProviderBase
 
 logger = logging.getLogger(__name__)
@@ -53,9 +54,12 @@ class ProviderRegistry:
 
             try:
                 self._discover_and_register_provider(provider_dir.name)
+            except ProviderInitializationError as e:
+                logger.debug(f"Could not load provider '{provider_dir.name}': {e}")
             except Exception as e:
+                # Wrap unexpected errors during provider discovery
                 logger.debug(
-                    f"Could not load provider '{provider_dir.name}': {e}",
+                    f"Unexpected error loading provider '{provider_dir.name}': {e}",
                     exc_info=True,
                 )
 
@@ -80,7 +84,12 @@ class ProviderRegistry:
                 self.register_provider(provider_instance)
                 logger.debug(f"Registered provider: {provider_name}")
             except Exception as e:
+                # Wrap instantiation failures as ProviderInitializationError
                 logger.debug(f"Failed to instantiate {provider_name}: {e}")
+                raise ProviderInitializationError(
+                    f"Failed to initialize provider '{provider_name}'",
+                    context={"provider": provider_name, "error": str(e)},
+                ) from e
 
     def _find_provider_class(self, module, provider_name: str) -> type[ProviderBase] | None:
         """Find the provider class in a module.
