@@ -8,6 +8,7 @@ from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
+from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -70,8 +71,13 @@ class ConfigManager(PathBasedManager):
             raise FileNotFoundError(error_msg)
 
         self._log_debug(f"Loading environment config: {env_name}")
-        with open(settings_file) as f:
-            data = yaml.safe_load(f)
+        try:
+            with open(settings_file) as f:
+                data = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            error_msg = f"Invalid YAML in {settings_file}: {e}"
+            self._log_error(error_msg)
+            raise InvalidConfigurationError(error_msg) from e
 
         if not data:
             # Ensure we return an empty but valid EnvironmentConfig if file is empty
