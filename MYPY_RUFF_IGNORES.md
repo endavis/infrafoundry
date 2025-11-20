@@ -102,8 +102,8 @@ Once in-code ignores are fixed, incrementally enable these rules by removing fro
 ### Session Progress Summary
 
 **Starting Point:** 120 mypy errors across 40 files
-**Current Status:** 57 mypy errors across 20 files
-**Total Fixed:** 63 errors (52% reduction) ✅
+**Current Status:** 51 mypy errors across 14 files
+**Total Fixed:** 69 errors (57% reduction) ✅
 
 ### Completed Work ✅
 
@@ -152,27 +152,43 @@ Once in-code ignores are fixed, incrementally enable these rules by removing fro
   - `isc_to_kea_migration.py`: Cast `dict.get()` to `str` (3 locations)
 - **Result:** Reduced errors from 66 → 57 (-9 errors)
 
-### Remaining Work (57 errors)
+#### 7. Quick Wins - Simple Type Fixes (6 errors)
+- Fixed "any" vs "Any" typo and added missing import
+  - `dependency_graph.py`: Changed `any` to `Any`, added `from typing import Any`
+- Added explicit variable type annotations
+  - `allowed_providers.py`: Added `violations: list[PolicyViolation]`
+  - `proxmox/__init__.py`: Added `merged_cloud_init: dict[Any, Any]`
+- Fixed ansible_runner method signature override
+  - Changed `run()` signature to match base class
+  - Added command routing logic for "plan", "apply", "destroy"
+  - Updated call site in deployment_executor.py
+  - Added `@override` decorator
+- **Result:** Reduced errors from 57 → 51 (-6 errors)
+
+### Remaining Work (51 errors)
 
 **Top Error Categories:**
 1. **[arg-type] Argument type issues (34 errors)** - Type mismatches in function arguments
-   - Includes complex kwargs unpacking in api_client.py (23 related errors)
+   - Complex kwargs unpacking in api_client.py (23 related errors)
    - Jinja2 Environment kwargs type issues (5 errors)
    - Proxmox validator optional str vs str (5 errors)
+   - Other argument mismatches (1 error)
 2. **[union-attr] Attribute access (4 errors)** - Accessing attributes on union types
 3. **[return-value] Return type mismatches (3 errors)** - Incompatible return values
-4. **[call-arg] Call argument issues (3 errors)** - Missing/incompatible call arguments
-5. **[attr-defined] Attribute undefined (3 errors)** - Missing attributes on classes
-6. **[assignment] Assignment issues (3 errors)** - Type assignment mismatches
-7. **[var-annotated] Variable annotations (2 errors)** - Missing type annotations
-8. **[abstract] Abstract class (2 errors)** - BaseCredentialLoader instantiation
-9. **[valid-type] Invalid type (1 error)** - Using "any" instead of "Any"
-10. **[override] Override signature (1 error)** - ansible_runner.run() signature mismatch
-11. **[unreachable] Unreachable code (1 error)** - Dead code path
+4. **[attr-defined] Attribute undefined (3 errors)** - Missing attributes on classes
+5. **[assignment] Assignment issues (3 errors)** - Type assignment mismatches
+6. **[call-arg] Call argument issues (2 errors)** - Missing/incompatible call arguments
+7. **[abstract] Abstract class (2 errors)** - BaseCredentialLoader instantiation
+
+**Completed Quick Wins:** ✅
+- ~~[valid-type]~~ Fixed "any" vs "Any" typo
+- ~~[var-annotated]~~ Added variable type annotations
+- ~~[override]~~ Fixed ansible_runner.run() signature
+- ~~[unreachable]~~ (bonus fix, eliminated with other changes)
 
 **Next Priorities:**
-1. Fix complex kwargs unpacking in api_client.py (largest contributor)
-2. Fix Proxmox validator optional parameter handling
-3. Fix ansible_runner.run() override signature
-4. Fix "any" vs "Any" typo in dependency_graph.py
+1. Fix complex kwargs unpacking in api_client.py (largest contributor - 23 errors)
+2. Fix Proxmox validator optional parameter handling (5 errors)
+3. Fix Jinja2 Environment kwargs issues (5 errors)
+4. Fix union-attr attribute access patterns (4 errors)
 5. Continue incremental improvements toward strict typing
