@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from ..services.isc_dhcp import ISCDHCPService
 from .base import BaseComponentManager
@@ -178,7 +178,7 @@ class _DHCPv4Converter(_BaseDHCPConverter):
     ) -> str:
         hostname = static_map.get("hostname")
         if hostname:
-            return hostname
+            return cast(str, hostname)
         compact_mac = identifier.replace(":", "")
         return f"{interface}-{compact_mac[:8]}"
 
@@ -188,7 +188,7 @@ class _DHCPv6Converter(_BaseDHCPConverter):
 
     def _prefix_length(self, isc_config: dict[str, Any]) -> str:
         prefix_range = isc_config.get("prefixrange", {}) or {}
-        return prefix_range.get("prefixlength", "64")
+        return cast(str, prefix_range.get("prefixlength", "64"))
 
     def _subnet_cidr(self, isc_config: dict[str, Any]) -> str | None:
         subnet = isc_config.get("subnet")
@@ -237,7 +237,7 @@ class _DHCPv6Converter(_BaseDHCPConverter):
     ) -> str:
         hostname = static_map.get("hostname")
         if hostname:
-            return hostname
+            return cast(str, hostname)
         return f"{interface}-{identifier[:16]}"
 
     def _reservation_subnet(
