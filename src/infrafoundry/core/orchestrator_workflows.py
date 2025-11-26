@@ -317,7 +317,7 @@ class PlanOrchestrator:
             all_resources, resources_by_provider = self._load_resources(env_name)
 
             if self._has_policies():
-                self._check_policies(env_name, all_resources, enforce=enforce_policies)
+                self._check_policies(env_name, all_resources, enforce_policies)
 
             providers = self._get_providers()
             for batch in self._iter_provider_batches(resources_by_provider, resource_filter):

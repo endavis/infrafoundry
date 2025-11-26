@@ -120,8 +120,10 @@ class Orchestrator:
             iter_provider_batches=self._iter_provider_batches,
             validate_resources=self.validate_resources,
             has_policies=lambda: bool(self.policy_engine.policies),
-            check_policies=lambda env, resources, enforce: self.check_policies(
-                env, resources, enforce=enforce
+            check_policies=(
+                lambda env, resources, enforce: (
+                    self.check_policies(env, resources, enforce=enforce), None
+                )[1]
             ),
             secret_manager_factory=lambda env: SecretManager(env_name=env),
             get_current_user=lambda: self._current_user,
