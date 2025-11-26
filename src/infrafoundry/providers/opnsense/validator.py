@@ -260,22 +260,44 @@ class OPNsenseValidator:
         Returns:
             Dict of existing interface names
         """
-        data = self.api_validator.fetch_json(
-            url=f"{api_url}/api/interfaces/overview/export",
-            auth=(api_key, api_secret),
-            verify_ssl=False,
-            timeout=10,
-            check_name="opnsense_get_interfaces",
-            error_message="Could not retrieve existing interfaces (status {status})",
-            error_level=ValidationLevel.WARNING,
+        data = cast(
+            Any,
+            self.api_validator.fetch_json(
+                url=f"{api_url}/api/interfaces/overview/export",
+                auth=(api_key, api_secret),
+                verify_ssl=False,
+                timeout=10,
+                check_name="opnsense_get_interfaces",
+                error_message="Could not retrieve existing interfaces (status {status})",
+                error_level=ValidationLevel.WARNING,
+            ),
         )
         if not data:
             return {}
 
         interfaces: dict[str, InterfaceData] = {}
-        for iface_name, iface_data in data.items():
-            if isinstance(iface_data, dict):
-                interfaces[iface_name] = cast(InterfaceData, iface_data)
+        # API may return a dict keyed by interface name, or a list of interface dicts.
+        if isinstance(data, dict):
+            for iface_name, iface_data in data.items():
+                if isinstance(iface_data, dict):
+                    interfaces[iface_name] = cast(InterfaceData, iface_data)
+            return interfaces
+
+        if isinstance(data, list):
+            for iface_data in data:
+                if not isinstance(iface_data, dict):
+                    continue
+                name = (
+                    iface_data.get("name")
+                    or iface_data.get("device")
+                    or iface_data.get("if")
+                    or iface_data.get("interface")
+                )
+                if name:
+                    interfaces[str(name)] = cast(InterfaceData, iface_data)
+            return interfaces
+
+        # Unexpected structure, return empty to avoid crashes while keeping validation non-fatal.
         return interfaces
 
     def _validate_firewall_rules(
