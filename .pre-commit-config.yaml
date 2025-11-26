@@ -22,3 +22,9 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+      - id: tests
+        name: tests
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        types: [python]
