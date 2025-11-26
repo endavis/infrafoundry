@@ -193,10 +193,25 @@ class TerraformRunner(BaseRunner):
         if auto_approve and command in {"apply", "destroy"}:
             cmd.append("-auto-approve")
 
-        # Run command with environment variables
-        result = subprocess.run(cmd, cwd=tf_dir, capture_output=False, env=env)
+        # Run command with environment variables; capture output for plan so drift parsing works
+        capture = command == "plan"
+        result = subprocess.run(
+            cmd,
+            cwd=tf_dir,
+            capture_output=capture,
+            text=capture,
+            env=env,
+        )
 
-        return {"exit_code": result.returncode, "success": result.returncode == 0}
+        response: dict[str, Any] = {
+            "exit_code": result.returncode,
+            "success": result.returncode == 0,
+        }
+        if capture:
+            response["output"] = result.stdout or ""
+            response["error"] = result.stderr or ""
+
+        return response
 
     def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
         """Extract Terraform resource IDs from state.
