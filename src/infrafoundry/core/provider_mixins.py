@@ -8,7 +8,7 @@ import json
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, FileSystemLoader, Template, TemplateNotFound
 
@@ -16,6 +16,18 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import TemplateError
 from infrafoundry.core.provider import ResourceConfig
+
+if TYPE_CHECKING:
+    # Type stubs for mixin expectations - not used at runtime
+    from typing import Protocol
+
+    class _TerraformGeneratorBase(Protocol):
+        """Protocol defining attributes expected by TerraformGeneratorMixin."""
+
+        config_dir: Path
+        terraform_dir: Path
+
+        def _write_terraform_file(self, filename: str, content: str) -> None: ...
 
 
 class TemplateRendererMixin:
@@ -63,16 +75,14 @@ class TemplateRendererMixin:
             self.template_dir = provider_dir / "templates"
 
         # Set up Jinja2 environment with defaults
-        env_defaults = {
-            "trim_blocks": True,
-            "lstrip_blocks": True,
-            "keep_trailing_newline": True,
-        }
-        env_defaults.update(env_kwargs)
-
+        # Pass parameters explicitly for proper type checking
+        # env_kwargs can override defaults or provide additional parameters
         self.jinja_env = Environment(
             loader=FileSystemLoader(str(self.template_dir)),
-            **env_defaults,
+            trim_blocks=env_kwargs.pop("trim_blocks", True),
+            lstrip_blocks=env_kwargs.pop("lstrip_blocks", True),
+            keep_trailing_newline=env_kwargs.pop("keep_trailing_newline", True),
+            **env_kwargs,  # Pass through any additional parameters
         )
 
         # Register common filters
@@ -316,9 +326,22 @@ class ResourceGrouperMixin:
 
 
 class TerraformGeneratorMixin:
-    """Mixin providing helpers for generating terraform.tfvars files."""
+    """Mixin providing helpers for generating terraform.tfvars files.
+
+    This mixin expects the following attributes from the mixed-in class:
+    - config_dir: Path to configuration directory
+    - terraform_dir: Path to terraform output directory
+    - _write_terraform_file(filename, content): Method to write terraform files
+    """
 
     _TFVARS_HEADER = "# Configuration from settings.yaml\n"
+
+    if TYPE_CHECKING:
+        # Declare expected attributes for type checking
+        config_dir: Path
+        terraform_dir: Path
+
+        def _write_terraform_file(self, filename: str, content: str) -> None: ...
 
     def _load_environment_config(self) -> EnvironmentConfig | None:
         """Load current environment configuration if available."""

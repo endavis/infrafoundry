@@ -51,7 +51,8 @@ class CredentialLoader:
         for name, loader_class in self.PROVIDER_LOADERS.items():
             # Create a temporary instance to get properties
             temp_secrets_dir = Path("/tmp")
-            loader = loader_class(temp_secrets_dir, False)
+            # Loader classes in registry are concrete implementations, not abstract
+            loader = loader_class(temp_secrets_dir, False)  # type: ignore[abstract]
             result[name] = {
                 "file": loader.credential_file,
                 "fields": loader.field_mapping,
@@ -148,7 +149,8 @@ class CredentialLoader:
             Dictionary of environment variables for this provider
         """
         loader_class = self.PROVIDER_LOADERS[provider]
-        loader = loader_class(secrets_dir, self._debug_mode)
+        # Loader classes in registry are concrete implementations, not abstract
+        loader = loader_class(secrets_dir, self._debug_mode)  # type: ignore[abstract]
         try:
             return loader.load_credentials()
         except CredentialLoaderError as exc:
@@ -184,7 +186,7 @@ class CredentialLoader:
 
     def temporary_credentials(
         self, env_name: str, providers: list[str] | None = None
-    ) -> Generator[dict[str, str], None, None]:
+    ) -> "_TemporaryCredentials":
         """Context manager for temporary credential loading.
 
         Loads credentials, applies them, and restores original values on exit.
@@ -193,8 +195,8 @@ class CredentialLoader:
             env_name: Environment name
             providers: List of providers to load credentials for (default: all)
 
-        Yields:
-            Dictionary of loaded credentials
+        Returns:
+            Context manager that yields dictionary of loaded credentials
 
         Example:
             >>> loader = CredentialLoader()
@@ -243,6 +245,8 @@ class CredentialLoader:
         if isinstance(loader_class_or_filename, str) and field_mapping is not None:
             # Create dynamic loader class for backward compatibility
             filename = loader_class_or_filename
+            # Capture field_mapping in closure for type safety
+            captured_mapping = field_mapping
 
             class DynamicLoader(BaseCredentialLoader):
                 @property
@@ -255,12 +259,12 @@ class CredentialLoader:
 
                 @property
                 def field_mapping(self) -> dict[str, str]:
-                    return field_mapping
+                    return captured_mapping
 
             self.PROVIDER_LOADERS[provider_name] = DynamicLoader
         else:
-            # New API (loader class)
-            self.PROVIDER_LOADERS[provider_name] = loader_class_or_filename
+            # New API (loader class) - at this point it must be a class
+            self.PROVIDER_LOADERS[provider_name] = loader_class_or_filename  # type: ignore[assignment]
 
         if self._debug_mode:
             logger.debug(f"Registered custom provider loader: {provider_name}")
