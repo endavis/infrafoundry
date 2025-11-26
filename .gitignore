@@ -90,3 +90,4 @@ tmp/
 .venv
 .cache/
 .infrafoundry/
+coverage.xml
