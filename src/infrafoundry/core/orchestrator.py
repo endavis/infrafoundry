@@ -3,7 +3,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from rich.console import Console
 
@@ -179,7 +179,8 @@ class Orchestrator:
         # Subscribe to all events
         def event_handler(event: Event) -> None:
             """Forward events to notification manager."""
-            self.notification_manager.notify(event.event_type.value, event.environment, event.data)
+            data = cast(dict[str, Any], event.data)
+            self.notification_manager.notify(event.event_type.value, event.environment, data)
 
         # Subscribe to all event types
         for event_type in EventType:
