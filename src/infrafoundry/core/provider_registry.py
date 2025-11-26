@@ -4,6 +4,7 @@ import importlib
 import logging
 import types
 from pathlib import Path
+from typing import Any, cast
 
 from infrafoundry.core.exceptions import ProviderInitializationError
 from infrafoundry.core.provider import ProviderBase
@@ -81,8 +82,14 @@ class ProviderRegistry:
         # Find the provider class (subclass of ProviderBase)
         if provider_class := self._find_provider_class(module, provider_name):
             try:
-                provider_instance = provider_class(provider_name, self.config_dir, self.output_dir)
-                self.register_provider(provider_instance)
+                ctor = cast(Any, provider_class)
+                try:
+                    # Most providers expect (config_dir, output_dir)
+                    provider_instance = ctor(self.config_dir, self.output_dir)
+                except TypeError:
+                    # Fallback for providers that expect (name, config_dir, output_dir)
+                    provider_instance = ctor(provider_name, self.config_dir, self.output_dir)
+                self.register_provider(cast(ProviderBase, provider_instance))
                 logger.debug(f"Registered provider: {provider_name}")
             except Exception as e:
                 # Wrap instantiation failures as ProviderInitializationError
