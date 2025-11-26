@@ -499,13 +499,14 @@ class RollbackOrchestrator:
         self._print_header(env_name, deployment_id, deployment, rollback_data)
 
         if not auto_approve:
-            should_continue = False
             if confirm_callback:
                 should_continue = confirm_callback()
-
-            if not should_continue:
-                self.console.print("[yellow]Rollback cancelled.[/yellow]")
-                return {}
+                if not should_continue:
+                    self.console.print("[yellow]Rollback cancelled.[/yellow]")
+                    return {}
+            else:
+                # Programmatic use without callback but requiring approval is an error
+                raise ValueError("Rollback requires approval but no confirmation callback provided")
 
         rollback_metadata: RollbackDeploymentMetadata = {
             "rollback_from": deployment_id,
@@ -763,16 +764,24 @@ class DestroyOrchestrator:
             self._print_header("Destroying", env_name, resource_filter, "bold red")
 
             if not auto_approve:
-                should_continue = False
                 if confirm_callback:
                     should_continue = confirm_callback()
-
-                if not should_continue:
-                    self.console.print("[yellow]Aborted[/yellow]")
+                    if not should_continue:
+                        self.console.print("[yellow]Aborted[/yellow]")
+                        self.state_manager.update_deployment_status(
+                            deployment_id, DeploymentStatus.FAILED, "User aborted"
+                        )
+                        return {}
+                else:
+                    # Programmatic use without callback but requiring approval is an error
                     self.state_manager.update_deployment_status(
-                        deployment_id, DeploymentStatus.FAILED, "User aborted"
+                        deployment_id,
+                        DeploymentStatus.FAILED,
+                        "Destroy requires approval but no callback provided",
                     )
-                    return {}
+                    raise ValueError(
+                        "Destroy requires approval but no confirmation callback provided"
+                    )
 
             _, resources_by_provider = self._load_resources(env_name)
             providers = self._get_providers()

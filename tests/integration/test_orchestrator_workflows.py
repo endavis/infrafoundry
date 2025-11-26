@@ -420,18 +420,16 @@ class TestDestroyOrchestrator:
             assert len(deployments) > 0
 
     def test_destroy_requires_confirmation_without_auto_approve(self, orchestrator):
-        """Test that destroy requires confirmation when auto_approve=False."""
-        result = orchestrator.destroy(
-            env_name="dev", auto_approve=False, confirm_callback=lambda: False
-        )
-
-        # Should return empty dict when aborted
-        assert result == {}
+        """Test that destroy raises error when confirmation required but no callback provided."""
+        with pytest.raises(
+            ValueError, match="Destroy requires approval but no confirmation callback provided"
+        ):
+            orchestrator.destroy(env_name="dev", auto_approve=False, confirm_callback=None)
 
         # Check deployment was marked as failed
         deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
         assert deployments[0].status == DeploymentStatus.FAILED
-        assert "aborted" in deployments[0].error_message.lower()
+        assert "Destroy requires approval" in deployments[0].error_message
 
     def test_destroy_proceeds_with_confirmation(self, orchestrator):
         """Test that destroy proceeds when user confirms."""
