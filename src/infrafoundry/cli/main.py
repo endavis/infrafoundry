@@ -77,7 +77,11 @@ def _get_orchestrator(
         config_manager = ConfigManager()
 
     # Create orchestrator (SecretManager is created per-operation now)
-    orchestrator = Orchestrator(config_manager, strict_config=strict_config)
+    orchestrator = Orchestrator(
+        config_manager,
+        strict_config=strict_config,
+        policy_dir=config_repo / "policies" if config_repo else None,
+    )
 
     # Dynamically register available providers
     try:
