@@ -1,5 +1,8 @@
 """ISC DHCP service for OPNsense operations."""
 
+import logging
+import traceback
+
 from infrafoundry.core.exceptions import APIError
 
 from ..api_client import OPNsenseClient
@@ -38,6 +41,8 @@ class ISCDHCPService(BaseService):
             # This allows graceful degradation for legacy ISC DHCP configs
             return {}
         except Exception:
+            logging.error("Unexpected error getting system config from OPNsense API")
+            logging.debug(traceback.format_exc())  # Log full traceback
             # Fallback: return empty dict for unexpected errors
             # This allows graceful degradation for legacy ISC DHCP configs
             return {}

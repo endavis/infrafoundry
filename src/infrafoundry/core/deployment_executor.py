@@ -1,3 +1,4 @@
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -5,9 +6,9 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.events import EventManager, EventType
-from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
+from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.state import ResourceState, StateManager
 from infrafoundry.core.types import ResourceEventData
 
@@ -37,6 +38,13 @@ class DeploymentExecutor:
         self.event_manager = event_manager
         self.providers = providers
         self.console = console or Console()
+
+        # Dynamically create all registered runners
+        self.runners: dict[str, BaseRunner] = {}
+        for tool_name in self.runner_registry.list_runners():
+            runner = self.runner_registry.create_runner(tool_name, console=self.console)
+            if runner:
+                self.runners[tool_name] = runner
 
     def apply_serial(
         self,
@@ -176,6 +184,9 @@ class DeploymentExecutor:
                         self.console.print(f"[green]✓ {provider_name} completed[/green]")
                     except Exception as e:
                         self.console.print(f"[red]✗ {provider_name} failed: {e}[/red]")
+                        self.console.print(
+                            traceback.format_exc(), style="dim red"
+                        )  # Log full traceback
                         results[provider_name] = {"error": str(e)}
                     progress.update(task, advance=1)
 
@@ -203,15 +214,6 @@ class DeploymentExecutor:
         Returns:
             Dict with apply results including terraform and ansible outcomes
         """
-        # Dynamically create runners
-        terraform_runner = self.runner_registry.create_runner("terraform", console=self.console)
-        if not terraform_runner:
-            raise InfraFoundryError("Could not create terraform runner")
-        ansible_runner = self.runner_registry.create_runner("ansible", console=self.console)
-        if not ansible_runner:
-            raise InfraFoundryError("Could not create ansible runner")
-
-        # Track resources being applied and store their IDs
         resource_ids: dict[str, int] = {}
         for resource in resources:
             tracked_resource = self.state_manager.track_resource(
@@ -236,27 +238,30 @@ class DeploymentExecutor:
                 creating_event,
             )
 
-        # Run Terraform apply
-        tf_result = terraform_runner.run(provider, "apply", auto_approve)
+        runner_results: dict[str, Any] = {}
         terraform_ids: dict[str, str] = {}
 
-        # Extract Terraform resource IDs from state if apply was successful
-        if tf_result["success"]:
-            terraform_ids = terraform_runner.get_resource_ids(provider)
+        for tool_name, runner in self.runners.items():
+            self.console.print(f"  [dim]Running {tool_name} apply...[/dim]")
 
-            # Update tracked resources with Terraform IDs
-            for resource_name, terraform_id in terraform_ids.items():
-                if resource_name in resource_ids:
-                    db_resource_id = resource_ids[resource_name]
-                    # Update resource with Terraform ID
-                    self.state_manager.update_resource(
-                        resource_id=db_resource_id,
-                        terraform_id=terraform_id,
-                    )
+            command = "apply"
+            if tool_name == "ansible" and not auto_approve:
+                # Ansible's 'apply' with auto_approve=False implies check mode (plan)
+                command = "plan"
 
-        # Run Ansible playbook (check mode for dry run)
-        command = "apply" if auto_approve else "plan"
-        ansible_result = ansible_runner.run(provider, command, auto_approve=auto_approve)
+            run_result = runner.run(provider, command, auto_approve)
+            runner_results[tool_name] = run_result
+
+            if tool_name == "terraform" and run_result["success"]:
+                terraform_ids = runner.get_resource_ids(provider)
+                # Update tracked resources with Terraform IDs
+                for resource_name, terraform_id in terraform_ids.items():
+                    if resource_name in resource_ids:
+                        db_resource_id = resource_ids[resource_name]
+                        self.state_manager.update_resource(
+                            resource_id=db_resource_id,
+                            terraform_id=terraform_id,
+                        )
 
         # Update resource states to ACTIVE after successful apply
         for resource in resources:
@@ -277,7 +282,4 @@ class DeploymentExecutor:
                     created_event,
                 )
 
-        return {
-            "terraform": tf_result,
-            "ansible": ansible_result,
-        }
+        return runner_results

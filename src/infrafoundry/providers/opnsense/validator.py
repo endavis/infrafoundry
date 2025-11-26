@@ -4,6 +4,8 @@ This module contains all validation methods for checking OPNsense firewall
 configurations against live API state before deployment.
 """
 
+import logging
+import traceback
 from typing import Any, TypedDict, cast
 
 import urllib3
@@ -15,6 +17,8 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+logger = logging.getLogger(__name__)
 
 
 class AliasRow(TypedDict, total=False):
@@ -181,13 +185,13 @@ class OPNsenseValidator:
                 level=ValidationLevel.ERROR,
             )
         except Exception as e:
-            # Unexpected errors during validation
             self.report.add_check(
-                check_name="opnsense_validation",
+                check_name="opnsense_validation_error",
                 passed=False,
-                message=f"Unexpected error during validation: {e}",
-                level=ValidationLevel.WARNING,
+                message=f"Error validating OPNsense references: {e}",
+                level=ValidationLevel.ERROR,
             )
+            logger.debug(traceback.format_exc())  # Log full traceback
 
     def _collect_resource_references(self, resources: list[ResourceConfig]) -> dict[str, Any]:
         """Collect all resource references from configurations.

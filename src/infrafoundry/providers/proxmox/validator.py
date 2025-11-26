@@ -2,21 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+import traceback
 from dataclasses import dataclass
 from typing import TypedDict, cast
 
 import urllib3
 
-from infrafoundry.core.exceptions import (
-    APIError,
-    InfraFoundryError,
-    ValidationError,
-)
+from infrafoundry.core.exceptions import APIError, InfraFoundryError, ValidationError
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.types import (
-    EnvironmentData,
-    ProxmoxProviderSettings,
-)
+from infrafoundry.core.types import EnvironmentData, ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 
@@ -197,6 +192,7 @@ class ProxmoxValidator:
                 message=f"Unexpected error during validation: {e}",
                 level=ValidationLevel.WARNING,
             )
+            logging.debug(traceback.format_exc())  # Log full traceback
 
     def _get_api_token(self) -> str | None:
         """Get API token from provider settings.

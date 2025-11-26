@@ -5,6 +5,7 @@ and standardized reporting.
 """
 
 import logging
+import traceback
 from typing import Any
 
 from infrafoundry.core.exceptions import ConnectivityValidationError
@@ -97,8 +98,13 @@ class ConnectivityValidator:
             # Already handled structured validation error
             return False
         except Exception as e:
-            # Unexpected error - log and report
-            self._add_unexpected_error(url, e)
+            self.report.add_check(
+                check_name=f"{self.provider_name}_connectivity_error",
+                passed=False,
+                message=f"Error making HTTP request to {url}: {e}",
+                level=ValidationLevel.ERROR,
+            )
+            logger.debug(traceback.format_exc())  # Log full traceback
             return False
 
     def _handle_response(
