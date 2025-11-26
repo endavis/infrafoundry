@@ -122,7 +122,8 @@ class Orchestrator:
             has_policies=lambda: bool(self.policy_engine.policies),
             check_policies=(
                 lambda env, resources, enforce: (
-                    self.check_policies(env, resources, enforce=enforce), None
+                    self.check_policies(env, resources, enforce=enforce),
+                    None,
                 )[1]
             ),
             secret_manager_factory=lambda env: SecretManager(env_name=env),
