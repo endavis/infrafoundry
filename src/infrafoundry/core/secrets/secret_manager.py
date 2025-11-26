@@ -41,15 +41,9 @@ class SecretManager(PathBasedManager):
         # Resolve secrets directory using PathBasedManager pattern
         if secrets_dir is None:
             config_repo = self._get_env_var("INFRAFOUNDRY_CONFIG_REPO")
-            if not config_repo:
-                raise ValueError(
-                    "INFRAFOUNDRY_CONFIG_REPO environment variable must be set. "
-                    "Please point it to your configuration repository. "
-                    "See docs/separate-config-repo.md for setup instructions."
-                )
-            # Config repo is specified - use environment directory (envs/{env}/)
-            # This is where settings.yaml and age.key live together
-            secrets_dir = Path(config_repo) / "envs" / env_name
+            base_dir = Path(config_repo) if config_repo else Path.cwd()
+            # Default to local ./envs/{env} when config repo env var is absent
+            secrets_dir = base_dir / "envs" / env_name
 
         self.secrets_dir: Path = secrets_dir  # Type assertion - secrets_dir is always Path here
         self._log_debug(
