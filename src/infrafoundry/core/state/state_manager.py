@@ -194,7 +194,7 @@ class StateManager(BaseManager):
         state: ResourceState,
         config: dict[str, Any] | None = None,
         terraform_id: str | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: "ResourceTrackingMetadata | None" = None,
     ) -> Resource:
         """Track a resource.
 

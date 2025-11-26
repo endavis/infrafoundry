@@ -99,21 +99,16 @@ class OPNsenseClient:
             logger.debug(f"Request data: {json.dumps(data, indent=2)}")
 
         try:
-            # Build request kwargs
-            request_kwargs = {
-                "method": method,
-                "url": url,
-                "headers": headers,
-                "params": params,
-                "verify": self.verify_ssl,
-                "timeout": self.timeout,
-            }
-
-            # Only add json parameter if we have data
-            if data:
-                request_kwargs["json"] = data
-
-            response = requests.request(**request_kwargs)
+            # Make the request with explicit parameters for proper type checking
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=headers,
+                params=params,
+                json=data,  # requests handles None properly
+                verify=self.verify_ssl,
+                timeout=self.timeout,
+            )
             response.raise_for_status()
 
             result = cast(dict[str, Any], response.json())

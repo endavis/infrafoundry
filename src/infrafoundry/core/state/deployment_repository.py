@@ -85,7 +85,8 @@ class DeploymentRepository:
         with self.SessionLocal() as session:
             deployment = session.query(Deployment).filter_by(id=deployment_id).first()
             if deployment:
-                deployment.rollback_data = rollback_data
+                # TypedDict is compatible with dict but mypy needs help with JSON field types
+                deployment.rollback_data = dict(rollback_data)  # type: ignore[assignment]
                 session.commit()
 
     def get_history(

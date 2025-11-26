@@ -45,7 +45,7 @@ class SlackNotifier(Notifier):
 
     def _format_slack_message(
         self, event_type: str, environment: str, data: dict[str, Any]
-    ) -> list[dict]:
+    ) -> list[dict[Any, Any]]:
         """Format message using Slack Block Kit.
 
         Args:
@@ -58,7 +58,7 @@ class SlackNotifier(Notifier):
         """
         emoji = self._get_event_emoji(event_type)
 
-        blocks = [
+        blocks: list[dict[Any, Any]] = [
             {
                 "type": "header",
                 "text": {

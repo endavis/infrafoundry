@@ -222,9 +222,10 @@ class OPNsenseProvider(
 
             # Add pools
             if "pools" in config:
-                subnet_data["pools"] = []
+                pools_list: list[dict[str, Any]] = []
                 for pool in config["pools"]:
-                    subnet_data["pools"].append({"pool": pool["range"]})
+                    pools_list.append({"pool": pool["range"]})
+                subnet_data["pools"] = pools_list
 
             # Add optional fields
             if "valid_lifetime" in config:
