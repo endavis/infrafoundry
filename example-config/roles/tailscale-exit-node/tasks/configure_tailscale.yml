@@ -1,0 +1,152 @@
+---
+# Configure and start Tailscale service
+
+- name: Validate authentication method
+  fail:
+    msg: "tailscale_auth_method must be either 'authkey' or 'oauth'"
+  when: tailscale_auth_method not in ['authkey', 'oauth']
+
+- name: Validate auth key is provided (authkey method)
+  fail:
+    msg: "tailscale_auth_key is required when using authkey authentication"
+  when:
+    - tailscale_auth_method == "authkey"
+    - tailscale_auth_key == ""
+
+- name: Validate OAuth credentials (oauth method)
+  fail:
+    msg: "tailscale_oauth_client_id and tailscale_oauth_client_secret are required when using OAuth"
+  when:
+    - tailscale_auth_method == "oauth"
+    - (tailscale_oauth_client_id == "" or tailscale_oauth_client_secret == "")
+
+- name: Start and enable Tailscale service
+  systemd:
+    name: "{{ tailscaled_service }}"
+    state: started
+    enabled: "{{ tailscale_start_on_boot }}"
+  when: not is_immutable
+
+- name: Wait for Tailscale daemon to be ready
+  wait_for:
+    timeout: 5
+  when: tailscaled_service is defined
+
+- name: Check if Tailscale is already authenticated
+  command: "{{ tailscale_bin }} status --json"
+  register: tailscale_status
+  changed_when: false
+  failed_when: false
+
+- name: Parse Tailscale status
+  set_fact:
+    tailscale_is_authenticated: "{{ (tailscale_status.stdout | from_json).Self.Online | default(false) }}"
+  when: tailscale_status.rc == 0
+
+# Auth Key authentication
+- name: Authenticate Tailscale with auth key
+  command: >
+    {{ tailscale_bin }} up
+    --authkey={{ tailscale_auth_key }}
+    --hostname={{ tailscale_hostname }}
+    {% if tailscale_exit_node %}--advertise-exit-node{% endif %}
+    {% if tailscale_accept_routes %}--accept-routes{% endif %}
+    {% if tailscale_advertise_routes | length > 0 %}--advertise-routes={{ tailscale_advertise_routes | join(',') }}{% endif %}
+  when:
+    - tailscale_auth_method == "authkey"
+    - not (tailscale_is_authenticated | default(false))
+  no_log: true  # Don't log auth key
+  register: tailscale_up_authkey
+
+# OAuth authentication
+- name: Authenticate Tailscale with OAuth (requires user interaction)
+  block:
+    - name: Set up OAuth environment variables
+      set_fact:
+        oauth_env:
+          TS_AUTHKEY: ""
+          TS_OAUTH_CLIENT_ID: "{{ tailscale_oauth_client_id }}"
+          TS_OAUTH_CLIENT_SECRET: "{{ tailscale_oauth_client_secret }}"
+
+    - name: Start Tailscale OAuth login
+      command: >
+        {{ tailscale_bin }} up
+        --hostname={{ tailscale_hostname }}
+        {% if tailscale_exit_node %}--advertise-exit-node{% endif %}
+        {% if tailscale_accept_routes %}--accept-routes{% endif %}
+        {% if tailscale_advertise_routes | length > 0 %}--advertise-routes={{ tailscale_advertise_routes | join(',') }}{% endif %}
+      environment: "{{ oauth_env }}"
+      async: "{{ tailscale_oauth_timeout }}"
+      poll: 10
+      register: tailscale_up_oauth
+      no_log: true  # Don't log OAuth secrets
+
+    - name: Display OAuth login URL
+      debug:
+        msg: |
+          ========================================
+          Tailscale OAuth Authentication Required
+          ========================================
+
+          Please authenticate by visiting:
+          https://login.tailscale.com/a/oauth
+
+          Or check the output above for the specific URL.
+
+          Waiting up to {{ tailscale_oauth_timeout }} seconds for authentication...
+          ========================================
+      when: tailscale_up_oauth is changed
+
+  when:
+    - tailscale_auth_method == "oauth"
+    - not (tailscale_is_authenticated | default(false))
+
+- name: Update Tailscale configuration (if already authenticated)
+  command: >
+    {{ tailscale_bin }} up
+    {% if tailscale_exit_node %}--advertise-exit-node{% endif %}
+    {% if tailscale_accept_routes %}--accept-routes{% endif %}
+    {% if tailscale_advertise_routes | length > 0 %}--advertise-routes={{ tailscale_advertise_routes | join(',') }}{% endif %}
+  when: tailscale_is_authenticated | default(false)
+  register: tailscale_update
+  changed_when: "'already' not in tailscale_update.stderr"
+
+- name: Get Tailscale status
+  command: "{{ tailscale_bin }} status"
+  register: tailscale_final_status
+  changed_when: false
+
+- name: Display Tailscale status
+  debug:
+    msg: "{{ tailscale_final_status.stdout_lines }}"
+
+- name: Get Tailscale IP address
+  command: "{{ tailscale_bin }} ip -4"
+  register: tailscale_ip
+  changed_when: false
+
+- name: Display Tailscale IP
+  debug:
+    msg: "Tailscale IP: {{ tailscale_ip.stdout }}"
+
+- name: Remind about admin console configuration
+  debug:
+    msg: |
+      ========================================
+      Tailscale Exit Node Configuration
+      ========================================
+
+      The exit node has been configured, but you need to approve it in the Tailscale admin console:
+
+      1. Go to https://login.tailscale.com/admin/machines
+      2. Find the machine: {{ tailscale_hostname }}
+      3. Click the "..." menu → "Edit route settings"
+      4. Check "Use as exit node"
+      5. Click "Save"
+
+      Tailscale IP: {{ tailscale_ip.stdout }}
+
+      To use this exit node from a client:
+        tailscale up --exit-node={{ tailscale_ip.stdout }}
+
+      ========================================

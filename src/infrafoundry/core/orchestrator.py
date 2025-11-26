@@ -1,15 +1,48 @@
 """Core orchestration for infrastructure deployment."""
 
-import subprocess
+import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from rich.console import Console
-from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
-from infrafoundry.core.provider import ProviderBase
-from infrafoundry.core.secrets import SecretManager
+from infrafoundry.core.dependencies import DependencyGraph
+from infrafoundry.core.deployment_executor import DeploymentExecutor
+from infrafoundry.core.drift_detector import DriftDetector
+from infrafoundry.core.events import Event, EventManager, EventType
+from infrafoundry.core.notifications import NotificationManager
+from infrafoundry.core.orchestrator_workflows import (
+    ApplyOrchestrator,
+    DestroyOrchestrator,
+    DriftOrchestrator,
+    PlanOrchestrator,
+    ProviderResourceBatch,
+    RollbackOrchestrator,
+    StatusOrchestrator,
+    ValidationOrchestrator,
+)
+from infrafoundry.core.policy import PolicyEngine
+from infrafoundry.core.policy_checker import PolicyChecker
+from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.runners import AnsibleRunner, RunnerRegistry, TerraformRunner
+from infrafoundry.core.secrets.secret_manager import SecretManager
+from infrafoundry.core.state import StateManager
+
+
+@dataclass(slots=True)
+class OrchestratorStrictConfig:
+    """Configuration for strict-mode safeguards."""
+
+    strict_mode: bool = False
+    fail_on_missing_secrets: bool = False
+    fail_on_missing_snippets: bool = False
+
+    def __post_init__(self) -> None:
+        if self.strict_mode:
+            self.fail_on_missing_secrets = True
+            self.fail_on_missing_snippets = True
 
 
 class Orchestrator:
@@ -18,22 +51,140 @@ class Orchestrator:
     def __init__(
         self,
         config_manager: ConfigManager,
-        secret_manager: SecretManager,
         output_dir: Path | None = None,
+        state_manager: StateManager | None = None,
+        event_manager: EventManager | None = None,
+        policy_dir: Path | None = None,
+        notifications_config: Path | None = None,
+        strict_config: OrchestratorStrictConfig | None = None,
     ) -> None:
         """Initialize orchestrator.
 
         Args:
             config_manager: Configuration manager instance
-            secret_manager: Secret manager instance
             output_dir: Directory for generated files (defaults to ./generated)
+            state_manager: State manager instance (creates default if None)
+            event_manager: Event manager instance (creates default if None)
+            policy_dir: Directory containing policy files (defaults to ./policies)
+            notifications_config: Path to notifications config file
         """
         self.config_manager = config_manager
-        self.secret_manager = secret_manager
         self.output_dir = output_dir or Path.cwd() / "generated"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.console = Console()
         self.providers: dict[str, ProviderBase] = {}
+        self.strict_config = strict_config or OrchestratorStrictConfig()
+
+        # Initialize state, event, policy, and notification managers
+        self.state_manager = state_manager or StateManager()
+        self.state_manager.initialize()  # Initialize database schema
+        self.event_manager = event_manager or EventManager()
+        self.policy_engine = PolicyEngine(policy_dir)
+        self.notification_manager = NotificationManager(notifications_config)
+
+        # Set up runner registry
+        self.runner_registry = RunnerRegistry()
+        self.runner_registry.register(TerraformRunner)
+        self.runner_registry.register(AnsibleRunner)
+
+        # Initialize helper classes for orchestration tasks
+        self.policy_checker = PolicyChecker(self.policy_engine, self.event_manager, self.console)
+        self.drift_detector = DriftDetector(
+            self.config_manager,
+            self.runner_registry,
+            self.event_manager,
+            self.providers,
+            self.console,
+        )
+        self.deployment_executor = DeploymentExecutor(
+            self.runner_registry,
+            self.state_manager,
+            self.event_manager,
+            self.providers,
+            self.console,
+        )
+        self.validation_orchestrator = ValidationOrchestrator(
+            config_manager=self.config_manager,
+            console=self.console,
+            get_providers=lambda: self.providers,
+            load_resources=self._load_resources,
+            iter_provider_batches=self._iter_provider_batches,
+        )
+        self.plan_orchestrator = PlanOrchestrator(
+            console=self.console,
+            state_manager=self.state_manager,
+            event_manager=self.event_manager,
+            runner_registry=self.runner_registry,
+            get_providers=lambda: self.providers,
+            load_resources=self._load_resources,
+            iter_provider_batches=self._iter_provider_batches,
+            validate_resources=self.validate_resources,
+            has_policies=lambda: bool(self.policy_engine.policies),
+            check_policies=(
+                lambda env, resources, enforce: (
+                    self.check_policies(env, resources, enforce=enforce),
+                    None,
+                )[1]
+            ),
+            secret_manager_factory=lambda env: SecretManager(env_name=env),
+            get_current_user=lambda: self._current_user,
+            fail_on_missing_secrets=self.strict_config.fail_on_missing_secrets,
+        )
+        self.apply_orchestrator = ApplyOrchestrator(
+            console=self.console,
+            state_manager=self.state_manager,
+            event_manager=self.event_manager,
+            load_resources=self._load_resources,
+            apply_serial=self._apply_providers_serial,
+            apply_parallel=self._apply_providers_parallel,
+            get_current_user=lambda: self._current_user,
+        )
+        self.destroy_orchestrator = DestroyOrchestrator(
+            console=self.console,
+            state_manager=self.state_manager,
+            event_manager=self.event_manager,
+            runner_registry=self.runner_registry,
+            get_providers=lambda: self.providers,
+            load_resources=self._load_resources,
+            iter_provider_batches=self._iter_provider_batches,
+            get_current_user=lambda: self._current_user,
+        )
+        self.rollback_orchestrator = RollbackOrchestrator(
+            console=self.console,
+            state_manager=self.state_manager,
+            apply_orchestrator=self.apply_orchestrator,
+            get_current_user=lambda: self._current_user,
+        )
+        self.drift_orchestrator = DriftOrchestrator(
+            drift_detector=self.drift_detector,
+            get_providers=lambda: self.providers,
+        )
+        self.status_orchestrator = StatusOrchestrator(
+            console=self.console,
+            config_manager=self.config_manager,
+            get_providers=lambda: self.providers,
+        )
+
+        # Subscribe notification manager to events
+        self._setup_notifications()
+
+        # Get current user for tracking
+        self._current_user = os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
+
+    def _setup_notifications(self) -> None:
+        """Set up notification handlers for events."""
+        if not self.notification_manager or not self.notification_manager.channels:
+            return
+
+        # Subscribe to all events
+        def event_handler(event: Event) -> None:
+            """Forward events to notification manager."""
+            data = cast(dict[str, Any], event.data)
+            self.notification_manager.notify(event.event_type.value, event.environment, data)
+
+        # Subscribe to all event types
+        for event_type in EventType:
+            self.event_manager.subscribe(event_type, event_handler)
 
     def register_provider(self, provider: ProviderBase) -> None:
         """Register a provider plugin.
@@ -42,146 +193,322 @@ class Orchestrator:
             provider: Provider instance to register
         """
         self.providers[provider.name] = provider
+        if hasattr(provider, "fail_on_missing_snippets"):
+            provider.fail_on_missing_snippets = self.strict_config.fail_on_missing_snippets
+        # Sync providers to helper classes that need them
+        self.deployment_executor.providers = self.providers
+        self.drift_detector.providers = self.providers
 
-    def plan(self, env_name: str, dry_run: bool = False) -> dict[str, Any]:
+    def _load_resources(
+        self, env_name: str
+    ) -> tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]:
+        """Load all resources for an environment and group them by provider."""
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+        resources_by_provider: dict[str, list[ResourceConfig]] = {}
+        for resource in all_resources:
+            resources_by_provider.setdefault(resource.provider, []).append(resource)
+        return all_resources, resources_by_provider
+
+    def _iter_provider_batches(
+        self,
+        resources_by_provider: dict[str, list[ResourceConfig]],
+        resource_filter: list[str] | None,
+    ) -> list[ProviderResourceBatch]:
+        """Yield provider batches applying an optional resource name filter."""
+        batches: list[ProviderResourceBatch] = []
+        for provider_name, resources in resources_by_provider.items():
+            original_count = len(resources)
+            filtered_resources = resources
+            if resource_filter:
+                filtered_resources = [r for r in resources if r.name in resource_filter]
+                if not filtered_resources:
+                    continue
+            batches.append(
+                ProviderResourceBatch(
+                    name=provider_name,
+                    resources=filtered_resources,
+                    original_count=original_count,
+                )
+            )
+        return batches
+
+    def validate_resources(self, resources: list[ResourceConfig]) -> None:
+        """Validate that all resources have providers that support their types.
+
+        Args:
+            resources: List of ResourceConfig objects to validate
+
+        Raises:
+            ValueError: If a resource's provider doesn't support its type
+        """
+        for resource in resources:
+            provider_name = resource.provider
+            resource_type = resource.type
+
+            # Check if provider is registered
+            if provider_name not in self.providers:
+                raise ValueError(
+                    f"Provider '{provider_name}' not registered for resource "
+                    f"'{resource.name}' (type: {resource_type})"
+                )
+
+            # Check if provider supports the resource type
+            provider = self.providers[provider_name]
+            supported_types = provider.get_resource_types()
+            if resource_type not in supported_types:
+                raise ValueError(
+                    f"Provider '{provider_name}' does not support resource type "
+                    f"'{resource_type}' for resource '{resource.name}'. "
+                    f"Supported types: {', '.join(supported_types)}"
+                )
+
+    def build_dependency_graph(self, env_name: str) -> DependencyGraph:
+        """Build dependency graph for an environment.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            DependencyGraph with all resources and dependencies
+        """
+        graph = DependencyGraph()
+
+        # Get all resources for the environment
+        all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+
+        # Build a map of resources by provider and type for dependency resolution
+        resources_by_provider: dict[str, list[ResourceConfig]] = {}
+        for resource in all_resources:
+            if resource.provider not in resources_by_provider:
+                resources_by_provider[resource.provider] = []
+            resources_by_provider[resource.provider].append(resource)
+
+        # Add all resources to graph with their dependencies
+        for resource in all_resources:
+            provider_name = resource.provider
+            dependencies: list[str] = []
+
+            if provider_name in self.providers:
+                provider = self.providers[provider_name]
+                dependency_rules = provider.get_dependencies()
+
+                # Check if this resource type has dependencies
+                if resource.type in dependency_rules:
+                    required_types = dependency_rules[resource.type]
+
+                    # Find resources of required types from same provider
+                    provider_resources = resources_by_provider.get(provider_name, [])
+                    for other_resource in provider_resources:
+                        if (
+                            other_resource.type in required_types
+                            and other_resource.name != resource.name
+                        ):
+                            dependencies.append(other_resource.name)
+
+            graph.add_resource(
+                provider=resource.provider,
+                resource_type=resource.type,
+                name=resource.name,
+                dependencies=dependencies,
+            )
+
+        return graph
+
+    def check_policies(
+        self, env_name: str, resources: list[ResourceConfig], enforce: bool = False
+    ) -> tuple[bool, list]:
+        """Check resources against policies.
+
+        Delegates to PolicyChecker.
+
+        Args:
+            env_name: Environment name
+            resources: List of resources to check
+            enforce: If True, raise exception on ERROR-level violations
+
+        Returns:
+            Tuple of (passed, violations)
+
+        Raises:
+            Exception: If enforce=True and ERROR-level violations exist
+        """
+        return self.policy_checker.check(env_name, resources, enforce)
+
+    def detect_drift(self, env_name: str) -> dict[str, Any]:
+        """Detect infrastructure drift from declared configuration.
+
+        Delegates to DriftDetector.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            Dict with drift detection results per provider
+        """
+        return self.drift_orchestrator.detect(env_name)
+
+    def validate(
+        self,
+        env_name: str,
+        resource_filter: list[str] | None = None,
+        verbose: bool = False,
+    ) -> dict[str, Any]:
+        """Validate infrastructure configuration against provider APIs.
+
+        Performs pre-flight validation checks:
+        - Connectivity to provider APIs
+        - Referenced resources exist (templates, networks, storage, etc.)
+        - No conflicts (duplicate VMIDs, MAC addresses, etc.)
+
+        Args:
+            env_name: Environment name
+            resource_filter: Optional list of resource names to validate
+            verbose: If True, show detailed validation output
+
+        Returns:
+            Dict with validation results per provider:
+            {
+                "provider_name": {
+                    "passed": bool,
+                    "report": ValidationReport,
+                "errors": int,
+                "warnings": int
+                }
+            }
+        """
+        return self.validation_orchestrator.validate(env_name, resource_filter, verbose)
+
+    def plan(
+        self,
+        env_name: str,
+        dry_run: bool = False,
+        resource_filter: list[str] | None = None,
+        enforce_policies: bool = False,
+    ) -> dict[str, Any]:
         """Plan infrastructure changes.
 
         Args:
             env_name: Environment name
             dry_run: If True, only show what would be done
+            resource_filter: Optional list of resource names to target
+            enforce_policies: If True, block on policy violations
 
         Returns:
             Dict with plan results per provider
         """
-        env_config = self.config_manager.load_environment(env_name)
-        results = {}
+        return self.plan_orchestrator.plan(env_name, dry_run, resource_filter, enforce_policies)
 
-        self.console.print(f"\n[bold cyan]Planning infrastructure for: {env_name}[/bold cyan]")
-
-        for provider_name in env_config.providers:
-            if provider_name not in self.providers:
-                self.console.print(
-                    f"[yellow]Warning: Provider '{provider_name}' not registered[/yellow]"
-                )
-                continue
-
-            provider = self.providers[provider_name]
-            resources = self.config_manager.get_all_resources(env_name, provider_name)
-
-            self.console.print(f"\n[bold]{provider_name}[/bold]: {len(resources)} resources")
-
-            # Generate Terraform and Ansible files
-            if not dry_run:
-                provider.ensure_directories()
-                provider.generate_terraform(resources)
-                provider.generate_ansible(resources)
-
-                # Export secrets for this provider
-                try:
-                    secrets_file = f"{provider_name}.yaml"
-                    tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
-                    self.secret_manager.export_for_terraform(secrets_file, tf_vars)
-                except FileNotFoundError:
-                    self.console.print(f"[yellow]No secrets file for {provider_name}[/yellow]")
-
-            results[provider_name] = {"resources": len(resources)}
-
-        return results
-
-    def apply(self, env_name: str, auto_approve: bool = False) -> dict[str, Any]:
+    def apply(
+        self,
+        env_name: str,
+        auto_approve: bool = False,
+        resource_filter: list[str] | None = None,
+        parallel: bool = False,
+        max_workers: int = 4,
+    ) -> dict[str, Any]:
         """Apply infrastructure changes.
 
         Args:
             env_name: Environment name
             auto_approve: If True, skip confirmation prompts
+            resource_filter: Optional list of resource names to target
+            parallel: If True, apply resources in parallel where possible
+            max_workers: Maximum number of parallel workers (default: 4)
 
         Returns:
             Dict with apply results per provider
         """
         # First, generate the plans
-        self.plan(env_name, dry_run=False)
+        self.plan(env_name, dry_run=False, resource_filter=resource_filter)
+        return self.apply_orchestrator.apply(
+            env_name=env_name,
+            resource_filter=resource_filter,
+            auto_approve=auto_approve,
+            parallel=parallel,
+            max_workers=max_workers,
+        )
 
-        env_config = self.config_manager.load_environment(env_name)
-        results = {}
+    def _apply_providers_serial(
+        self,
+        env_name: str,
+        deployment_id: int,
+        resources_by_provider: dict[str, list[ResourceConfig]],
+        resource_filter: list[str] | None,
+        auto_approve: bool,
+    ) -> dict[str, Any]:
+        """Apply providers sequentially."""
+        self.deployment_executor.providers = self.providers
+        return self.deployment_executor.apply_serial(
+            env_name, deployment_id, resources_by_provider, resource_filter, auto_approve
+        )
 
-        self.console.print(f"\n[bold green]Applying infrastructure for: {env_name}[/bold green]")
+    def _apply_providers_parallel(
+        self,
+        env_name: str,
+        deployment_id: int,
+        resources_by_provider: dict[str, list[ResourceConfig]],
+        resource_filter: list[str] | None,
+        auto_approve: bool,
+        max_workers: int,
+    ) -> dict[str, Any]:
+        """Apply providers in parallel."""
+        self.deployment_executor.providers = self.providers
+        return self.deployment_executor.apply_parallel(
+            env_name,
+            deployment_id,
+            resources_by_provider,
+            resource_filter,
+            auto_approve,
+            max_workers,
+        )
 
-        for provider_name in env_config.providers:
-            if provider_name not in self.providers:
-                continue
+    def _apply_single_provider(
+        self,
+        env_name: str,
+        deployment_id: int,
+        provider_name: str,
+        provider: ProviderBase,
+        resources: list[ResourceConfig],
+        auto_approve: bool,
+    ) -> dict[str, Any]:
+        """Apply a single provider's resources."""
+        self.deployment_executor.providers = self.providers
+        return self.deployment_executor.apply_single_provider(
+            env_name, deployment_id, provider_name, provider, resources, auto_approve
+        )
 
-            provider = self.providers[provider_name]
-            self.console.print(f"\n[bold]Applying {provider_name}...[/bold]")
-
-            # Run Terraform
-            tf_result = self._run_terraform(provider, "apply", auto_approve)
-            results[provider_name] = {"terraform": tf_result}
-
-        return results
-
-    def destroy(self, env_name: str, auto_approve: bool = False) -> dict[str, Any]:
+    def destroy(
+        self,
+        env_name: str,
+        auto_approve: bool = False,
+        resource_filter: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Destroy infrastructure.
 
         Args:
             env_name: Environment name
             auto_approve: If True, skip confirmation prompts
+            resource_filter: Optional list of resource names to target
 
         Returns:
             Dict with destroy results per provider
         """
-        env_config = self.config_manager.load_environment(env_name)
-        results = {}
+        return self.destroy_orchestrator.destroy(env_name, resource_filter, auto_approve)
 
-        self.console.print(f"\n[bold red]Destroying infrastructure for: {env_name}[/bold red]")
-
-        if not auto_approve:
-            response = input("Are you sure you want to destroy? (yes/no): ")
-            if response.lower() != "yes":
-                self.console.print("[yellow]Aborted[/yellow]")
-                return {}
-
-        for provider_name in env_config.providers:
-            if provider_name not in self.providers:
-                continue
-
-            provider = self.providers[provider_name]
-            self.console.print(f"\n[bold]Destroying {provider_name}...[/bold]")
-
-            # Run Terraform destroy
-            tf_result = self._run_terraform(provider, "destroy", auto_approve)
-            results[provider_name] = {"terraform": tf_result}
-
-        return results
-
-    def _run_terraform(
-        self, provider: ProviderBase, command: str, auto_approve: bool = False
-    ) -> dict[str, Any]:
-        """Run Terraform command for a provider.
+    def rollback(self, deployment_id: int, auto_approve: bool = False) -> dict[str, Any]:
+        """Rollback infrastructure to a previous deployment state.
 
         Args:
-            provider: Provider instance
-            command: Terraform command (plan, apply, destroy)
-            auto_approve: If True, add -auto-approve flag
+            deployment_id: ID of deployment to rollback to
+            auto_approve: If True, skip confirmation prompts
 
         Returns:
-            Dict with command results
+            Dict with rollback results
+
+        Raises:
+            ValueError: If deployment not found or has no rollback data
         """
-        tf_dir = provider.terraform_dir
-
-        # Initialize if needed
-        if not (tf_dir / ".terraform").exists():
-            self.console.print("[dim]Initializing Terraform...[/dim]")
-            subprocess.run(["terraform", "init"], cwd=tf_dir, check=True)
-
-        # Build command
-        cmd = ["terraform", command]
-        if auto_approve and command in ("apply", "destroy"):
-            cmd.append("-auto-approve")
-
-        # Run command
-        result = subprocess.run(cmd, cwd=tf_dir, capture_output=False)
-
-        return {"exit_code": result.returncode, "success": result.returncode == 0}
+        return self.rollback_orchestrator.rollback(deployment_id, auto_approve)
 
     def status(self, env_name: str) -> None:
         """Show status of infrastructure.
@@ -189,25 +516,4 @@ class Orchestrator:
         Args:
             env_name: Environment name
         """
-        env_config = self.config_manager.load_environment(env_name)
-
-        table = Table(title=f"Infrastructure Status: {env_name}")
-        table.add_column("Provider", style="cyan")
-        table.add_column("Resources", style="magenta")
-        table.add_column("Status", style="green")
-
-        for provider_name in env_config.providers:
-            if provider_name not in self.providers:
-                table.add_row(provider_name, "N/A", "[yellow]Not registered[/yellow]")
-                continue
-
-            resources = self.config_manager.get_all_resources(env_name, provider_name)
-            provider = self.providers[provider_name]
-
-            # Check if Terraform state exists
-            state_file = provider.terraform_dir / "terraform.tfstate"
-            status = "[green]Deployed[/green]" if state_file.exists() else "[dim]Not deployed[/dim]"
-
-            table.add_row(provider_name, str(len(resources)), status)
-
-        self.console.print(table)
+        self.status_orchestrator.show(env_name)

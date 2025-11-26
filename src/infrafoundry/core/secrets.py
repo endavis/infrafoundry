@@ -1,34 +1,58 @@
 """Secret management using SOPS with age encryption."""
 
 import json
-import os
 import subprocess
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from infrafoundry.core.base_manager import PathBasedManager
 
-class SecretManager:
-    """Manages encrypted secrets using SOPS and age."""
 
-    def __init__(self, secrets_dir: Path | None = None) -> None:
+class SecretManager(PathBasedManager):
+    """Manages encrypted secrets using SOPS and age.
+
+    Uses per-environment secrets stored in secrets/{env}/ directories.
+    """
+
+    def __init__(self, env_name: str, secrets_dir: Path | None = None) -> None:
         """Initialize secret manager.
 
         Args:
-            secrets_dir: Directory containing encrypted secrets
-                (defaults to INFRAFOUNDRY_CONFIG_REPO/secrets or ./secrets)
+            env_name: Environment name (e.g., 'dev', 'prod') - used to determine
+                     environment directory (envs/{env}/)
+            secrets_dir: Base directory containing environment folders
+                (defaults to INFRAFOUNDRY_CONFIG_REPO/envs/{env})
+
+        Raises:
+            ValueError: If secrets_dir is None and INFRAFOUNDRY_CONFIG_REPO is not set
         """
+        # Initialize base manager with logging
+        super().__init__()
+
+        self.env_name = env_name
+
+        # Resolve secrets directory using PathBasedManager pattern
         if secrets_dir is None:
-            # Check for separate config repo first
-            config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
-            if config_repo:
-                secrets_dir = Path(config_repo) / "secrets"
-            else:
-                # Fall back to local secrets directory
-                secrets_path = os.getenv("INFRAFOUNDRY_SECRETS_DIR", "secrets")
-                secrets_dir = Path.cwd() / secrets_path
-        self.secrets_dir = secrets_dir
+            config_repo = self._get_env_var("INFRAFOUNDRY_CONFIG_REPO")
+            if not config_repo:
+                raise ValueError(
+                    "INFRAFOUNDRY_CONFIG_REPO environment variable must be set. "
+                    "Please point it to your configuration repository. "
+                    "See docs/separate-config-repo.md for setup instructions."
+                )
+            # Config repo is specified - use environment directory (envs/{env}/)
+            # This is where settings.yaml and age.key live together
+            secrets_dir = Path(config_repo) / "envs" / env_name
+
+        self.secrets_dir: Path = secrets_dir  # Type assertion - secrets_dir is always Path here
+        self._log_debug(
+            f"Initialized SecretManager for environment '{env_name}' "
+            f"with secrets_dir: {self.secrets_dir}"
+        )
+
+        # Validate SOPS and age setup
         self._check_sops_installed()
         self._check_age_key()
 
@@ -40,21 +64,30 @@ class SecretManager:
                 capture_output=True,
                 check=True,
             )
+            self._log_debug("SOPS is installed and available")
         except (subprocess.CalledProcessError, FileNotFoundError):
-            raise RuntimeError(
-                "sops not found. Install with: brew install sops (macOS) or see https://github.com/getsops/sops"
-            )
+            error_msg = "sops not found. Install with: brew install sops (macOS) or see https://github.com/getsops/sops"
+            self._log_error(error_msg)
+            raise RuntimeError(error_msg)
 
     def _check_age_key(self) -> None:
         """Check if age key is configured."""
-        age_key_file = os.getenv("SOPS_AGE_KEY_FILE")
+        age_key_file = self._get_env_var("SOPS_AGE_KEY_FILE")
         if not age_key_file:
-            raise ValueError(
-                "SOPS_AGE_KEY_FILE not set. Generate a key with: age-keygen -o secrets/age.key"
+            error_msg = (
+                f"SOPS_AGE_KEY_FILE not set. Generate a key with: "
+                f"age-keygen -o envs/{self.env_name}/age.key"
             )
+            self._log_error(error_msg)
+            raise ValueError(error_msg)
 
-        if not Path(age_key_file).exists():
-            raise FileNotFoundError(f"Age key file not found: {age_key_file}")
+        age_key_path = Path(age_key_file)
+        if not age_key_path.exists():
+            error_msg = f"Age key file not found: {age_key_file}"
+            self._log_error(error_msg)
+            raise FileNotFoundError(error_msg)
+
+        self._log_debug(f"Age key file found: {age_key_file}")
 
     def decrypt_file(self, filename: str) -> dict[str, Any]:
         """Decrypt a SOPS-encrypted file.
@@ -71,8 +104,11 @@ class SecretManager:
         """
         encrypted_file = self.secrets_dir / filename
         if not encrypted_file.exists():
-            raise FileNotFoundError(f"Encrypted file not found: {encrypted_file}")
+            error_msg = f"Encrypted file not found: {encrypted_file}"
+            self._log_error(error_msg)
+            raise FileNotFoundError(error_msg)
 
+        self._log_debug(f"Decrypting file: {filename}")
         try:
             result = subprocess.run(
                 ["sops", "--decrypt", str(encrypted_file)],
@@ -80,9 +116,12 @@ class SecretManager:
                 check=True,
                 text=True,
             )
+            self._log_debug(f"Successfully decrypted: {filename}")
             return yaml.safe_load(result.stdout)
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to decrypt {filename}: {e.stderr}")
+            error_msg = f"Failed to decrypt {filename}: {e.stderr}"
+            self._log_error(error_msg)
+            raise RuntimeError(error_msg)
 
     def encrypt_file(self, filename: str, data: dict[str, Any]) -> None:
         """Encrypt data and save to file.
@@ -94,16 +133,18 @@ class SecretManager:
         Raises:
             RuntimeError: If encryption fails
         """
-        self.secrets_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_directory_exists(self.secrets_dir)
         encrypted_file = self.secrets_dir / filename
 
         # Write unencrypted data to temp file
         temp_file = encrypted_file.with_suffix(".tmp")
+        self._log_debug(f"Writing temp file: {temp_file}")
         with open(temp_file, "w") as f:
             yaml.dump(data, f)
 
         try:
             # Encrypt in place
+            self._log_debug(f"Encrypting file: {filename}")
             subprocess.run(
                 ["sops", "--encrypt", "--in-place", str(temp_file)],
                 capture_output=True,
@@ -111,9 +152,12 @@ class SecretManager:
             )
             # Move to final location
             temp_file.rename(encrypted_file)
+            self._log_info(f"Successfully encrypted: {filename}")
         except subprocess.CalledProcessError as e:
             temp_file.unlink(missing_ok=True)
-            raise RuntimeError(f"Failed to encrypt {filename}: {e.stderr}")
+            error_msg = f"Failed to encrypt {filename}: {e.stderr}"
+            self._log_error(error_msg)
+            raise RuntimeError(error_msg)
 
     def get_secret(self, filename: str, key: str) -> Any:
         """Get a specific secret value from an encrypted file.
@@ -179,3 +223,11 @@ class SecretManager:
         data = self.decrypt_file(filename)
         with open(output_file, "w") as f:
             yaml.dump(data, f)
+
+    def cleanup(self) -> None:
+        """Cleanup resources (required by BaseManager).
+
+        No cleanup needed for SecretManager as it doesn't maintain
+        persistent connections or file handles.
+        """
+        self._log_debug("SecretManager cleanup complete")

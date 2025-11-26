@@ -1,100 +1,278 @@
 """Proxmox provider for InfraFoundry."""
 
 from pathlib import Path
-from typing import Any
-
-from jinja2 import Environment, FileSystemLoader
+from typing import Any, override
 
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider_mixins import (
+    ResourceGrouperMixin,
+    TemplateRendererMixin,
+    TerraformGeneratorMixin,
+)
+from infrafoundry.core.types import EnvironmentData
+from infrafoundry.core.validation import ValidationReport
+
+from .validator import ProxmoxValidator
 
 
-class ProxmoxProvider(ProviderBase):
+class ProxmoxProvider(
+    ProviderBase,
+    TemplateRendererMixin,
+    ResourceGrouperMixin,
+    TerraformGeneratorMixin,
+):
     """Proxmox VE provider for managing VMs, templates, and networks."""
+
+    _PROXMOX_TFVARS_MAPPING = {
+        "api_url": "proxmox_api_url",
+        "api_token": "proxmox_api_token",
+        "node": "proxmox_node",
+        "storage": "proxmox_storage",
+    }
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize Proxmox provider."""
         super().__init__("proxmox", config_dir, output_dir)
-        self.template_dir = Path(__file__).parent / "templates"
-        self.jinja_env = Environment(
-            loader=FileSystemLoader(str(self.template_dir)),
-            trim_blocks=True,
-            lstrip_blocks=True,
-        )
+        self.fail_on_missing_snippets = False
+        # Use TemplateRendererMixin to set up Jinja2 environment
+        self._setup_template_environment()
 
+    @override
     def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate Proxmox configuration."""
         required_fields = ["name"]
         return all(field in config for field in required_fields)
 
+    @override
+    def validate_connectivity(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+        """Validate connectivity to Proxmox API."""
+        validator = ProxmoxValidator(env_config, report)
+        validator.validate_connectivity()
+
+    @override
+    def validate_references(
+        self, resources: list[ResourceConfig], env_config: EnvironmentData, report: ValidationReport
+    ) -> None:
+        """Validate that referenced Proxmox resources exist."""
+        validator = ProxmoxValidator(env_config, report)
+        validator.validate_references(resources)
+
+    @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Proxmox resources."""
         self.ensure_directories()
 
-        # Group resources by type
-        resources_by_type: dict[str, list[ResourceConfig]] = {}
-        for resource in resources:
-            if resource.type not in resources_by_type:
-                resources_by_type[resource.type] = []
-            resources_by_type[resource.type].append(resource)
+        # Use ResourceGrouperMixin to group resources by type
+        resources_by_type = self.group_resources_by_type(resources)
 
         # Generate provider configuration
-        provider_template = self.jinja_env.get_template("proxmox/provider.tf.j2")
-        provider_content = provider_template.render()
-        (self.terraform_dir / "provider.tf").write_text(provider_content)
+        self.render_and_write_terraform(
+            "proxmox/provider.tf.j2",
+            output_name="provider.tf",
+        )
 
-        # Generate variables file
-        variables_template = self.jinja_env.get_template("proxmox/variables.tf.j2")
-        variables_content = variables_template.render()
-        (self.terraform_dir / "variables.tf").write_text(variables_content)
+        # Generate variables file with environment context
+        import os
+
+        self.render_and_write_terraform(
+            "proxmox/variables.tf.j2",
+            context={"default_ssh_user": os.getenv("USER", "root")},
+            output_name="variables.tf",
+        )
+
+        # Copy or generate terraform.tfvars from environment config
+        self.generate_provider_tfvars(
+            provider_name="proxmox",
+            mapping=self._PROXMOX_TFVARS_MAPPING,
+            include_ssh=True,
+            ssh_prefix="proxmox",
+        )
 
         # Generate resources by type
-        if "vms" in resources_by_type:
-            self._generate_vms_terraform(resources_by_type["vms"])
+        if "vm" in resources_by_type:
+            self._generate_vms_terraform(resources_by_type["vm"])
 
-        if "templates" in resources_by_type:
-            self._generate_templates_terraform(resources_by_type["templates"])
+        if "template" in resources_by_type:
+            self._generate_templates_terraform(resources_by_type["template"])
 
-        if "networks" in resources_by_type:
-            self._generate_networks_terraform(resources_by_type["networks"])
+        if "network" in resources_by_type:
+            self._generate_networks_terraform(resources_by_type["network"])
 
         # Generate outputs
-        outputs_template = self.jinja_env.get_template("proxmox/outputs.tf.j2")
-        outputs_content = outputs_template.render(
-            resources_by_type=resources_by_type,
+        self.render_and_write_terraform(
+            "proxmox/outputs.tf.j2",
+            context={"resources_by_type": resources_by_type},
+            output_name="outputs.tf",
         )
-        (self.terraform_dir / "outputs.tf").write_text(outputs_content)
 
     def _generate_vms_terraform(self, vms: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox VMs."""
-        template = self.jinja_env.get_template("proxmox/vms.tf.j2")
-        content = template.render(vms=vms)
-        (self.terraform_dir / "vms.tf").write_text(content)
+        # Process VMs to merge cloud-init snippets
+        processed_vms = []
+        for vm in vms:
+            processed_vm = self._process_cloud_init_snippets(vm)
+            processed_vms.append(processed_vm)
+
+        self.render_and_write_terraform(
+            "proxmox/vms.tf.j2",
+            context={"vms": processed_vms},
+            output_name="vms.tf",
+        )
+
+    def _process_cloud_init_snippets(self, vm: ResourceConfig) -> ResourceConfig:
+        """Process cloud-init snippets and merge them into VM config."""
+        import copy
+
+        import yaml
+
+        # Work with a copy to avoid modifying the original
+        vm_copy = copy.deepcopy(vm)
+        config = vm_copy.config
+
+        # Check if cloud_init_snippets is defined
+        if "cloud_init_snippets" not in config:
+            return vm_copy
+
+        snippet_names = config.get("cloud_init_snippets", [])
+        cloud_init_vars = config.get("cloud_init_vars", {})
+
+        # Load and merge snippets
+        merged_cloud_init: dict[Any, Any] = {}
+
+        for snippet_name in snippet_names:
+            # Build path to snippet file
+            if self._current_environment:
+                snippet_path = (
+                    self.config_dir
+                    / self._current_environment
+                    / "files"
+                    / "cloud-init-snippets"
+                    / f"{snippet_name}.yaml"
+                )
+            else:
+                snippet_path = (
+                    self.config_dir / "files" / "cloud-init-snippets" / f"{snippet_name}.yaml"
+                )
+
+            if not snippet_path.exists():
+                message = f"Cloud-init snippet not found: {snippet_path}"
+                if self.fail_on_missing_snippets:
+                    raise FileNotFoundError(message)
+                print(f"Warning: {message}")
+                continue
+
+            # Load snippet YAML
+            with open(snippet_path) as f:
+                snippet_content = f.read()
+
+                # Substitute variables
+                for var_name, var_value in cloud_init_vars.items():
+                    snippet_content = snippet_content.replace(f"${{{var_name}}}", str(var_value))
+
+                snippet_data = yaml.safe_load(snippet_content)
+
+                if snippet_data:
+                    # Merge snippet into merged_cloud_init
+                    self._deep_merge(merged_cloud_init, snippet_data)
+
+        # Convert merged cloud-init to the format expected by the template
+        if merged_cloud_init:
+            # Handle hostname
+            if "hostname" in merged_cloud_init:
+                config["cloud_init_hostname"] = merged_cloud_init["hostname"]
+            if "fqdn" in merged_cloud_init:
+                config["cloud_init_fqdn"] = merged_cloud_init.get(
+                    "fqdn", merged_cloud_init.get("hostname")
+                )
+
+            # Handle users
+            if "users" in merged_cloud_init:
+                config["cloud_init_users"] = merged_cloud_init["users"]
+
+            # Handle packages
+            if "packages" in merged_cloud_init:
+                config["cloud_init_packages"] = merged_cloud_init["packages"]
+
+            # Handle runcmd
+            if "runcmd" in merged_cloud_init:
+                config["cloud_init_runcmd"] = merged_cloud_init["runcmd"]
+
+            # Handle network config - store as raw YAML for template
+            if "network" in merged_cloud_init:
+                config["cloud_init_network"] = merged_cloud_init["network"]
+
+        return vm_copy
+
+    def _deep_merge(self, base: dict, overlay: dict) -> None:
+        """Deep merge overlay dict into base dict (modifies base in-place)."""
+        for key, value in overlay.items():
+            if key in base:
+                if isinstance(base[key], dict) and isinstance(value, dict):
+                    self._deep_merge(base[key], value)
+                elif isinstance(base[key], list) and isinstance(value, list):
+                    base[key].extend(value)
+                else:
+                    base[key] = value
+            else:
+                base[key] = value
 
     def _generate_templates_terraform(self, templates: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox templates."""
-        template = self.jinja_env.get_template("proxmox/templates.tf.j2")
-        content = template.render(templates=templates)
-        (self.terraform_dir / "templates.tf").write_text(content)
+        from urllib.parse import urlparse
+
+        from infrafoundry.core.config import ConfigManager
+
+        # Extract SSH hostname from API URL for templates that need it
+        ssh_hostname = None
+        if self._current_environment:
+            config_manager = ConfigManager(self.config_dir)
+            try:
+                env_config = config_manager.load_environment(self._current_environment)
+                provider_settings = env_config.get_provider_settings("proxmox")
+                if provider_settings and "api_url" in provider_settings:
+                    parsed = urlparse(provider_settings["api_url"])
+                    ssh_hostname = parsed.hostname
+            except FileNotFoundError:
+                pass
+
+        self.render_and_write_terraform(
+            "proxmox/templates.tf.j2",
+            context={"templates": templates, "ssh_hostname": ssh_hostname},
+            output_name="templates.tf",
+        )
 
     def _generate_networks_terraform(self, networks: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox networks."""
-        template = self.jinja_env.get_template("proxmox/networks.tf.j2")
-        content = template.render(networks=networks)
-        (self.terraform_dir / "networks.tf").write_text(content)
+        self.render_and_write_terraform(
+            "proxmox/networks.tf.j2",
+            context={"networks": networks},
+            output_name="networks.tf",
+        )
 
+    def _copy_tfvars_if_exists(self) -> None:
+        """Copy environment-specific terraform.tfvars if it exists."""
+        import shutil
+
+        # Look for terraform.tfvars in the config directory
+        # The config_dir points to envs/{env}, so we need to go up and check
+        potential_tfvars = self.config_dir / "terraform.tfvars"
+
+        if potential_tfvars.exists():
+            dest = self.terraform_dir / "terraform.tfvars"
+            shutil.copy2(potential_tfvars, dest)
+
+    @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
         """Generate Ansible playbooks for Proxmox post-configuration."""
         self.ensure_directories()
 
         # Generate main playbook
-        playbook_template = self.jinja_env.get_template("proxmox/playbook.yml.j2")
-        playbook_content = playbook_template.render(resources=resources)
-        (self.ansible_dir / "playbook.yml").write_text(playbook_content)
+        content = self.render_template("proxmox/playbook.yml.j2", {"resources": resources})
+        self._write_ansible_file("playbook.yml", content)
 
         # Generate inventory
-        inventory_template = self.jinja_env.get_template("proxmox/inventory.yml.j2")
-        inventory_content = inventory_template.render(resources=resources)
-        (self.ansible_dir / "inventory.yml").write_text(inventory_content)
+        content = self.render_template("proxmox/inventory.yml.j2", {"resources": resources})
+        self._write_ansible_file("inventory.yml", content)
 
         # Create roles directory structure
         roles_dir = self.ansible_dir / "roles"
@@ -110,18 +288,19 @@ class ProxmoxProvider(ProviderBase):
         tasks_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate main tasks
-        tasks_template = self.jinja_env.get_template("proxmox/roles/common/main.yml.j2")
-        tasks_content = tasks_template.render()
-        (tasks_dir / "main.yml").write_text(tasks_content)
+        content = self.render_template("proxmox/roles/common/main.yml.j2", {})
+        (tasks_dir / "main.yml").write_text(content)
 
+    @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["vms", "templates", "networks"]
+        return ["vm", "template", "network"]
 
+    @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
-            "vms": ["templates", "networks"],
-            "templates": [],
-            "networks": [],
+            "vm": ["template", "network"],
+            "template": [],
+            "network": [],
         }

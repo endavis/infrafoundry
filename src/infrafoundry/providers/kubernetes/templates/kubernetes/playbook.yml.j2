@@ -8,15 +8,15 @@
     - name: Wait for deployments to be ready
       command: >
         kubectl wait --for=condition=available --timeout=300s
-        deployment/{{ item.config.name }}
-        -n {{ item.config.namespace | default('default') }}
+        deployment/{% raw %}{{ item.config.name }}{% endraw %}
+        -n {% raw %}{{ item.config.namespace | default('default') }}{% endraw %}
       loop: "{{ resources | selectattr('type', 'equalto', 'deployments') | list }}"
       when: resources is defined
 
     - name: Get deployment status
       command: >
         kubectl get deployments
-        -n {{ item.config.namespace | default('default') }}
+        -n {% raw %}{{ item.config.namespace | default('default') }}{% endraw %}
         -o wide
       loop: "{{ resources | selectattr('type', 'equalto', 'deployments') | list }}"
       when: resources is defined

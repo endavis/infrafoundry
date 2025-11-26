@@ -1,0 +1,49 @@
+{
+  "recommendations": [
+    // Python Development
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+
+    // Code Quality & Formatting
+    "charliermarsh.ruff",
+
+    // Testing
+    "ms-python.pytest",
+    "littlefoxteam.vscode-python-test-adapter",
+    "hbenl.vscode-test-explorer",
+
+    // Infrastructure as Code
+    "hashicorp.terraform",
+    "redhat.ansible",
+
+    // YAML Support
+    "redhat.vscode-yaml",
+
+    // Git
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+
+    // Secret Management
+    "signageos.signageos-vscode-sops",
+
+    // Markdown
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+
+    // Shell Scripts
+    "timonwong.shellcheck",
+    "foxundermoon.shell-format",
+
+    // Productivity
+    "streetsidesoftware.code-spell-checker",
+    "editorconfig.editorconfig",
+    "gruntfuggly.todo-tree",
+
+    // Docker (if using containers)
+    "ms-azuretools.vscode-docker"
+  ],
+  "unwantedRecommendations": [
+    "ms-python.pylint"
+  ]
+}

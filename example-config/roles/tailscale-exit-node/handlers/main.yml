@@ -1,0 +1,10 @@
+---
+- name: reload ufw
+  ufw:
+    state: reloaded
+  when: not is_immutable
+
+- name: reload firewalld
+  systemd:
+    name: firewalld
+    state: reloaded

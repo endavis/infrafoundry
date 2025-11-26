@@ -1,0 +1,21 @@
+name: dev
+description: Development environment for testing InfraFoundry
+
+# NOTE: In production, encrypt this file with SOPS!
+# sops --encrypt --in-place envs/dev/settings.yaml
+#
+# Provider credentials would go here in provider_settings section:
+# provider_settings:
+#   proxmox:
+#     api_url: https://proxmox.example.com:8006
+#     token_id: terraform@pve!token
+#     token_secret: your-secret-here
+#   opnsense:
+#     api_url: https://firewall.example.com
+#     api_key: your-api-key
+#     api_secret: your-api-secret
+
+variables:
+  environment: development
+  region: us-east
+  domain: dev.example.com

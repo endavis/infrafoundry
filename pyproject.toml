@@ -3,7 +3,7 @@ name = "infrafoundry"
 version = "0.1.0"
 description = "Infrastructure automation framework with pluggable providers (Proxmox, OPNsense, Kubernetes)"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "click>=8.1.0",
     "pyyaml>=6.0",
@@ -11,15 +11,21 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
     "rich>=13.0.0",
+    "ansible>=2.15.0",
+    "requests>=2.32.0",
+    "sqlalchemy>=2.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "coverage-badge>=1.1.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.7.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "black>=23.0.0",
     "ruff>=0.1.0",
-    "mypy>=1.0.0",
+    "types-PyYAML>=6.0.0",
+    "types-requests>=2.32.0",
 ]
 
 [project.scripts]
@@ -29,20 +35,52 @@ infra = "infrafoundry.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.black]
-line-length = 100
-target-version = ['py311']
-
 [tool.ruff]
 line-length = 100
-target-version = "py311"
-select = ["E", "F", "I", "N", "W", "UP"]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "W",    # pycodestyle warnings
+    "UP",   # pyupgrade
+    "ANN",  # flake8-annotations (type hints)
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "RUF",  # Ruff-specific rules
+]
+ignore = [
+    "ANN401",  # Dynamically typed expressions (Any) - allow for now, fix incrementally
+    "ANN001",  # Missing type annotation for function argument - fix incrementally
+    "ANN002",  # Missing type annotation for *args
+    "ANN003",  # Missing type annotation for **kwargs
+    "ANN201",  # Missing return type annotation for public function
+    "ANN202",  # Missing return type annotation for private function
+    "B024",    # Abstract base class without abstract methods - intentional in some cases
+    "B904",    # raise-without-from - fix incrementally
+    "RUF012",  # Mutable class default - fix incrementally
+    "E402",    # Module level import not at top of file - needed for CLI command loading
+]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
+# Strict type checking
+disallow_untyped_defs = true
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
+warn_unused_ignores = true
+# Additional strict checks
+check_untyped_defs = true
+disallow_any_generics = false  # Can enable later for even stricter checking
+disallow_incomplete_defs = true
+disallow_subclassing_any = true
+no_implicit_optional = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unreachable = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

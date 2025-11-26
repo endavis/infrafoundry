@@ -1,6 +1,9 @@
+# OPNsense Provider Variables
+
 variable "opnsense_api_url" {
-  description = "OPNsense API URL"
+  description = "OPNsense API URL (e.g., https://opnsense.example.com)"
   type        = string
+  sensitive   = false
 }
 
 variable "opnsense_api_key" {

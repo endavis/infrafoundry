@@ -1,0 +1,73 @@
+# .envrc.local - Personal settings for configuration repository (git-ignored)
+# Copy this to .envrc.local and customize with your preferences
+
+# Point to this configuration repository
+export INFRAFOUNDRY_CONFIG_REPO="$(pwd)"
+
+# Output directory for generated Terraform/Ansible files
+# Default: ./generated (creates dev/, staging/, prod/ subdirectories)
+# Each environment gets isolated directories with separate Terraform state
+export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"
+
+# SOPS age encryption key for the environment you're working with
+# Switch this when working on different environments
+export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/envs/dev/age.key"
+
+# Or dynamically set based on INFRA_ENV:
+# export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/envs/${INFRA_ENV}/age.key"
+
+# Environment selection (dev, staging, prod)
+# This is just a default for convenience - CLI uses --env flag
+export INFRA_ENV="${INFRA_ENV:-dev}"
+
+# Personal preferences
+# export INFRAFOUNDRY_LOG_LEVEL=DEBUG
+# export TF_LOG=DEBUG
+
+# State management (deployment tracking and resource state)
+# Default: SQLite at ~/.infrafoundry/state.db
+# export INFRAFOUNDRY_STATE_BACKEND=sqlite
+# export INFRAFOUNDRY_STATE_CONNECTION=sqlite:////home/user/.infrafoundry/state.db
+
+# For team usage with PostgreSQL:
+# export INFRAFOUNDRY_STATE_BACKEND=postgresql
+# export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
+
+# ============================================================================
+# CREDENTIALS - Stored in Encrypted settings.yaml
+# ============================================================================
+# Provider credentials are stored in envs/{env}/settings.yaml under provider_settings
+# section and encrypted with SOPS.
+#
+# The InfraFoundry CLI automatically loads credentials based on --env flag:
+#   infra plan --env dev      # Uses envs/dev/settings.yaml
+#   infra apply --env staging # Uses envs/staging/settings.yaml
+#   infra plan --env prod     # Uses envs/prod/settings.yaml
+#
+# To edit credentials:
+#   export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
+#   sops envs/dev/settings.yaml
+#
+# See: docs/per-environment-credentials.md for full guide
+# ============================================================================
+
+# ============================================================================
+# OPTIONAL OVERRIDES
+# ============================================================================
+# These are typically NOT needed since credentials come from settings.yaml
+# Only use for special cases or local testing
+
+# Terraform backend configuration (for remote state)
+# Local state (default): Stored in generated/{env}/terraform/{provider}/.terraform/
+# Remote state (production): Configure in settings.yaml terraform_backend section
+# export INFRAFOUNDRY_TF_BACKEND_TYPE=s3
+# export INFRAFOUNDRY_TF_BACKEND_BUCKET=my-terraform-state
+# export INFRAFOUNDRY_TF_BACKEND_REGION=us-east-1
+# export INFRAFOUNDRY_TF_BACKEND_KEY=infrafoundry/terraform.tfstate
+
+# Ansible configuration overrides
+# export ANSIBLE_HOST_KEY_CHECKING=False
+# export ANSIBLE_STDOUT_CALLBACK=yaml
+
+# Python virtual environment (uncomment to auto-activate)
+# layout python python3.12

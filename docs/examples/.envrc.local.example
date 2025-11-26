@@ -1,0 +1,67 @@
+# .envrc.local - Personal settings (git-ignored)
+# Copy this to .envrc.local and customize for your setup
+#
+# ============================================================================
+# CREDENTIALS ARE NOT STORED HERE!
+# ============================================================================
+# The InfraFoundry CLI automatically loads credentials from your config repo
+# based on the --env flag:
+#
+#   infra plan --env dev      # Loads secrets/dev/*.yaml
+#   infra apply --env staging # Loads secrets/staging/*.yaml
+#   infra plan --env prod     # Loads secrets/prod/*.yaml
+#
+# Store credentials in: {INFRAFOUNDRY_CONFIG_REPO}/secrets/{env}/
+#   - secrets/dev/proxmox.yaml (encrypted with SOPS)
+#   - secrets/dev/opnsense.yaml (encrypted with SOPS)
+#   - secrets/staging/proxmox.yaml (encrypted with SOPS)
+#   - etc.
+#
+# See: docs/per-environment-credentials.md for setup instructions
+# ============================================================================
+
+# ============================================================================
+# Required Settings
+# ============================================================================
+
+# Path to your configuration repository
+export INFRAFOUNDRY_CONFIG_REPO=/path/to/my-infrastructure-config
+
+# Note: SOPS age key is automatically set per-environment from:
+# secrets/{env}/age.key (e.g., secrets/dev/age.key, secrets/prod/age.key)
+# This allows each environment to have its own encryption key
+
+# ============================================================================
+# Optional Settings
+# ============================================================================
+
+# Output directory for generated Terraform/Ansible files
+# Default: ./generated (relative to framework directory)
+# export INFRAFOUNDRY_OUTPUT_DIR=/path/to/custom/output
+# export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"
+
+# Development preferences
+# export INFRAFOUNDRY_LOG_LEVEL=DEBUG
+# export TF_LOG=DEBUG
+
+# State management (deployment tracking)
+# Default: SQLite at ~/.infrafoundry/state.db
+# export INFRAFOUNDRY_STATE_BACKEND=sqlite
+# export INFRAFOUNDRY_STATE_CONNECTION=sqlite:////home/user/.infrafoundry/state.db
+
+# For team usage with PostgreSQL:
+# export INFRAFOUNDRY_STATE_BACKEND=postgresql
+# export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
+
+# Terraform backend configuration (for remote state)
+# export INFRAFOUNDRY_TF_BACKEND_TYPE=s3
+# export INFRAFOUNDRY_TF_BACKEND_BUCKET=my-terraform-state
+# export INFRAFOUNDRY_TF_BACKEND_REGION=us-east-1
+# export INFRAFOUNDRY_TF_BACKEND_KEY=infrafoundry/terraform.tfstate
+
+# Ansible configuration overrides
+# export ANSIBLE_HOST_KEY_CHECKING=False
+# export ANSIBLE_STDOUT_CALLBACK=yaml
+
+# Kubernetes config (if not using default ~/.kube/config)
+# export KUBECONFIG=/path/to/custom/kubeconfig

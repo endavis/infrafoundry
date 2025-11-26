@@ -1,0 +1,54 @@
+# SOPS Configuration for InfraFoundry Config Repository
+#
+# This file defines how SOPS encrypts files in this repository.
+# Place this in the root of your config repository.
+#
+# Per-environment encryption: Each environment has its own age key
+# This allows:
+# - Different teams to access different environments
+# - Developers can access dev/staging, ops team accesses prod
+# - Loss of one key doesn't compromise other environments
+
+creation_rules:
+  # Development environment
+  - path_regex: envs/dev/settings\.yaml$
+    age: age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # Replace with: cat envs/dev/age.key | age-keygen -y
+
+  # Staging environment
+  - path_regex: envs/staging/settings\.yaml$
+    age: age1yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy  # Replace with: cat envs/staging/age.key | age-keygen -y
+
+  # Production environment (most restrictive)
+  - path_regex: envs/prod/settings\.yaml$
+    age: age1zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz  # Replace with: cat envs/prod/age.key | age-keygen -y
+
+# Alternative: Multi-user encryption (most secure)
+# Each environment can have multiple age keys (one per team member)
+# This allows individual access tracking and key revocation
+#
+# creation_rules:
+#   - path_regex: envs/dev/settings\.yaml$
+#     age: >-
+#       age1dev_alice...,
+#       age1dev_bob...,
+#       age1dev_charlie...
+#
+#   - path_regex: envs/prod/settings\.yaml$
+#     age: >-
+#       age1prod_admin1...,
+#       age1prod_admin2...
+
+# How to get your age public key:
+# age-keygen -y envs/dev/age.key
+
+# How to encrypt a file:
+# export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
+# sops --encrypt --in-place envs/dev/settings.yaml
+
+# How to decrypt a file:
+# export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
+# sops --decrypt envs/dev/settings.yaml
+
+# How to edit an encrypted file:
+# export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
+# sops envs/dev/settings.yaml

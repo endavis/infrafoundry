@@ -29,12 +29,13 @@ htmlcov/
 # Virtual environments
 venv/
 .venv/
+.venv*/
 ENV/
 env/
 
 # User configuration (use example-config/ as template, or separate repo)
 envs/
-secrets/
+!src/infrafoundry/core/secrets/
 
 # Secrets and sensitive data
 *.key
@@ -42,6 +43,7 @@ secrets/
 !example-config/**/*.yaml
 !src/**/*.yaml
 !.sops.yaml
+!.pre-commit-config.yaml
 .env
 *.tfvars
 !*.tfvars.example
@@ -62,7 +64,11 @@ terraform.tfvars
 .vault_pass
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 .idea/
 *.swp
 *.swo
@@ -73,3 +79,12 @@ terraform.tfvars
 generated/
 output/
 *.log
+*-PLAINTEXT.yaml
+*-decrypted.yaml
+REFACTORING_TODO.md
+
+
+
+# Temporary files
+tmp/
+.venv

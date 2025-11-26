@@ -1,5 +1,6 @@
 #!/bin/bash
 # CI/CD setup script - Run this before infrastructure deployment in CI/CD
+# Updated for per-environment secrets architecture
 
 set -e
 
@@ -9,6 +10,27 @@ echo "🔧 Setting up InfraFoundry for CI/CD..."
 command -v terraform >/dev/null 2>&1 || { echo "❌ Terraform not found"; exit 1; }
 command -v sops >/dev/null 2>&1 || { echo "❌ SOPS not found"; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "❌ Python 3 not found"; exit 1; }
+
+# Check for uv, install if missing
+if ! command -v uv >/dev/null 2>&1; then
+    echo "⚠️  uv not found, installing..."
+    if command -v curl >/dev/null 2>&1; then
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.cargo/bin:$PATH"
+    elif command -v pip >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
+        pip install uv 2>/dev/null || pip3 install uv
+    else
+        echo "❌ Cannot install uv (no curl or pip available)"
+        exit 1
+    fi
+
+    # Verify uv is now available
+    if ! command -v uv >/dev/null 2>&1; then
+        echo "❌ Failed to install uv"
+        exit 1
+    fi
+    echo "✅ uv installed"
+fi
 
 echo "✅ Required tools found"
 
@@ -20,9 +42,9 @@ if [ -z "$SOPS_AGE_KEY_FILE" ]; then
     if [ -n "$SOPS_AGE_KEY" ]; then
         echo "📝 Creating age key from SOPS_AGE_KEY environment variable..."
         mkdir -p secrets
-        echo "$SOPS_AGE_KEY" | base64 -d > secrets/age.key
-        chmod 600 secrets/age.key
-        export SOPS_AGE_KEY_FILE="$(pwd)/secrets/age.key"
+        echo "$SOPS_AGE_KEY" | base64 -d > envs/dev/age.key
+        chmod 600 envs/dev/age.key
+        export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
         echo "✅ Age key configured"
     else
         echo "❌ Neither SOPS_AGE_KEY_FILE nor SOPS_AGE_KEY is set"
@@ -39,12 +61,12 @@ fi
 echo "✅ Age key verified: $SOPS_AGE_KEY_FILE"
 
 # Set defaults for InfraFoundry
-export INFRAFOUNDRY_CONFIG_DIR="${INFRAFOUNDRY_CONFIG_DIR:-envs}"
+export INFRAFOUNDRY_CONFIG_REPO="${INFRAFOUNDRY_CONFIG_REPO:-envs}"
 export INFRAFOUNDRY_SECRETS_DIR="${INFRAFOUNDRY_SECRETS_DIR:-secrets}"
 export INFRAFOUNDRY_LOG_LEVEL="${INFRAFOUNDRY_LOG_LEVEL:-INFO}"
 
 echo "✅ InfraFoundry configuration:"
-echo "   - Config dir: $INFRAFOUNDRY_CONFIG_DIR"
+echo "   - Config repo: $INFRAFOUNDRY_CONFIG_REPO"
 echo "   - Secrets dir: $INFRAFOUNDRY_SECRETS_DIR"
 echo "   - Log level: $INFRAFOUNDRY_LOG_LEVEL"
 
@@ -58,9 +80,10 @@ fi
 ENVIRONMENT=$1
 echo "🎯 Target environment: $ENVIRONMENT"
 
-# Validate environment exists
-if [ ! -d "$INFRAFOUNDRY_CONFIG_DIR/$ENVIRONMENT" ]; then
-    echo "❌ Environment directory not found: $INFRAFOUNDRY_CONFIG_DIR/$ENVIRONMENT"
+# Validate environment exists (check in config repo path)
+ENV_PATH="$INFRAFOUNDRY_CONFIG_REPO/$ENVIRONMENT"
+if [ ! -d "$ENV_PATH" ]; then
+    echo "❌ Environment directory not found: $ENV_PATH"
     exit 1
 fi
 
@@ -68,12 +91,8 @@ echo "✅ Environment validated"
 
 # Install Python dependencies if needed
 if [ ! -f ".venv/bin/activate" ] && [ ! -f "venv/bin/activate" ]; then
-    echo "📦 Installing Python dependencies..."
-    if command -v uv >/dev/null 2>&1; then
-        uv pip install -e .
-    else
-        pip install -e .
-    fi
+    echo "📦 Installing Python dependencies with uv..."
+    uv pip install -e .
     echo "✅ Dependencies installed"
 fi
 
