@@ -37,6 +37,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.ruff]
+cache-dir = "tmp/.ruff_cache"
 line-length = 100
 target-version = "py312"
 
@@ -67,6 +68,7 @@ ignore = [
 ]
 
 [tool.mypy]
+cache_dir = "tmp/.mypy_cache"
 python_version = "3.12"
 # Strict type checking
 disallow_untyped_defs = true
