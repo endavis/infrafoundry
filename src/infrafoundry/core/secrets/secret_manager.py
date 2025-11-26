@@ -53,7 +53,8 @@ class SecretManager(PathBasedManager):
 
         # Validate SOPS and age setup
         skip_sops_checks = self._get_env_var("INFRAFOUNDRY_SKIP_SOPS_CHECK")
-        if skip_sops_checks:
+        force_sops_checks = self._get_env_var("INFRAFOUNDRY_FORCE_SOPS_CHECK")
+        if not force_sops_checks and skip_sops_checks:
             self._log_warning(
                 "Skipping SOPS/age checks because INFRAFOUNDRY_SKIP_SOPS_CHECK is set. "
                 "Use only in non-production environments."
