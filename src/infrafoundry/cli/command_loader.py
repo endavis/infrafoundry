@@ -21,6 +21,7 @@ Example command file (commands/example.py):
 
 import importlib
 import logging
+import traceback
 from pathlib import Path
 
 import click
@@ -112,7 +113,8 @@ class CommandLoader:
         except InfraFoundryError as e:
             logger.error(f"InfraFoundry error loading commands from '{module_name}': {e}")
         except Exception as e:
-            logger.error(f"Unexpected error loading commands from '{module_name}': {e}")
+            logger.warning(f"Failed to load command module '{module_name}': {e}")
+            logger.debug(traceback.format_exc())  # Log full traceback
 
     def register_module(self, module_name: str) -> None:
         """Manually register a specific module.

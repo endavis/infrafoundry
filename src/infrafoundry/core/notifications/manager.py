@@ -1,5 +1,6 @@
 """Notification manager for handling multiple notification channels."""
 
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -88,8 +89,8 @@ class NotificationManager(PathBasedManager):
                     self._log_debug(f"Sending notification via {channel.name}")
                     notifier.send(event_type, environment, data)
                 except Exception as e:
-                    error_msg = f"Error sending notification via {channel.name}"
-                    self._log_error(error_msg, e)
+                    self.logger.error(f"Failed to send notification via {channel.name}: {e}")
+                    self.logger.debug(traceback.format_exc())  # Log full traceback
 
     def add_channel(self, channel: NotificationChannel) -> None:
         """Add a notification channel dynamically.

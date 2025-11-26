@@ -1,5 +1,6 @@
 """Drift detection for infrastructure resources."""
 
+import traceback
 from typing import Any
 
 from rich.console import Console
@@ -150,6 +151,7 @@ class DriftDetector:
             raise
         except Exception as e:
             self.console.print(f"\n[bold red]Unexpected error detecting drift:[/bold red] {e}")
+            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
 
         return results

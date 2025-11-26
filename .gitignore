@@ -88,3 +88,5 @@ REFACTORING_TODO.md
 # Temporary files
 tmp/
 .venv
+.cache/
+.infrafoundry/

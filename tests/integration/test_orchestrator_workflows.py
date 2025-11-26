@@ -1,6 +1,5 @@
 """Integration tests for Orchestrator workflow methods (plan, apply, destroy, rollback)."""
 
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -421,27 +420,25 @@ class TestDestroyOrchestrator:
             assert len(deployments) > 0
 
     def test_destroy_requires_confirmation_without_auto_approve(self, orchestrator):
-        """Test that destroy requires confirmation when auto_approve=False."""
-        with patch("builtins.input", return_value="no"):
-            result = orchestrator.destroy(env_name="dev", auto_approve=False)
+        """Test that destroy raises error when confirmation required but no callback provided."""
+        with pytest.raises(
+            ValueError, match="Destroy requires approval but no confirmation callback provided"
+        ):
+            orchestrator.destroy(env_name="dev", auto_approve=False, confirm_callback=None)
 
-            # Should return empty dict when aborted
-            assert result == {}
-
-            # Check deployment was marked as failed
-            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
-            assert deployments[0].status == DeploymentStatus.FAILED
-            assert "aborted" in deployments[0].error_message.lower()
+        # Check deployment was marked as failed
+        deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
+        assert deployments[0].status == DeploymentStatus.FAILED
+        assert "Destroy requires approval" in deployments[0].error_message
 
     def test_destroy_proceeds_with_confirmation(self, orchestrator):
         """Test that destroy proceeds when user confirms."""
-        with (
-            patch("builtins.input", return_value="yes"),
-            patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf,
-        ):
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
             mock_tf.return_value = {"success": True}
 
-            result = orchestrator.destroy(env_name="dev", auto_approve=False)
+            result = orchestrator.destroy(
+                env_name="dev", auto_approve=False, confirm_callback=lambda: True
+            )
 
             # Should proceed with destroy
             assert "proxmox" in result
@@ -498,12 +495,13 @@ class TestDestroyOrchestrator:
 class TestMultiProviderWorkflow:
     """Tests for multi-provider orchestration."""
 
-    def test_plan_multiple_providers(self, orchestrator, mock_providers, mock_config):
+    def test_plan_multiple_providers(self, orchestrator, mock_providers, mock_config, tmp_path):
         """Test plan workflow with multiple providers."""
         # Add a second provider
         kubernetes = Mock()
         kubernetes.name = "kubernetes"
-        kubernetes.terraform_dir = Path("/tmp/k8s")
+        kubernetes.terraform_dir = tmp_path / "generated" / "terraform" / "kubernetes"
+        kubernetes.ansible_dir = tmp_path / "generated" / "ansible" / "kubernetes"
         kubernetes.ensure_directories = Mock()
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
@@ -570,12 +568,13 @@ class TestMultiProviderWorkflow:
             assert "proxmox" in result
             assert "kubernetes" in result
 
-    def test_destroy_multiple_providers(self, orchestrator, mock_providers, mock_config):
+    def test_destroy_multiple_providers(self, orchestrator, mock_providers, mock_config, tmp_path):
         """Test destroy workflow with multiple providers."""
         # Add second provider
         opnsense = Mock()
         opnsense.name = "opnsense"
-        opnsense.terraform_dir = Path("/tmp/opn")
+        opnsense.terraform_dir = tmp_path / "generated" / "terraform" / "opnsense"
+        opnsense.ansible_dir = tmp_path / "generated" / "ansible" / "opnsense"
         opnsense.ensure_directories = Mock()
         opnsense.generate_terraform = Mock()
         opnsense.generate_ansible = Mock()

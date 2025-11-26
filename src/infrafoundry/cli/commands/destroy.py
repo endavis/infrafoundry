@@ -28,9 +28,14 @@ def destroy(
     resource: tuple[str, ...],
 ) -> None:
     """Destroy infrastructure."""
+
+    def confirm_callback() -> bool:
+        return click.confirm("Are you sure you want to destroy?")
+
     orchestrator.destroy(
         env,
         auto_approve=auto_approve,
         resource_filter=list(resource) if resource else None,
+        confirm_callback=confirm_callback,
     )
     console.print("\n[bold green]Destroy complete![/bold green]")

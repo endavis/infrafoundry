@@ -193,8 +193,10 @@ def main(
 
 # Auto-discover and register commands from commands/ directory
 from infrafoundry.cli.command_loader import load_commands
+from infrafoundry.cli.commands.state import state
 
 load_commands(main)
+main.add_command(state)
 
 
 if __name__ == "__main__":
