@@ -16,7 +16,7 @@ import yaml
 class OPNsenseParser:
     """Parse OPNsense XML configuration and generate InfraFoundry YAML files."""
 
-    def __init__(self, config_path: Path):
+    def __init__(self, config_path: Path) -> None:
         """Initialize parser with config file path."""
         self.config_path = config_path
         self.tree = ET.parse(config_path)
