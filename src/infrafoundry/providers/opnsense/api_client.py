@@ -1,20 +1,15 @@
-"""OPNsense API client for Kea DHCP operations.
-
-This module provides a minimal API client for interacting with OPNsense's Kea DHCP
-API endpoints. The implementation is inspired by turnbros/python-opnsense but kept
-minimal to avoid unnecessary dependencies.
-
-References:
-- https://github.com/turnbros/python-opnsense (Apache 2.0 License)
-- OPNsense API: https://docs.opnsense.org/development/api.html
-"""
+"""OPNsense API client built on the opnsense-openapi package."""
 
 import json
 import logging
-from base64 import b64encode
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import requests
+import httpx
+from opnsense_openapi import OPNsenseClient as OpenAPIOPNsenseClient  # type: ignore[import-untyped]
+
+if TYPE_CHECKING:  # pragma: no cover
+    # opnsense-openapi lacks stubs; this keeps mypy satisfied without affecting runtime.
+    pass
 
 from infrafoundry.core.exceptions import APIError, AuthenticationError
 
@@ -22,27 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class OPNsenseClient:
-    """Minimal OPNsense API client for authenticated requests.
-
-    This class handles authentication and HTTP communication with an OPNsense
-    firewall API. It follows the pattern from turnbros/python-opnsense but
-    uses the requests library for better maintainability.
-
-    Args:
-        api_key: OPNsense API key
-        api_secret: OPNsense API secret
-        base_url: Base URL of OPNsense instance (e.g., https://192.168.1.1)
-        verify_ssl: Whether to verify SSL certificates (default: True)
-        timeout: Request timeout in seconds (default: 30)
-
-    Example:
-        >>> client = OPNsenseClient(
-        ...     api_key="your_key",
-        ...     api_secret="your_secret",
-        ...     base_url="https://opnsense.example.com"
-        ... )
-        >>> response = client.request("GET", "kea/dhcpv6/searchSubnet")
-    """
+    """Thin wrapper around opnsense-openapi's client with InfraFoundry error handling."""
 
     def __init__(
         self,
@@ -52,15 +27,14 @@ class OPNsenseClient:
         verify_ssl: bool = True,
         timeout: int = 30,
     ) -> None:
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.base_url = base_url.rstrip("/")
-        self.verify_ssl = verify_ssl
-        self.timeout = timeout
-
-        # Create basic auth header
-        credentials = f"{api_key}:{api_secret}"
-        self.auth_header = b64encode(credentials.encode()).decode("ascii")
+        self.client = OpenAPIOPNsenseClient(
+            base_url=base_url,
+            api_key=api_key,
+            api_secret=api_secret,
+            verify_ssl=verify_ssl,
+            timeout=timeout,
+            auto_detect_version=False,
+        )
 
     def request(
         self,
@@ -69,73 +43,39 @@ class OPNsenseClient:
         data: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Make an authenticated API request.
+        """Make an authenticated API request using opnsense-openapi."""
+        parts = [p for p in endpoint.split("/") if p]
+        if len(parts) < 3:
+            raise ValueError(f"Invalid endpoint format: {endpoint}")
 
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            endpoint: API endpoint path (e.g., "kea/dhcpv6/addSubnet")
-            data: Request body data (for POST requests)
-            params: URL query parameters
-
-        Returns:
-            API response as dictionary
-
-        Raises:
-            requests.HTTPError: If the request fails
-            ValueError: If the response is not valid JSON
-        """
-        url = f"{self.base_url}/api/{endpoint}"
-
-        headers = {
-            "Authorization": f"Basic {self.auth_header}",
-        }
-
-        # Only add Content-Type for requests with data
-        if data:
-            headers["Content-Type"] = "application/json"
-
-        logger.debug(f"{method} {url}")
-        if data:
-            logger.debug(f"Request data: {json.dumps(data, indent=2)}")
-
+        module, controller, command, *extra = parts
         try:
-            # Make the request with explicit parameters for proper type checking
-            response = requests.request(
-                method=method,
-                url=url,
-                headers=headers,
-                params=params,
-                json=data,  # requests handles None properly
-                verify=self.verify_ssl,
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
+            if method.upper() == "GET":
+                response = self.client.get(module, controller, command, *extra, **(params or {}))
+            else:
+                response = self.client.post(module, controller, command, *extra, json=data or {})
 
-            result = cast(dict[str, Any], response.json())
-            logger.debug(f"Response: {json.dumps(result, indent=2)}")
-            return result
+            return cast(dict[str, Any], response)
 
-        except requests.HTTPError as e:
-            logger.error(f"HTTP error: {e}")
-            status_code = e.response.status_code if hasattr(e, "response") and e.response else None
-            response_text = e.response.text if hasattr(e, "response") and e.response else str(e)
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code if e.response else None
+            response_text = e.response.text if e.response else str(e)
 
-            if status_code == 401 or status_code == 403:
+            if status_code in (401, 403):
                 raise AuthenticationError(
                     "OPNsense authentication failed",
                     status_code=status_code,
                     response=response_text,
                     provider="opnsense",
                 ) from e
-            else:
-                raise APIError(
-                    f"OPNsense API request failed: {e}",
-                    status_code=status_code,
-                    response=response_text,
-                    provider="opnsense",
-                ) from e
+
+            raise APIError(
+                f"OPNsense API request failed: {e}",
+                status_code=status_code,
+                response=response_text,
+                provider="opnsense",
+            ) from e
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON response: {e}")
             raise APIError(
                 "Invalid JSON response from OPNsense",
                 response=str(e),
