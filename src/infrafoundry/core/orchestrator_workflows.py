@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,9 +14,9 @@ from rich.table import Table
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
-from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
+from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
 from infrafoundry.core.types import (
@@ -188,11 +189,13 @@ class ValidationOrchestrator:
             provider.validate_connectivity(env_data, report)
         except Exception as exc:
             self.console.print(f"[red]✗ Connectivity validation failed: {exc}[/red]")
+            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
 
         try:
             provider.validate_references(resources, env_data, report)
         except Exception as exc:
             self.console.print(f"[red]✗ Reference validation failed: {exc}[/red]")
+            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
 
     def _print_summary(self, provider_name: str, summary: dict[str, Any], passed: bool) -> None:
         """Render summary results to the console."""
@@ -285,6 +288,13 @@ class PlanOrchestrator:
         self._get_current_user = get_current_user
         self._fail_on_missing_secrets = fail_on_missing_secrets
 
+        # Dynamically create all registered runners
+        self.runners: dict[str, BaseRunner] = {}
+        for tool_name in self.runner_registry.list_runners():
+            runner = self.runner_registry.create_runner(tool_name, console=self.console)
+            if runner:
+                self.runners[tool_name] = runner
+
     def plan(
         self,
         env_name: str,
@@ -308,9 +318,6 @@ class PlanOrchestrator:
         )
 
         results: dict[str, Any] = {}
-        terraform_runner = self.runner_registry.create_runner("terraform", console=self.console)
-        if not terraform_runner:
-            raise InfraFoundryError("Could not create terraform runner")
 
         try:
             self._print_header("Planning", env_name, resource_filter, style="bold cyan")
@@ -338,26 +345,33 @@ class PlanOrchestrator:
                     deployment_id, env_name, provider_name, provider_resources
                 )
 
+                provider_results: dict[str, Any] = {"resources": len(provider_resources)}
+
                 if dry_run:
-                    self.console.print("  [dim]Would generate Terraform and Ansible files[/dim]")
-                    results[provider_name] = {
-                        "resources": len(provider_resources),
-                        "dry_run": True,
-                    }
-                    continue
+                    self.console.print("  [dim]Would generate configurations and run plans[/dim]")
+                    provider_results["dry_run"] = True
+                else:
+                    provider.set_environment(env_name)
+                    provider.ensure_directories()
+                    self._export_secrets(provider_name, env_name, provider)
 
-                provider.set_environment(env_name)
-                provider.ensure_directories()
-                provider.generate_terraform(provider_resources)
-                provider.generate_ansible(provider_resources)
-                self._export_secrets(provider_name, env_name, provider)
+                    for tool_name, runner in self.runners.items():
+                        generate_method = getattr(provider, f"generate_{tool_name}", None)
+                        if generate_method and callable(generate_method):
+                            self.console.print(
+                                f"  [dim]Generating {tool_name} configuration...[/dim]"
+                            )
+                            generate_method(provider_resources)
+                            self.console.print(f"  [dim]Running {tool_name} plan...[/dim]")
+                            runner_result = runner.run(provider, "plan", auto_approve=False)
+                            provider_results[f"{tool_name}_plan"] = runner_result
+                        else:
+                            self.console.print(
+                                f"  [dim]Skipping {tool_name} for {provider_name}: "
+                                f"no generate_{tool_name} method[/dim]"
+                            )
 
-                self.console.print("  [dim]Running terraform plan...[/dim]")
-                tf_result = terraform_runner.run(provider, "plan", auto_approve=False)
-                results[provider_name] = {
-                    "resources": len(provider_resources),
-                    "terraform_plan": tf_result,
-                }
+                results[provider_name] = provider_results
 
             self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
             self.event_manager.emit_event(
@@ -374,6 +388,7 @@ class PlanOrchestrator:
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
             )
+            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
 
         return results
@@ -466,7 +481,12 @@ class RollbackOrchestrator:
         self.apply_orchestrator = apply_orchestrator
         self._get_current_user = get_current_user
 
-    def rollback(self, deployment_id: int, auto_approve: bool) -> dict[str, Any]:
+    def rollback(
+        self,
+        deployment_id: int,
+        auto_approve: bool,
+        confirm_callback: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
         deployment = self.state_manager.get_deployment_by_id(deployment_id)
         if not deployment:
             raise ValueError(f"Deployment {deployment_id} not found")
@@ -478,9 +498,14 @@ class RollbackOrchestrator:
         env_name = rollback_data["environment"]
         self._print_header(env_name, deployment_id, deployment, rollback_data)
 
-        if not auto_approve and not self._confirm_rollback():
-            self.console.print("[yellow]Rollback cancelled.[/yellow]")
-            return {}
+        if not auto_approve:
+            should_continue = False
+            if confirm_callback:
+                should_continue = confirm_callback()
+
+            if not should_continue:
+                self.console.print("[yellow]Rollback cancelled.[/yellow]")
+                return {}
 
         rollback_metadata: RollbackDeploymentMetadata = {
             "rollback_from": deployment_id,
@@ -515,6 +540,7 @@ class RollbackOrchestrator:
                 rollback_deployment_id, DeploymentStatus.FAILED, str(exc)
             )
             self.console.print(f"\n[bold red]✗ Rollback failed: {exc}[/bold red]")
+            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
 
     def _print_header(
@@ -532,10 +558,6 @@ class RollbackOrchestrator:
                 f"[dim]Deployment from: {deployment.started_at.strftime('%Y-%m-%d %H:%M:%S')}[/dim]"
             )
         self.console.print(f"[dim]Resources: {len(rollback_data.get('resources', []))}[/dim]\n")
-
-    def _confirm_rollback(self) -> bool:
-        response = input("Are you sure you want to rollback? (yes/no): ")
-        return response.lower() == "yes"
 
     def _print_note(self, deployment_id: int) -> None:
         self.console.print(
@@ -641,6 +663,7 @@ class ApplyOrchestrator:
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
             )
+            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
 
         return results
@@ -702,11 +725,19 @@ class DestroyOrchestrator:
         self._iter_provider_batches = iter_provider_batches
         self._get_current_user = get_current_user
 
+        # Dynamically create all registered runners
+        self.runners: dict[str, BaseRunner] = {}
+        for tool_name in self.runner_registry.list_runners():
+            runner = self.runner_registry.create_runner(tool_name, console=self.console)
+            if runner:
+                self.runners[tool_name] = runner
+
     def destroy(
         self,
         env_name: str,
         resource_filter: list[str] | None,
         auto_approve: bool,
+        confirm_callback: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
         """Destroy all requested resources."""
         destroy_metadata: DestroyDeploymentMetadata = {
@@ -727,18 +758,21 @@ class DestroyOrchestrator:
         )
 
         results: dict[str, Any] = {}
-        terraform_runner = self.runner_registry.create_runner("terraform", console=self.console)
-        if not terraform_runner:
-            raise InfraFoundryError("Could not create terraform runner")
 
         try:
             self._print_header("Destroying", env_name, resource_filter, "bold red")
-            if not auto_approve and not self._confirm_destroy():
-                self.console.print("[yellow]Aborted[/yellow]")
-                self.state_manager.update_deployment_status(
-                    deployment_id, DeploymentStatus.FAILED, "User aborted"
-                )
-                return {}
+
+            if not auto_approve:
+                should_continue = False
+                if confirm_callback:
+                    should_continue = confirm_callback()
+
+                if not should_continue:
+                    self.console.print("[yellow]Aborted[/yellow]")
+                    self.state_manager.update_deployment_status(
+                        deployment_id, DeploymentStatus.FAILED, "User aborted"
+                    )
+                    return {}
 
             _, resources_by_provider = self._load_resources(env_name)
             providers = self._get_providers()
@@ -756,9 +790,14 @@ class DestroyOrchestrator:
                     deployment_id, env_name, provider_name, resources
                 )
 
-                tf_result = terraform_runner.run(provider, "destroy", auto_approve)
+                provider_results: dict[str, Any] = {}
+                for tool_name, runner in self.runners.items():
+                    self.console.print(f"  [dim]Running {tool_name} destroy...[/dim]")
+                    runner_result = runner.run(provider, "destroy", auto_approve)
+                    provider_results[tool_name] = runner_result
+
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)
-                results[provider_name] = {"terraform": tf_result}
+                results[provider_name] = provider_results
 
             self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
             self.event_manager.emit_event(
@@ -775,13 +814,10 @@ class DestroyOrchestrator:
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
             )
+            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
 
         return results
-
-    def _confirm_destroy(self) -> bool:
-        response = input("Are you sure you want to destroy? (yes/no): ")
-        return response.lower() == "yes"
 
     def _track_destroying_resources(
         self,

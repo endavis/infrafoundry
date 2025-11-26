@@ -1,5 +1,6 @@
 """Policy engine for evaluating policies against resources."""
 
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +73,7 @@ class PolicyEngine:
                 print(f"Warning: Policy error in {policy_file}: {e}")
             except Exception as e:
                 print(f"Warning: Unexpected error loading policy file {policy_file}: {e}")
+                print(traceback.format_exc())  # Log full traceback
 
     def register_evaluator(self, policy_type: PolicyType, evaluator: PolicyEvaluator) -> None:
         """Register a custom evaluator for a policy type.

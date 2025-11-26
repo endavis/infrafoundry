@@ -22,4 +22,12 @@ def rollback(
     _ctx: click.Context, orchestrator: Orchestrator, deployment_id: int, auto_approve: bool
 ) -> None:
     """Rollback infrastructure to a previous deployment state."""
-    orchestrator.rollback(deployment_id=deployment_id, auto_approve=auto_approve)
+
+    def confirm_callback() -> bool:
+        return click.confirm("Are you sure you want to rollback?")
+
+    orchestrator.rollback(
+        deployment_id=deployment_id,
+        auto_approve=auto_approve,
+        confirm_callback=confirm_callback,
+    )

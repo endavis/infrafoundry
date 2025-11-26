@@ -1,6 +1,7 @@
 """Core orchestration for infrastructure deployment."""
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -106,7 +107,7 @@ class Orchestrator:
         self.validation_orchestrator = ValidationOrchestrator(
             config_manager=self.config_manager,
             console=self.console,
-            get_providers=lambda: self.providers,
+            get_providers=lambda: self.providers,  # Revert to lambda
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
         )
@@ -115,11 +116,11 @@ class Orchestrator:
             state_manager=self.state_manager,
             event_manager=self.event_manager,
             runner_registry=self.runner_registry,
-            get_providers=lambda: self.providers,
+            get_providers=lambda: self.providers,  # Revert to lambda
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
             validate_resources=self.validate_resources,
-            has_policies=lambda: bool(self.policy_engine.policies),
+            has_policies=lambda: bool(self.policy_engine.policies),  # Revert to lambda
             check_policies=(
                 lambda env, resources, enforce: (
                     self.check_policies(env, resources, enforce=enforce),
@@ -144,7 +145,7 @@ class Orchestrator:
             state_manager=self.state_manager,
             event_manager=self.event_manager,
             runner_registry=self.runner_registry,
-            get_providers=lambda: self.providers,
+            get_providers=lambda: self.providers,  # Revert to lambda
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
             get_current_user=lambda: self._current_user,
@@ -157,12 +158,12 @@ class Orchestrator:
         )
         self.drift_orchestrator = DriftOrchestrator(
             drift_detector=self.drift_detector,
-            get_providers=lambda: self.providers,
+            get_providers=lambda: self.providers,  # Revert to lambda
         )
         self.status_orchestrator = StatusOrchestrator(
             console=self.console,
             config_manager=self.config_manager,
-            get_providers=lambda: self.providers,
+            get_providers=lambda: self.providers,  # Revert to lambda
         )
 
         # Subscribe notification manager to events
@@ -482,6 +483,7 @@ class Orchestrator:
         env_name: str,
         auto_approve: bool = False,
         resource_filter: list[str] | None = None,
+        confirm_callback: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
         """Destroy infrastructure.
 
@@ -489,18 +491,27 @@ class Orchestrator:
             env_name: Environment name
             auto_approve: If True, skip confirmation prompts
             resource_filter: Optional list of resource names to target
+            confirm_callback: Optional callback for user confirmation
 
         Returns:
             Dict with destroy results per provider
         """
-        return self.destroy_orchestrator.destroy(env_name, resource_filter, auto_approve)
+        return self.destroy_orchestrator.destroy(
+            env_name, resource_filter, auto_approve, confirm_callback
+        )
 
-    def rollback(self, deployment_id: int, auto_approve: bool = False) -> dict[str, Any]:
+    def rollback(
+        self,
+        deployment_id: int,
+        auto_approve: bool = False,
+        confirm_callback: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
         """Rollback infrastructure to a previous deployment state.
 
         Args:
             deployment_id: ID of deployment to rollback to
             auto_approve: If True, skip confirmation prompts
+            confirm_callback: Optional callback for user confirmation
 
         Returns:
             Dict with rollback results
@@ -508,7 +519,7 @@ class Orchestrator:
         Raises:
             ValueError: If deployment not found or has no rollback data
         """
-        return self.rollback_orchestrator.rollback(deployment_id, auto_approve)
+        return self.rollback_orchestrator.rollback(deployment_id, auto_approve, confirm_callback)
 
     def status(self, env_name: str) -> None:
         """Show status of infrastructure.

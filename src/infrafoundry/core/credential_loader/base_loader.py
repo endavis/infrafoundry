@@ -2,6 +2,7 @@
 
 import logging
 import subprocess
+import traceback
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -115,4 +116,6 @@ class BaseCredentialLoader(ABC):
                 logger.debug(f"YAML parsing failed for {file_path}: {e}")
             return {}
         except Exception as exc:  # pragma: no cover - unexpected failure path
+            logger.error(f"Unexpected error decrypting {file_path}: {exc}")
+            logger.debug(traceback.format_exc())  # Log full traceback
             raise CredentialLoaderError(f"Unexpected error decrypting {file_path}: {exc}") from exc

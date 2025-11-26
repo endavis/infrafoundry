@@ -412,11 +412,18 @@ class TestPlanOrchestratorStrictMode:
     def _make_plan_workflow(self, tmp_path, fail_on_missing_secrets: bool) -> PlanOrchestrator:
         secret_manager = Mock(spec=SecretManager)
         secret_manager.export_for_terraform.side_effect = FileNotFoundError("missing")
+
+        mock_runner_registry = Mock()
+        mock_runner_registry.list_runners.return_value = []
+        mock_runner_registry.create_runner.return_value = (
+            None  # No runners needed for these specific tests
+        )
+
         return PlanOrchestrator(
             console=Mock(),
             state_manager=Mock(),
             event_manager=Mock(),
-            runner_registry=Mock(),
+            runner_registry=mock_runner_registry,
             get_providers=lambda: {},
             load_resources=lambda env: ([], {}),
             iter_provider_batches=lambda *_args, **_kwargs: [],
