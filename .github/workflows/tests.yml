@@ -10,6 +10,7 @@ on:
 env:
   PYTHON_VERSION: '3.12'
   COVERAGE_THRESHOLD: '69'  # 69.89% actual coverage (rounds to 70%)
+  INFRAFOUNDRY_SKIP_SOPS_CHECK: '1'
 
 jobs:
   test:

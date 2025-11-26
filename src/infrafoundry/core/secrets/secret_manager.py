@@ -52,8 +52,15 @@ class SecretManager(PathBasedManager):
         )
 
         # Validate SOPS and age setup
-        check_sops_installed()
-        check_age_key()
+        skip_sops_checks = self._get_env_var("INFRAFOUNDRY_SKIP_SOPS_CHECK")
+        if skip_sops_checks:
+            self._log_warning(
+                "Skipping SOPS/age checks because INFRAFOUNDRY_SKIP_SOPS_CHECK is set. "
+                "Use only in non-production environments."
+            )
+        else:
+            check_sops_installed()
+            check_age_key()
 
     def decrypt_file(self, filename: str) -> dict[str, Any]:
         """Decrypt a SOPS-encrypted file.
