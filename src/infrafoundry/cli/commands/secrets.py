@@ -50,7 +50,7 @@ def secrets_init(key_file: str) -> None:
             public_key = line.split(": ")[1]
 
             # Create .sops.yaml
-            secret_manager = SecretManager(key_path.parent)
+            secret_manager = SecretManager(str(key_path.parent))
             secret_manager.create_sops_config(public_key)
 
             console.print(f"[green]Created age key: {key_path}[/green]")

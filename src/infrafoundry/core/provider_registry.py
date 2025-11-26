@@ -81,7 +81,7 @@ class ProviderRegistry:
         # Find the provider class (subclass of ProviderBase)
         if provider_class := self._find_provider_class(module, provider_name):
             try:
-                provider_instance = provider_class(self.config_dir, self.output_dir)
+                provider_instance = provider_class(provider_name, self.config_dir, self.output_dir)
                 self.register_provider(provider_instance)
                 logger.debug(f"Registered provider: {provider_name}")
             except Exception as e:

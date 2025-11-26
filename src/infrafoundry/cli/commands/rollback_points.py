@@ -35,10 +35,11 @@ def rollback_points(_ctx: click.Context, orchestrator: Orchestrator, env: str, l
     table.add_column("Commit", style="dim")
 
     for deployment in deployments:
-        resource_count = len(deployment.rollback_data.get("resources", []))
+        resource_count = len(deployment.rollback_data.get("resources", [])) if deployment.rollback_data else 0
+        completed_time = deployment.completed_at.strftime("%Y-%m-%d %H:%M:%S") if deployment.completed_at else "N/A"
         table.add_row(
             str(deployment.id),
-            deployment.completed_at.strftime("%Y-%m-%d %H:%M:%S"),
+            completed_time,
             deployment.user or "unknown",
             str(resource_count),
             deployment.commit_sha or "N/A",
