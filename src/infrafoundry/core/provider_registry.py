@@ -2,6 +2,7 @@
 
 import importlib
 import logging
+import traceback
 import types
 from pathlib import Path
 from typing import Any, cast
@@ -59,11 +60,8 @@ class ProviderRegistry:
             except ProviderInitializationError as e:
                 logger.debug(f"Could not load provider '{provider_dir.name}': {e}")
             except Exception as e:
-                # Wrap unexpected errors during provider discovery
-                logger.debug(
-                    f"Unexpected error loading provider '{provider_dir.name}': {e}",
-                    exc_info=True,
-                )
+                logger.warning(f"Error discovering provider from {provider_dir.name}: {e}")
+                logger.debug(traceback.format_exc())  # Log full traceback
 
     def _discover_and_register_provider(self, provider_name: str) -> None:
         """Discover and register a specific provider by name.
@@ -94,6 +92,7 @@ class ProviderRegistry:
             except Exception as e:
                 # Wrap instantiation failures as ProviderInitializationError
                 logger.debug(f"Failed to instantiate {provider_name}: {e}")
+                logger.debug(traceback.format_exc())  # Log full traceback
                 raise ProviderInitializationError(
                     f"Failed to initialize provider '{provider_name}'",
                     context={"provider": provider_name, "error": str(e)},

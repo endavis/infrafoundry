@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import inspect
+import sys
+import traceback
 from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
 import click
+from rich.console import Console
 
 from infrafoundry.core.exceptions import (
     ConfigurationError,
@@ -16,6 +19,8 @@ from infrafoundry.core.exceptions import (
 )
 
 from .utils import raise_cli_error
+
+console = Console()
 
 
 def with_orchestrator(
@@ -78,8 +83,9 @@ def with_orchestrator(
                 # Other InfraFoundry errors - show with context
                 raise_cli_error(action, exc)
             except Exception as exc:
-                # Unexpected errors - show message
-                raise_cli_error(action, exc)
+                console.print(f"[bold red]ERROR:[/bold red] {action} - {exc}")
+                console.print(traceback.format_exc(), style="dim red")  # Log full traceback
+                sys.exit(1)
 
         return wrapper
 

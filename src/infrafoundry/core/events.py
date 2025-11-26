@@ -3,6 +3,7 @@
 Provides hooks for providers and plugins to respond to lifecycle events.
 """
 
+import traceback
 from collections import defaultdict
 from collections.abc import Callable
 from enum import Enum
@@ -168,13 +169,11 @@ class EventManager(BaseManager):
         try:
             handler(event)
         except Exception as exc:  # pragma: no cover - defensive wrapper
-            error = EventHandlerError(handler, event, exc)
-            self._log_error(
-                f"Error in {scope} handler",
-                error,
-                handler=error.handler_name,
-                event=event.event_type.value,
-                environment=event.environment,
+            self.logger.error(
+                "Event handler for %s failed: %s\n%s",
+                event.event_type,
+                exc,
+                traceback.format_exc(),
             )
 
     def emit_event(

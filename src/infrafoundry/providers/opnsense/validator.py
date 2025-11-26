@@ -4,6 +4,8 @@ This module contains all validation methods for checking OPNsense firewall
 configurations against live API state before deployment.
 """
 
+import logging
+import traceback
 from typing import Any, TypedDict, cast
 
 import urllib3
@@ -15,6 +17,8 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+logger = logging.getLogger(__name__)
 
 
 class AliasRow(TypedDict, total=False):
@@ -181,13 +185,13 @@ class OPNsenseValidator:
                 level=ValidationLevel.ERROR,
             )
         except Exception as e:
-            # Unexpected errors during validation
             self.report.add_check(
-                check_name="opnsense_validation",
+                check_name="opnsense_validation_error",
                 passed=False,
-                message=f"Unexpected error during validation: {e}",
-                level=ValidationLevel.WARNING,
+                message=f"Error validating OPNsense references: {e}",
+                level=ValidationLevel.ERROR,
             )
+            logger.debug(traceback.format_exc())  # Log full traceback
 
     def _collect_resource_references(self, resources: list[ResourceConfig]) -> dict[str, Any]:
         """Collect all resource references from configurations.
@@ -260,22 +264,44 @@ class OPNsenseValidator:
         Returns:
             Dict of existing interface names
         """
-        data = self.api_validator.fetch_json(
-            url=f"{api_url}/api/interfaces/overview/export",
-            auth=(api_key, api_secret),
-            verify_ssl=False,
-            timeout=10,
-            check_name="opnsense_get_interfaces",
-            error_message="Could not retrieve existing interfaces (status {status})",
-            error_level=ValidationLevel.WARNING,
+        data = cast(
+            Any,
+            self.api_validator.fetch_json(
+                url=f"{api_url}/api/interfaces/overview/export",
+                auth=(api_key, api_secret),
+                verify_ssl=False,
+                timeout=10,
+                check_name="opnsense_get_interfaces",
+                error_message="Could not retrieve existing interfaces (status {status})",
+                error_level=ValidationLevel.WARNING,
+            ),
         )
         if not data:
             return {}
 
         interfaces: dict[str, InterfaceData] = {}
-        for iface_name, iface_data in data.items():
-            if isinstance(iface_data, dict):
-                interfaces[iface_name] = cast(InterfaceData, iface_data)
+        # API may return a dict keyed by interface name, or a list of interface dicts.
+        if isinstance(data, dict):
+            for iface_name, iface_data in data.items():
+                if isinstance(iface_data, dict):
+                    interfaces[iface_name] = cast(InterfaceData, iface_data)
+            return interfaces
+
+        if isinstance(data, list):
+            for iface_data in data:
+                if not isinstance(iface_data, dict):
+                    continue
+                name = (
+                    iface_data.get("name")
+                    or iface_data.get("device")
+                    or iface_data.get("if")
+                    or iface_data.get("interface")
+                )
+                if name:
+                    interfaces[str(name)] = cast(InterfaceData, iface_data)
+            return interfaces
+
+        # Unexpected structure, return empty to avoid crashes while keeping validation non-fatal.
         return interfaces
 
     def _validate_firewall_rules(
