@@ -28,7 +28,7 @@ dev:
 	uv pip install -e ".[dev]"
 
 clean:
-	rm -rf build/ dist/ *.egg-info __pycache__ .pytest_cache .mypy_cache .ruff_cache tmp/htmlcov/ tmp/coverage.xml .coverage
+	rm -rf build/ dist/ *.egg-info __pycache__ .pytest_cache .mypy_cache .ruff_cache tmp/htmlcov/ tmp/coverage.xml .coverage tmp/.pytest_cache tmp/.mypy_cache tmp/.ruff_cache
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
