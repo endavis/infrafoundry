@@ -28,7 +28,7 @@ dev:
 	uv pip install -e ".[dev]"
 
 clean:
-	rm -rf build/ dist/ *.egg-info __pycache__ .pytest_cache .mypy_cache .ruff_cache htmlcov/ coverage.xml .coverage
+	rm -rf build/ dist/ *.egg-info __pycache__ .pytest_cache .mypy_cache .ruff_cache tmp/htmlcov/ tmp/coverage.xml .coverage
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
@@ -36,11 +36,11 @@ test:
 	pytest -v
 
 coverage:
-	pytest --cov=src/infrafoundry --cov-report=term-missing --cov-report=html --cov-report=xml -v
+	pytest --cov=src/infrafoundry --cov-report=term-missing --cov-report=html:tmp/htmlcov --cov-report=xml:tmp/coverage.xml -v
 	@echo ""
 	@echo "Coverage report generated:"
-	@echo "  HTML: htmlcov/index.html"
-	@echo "  XML:  coverage.xml"
+	@echo "  HTML: tmp/htmlcov/index.html"
+	@echo "  XML:  tmp/coverage.xml"
 	@echo ""
 	@echo "Target: 90% coverage (currently ~92%)"
 
