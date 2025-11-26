@@ -21,10 +21,19 @@ def secrets() -> None:
 
 
 @secrets.command("init")
-@click.option("--key-file", default="secrets/age.key", help="Path to age key file")
-def secrets_init(key_file: str) -> None:
+@click.option(
+    "--key-file",
+    default=None,
+    help="Path to age key file (defaults to envs/age.key in config repo)",
+)
+def secrets_init(key_file: str | None) -> None:
     """Initialize secrets with a new age key."""
-    key_path = Path(key_file)
+    if key_file:
+        key_path = Path(key_file)
+    else:
+        config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
+        base_dir = Path(config_repo) if config_repo else Path.cwd()
+        key_path = base_dir / "envs" / "age.key"
 
     if key_path.exists():
         console.print(f"[yellow]Key file already exists: {key_path}[/yellow]")
