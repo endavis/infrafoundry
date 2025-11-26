@@ -17,21 +17,26 @@ This repository contains your infrastructure configurations, environment definit
 .
 ├── envs/                    # Environment configurations
 │   ├── dev/                 # Development environment
-│   │   ├── environment.yaml # Environment definition
-│   │   ├── proxmox/         # Proxmox resources
-│   │   ├── opnsense/        # OPNsense resources
-│   │   └── kubernetes/      # Kubernetes resources
+│   │   ├── age.key          # Age encryption key (DO NOT COMMIT)
+│   │   ├── settings.yaml    # Environment definition + provider credentials (SOPS encrypted)
+│   │   ├── proxmox/         # Proxmox resources (YAML, not encrypted)
+│   │   ├── opnsense/        # OPNsense resources (YAML, not encrypted)
+│   │   └── kubernetes/      # Kubernetes resources (YAML, not encrypted)
 │   ├── staging/             # Staging environment
+│   │   ├── age.key          # Staging encryption key (DO NOT COMMIT)
+│   │   └── settings.yaml    # Staging environment + credentials (SOPS encrypted)
 │   └── prod/                # Production environment
-├── secrets/                 # Encrypted secrets (SOPS + age)
-│   ├── age.key              # Age encryption key (DO NOT COMMIT)
-│   ├── .sops.yaml           # SOPS configuration
-│   └── *.yaml               # Encrypted secret files
-├── .gitignore               # Ignore secrets and generated files
+│       ├── age.key          # Production encryption key (DO NOT COMMIT)
+│       └── settings.yaml    # Production environment + credentials (SOPS encrypted)
+├── .sops.yaml               # SOPS configuration (in config repo root)
+├── .gitignore               # Ignore age.key files and generated files
+├── .envrc.local.example     # Example environment variables
+├── policies/                # Policy files for validation (optional)
+├── notifications.yaml       # Notification configuration (optional)
 └── README.md                # This file
 ```
 
-**Note:** Credentials and environment-specific settings are configured in the **framework repository's** `.envrc.local` file, not in this config repository.
+**Note:** All configuration is YAML. InfraFoundry automatically generates Terraform `.tf` files and Ansible playbooks from your YAML definitions - you never need to write HCL or Terraform code directly.
 
 ## Setup
 
@@ -72,40 +77,72 @@ If using direnv in the framework repo:
 direnv allow
 ```
 
-### 3. Initialize secrets
+### 3. Initialize secrets for an environment
 
-From the framework repository:
+Generate an age key for your first environment (dev):
 
 ```bash
-infra secrets init
+# From the framework repository
+infra secrets init --env dev
 ```
 
-This creates `secrets/age.key` and `secrets/.sops.yaml` in this config repository. The age key is automatically set up for decryption.
+This creates `envs/dev/age.key` and `.sops.yaml` (in the config repo root).
 
-### 4. Add encrypted secrets
+⚠️ **IMPORTANT:** Each environment should have its own age key:
+```bash
+infra secrets init --env staging
+infra secrets init --env prod
+```
 
-Create a secrets file and encrypt it:
+### 4. Add provider credentials to settings.yaml
+
+All credentials go in the `provider_settings` section of `envs/{env}/settings.yaml`:
 
 ```bash
-# Create secrets file (in config repo)
-cat > secrets/proxmox.yaml <<EOF
-proxmox_api_url: https://proxmox.example.com:8006
-proxmox_token_id: terraform@pve!token
-proxmox_token_secret: your-secret-here
+# Edit settings.yaml for dev environment
+cat > envs/dev/settings.yaml <<EOF
+name: dev
+description: Development environment
+
+# Provider credentials (will be encrypted with SOPS)
+provider_settings:
+  proxmox:
+    api_url: https://proxmox.example.com:8006
+    token_id: terraform@pve!token
+    token_secret: your-secret-here
+
+  opnsense:
+    api_url: https://firewall.example.com
+    api_key: your-api-key
+    api_secret: your-api-secret
 EOF
 
-# Encrypt it
-infra secrets encrypt secrets/proxmox.yaml
+# Encrypt the settings file
+sops --encrypt --in-place envs/dev/settings.yaml
 ```
 
 The original file will be encrypted in place. Commit the encrypted file:
 
 ```bash
-git add secrets/proxmox.yaml secrets/.sops.yaml
-git commit -m "Add encrypted Proxmox credentials"
+git add envs/dev/settings.yaml .sops.yaml
+git commit -m "Add encrypted dev environment settings"
 ```
 
-⚠️ **NEVER commit `secrets/age.key` or `.envrc.local`!** These are git-ignored.
+⚠️ **NEVER commit `envs/*/age.key` or `.envrc.local`!** These are git-ignored.
+
+### 5. Verify encryption
+
+```bash
+# Check file is encrypted (looks like gibberish)
+cat envs/dev/settings.yaml
+
+# Decrypt to view (requires age key)
+export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
+sops --decrypt envs/dev/settings.yaml
+
+# Or edit encrypted file directly
+sops envs/dev/settings.yaml
+```
 
 ## Usage
 
@@ -151,17 +188,40 @@ Create a new environment:
 mkdir -p envs/staging
 ```
 
-Create `envs/staging/environment.yaml`:
+Create `envs/staging/settings.yaml`:
 
 ```yaml
 name: staging
 description: Staging environment
-providers:
-  - proxmox
-  - kubernetes
+
+# Provider credentials (encrypt with SOPS)
+provider_settings:
+  proxmox:
+    api_url: https://proxmox-staging.example.com:8006
+    token_id: terraform@pve!staging-token
+    token_secret: staging-secret-here
+
+# Environment-specific variables
 variables:
   cluster_name: staging-cluster
   domain: staging.example.com
+
+# Optional: SSH configuration for Proxmox template operations
+ssh:
+  user: automation
+  key_path: /home/automation/.ssh/id_ed25519
+  port: 22
+```
+
+Then encrypt it:
+
+```bash
+# Generate age key for staging
+infra secrets init --env staging
+
+# Encrypt settings
+export SOPS_AGE_KEY_FILE="$(pwd)/envs/staging/age.key"
+sops --encrypt --in-place envs/staging/settings.yaml
 ```
 
 Add provider-specific configurations:
@@ -229,8 +289,8 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo apt update && sudo apt install terraform
 
-          # Install Ansible
-          pip install ansible
+          # Install Ansible (use uv)
+          uv pip install ansible
 
           # Install SOPS
           wget https://github.com/getsops/sops/releases/latest/download/sops-latest.linux.amd64
@@ -240,18 +300,15 @@ jobs:
       - name: Set up age key
         working-directory: config
         run: |
-          mkdir -p secrets
-          echo "${{ secrets.SOPS_AGE_KEY }}" | base64 -d > secrets/age.key
-          chmod 600 secrets/age.key
+          mkdir -p envs/dev
+          echo "${{ secrets.SOPS_AGE_KEY_DEV }}" | base64 -d > envs/dev/age.key
+          chmod 600 envs/dev/age.key
 
       - name: Set environment variables
         working-directory: config
         run: |
           echo "INFRAFOUNDRY_CONFIG_REPO=$(pwd)" >> $GITHUB_ENV
-          echo "SOPS_AGE_KEY_FILE=$(pwd)/secrets/age.key" >> $GITHUB_ENV
-          echo "PROXMOX_API_URL=${{ secrets.PROXMOX_API_URL }}" >> $GITHUB_ENV
-          echo "PROXMOX_API_TOKEN_ID=${{ secrets.PROXMOX_API_TOKEN_ID }}" >> $GITHUB_ENV
-          echo "PROXMOX_API_TOKEN_SECRET=${{ secrets.PROXMOX_API_TOKEN_SECRET }}" >> $GITHUB_ENV
+          echo "SOPS_AGE_KEY_FILE=$(pwd)/envs/dev/age.key" >> $GITHUB_ENV
 
       - name: Plan infrastructure
         run: |
@@ -265,28 +322,33 @@ jobs:
 ### Required Secrets
 
 In GitHub repository settings, add these secrets:
-- `SOPS_AGE_KEY` - Base64-encoded age key: `cat secrets/age.key | base64 -w0`
-- `PROXMOX_API_URL` - Proxmox API URL
-- `PROXMOX_API_TOKEN_ID` - Proxmox token ID
-- `PROXMOX_API_TOKEN_SECRET` - Proxmox token secret
-- (Similar for other providers)
+
+**Per-environment age keys:**
+- `SOPS_AGE_KEY_DEV` - Base64-encoded dev age key: `cat envs/dev/age.key | base64 -w0`
+- `SOPS_AGE_KEY_STAGING` - Base64-encoded staging age key
+- `SOPS_AGE_KEY_PROD` - Base64-encoded prod age key
+
+**Note:** Provider credentials are stored in encrypted `settings.yaml` files, not as GitHub secrets. Only the age key needs to be in GitHub secrets.
 
 ## Security Best Practices
 
-1. **Never commit unencrypted secrets** - Always use SOPS encryption
-2. **Protect age.key** - Store securely, never commit, backup safely
-3. **Use separate credentials per environment** - Different keys for dev/staging/prod
-4. **Rotate credentials regularly** - Update encrypted secrets periodically
-5. **Audit access** - Review who has access to config repo and age key
+1. **Never commit unencrypted secrets** - Always use SOPS encryption on `settings.yaml`
+2. **Protect age.key files** - Store securely, never commit, backup safely
+3. **Use separate keys per environment** - Each environment has its own `age.key`
+4. **Rotate credentials regularly** - Update encrypted `settings.yaml` periodically
+5. **Audit access** - Review who has access to config repo and age keys
 6. **Use branch protection** - Require reviews for production changes
+7. **Separate environments** - Never use prod credentials in dev/staging
 
 ## Team Collaboration
 
 ### Sharing age key with team
 
-**Option 1: Secure key management service** (Recommended)
-- Store age key in HashiCorp Vault, AWS Secrets Manager, or similar
-- Team members retrieve key from secure service
+**Option 1: Per-environment keys** (Recommended)
+- Each environment (dev, staging, prod) has its own age key
+- Developers get dev/staging keys only
+- Ops team gets all keys including prod
+- Store keys in secure key management service (Vault, AWS Secrets Manager)
 
 **Option 2: Encrypted handoff**
 - Encrypt age key with team member's personal age public key
@@ -297,11 +359,11 @@ In GitHub repository settings, add these secrets:
 # Team member generates personal key
 age-keygen -o ~/.age/personal.key
 
-# Admin encrypts shared key
-age -r <team-member-public-key> -o age.key.encrypted secrets/age.key
+# Admin encrypts shared key for specific environment
+age -r <team-member-public-key> -o dev-age.key.encrypted envs/dev/age.key
 
 # Team member decrypts
-age -d -i ~/.age/personal.key age.key.encrypted > secrets/age.key
+age -d -i ~/.age/personal.key dev-age.key.encrypted > envs/dev/age.key
 ```
 
 **Option 3: Per-user SOPS setup** (Most secure)
@@ -309,14 +371,18 @@ age -d -i ~/.age/personal.key age.key.encrypted > secrets/age.key
 - Add all public keys to `.sops.yaml`
 - SOPS encrypts for all keys
 
-Edit `secrets/.sops.yaml`:
+Edit `.sops.yaml` (in config repo root):
 ```yaml
 creation_rules:
-  - path_regex: .*\.yaml$
+  - path_regex: envs/dev/settings\.yaml$
     age: >-
-      age1public1...,
-      age1public2...,
-      age1public3...
+      age1dev_user1...,
+      age1dev_user2...,
+      age1dev_user3...
+  - path_regex: envs/prod/settings\.yaml$
+    age: >-
+      age1prod_admin1...,
+      age1prod_admin2...
 ```
 
 ## Troubleshooting
@@ -327,13 +393,14 @@ export INFRAFOUNDRY_CONFIG_REPO="/path/to/config/repo"
 ```
 
 ### Decryption fails
-- Check `SOPS_AGE_KEY_FILE` points to correct key
-- Verify age.key is readable: `ls -l $SOPS_AGE_KEY_FILE`
-- Test manually: `sops -d secrets/proxmox.yaml`
+- Check `SOPS_AGE_KEY_FILE` points to correct environment's key
+- Verify age.key is readable: `ls -l envs/dev/age.key`
+- Test manually: `sops -d envs/dev/settings.yaml`
+- Ensure you're using the right environment's key: `export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"`
 
 ### Environment not found
 - Check directory structure: `ls envs/`
-- Verify `environment.yaml` exists in environment directory
+- Verify `settings.yaml` exists in environment directory
 - List available environments: `infra envs`
 
 ## Maintaining This Repository
@@ -367,13 +434,41 @@ git push -u origin update-dev-vms
 ### Backup important files
 
 Regularly backup:
-- `secrets/age.key` - Encryption key (store securely offline)
-- `secrets/.sops.yaml` - SOPS configuration
-- `.envrc.local` - Local environment settings (keep private)
+- `envs/*/age.key` - Encryption keys for each environment (store securely offline, separately)
+- `.sops.yaml` - SOPS configuration
+- `.envrc.local` - Local environment settings (keep private, don't backup to same location as age keys)
+- Encrypted `settings.yaml` files - Already in git, but maintain offline backups
+
+**Important:** Back up age keys to a secure, separate location from the config repo. If you lose an age key, you cannot decrypt that environment's settings.
+
+**Note:** Each environment (dev, staging, prod) has isolated state in `generated/{env}/terraform/{provider}/`. This prevents conflicts when working on multiple environments simultaneously.
+
+## State Management
+
+InfraFoundry manages three types of state:
+
+1. **Terraform State**: `generated/{env}/terraform/{provider}/.terraform/terraform.tfstate`
+   - Tracks infrastructure resources created by Terraform
+   - Separate state per environment (dev, staging, prod)
+   - Can use remote backends (S3, Terraform Cloud) for team collaboration
+
+2. **InfraFoundry State**: `~/.infrafoundry/state.db`
+   - Tracks deployment history and resource lifecycle
+   - Provides audit trail for all operations
+   - Can use PostgreSQL for shared team state
+
+3. **Generated Configs**: `generated/{env}/`
+   - Temporary `.tf` files and Ansible playbooks
+   - Reproducible from YAML configs
+   - Git-ignored, regenerated on each plan/apply
+
+For more details, see [State Management Guide](../docs/state-management.md).
 
 ## Related Documentation
 
 - [InfraFoundry Framework](https://github.com/your-org/infrafoundry)
+- [State Management Strategies](../docs/state-management.md)
+- [Separate Config Repository Guide](../docs/separate-config-repo.md)
 - [Provider Documentation](https://github.com/your-org/infrafoundry/tree/main/docs)
 - [SOPS Documentation](https://github.com/getsops/sops)
 - [age Encryption](https://github.com/FiloSottile/age)

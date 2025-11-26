@@ -1,18 +1,32 @@
 # Secrets and sensitive data
-secrets/*.key
-secrets/*.yaml
-!secrets/.gitkeep
-!secrets/*.yaml.example
+# CRITICAL: Never commit age encryption keys!
+envs/*/age.key
+envs/**/*.key
 
-# Terraform state and variables
+# Encrypted settings files are COMMITTED (they're encrypted)
+# Unencrypted settings would look like regular YAML - never commit those!
+
+# Example files can be committed (for reference)
+!*.example
+!*.yaml.example
+
+# Local environment configuration (contains paths, preferences)
+.envrc.local
+
+# Terraform state and generated variables
 *.tfvars
+*.auto.tfvars
 !*.tfvars.example
 
-# Generated files
+# Generated files (reproducible from YAML configs)
 generated/
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.tfstate.lock.hcl
+
+# Ansible generated files
+*.retry
 
 # Backups
 *.bak
@@ -21,3 +35,10 @@ generated/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/

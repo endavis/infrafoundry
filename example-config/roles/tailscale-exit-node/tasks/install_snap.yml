@@ -1,0 +1,28 @@
+---
+# Install Tailscale via snap (for Ubuntu Core and optionally regular Ubuntu)
+- name: Install Tailscale snap
+  snap:
+    name: tailscale
+    channel: "{{ tailscale_snap_channel }}"
+    state: present
+  register: snap_install
+
+- name: Connect snap interfaces for network control
+  command: "snap connect tailscale:{{ item }}"
+  loop:
+    - network-control
+    - firewall-control
+    - network-observe
+  when: snap_install.changed
+  failed_when: false
+  changed_when: false
+
+- name: Wait for Tailscale snap to be ready
+  wait_for:
+    timeout: 10
+  when: snap_install.changed
+
+- name: Set Tailscale binary path for snap
+  set_fact:
+    tailscale_bin: "/snap/bin/tailscale"
+    tailscaled_service: "snap.tailscale.tailscaled.service"

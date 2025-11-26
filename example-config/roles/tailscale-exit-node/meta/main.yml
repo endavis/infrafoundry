@@ -1,0 +1,44 @@
+---
+dependencies: []
+# No dependencies required
+# Common role is recommended but not required
+
+galaxy_info:
+  role_name: tailscale_exit_node
+  author: InfraFoundry
+  description: Configure a Tailscale exit node on regular or immutable Linux systems
+  license: MIT
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal      # 20.04
+        - jammy      # 22.04
+        - noble      # 24.04
+    - name: Ubuntu Core
+      versions:
+        - "22"
+        - "24"
+    - name: Debian
+      versions:
+        - bullseye  # 11
+        - bookworm  # 12
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Fedora
+      versions:
+        - "38"
+        - "39"
+        - "40"
+
+  galaxy_tags:
+    - tailscale
+    - vpn
+    - networking
+    - exitnode
+    - immutable
+    - ubuntu-core
+    - security

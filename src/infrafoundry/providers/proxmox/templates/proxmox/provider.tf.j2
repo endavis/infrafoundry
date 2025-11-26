@@ -1,15 +1,22 @@
 terraform {
   required_providers {
     proxmox = {
-      source  = "Telmate/proxmox"
-      version = "~> 2.9"
+      source  = "bpg/proxmox"
+      version = "~> 0.86"
     }
   }
 }
 
 provider "proxmox" {
-  pm_api_url          = var.proxmox_api_url
-  pm_api_token_id     = var.proxmox_api_token_id
-  pm_api_token_secret = var.proxmox_api_token_secret
-  pm_tls_insecure     = var.proxmox_tls_insecure
+  # API credentials are read from environment variables:
+  # - PROXMOX_VE_ENDPOINT
+  # - PROXMOX_VE_API_TOKEN
+  # - PROXMOX_VE_INSECURE (optional, defaults to false)
+
+  # SSH connection for operations requiring host access
+  # (e.g., template creation, disk import)
+  ssh {
+    agent = true
+    username = var.proxmox_ssh_user
+  }
 }

@@ -1,48 +1,258 @@
 {% for vm in vms %}
-resource "proxmox_vm_qemu" "{{ vm.config.name | replace('-', '_') }}" {
+{% if vm.config.cloud_init_users is defined %}
+# Cloud-init user-data file for multiple users
+resource "proxmox_virtual_environment_file" "cloud_init_user_data_{{ vm.name | replace('-', '_') }}" {
+  content_type = "snippets"
+  datastore_id = "{{ vm.config.cloud_init_snippets_storage | default('nas01') }}"
+  node_name    = "{{ vm.config.target_node }}"
+
+  source_raw {
+    data = <<-EOF
+      #cloud-config
+      {% if vm.config.cloud_init_hostname is defined %}
+      hostname: {{ vm.config.cloud_init_hostname }}
+      fqdn: {{ vm.config.cloud_init_hostname }}
+      {% endif %}
+      users:
+      {% for user in vm.config.cloud_init_users %}
+        - name: {{ user.name }}
+          {% if user.groups is defined %}
+          groups: {{ user.groups | join(',') }}
+          {% endif %}
+          {% if user.sudo is defined %}
+          sudo: {{ user.sudo }}
+          {% endif %}
+          {% if user.shell is defined %}
+          shell: {{ user.shell }}
+          {% endif %}
+          {% if user.ssh_authorized_keys is defined %}
+          ssh_authorized_keys:
+          {% for key in user.ssh_authorized_keys %}
+            - {{ key }}
+          {% endfor %}
+          {% endif %}
+          {% if user.lock_passwd is defined %}
+          lock_passwd: {{ user.lock_passwd | lower }}
+          {% endif %}
+      {% endfor %}
+      {% if vm.config.cloud_init_packages is defined %}
+      packages:
+      {% for package in vm.config.cloud_init_packages %}
+        - {{ package }}
+      {% endfor %}
+      {% endif %}
+      {% if vm.config.cloud_init_runcmd is defined %}
+      runcmd:
+      {% for cmd in vm.config.cloud_init_runcmd %}
+        - {{ cmd }}
+      {% endfor %}
+      {% endif %}
+      {% if vm.config.cloud_init_network is defined %}
+      # Network configuration from snippet
+      network:
+        version: {{ vm.config.cloud_init_network.version }}
+        ethernets:
+      {% for iface_name, iface_config in vm.config.cloud_init_network.ethernets.items() %}
+          {{ iface_name }}:
+        {% if iface_config.match is defined %}
+            match:
+          {% for match_key, match_value in iface_config.match.items() %}
+              {{ match_key }}: {{ match_value }}
+          {% endfor %}
+        {% endif %}
+        {% if iface_config.dhcp4 is defined %}
+            dhcp4: {{ iface_config.dhcp4 | lower }}
+        {% endif %}
+        {% if iface_config.dhcp6 is defined %}
+            dhcp6: {{ iface_config.dhcp6 | lower }}
+        {% endif %}
+        {% if iface_config.addresses is defined %}
+            addresses:
+          {% for addr in iface_config.addresses %}
+              - {{ addr }}
+          {% endfor %}
+        {% endif %}
+        {% if iface_config.gateway4 is defined %}
+            gateway4: {{ iface_config.gateway4 }}
+        {% endif %}
+        {% if iface_config.nameservers is defined %}
+            nameservers:
+              addresses:
+          {% for ns in iface_config.nameservers.addresses %}
+                - {{ ns }}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      {% else %}
+      # Default DHCP network configuration
+      network:
+        version: 2
+        ethernets:
+          ens18:
+            dhcp4: true
+            dhcp6: false
+      {% endif %}
+    EOF
+
+    file_name = "cloud-init-user-data-{{ vm.name }}.yml"
+  }
+}
+{% endif %}
+
+resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_') }}" {
   name        = "{{ vm.config.name }}"
-  target_node = "{{ vm.config.target_node }}"
-  {% if vm.config.clone is defined %}
-  clone       = "{{ vm.config.clone }}"
+  node_name   = "{{ vm.config.target_node }}"
+  {% if vm.config.vmid is defined %}
+  vm_id       = {{ vm.config.vmid }}
   {% endif %}
 
-  # VM Configuration
-  cores   = {{ vm.config.cores | default(2) }}
-  sockets = {{ vm.config.sockets | default(1) }}
-  memory  = {{ vm.config.memory | default(2048) }}
+  {% if vm.config.clone is defined %}
+  # Clone from existing template/VM
+  clone {
+    vm_id = "{{ vm.config.clone }}"
+    {% if vm.config.full_clone is defined %}
+    full = {{ vm.config.full_clone | lower }}
+    {% endif %}
+  }
+  {% endif %}
 
-  {% if vm.config.disk is defined %}
-  # Disk Configuration
+  {% if vm.config.bios is defined %}
+  # BIOS Configuration (seabios or ovmf for UEFI)
+  bios = "{{ vm.config.bios }}"
+  {% endif %}
+
+  {% if vm.config.machine is defined %}
+  # Machine type
+  machine = "{{ vm.config.machine }}"
+  {% endif %}
+
+  # CPU Configuration
+  cpu {
+    cores   = {{ vm.config.cores | default(2) }}
+    sockets = {{ vm.config.sockets | default(1) }}
+  }
+
+  # Memory Configuration
+  memory {
+    dedicated = {{ vm.config.memory | default(2048) }}
+  }
+
+  {% if vm.config.agent is defined %}
+  # Agent
+  agent {
+    enabled = {{ 'true' if vm.config.agent == 1 else 'false' }}
+  }
+  {% endif %}
+
+  {% if vm.config.disk is defined and vm.config.clone is not defined %}
+  # Disk Configuration (only for new VMs, not clones)
   disk {
-    size    = "{{ vm.config.disk.size | default('32G') }}"
-    type    = "{{ vm.config.disk.type | default('scsi') }}"
-    storage = "{{ vm.config.disk.storage | default('local-lvm') }}"
+    datastore_id = "{{ vm.config.disk.storage | default('local-lvm') }}"
+    size         = {{ vm.config.disk.size | default('32') | replace('G', '') }}
+    interface    = "{{ 'scsi0' if vm.config.disk.type == 'scsi' else 'virtio0' }}"
+  }
+  {% endif %}
+
+  {% if vm.config.efi_disk is defined and vm.config.clone is not defined %}
+  # EFI Disk for UEFI boot (only for new VMs, not clones)
+  efi_disk {
+    datastore_id = "{{ vm.config.efi_disk.storage | default(vm.config.disk.storage if vm.config.disk is defined else 'local-lvm') }}"
+    {% if vm.config.efi_disk.type is defined %}
+    type = "{{ vm.config.efi_disk.type }}"
+    {% endif %}
   }
   {% endif %}
 
   {% if vm.config.network is defined %}
   # Network Configuration
-  network {
-    model  = "{{ vm.config.network.model | default('virtio') }}"
-    bridge = "{{ vm.config.network.bridge | default('vmbr0') }}"
+  network_device {
+    bridge      = "{{ vm.config.network.bridge | default('vmbr0') }}"
+    {% if vm.config.network.macaddr is defined %}
+    mac_address = "{{ vm.config.network.macaddr }}"
+    {% endif %}
     {% if vm.config.network.tag is defined %}
-    tag    = {{ vm.config.network.tag }}
+    vlan_id     = {{ vm.config.network.tag }}
     {% endif %}
   }
   {% endif %}
 
-  {% if vm.config.ipconfig is defined %}
-  # IP Configuration
-  ipconfig0 = "{{ vm.config.ipconfig }}"
+  {% if vm.config.ipconfig is defined or vm.config.ssh_user is defined or vm.config.ssh_keys is defined or vm.config.cloud_init_users is defined %}
+  # Cloud-init Configuration
+  initialization {
+    datastore_id = "{{ vm.config.cloud_init_datastore | default((vm.config.disk.storage if vm.config.disk is defined else 'local-lvm')) }}"
+
+    {% if vm.config.cloud_init_users is not defined and vm.config.ipconfig is defined %}
+    # Network configuration via ip_config (only when NOT using custom user-data)
+    ip_config {
+      {% if 'dhcp' in vm.config.ipconfig %}
+      ipv4 {
+        address = "dhcp"
+      }
+      {% elif vm.config.ipconfig.startswith('ip=') %}
+      ipv4 {
+        address = "{{ vm.config.ipconfig.split('ip=')[1].split(',')[0] }}"
+        {% if 'gw=' in vm.config.ipconfig %}
+        gateway = "{{ vm.config.ipconfig.split('gw=')[1].split(',')[0] }}"
+        {% endif %}
+      }
+      {% endif %}
+    }
+    {% endif %}
+
+    {% if vm.config.ssh_user is defined %}
+    user_account {
+      username = "{{ vm.config.ssh_user }}"
+      {% if vm.config.ssh_keys is defined %}
+      keys = [
+        {% for key in vm.config.ssh_keys %}
+        "{{ key }}",
+        {% endfor %}
+      ]
+      {% endif %}
+      {% if vm.config.ssh_password is defined %}
+      password = "{{ vm.config.ssh_password }}"
+      {% endif %}
+    }
+    {% endif %}
+
+    {% if vm.config.cloud_init_users is defined %}
+    # Advanced cloud-init user-data for multiple users via custom snippet
+    user_data_file_id = proxmox_virtual_environment_file.cloud_init_user_data_{{ vm.name | replace('-', '_') }}.id
+    {% endif %}
+
+    {% if vm.config.ipconfig is defined and vm.config.cloud_init_users is defined %}
+    # IP configuration alongside custom user-data
+    ip_config {
+      {% if 'dhcp' in vm.config.ipconfig %}
+      ipv4 {
+        address = "dhcp"
+      }
+      {% endif %}
+    }
+    {% endif %}
+
+    {% if vm.config.cloud_init_dns is defined %}
+    dns {
+      servers = {{ vm.config.cloud_init_dns.servers | tojson }}
+      {% if vm.config.cloud_init_dns.domain is defined %}
+      domain = "{{ vm.config.cloud_init_dns.domain }}"
+      {% endif %}
+    }
+    {% endif %}
+  }
   {% endif %}
 
-  # Startup Configuration
-  onboot  = {{ vm.config.onboot | default(true) | lower }}
-  agent   = {{ vm.config.agent | default(1) }}
+  # Boot and startup
+  {% if vm.config.onboot is defined %}
+  on_boot = {{ vm.config.onboot | lower }}
+  {% endif %}
+  {% if vm.config.oncreate is defined %}
+  started = {{ vm.config.oncreate | lower }}
+  {% endif %}
 
   {% if vm.config.tags is defined %}
   # Tags
-  tags = "{{ vm.config.tags | join(',') }}"
+  tags = {{ vm.config.tags | tojson }}
   {% endif %}
 }
 

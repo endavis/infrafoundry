@@ -6,6 +6,9 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from infrafoundry.core.types import EnvironmentData
+from infrafoundry.core.validation import ValidationReport
+
 
 class ResourceConfig(BaseModel):
     """Base configuration for infrastructure resources."""
@@ -25,13 +28,30 @@ class ProviderBase(ABC):
         Args:
             name: Provider name (e.g., 'proxmox', 'opnsense', 'kubernetes')
             config_dir: Directory containing provider configs
-            output_dir: Directory for generated Terraform/Ansible files
+            output_dir: Base directory for generated Terraform/Ansible files
+                       (actual paths will be output_dir/{env}/{terraform|ansible}/{provider})
         """
         self.name = name
         self.config_dir = config_dir
-        self.output_dir = output_dir
+        self.base_output_dir = output_dir  # Store base, use set_environment() for actual paths
+        self.output_dir = output_dir  # Will be updated by set_environment()
         self.terraform_dir = output_dir / "terraform" / name
         self.ansible_dir = output_dir / "ansible" / name
+        self._current_environment: str | None = None
+
+    def set_environment(self, env_name: str) -> None:
+        """Set the current environment and update output directories.
+
+        This should be called before generate_terraform() or generate_ansible()
+        to ensure files are generated in the correct environment-specific directory.
+
+        Args:
+            env_name: Environment name (e.g., 'dev', 'staging', 'prod')
+        """
+        self._current_environment = env_name
+        self.output_dir = self.base_output_dir / env_name
+        self.terraform_dir = self.output_dir / "terraform" / self.name
+        self.ansible_dir = self.output_dir / "ansible" / self.name
 
     @abstractmethod
     def validate_config(self, config: dict[str, Any]) -> bool:
@@ -84,3 +104,32 @@ class ProviderBase(ABC):
             Dict mapping resource types to their dependencies
         """
         return {}
+
+    def validate_connectivity(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+        """Validate connectivity to provider API.
+
+        Optional method for providers to implement API connectivity checks.
+        Should add results to the validation report.
+
+        Args:
+            env_config: Environment configuration including credentials
+            report: ValidationReport to add results to
+        """
+        # Default: no connectivity validation
+        return None
+
+    def validate_references(
+        self, resources: list[ResourceConfig], env_config: EnvironmentData, report: ValidationReport
+    ) -> None:
+        """Validate that referenced resources exist in the provider.
+
+        Optional method for providers to check that templates, networks,
+        aliases, etc. referenced in configs actually exist.
+
+        Args:
+            resources: Resources to validate
+            env_config: Environment configuration including credentials
+            report: ValidationReport to add results to
+        """
+        # Default: no reference validation
+        return None

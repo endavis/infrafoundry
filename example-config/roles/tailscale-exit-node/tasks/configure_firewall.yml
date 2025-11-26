@@ -1,0 +1,112 @@
+---
+# Configure firewall for Tailscale exit node
+
+- name: Detect firewall type
+  set_fact:
+    has_ufw: "{{ ansible_facts.services['ufw.service'] is defined }}"
+    has_firewalld: "{{ ansible_facts.services['firewalld.service'] is defined }}"
+
+# UFW configuration (Ubuntu/Debian)
+- name: Configure UFW firewall
+  block:
+    - name: Enable UFW
+      ufw:
+        state: enabled
+        policy: allow
+      when: not is_immutable
+
+    - name: Allow SSH through UFW (if not immutable)
+      ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+      when: not is_immutable
+
+    - name: Allow Tailscale UDP port
+      ufw:
+        rule: allow
+        port: "41641"
+        proto: udp
+
+    - name: Enable IP forwarding in UFW config
+      lineinfile:
+        path: /etc/default/ufw
+        regexp: "^DEFAULT_FORWARD_POLICY="
+        line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+      when: not is_immutable
+      notify: reload ufw
+
+    - name: Add UFW before rules for NAT
+      blockinfile:
+        path: /etc/ufw/before.rules
+        insertbefore: "^# Don't delete these required lines"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Tailscale NAT"
+        block: |
+          # NAT table rules for Tailscale exit node
+          *nat
+          :POSTROUTING ACCEPT [0:0]
+          # Allow traffic from Tailscale
+          -A POSTROUTING -s 100.64.0.0/10 -o {{ ansible_default_ipv4.interface }} -j MASQUERADE
+          COMMIT
+      when: not is_immutable
+      notify: reload ufw
+
+    - name: Allow forwarding from Tailscale interface
+      command: ufw route allow in on tailscale0
+      when: not is_immutable
+      changed_when: false
+  when: has_ufw or (ansible_os_family == "Debian" and not is_immutable)
+
+# firewalld configuration (RHEL/CentOS/Fedora)
+- name: Configure firewalld
+  block:
+    - name: Start and enable firewalld
+      systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Add Tailscale interface to trusted zone
+      firewalld:
+        zone: trusted
+        interface: tailscale0
+        permanent: yes
+        state: enabled
+      notify: reload firewalld
+
+    - name: Enable masquerading in firewalld zones
+      firewalld:
+        zone: "{{ item }}"
+        masquerade: yes
+        permanent: yes
+        state: enabled
+      loop: "{{ tailscale_firewall_zones }}"
+      notify: reload firewalld
+
+    - name: Allow Tailscale UDP port
+      firewalld:
+        port: 41641/udp
+        permanent: yes
+        state: enabled
+      notify: reload firewalld
+  when: has_firewalld or ansible_os_family == "RedHat"
+
+# For immutable systems with no persistent firewall config
+- name: Configure iptables directly (immutable systems)
+  block:
+    - name: Allow Tailscale forwarding with iptables
+      iptables:
+        chain: FORWARD
+        in_interface: tailscale0
+        jump: ACCEPT
+      when: is_immutable
+
+    - name: Configure NAT for Tailscale exit node
+      iptables:
+        table: nat
+        chain: POSTROUTING
+        source: 100.64.0.0/10
+        out_interface: "{{ ansible_default_ipv4.interface }}"
+        jump: MASQUERADE
+      when: is_immutable
+  when: is_immutable

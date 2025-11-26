@@ -1,0 +1,49 @@
+---
+- name: Fail if auth key not provided
+  fail:
+    msg: "tailscale_auth_key is required. Set it in ansible_vars."
+  when: tailscale_auth_key == ""
+
+- name: Detect if system is immutable (read-only root filesystem)
+  stat:
+    path: /
+  register: root_fs
+
+- name: Check if snapd is available
+  command: which snap
+  register: snap_available
+  failed_when: false
+  changed_when: false
+
+- name: Set facts for installation method
+  set_fact:
+    is_immutable: "{{ ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='options') | select('search', 'ro') | list | length > 0 }}"
+    has_snap: "{{ snap_available.rc == 0 }}"
+    use_snap: "{{ tailscale_force_snap or (snap_available.rc == 0 and (ansible_distribution == 'Ubuntu' and ansible_distribution_version is version('20.04', '>='))) }}"
+
+- name: Display installation method
+  debug:
+    msg: >
+      Installing Tailscale via {{ 'snap' if use_snap else 'native package manager' }}
+      (immutable: {{ is_immutable }}, has_snap: {{ has_snap }}, force_snap: {{ tailscale_force_snap }})
+
+# Include appropriate installation tasks
+- name: Include snap installation tasks
+  include_tasks: install_snap.yml
+  when: use_snap or is_immutable
+
+- name: Include native installation tasks
+  include_tasks: install_native.yml
+  when: not use_snap and not is_immutable
+
+# Common configuration tasks
+- name: Include IP forwarding configuration
+  include_tasks: configure_ip_forwarding.yml
+  when: tailscale_enable_ip_forwarding
+
+- name: Include firewall configuration
+  include_tasks: configure_firewall.yml
+  when: tailscale_configure_firewall
+
+- name: Include Tailscale service configuration
+  include_tasks: configure_tailscale.yml

@@ -1,0 +1,14 @@
+{% for static_map in static_maps %}
+resource "opnsense_dhcpv4_static_map" "{{ static_map.config.name | replace('-', '_') }}" {
+  interface   = "{{ static_map.config.interface }}"
+  mac         = "{{ static_map.config.mac }}"
+  ipaddr      = "{{ static_map.config.ip }}"
+  hostname    = "{{ static_map.config.hostname | default(static_map.config.name) }}"
+  description = "{{ static_map.config.description | default('Managed by InfraFoundry') }}"
+
+  {% if static_map.config.get('domain') %}
+  domain      = "{{ static_map.config.domain }}"
+  {% endif %}
+}
+
+{% endfor %}

@@ -1,35 +1,246 @@
 {% for template in templates %}
 # Template: {{ template.config.name }}
-resource "proxmox_vm_qemu" "template_{{ template.config.name | replace('-', '_') }}" {
-  name        = "{{ template.config.name }}"
-  target_node = "{{ template.config.target_node }}"
-  iso         = "{{ template.config.iso }}"
+{% if template.config.download_image is defined %}
+# Download image and create template from scratch using Proxmox API
+# Step 1: Download image to Proxmox storage via SSH
+# Note: Proxmox download_file provider only accepts ISOs, not disk images
+resource "null_resource" "download_image_{{ template.config.name | replace('-', '_') }}" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Download and extract image via SSH in one operation
+      {% if template.config.download_image.extract is defined and template.config.download_image.extract %}
+      {% if template.config.download_image.filename.endswith('.xz') %}
+      {% set image_file = template.config.download_image.filename | replace('.xz', '') %}
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "cd /var/lib/vz/template/iso && \
+        ([ -f {{ image_file }} ] || (wget -O {{ template.config.download_image.filename }} {{ template.config.download_image.url }} && xz -d {{ template.config.download_image.filename }}))"
+      {% elif template.config.download_image.filename.endswith('.gz') %}
+      {% set image_file = template.config.download_image.filename | replace('.gz', '') %}
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "cd /var/lib/vz/template/iso && \
+        ([ -f {{ image_file }} ] || (wget -O {{ template.config.download_image.filename }} {{ template.config.download_image.url }} && gunzip {{ template.config.download_image.filename }}))"
+      {% endif %}
+      {% else %}
+      # Download without extraction
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "cd /var/lib/vz/template/iso && \
+        [ -f {{ template.config.download_image.filename }} ] || wget -O {{ template.config.download_image.filename }} {{ template.config.download_image.url }}"
+      {% endif %}
+    EOT
+  }
 
-  # Template Configuration
-  cores   = {{ template.config.cores | default(2) }}
-  sockets = {{ template.config.sockets | default(1) }}
-  memory  = {{ template.config.memory | default(2048) }}
+  triggers = {
+    url = "{{ template.config.download_image.url }}"
+    filename = "{{ template.config.download_image.filename }}"
+  }
+}
 
+# Step 2: Create VM using qm command via SSH
+resource "null_resource" "create_vm_{{ template.config.name | replace('-', '_') }}" {
+  depends_on = [null_resource.download_image_{{ template.config.name | replace('-', '_') }}]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Create VM using qm command
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "qm create {{ template.config.vmid }} \
+        --name {{ template.config.name }} \
+        --memory {{ template.config.memory | default(2048) }} \
+        --cores {{ template.config.cores | default(2) }} \
+        {% if template.config.bios is defined %}--bios {{ template.config.bios }} \
+        {% endif %}{% if template.config.machine is defined %}--machine {{ template.config.machine }} \
+        {% endif %}--scsihw virtio-scsi-pci \
+        --net0 virtio,bridge={{ template.config.network.bridge | default('vmbr0') }}{% if template.config.network.tag is defined %},tag={{ template.config.network.tag }}{% endif %} \
+        --boot order=scsi0 \
+        --agent 1"
+    EOT
+  }
+
+  triggers = {
+    vmid = "{{ template.config.vmid }}"
+    name = "{{ template.config.name }}"
+  }
+}
+
+# Step 3: Import disk and configure cloud-init using qm commands
+resource "null_resource" "configure_vm_{{ template.config.name | replace('-', '_') }}" {
+  depends_on = [null_resource.create_vm_{{ template.config.name | replace('-', '_') }}]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      {% if template.config.download_image.extract is defined and template.config.download_image.extract %}
+      {% set image_file = template.config.download_image.filename | replace('.xz', '') | replace('.gz', '') %}
+      {% else %}
+      {% set image_file = template.config.download_image.filename %}
+      {% endif %}
+
+      # Import disk and configure VM using qm commands
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "
+        # Import disk
+        qm importdisk {{ template.config.vmid }} /var/lib/vz/template/iso/{{ image_file }} {{ template.config.disk.storage | default('local-lvm') }}
+
+        # Attach disk
+        qm set {{ template.config.vmid }} --scsi0 {{ template.config.disk.storage | default('local-lvm') }}:vm-{{ template.config.vmid }}-disk-0
+
+        {% if template.config.efi_disk is defined %}
+        # Add EFI disk for UEFI boot
+        qm set {{ template.config.vmid }} --efidisk0 {{ template.config.efi_disk.storage | default(template.config.disk.storage) | default('local-lvm') }}:1,format=raw,efitype={{ template.config.efi_disk.type | default('4m') }},pre-enrolled-keys=0
+        {% endif %}
+
+        {% if template.config.cloud_init is defined and template.config.cloud_init %}
+        # Configure cloud-init
+        {% if template.config.ciuser is defined %}
+        qm set {{ template.config.vmid }} --ciuser {{ template.config.ciuser }}
+        {% endif %}
+        {% if template.config.sshkeys is defined %}
+        qm set {{ template.config.vmid }} --sshkeys \"{{ template.config.sshkeys | replace(' ', '%20') }}\"
+        {% endif %}
+        qm set {{ template.config.vmid }} --ipconfig0 ip=dhcp
+        {% endif %}
+      "
+    EOT
+  }
+
+  triggers = {
+    vmid = "{{ template.config.vmid }}"
+  }
+}
+
+# Step 4: Convert VM to template using qm command
+resource "null_resource" "convert_to_template_{{ template.config.name | replace('-', '_') }}" {
+  depends_on = [null_resource.configure_vm_{{ template.config.name | replace('-', '_') }}]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Convert to template
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_hostname if ssh_hostname else template.config.target_node }} "qm template {{ template.config.vmid }}"
+    EOT
+  }
+
+  triggers = {
+    vmid = "{{ template.config.vmid }}"
+  }
+}
+
+{% else %}
+# Create template from clone or manual creation
+# Note: VM will be converted to template after creation using local-exec provisioner
+resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | replace('-', '_') }}" {
+  name      = "{{ template.config.name }}"
+  node_name = "{{ template.config.target_node }}"
+  {% if template.config.vmid is defined %}
+  vm_id     = {{ template.config.vmid }}
+  {% endif %}
+
+  {% if template.config.clone is defined %}
+  # Clone from existing template/VM
+  clone {
+    vm_id = {{ template.config.clone }}
+    {% if template.config.full_clone is defined %}
+    full = {{ template.config.full_clone | lower }}
+    {% endif %}
+  }
+  {% endif %}
+
+  # CPU Configuration
+  cpu {
+    cores   = {{ template.config.cores | default(2) }}
+    sockets = {{ template.config.sockets | default(1) }}
+    {% if template.config.cpu is defined %}
+    type    = "{{ template.config.cpu }}"
+    {% endif %}
+  }
+
+  # Memory Configuration
+  memory {
+    dedicated = {{ template.config.memory | default(2048) }}
+  }
+
+  {% if template.config.agent is defined %}
+  # Guest Agent
+  agent {
+    enabled = {{ 'true' if template.config.agent == 1 else 'false' }}
+  }
+  {% endif %}
+
+  {% if template.config.disk is defined %}
   # Disk Configuration
   disk {
-    size    = "{{ template.config.disk.size | default('32G') }}"
-    type    = "{{ template.config.disk.type | default('scsi') }}"
-    storage = "{{ template.config.disk.storage | default('local-lvm') }}"
+    datastore_id = "{{ template.config.disk.storage | default('local-lvm') }}"
+    size         = {{ template.config.disk.size | default('32') | replace('G', '') }}
+    interface    = "{{ 'scsi0' if template.config.disk.type == 'scsi' else 'virtio0' }}"
+    {% if template.config.disk.file_format is defined %}
+    file_format  = "{{ template.config.disk.file_format }}"
+    {% endif %}
   }
+  {% endif %}
 
+  {% if template.config.network is defined %}
   # Network Configuration
-  network {
-    model  = "{{ template.config.network.model | default('virtio') }}"
+  network_device {
     bridge = "{{ template.config.network.bridge | default('vmbr0') }}"
+    {% if template.config.network.tag is defined %}
+    vlan_id = {{ template.config.network.tag }}
+    {% endif %}
   }
+  {% endif %}
 
-  # Mark as template
-  template = true
+  # Don't start the VM (templates should not run)
+  on_boot = false
+  started = false
 
   {% if template.config.cloud_init is defined and template.config.cloud_init %}
   # Cloud-init Configuration
-  cicustom = "{{ template.config.cicustom | default('') }}"
+  initialization {
+    datastore_id = "{{ template.config.cloud_init_datastore | default(template.config.disk.storage) | default('local-lvm') }}"
+
+    {% if template.config.ciuser is defined %}
+    user_account {
+      username = "{{ template.config.ciuser }}"
+      {% if template.config.sshkeys is defined %}
+      keys = [
+        "{{ template.config.sshkeys }}"
+      ]
+      {% endif %}
+    }
+    {% endif %}
+  }
+  {% endif %}
+
+  {% if template.config.description is defined %}
+  # Description
+  description = "{{ template.config.description }}"
+  {% endif %}
+
+  {% if template.config.tags is defined %}
+  # Tags
+  tags = {{ template.config.tags | tojson }}
+  {% endif %}
+
+  {% if template.config.prevent_destroy | default(true) %}
+  # Lifecycle - prevent accidental destruction of templates
+  lifecycle {
+    prevent_destroy = true
+  }
   {% endif %}
 }
 
+# Convert VM to template using local-exec provisioner
+resource "null_resource" "convert_to_template_{{ template.config.name | replace('-', '_') }}" {
+  depends_on = [proxmox_virtual_environment_vm.template_{{ template.config.name | replace('-', '_') }}]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Wait for VM to be fully created
+      sleep 5
+      # Convert to template via API using bpg provider auth
+      curl -k -X POST \
+        -H "Authorization: PVEAPIToken=$PROXMOX_VE_API_TOKEN" \
+        "$PROXMOX_VE_ENDPOINT/api2/json/nodes/{{ template.config.target_node }}/qemu/${proxmox_virtual_environment_vm.template_{{ template.config.name | replace('-', '_') }}.vm_id}/template"
+    EOT
+  }
+
+  # Trigger on changes to the VM
+  triggers = {
+    vm_id = proxmox_virtual_environment_vm.template_{{ template.config.name | replace('-', '_') }}.id
+  }
+}
+
+{% endif %}
 {% endfor %}

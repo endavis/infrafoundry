@@ -37,14 +37,14 @@ See https://direnv.net/docs/installation.html
 2. **Allow direnv in this project** (first time only):
 
    ```bash
-   cd /path/to/infrafoundry2
+   cd /path/to/infrafoundry
    direnv allow
    ```
 
 3. **Create your personal settings file**:
 
    ```bash
-   cp .envrc.local.example .envrc.local
+   cp docs/examples/.envrc.local.example .envrc.local
    # Edit .envrc.local with your actual credentials
    ```
 
@@ -57,7 +57,7 @@ See https://direnv.net/docs/installation.html
 
 ### Automatic loading
 ```bash
-cd ~/projects/infrafoundry2
+cd ~/projects/infrafoundry
 # Output: 🔧 InfraFoundry environment loaded
 #         Config: envs
 #         Secrets: secrets
@@ -99,8 +99,8 @@ direnv allow
 ```
 .envrc                  # Framework defaults (committed to git)
 .envrc.local           # Your personal settings (git-ignored)
-.envrc.local.example   # Template for .envrc.local (committed to git)
-.env.example           # Legacy, kept for CI/CD compatibility
+docs/examples/.envrc.local.example   # Template for .envrc.local (committed to git)
+docs/examples/.env.example           # Legacy, kept for CI/CD compatibility
 ```
 
 ## Advanced: Customizing .envrc.local
