@@ -37,9 +37,8 @@ InfraFoundry includes comprehensive CI/CD workflows for both **testing** and **i
    - Tests external tool integration
 
 4. **Code Quality**
-   - Black formatting
+   - Ruff formatting (format and check)
    - Ruff linting
-   - isort import sorting
    - mypy type checking
 
 **Local Testing:**

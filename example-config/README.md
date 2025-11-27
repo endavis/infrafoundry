@@ -279,23 +279,18 @@ jobs:
       - name: Install InfraFoundry
         working-directory: infrafoundry
         run: |
-          pip install uv
-          uv pip install -e .
+          # Install just and use it to install dependencies
+          curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+          just install-uv
+          just install
 
       - name: Set up infrastructure tools
+        working-directory: infrafoundry
         run: |
-          # Install Terraform
-          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt update && sudo apt install terraform
-
-          # Install Ansible (use uv)
-          uv pip install ansible
-
-          # Install SOPS
-          wget https://github.com/getsops/sops/releases/latest/download/sops-latest.linux.amd64
-          sudo mv sops-latest.linux.amd64 /usr/local/bin/sops
-          sudo chmod +x /usr/local/bin/sops
+          # Use just recipes to install all tools
+          just install-terraform
+          just install-ansible
+          just install-sops
 
       - name: Set up age key
         working-directory: config

@@ -38,9 +38,9 @@ The workflow runs 4 parallel jobs:
 **Coverage Threshold:** 69% (actual coverage: 69.89%, rounds to 70%)
 
 **Artifacts:**
-- `htmlcov/` - HTML coverage report
-- `coverage.xml` - XML coverage report for Codecov
-- `.coverage` - Raw coverage data
+- `tmp/htmlcov/` - HTML coverage report
+- `tmp/coverage.xml` - XML coverage report for Codecov
+- `tmp/.coverage` - Raw coverage data
 
 #### 2. Python Matrix Job (`test-matrix`)
 
@@ -78,10 +78,9 @@ The workflow runs 4 parallel jobs:
 **Purpose:** Enforce code style and type safety
 
 **Checks:**
-1. **black** - Code formatting (blocking)
-2. **ruff** - Linting and import sorting (blocking)
-3. **isort** - Import organization (non-blocking)
-4. **mypy** - Static type checking (non-blocking)
+1. **ruff format** - Code formatting (blocking)
+2. **ruff check** - Linting and import sorting (blocking)
+3. **mypy** - Static type checking (non-blocking)
 
 **Non-blocking checks** use `continue-on-error: true` to provide feedback without failing the build.
 
@@ -138,8 +137,8 @@ just coverage      # Run with full coverage report
 pytest --cov=src/infrafoundry --cov-report=term-missing --cov-report=html
 
 # Open HTML report
-open htmlcov/index.html  # macOS
-xdg-open htmlcov/index.html  # Linux
+open tmp/htmlcov/index.html  # macOS
+xdg-open tmp/htmlcov/index.html  # Linux
 ```
 
 ### Test Specific Modules
@@ -166,9 +165,8 @@ just lint          # Run ruff
 just check         # Run all checks
 
 # Individual tools
-black src/ tests/
+ruff format src/ tests/
 ruff check src/ tests/
-isort src/ tests/
 mypy src/
 ```
 
@@ -265,13 +263,13 @@ ruff check --fix src/ tests/
 ruff check --select E,F,I,N,W,UP src/
 ```
 
-**black formatting:**
+**ruff formatting:**
 ```bash
 # Format code
-black src/ tests/
+ruff format src/ tests/
 
 # Check without changes
-black --check src/ tests/
+ruff format --check src/ tests/
 ```
 
 ## Best Practices
@@ -283,7 +281,7 @@ black --check src/ tests/
 just format && just lint && just coverage
 
 # Or individual steps
-black src/ tests/              # Format
+ruff format src/ tests/        # Format
 ruff check --fix src/ tests/   # Fix linting
 pytest --cov=src/infrafoundry --cov-fail-under=69  # Test with coverage
 ```
@@ -300,7 +298,7 @@ pytest --cov=src/infrafoundry --cov-fail-under=69  # Test with coverage
 
 - **Add tests with new features** - Don't let coverage drop
 - **Test error paths** - Exception handling is often uncovered
-- **Review coverage reports** - Check `htmlcov/` after each test run
+- **Review coverage reports** - Check `tmp/htmlcov/` after each test run
 - **Track trends** - Use Codecov to see coverage over time
 
 ## CI/CD Architecture
@@ -325,7 +323,7 @@ pytest --cov=src/infrafoundry --cov-fail-under=69  # Test with coverage
    └───┬────┘        └──────────┘   └─────────┘   └─────────┘
        │
        ├─ Upload to Codecov
-       ├─ Generate artifacts (htmlcov, coverage.xml)
+       ├─ Generate artifacts (tmp/htmlcov, tmp/coverage.xml)
        ├─ Comment on PR
        └─ Generate badge (main/dev only)
 ```
