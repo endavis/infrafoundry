@@ -10,10 +10,16 @@ help:
     @echo "InfraFoundry - Infrastructure Automation Framework"
     @echo ""
     @echo "Setup commands:"
-    @echo "  just install       Install dependencies with uv"
-    @echo "  just dev           Install with dev dependencies"
-    @echo "  just clean         Remove build artifacts and caches"
-    @echo "  just setup-vscode  Display VS Code extension installation tips"
+    @echo "  just install           Install dependencies with uv"
+    @echo "  just dev               Install with dev dependencies"
+    @echo "  just clean             Remove build artifacts and caches"
+    @echo "  just setup-vscode      Display VS Code extension installation tips"
+    @echo "  just install-deps      Install all system dependencies (direnv, age, sops, terraform, ansible)"
+    @echo "  just install-direnv    Install direnv"
+    @echo "  just install-age       Install age encryption tool"
+    @echo "  just install-sops      Install SOPS secrets manager"
+    @echo "  just install-terraform Install Terraform"
+    @echo "  just install-ansible   Install Ansible via uv"
     @echo ""
     @echo "Development commands:"
     @echo "  just test          Run pytest"
@@ -117,3 +123,128 @@ setup-vscode:
     @echo "  • Git tools (GitLens)"
     @echo ""
     @echo "See .vscode/extensions.json for the complete list."
+
+# Install all system dependencies
+install-deps: install-direnv install-age install-sops install-terraform install-ansible
+    @echo ""
+    @echo "✓ All dependencies installed successfully!"
+
+# Install direnv
+install-direnv:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if command -v direnv &> /dev/null; then
+        echo "✓ direnv already installed: $(direnv --version)"
+        exit 0
+    fi
+    echo "Installing direnv..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        sudo apt-get update && sudo apt-get install -y direnv
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        brew install direnv
+    else
+        echo "Unsupported OS: $OSTYPE"
+        exit 1
+    fi
+    # Configure direnv for bash if not already configured
+    if ! grep -q 'direnv hook bash' ~/.bashrc 2>/dev/null; then
+        echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
+        echo "✓ Added direnv hook to ~/.bashrc"
+    fi
+    echo "✓ direnv installed"
+
+# Install age encryption tool
+install-age:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if command -v age &> /dev/null; then
+        echo "✓ age already installed: $(age --version 2>&1 | head -1)"
+        exit 0
+    fi
+    echo "Installing age..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        sudo apt-get update && sudo apt-get install -y age
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        brew install age
+    else
+        echo "Unsupported OS: $OSTYPE"
+        exit 1
+    fi
+    echo "✓ age installed"
+
+# Install SOPS secrets manager
+install-sops:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if command -v sops &> /dev/null; then
+        echo "✓ SOPS already installed: $(sops --version 2>&1 | head -1)"
+        exit 0
+    fi
+    echo "Installing SOPS..."
+    SOPS_VERSION=$(curl -s "https://api.github.com/repos/getsops/sops/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/')
+    echo "Latest version: $SOPS_VERSION"
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        wget -q "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops_${SOPS_VERSION}_amd64.deb" -O /tmp/sops.deb
+        sudo dpkg -i /tmp/sops.deb
+        rm /tmp/sops.deb
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        brew install sops
+    else
+        echo "Unsupported OS: $OSTYPE"
+        exit 1
+    fi
+    echo "✓ SOPS $SOPS_VERSION installed"
+
+# Install Terraform
+install-terraform:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    TF_VERSION=$(curl -s "https://api.github.com/repos/hashicorp/terraform/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/')
+    if command -v terraform &> /dev/null; then
+        CURRENT_TF_VERSION=$(terraform version -json 2>/dev/null | grep -o '"terraform_version":"[^"]*"' | cut -d'"' -f4)
+        if [[ "$CURRENT_TF_VERSION" == "$TF_VERSION" ]]; then
+            echo "✓ Terraform already up to date: $TF_VERSION"
+            exit 0
+        fi
+        echo "Current version: $CURRENT_TF_VERSION, upgrading to: $TF_VERSION"
+    fi
+    echo "Installing Terraform $TF_VERSION..."
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        wget -q "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -O /tmp/terraform.zip
+        sudo unzip -o /tmp/terraform.zip -d /usr/local/bin/
+        sudo chmod +x /usr/local/bin/terraform
+        rm /tmp/terraform.zip
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        ARCH=$(uname -m)
+        if [[ "$ARCH" == "arm64" ]]; then
+            wget -q "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_darwin_arm64.zip" -O /tmp/terraform.zip
+        else
+            wget -q "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_darwin_amd64.zip" -O /tmp/terraform.zip
+        fi
+        sudo unzip -o /tmp/terraform.zip -d /usr/local/bin/
+        sudo chmod +x /usr/local/bin/terraform
+        rm /tmp/terraform.zip
+    else
+        echo "Unsupported OS: $OSTYPE"
+        exit 1
+    fi
+    echo "✓ Terraform $TF_VERSION installed"
+
+# Install Ansible via uv
+install-ansible:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v uv &> /dev/null; then
+        echo "⚠ uv not found. Installing uv first..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.cargo/bin:$PATH"
+    fi
+    if [[ -f "pyproject.toml" ]]; then
+        echo "Installing InfraFoundry with Ansible..."
+        uv pip install -e .
+        echo "✓ Ansible installed via uv"
+    else
+        echo "Installing Ansible directly..."
+        uv pip install ansible
+        echo "✓ Ansible installed"
+    fi
