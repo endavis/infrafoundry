@@ -14,6 +14,7 @@ help:
     @echo "  just dev               Install with dev dependencies"
     @echo "  just clean             Remove build artifacts and caches"
     @echo "  just setup-vscode      Display VS Code extension installation tips"
+    @echo "  just install-uv        Install uv package manager"
     @echo "  just install-deps      Install all system dependencies (direnv, age, sops, terraform, ansible)"
     @echo "  just install-direnv    Install direnv"
     @echo "  just install-age       Install age encryption tool"
@@ -123,6 +124,50 @@ setup-vscode:
     @echo "  • Git tools (GitLens)"
     @echo ""
     @echo "See .vscode/extensions.json for the complete list."
+
+# Install uv package manager
+install-uv:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if command -v uv &> /dev/null; then
+        echo "✓ uv already installed: $(uv --version)"
+        exit 0
+    fi
+    echo "Installing uv package manager..."
+    # Try download with curl first
+    if command -v curl &> /dev/null; then
+        echo "Downloading with curl..."
+        if curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh 2>/dev/null; then
+            echo "✓ Downloaded with curl"
+            sh /tmp/uv-install.sh
+            rm -f /tmp/uv-install.sh
+            export PATH="$HOME/.cargo/bin:$PATH"
+            echo "✓ uv installed"
+            exit 0
+        fi
+    fi
+    # Try download with wget
+    if command -v wget &> /dev/null; then
+        echo "Downloading with wget..."
+        if wget -q https://astral.sh/uv/install.sh -O /tmp/uv-install.sh 2>/dev/null; then
+            echo "✓ Downloaded with wget"
+            sh /tmp/uv-install.sh
+            rm -f /tmp/uv-install.sh
+            export PATH="$HOME/.cargo/bin:$PATH"
+            echo "✓ uv installed"
+            exit 0
+        fi
+    fi
+    # Fall back to pip if available
+    if command -v pip &> /dev/null || command -v pip3 &> /dev/null; then
+        echo "Installing with pip..."
+        if pip install uv 2>/dev/null || pip3 install uv 2>/dev/null; then
+            echo "✓ uv installed via pip"
+            exit 0
+        fi
+    fi
+    echo "✗ Failed to install uv. Please install manually: https://github.com/astral-sh/uv"
+    exit 1
 
 # Install all system dependencies
 install-deps: install-direnv install-age install-sops install-terraform install-ansible
