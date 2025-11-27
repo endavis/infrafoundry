@@ -78,55 +78,63 @@ See [Separate Configuration Repository Guide](docs/separate-config-repo.md) for 
 ### Prerequisites
 
 - Python 3.12+
-- [uv](https://github.com/astral-sh/uv) - Fast Python package installer
-  ```bash
-  # Install uv (recommended method)
-  curl -LsSf https://astral.sh/uv/install.sh | sh
+- [just](https://just.systems/) - Command runner (installed automatically by setup scripts)
+- [uv](https://github.com/astral-sh/uv) - Fast Python package installer (installed automatically)
+- [Terraform](https://www.terraform.io/) >= 1.6 (installed automatically)
+- [Ansible](https://www.ansible.com/) >= 2.15 (installed automatically)
+- [SOPS](https://github.com/getsops/sops) - For secret management (installed automatically)
+- [age](https://github.com/FiloSottile/age) - For encryption keys (installed automatically)
+- [direnv](https://direnv.net/) - Optional but recommended (installed automatically)
 
-  # Or with pip (if uv not available)
-  pip install uv
-  ```
-- [Terraform](https://www.terraform.io/) >= 1.6
-- [Ansible](https://www.ansible.com/) >= 2.15
-- [SOPS](https://github.com/getsops/sops) - For secret management
-- [age](https://github.com/FiloSottile/age) - For encryption keys
-- [direnv](https://direnv.net/) - Optional but recommended
+**Note:** All dependencies are automatically installed by the setup scripts. You can also install them manually using `just` recipes (see below).
 
 ### Installation
 
-**Option 1: Interactive Setup (Recommended)**
+**Option 1: Automated Setup with Dependencies (Recommended)**
 
 ```bash
-# Install uv if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
 # Clone the repository
 git clone https://github.com/yourusername/infrafoundry.git
 cd infrafoundry
 
-# Install dependencies with uv
-uv pip install -e .
+# Install all dependencies (just, uv, terraform, ansible, sops, age, direnv)
+./scripts/setup-dependencies.sh
 
-# Run the interactive setup wizard
+# The script will:
+# - Install just command runner
+# - Use just recipes to install: uv, direnv, age, sops, terraform, ansible
+# - Verify all installations
+# - Display next steps
+
+# Then run the interactive configuration wizard
 ./scripts/setup-config.sh
 
 # The wizard will:
-# - Check for and install uv if needed
+# - Install just and uv if not already present
 # - Guide you through configuration choices
 # - Create environment files
 # - Set up secrets management
 # - Generate .envrc.local for direnv
 ```
 
-**Option 2: Separate Configuration Repository (Manual)**
+**Option 2: Manual Installation**
 
 ```bash
-# Install uv if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install the framework
+# Clone the repository
 git clone https://github.com/yourusername/infrafoundry.git
 cd infrafoundry
+
+# Install dependencies using just recipes
+./scripts/setup-dependencies.sh  # Installs just, then uses just recipes
+
+# Or install just first, then use individual recipes:
+# See: https://just.systems/man/en/chapter_4.html
+just install-deps       # Install all system dependencies
+just install-uv         # Install uv only
+just install-terraform  # Install terraform only
+just install-ansible    # Install ansible only
+
+# Install InfraFoundry
 uv pip install -e .
 
 # Create your configuration repository from example
@@ -146,7 +154,40 @@ infra secrets init
 infra envs
 ```
 
-> **Note:** The interactive setup wizard (`scripts/setup-config.sh`) is the easiest way to get started. It automates configuration creation, secret management setup, and environment variable configuration. For manual setup or CI/CD environments, use Option 2 (separate config repo).
+> **Note:** The automated setup with `scripts/setup-dependencies.sh` and `scripts/setup-config.sh` is the easiest way to get started. These scripts install `just` command runner first, then use `just` recipes to install all dependencies and configure your environment. For manual setup or CI/CD environments, use Option 2.
+
+### Available Just Recipes
+
+Once `just` is installed, you can use these recipes for dependency management:
+
+```bash
+# System dependencies
+just install-deps       # Install all dependencies (direnv, age, sops, terraform, ansible)
+just install-uv         # Install uv package manager
+just install-direnv     # Install direnv
+just install-age        # Install age encryption tool
+just install-sops       # Install SOPS secrets manager
+just install-terraform  # Install Terraform
+just install-ansible    # Install Ansible via uv
+
+# Development
+just install            # Install Python dependencies with uv
+just dev                # Install with dev dependencies
+just test               # Run tests
+just coverage           # Run tests with coverage
+just lint               # Run linters
+just format             # Format code
+just check              # Run all checks (lint + type check)
+
+# Infrastructure
+just plan ENV           # Generate and plan infrastructure (dry-run)
+just apply ENV          # Apply infrastructure changes
+just destroy ENV        # Destroy infrastructure
+
+# List all available recipes
+just --list
+just help               # Display detailed help
+```
 
 ## How It Works
 
@@ -900,11 +941,20 @@ class YourProvider(ProviderBase):
 ### Installing Dependencies
 
 ```bash
-# ALWAYS use uv for package management
+# Use just recipes for system dependencies
+just install-deps                # Install all system dependencies
+just install-terraform           # Install just Terraform
+just install-ansible             # Install just Ansible
+
+# Use uv for Python package management
 uv pip install <package>         # Install a package
 uv pip install -e .              # Install project in editable mode
 uv pip install -e ".[dev]"       # Install with dev dependencies
 uv pip list                      # List installed packages
+
+# Or use just recipes for common tasks
+just install                     # Install Python dependencies
+just dev                         # Install with dev dependencies
 ```
 
 ### Running Tests
