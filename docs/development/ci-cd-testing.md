@@ -127,8 +127,8 @@ Badge URL: `https://img.shields.io/badge/coverage-70%25-brightgreen`
 ### Quick Tests
 
 ```bash
-make test          # Run all tests
-make coverage      # Run with full coverage report
+just test          # Run all tests
+just coverage      # Run with full coverage report
 ```
 
 ### Manual Coverage
@@ -161,9 +161,9 @@ pytest tests/unit/test_config.py --cov=src/infrafoundry/core/config --cov-report
 ### Code Quality Checks
 
 ```bash
-make format        # Format with black
-make lint          # Run ruff
-make check         # Run all checks
+just format        # Format with ruff
+just lint          # Run ruff
+just check         # Run all checks
 
 # Individual tools
 black src/ tests/
@@ -237,8 +237,8 @@ pytest --cov=src/infrafoundry --cov-fail-under=69 -v
 
 **Check coverage locally:**
 ```bash
-make coverage
-# Review htmlcov/index.html to see uncovered lines
+just coverage
+# Review tmp/htmlcov/index.html to see uncovered lines
 ```
 
 ### Codecov Upload Fails
@@ -280,7 +280,7 @@ black --check src/ tests/
 
 ```bash
 # Run full check
-make format && make lint && make coverage
+just format && just lint && just coverage
 
 # Or individual steps
 black src/ tests/              # Format
