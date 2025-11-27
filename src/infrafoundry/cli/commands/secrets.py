@@ -26,13 +26,18 @@ def secrets() -> None:
     default=None,
     help="Path to age key file (defaults to envs/age.key in config repo)",
 )
-def secrets_init(key_file: str | None) -> None:
+@click.pass_context
+def secrets_init(ctx: click.Context, key_file: str | None) -> None:
     """Initialize secrets with a new age key."""
     if key_file:
         key_path = Path(key_file)
     else:
-        config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
-        base_dir = Path(config_repo) if config_repo else Path.cwd()
+        ctx_config_dir = ctx.obj.get("config_dir") if ctx and ctx.obj else None
+        base_dir = Path(ctx_config_dir) if ctx_config_dir else None
+        if not base_dir:
+            config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
+            base_dir = Path(config_repo) if config_repo else Path.cwd()
+
         key_path = base_dir / "envs" / "age.key"
 
     if key_path.exists():

@@ -108,6 +108,29 @@ class TestCLICommands:
             # Command should attempt to run
             assert result.exit_code in [0, 1, 2]
 
+    def test_secrets_init_defaults_to_config_dir(self, cli_runner, temp_dir):
+        """Test secrets init writes key to --config-dir when no key path provided."""
+        config_dir = temp_dir / "config"
+        (config_dir / "envs").mkdir(parents=True)
+        key_path = config_dir / "envs" / "age.key"
+
+        def fake_run(*args, **kwargs):
+            key_path.parent.mkdir(parents=True, exist_ok=True)
+            key_path.write_text("AGE-SECRET-KEY-TEST")
+            stderr = "# public key: age1test\n" if args and "age-keygen" in args[0][0] else ""
+            return MagicMock(returncode=0, stdout="", stderr=stderr)
+
+        env = {"SOPS_AGE_KEY_FILE": str(key_path)}
+
+        with patch("subprocess.run", side_effect=fake_run):
+            result = cli_runner.invoke(
+                cli, ["--config-dir", str(config_dir), "secrets", "init"], env=env
+            )
+
+        assert result.exit_code == 0
+        assert key_path.exists()
+        assert (config_dir / "envs" / ".sops.yaml").exists()
+
     def test_secrets_encrypt_requires_file(self, cli_runner):
         """Test that secrets encrypt requires a file argument."""
         result = cli_runner.invoke(cli, ["secrets", "encrypt"])

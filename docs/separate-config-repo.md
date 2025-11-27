@@ -295,7 +295,8 @@ jobs:
         run: |
           cd infrafoundry
           # Install just and use it to install dependencies
-          curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+          curl -LsSf https://just.systems/install.sh | bash -s -- --to $HOME/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
           just install-uv
           just install
 
@@ -369,7 +370,8 @@ variables:
   before_script:
     # Install just and InfraFoundry
     - apt-get update && apt-get install -y git curl wget
-    - curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+    - curl -LsSf https://just.systems/install.sh | bash -s -- --to $HOME/.local/bin
+    - export PATH="$HOME/.local/bin:$PATH"
     - git clone --depth 1 --branch $INFRAFOUNDRY_VERSION https://github.com/your-org/infrafoundry.git
     - cd infrafoundry
     - just install-uv
