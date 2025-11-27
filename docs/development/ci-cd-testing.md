@@ -38,9 +38,9 @@ The workflow runs 4 parallel jobs:
 **Coverage Threshold:** 69% (actual coverage: 69.89%, rounds to 70%)
 
 **Artifacts:**
-- `htmlcov/` - HTML coverage report
-- `coverage.xml` - XML coverage report for Codecov
-- `.coverage` - Raw coverage data
+- `tmp/htmlcov/` - HTML coverage report
+- `tmp/coverage.xml` - XML coverage report for Codecov
+- `tmp/.coverage` - Raw coverage data
 
 #### 2. Python Matrix Job (`test-matrix`)
 
@@ -137,8 +137,8 @@ just coverage      # Run with full coverage report
 pytest --cov=src/infrafoundry --cov-report=term-missing --cov-report=html
 
 # Open HTML report
-open htmlcov/index.html  # macOS
-xdg-open htmlcov/index.html  # Linux
+open tmp/htmlcov/index.html  # macOS
+xdg-open tmp/htmlcov/index.html  # Linux
 ```
 
 ### Test Specific Modules
@@ -298,7 +298,7 @@ pytest --cov=src/infrafoundry --cov-fail-under=69  # Test with coverage
 
 - **Add tests with new features** - Don't let coverage drop
 - **Test error paths** - Exception handling is often uncovered
-- **Review coverage reports** - Check `htmlcov/` after each test run
+- **Review coverage reports** - Check `tmp/htmlcov/` after each test run
 - **Track trends** - Use Codecov to see coverage over time
 
 ## CI/CD Architecture
@@ -323,7 +323,7 @@ pytest --cov=src/infrafoundry --cov-fail-under=69  # Test with coverage
    └───┬────┘        └──────────┘   └─────────┘   └─────────┘
        │
        ├─ Upload to Codecov
-       ├─ Generate artifacts (htmlcov, coverage.xml)
+       ├─ Generate artifacts (tmp/htmlcov, tmp/coverage.xml)
        ├─ Comment on PR
        └─ Generate badge (main/dev only)
 ```
