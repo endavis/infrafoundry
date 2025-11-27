@@ -78,10 +78,9 @@ The workflow runs 4 parallel jobs:
 **Purpose:** Enforce code style and type safety
 
 **Checks:**
-1. **black** - Code formatting (blocking)
-2. **ruff** - Linting and import sorting (blocking)
-3. **isort** - Import organization (non-blocking)
-4. **mypy** - Static type checking (non-blocking)
+1. **ruff format** - Code formatting (blocking)
+2. **ruff check** - Linting and import sorting (blocking)
+3. **mypy** - Static type checking (non-blocking)
 
 **Non-blocking checks** use `continue-on-error: true` to provide feedback without failing the build.
 
@@ -166,9 +165,8 @@ just lint          # Run ruff
 just check         # Run all checks
 
 # Individual tools
-black src/ tests/
+ruff format src/ tests/
 ruff check src/ tests/
-isort src/ tests/
 mypy src/
 ```
 
@@ -265,13 +263,13 @@ ruff check --fix src/ tests/
 ruff check --select E,F,I,N,W,UP src/
 ```
 
-**black formatting:**
+**ruff formatting:**
 ```bash
 # Format code
-black src/ tests/
+ruff format src/ tests/
 
 # Check without changes
-black --check src/ tests/
+ruff format --check src/ tests/
 ```
 
 ## Best Practices
@@ -283,7 +281,7 @@ black --check src/ tests/
 just format && just lint && just coverage
 
 # Or individual steps
-black src/ tests/              # Format
+ruff format src/ tests/        # Format
 ruff check --fix src/ tests/   # Fix linting
 pytest --cov=src/infrafoundry --cov-fail-under=69  # Test with coverage
 ```

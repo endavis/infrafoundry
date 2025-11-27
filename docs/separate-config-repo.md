@@ -293,27 +293,19 @@ jobs:
 
       - name: Install InfraFoundry
         run: |
-          pip install uv
           cd infrafoundry
-          uv pip install --system -e .
+          # Install just and use it to install dependencies
+          curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+          just install-uv
+          just install
 
       - name: Install infrastructure tools
+        working-directory: infrafoundry
         run: |
-          # Terraform
-          wget -O- https://apt.releases.hashicorp.com/gpg | \
-            sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
-            https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
-            sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt update && sudo apt install terraform
-
-          # Ansible (use uv)
-          uv pip install ansible
-
-          # SOPS
-          wget https://github.com/getsops/sops/releases/latest/download/sops-latest.linux.amd64
-          sudo mv sops-latest.linux.amd64 /usr/local/bin/sops
-          sudo chmod +x /usr/local/bin/sops
+          # Use just recipes to install all tools
+          just install-terraform
+          just install-ansible
+          just install-sops
 
       - name: Set up age key
         run: |
@@ -375,29 +367,17 @@ variables:
 
 .setup_template: &setup
   before_script:
-    # Install Python and InfraFoundry
-    - apt-get update && apt-get install -y python3-pip git
-    - pip install uv
+    # Install just and InfraFoundry
+    - apt-get update && apt-get install -y git curl wget
+    - curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
     - git clone --depth 1 --branch $INFRAFOUNDRY_VERSION https://github.com/your-org/infrafoundry.git
-    - cd infrafoundry && uv pip install --system -e . && cd ..
-
-    # Install infrastructure tools
-    - |
-      # Terraform
-      wget -O- https://apt.releases.hashicorp.com/gpg | \
-        gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-      echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
-        https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
-        tee /etc/apt/sources.list.d/hashicorp.list
-      apt update && apt install -y terraform
-
-      # Ansible (use uv)
-      uv pip install ansible
-
-      # SOPS
-      wget https://github.com/getsops/sops/releases/latest/download/sops-latest.linux.amd64
-      mv sops-latest.linux.amd64 /usr/local/bin/sops
-      chmod +x /usr/local/bin/sops
+    - cd infrafoundry
+    - just install-uv
+    - just install
+    - just install-terraform
+    - just install-ansible
+    - just install-sops
+    - cd ..
 
     # Set up secrets
     - mkdir -p secrets
