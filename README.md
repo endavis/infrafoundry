@@ -829,10 +829,10 @@ The test workflow (`.github/workflows/tests.yml`) runs on every push and PR:
 
 **Local testing:**
 ```bash
-make test          # Run all tests
-make coverage      # Run with coverage report
-make lint          # Run linting
-make format        # Format code
+just test          # Run all tests
+just coverage      # Run with coverage report
+just lint          # Run linting
+just format        # Format code
 ```
 
 ### Infrastructure Deployment (GitHub Actions)
@@ -910,31 +910,31 @@ uv pip list                      # List installed packages
 ### Running Tests
 
 ```bash
-make test
+just test
 ```
 
 ### Code Formatting
 
 ```bash
-make format
-make lint
+just format
+just lint
 ```
 
 ## Common Tasks
 
 ```bash
 # Development workflow
-make install          # Install dependencies
-make dev              # Install with dev dependencies
-make plan ENV=dev     # Plan infrastructure
-make apply ENV=dev    # Apply infrastructure
-make destroy ENV=dev  # Destroy infrastructure
+just install          # Install dependencies
+just dev              # Install with dev dependencies
+just plan dev         # Plan infrastructure
+just apply dev        # Apply infrastructure
+just destroy dev      # Destroy infrastructure
 
 # Code quality
-make test             # Run tests
-make lint             # Run linters
-make format           # Format code
-make check            # Run all checks
+just test             # Run tests
+just lint             # Run linters
+just format           # Format code
+just check            # Run all checks
 
 # Tools
 python tools/opnsense-parser.py config.xml  # Parse OPNsense config
@@ -1077,9 +1077,9 @@ We welcome contributions! Please follow these guidelines:
 2. **Write tests** for new functionality (maintain 70% coverage)
 3. **Run quality checks** before committing:
    ```bash
-   make format        # Format code with black
-   make lint          # Run ruff linting
-   make coverage      # Run tests with coverage (must pass 69% threshold)
+   just format        # Format code with ruff
+   just lint          # Run ruff linting
+   just coverage      # Run tests with coverage (must pass 69% threshold)
    ```
 4. **Ensure all checks pass** - CI will verify:
    - All 286+ tests passing
