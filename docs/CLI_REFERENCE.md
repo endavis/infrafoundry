@@ -274,6 +274,12 @@ infra policies check --env prod --enforce
 - **WARNING**: Shows warning but allows deployment
 - **INFO**: Informational only
 
+**Policy Location:**
+- Policies are loaded from `policies/` directory in your configuration repository
+- Set via `INFRAFOUNDRY_CONFIG_REPO` environment variable or `--config-dir` flag
+- Example structure: `my-infra-config/policies/naming.yaml`
+- This allows policies to be versioned alongside your infrastructure configurations
+
 ---
 
 ### `infra rollback`
@@ -336,6 +342,34 @@ infra secrets decrypt envs/dev/settings.yaml
 ```
 
 Displays decrypted contents (does not modify file).
+
+---
+
+### `infra state`
+Manage InfraFoundry state database (backup, restore, migrate).
+
+```bash
+# Create a backup of the state database
+infra state backup
+
+# Backup creates timestamped file in backups/ directory
+# Output: backups/infrafoundry-state-YYYYMMDD-HHMMSS.db
+```
+
+**Use Cases:**
+- Create regular backups before major operations
+- Backup before production deployments
+- Disaster recovery preparation
+- State migration between environments
+
+**State Database Location:**
+- Default: `~/.infrafoundry/state.db`
+- Tracks deployment history, resource lifecycle, and audit trail
+- Can be configured to use PostgreSQL for team collaboration
+
+**Related Commands:**
+- See [State Management Guide](state-management.md) for backup strategies
+- Use with `infra history` and `infra status` for state inspection
 
 ---
 

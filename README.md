@@ -1143,7 +1143,7 @@ We welcome contributions! Please follow these guidelines:
 - Follow existing test patterns in `tests/unit/`
 - Use fixtures for common setup
 - Mock external dependencies (Terraform, Ansible, APIs)
-- Check `htmlcov/index.html` for coverage gaps
+- Check `tmp/htmlcov/index.html` for coverage gaps
 
 See [docs/development/TESTING_STATUS.md](docs/development/TESTING_STATUS.md) for testing status and [docs/development/ci-cd-testing.md](docs/development/ci-cd-testing.md) for testing guide.
 
