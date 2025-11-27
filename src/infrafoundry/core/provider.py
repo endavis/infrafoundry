@@ -37,13 +37,15 @@ class ProviderBase(ABC):
         self.output_dir = output_dir  # Will be updated by set_environment()
         self.terraform_dir = output_dir / "terraform" / name
         self.ansible_dir = output_dir / "ansible" / name
+        self.pyinfra_dir = output_dir / "pyinfra" / name
         self._current_environment: str | None = None
 
     def set_environment(self, env_name: str) -> None:
         """Set the current environment and update output directories.
 
-        This should be called before generate_terraform() or generate_ansible()
-        to ensure files are generated in the correct environment-specific directory.
+        This should be called before generate_terraform(), generate_ansible(),
+        or generate_pyinfra() to ensure files are generated in the correct
+        environment-specific directory.
 
         Args:
             env_name: Environment name (e.g., 'dev', 'staging', 'prod')
@@ -52,6 +54,7 @@ class ProviderBase(ABC):
         self.output_dir = self.base_output_dir / env_name
         self.terraform_dir = self.output_dir / "terraform" / self.name
         self.ansible_dir = self.output_dir / "ansible" / self.name
+        self.pyinfra_dir = self.output_dir / "pyinfra" / self.name
 
     @abstractmethod
     def validate_config(self, config: dict[str, Any]) -> bool:
@@ -83,10 +86,21 @@ class ProviderBase(ABC):
         """
         pass
 
+    def generate_pyinfra(self, resources: list[ResourceConfig]) -> None:
+        """Generate pyinfra deploy scripts and inventory.
+
+        Optional method. Providers can override this to support pyinfra.
+
+        Args:
+            resources: List of resources to generate pyinfra for
+        """
+        return
+
     def ensure_directories(self) -> None:
         """Create necessary output directories."""
         self.terraform_dir.mkdir(parents=True, exist_ok=True)
         self.ansible_dir.mkdir(parents=True, exist_ok=True)
+        self.pyinfra_dir.mkdir(parents=True, exist_ok=True)
 
     @abstractmethod
     def get_resource_types(self) -> list[str]:

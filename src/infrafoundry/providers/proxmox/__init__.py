@@ -292,6 +292,23 @@ class ProxmoxProvider(
         (tasks_dir / "main.yml").write_text(content)
 
     @override
+    def generate_pyinfra(self, resources: list[ResourceConfig]) -> None:
+        """Generate pyinfra deploy scripts and inventory.
+
+        Args:
+            resources: List of resources to generate pyinfra for
+        """
+        self.ensure_directories()
+
+        # Generate inventory
+        content = self.render_template("proxmox/inventory.py.j2", {"resources": resources})
+        self._write_pyinfra_file("inventory.py", content)
+
+        # Generate deploy script
+        content = self.render_template("proxmox/deploy.py.j2", {"resources": resources})
+        self._write_pyinfra_file("deploy.py", content)
+
+    @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
         return ["vm", "template", "network"]

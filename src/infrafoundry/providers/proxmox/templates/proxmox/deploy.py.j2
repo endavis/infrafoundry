@@ -1,0 +1,34 @@
+"""Generated pyinfra deployment script."""
+
+from pyinfra import inventory
+from pyinfra.operations import (
+    apk,
+    apt,
+    brew,
+    dnf,
+    docker,
+    files,
+    git,
+    init,
+    npm,
+    pacman,
+    pip,
+    server,
+    systemd,
+    yum,
+)
+
+{% for resource in resources %}
+{% if resource.config.get('pyinfra_ops') %}
+# Operations for {{ resource.name }}
+with inventory.hosts.get_group("{{ resource.name | to_snake_case }}") as host:
+    {% for op in resource.config.pyinfra_ops %}
+    {{ op.operation }}(
+        name="{{ op.name }}",
+        {% for k, v in op.params.items() %}
+        {{ k }}={{ v | repr }},
+        {% endfor %}
+    )
+    {% endfor %}
+{% endif %}
+{% endfor %}

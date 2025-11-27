@@ -19,6 +19,7 @@ def mock_providers(tmp_path):
     proxmox.name = "proxmox"
     proxmox.terraform_dir = tmp_path / "generated" / "terraform" / "proxmox"
     proxmox.ansible_dir = tmp_path / "generated" / "ansible" / "proxmox"
+    proxmox.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "proxmox"
     proxmox.ensure_directories = Mock()
     proxmox.generate_terraform = Mock()
     proxmox.generate_ansible = Mock()
@@ -424,9 +425,7 @@ class TestDestroyOrchestrator:
         with patch.object(
             orchestrator.destroy_orchestrator, "_confirm_destroy", return_value=False
         ):
-            result = orchestrator.destroy(
-                env_name="dev", auto_approve=False, confirm_callback=None
-            )
+            result = orchestrator.destroy(env_name="dev", auto_approve=False, confirm_callback=None)
 
         assert result == {}
 
@@ -448,12 +447,8 @@ class TestDestroyOrchestrator:
 
     def test_destroy_prompts_without_callback_and_proceeds(self, orchestrator):
         """Test that destroy proceeds using internal prompt when confirmed."""
-        with patch.object(
-            orchestrator.destroy_orchestrator, "_confirm_destroy", return_value=True
-        ):
-            with patch(
-                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run"
-            ) as mock_tf:
+        with patch.object(orchestrator.destroy_orchestrator, "_confirm_destroy", return_value=True):
+            with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
                 mock_tf.return_value = {"success": True}
 
                 result = orchestrator.destroy(
@@ -521,6 +516,7 @@ class TestMultiProviderWorkflow:
         kubernetes.name = "kubernetes"
         kubernetes.terraform_dir = tmp_path / "generated" / "terraform" / "kubernetes"
         kubernetes.ansible_dir = tmp_path / "generated" / "ansible" / "kubernetes"
+        kubernetes.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "kubernetes"
         kubernetes.ensure_directories = Mock()
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
@@ -552,6 +548,7 @@ class TestMultiProviderWorkflow:
         kubernetes.name = "kubernetes"
         kubernetes.terraform_dir = tmp_path / "generated" / "terraform" / "kubernetes"
         kubernetes.ansible_dir = tmp_path / "generated" / "ansible" / "kubernetes"
+        kubernetes.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "kubernetes"
         kubernetes.ensure_directories = Mock()
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
@@ -594,6 +591,7 @@ class TestMultiProviderWorkflow:
         opnsense.name = "opnsense"
         opnsense.terraform_dir = tmp_path / "generated" / "terraform" / "opnsense"
         opnsense.ansible_dir = tmp_path / "generated" / "ansible" / "opnsense"
+        opnsense.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "opnsense"
         opnsense.ensure_directories = Mock()
         opnsense.generate_terraform = Mock()
         opnsense.generate_ansible = Mock()

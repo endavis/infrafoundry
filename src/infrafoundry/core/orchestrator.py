@@ -27,7 +27,7 @@ from infrafoundry.core.orchestrator_workflows import (
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.runners import AnsibleRunner, RunnerRegistry, TerraformRunner
+from infrafoundry.core.runners import AnsibleRunner, PyInfraRunner, RunnerRegistry, TerraformRunner
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
 
@@ -87,6 +87,7 @@ class Orchestrator:
         self.runner_registry = RunnerRegistry()
         self.runner_registry.register(TerraformRunner)
         self.runner_registry.register(AnsibleRunner)
+        self.runner_registry.register(PyInfraRunner)
 
         # Initialize helper classes for orchestration tasks
         self.policy_checker = PolicyChecker(self.policy_engine, self.event_manager, self.console)

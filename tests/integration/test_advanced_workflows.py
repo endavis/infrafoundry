@@ -77,6 +77,7 @@ vms:
     provider.name = "proxmox"
     provider.terraform_dir = output_dir / "terraform" / "proxmox"
     provider.ansible_dir = output_dir / "ansible" / "proxmox"
+    provider.pyinfra_dir = output_dir / "pyinfra" / "proxmox"
     provider.ensure_directories = Mock()
     provider.generate_terraform = Mock()
     provider.generate_ansible = Mock()
@@ -176,6 +177,7 @@ class TestDriftDetection:
         opnsense_provider.name = "opnsense"
         opnsense_provider.terraform_dir = Path("/tmp/terraform/opnsense")
         opnsense_provider.ansible_dir = Path("/tmp/ansible/opnsense")
+        opnsense_provider.pyinfra_dir = Path("/tmp/pyinfra/opnsense")
         opnsense_provider.ensure_directories = Mock()
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.get_resource_types = Mock(return_value=["firewall_rule"])
@@ -314,6 +316,7 @@ firewall_rules:
         opnsense_provider.name = "opnsense"
         opnsense_provider.terraform_dir = tmp_path / "generated" / "terraform" / "opnsense"
         opnsense_provider.ansible_dir = tmp_path / "generated" / "ansible" / "opnsense"
+        opnsense_provider.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "opnsense"
         opnsense_provider.ensure_directories = Mock()
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.generate_ansible = Mock()
@@ -373,6 +376,7 @@ deployments:
         k8s_provider.name = "kubernetes"
         k8s_provider.terraform_dir = tmp_path / "generated" / "terraform" / "kubernetes"
         k8s_provider.ansible_dir = tmp_path / "generated" / "ansible" / "kubernetes"
+        k8s_provider.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "kubernetes"
         k8s_provider.ensure_directories = Mock()
         k8s_provider.generate_terraform = Mock()
         k8s_provider.generate_ansible = Mock()
