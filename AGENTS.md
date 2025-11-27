@@ -34,9 +34,9 @@ InfraFoundry generates Terraform `.tf` files and Ansible playbooks from YAML con
 
 ## Development & Testing
 - **Use `uv` for Python package management**
-- **Run tests:** `make test` or `uv run pytest`
-- **Format/lint:** `make format`, `make lint`
-- **Coverage:** `make coverage`
+- **Run tests:** `just test` or `uv run pytest`
+- **Format/lint:** `just format`, `just lint`
+- **Coverage:** `just coverage`
 - **Add dependencies:** `uv pip install <package>`
 - **Temporary files:** Use `tmp/` (git-ignored); keep root directory clean
 
