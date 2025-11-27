@@ -4,15 +4,30 @@ This guide walks you through setting up InfraFoundry for your environment with P
 
 ## Choose Your Approach
 
-### Option A: Interactive Setup (Recommended for First Time)
+### Option A: Automated Setup (Recommended for First Time)
 
-Run the interactive setup wizard:
+Run the setup scripts to install all dependencies and configure your environment:
 
 ```bash
-../scripts/setup-config.sh
-```
+# Step 1: Install all system dependencies (just, uv, terraform, ansible, sops, age, direnv)
+./scripts/setup-dependencies.sh
 
-The wizard will ask you questions and generate all configuration files automatically.
+# The script will:
+# - Install just command runner
+# - Use just recipes to install all required tools
+# - Verify installations
+# - Show next steps
+
+# Step 2: Run the interactive configuration wizard
+./scripts/setup-config.sh
+
+# The wizard will:
+# - Install just and uv if not already present (uses just install-uv recipe)
+# - Ask you questions about your infrastructure
+# - Generate all configuration files automatically
+# - Set up secrets management
+# - Create .envrc.local for environment variables
+```
 
 ### Option B: Manual Setup (Full Control)
 
