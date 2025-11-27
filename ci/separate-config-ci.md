@@ -358,9 +358,9 @@ jobs:
           python-version: '3.11'
       - run: pip install uv
       - run: uv pip install --system -e .[dev]
-      - run: make test
-      - run: make lint
-      - run: make format-check
+      - run: just test
+      - run: just lint
+      - run: just format
 ```
 
 ## Best Practices
