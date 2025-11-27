@@ -419,17 +419,20 @@ class TestDestroyOrchestrator:
             )
             assert len(deployments) > 0
 
-    def test_destroy_requires_confirmation_without_auto_approve(self, orchestrator):
-        """Test that destroy raises error when confirmation required but no callback provided."""
-        with pytest.raises(
-            ValueError, match="Destroy requires approval but no confirmation callback provided"
+    def test_destroy_prompts_without_callback_and_aborts(self, orchestrator):
+        """Test that destroy prompts when no callback provided and aborts on negative response."""
+        with patch.object(
+            orchestrator.destroy_orchestrator, "_confirm_destroy", return_value=False
         ):
-            orchestrator.destroy(env_name="dev", auto_approve=False, confirm_callback=None)
+            result = orchestrator.destroy(
+                env_name="dev", auto_approve=False, confirm_callback=None
+            )
 
-        # Check deployment was marked as failed
+        assert result == {}
+
         deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
         assert deployments[0].status == DeploymentStatus.FAILED
-        assert "Destroy requires approval" in deployments[0].error_message
+        assert deployments[0].error_message == "User aborted"
 
     def test_destroy_proceeds_with_confirmation(self, orchestrator):
         """Test that destroy proceeds when user confirms."""
@@ -442,6 +445,22 @@ class TestDestroyOrchestrator:
 
             # Should proceed with destroy
             assert "proxmox" in result
+
+    def test_destroy_prompts_without_callback_and_proceeds(self, orchestrator):
+        """Test that destroy proceeds using internal prompt when confirmed."""
+        with patch.object(
+            orchestrator.destroy_orchestrator, "_confirm_destroy", return_value=True
+        ):
+            with patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run"
+            ) as mock_tf:
+                mock_tf.return_value = {"success": True}
+
+                result = orchestrator.destroy(
+                    env_name="dev", auto_approve=False, confirm_callback=None
+                )
+
+        assert "proxmox" in result
 
     def test_destroy_with_resource_filter(self, orchestrator):
         """Test destroy with resource filter."""

@@ -280,7 +280,8 @@ jobs:
         working-directory: infrafoundry
         run: |
           # Install just and use it to install dependencies
-          curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+          curl -LsSf https://just.systems/install.sh | bash -s -- --to $HOME/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
           just install-uv
           just install
 
