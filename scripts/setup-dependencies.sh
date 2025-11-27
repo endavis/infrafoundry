@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # InfraFoundry Dependencies Setup
-# Installs all required tools: Terraform, Ansible, SOPS, age, direnv
+# Installs just command runner, then uses it to install all required tools
 
 set -e
 
@@ -39,113 +39,42 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to get latest version from GitHub
-get_latest_version() {
-    local repo=$1
-    curl -s "https://api.github.com/repos/$repo/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v?([^"]+)".*/\1/'
-}
-
-# Install direnv
-echo -e "${BLUE}[1/5] Installing direnv...${NC}"
-if command_exists direnv; then
-    echo -e "${GREEN}✓ direnv already installed: $(direnv --version)${NC}"
+# Install just command runner
+echo -e "${BLUE}[1/2] Installing just command runner...${NC}"
+if command_exists just; then
+    echo -e "${GREEN}✓ just already installed: $(just --version)${NC}"
 else
+    echo "Installing just..."
     if [[ "$OS" == "linux" ]]; then
-        sudo apt-get update && sudo apt-get install -y direnv
+        # Download prebuilt binary for Linux
+        JUST_VERSION=$(curl -s "https://api.github.com/repos/casey/just/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        echo "Latest version: $JUST_VERSION"
+        wget -q "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz" -O /tmp/just.tar.gz
+        tar -xzf /tmp/just.tar.gz -C /tmp
+        sudo mv /tmp/just /usr/local/bin/
+        sudo chmod +x /usr/local/bin/just
+        rm /tmp/just.tar.gz
     elif [[ "$OS" == "macos" ]]; then
-        brew install direnv
+        # Use homebrew on macOS
+        if command_exists brew; then
+            brew install just
+        else
+            echo -e "${RED}Error: Homebrew not found. Please install Homebrew first:${NC}"
+            echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            exit 1
+        fi
     fi
-    echo -e "${GREEN}✓ direnv installed${NC}"
+    echo -e "${GREEN}✓ just installed${NC}"
 fi
-
-# Configure direnv for bash if not already configured
-if ! grep -q 'direnv hook bash' ~/.bashrc 2>/dev/null; then
-    echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
-    echo -e "${GREEN}✓ Added direnv hook to ~/.bashrc${NC}"
-else
-    echo -e "${GREEN}✓ direnv already configured in ~/.bashrc${NC}"
-fi
-
-# Install age
 echo ""
-echo -e "${BLUE}[2/5] Installing age (encryption tool)...${NC}"
-if command_exists age; then
-    echo -e "${GREEN}✓ age already installed: $(age --version 2>&1 | head -1)${NC}"
-else
-    if [[ "$OS" == "linux" ]]; then
-        sudo apt-get install -y age
-    elif [[ "$OS" == "macos" ]]; then
-        brew install age
-    fi
-    echo -e "${GREEN}✓ age installed${NC}"
-fi
 
-# Install SOPS
+# Install all dependencies using just
+echo -e "${BLUE}[2/2] Installing infrastructure dependencies...${NC}"
+echo -e "${YELLOW}Running: just install-deps${NC}"
 echo ""
-echo -e "${BLUE}[3/5] Installing SOPS (secrets management)...${NC}"
-if command_exists sops; then
-    echo -e "${GREEN}✓ SOPS already installed: $(sops --version 2>&1 | head -1)${NC}"
-else
-    SOPS_VERSION=$(get_latest_version "getsops/sops")
-    echo "Installing SOPS version $SOPS_VERSION..."
 
-    if [[ "$OS" == "linux" ]]; then
-        wget -q "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops_${SOPS_VERSION}_amd64.deb" -O /tmp/sops.deb
-        sudo dpkg -i /tmp/sops.deb
-        rm /tmp/sops.deb
-    elif [[ "$OS" == "macos" ]]; then
-        brew install sops
-    fi
-    echo -e "${GREEN}✓ SOPS $SOPS_VERSION installed${NC}"
-fi
-
-# Install Terraform
-echo ""
-echo -e "${BLUE}[4/5] Installing Terraform...${NC}"
-if command_exists terraform; then
-    CURRENT_TF_VERSION=$(terraform version -json 2>/dev/null | grep -o '"terraform_version":"[^"]*"' | cut -d'"' -f4)
-    echo "Current Terraform version: $CURRENT_TF_VERSION"
-fi
-
-TF_VERSION=$(get_latest_version "hashicorp/terraform")
-echo "Latest Terraform version: $TF_VERSION"
-
-if command_exists terraform && [[ "$CURRENT_TF_VERSION" == "$TF_VERSION" ]]; then
-    echo -e "${GREEN}✓ Terraform already up to date${NC}"
-else
-    echo "Installing Terraform $TF_VERSION..."
-
-    if [[ "$OS" == "linux" ]]; then
-        wget -q "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -O /tmp/terraform.zip
-        sudo unzip -o /tmp/terraform.zip -d /usr/local/bin/
-        sudo chmod +x /usr/local/bin/terraform
-        rm /tmp/terraform.zip
-    elif [[ "$OS" == "macos" ]]; then
-        wget -q "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_darwin_arm64.zip" -O /tmp/terraform.zip
-        sudo unzip -o /tmp/terraform.zip -d /usr/local/bin/
-        sudo chmod +x /usr/local/bin/terraform
-        rm /tmp/terraform.zip
-    fi
-    echo -e "${GREEN}✓ Terraform $TF_VERSION installed${NC}"
-fi
-
-# Install Ansible (via Python/uv)
-echo ""
-echo -e "${BLUE}[5/5] Installing Ansible (via uv)...${NC}"
-if ! command_exists uv; then
-    echo -e "${YELLOW}uv not found. Installing uv first...${NC}"
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.cargo/bin:$PATH"
-fi
-
-# Install or update InfraFoundry with ansible dependency
-if [[ -f "pyproject.toml" ]]; then
-    echo "Installing InfraFoundry with Ansible..."
-    uv pip install -e .
-    echo -e "${GREEN}✓ Ansible installed via uv${NC}"
-else
-    echo -e "${YELLOW}⚠ Not in InfraFoundry directory, skipping Ansible install${NC}"
-fi
+# Run just install-deps which will install: direnv, age, sops, terraform, ansible
+just install-deps
 
 # Verify installations
 echo ""
@@ -164,6 +93,7 @@ verify_tool() {
     fi
 }
 
+verify_tool "just" "just --version"
 verify_tool "direnv" "direnv --version"
 verify_tool "age" "age --version"
 verify_tool "sops" "sops --version"
@@ -188,4 +118,7 @@ echo ""
 echo -e "${GREEN}💡 VS Code Users:${NC}"
 echo "   Open this project in VS Code and install recommended extensions:"
 echo -e "   ${BLUE}just setup-vscode${NC} for more details"
+echo ""
+echo -e "${GREEN}💡 Available Commands:${NC}"
+echo -e "   Run ${BLUE}just${NC} or ${BLUE}just help${NC} to see all available commands"
 echo ""
