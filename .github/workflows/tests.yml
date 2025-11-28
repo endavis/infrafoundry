@@ -2,9 +2,15 @@ name: Tests and Coverage
 
 on:
   push:
-    branches: [main, dev, develop]
+    branches:
+      - main
+      - dev
+      - develop
+      - feat/pyinfra-support
   pull_request:
-    branches: [main, dev]
+    branches:
+      - main
+      - dev
   workflow_dispatch:
 
 env:
@@ -70,7 +76,7 @@ jobs:
             coverage.xml
             .coverage
       - name: Generate coverage badge
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+        if: "${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' }}"
         run: |
           coverage-badge -o coverage.svg -f
         continue-on-error: true

@@ -273,6 +273,7 @@ class PlanOrchestrator:
         secret_manager_factory: Callable[[str], SecretManager],
         get_current_user: Callable[[], str],
         fail_on_missing_secrets: bool,
+        get_runner_priorities: Callable[[str], dict[str, int]],
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -287,6 +288,7 @@ class PlanOrchestrator:
         self._secret_manager_factory = secret_manager_factory
         self._get_current_user = get_current_user
         self._fail_on_missing_secrets = fail_on_missing_secrets
+        self._get_runner_priorities = get_runner_priorities
 
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
@@ -294,6 +296,15 @@ class PlanOrchestrator:
             runner = self.runner_registry.create_runner(tool_name, console=self.console)
             if runner:
                 self.runners[tool_name] = runner
+
+    def _get_sorted_runners(self, priorities: dict[str, int]) -> list[tuple[str, BaseRunner]]:
+        """Get runners sorted by priority."""
+
+        def get_priority(item: tuple[str, BaseRunner]) -> int:
+            name, runner = item
+            return priorities.get(name, runner.priority)
+
+        return sorted(self.runners.items(), key=get_priority)
 
     def plan(
         self,
@@ -318,6 +329,7 @@ class PlanOrchestrator:
         )
 
         results: dict[str, Any] = {}
+        runner_priorities = self._get_runner_priorities(env_name)
 
         try:
             self._print_header("Planning", env_name, resource_filter, style="bold cyan")
@@ -355,7 +367,7 @@ class PlanOrchestrator:
                     provider.ensure_directories()
                     self._export_secrets(provider_name, env_name, provider)
 
-                    for tool_name, runner in self.runners.items():
+                    for tool_name, runner in self._get_sorted_runners(runner_priorities):
                         generate_method = getattr(provider, f"generate_{tool_name}", None)
                         if generate_method and callable(generate_method):
                             self.console.print(

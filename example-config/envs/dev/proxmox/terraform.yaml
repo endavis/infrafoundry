@@ -1,0 +1,27 @@
+vms:
+  # ------------------------------------------------------------------
+  # Terraform Runner Examples (Basic Provisioning)
+  # ------------------------------------------------------------------
+  # These VMs demonstrate pure infrastructure provisioning without
+  # additional configuration management.
+  
+  - name: basic-vm-01
+    target_node: pve01
+    clone: ubuntu-22-04-template
+    cores: 1
+    sockets: 1
+    memory: 1024
+    disk:
+      size: 10G
+      type: scsi
+      storage: local-lvm
+    network:
+      model: virtio
+      bridge: vmbr0
+      tag: 100
+    ipconfig: ip=192.168.100.50/24,gw=192.168.100.1
+    onboot: true
+    agent: 1
+    tags:
+      - terraform
+      - basic

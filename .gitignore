@@ -91,3 +91,4 @@ tmp/
 .cache/
 .infrafoundry/
 coverage.xml
+.nfs*
