@@ -87,7 +87,7 @@ class TestOrchestratorInit:
             orchestrator = Orchestrator(
                 config_manager=config_manager,
             )
-            assert orchestrator._current_user == "testuser"
+            assert orchestrator._get_current_user() == "testuser"
 
     def test_init_fallback_user(self, tmp_path):
         """Test user fallback when USER env var not set."""
@@ -102,7 +102,7 @@ class TestOrchestratorInit:
             orchestrator = Orchestrator(
                 config_manager=config_manager,
             )
-            assert orchestrator._current_user == "unknown"
+            assert orchestrator._get_current_user() == "unknown"
 
 
 class TestOrchestratorNotifications:
