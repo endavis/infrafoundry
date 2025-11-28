@@ -57,7 +57,7 @@ jobs:
                  -v
 
       - name: Upload coverage to Codecov
-        if: secrets.CODECOV_TOKEN != ''
+        if: "${{ secrets.CODECOV_TOKEN != '' }}"
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
@@ -77,7 +77,7 @@ jobs:
             coverage.xml
             .coverage
       - name: Generate coverage badge
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+        if: "${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' }}"
         run: |
           coverage-badge -o coverage.svg -f
         continue-on-error: true
