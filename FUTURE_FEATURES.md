@@ -2,7 +2,7 @@
 
 This document outlines potential value-add features for InfraFoundry to enhance its capabilities as an infrastructure workflow manager.
 
-## 1. Configuration Templating / Blueprints
+## 1. Configuration Templating / Blueprints (Completed) ✅
 **Goal:** Reduce boilerplate and standardize best practices.
 **Description:** A library of reusable "Blueprints" (e.g., "HA Web Cluster", "K8s Cluster") that users can instantiate with minimal parameters.
 **Implementation:**
@@ -10,7 +10,7 @@ This document outlines potential value-add features for InfraFoundry to enhance 
 - Scaffolding mechanism for config files.
 - Internal registry or git-based source for blueprints.
 
-## 2. Visual Topology / Graphing
+## 2. Visual Topology / Graphing (Completed) ✅
 **Goal:** Visualization for documentation and debugging.
 **Description:** Generate visual diagrams of the infrastructure graph (dependencies, resources, networks).
 **Implementation:**
