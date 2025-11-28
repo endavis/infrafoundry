@@ -280,6 +280,8 @@ infra policies check --env prod --enforce
 - Example structure: `my-infra-config/policies/naming.yaml`
 - This allows policies to be versioned alongside your infrastructure configurations
 
+For complete configuration details and schema, see the **[Policy Configuration Guide](policy-configuration.md)**.
+
 ---
 
 ### `infra rollback`

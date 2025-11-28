@@ -1097,11 +1097,13 @@ YAML Configs → ConfigManager → Providers → Jinja2 Templates → Generated 
 - **[Separate Configuration Repository](docs/separate-config-repo.md)** - Best practices for organizing infrastructure configs
 - **[State Management Strategies](docs/state-management.md)** - Understanding and managing Terraform state, InfraFoundry state, and generated files
 - **[Per-Environment Credentials](docs/per-environment-credentials.md)** - Managing different credentials for dev, staging, and production
+- **[Policy Configuration](docs/policy-configuration.md)** - Guide to defining and enforcing infrastructure policies
 - **[ISC to Kea DHCP Migration](docs/isc-to-kea-migration.md)** - Complete guide for migrating from legacy ISC DHCP to Kea DHCP
 - **[direnv Setup](docs/direnv.md)** - Environment variable management
 
 ### Development
 - **[Plugin Development](docs/development/plugin-development.md)** - Creating custom provider plugins
+- **[Event System Guide](docs/development/event-system.md)** - Understanding the internal event bus and notifications
 - **[Manager Patterns](docs/development/manager-patterns.md)** - Standard patterns for managers and 3-layer architecture
 - **[Architectural Patterns](docs/architecture/architectural-patterns.md)** - Core patterns and best practices
 
