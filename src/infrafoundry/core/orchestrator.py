@@ -68,6 +68,7 @@ class Orchestrator:
             event_manager: Event manager instance (creates default if None)
             policy_dir: Directory containing policy files (defaults to ./policies)
             notifications_config: Path to notifications config file
+            strict_config: Configuration for strict-mode safeguards
         """
         self.config_manager = config_manager
         self.output_dir = output_dir or Path.cwd() / "generated"
@@ -108,7 +109,7 @@ class Orchestrator:
         self.validation_orchestrator = ValidationOrchestrator(
             config_manager=self.config_manager,
             console=self.console,
-            get_providers=lambda: self.providers,  # Revert to lambda
+            get_providers=self._get_providers,
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
         )
@@ -117,19 +118,14 @@ class Orchestrator:
             state_manager=self.state_manager,
             event_manager=self.event_manager,
             runner_registry=self.runner_registry,
-            get_providers=lambda: self.providers,  # Revert to lambda
+            get_providers=self._get_providers,
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
             validate_resources=self.validate_resources,
-            has_policies=lambda: bool(self.policy_engine.policies),  # Revert to lambda
-            check_policies=(
-                lambda env, resources, enforce: (
-                    self.check_policies(env, resources, enforce=enforce),
-                    None,
-                )[1]
-            ),
-            secret_manager_factory=lambda env: SecretManager(env_name=env),
-            get_current_user=lambda: self._current_user,
+            has_policies=self._has_policies,
+            check_policies=self._check_policies_wrapper,
+            secret_manager_factory=self._create_secret_manager,
+            get_current_user=self._get_current_user,
             fail_on_missing_secrets=self.strict_config.fail_on_missing_secrets,
             get_runner_priorities=self._get_runner_priorities,
         )
@@ -140,39 +136,58 @@ class Orchestrator:
             load_resources=self._load_resources,
             apply_serial=self._apply_providers_serial,
             apply_parallel=self._apply_providers_parallel,
-            get_current_user=lambda: self._current_user,
+            get_current_user=self._get_current_user,
         )
         self.destroy_orchestrator = DestroyOrchestrator(
             console=self.console,
             state_manager=self.state_manager,
             event_manager=self.event_manager,
             runner_registry=self.runner_registry,
-            get_providers=lambda: self.providers,  # Revert to lambda
+            get_providers=self._get_providers,
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
-            get_current_user=lambda: self._current_user,
+            get_current_user=self._get_current_user,
         )
         self.rollback_orchestrator = RollbackOrchestrator(
             console=self.console,
             state_manager=self.state_manager,
             apply_orchestrator=self.apply_orchestrator,
-            get_current_user=lambda: self._current_user,
+            get_current_user=self._get_current_user,
         )
         self.drift_orchestrator = DriftOrchestrator(
             drift_detector=self.drift_detector,
-            get_providers=lambda: self.providers,  # Revert to lambda
+            get_providers=self._get_providers,
         )
         self.status_orchestrator = StatusOrchestrator(
             console=self.console,
             config_manager=self.config_manager,
-            get_providers=lambda: self.providers,  # Revert to lambda
+            get_providers=self._get_providers,
         )
 
         # Subscribe notification manager to events
         self._setup_notifications()
 
-        # Get current user for tracking
-        self._current_user = os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
+    def _get_current_user(self) -> str:
+        """Get current system user."""
+        return os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
+
+    def _get_providers(self) -> dict[str, ProviderBase]:
+        """Get registered providers."""
+        return self.providers
+
+    def _has_policies(self) -> bool:
+        """Check if policies are loaded."""
+        return bool(self.policy_engine.policies)
+
+    def _create_secret_manager(self, env_name: str) -> SecretManager:
+        """Create a secret manager for an environment."""
+        return SecretManager(env_name=env_name)
+
+    def _check_policies_wrapper(
+        self, env_name: str, resources: list[ResourceConfig], enforce: bool
+    ) -> None:
+        """Wrapper for check_policies to match PlanOrchestrator interface."""
+        self.check_policies(env_name, resources, enforce=enforce)
 
     def _setup_notifications(self) -> None:
         """Set up notification handlers for events."""
