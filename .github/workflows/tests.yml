@@ -57,7 +57,6 @@ jobs:
                  -v
 
       - name: Upload coverage to Codecov
-        if: "${{ secrets.CODECOV_TOKEN != '' }}"
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
