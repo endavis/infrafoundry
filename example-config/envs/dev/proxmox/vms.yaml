@@ -43,3 +43,28 @@ vms:
     pyinfra_deploy_funcs:
       - webserver.setup_webserver
       - webserver.setup_monitoring
+
+  # 4. Hybrid VM (Ansible + PyInfra)
+  # Demonstrates using both runners on the same resource.
+  # Runners execute in order: Terraform -> Ansible -> PyInfra.
+  - name: hybrid-server-01
+    target_node: pve01
+    clone: ubuntu-22-04-template
+    cores: 2
+    memory: 4096
+    ipconfig: ip=192.168.100.40/24,gw=192.168.100.1
+    ssh_user: ubuntu
+    tags: [hybrid]
+
+    # Ansible handles base system config
+    ansible_roles:
+      - common
+    
+    # PyInfra handles application deployment
+    pyinfra_ops:
+      - name: Install htop (via PyInfra)
+        operation: apt.packages
+        params:
+          packages: ["htop"]
+          update: true
+          _sudo: true
