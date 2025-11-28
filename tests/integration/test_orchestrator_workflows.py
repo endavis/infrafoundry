@@ -424,9 +424,7 @@ class TestDestroyOrchestrator:
         with patch.object(
             orchestrator.destroy_orchestrator, "_confirm_destroy", return_value=False
         ):
-            result = orchestrator.destroy(
-                env_name="dev", auto_approve=False, confirm_callback=None
-            )
+            result = orchestrator.destroy(env_name="dev", auto_approve=False, confirm_callback=None)
 
         assert result == {}
 
@@ -448,12 +446,8 @@ class TestDestroyOrchestrator:
 
     def test_destroy_prompts_without_callback_and_proceeds(self, orchestrator):
         """Test that destroy proceeds using internal prompt when confirmed."""
-        with patch.object(
-            orchestrator.destroy_orchestrator, "_confirm_destroy", return_value=True
-        ):
-            with patch(
-                "infrafoundry.core.runners.terraform_runner.TerraformRunner.run"
-            ) as mock_tf:
+        with patch.object(orchestrator.destroy_orchestrator, "_confirm_destroy", return_value=True):
+            with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.run") as mock_tf:
                 mock_tf.return_value = {"success": True}
 
                 result = orchestrator.destroy(
