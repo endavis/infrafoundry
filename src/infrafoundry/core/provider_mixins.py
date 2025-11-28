@@ -77,11 +77,16 @@ class TemplateRendererMixin:
         # Set up Jinja2 environment with defaults
         # Pass parameters explicitly for proper type checking
         # env_kwargs can override defaults or provide additional parameters
+        extensions = env_kwargs.pop("extensions", [])
+        if "jinja2.ext.do" not in extensions:
+            extensions.append("jinja2.ext.do")
+
         self.jinja_env = Environment(
             loader=FileSystemLoader(str(self.template_dir)),
             trim_blocks=env_kwargs.pop("trim_blocks", True),
             lstrip_blocks=env_kwargs.pop("lstrip_blocks", True),
             keep_trailing_newline=env_kwargs.pop("keep_trailing_newline", True),
+            extensions=extensions,
             **env_kwargs,  # Pass through any additional parameters
         )
 
@@ -109,6 +114,9 @@ class TemplateRendererMixin:
 
         # Quote string for YAML/JSON
         self.jinja_env.filters["quote"] = lambda s: f'"{s}"'
+
+        # Python repr for code generation
+        self.jinja_env.filters["repr"] = repr
 
     def get_template(self, template_name: str) -> Template:
         """Load a Jinja2 template by name.
@@ -198,6 +206,22 @@ class TemplateRendererMixin:
 
         if hasattr(self, "_logger"):
             self._logger.debug(f"Wrote Ansible file: {file_path}")
+
+    def _write_pyinfra_file(self, filename: str, content: str) -> None:
+        """Write content to a pyinfra file.
+
+        Args:
+            filename: Name of the file
+            content: File content
+        """
+        if not hasattr(self, "pyinfra_dir"):
+            raise AttributeError("Missing pyinfra_dir attribute (from ProviderBase)")
+
+        file_path = Path(self.pyinfra_dir) / filename
+        file_path.write_text(content)
+
+        if hasattr(self, "_logger"):
+            self._logger.debug(f"Wrote pyinfra file: {file_path}")
 
 
 class ResourceGrouperMixin:

@@ -1,0 +1,15 @@
+"""Generated pyinfra inventory."""
+
+# Host definitions
+{% for resource in resources %}
+{% if resource.type == 'vm' %}
+{{ resource.name | to_snake_case }} = [
+    (
+        "{{ resource.config.ipconfig.split(',')[0].split('=')[1].split('/')[0] if resource.config.get('ipconfig') else resource.name }}",
+        {
+            "ssh_user": "{{ resource.config.ssh_user | default('ubuntu') }}",
+        }
+    )
+]
+{% endif %}
+{% endfor %}

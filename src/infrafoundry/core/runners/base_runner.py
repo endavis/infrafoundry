@@ -26,6 +26,20 @@ class BaseRunner(ABC):
         self.console = console or Console()
 
     @property
+    def priority(self) -> int:
+        """Return the execution priority of the runner (lower runs first).
+
+        Default priorities:
+        - Terraform: 0 (Provisioning)
+        - Ansible: 50 (Configuration)
+        - PyInfra: 50 (Configuration)
+
+        Returns:
+            Priority integer
+        """
+        return 50
+
+    @property
     @abstractmethod
     def tool_name(self) -> str:
         """Return the name of the tool this runner executes.

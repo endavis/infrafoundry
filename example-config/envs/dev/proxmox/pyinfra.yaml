@@ -1,0 +1,47 @@
+vms:
+  # ------------------------------------------------------------------
+  # PyInfra Runner Examples
+  # ------------------------------------------------------------------
+  # These VMs demonstrate integration with PyInfra for configuration.
+
+  # Example 1: Inline PyInfra Operations
+  # Useful for simple, one-off tasks defined directly in YAML.
+  - name: pyinfra-inline-01
+    target_node: pve01
+    clone: ubuntu-22-04-template
+    cores: 2
+    memory: 2048
+    ipconfig: ip=192.168.100.30/24,gw=192.168.100.1
+    ssh_user: ubuntu
+    tags: [pyinfra, inline]
+    
+    pyinfra_ops:
+      - name: Install Nginx
+        operation: apt.packages
+        params:
+          packages: ["nginx"]
+          update: true
+          _sudo: true
+      
+      - name: Ensure Nginx Started
+        operation: systemd.service
+        params:
+          service: "nginx"
+          running: true
+          enabled: true
+          _sudo: true
+
+  # Example 2: Custom PyInfra Deploy Functions
+  # References Python code in `pyinfra/webserver.py` in the config repo.
+  - name: pyinfra-custom-01
+    target_node: pve01
+    clone: ubuntu-22-04-template
+    cores: 2
+    memory: 2048
+    ipconfig: ip=192.168.100.31/24,gw=192.168.100.1
+    ssh_user: ubuntu
+    tags: [pyinfra, custom]
+    
+    pyinfra_deploy_funcs:
+      - webserver.setup_webserver
+      - webserver.setup_monitoring

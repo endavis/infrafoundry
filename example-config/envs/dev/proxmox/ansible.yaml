@@ -1,0 +1,68 @@
+vms:
+  # ------------------------------------------------------------------
+  # Ansible Runner Examples
+  # ------------------------------------------------------------------
+  # These VMs demonstrate integration with Ansible for configuration.
+
+  # Example 1: Using Roles
+  - name: web-server-01
+    target_node: pve01
+    clone: ubuntu-22-04-template
+    cores: 2
+    memory: 4096
+    ipconfig: ip=192.168.100.10/24,gw=192.168.100.1
+    ssh_user: ubuntu
+    tags: [ansible, webserver]
+    
+    ansible_roles:
+      - common
+      - webserver
+    ansible_vars:
+      webserver_port: 80
+      webserver_ssl: true
+
+  # Example 2: Inline Tasks + Secrets
+  - name: db-server-01
+    target_node: pve01
+    clone: ubuntu-22-04-template
+    cores: 4
+    memory: 8192
+    ipconfig: ip=192.168.100.11/24,gw=192.168.100.1
+    ssh_user: ubuntu
+    tags: [ansible, database]
+
+    ansible_roles:
+      - common
+      - database
+    
+    ansible_tasks:
+      - name: Create application database
+        module: postgresql_db
+        params:
+          name: appdb
+          state: present
+      - name: Create database user
+        module: postgresql_user
+        params:
+          name: appuser
+          password: "{{ vault_db_password }}" # From encrypted secrets
+          priv: "appdb:ALL"
+
+  # Example 3: Complex Application Stack
+  - name: app-server-01
+    target_node: pve01
+    clone: ubuntu-22-04-template
+    cores: 2
+    memory: 4096
+    ipconfig: ip=192.168.100.12/24,gw=192.168.100.1
+    ssh_user: ubuntu
+    tags: [ansible, app]
+
+    ansible_roles:
+      - common
+      - nodejs
+      - nginx
+    
+    ansible_vars:
+      nodejs_version: "18.x"
+      app_port: 3000
