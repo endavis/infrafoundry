@@ -186,6 +186,32 @@ class DependencyGraph:
             reverse_adjacency=self._reverse_adjacency,
         )
 
+    def export_to_mermaid(self) -> str:
+        """Export dependency graph to Mermaid diagram format.
+
+        Returns:
+            String containing Mermaid diagram definition (graph TD)
+        """
+        lines = ["graph TD"]
+
+        # Add nodes
+        for full_name, _ in self.nodes.items():
+            # Format: id["Label"]
+            # Using full_name as ID, but escaping appropriately if needed
+            # For now, simple names are assumed safe
+            safe_id = full_name.replace(":", "_").replace("-", "_")
+            lines.append(f'    {safe_id}["{full_name}"]')
+
+        # Add edges
+        for source, targets in self._adjacency.items():
+            source_id = source.replace(":", "_").replace("-", "_")
+            for target in targets:
+                target_id = target.replace(":", "_").replace("-", "_")
+                # A --> B means A depends on B
+                lines.append(f"    {source_id} --> {target_id}")
+
+        return "\n".join(lines)
+
     def __len__(self) -> int:
         """Get number of resources in graph."""
         return len(self.nodes)
