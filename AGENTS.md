@@ -70,6 +70,10 @@ InfraFoundry generates Terraform `.tf` files and Ansible playbooks from YAML con
 - Markdown formatting for detailed commits
 - Separate commits for refactoring, docs, tests, cleanup, dependencies
 
+### Branching Strategy
+- **General Fixes:** For minor bug fixes and small improvements, directly branch from and target the `dev` branch.
+- **Refactors & Feature Additions:** For larger changes, refactorings, or new features, create a dedicated branch (e.g., `feat/my-new-feature`, `refactor/api-cleanup`) branched off `dev`. These branches should be merged into `main` via a Pull Request once completed and reviewed.
+
 ## Testing Expectations
 - Maintain ≥69% coverage
 - Add/update tests when refactoring or adding features; use fixtures and mocks
