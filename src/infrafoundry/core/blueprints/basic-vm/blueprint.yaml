@@ -1,0 +1,4 @@
+name: basic-vm
+description: A simple Ubuntu VM on Proxmox
+version: 1.0.0
+author: InfraFoundry Team
