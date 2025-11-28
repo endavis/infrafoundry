@@ -27,7 +27,7 @@ from infrafoundry.core.orchestrator_workflows import (
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.runners import AnsibleRunner, RunnerRegistry, TerraformRunner
+from infrafoundry.core.runners import AnsibleRunner, PyInfraRunner, RunnerRegistry, TerraformRunner
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
 
@@ -87,6 +87,7 @@ class Orchestrator:
         self.runner_registry = RunnerRegistry()
         self.runner_registry.register(TerraformRunner)
         self.runner_registry.register(AnsibleRunner)
+        self.runner_registry.register(PyInfraRunner)
 
         # Initialize helper classes for orchestration tasks
         self.policy_checker = PolicyChecker(self.policy_engine, self.event_manager, self.console)
@@ -130,6 +131,7 @@ class Orchestrator:
             secret_manager_factory=lambda env: SecretManager(env_name=env),
             get_current_user=lambda: self._current_user,
             fail_on_missing_secrets=self.strict_config.fail_on_missing_secrets,
+            get_runner_priorities=self._get_runner_priorities,
         )
         self.apply_orchestrator = ApplyOrchestrator(
             console=self.console,
@@ -429,6 +431,11 @@ class Orchestrator:
             max_workers=max_workers,
         )
 
+    def _get_runner_priorities(self, env_name: str) -> dict[str, int]:
+        """Get runner priorities for an environment."""
+        env_config = self.config_manager.load_environment(env_name)
+        return env_config.runner_priorities if env_config else {}
+
     def _apply_providers_serial(
         self,
         env_name: str,
@@ -438,6 +445,11 @@ class Orchestrator:
         auto_approve: bool,
     ) -> dict[str, Any]:
         """Apply providers sequentially."""
+        # Load runner priorities from environment config
+        env_config = self.config_manager.load_environment(env_name)
+        if env_config:
+            self.deployment_executor.runner_priorities = env_config.runner_priorities
+
         self.deployment_executor.providers = self.providers
         return self.deployment_executor.apply_serial(
             env_name, deployment_id, resources_by_provider, resource_filter, auto_approve
@@ -453,6 +465,11 @@ class Orchestrator:
         max_workers: int,
     ) -> dict[str, Any]:
         """Apply providers in parallel."""
+        # Load runner priorities from environment config
+        env_config = self.config_manager.load_environment(env_name)
+        if env_config:
+            self.deployment_executor.runner_priorities = env_config.runner_priorities
+
         self.deployment_executor.providers = self.providers
         return self.deployment_executor.apply_parallel(
             env_name,

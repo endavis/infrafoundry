@@ -19,6 +19,7 @@ def mock_providers(tmp_path):
     proxmox.name = "proxmox"
     proxmox.terraform_dir = tmp_path / "generated" / "terraform" / "proxmox"
     proxmox.ansible_dir = tmp_path / "generated" / "ansible" / "proxmox"
+    proxmox.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "proxmox"
     proxmox.ensure_directories = Mock()
     proxmox.generate_terraform = Mock()
     proxmox.generate_ansible = Mock()
@@ -46,7 +47,13 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     # Create mock ConfigManager
     config_manager = Mock(spec=ConfigManager)
     config_manager.base_dir = config_dir
-    config_manager.load_environment = Mock(return_value=mock_config["environment"])
+
+    # Create a mock environment config object
+    env_config_mock = Mock()
+    env_config_mock.runner_priorities = {}
+    env_config_mock.model_dump.return_value = mock_config["environment"]
+
+    config_manager.load_environment = Mock(return_value=env_config_mock)
     config_manager.get_all_resources_all_providers = Mock(return_value=mock_config["resources"])
 
     # Create real components
@@ -515,6 +522,7 @@ class TestMultiProviderWorkflow:
         kubernetes.name = "kubernetes"
         kubernetes.terraform_dir = tmp_path / "generated" / "terraform" / "kubernetes"
         kubernetes.ansible_dir = tmp_path / "generated" / "ansible" / "kubernetes"
+        kubernetes.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "kubernetes"
         kubernetes.ensure_directories = Mock()
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
@@ -546,6 +554,7 @@ class TestMultiProviderWorkflow:
         kubernetes.name = "kubernetes"
         kubernetes.terraform_dir = tmp_path / "generated" / "terraform" / "kubernetes"
         kubernetes.ansible_dir = tmp_path / "generated" / "ansible" / "kubernetes"
+        kubernetes.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "kubernetes"
         kubernetes.ensure_directories = Mock()
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
@@ -588,6 +597,7 @@ class TestMultiProviderWorkflow:
         opnsense.name = "opnsense"
         opnsense.terraform_dir = tmp_path / "generated" / "terraform" / "opnsense"
         opnsense.ansible_dir = tmp_path / "generated" / "ansible" / "opnsense"
+        opnsense.pyinfra_dir = tmp_path / "generated" / "pyinfra" / "opnsense"
         opnsense.ensure_directories = Mock()
         opnsense.generate_terraform = Mock()
         opnsense.generate_ansible = Mock()

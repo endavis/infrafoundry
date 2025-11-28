@@ -24,6 +24,8 @@ class EnvironmentConfig(BaseModel):
     provider_ssh: dict[str, SSHConfig] = Field(default_factory=dict)  # Per-provider SSH
     # Provider-specific settings (credentials, api_url, etc.)
     provider_settings: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    # Override runner execution order: { "pyinfra": 40, "ansible": 60 }
+    runner_priorities: dict[str, int] = Field(default_factory=dict)
 
     def get_ssh_config(self, provider_name: str) -> SSHConfig | None:
         """Get SSH config for a specific provider.
