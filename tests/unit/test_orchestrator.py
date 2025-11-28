@@ -433,6 +433,7 @@ class TestPlanOrchestratorStrictMode:
             secret_manager_factory=lambda env: secret_manager,
             get_current_user=lambda: "tester",
             fail_on_missing_secrets=fail_on_missing_secrets,
+            get_runner_priorities=lambda env: {},
         )
 
     def test_export_secrets_strict_mode_raises(self, tmp_path):

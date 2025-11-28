@@ -23,6 +23,7 @@ class DeploymentExecutor:
         event_manager: EventManager,
         providers: dict[str, ProviderBase],
         console: Console | None = None,
+        runner_priorities: dict[str, int] | None = None,
     ) -> None:
         """Initialize deployment executor.
 
@@ -32,12 +33,14 @@ class DeploymentExecutor:
             event_manager: Event manager for notifications
             providers: Dict of registered provider instances
             console: Rich console for output (creates default if None)
+            runner_priorities: Optional dict mapping runner names to priorities
         """
         self.runner_registry = runner_registry
         self.state_manager = state_manager
         self.event_manager = event_manager
         self.providers = providers
         self.console = console or Console()
+        self.runner_priorities = runner_priorities or {}
 
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
@@ -45,6 +48,28 @@ class DeploymentExecutor:
             runner = self.runner_registry.create_runner(tool_name, console=self.console)
             if runner:
                 self.runners[tool_name] = runner
+
+    def _get_sorted_runners(self) -> list[tuple[str, BaseRunner]]:
+        """Get runners sorted by priority.
+
+        Priority is determined by:
+        1. Environment config override (if present)
+        2. Runner class default priority
+        3. Registration order (implicit stability of sort)
+
+        Returns:
+            List of (tool_name, runner) tuples sorted by priority.
+        """
+
+        def get_priority(item: tuple[str, BaseRunner]) -> int:
+            name, runner = item
+            # Check for override first
+            if name in self.runner_priorities:
+                return self.runner_priorities[name]
+            # Fallback to default
+            return runner.priority
+
+        return sorted(self.runners.items(), key=get_priority)
 
     def apply_serial(
         self,
@@ -241,7 +266,7 @@ class DeploymentExecutor:
         runner_results: dict[str, Any] = {}
         terraform_ids: dict[str, str] = {}
 
-        for tool_name, runner in self.runners.items():
+        for tool_name, runner in self._get_sorted_runners():
             self.console.print(f"  [dim]Running {tool_name} apply...[/dim]")
 
             command = "apply"

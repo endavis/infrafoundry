@@ -2,6 +2,8 @@
 
 InfraFoundry integrates Ansible for post-deployment configuration management. This runner allows you to apply Ansible roles and tasks to resources provisioned by Terraform.
 
+For an overview of how runners interact and their fixed execution order, please refer to the [Runner Execution Overview](overview.md).
+
 ## Overview
 
 The Ansible runner automatically:

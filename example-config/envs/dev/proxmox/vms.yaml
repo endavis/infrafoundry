@@ -46,7 +46,8 @@ vms:
 
   # 4. Hybrid VM (Ansible + PyInfra)
   # Demonstrates using both runners on the same resource.
-  # Runners execute in order: Terraform -> Ansible -> PyInfra.
+  # Runners execute in fixed order: Terraform -> Ansible -> PyInfra.
+  # For more details, see docs/runners/overview.md
   - name: hybrid-server-01
     target_node: pve01
     clone: ubuntu-22-04-template
