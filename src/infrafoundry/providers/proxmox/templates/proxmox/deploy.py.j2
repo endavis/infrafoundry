@@ -18,10 +18,35 @@ from pyinfra.operations import (
     yum,
 )
 
+# Import custom deploy functions
+{% set imported_funcs = [] %}
 {% for resource in resources %}
-{% if resource.config.get('pyinfra_ops') %}
+{% if resource.config.get('pyinfra_deploy_funcs') %}
+{% for func_path in resource.config.pyinfra_deploy_funcs %}
+{% if func_path not in imported_funcs %}
+{% set module = func_path.rsplit('.', 1)[0] %}
+{% set func = func_path.rsplit('.', 1)[1] %}
+from {{ module }} import {{ func }}
+{% do imported_funcs.append(func_path) %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}
+
+
+{% for resource in resources %}
+{% if resource.config.get('pyinfra_ops') or resource.config.get('pyinfra_deploy_funcs') %}
 # Operations for {{ resource.name }}
 with inventory.hosts.get_group("{{ resource.name | to_snake_case }}") as host:
+    {% if resource.config.get('pyinfra_deploy_funcs') %}
+    # Call custom deploy functions
+    {% for func_path in resource.config.pyinfra_deploy_funcs %}
+    {{ func_path.rsplit('.', 1)[1] }}()
+    {% endfor %}
+    {% endif %}
+
+    {% if resource.config.get('pyinfra_ops') %}
+    # Inline operations
     {% for op in resource.config.pyinfra_ops %}
     {{ op.operation }}(
         name="{{ op.name }}",
@@ -30,5 +55,6 @@ with inventory.hosts.get_group("{{ resource.name | to_snake_case }}") as host:
         {% endfor %}
     )
     {% endfor %}
+    {% endif %}
 {% endif %}
 {% endfor %}

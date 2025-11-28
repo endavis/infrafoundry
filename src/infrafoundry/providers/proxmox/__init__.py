@@ -300,6 +300,27 @@ class ProxmoxProvider(
         """
         self.ensure_directories()
 
+        # Copy custom pyinfra code if it exists
+        # Assuming 'pyinfra' directory at the root of the config repo
+        # self.config_dir is envs/{env}, so we go up to the root
+        custom_pyinfra_dir = self.config_dir.parent.parent / "pyinfra"
+        if not custom_pyinfra_dir.exists():
+            # Fallback: maybe config_dir is envs/ (if called from test or strict context)
+            custom_pyinfra_dir = self.config_dir.parent / "pyinfra"
+
+        if custom_pyinfra_dir.exists() and custom_pyinfra_dir.is_dir():
+            import shutil
+
+            # Copy contents to self.pyinfra_dir (so they are importable directly)
+            for item in custom_pyinfra_dir.iterdir():
+                dest = self.pyinfra_dir / item.name
+                if item.is_dir():
+                    if dest.exists():
+                        shutil.rmtree(dest)
+                    shutil.copytree(item, dest)
+                else:
+                    shutil.copy2(item, dest)
+
         # Generate inventory
         content = self.render_template("proxmox/inventory.py.j2", {"resources": resources})
         self._write_pyinfra_file("inventory.py", content)
