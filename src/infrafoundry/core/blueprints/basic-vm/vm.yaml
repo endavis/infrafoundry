@@ -1,0 +1,16 @@
+vms:
+  - name: ubuntu-vm-01
+    target_node: pve01
+    clone: ubuntu-22-04-template
+    cores: 2
+    memory: 4096
+    disk:
+      size: 32G
+      storage: local-lvm
+    network:
+      bridge: vmbr0
+      tag: 100
+    ipconfig: ip=dhcp
+    onboot: true
+    tags:
+      - basic
