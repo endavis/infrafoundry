@@ -775,15 +775,27 @@ class DestroyOrchestrator:
             self._print_header("Destroying", env_name, resource_filter, "bold red")
 
             if not auto_approve:
-                should_continue = (
-                    confirm_callback() if confirm_callback else self._confirm_destroy()
-                )
+                if confirm_callback:
+                    should_continue = confirm_callback()
+                else:
+                    # If auto_approve is False and no callback, then CLI should have handled it.
+                    # This indicates an improper call from the CLI.
+                    self.console.print(
+                        "[red]Error: Confirmation callback needed for destroy.[/red]"
+                    )
+                    self.state_manager.update_deployment_status(
+                        deployment_id,
+                        DeploymentStatus.FAILED,
+                        "Confirmation callback required but not provided",
+                    )
+                    return {"success": False, "error": "Confirmation not provided"}
+
                 if not should_continue:
                     self.console.print("[yellow]Aborted[/yellow]")
                     self.state_manager.update_deployment_status(
                         deployment_id, DeploymentStatus.FAILED, "User aborted"
                     )
-                    return {}
+                    return {"success": False, "message": "User aborted"}
 
             _, resources_by_provider = self._load_resources(env_name)
             providers = self._get_providers()
@@ -829,11 +841,6 @@ class DestroyOrchestrator:
             raise
 
         return results
-
-    def _confirm_destroy(self) -> bool:
-        """Prompt for destroy confirmation when no callback provided."""
-        response = self.console.input("Are you sure you want to destroy? [y/N]: ")
-        return response.strip().lower() in {"y", "yes"}
 
     def _track_destroying_resources(
         self,
