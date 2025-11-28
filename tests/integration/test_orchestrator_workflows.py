@@ -47,7 +47,13 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     # Create mock ConfigManager
     config_manager = Mock(spec=ConfigManager)
     config_manager.base_dir = config_dir
-    config_manager.load_environment = Mock(return_value=mock_config["environment"])
+
+    # Create a mock environment config object
+    env_config_mock = Mock()
+    env_config_mock.runner_priorities = {}
+    env_config_mock.model_dump.return_value = mock_config["environment"]
+
+    config_manager.load_environment = Mock(return_value=env_config_mock)
     config_manager.get_all_resources_all_providers = Mock(return_value=mock_config["resources"])
 
     # Create real components

@@ -31,6 +31,12 @@ class TerraformRunner(BaseRunner):
         """Return the name of the tool."""
         return "terraform"
 
+    @property
+    @override
+    def priority(self) -> int:
+        """Terraform must run first to provision resources."""
+        return 0
+
     @override
     def is_available(self) -> bool:
         """Check if Terraform is installed."""

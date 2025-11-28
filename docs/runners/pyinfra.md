@@ -2,6 +2,8 @@
 
 InfraFoundry supports [pyinfra](https://pyinfra.com/) as a pure-Python alternative to Ansible for configuration management. It offers faster execution and allows you to write deployment logic in standard Python.
 
+For an overview of how runners interact and their fixed execution order, please refer to the [Runner Execution Overview](overview.md).
+
 ## Overview
 
 The PyInfra runner:
