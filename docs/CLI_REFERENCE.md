@@ -30,6 +30,21 @@ Creates `~/.infrafoundry/state.db` (SQLite) for tracking deployments and resourc
 
 ---
 
+### `infra new`
+Create new infrastructure configurations from blueprints.
+
+```bash
+# List available blueprints
+infra new list
+
+# Create a new project from a blueprint
+infra new create basic-vm ./my-project
+```
+
+See the **[Blueprints Guide](configuration/blueprints.md)** for details on creating and managing blueprints.
+
+---
+
 ### `infra envs`
 List available environments.
 
@@ -194,6 +209,19 @@ infra drift --env prod
 - Per-provider drift summary
 - Count of resources to add/change/destroy
 - Detailed change descriptions
+
+---
+
+### `infra graph`
+Visualize infrastructure dependencies.
+
+```bash
+# Generate dependency graph (Mermaid format)
+infra graph --env dev --format mermaid
+```
+
+Generates a text-based graph description that can be rendered into a visual diagram showing resource dependencies.
+See the **[Graphing Guide](architecture/graphing.md)** for more details.
 
 ---
 
