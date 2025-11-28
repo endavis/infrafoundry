@@ -77,11 +77,16 @@ class TemplateRendererMixin:
         # Set up Jinja2 environment with defaults
         # Pass parameters explicitly for proper type checking
         # env_kwargs can override defaults or provide additional parameters
+        extensions = env_kwargs.pop("extensions", [])
+        if "jinja2.ext.do" not in extensions:
+            extensions.append("jinja2.ext.do")
+
         self.jinja_env = Environment(
             loader=FileSystemLoader(str(self.template_dir)),
             trim_blocks=env_kwargs.pop("trim_blocks", True),
             lstrip_blocks=env_kwargs.pop("lstrip_blocks", True),
             keep_trailing_newline=env_kwargs.pop("keep_trailing_newline", True),
+            extensions=extensions,
             **env_kwargs,  # Pass through any additional parameters
         )
 
