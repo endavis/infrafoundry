@@ -59,8 +59,10 @@ class ProviderRegistry:
                 self._discover_and_register_provider(provider_dir.name)
             except ProviderInitializationError as e:
                 logger.debug(f"Could not load provider '{provider_dir.name}': {e}")
+            except (ImportError, SyntaxError) as e:
+                logger.warning(f"Failed to import provider '{provider_dir.name}': {e}")
             except Exception as e:
-                logger.warning(f"Error discovering provider from {provider_dir.name}: {e}")
+                logger.error(f"Unexpected error discovering provider '{provider_dir.name}': {e}")
                 logger.debug(traceback.format_exc())  # Log full traceback
 
     def _discover_and_register_provider(self, provider_name: str) -> None:

@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
@@ -207,8 +208,13 @@ class DeploymentExecutor:
                         result = future.result()
                         results[provider_name] = result
                         self.console.print(f"[green]✓ {provider_name} completed[/green]")
+                    except InfraFoundryError as e:
+                        self.console.print(f"[red]✗ {provider_name} failed: {e.message}[/red]")
+                        if e.context:
+                            self.console.print(f"  Context: {e.context}", style="dim red")
+                        results[provider_name] = {"error": str(e)}
                     except Exception as e:
-                        self.console.print(f"[red]✗ {provider_name} failed: {e}[/red]")
+                        self.console.print(f"[red]✗ {provider_name} failed (unexpected): {e}[/red]")
                         self.console.print(
                             traceback.format_exc(), style="dim red"
                         )  # Log full traceback
