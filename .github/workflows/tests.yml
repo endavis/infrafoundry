@@ -42,6 +42,13 @@ jobs:
         run: |
           uv pip install --system -e ".[dev]"
 
+      - name: Install SOPS
+        run: |
+          curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
+          mv sops-v3.8.1.linux.amd64 sops
+          chmod +x sops
+          sudo mv sops /usr/local/bin/
+
       - name: Run linting
         run: |
           ruff check src/ tests/
@@ -108,6 +115,13 @@ jobs:
         run: |
           uv pip install --system -e ".[dev]"
 
+      - name: Install SOPS
+        run: |
+          curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
+          mv sops-v3.8.1.linux.amd64 sops
+          chmod +x sops
+          sudo mv sops /usr/local/bin/
+
       - name: Run tests
         run: |
           pytest -v --tb=short
@@ -144,6 +158,13 @@ jobs:
       - name: Install Ansible
         run: |
           uv pip install --system ansible
+
+      - name: Install SOPS
+        run: |
+          curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
+          mv sops-v3.8.1.linux.amd64 sops
+          chmod +x sops
+          sudo mv sops /usr/local/bin/
 
       - name: Run integration tests
         run: |
