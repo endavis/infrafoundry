@@ -461,15 +461,4 @@ from infrafoundry.core.exceptions import InfraFoundryError
 
 - **Architecture**: `docs/architecture/ARCHITECTURE.md`
 - **CLI Reference**: `docs/CLI_REFERENCE.md`
-- **API Documentation**: `docs/architecture/api-documentation.md`
-- **Refactoring Status**: `REFACTORING_TODO.md`
-- **Testing Status**: `docs/development/TESTING_STATUS.md`
-
----
-
-## Version History
-
-- **2025-11-20**: Initial version based on Phase 2C refactoring work
-  - Exception handling patterns (Task #9)
-  - Type safety standards (Task #8)
-  - Code organization guidelines
+- **CI/CD Testing**: `docs/development/ci-cd-testing.md`
