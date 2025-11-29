@@ -9,7 +9,7 @@ import urllib.request
 
 # Doit configuration
 DOIT_CONFIG = {
-    "verbosity": 3,
+    "verbosity": 2,
     "default_tasks": ["list"],
 }
 
@@ -26,14 +26,14 @@ def run_cmd(cmd, shell=True, check=True):
 def task_install():
     """Install dependencies with uv."""
     return {
-        "actions": ["uv pip install -e ."],
+        "actions": [(run_cmd, ["uv pip install -e ."])],
     }
 
 
 def task_dev():
     """Install with dev dependencies."""
     return {
-        "actions": ['uv pip install -e ".[dev]"'],
+        "actions": [(run_cmd, ['uv pip install -e ".[dev]"'])],
     }
 
 
@@ -82,7 +82,7 @@ def task_cleanup():
 def task_test():
     """Run pytest."""
     return {
-        "actions": ["pytest -v"],
+        "actions": [(run_cmd, ["pytest -v"])],
     }
 
 
@@ -94,7 +94,7 @@ def task_coverage():
     )
     return {
         "actions": [
-            cmd,
+            (run_cmd, [cmd]),
             lambda: print(
                 "\nCoverage report generated:\n  HTML: tmp/htmlcov/index.html\n"
                 "  XML:  tmp/coverage.xml\n\n"
@@ -107,42 +107,45 @@ def task_coverage():
 def task_test_unit():
     """Run unit tests only."""
     return {
-        "actions": ["pytest -v -m unit tests/unit/"],
+        "actions": [(run_cmd, ["pytest -v -m unit tests/unit/"])],
     }
 
 
 def task_test_integration():
     """Run integration tests only."""
     return {
-        "actions": ["pytest -v -m integration tests/integration/"],
+        "actions": [(run_cmd, ["pytest -v -m integration tests/integration/"])],
     }
 
 
 def task_test_fast():
     """Run fast tests (skip slow ones)."""
     return {
-        "actions": ['pytest -v -m "not slow"'],
+        "actions": [(run_cmd, ['pytest -v -m "not slow"'])],
     }
 
 
 def task_lint():
     """Run ruff linter."""
     return {
-        "actions": ["ruff check src/ tests/"],
+        "actions": [(run_cmd, ["ruff check src/ tests/"])],
     }
 
 
 def task_format():
     """Format code with ruff."""
     return {
-        "actions": ["ruff format src/ tests/", "ruff check --fix src/ tests/"],
+        "actions": [
+            (run_cmd, ["ruff format src/ tests/"]),
+            (run_cmd, ["ruff check --fix src/ tests/"]),
+        ],
     }
 
 
 def task_check():
     """Run all checks (lint + type check)."""
     return {
-        "actions": ["mypy src/"],
+        "actions": [(run_cmd, ["mypy src/"])],
         "task_dep": ["lint"],
     }
 
@@ -153,7 +156,7 @@ def task_check():
 def task_plan():
     """Generate and plan infrastructure (dry-run)."""
     return {
-        "actions": ["infra plan --env %(env)s --dry-run"],
+        "actions": [(run_cmd, ["infra plan --env %(env)s --dry-run"])],
         "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
     }
 
@@ -161,7 +164,7 @@ def task_plan():
 def task_apply():
     """Apply infrastructure changes."""
     return {
-        "actions": ["infra apply --env %(env)s"],
+        "actions": [(run_cmd, ["infra apply --env %(env)s"])],
         "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
     }
 
@@ -169,7 +172,7 @@ def task_apply():
 def task_destroy():
     """Destroy infrastructure."""
     return {
-        "actions": ["infra destroy --env %(env)s"],
+        "actions": [(run_cmd, ["infra destroy --env %(env)s"])],
         "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
     }
 
