@@ -40,7 +40,7 @@ InfraFoundry generates Terraform and Ansible configurations from YAML definition
 ### Prerequisites
 
 - Python 3.12+
-- [just](https://just.systems/) - Command runner (installed automatically by setup scripts)
+- [doit](https://pydoit.org/) - Task runner (installed automatically via uv)
 - [uv](https://github.com/astral-sh/uv) - Fast Python package installer (installed automatically)
 - [Terraform](https://www.terraform.io/) >= 1.6 (installed automatically)
 - [Ansible](https://www.ansible.com/) >= 2.15 (installed automatically)
@@ -101,9 +101,9 @@ We welcome contributions! Please follow these guidelines:
 2. **Write tests** for new functionality (maintain 70% coverage)
 3. **Run quality checks** before committing:
    ```bash
-   just format        # Format code with ruff
-   just lint          # Run ruff linting
-   just coverage      # Run tests with coverage (must pass 69% threshold)
+   doit format        # Format code with ruff
+   doit lint          # Run ruff linting
+   doit coverage      # Run tests with coverage (must pass 69% threshold)
    ```
 4. **Submit a pull request** with clear description
 
