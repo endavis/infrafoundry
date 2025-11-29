@@ -57,7 +57,7 @@ InfraFoundry generates Terraform and Ansible configurations from YAML definition
 git clone https://github.com/yourusername/infrafoundry.git
 cd infrafoundry
 
-# Install all dependencies (just, uv, terraform, ansible, sops, age, direnv)
+# Install all dependencies (uv, terraform, ansible, sops, age, direnv)
 ./scripts/setup-dependencies.sh
 
 # Then run the interactive configuration wizard
