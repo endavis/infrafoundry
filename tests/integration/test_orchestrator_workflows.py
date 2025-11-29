@@ -7,6 +7,7 @@ import pytest
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
 from infrafoundry.providers.proxmox import ProxmoxProvider
 
@@ -73,6 +74,16 @@ def orchestrator(tmp_path, mock_config, mock_providers):
 
     # Inject mock providers
     orchestrator.providers = mock_providers
+
+    # Mock SecretManager to avoid external dependency on SOPS
+    secret_manager = Mock(spec=SecretManager)
+    secret_manager.decrypt_file = Mock(return_value={})
+    secret_manager.get_secret = Mock(return_value=None)
+    secret_manager.export_for_terraform = Mock()
+    secret_manager.export_for_ansible = Mock()
+
+    # Override factory to return our mock
+    orchestrator._create_secret_manager = Mock(return_value=secret_manager)
 
     return orchestrator
 

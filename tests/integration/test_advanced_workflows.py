@@ -72,6 +72,9 @@ vms:
         output_dir=output_dir,
     )
 
+    # Override secret manager factory to return our mock
+    orchestrator._create_secret_manager = Mock(return_value=secret_manager)
+
     # Register mock provider
     provider = Mock()
     provider.name = "proxmox"
