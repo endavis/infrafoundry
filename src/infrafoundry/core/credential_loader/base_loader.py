@@ -1,33 +1,44 @@
 """Base credential loader for provider-specific implementations."""
 
 import logging
-import subprocess
 import traceback
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
 
-import yaml
+from infrafoundry.core.exceptions import (
+    CredentialError,
+    SecretError,
+    SecretNotFoundError,
+)
+from infrafoundry.core.secrets.provider import SecretProvider
+from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 
 logger = logging.getLogger(__name__)
 
 
-class CredentialLoaderError(Exception):
+class CredentialLoaderError(CredentialError):
     """Raised when provider credentials cannot be loaded."""
 
 
 class BaseCredentialLoader(ABC):
     """Abstract base class for provider-specific credential loaders."""
 
-    def __init__(self, secrets_dir: Path, debug_mode: bool = False) -> None:
+    def __init__(
+        self,
+        secrets_dir: Path,
+        debug_mode: bool = False,
+        secret_provider: SecretProvider | None = None,
+    ) -> None:
         """Initialize credential loader.
 
         Args:
             secrets_dir: Directory containing encrypted credential files
             debug_mode: Enable debug logging
+            secret_provider: Secret provider implementation (defaults to SopsSecretProvider)
         """
         self.secrets_dir = secrets_dir
         self.debug_mode = debug_mode
+        self.secret_provider = secret_provider or SopsSecretProvider()
 
     @property
     @abstractmethod
@@ -62,17 +73,30 @@ class BaseCredentialLoader(ABC):
         """
         file_path = self.secrets_dir / self.credential_file
 
+        # Check if file exists using Path.exists() first to avoid overhead if missing
+        # But provider.load_secret should also handle it.
+        # However, existing logic checks existence first.
         if not file_path.exists():
             if self.debug_mode:
                 logger.debug(f"Credential file not found: {file_path}")
             return {}
 
         try:
-            decrypted_data = self._decrypt_sops_file(file_path)
-        except CredentialLoaderError:
-            raise
+            decrypted_data = self.secret_provider.load_secret(file_path)
+        except SecretNotFoundError:
+            if self.debug_mode:
+                logger.debug(f"Credential file not found (via provider): {file_path}")
+            return {}
+        except SecretError as exc:
+            if self.debug_mode:
+                logger.debug(f"Secret loading failed for {file_path}: {exc}")
+            # We re-raise as CredentialLoaderError to maintain contract
+            raise CredentialLoaderError(f"Failed to load secret from {file_path}: {exc}") from exc
         except Exception as exc:  # pragma: no cover - defensive
+            logger.error(f"Unexpected error reading {file_path}: {exc}")
+            logger.debug(traceback.format_exc())
             raise CredentialLoaderError(f"Unexpected error reading {file_path}: {exc}") from exc
+
         if not decrypted_data:
             return {}
 
@@ -85,37 +109,3 @@ class BaseCredentialLoader(ABC):
             logger.debug(f"Loaded {len(env_vars)} credentials for {self.provider_name}")
 
         return env_vars
-
-    def _decrypt_sops_file(self, file_path: Path) -> dict[str, Any]:
-        """Decrypt a SOPS-encrypted YAML file.
-
-        Args:
-            file_path: Path to encrypted file
-
-        Returns:
-            Decrypted data as dictionary (empty dict if decryption fails)
-        """
-        try:
-            result = subprocess.run(
-                ["sops", "--decrypt", str(file_path)],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            return yaml.safe_load(result.stdout) or {}
-        except subprocess.CalledProcessError as e:
-            if self.debug_mode:
-                logger.debug(f"SOPS decryption failed for {file_path}: {e}")
-            return {}
-        except FileNotFoundError:
-            if self.debug_mode:
-                logger.debug("SOPS command not found")
-            return {}
-        except yaml.YAMLError as e:
-            if self.debug_mode:
-                logger.debug(f"YAML parsing failed for {file_path}: {e}")
-            return {}
-        except Exception as exc:  # pragma: no cover - unexpected failure path
-            logger.error(f"Unexpected error decrypting {file_path}: {exc}")
-            logger.debug(traceback.format_exc())  # Log full traceback
-            raise CredentialLoaderError(f"Unexpected error decrypting {file_path}: {exc}") from exc
