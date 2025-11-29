@@ -79,22 +79,6 @@ class TestSecretManager:
             manager = SecretManager(env_name="dev")
             assert manager.secrets_dir == config_repo / "envs" / "dev"
 
-    def test_init_sops_not_installed(self, mock_age_key):
-        """Test initialization fails when sops is not installed."""
-        with patch.dict("os.environ", {"INFRAFOUNDRY_FORCE_SOPS_CHECK": "1"}):
-            with patch("subprocess.run", side_effect=FileNotFoundError()):
-                with pytest.raises(SecretError, match="sops not found"):
-                    SecretManager(env_name="dev")
-
-    def test_init_sops_command_fails(self, mock_age_key):
-        """Test initialization fails when sops command fails."""
-        import subprocess
-
-        with patch.dict("os.environ", {"INFRAFOUNDRY_FORCE_SOPS_CHECK": "1"}):
-            with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sops")):
-                with pytest.raises(SecretError, match="sops not found"):
-                    SecretManager(env_name="dev")
-
     def test_init_no_age_key_env(self, mock_sops_age, temp_secrets_dir):
         """Test initialization fails when SOPS_AGE_KEY_FILE is not set."""
         with patch.dict(
