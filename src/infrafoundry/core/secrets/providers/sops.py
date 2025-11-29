@@ -1,0 +1,139 @@
+import logging
+import subprocess
+from pathlib import Path
+from typing import Any, cast
+
+import yaml
+
+from infrafoundry.core.exceptions import (
+    SecretDecryptionError,
+    SecretError,
+    SecretNotFoundError,
+)
+from infrafoundry.core.secrets.provider import SecretProvider
+
+logger = logging.getLogger(__name__)
+
+
+class SopsSecretProvider(SecretProvider):
+    """
+    Secret provider implementation using Mozilla SOPS.
+    """
+
+    def __init__(self) -> None:
+        """Initialize SOPS provider and check for sops binary."""
+        self._check_sops_installed()
+
+    def _check_sops_installed(self) -> None:
+        """Check if sops is installed."""
+        try:
+            subprocess.run(
+                ["sops", "--version"],
+                capture_output=True,
+                check=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # We only log here, as we might want to instantiate the provider even if sops is missing
+            # (e.g. in tests or strict CI envs where we might not use it yet),
+            # but strictly speaking if this provider is used, sops must be there.
+            # However, the original code raised RuntimeError.
+            error_msg = (
+                "sops not found. Install with: brew install sops (macOS) "
+                "or see https://github.com/getsops/sops"
+            )
+            raise SecretError(error_msg)
+
+    def load_secret(self, location: str | Path) -> dict[str, Any]:
+        """
+        Loads a secret from a file using SOPS.
+
+        Args:
+            location: Path to the encrypted file.
+
+        Returns:
+            The decrypted data as a dictionary.
+        """
+        file_path = Path(location)
+        if not file_path.exists():
+            raise SecretNotFoundError(f"Encrypted file not found: {file_path}")
+
+        try:
+            result = subprocess.run(
+                ["sops", "--decrypt", str(file_path)],
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+            return cast(dict[str, Any], yaml.safe_load(result.stdout)) or {}
+        except subprocess.CalledProcessError as e:
+            raise SecretDecryptionError(f"Failed to decrypt {file_path}: {e.stderr}") from e
+        except yaml.YAMLError as e:
+            raise SecretDecryptionError(
+                f"Failed to parse decrypted YAML from {file_path}: {e}"
+            ) from e
+        except Exception as e:
+            raise SecretError(f"Unexpected error loading secret from {file_path}: {e}") from e
+
+    def save_secret(self, location: str | Path, data: dict[str, Any]) -> None:
+        """
+        Saves a secret to a file using SOPS.
+
+        Args:
+            location: Path where the encrypted file should be saved.
+            data: Data to encrypt and save.
+        """
+        file_path = Path(location)
+
+        # Logic adapted from sops_wrapper.py
+        # Write unencrypted data to temp file
+        # Use tempfile to be safe
+
+        # We need to write to a temp file in the same directory or system temp.
+        # sops_wrapper used .tmp suffix in the same dir.
+
+        temp_file = file_path.with_suffix(".tmp")
+
+        try:
+            with open(temp_file, "w") as f:
+                yaml.dump(data, f)
+
+            # Encrypt in place
+            subprocess.run(
+                ["sops", "--encrypt", "--in-place", str(temp_file)],
+                capture_output=True,
+                check=True,
+            )
+
+            # Move to final location
+            temp_file.rename(file_path)
+
+        except subprocess.CalledProcessError as e:
+            temp_file.unlink(missing_ok=True)
+            raise SecretError(f"Failed to encrypt {file_path}: {e.stderr}") from e
+        except Exception as e:
+            temp_file.unlink(missing_ok=True)
+            raise SecretError(f"Failed to save secret to {file_path}: {e}") from e
+
+    def create_sops_config(self, directory: Path, age_public_key: str) -> None:
+        """
+        Create .sops.yaml configuration file.
+        This is specific to SOPS but useful to have here.
+        """
+        config_path = directory / ".sops.yaml"
+        if config_path.exists():
+            return
+
+        config = {
+            "creation_rules": [
+                {
+                    "path_regex": ".*",
+                    "age": age_public_key,
+                }
+            ]
+        }
+
+        try:
+            with open(config_path, "w") as f:
+                yaml.dump(config, f)
+        except Exception as e:
+            raise SecretError(f"Failed to create .sops.yaml at {directory}: {e}") from e
