@@ -8,11 +8,8 @@ import yaml
 
 from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.secrets.age_key_manager import check_age_key, create_sops_config
-from infrafoundry.core.secrets.sops_wrapper import (
-    check_sops_installed,
-    decrypt_file,
-    encrypt_file,
-)
+from infrafoundry.core.secrets.provider import SecretProvider
+from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 
 
 class SecretManager(PathBasedManager):
@@ -21,7 +18,12 @@ class SecretManager(PathBasedManager):
     Uses per-environment secrets stored in secrets/{env}/ directories.
     """
 
-    def __init__(self, env_name: str, secrets_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        env_name: str,
+        secrets_dir: Path | None = None,
+        provider: SecretProvider | None = None,
+    ) -> None:
         """Initialize secret manager.
 
         Args:
@@ -29,6 +31,7 @@ class SecretManager(PathBasedManager):
                      environment directory (envs/{env}/)
             secrets_dir: Base directory containing environment folders
                 (defaults to INFRAFOUNDRY_CONFIG_REPO/envs/{env})
+            provider: Secret provider implementation (defaults to SopsSecretProvider)
 
         Raises:
             ValueError: If secrets_dir is None and INFRAFOUNDRY_CONFIG_REPO is not set
@@ -54,13 +57,29 @@ class SecretManager(PathBasedManager):
         # Validate SOPS and age setup
         skip_sops_checks = self._get_env_var("INFRAFOUNDRY_SKIP_SOPS_CHECK")
         force_sops_checks = self._get_env_var("INFRAFOUNDRY_FORCE_SOPS_CHECK")
-        if not force_sops_checks and skip_sops_checks:
+        should_check = force_sops_checks or not skip_sops_checks
+
+        if not should_check:
             self._log_warning(
                 "Skipping SOPS/age checks because INFRAFOUNDRY_SKIP_SOPS_CHECK is set. "
                 "Use only in non-production environments."
             )
+
+        if provider:
+            self.provider = provider
         else:
-            check_sops_installed()
+            # Use SopsSecretProvider by default
+            try:
+                self.provider = SopsSecretProvider()
+            except Exception as e:
+                if not should_check:
+                    self._log_warning(
+                        f"SopsSecretProvider failed to initialize but checks are skipped: {e}"
+                    )
+                    raise
+                raise
+
+        if should_check and isinstance(self.provider, SopsSecretProvider):
             check_age_key()
 
     def decrypt_file(self, filename: str) -> dict[str, Any]:
@@ -74,7 +93,7 @@ class SecretManager(PathBasedManager):
         """
         encrypted_file = self.secrets_dir / filename
         self._log_debug(f"Decrypting file: {filename}")
-        data = decrypt_file(encrypted_file)
+        data = self.provider.load_secret(encrypted_file)
         self._log_debug(f"Successfully decrypted: {filename}")
         return data
 
@@ -88,7 +107,7 @@ class SecretManager(PathBasedManager):
         self._ensure_directory_exists(self.secrets_dir)
         encrypted_file = self.secrets_dir / filename
         self._log_debug(f"Encrypting file: {filename}")
-        encrypt_file(encrypted_file, data)
+        self.provider.save_secret(encrypted_file, data)
         self._log_info(f"Successfully encrypted: {filename}")
 
     def get_secret(self, filename: str, key: str) -> Any:
