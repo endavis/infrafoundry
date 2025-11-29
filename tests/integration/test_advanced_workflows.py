@@ -73,7 +73,8 @@ vms:
     )
 
     # Override secret manager factory to return our mock
-    orchestrator._create_secret_manager = Mock(return_value=secret_manager)
+    # Patch on plan_orchestrator instance as it holds reference to original method
+    orchestrator.plan_orchestrator.secret_manager_factory = Mock(return_value=secret_manager)
 
     # Register mock provider
     provider = Mock()
