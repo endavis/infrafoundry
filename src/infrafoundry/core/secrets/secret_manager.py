@@ -57,7 +57,7 @@ class SecretManager(PathBasedManager):
         # Validate SOPS and age setup
         skip_sops_checks = self._get_env_var("INFRAFOUNDRY_SKIP_SOPS_CHECK")
         force_sops_checks = self._get_env_var("INFRAFOUNDRY_FORCE_SOPS_CHECK")
-        should_check = force_sops_checks or not skip_sops_checks
+        should_check = bool(force_sops_checks) or not bool(skip_sops_checks)
 
         if not should_check:
             self._log_warning(
@@ -68,16 +68,8 @@ class SecretManager(PathBasedManager):
         if provider:
             self.provider = provider
         else:
-            # Use SopsSecretProvider by default
-            try:
-                self.provider = SopsSecretProvider()
-            except Exception as e:
-                if not should_check:
-                    self._log_warning(
-                        f"SopsSecretProvider failed to initialize but checks are skipped: {e}"
-                    )
-                    raise
-                raise
+            # Use SopsSecretProvider by default, passing check_binary flag based on env vars
+            self.provider = SopsSecretProvider(check_binary=should_check)
 
         if should_check and isinstance(self.provider, SopsSecretProvider):
             check_age_key()

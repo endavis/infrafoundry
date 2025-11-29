@@ -20,9 +20,14 @@ class SopsSecretProvider(SecretProvider):
     Secret provider implementation using Mozilla SOPS.
     """
 
-    def __init__(self) -> None:
-        """Initialize SOPS provider and check for sops binary."""
-        self._check_sops_installed()
+    def __init__(self, check_binary: bool = True) -> None:
+        """Initialize SOPS provider.
+
+        Args:
+            check_binary: Whether to check if sops binary is installed.
+        """
+        if check_binary:
+            self._check_sops_installed()
 
     def _check_sops_installed(self) -> None:
         """Check if sops is installed."""
