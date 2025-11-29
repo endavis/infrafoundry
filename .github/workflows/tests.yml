@@ -7,6 +7,7 @@ on:
       - dev
       - develop
       - feat/pyinfra-support
+      - refactor/migrate-to-pydoit
   pull_request:
     branches:
       - main
@@ -35,33 +36,26 @@ jobs:
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      - name: Add uv to PATH
-        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Add paths to PATH
+        run: |
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           uv pip install --system -e ".[dev]"
-
-      - name: Install SOPS
-        run: |
-          curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
-          mv sops-v3.8.1.linux.amd64 sops
-          chmod +x sops
-          sudo mv sops /usr/local/bin/
+          doit install_deps
 
       - name: Run linting
         run: |
-          ruff check src/ tests/
+          doit lint
         continue-on-error: true
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=src/infrafoundry \
-                 --cov-report=term-missing \
-                 --cov-report=xml \
-                 --cov-report=html \
-                 --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
-                 -v
+          doit coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -108,23 +102,21 @@ jobs:
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      - name: Add uv to PATH
-        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Add paths to PATH
+        run: |
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           uv pip install --system -e ".[dev]"
-
-      - name: Install SOPS
-        run: |
-          curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
-          mv sops-v3.8.1.linux.amd64 sops
-          chmod +x sops
-          sudo mv sops /usr/local/bin/
+          doit install_deps
 
       - name: Run tests
         run: |
-          pytest -v --tb=short
+          doit test
 
   integration-test:
     name: Integration Tests
@@ -143,32 +135,22 @@ jobs:
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      - name: Add uv to PATH
-        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Install dependencies
+      - name: Add paths to PATH
         run: |
-          uv pip install --system -e ".[dev]"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: '1.6.0'
-
-      - name: Install Ansible
+      - name: Install dependencies via doit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv pip install --system ansible
-
-      - name: Install SOPS
-        run: |
-          curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
-          mv sops-v3.8.1.linux.amd64 sops
-          chmod +x sops
-          sudo mv sops /usr/local/bin/
+          uv run doit install
+          uv run doit dev
+          uv run doit install_deps
 
       - name: Run integration tests
         run: |
-          pytest tests/integration/ -v --tb=short
+          uv run doit test_integration
 
   code-quality:
     name: Code Quality Checks
@@ -186,22 +168,23 @@ jobs:
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      - name: Add uv to PATH
-        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Install dependencies
+      - name: Add paths to PATH
         run: |
-          uv pip install --system -e ".[dev]"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies via doit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run doit install
+          uv run doit dev
 
       - name: Check formatting with ruff
         run: |
-          ruff format --check src/ tests/
+          uv run ruff format --check src/ tests/
 
-      - name: Run ruff linting
+      - name: Run linting and type checking
         run: |
-          ruff check src/ tests/
-
-      - name: Type checking with mypy
-        run: |
-          mypy src/
+          uv run doit check
         continue-on-error: true

@@ -92,3 +92,4 @@ tmp/
 .infrafoundry/
 coverage.xml
 .nfs*
+.doit.db.db

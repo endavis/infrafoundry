@@ -50,7 +50,7 @@ For VS Code users, the workspace includes recommended extensions and debug confi
 
 ```bash
 # Install recommended VS Code extensions
-just setup-vscode
+doit setup_vscode
 ```
 
 The workspace is configured with:
