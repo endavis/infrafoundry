@@ -7,6 +7,7 @@ on:
       - dev
       - develop
       - feat/pyinfra-support
+      - refactor/migrate-to-pydoit
   pull_request:
     branches:
       - main
