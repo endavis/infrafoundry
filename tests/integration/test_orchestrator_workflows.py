@@ -83,7 +83,8 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     secret_manager.export_for_ansible = Mock()
 
     # Override factory to return our mock
-    orchestrator._create_secret_manager = Mock(return_value=secret_manager)
+    # Patch on plan_orchestrator instance as it holds reference to original method
+    orchestrator.plan_orchestrator.secret_manager_factory = Mock(return_value=secret_manager)
 
     return orchestrator
 
