@@ -90,6 +90,7 @@ See [Setup Guide](docs/SETUP_GUIDE.md) for manual installation steps.
 ### Development
 - **[Plugin Development](docs/development/plugin-development.md)** - Creating custom provider plugins
 - **[Implementing Secret Providers](docs/development/implementing-secret-providers.md)** - Guide to creating custom secret backend integrations
+- **[Credential Loader System](docs/development/credential-loader-system.md)** - Extending the credential loading system for new providers
 - **[Event System Guide](docs/development/event-system.md)** - Understanding the internal event bus and notifications
 - **[Manager Patterns](docs/development/manager-patterns.md)** - Standard patterns for managers and 3-layer architecture
 - **[Architectural Patterns](docs/architecture/architectural-patterns.md)** - Core patterns and best practices
