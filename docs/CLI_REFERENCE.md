@@ -139,10 +139,10 @@ Shows current state of all resources in the environment.
 ---
 
 ### `infra list`
-List resources in an environment.
+List resources defined in configuration files.
 
 ```bash
-# List all resources
+# List all configured resources
 infra list --env dev
 
 # Filter by provider
@@ -159,6 +159,42 @@ infra list --env dev --provider proxmox --type vms
 - `--env`, `-e` - Environment name (required)
 - `--provider` - Filter by provider (proxmox, opnsense, kubernetes)
 - `--type` - Filter by resource type (vms, networks, firewall_rules, etc.)
+
+**Note:** Lists resources from YAML configuration files. Use `infra resources` to see tracked resources in the state database.
+
+---
+
+### `infra resources`
+List tracked infrastructure resources from state database.
+
+```bash
+# List all tracked resources
+infra resources
+
+# Filter by environment
+infra resources --env prod
+
+# Filter by provider
+infra resources --provider proxmox
+
+# Filter by resource type
+infra resources --type vm
+
+# Filter by state
+infra resources --state ACTIVE
+infra resources --state FAILED
+
+# Combine filters
+infra resources --env prod --provider proxmox --state ACTIVE
+```
+
+**Options:**
+- `--env`, `-e` - Filter by environment name
+- `--provider`, `-p` - Filter by provider (proxmox, opnsense, kubernetes)
+- `--type`, `-t` - Filter by resource type (vm, deployment, firewall_rule, etc.)
+- `--state`, `-s` - Filter by state (PLANNED, CREATING, ACTIVE, DELETING, DELETED, FAILED)
+
+**Note:** Shows resources tracked in the state database with their current status. Use `infra list` to see resources defined in configuration files.
 
 ---
 
@@ -334,6 +370,32 @@ infra rollback --env prod --to-previous --auto-approve
 - `--to-deployment` - Specific deployment ID to rollback to
 - `--to-previous` - Rollback to previous deployment
 - `--auto-approve` - Skip confirmation
+
+---
+
+### `infra rollback-points`
+List available rollback points for an environment.
+
+```bash
+# List rollback points
+infra rollback-points --env prod
+
+# Limit results
+infra rollback-points --env prod --limit 20
+```
+
+**Options:**
+- `--env`, `-e` - Environment name (required)
+- `--limit`, `-l` - Maximum number of rollback points to show (default: 10)
+
+Displays:
+- Deployment ID
+- Date and time
+- User who deployed
+- Number of resources
+- Git commit SHA
+
+Use the deployment ID with `infra rollback --to-deployment <ID>` to rollback to that point.
 
 ---
 

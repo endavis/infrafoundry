@@ -499,5 +499,6 @@ terraform plan
 
 - [Proxmox API Documentation](https://pve.proxmox.com/pve-docs/api-viewer/)
 - [OPNsense API Documentation](https://docs.opnsense.org/development/api.html)
-- [InfraFoundry Ansible Integration](docs/ansible-integration.md)
+- [Ansible Runner Guide](runners/ansible.md)
+- [Pluggable Runners Overview](runners/overview.md)
 - [Tailscale Exit Node Role](example-config/roles/tailscale-exit-node/README.md)

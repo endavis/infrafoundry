@@ -354,7 +354,7 @@ To add support for additional configuration sections:
 ## Related Documentation
 
 - [InfraFoundry Setup Guide](../SETUP_GUIDE.md)
-- [Ansible Integration](../ansible-integration.md)
+- [Ansible Runner Guide](../runners/ansible.md)
 - [Separate Config Repository Pattern](../separate-config-repo.md)
 
 ## Examples
