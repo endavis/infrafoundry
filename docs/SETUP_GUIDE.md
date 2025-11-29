@@ -9,7 +9,7 @@ This guide walks you through setting up InfraFoundry for your environment with P
 Run the setup scripts to install all dependencies and configure your environment:
 
 ```bash
-# Step 1: Install all system dependencies (just, uv, terraform, ansible, sops, age, direnv)
+# Step 1: Install all system dependencies (uv, terraform, ansible, sops, age, direnv)
 ./scripts/setup-dependencies.sh
 
 # - Install uv if not already present
