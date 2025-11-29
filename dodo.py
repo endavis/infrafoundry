@@ -286,7 +286,14 @@ def task_install_age():
 
 def _get_latest_github_release(repo):
     url = f"https://api.github.com/repos/{repo}/releases/latest"
-    with urllib.request.urlopen(url) as response:
+    request = urllib.request.Request(url)
+
+    # Use GitHub token if available to avoid rate limits
+    github_token = os.environ.get("GITHUB_TOKEN")
+    if github_token:
+        request.add_header("Authorization", f"token {github_token}")
+
+    with urllib.request.urlopen(request) as response:
         data = json.loads(response.read().decode())
         return data["tag_name"].lstrip("v")
 
