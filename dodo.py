@@ -27,7 +27,6 @@ def task_install():
     """Install dependencies with uv."""
     return {
         "actions": ["uv pip install -e ."],
-        "verbosity": 2,
     }
 
 
@@ -35,7 +34,6 @@ def task_dev():
     """Install with dev dependencies."""
     return {
         "actions": ['uv pip install -e ".[dev]"'],
-        "verbosity": 2,
     }
 
 
@@ -75,7 +73,6 @@ def task_cleanup():
 
     return {
         "actions": [clean_artifacts],
-        "verbosity": 2,
     }
 
 
@@ -86,7 +83,6 @@ def task_test():
     """Run pytest."""
     return {
         "actions": ["pytest -v"],
-        "verbosity": 2,
     }
 
 
@@ -105,7 +101,6 @@ def task_coverage():
                 "Target: 90% coverage"
             ),
         ],
-        "verbosity": 2,
     }
 
 
@@ -113,7 +108,6 @@ def task_test_unit():
     """Run unit tests only."""
     return {
         "actions": ["pytest -v -m unit tests/unit/"],
-        "verbosity": 2,
     }
 
 
@@ -121,7 +115,6 @@ def task_test_integration():
     """Run integration tests only."""
     return {
         "actions": ["pytest -v -m integration tests/integration/"],
-        "verbosity": 2,
     }
 
 
@@ -129,7 +122,6 @@ def task_test_fast():
     """Run fast tests (skip slow ones)."""
     return {
         "actions": ['pytest -v -m "not slow"'],
-        "verbosity": 2,
     }
 
 
@@ -137,7 +129,6 @@ def task_lint():
     """Run ruff linter."""
     return {
         "actions": ["ruff check src/ tests/"],
-        "verbosity": 2,
     }
 
 
@@ -145,7 +136,6 @@ def task_format():
     """Format code with ruff."""
     return {
         "actions": ["ruff format src/ tests/", "ruff check --fix src/ tests/"],
-        "verbosity": 2,
     }
 
 
@@ -154,7 +144,6 @@ def task_check():
     return {
         "actions": ["mypy src/"],
         "task_dep": ["lint"],
-        "verbosity": 2,
     }
 
 
@@ -166,7 +155,6 @@ def task_plan():
     return {
         "actions": ["infra plan --env %(env)s --dry-run"],
         "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
-        "verbosity": 2,
     }
 
 
@@ -175,7 +163,6 @@ def task_apply():
     return {
         "actions": ["infra apply --env %(env)s"],
         "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
-        "verbosity": 2,
     }
 
 
@@ -184,7 +171,6 @@ def task_destroy():
     return {
         "actions": ["infra destroy --env %(env)s"],
         "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
-        "verbosity": 2,
     }
 
 
@@ -221,7 +207,6 @@ def task_install_uv():
     """Install uv package manager."""
     return {
         "actions": [_install_uv],
-        "verbosity": 2,
     }
 
 
@@ -261,7 +246,6 @@ def task_install_direnv():
     """Install direnv."""
     return {
         "actions": [_install_direnv],
-        "verbosity": 2,
     }
 
 
@@ -309,7 +293,6 @@ def task_install_age():
     """Install age encryption tool."""
     return {
         "actions": [_install_age],
-        "verbosity": 2,
     }
 
 
@@ -353,7 +336,6 @@ def task_install_sops():
     """Install SOPS secrets manager."""
     return {
         "actions": [_install_sops],
-        "verbosity": 2,
     }
 
 
@@ -420,7 +402,6 @@ def task_install_terraform():
     """Install Terraform."""
     return {
         "actions": [_install_terraform],
-        "verbosity": 2,
     }
 
 
@@ -441,7 +422,6 @@ def task_install_ansible():
 
     return {
         "actions": [install_ansible],
-        "verbosity": 2,
     }
 
 
@@ -456,7 +436,6 @@ def task_install_deps():
             "install_terraform",
             "install_ansible",
         ],
-        "verbosity": 2,
     }
 
 
@@ -484,5 +463,4 @@ See .vscode/extensions.json for the complete list.
 """
     return {
         "actions": [lambda: print(msg)],
-        "verbosity": 2,
     }
