@@ -29,46 +29,11 @@ echo -e "${NC}"
 echo "This wizard will help you set up your InfraFoundry configuration."
 echo ""
 
-# Check for just and install if needed
+# Check for uv and install if needed
 echo -e "${YELLOW}Checking dependencies...${NC}"
-if ! command_exists just; then
-    echo -e "${YELLOW}⚠ just is not installed. Installing just...${NC}"
-
-    # Detect OS
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        OS="linux"
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        OS="macos"
-    else
-        echo -e "${RED}Unsupported OS: $OSTYPE${NC}"
-        exit 1
-    fi
-
-    if [[ "$OS" == "linux" ]]; then
-        # Download prebuilt binary for Linux
-        JUST_VERSION=$(curl -s "https://api.github.com/repos/casey/just/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        wget -q "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz" -O /tmp/just.tar.gz
-        tar -xzf /tmp/just.tar.gz -C /tmp
-        sudo mv /tmp/just /usr/local/bin/
-        sudo chmod +x /usr/local/bin/just
-        rm /tmp/just.tar.gz
-    elif [[ "$OS" == "macos" ]]; then
-        # Use homebrew on macOS
-        if command_exists brew; then
-            brew install just
-        else
-            echo -e "${RED}Error: Homebrew not found. Please install Homebrew first:${NC}"
-            echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-            exit 1
-        fi
-    fi
-    echo -e "${GREEN}✓ just installed${NC}"
-fi
-
-# Install uv using just
 if ! command_exists uv; then
     echo -e "${YELLOW}⚠ uv is not installed. Installing uv...${NC}"
-    just install-uv
+    curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.cargo/bin:$PATH"
     if ! command_exists uv; then
         echo -e "${RED}✗ uv installation failed${NC}"
@@ -76,6 +41,7 @@ if ! command_exists uv; then
         echo "Or install manually: https://github.com/astral-sh/uv"
         exit 1
     fi
+    echo -e "${GREEN}✓ uv installed${NC}"
 else
     echo -e "${GREEN}✓ uv is installed${NC}"
 fi

@@ -39,14 +39,14 @@ InfraFoundry generates Terraform and Ansible configurations from YAML definition
 
 ### Prerequisites
 
+- [uv](https://github.com/astral-sh/uv) (install first)
 - Python 3.12+
-- [just](https://just.systems/) - Command runner (installed automatically by setup scripts)
-- [uv](https://github.com/astral-sh/uv) - Fast Python package installer (installed automatically)
-- [Terraform](https://www.terraform.io/) >= 1.6 (installed automatically)
-- [Ansible](https://www.ansible.com/) >= 2.15 (installed automatically)
-- [SOPS](https://github.com/getsops/sops) - For secret management (installed automatically)
-- [age](https://github.com/FiloSottile/age) - For encryption keys (installed automatically)
-- [direnv](https://direnv.net/) - Optional but recommended (installed automatically)
+- [doit](https://pydoit.org/) - Task runner (installed via uv)
+- Terraform >= 1.6 (installed via doit)
+- Ansible >= 2.15 (installed via doit)
+- SOPS (installed via doit)
+- age (installed via doit)
+- direnv (installed via doit)
 
 ### Installation
 
@@ -57,7 +57,7 @@ InfraFoundry generates Terraform and Ansible configurations from YAML definition
 git clone https://github.com/yourusername/infrafoundry.git
 cd infrafoundry
 
-# Install all dependencies (just, uv, terraform, ansible, sops, age, direnv)
+# Install all dependencies (uv, terraform, ansible, sops, age, direnv)
 ./scripts/setup-dependencies.sh
 
 # Then run the interactive configuration wizard
@@ -101,9 +101,9 @@ We welcome contributions! Please follow these guidelines:
 2. **Write tests** for new functionality (maintain 70% coverage)
 3. **Run quality checks** before committing:
    ```bash
-   just format        # Format code with ruff
-   just lint          # Run ruff linting
-   just coverage      # Run tests with coverage (must pass 69% threshold)
+   doit format        # Format code with ruff
+   doit lint          # Run ruff linting
+   doit coverage      # Run tests with coverage (must pass 69% threshold)
    ```
 4. **Submit a pull request** with clear description
 

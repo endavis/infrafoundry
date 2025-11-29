@@ -279,19 +279,17 @@ jobs:
       - name: Install InfraFoundry
         working-directory: infrafoundry
         run: |
-          # Install just and use it to install dependencies
-          curl -LsSf https://just.systems/install.sh | bash -s -- --to $HOME/.local/bin
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          just install-uv
-          just install
+# Install uv if needed
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      - name: Set up infrastructure tools
-        working-directory: infrafoundry
-        run: |
-          # Use just recipes to install all tools
-          just install-terraform
-          just install-ansible
-          just install-sops
+# Install dependencies
+doit install
+doit install_deps
+
+# Or install individual tools
+doit install_terraform
+doit install_ansible
+doit install_sops
 
       - name: Set up age key
         working-directory: config

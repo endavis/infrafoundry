@@ -10,26 +10,26 @@ repos:
         language: system
         pass_filenames: true
         types: [python]
-        exclude: '\.cache/' # Exclude cache directory
+        exclude: '(\.cache/|dodo\.py)' # Exclude cache directory and dodo.py
       - id: ruff-check
         name: ruff check
         entry: uv run ruff check --fix --exit-non-zero-on-fix
         language: system
         pass_filenames: true
         types: [python]
-        exclude: '\.cache/' # Exclude cache directory
+        exclude: '(\.cache/|dodo\.py)' # Exclude cache directory and dodo.py
       - id: mypy
         name: mypy
         entry: uv run mypy src
         language: system
         pass_filenames: false
         types: [python]
-        exclude: '\.cache/' # Exclude cache directory
+        exclude: '(\.cache/|dodo\.py)' # Exclude cache directory and dodo.py
       - id: tests
         name: tests
         entry: uv run pytest
         language: system
         pass_filenames: false
         types: [python]
-        exclude: '\.cache/' # Exclude cache directory
+        exclude: '(\.cache/|dodo\.py)' # Exclude cache directory and dodo.py
 
