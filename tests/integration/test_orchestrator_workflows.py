@@ -84,7 +84,7 @@ def orchestrator(tmp_path, mock_config, mock_providers):
 
     # Override factory to return our mock
     # Patch on plan_orchestrator instance as it holds reference to original method
-    orchestrator.plan_orchestrator.secret_manager_factory = Mock(return_value=secret_manager)
+    orchestrator.plan_orchestrator._secret_manager_factory = Mock(return_value=secret_manager)
 
     return orchestrator
 
