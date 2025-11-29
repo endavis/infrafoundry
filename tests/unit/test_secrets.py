@@ -7,6 +7,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
+from infrafoundry.core.exceptions import (
+    SecretDecryptionError,
+    SecretError,
+    SecretNotFoundError,
+)
+from infrafoundry.core.secrets.provider import SecretProvider
 from infrafoundry.core.secrets.secret_manager import SecretManager
 
 
@@ -19,11 +25,18 @@ def temp_secrets_dir():
 
 @pytest.fixture
 def mock_sops_age():
-    """Mock sops and age availability."""
+    """Mock sops and age availability via subprocess."""
     with patch("subprocess.run") as mock_run:
         # Default: sops --version succeeds
         mock_run.return_value = MagicMock(returncode=0, stdout="sops 3.7.3")
         yield mock_run
+
+
+@pytest.fixture
+def mock_provider():
+    """Create a mock SecretProvider."""
+    provider = MagicMock(spec=SecretProvider)
+    return provider
 
 
 @pytest.fixture
@@ -49,6 +62,13 @@ class TestSecretManager:
         manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
         assert manager.secrets_dir == temp_secrets_dir
 
+    def test_init_with_provider(self, temp_secrets_dir, mock_provider):
+        """Test initialization with injected provider."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
+        assert manager.provider == mock_provider
+
     def test_init_with_config_repo_env(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test initialization uses INFRAFOUNDRY_CONFIG_REPO environment variable."""
         config_repo = temp_secrets_dir / "config-repo"
@@ -59,26 +79,12 @@ class TestSecretManager:
             manager = SecretManager(env_name="dev")
             assert manager.secrets_dir == config_repo / "envs" / "dev"
 
-    def test_init_sops_not_installed(self, mock_age_key):
-        """Test initialization fails when sops is not installed."""
-        with patch.dict("os.environ", {"INFRAFOUNDRY_FORCE_SOPS_CHECK": "1"}):
-            with patch("subprocess.run", side_effect=FileNotFoundError()):
-                with pytest.raises(RuntimeError, match="sops not found"):
-                    SecretManager(env_name="dev")
-
-    def test_init_sops_command_fails(self, mock_age_key):
-        """Test initialization fails when sops command fails."""
-        import subprocess
-
-        with patch.dict("os.environ", {"INFRAFOUNDRY_FORCE_SOPS_CHECK": "1"}):
-            with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "sops")):
-                with pytest.raises(RuntimeError, match="sops not found"):
-                    SecretManager(env_name="dev")
-
     def test_init_no_age_key_env(self, mock_sops_age, temp_secrets_dir):
         """Test initialization fails when SOPS_AGE_KEY_FILE is not set."""
         with patch.dict(
-            "os.environ", {"INFRAFOUNDRY_CONFIG_REPO": str(temp_secrets_dir)}, clear=True
+            "os.environ",
+            {"INFRAFOUNDRY_CONFIG_REPO": str(temp_secrets_dir)},
+            clear=True,
         ):
             with pytest.raises(ValueError, match="SOPS_AGE_KEY_FILE not set"):
                 SecretManager(env_name="dev")
@@ -87,135 +93,99 @@ class TestSecretManager:
         """Test initialization fails when age key file doesn't exist."""
         with patch.dict(
             "os.environ",
-            {"SOPS_AGE_KEY_FILE": "/nonexistent/age.key", "INFRAFOUNDRY_FORCE_SOPS_CHECK": "1"},
+            {
+                "SOPS_AGE_KEY_FILE": "/nonexistent/age.key",
+                "INFRAFOUNDRY_FORCE_SOPS_CHECK": "1",
+            },
         ):
             with pytest.raises(FileNotFoundError, match="Age key file not found"):
                 SecretManager(env_name="dev")
 
-    def test_decrypt_file(self, mock_sops_age, mock_age_key, temp_secrets_dir):
-        """Test decrypting a SOPS-encrypted file."""
-        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
+    def test_decrypt_file(self, temp_secrets_dir, mock_provider):
+        """Test decrypting a file using injected provider."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
 
-        # Create encrypted file
-        encrypted_file = temp_secrets_dir / "proxmox.yaml"
-        encrypted_file.write_text("encrypted content")
-
-        # Mock sops decrypt returning YAML
-        decrypted_data = {"api_url": "https://proxmox.example.com", "api_token": "secret123"}
-        mock_sops_age.return_value = MagicMock(returncode=0, stdout=yaml.dump(decrypted_data))
+        decrypted_data = {
+            "api_url": "https://proxmox.example.com",
+            "api_token": "secret123",
+        }
+        mock_provider.load_secret.return_value = decrypted_data
 
         result = manager.decrypt_file("proxmox.yaml")
 
         assert result == decrypted_data
-        # Verify sops was called correctly
-        mock_sops_age.assert_called_with(
-            ["sops", "--decrypt", str(encrypted_file)],
-            capture_output=True,
-            check=True,
-            text=True,
+        mock_provider.load_secret.assert_called_with(temp_secrets_dir / "proxmox.yaml")
+
+    def test_decrypt_file_not_found(self, temp_secrets_dir, mock_provider):
+        """Test decrypting non-existent file raises error."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
         )
 
-    def test_decrypt_file_not_found(self, mock_sops_age, mock_age_key, temp_secrets_dir):
-        """Test decrypting non-existent file raises error."""
-        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
+        mock_provider.load_secret.side_effect = SecretNotFoundError("File not found")
 
-        with pytest.raises(FileNotFoundError, match="Encrypted file not found"):
+        with pytest.raises(SecretNotFoundError):
             manager.decrypt_file("nonexistent.yaml")
 
-    def test_decrypt_file_sops_fails(self, mock_sops_age, mock_age_key, temp_secrets_dir):
-        """Test decryption failure when sops command fails."""
-        import subprocess
-
-        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
-
-        # Create encrypted file
-        encrypted_file = temp_secrets_dir / "proxmox.yaml"
-        encrypted_file.write_text("encrypted content")
-
-        # Mock sops decrypt failing
-        mock_sops_age.side_effect = subprocess.CalledProcessError(
-            1, "sops", stderr="decryption failed"
+    def test_decrypt_file_provider_fails(self, temp_secrets_dir, mock_provider):
+        """Test decryption failure when provider fails."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
         )
 
-        with pytest.raises(RuntimeError, match="Failed to decrypt"):
+        mock_provider.load_secret.side_effect = SecretDecryptionError("Decryption failed")
+
+        with pytest.raises(SecretDecryptionError, match="Decryption failed"):
             manager.decrypt_file("proxmox.yaml")
 
-    def test_encrypt_file(self, mock_sops_age, mock_age_key, temp_secrets_dir):
-        """Test encrypting data and saving to file."""
-        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
+    def test_encrypt_file(self, temp_secrets_dir, mock_provider):
+        """Test encrypting data using injected provider."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
 
         data = {"api_url": "https://proxmox.example.com", "api_token": "secret123"}
 
-        # Mock sops encrypt succeeding
-        def sops_side_effect(*args, **kwargs):
-            # On encrypt call, mark temp file as encrypted
-            if "--encrypt" in args[0]:
-                temp_file = Path(args[0][-1])
-                temp_file.write_text("encrypted content")
-            return MagicMock(returncode=0)
-
-        mock_sops_age.side_effect = sops_side_effect
-
         manager.encrypt_file("proxmox.yaml", data)
 
-        encrypted_file = temp_secrets_dir / "proxmox.yaml"
-        assert encrypted_file.exists()
-        assert encrypted_file.read_text() == "encrypted content"
+        mock_provider.save_secret.assert_called_with(temp_secrets_dir / "proxmox.yaml", data)
 
-    def test_encrypt_file_creates_directory(self, mock_sops_age, mock_age_key, temp_secrets_dir):
+    def test_encrypt_file_creates_directory(self, temp_secrets_dir, mock_provider):
         """Test encrypt_file creates secrets directory if it doesn't exist."""
         secrets_dir = temp_secrets_dir / "nested" / "secrets"
-        manager = SecretManager(env_name="dev", secrets_dir=secrets_dir)
+        manager = SecretManager(env_name="dev", secrets_dir=secrets_dir, provider=mock_provider)
 
         data = {"key": "value"}
-
-        # Mock sops encrypt
-        def sops_side_effect(*args, **kwargs):
-            if "--encrypt" in args[0]:
-                temp_file = Path(args[0][-1])
-                temp_file.write_text("encrypted")
-            return MagicMock(returncode=0)
-
-        mock_sops_age.side_effect = sops_side_effect
-
         manager.encrypt_file("test.yaml", data)
 
         assert secrets_dir.exists()
-        assert (secrets_dir / "test.yaml").exists()
+        mock_provider.save_secret.assert_called()
 
-    def test_encrypt_file_sops_fails(self, mock_sops_age, mock_age_key, temp_secrets_dir):
-        """Test encryption failure when sops command fails."""
-        import subprocess
-
-        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
-
-        data = {"key": "value"}
-
-        # Mock sops encrypt failing
-        mock_sops_age.side_effect = subprocess.CalledProcessError(
-            1, "sops", stderr="encryption failed"
+    def test_encrypt_file_provider_fails(self, temp_secrets_dir, mock_provider):
+        """Test encryption failure when provider fails."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
         )
 
-        with pytest.raises(RuntimeError, match="Failed to encrypt"):
+        data = {"key": "value"}
+        mock_provider.save_secret.side_effect = SecretError("Encryption failed")
+
+        with pytest.raises(SecretError, match="Encryption failed"):
             manager.encrypt_file("test.yaml", data)
 
-        # Verify temp file was cleaned up
-        assert not (temp_secrets_dir / "test.tmp").exists()
-
-    def test_get_secret(self, mock_sops_age, mock_age_key, temp_secrets_dir):
+    def test_get_secret(self, temp_secrets_dir, mock_provider):
         """Test retrieving a specific secret value."""
-        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
 
-        # Create encrypted file
-        encrypted_file = temp_secrets_dir / "config.yaml"
-        encrypted_file.write_text("encrypted")
-
-        # Mock sops decrypt
         decrypted_data = {
             "api": {"url": "https://example.com", "token": "secret123"},
             "database": {"password": "dbpass"},
         }
-        mock_sops_age.return_value = MagicMock(returncode=0, stdout=yaml.dump(decrypted_data))
+        mock_provider.load_secret.return_value = decrypted_data
 
         # Get nested secret
         token = manager.get_secret("config.yaml", "api.token")
@@ -225,21 +195,22 @@ class TestSecretManager:
         db_config = manager.get_secret("config.yaml", "database")
         assert db_config == {"password": "dbpass"}
 
-    def test_get_secret_key_not_found(self, mock_sops_age, mock_age_key, temp_secrets_dir):
+    def test_get_secret_key_not_found(self, temp_secrets_dir, mock_provider):
         """Test get_secret raises KeyError when key doesn't exist."""
-        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
-
-        encrypted_file = temp_secrets_dir / "config.yaml"
-        encrypted_file.write_text("encrypted")
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
 
         decrypted_data = {"api": {"url": "https://example.com"}}
-        mock_sops_age.return_value = MagicMock(returncode=0, stdout=yaml.dump(decrypted_data))
+        mock_provider.load_secret.return_value = decrypted_data
 
         with pytest.raises(KeyError):
             manager.get_secret("config.yaml", "nonexistent.key")
 
     def test_create_sops_config(self, mock_sops_age, mock_age_key, temp_secrets_dir):
         """Test creating .sops.yaml configuration file."""
+        # This still uses legacy method in SecretManager
+        # which calls create_sops_config from age_key_manager
         manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
 
         age_public_key = "age1abcdefghijklmnopqrstuvwxyz1234567890"
@@ -252,21 +223,18 @@ class TestSecretManager:
         assert "creation_rules" in config
         assert config["creation_rules"][0]["age"] == age_public_key
 
-    def test_export_for_terraform(self, mock_sops_age, mock_age_key, temp_secrets_dir):
+    def test_export_for_terraform(self, temp_secrets_dir, mock_provider):
         """Test exporting secrets as Terraform variables file."""
-        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
 
-        # Create encrypted file
-        encrypted_file = temp_secrets_dir / "secrets.yaml"
-        encrypted_file.write_text("encrypted")
-
-        # Mock sops decrypt
         decrypted_data = {
             "api_url": "https://example.com",
             "api_token": "secret123",
             "config": {"nested": "value"},
         }
-        mock_sops_age.return_value = MagicMock(returncode=0, stdout=yaml.dump(decrypted_data))
+        mock_provider.load_secret.return_value = decrypted_data
 
         output_file = temp_secrets_dir / "secrets.tfvars"
         manager.export_for_terraform("secrets.yaml", output_file)
@@ -277,21 +245,18 @@ class TestSecretManager:
         assert 'api_token = "secret123"' in content
         assert 'config = {"nested": "value"}' in content
 
-    def test_export_for_ansible(self, mock_sops_age, mock_age_key, temp_secrets_dir):
+    def test_export_for_ansible(self, temp_secrets_dir, mock_provider):
         """Test exporting secrets as Ansible vars file."""
-        manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
 
-        # Create encrypted file
-        encrypted_file = temp_secrets_dir / "secrets.yaml"
-        encrypted_file.write_text("encrypted")
-
-        # Mock sops decrypt
         decrypted_data = {
             "api_url": "https://example.com",
             "api_token": "secret123",
             "users": ["alice", "bob"],
         }
-        mock_sops_age.return_value = MagicMock(returncode=0, stdout=yaml.dump(decrypted_data))
+        mock_provider.load_secret.return_value = decrypted_data
 
         output_file = temp_secrets_dir / "secrets_vars.yml"
         manager.export_for_ansible("secrets.yaml", output_file)

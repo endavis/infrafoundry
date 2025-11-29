@@ -12,6 +12,8 @@ from infrafoundry.core.credential_loader.base_loader import (
 from infrafoundry.core.credential_loader.kubernetes_loader import KubernetesCredentialLoader
 from infrafoundry.core.credential_loader.opnsense_loader import OPNsenseCredentialLoader
 from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
+from infrafoundry.core.secrets.provider import SecretProvider
+from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +60,16 @@ class CredentialLoader:
             }
         return result
 
-    def __init__(self, config_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        config_dir: Path | None = None,
+        secret_provider: SecretProvider | None = None,
+    ) -> None:
         """Initialize credential loader.
 
         Args:
             config_dir: Configuration directory (defaults to INFRAFOUNDRY_CONFIG_REPO or cwd)
+            secret_provider: Secret provider implementation (defaults to SopsSecretProvider)
         """
         if config_dir is None:
             config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
@@ -71,6 +78,7 @@ class CredentialLoader:
             self.config_dir = Path(config_dir)
 
         self._debug_mode = os.getenv("INFRAFOUNDRY_LOG_LEVEL") == "DEBUG"
+        self.secret_provider = secret_provider or SopsSecretProvider()
 
     def get_secrets_dir(self, env_name: str) -> Path:
         """Get the environment directory containing secrets.
@@ -106,6 +114,8 @@ class CredentialLoader:
             return {}
 
         # Set per-environment SOPS age key if it exists
+        # Note: SopsSecretProvider might need this, but if we use a different provider
+        # this might be irrelevant. We keep it for backward compatibility and SOPS support.
         self._set_age_key(secrets_dir)
 
         # Determine which providers to load
@@ -149,7 +159,8 @@ class CredentialLoader:
         """
         loader_class = self.PROVIDER_LOADERS[provider]
         # Loader classes in registry are concrete implementations, not abstract
-        loader = loader_class(secrets_dir, self._debug_mode)  # type: ignore[abstract]
+        # Pass the shared secret_provider instance
+        loader = loader_class(secrets_dir, self._debug_mode, self.secret_provider)  # type: ignore[abstract]
         try:
             return loader.load_credentials()
         except CredentialLoaderError as exc:

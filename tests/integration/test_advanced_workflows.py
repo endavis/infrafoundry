@@ -72,6 +72,10 @@ vms:
         output_dir=output_dir,
     )
 
+    # Override secret manager factory to return our mock
+    # Patch on plan_orchestrator instance as it holds reference to original method
+    orchestrator.plan_orchestrator._secret_manager_factory = Mock(return_value=secret_manager)
+
     # Register mock provider
     provider = Mock()
     provider.name = "proxmox"
