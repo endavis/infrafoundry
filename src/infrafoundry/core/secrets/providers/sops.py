@@ -20,16 +20,7 @@ class SopsSecretProvider(SecretProvider):
     Secret provider implementation using Mozilla SOPS.
     """
 
-    def __init__(self, check_binary: bool = True) -> None:
-        """Initialize SOPS provider.
-
-        Args:
-            check_binary: Whether to check if sops binary is installed.
-        """
-        if check_binary:
-            self._check_sops_installed()
-
-    def _check_sops_installed(self) -> None:
+    def _ensure_sops_installed(self) -> None:
         """Check if sops is installed."""
         try:
             subprocess.run(
@@ -38,10 +29,6 @@ class SopsSecretProvider(SecretProvider):
                 check=True,
             )
         except (subprocess.CalledProcessError, FileNotFoundError):
-            # We only log here, as we might want to instantiate the provider even if sops is missing
-            # (e.g. in tests or strict CI envs where we might not use it yet),
-            # but strictly speaking if this provider is used, sops must be there.
-            # However, the original code raised RuntimeError.
             error_msg = (
                 "sops not found. Install with: brew install sops (macOS) "
                 "or see https://github.com/getsops/sops"
@@ -58,6 +45,7 @@ class SopsSecretProvider(SecretProvider):
         Returns:
             The decrypted data as a dictionary.
         """
+        self._ensure_sops_installed()
         file_path = Path(location)
         if not file_path.exists():
             raise SecretNotFoundError(f"Encrypted file not found: {file_path}")
@@ -87,6 +75,7 @@ class SopsSecretProvider(SecretProvider):
             location: Path where the encrypted file should be saved.
             data: Data to encrypt and save.
         """
+        self._ensure_sops_installed()
         file_path = Path(location)
 
         # Logic adapted from sops_wrapper.py
