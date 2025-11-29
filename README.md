@@ -107,7 +107,7 @@ We welcome contributions! Please follow these guidelines:
    ```
 4. **Submit a pull request** with clear description
 
-See [docs/development/TESTING_STATUS.md](docs/development/TESTING_STATUS.md) for testing status and [docs/development/ci-cd-testing.md](docs/development/ci-cd-testing.md) for testing guide.
+See [docs/development/ci-cd-testing.md](docs/development/ci-cd-testing.md) for testing guide.
 
 ## License
 
