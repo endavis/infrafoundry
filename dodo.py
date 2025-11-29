@@ -400,12 +400,18 @@ def task_install_ansible():
 
     def install_ansible():
         # uv is assumed to be installed
+        # Check if we're in a virtual environment or need --system
+        in_venv = os.environ.get("VIRTUAL_ENV") or hasattr(sys, "real_prefix") or (
+            hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+        )
+        system_flag = "" if in_venv else "--system"
+
         if os.path.exists("pyproject.toml"):
             print("Installing InfraFoundry with Ansible...")
-            _run_cmd_internal("uv pip install -e .")
+            _run_cmd_internal(f"uv pip install {system_flag} -e .")
         else:
             print("Installing Ansible directly...")
-            _run_cmd_internal("uv pip install ansible")
+            _run_cmd_internal(f"uv pip install {system_flag} ansible")
 
     return {
         "actions": [install_ansible],
