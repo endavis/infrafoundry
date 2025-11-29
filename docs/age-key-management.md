@@ -4,6 +4,8 @@
 
 Age keys are used to encrypt/decrypt your infrastructure secrets with SOPS. This guide covers best practices for managing these sensitive keys.
 
+> **Note:** This guide focuses on SOPS/age encryption (the default provider). InfraFoundry also supports pluggable secret backends like HashiCorp Vault, AWS Secrets Manager, and more. See [Secrets Architecture](architecture/secrets-architecture.md) for details.
+
 ## Critical Rules
 
 ### ⚠️ Rule #1: NEVER Commit Private Keys to Git
