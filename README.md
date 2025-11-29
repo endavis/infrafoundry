@@ -79,6 +79,7 @@ See [Setup Guide](docs/SETUP_GUIDE.md) for manual installation steps.
 - **[Configuration Guide](docs/configuration.md)** - Environment and resource configuration
 - **[Secrets Architecture](docs/architecture/secrets-architecture.md)** - Pluggable secrets management with SOPS, Vault, AWS, and custom providers
 - **[Age Key Management](docs/age-key-management.md)** - Best practices for SOPS/age encryption keys
+- **[Notifications](docs/notifications.md)** - Configure Slack, webhooks, and custom notifications for infrastructure events
 - **[Separate Configuration Repository](docs/separate-config-repo.md)** - Best practices for organizing infrastructure configs
 - **[State Management Strategies](docs/state-management.md)** - Understanding and managing Terraform state, InfraFoundry state, and generated files
 - **[Per-Environment Credentials](docs/per-environment-credentials.md)** - Managing different credentials for dev, staging, and production
