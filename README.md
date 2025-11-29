@@ -15,7 +15,7 @@ InfraFoundry generates Terraform and Ansible configurations from YAML definition
 
 ### Core Infrastructure Management
 - 🔌 **Pluggable Providers**: Proxmox, OPNsense, Kubernetes (extensible to ESXi, Docker, cloud providers)
-- 🔐 **Secure Secrets**: SOPS with age encryption for secrets shared between Terraform and Ansible
+- 🔐 **Pluggable Secrets**: SOPS/age (default), HashiCorp Vault, AWS Secrets Manager, or custom backends
 - 📝 **Declarative Config**: YAML configuration files separated by resource type
 - 🏗️ **Separate Config Repos**: Keep infrastructure configs in separate repository from framework
 - 🚀 **CI/CD Ready**: GitHub Actions and GitLab CI examples with auto-approve
@@ -77,6 +77,8 @@ See [Setup Guide](docs/SETUP_GUIDE.md) for manual installation steps.
 
 ### Core Guides
 - **[Configuration Guide](docs/configuration.md)** - Environment and resource configuration
+- **[Secrets Architecture](docs/architecture/secrets-architecture.md)** - Pluggable secrets management with SOPS, Vault, AWS, and custom providers
+- **[Age Key Management](docs/age-key-management.md)** - Best practices for SOPS/age encryption keys
 - **[Separate Configuration Repository](docs/separate-config-repo.md)** - Best practices for organizing infrastructure configs
 - **[State Management Strategies](docs/state-management.md)** - Understanding and managing Terraform state, InfraFoundry state, and generated files
 - **[Per-Environment Credentials](docs/per-environment-credentials.md)** - Managing different credentials for dev, staging, and production
@@ -86,6 +88,7 @@ See [Setup Guide](docs/SETUP_GUIDE.md) for manual installation steps.
 
 ### Development
 - **[Plugin Development](docs/development/plugin-development.md)** - Creating custom provider plugins
+- **[Implementing Secret Providers](docs/development/implementing-secret-providers.md)** - Guide to creating custom secret backend integrations
 - **[Event System Guide](docs/development/event-system.md)** - Understanding the internal event bus and notifications
 - **[Manager Patterns](docs/development/manager-patterns.md)** - Standard patterns for managers and 3-layer architecture
 - **[Architectural Patterns](docs/architecture/architectural-patterns.md)** - Core patterns and best practices
