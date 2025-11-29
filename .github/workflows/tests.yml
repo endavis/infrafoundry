@@ -41,20 +41,19 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Install dependencies via doit
+      - name: Install dependencies
         run: |
-          uv run doit install
-          uv run doit dev
-          uv run doit install_deps
+          uv pip install --system -e ".[dev]"
+          doit install_deps
 
       - name: Run linting
         run: |
-          uv run doit lint
+          doit lint
         continue-on-error: true
 
       - name: Run tests with coverage
         run: |
-          uv run doit coverage
+          doit coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -106,15 +105,14 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Install dependencies via doit
+      - name: Install dependencies
         run: |
-          uv run doit install
-          uv run doit dev
-          uv run doit install_deps
+          uv pip install --system -e ".[dev]"
+          doit install_deps
 
       - name: Run tests
         run: |
-          uv run doit test
+          doit test
 
   integration-test:
     name: Integration Tests
