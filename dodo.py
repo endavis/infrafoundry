@@ -1,0 +1,488 @@
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import tarfile
+import urllib.request
+
+# Doit configuration
+DOIT_CONFIG = {
+    "verbosity": 3,
+    "default_tasks": ["list"],
+}
+
+
+def run_cmd(cmd, shell=True, check=True):
+    """Run a shell command."""
+    print(f"Running: {cmd}")
+    subprocess.run(cmd, shell=shell, check=check)
+
+
+# --- Setup / Install Tasks ---
+
+
+def task_install():
+    """Install dependencies with uv."""
+    return {
+        "actions": ["uv pip install -e ."],
+        "verbosity": 2,
+    }
+
+
+def task_dev():
+    """Install with dev dependencies."""
+    return {
+        "actions": ['uv pip install -e ".[dev]"'],
+        "verbosity": 2,
+    }
+
+
+def task_cleanup():
+    """Remove build artifacts and caches."""
+
+    def clean_artifacts():
+        dirs_to_remove = [
+            "build",
+            "dist",
+            "__pycache__",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            "tmp/htmlcov",
+            "tmp/.coverage",
+            "tmp/.pytest_cache",
+            "tmp/.mypy_cache",
+            "tmp/.ruff_cache",
+        ]
+        for d in dirs_to_remove:
+            if os.path.exists(d):
+                print(f"Removing {d}...")
+                if os.path.isdir(d):
+                    shutil.rmtree(d)
+                else:
+                    os.remove(d)
+
+        # Recursive removal
+        for root, dirs, files in os.walk("."):
+            for d in dirs:
+                if d == "__pycache__":
+                    shutil.rmtree(os.path.join(root, d))
+            for f in files:
+                if f.endswith(".pyc"):
+                    os.remove(os.path.join(root, f))
+
+    return {
+        "actions": [clean_artifacts],
+        "verbosity": 2,
+    }
+
+
+# --- Development Tasks ---
+
+
+def task_test():
+    """Run pytest."""
+    return {
+        "actions": ["pytest -v"],
+        "verbosity": 2,
+    }
+
+
+def task_coverage():
+    """Run tests with full coverage report."""
+    cmd = (
+        "pytest --cov=src/infrafoundry --cov-report=term-missing "
+        "--cov-report=html:tmp/htmlcov --cov-report=xml:tmp/coverage.xml -v"
+    )
+    return {
+        "actions": [
+            cmd,
+            lambda: print(
+                "\nCoverage report generated:\n  HTML: tmp/htmlcov/index.html\n"
+                "  XML:  tmp/coverage.xml\n\n"
+                "Target: 90% coverage"
+            ),
+        ],
+        "verbosity": 2,
+    }
+
+
+def task_test_unit():
+    """Run unit tests only."""
+    return {
+        "actions": ["pytest -v -m unit tests/unit/"],
+        "verbosity": 2,
+    }
+
+
+def task_test_integration():
+    """Run integration tests only."""
+    return {
+        "actions": ["pytest -v -m integration tests/integration/"],
+        "verbosity": 2,
+    }
+
+
+def task_test_fast():
+    """Run fast tests (skip slow ones)."""
+    return {
+        "actions": ['pytest -v -m "not slow"'],
+        "verbosity": 2,
+    }
+
+
+def task_lint():
+    """Run ruff linter."""
+    return {
+        "actions": ["ruff check src/ tests/"],
+        "verbosity": 2,
+    }
+
+
+def task_format():
+    """Format code with ruff."""
+    return {
+        "actions": ["ruff format src/ tests/", "ruff check --fix src/ tests/"],
+        "verbosity": 2,
+    }
+
+
+def task_check():
+    """Run all checks (lint + type check)."""
+    return {
+        "actions": ["mypy src/"],
+        "task_dep": ["lint"],
+        "verbosity": 2,
+    }
+
+
+# --- Infrastructure Tasks ---
+
+
+def task_plan():
+    """Generate and plan infrastructure (dry-run)."""
+    return {
+        "actions": ["infra plan --env %(env)s --dry-run"],
+        "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
+        "verbosity": 2,
+    }
+
+
+def task_apply():
+    """Apply infrastructure changes."""
+    return {
+        "actions": ["infra apply --env %(env)s"],
+        "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
+        "verbosity": 2,
+    }
+
+
+def task_destroy():
+    """Destroy infrastructure."""
+    return {
+        "actions": ["infra destroy --env %(env)s"],
+        "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
+        "verbosity": 2,
+    }
+
+
+# --- Installation Helpers (Converted from Bash) ---
+
+
+def _install_uv():
+    if shutil.which("uv"):
+        print(f"✓ uv already installed: {subprocess.getoutput('uv --version')}")
+        return
+
+    print("Installing uv package manager...")
+    # Try pip first if available (safest cross-platform)
+    if shutil.which("pip") or shutil.which("pip3"):
+        cmd = "pip install uv" if shutil.which("pip") else "pip3 install uv"
+        try:
+            run_cmd(cmd)
+            print("✓ uv installed via pip")
+            return
+        except subprocess.CalledProcessError:
+            pass
+
+    # Fallback to install script
+    print("Downloading install script...")
+    try:
+        subprocess.run("curl -LsSf https://astral.sh/uv/install.sh | sh", shell=True, check=True)
+        print("✓ uv installed via script")
+    except subprocess.CalledProcessError:
+        print("✗ Failed to install uv. Please install manually: https://github.com/astral-sh/uv")
+        sys.exit(1)
+
+
+def task_install_uv():
+    """Install uv package manager."""
+    return {
+        "actions": [_install_uv],
+        "verbosity": 2,
+    }
+
+
+def _install_direnv():
+    if shutil.which("direnv"):
+        print(f"✓ direnv already installed: {subprocess.getoutput('direnv --version')}")
+        return
+
+    print("Installing direnv...")
+    version = _get_latest_github_release("direnv/direnv")
+    print(f"Latest version: {version}")
+
+    system = platform.system().lower()
+    install_dir = os.path.expanduser("~/.local/bin")
+    if not os.path.exists(install_dir):
+        os.makedirs(install_dir, exist_ok=True)
+
+    if system == "linux":
+        bin_url = (
+            f"https://github.com/direnv/direnv/releases/download/v{version}/direnv.linux-amd64"
+        )
+        bin_path = os.path.join(install_dir, "direnv")
+        print(f"Downloading {bin_url}...")
+        urllib.request.urlretrieve(bin_url, bin_path)
+        run_cmd(f"chmod +x {bin_path}")
+    elif system == "darwin":
+        run_cmd("brew install direnv")
+    else:
+        print(f"Unsupported OS: {system}")
+        sys.exit(1)
+
+    # Hook setup hint
+    print("✓ direnv installed. Ensure you have hooked it into your shell (e.g., ~/.bashrc).")
+
+
+def task_install_direnv():
+    """Install direnv."""
+    return {
+        "actions": [_install_direnv],
+        "verbosity": 2,
+    }
+
+
+def _install_age():
+    if shutil.which("age"):
+        print(f"✓ age already installed: {subprocess.getoutput('age --version').splitlines()[0]}")
+        return
+
+    print("Installing age...")
+    version = _get_latest_github_release("FiloSottile/age")
+    print(f"Latest version: {version}")
+
+    system = platform.system().lower()
+    install_dir = os.path.expanduser("~/.local/bin")
+    if not os.path.exists(install_dir):
+        os.makedirs(install_dir, exist_ok=True)
+
+    if system == "linux":
+        tar_url = f"https://github.com/FiloSottile/age/releases/download/v{version}/age-v{version}-linux-amd64.tar.gz"
+        tar_path = "/tmp/age.tar.gz"
+        print(f"Downloading {tar_url}...")
+        urllib.request.urlretrieve(tar_url, tar_path)
+
+        print(f"Extracting to {install_dir}...")
+        with tarfile.open(tar_path, "r:gz") as tar:
+            # Filter for binary files
+            for member in tar.getmembers():
+                if member.name.endswith("/age") or member.name.endswith("/age-keygen"):
+                    # flatten structure
+                    member.name = os.path.basename(member.name)
+                    tar.extract(member, path=install_dir)
+
+        os.remove(tar_path)
+        run_cmd(f"chmod +x {install_dir}/age {install_dir}/age-keygen")
+
+    elif system == "darwin":
+        run_cmd("brew install age")
+    else:
+        print(f"Unsupported OS: {system}")
+        sys.exit(1)
+    print("✓ age installed")
+
+
+def task_install_age():
+    """Install age encryption tool."""
+    return {
+        "actions": [_install_age],
+        "verbosity": 2,
+    }
+
+
+def _get_latest_github_release(repo):
+    url = f"https://api.github.com/repos/{repo}/releases/latest"
+    with urllib.request.urlopen(url) as response:
+        data = json.loads(response.read().decode())
+        return data["tag_name"].lstrip("v")
+
+
+def _install_sops():
+    if shutil.which("sops"):
+        print(f"✓ SOPS already installed: {subprocess.getoutput('sops --version').splitlines()[0]}")
+        return
+
+    print("Installing SOPS...")
+    version = _get_latest_github_release("getsops/sops")
+    print(f"Latest version: {version}")
+
+    system = platform.system().lower()
+    install_dir = os.path.expanduser("~/.local/bin")
+    if not os.path.exists(install_dir):
+        os.makedirs(install_dir, exist_ok=True)
+
+    if system == "linux":
+        # Download binary directly
+        bin_url = f"https://github.com/getsops/sops/releases/download/v{version}/sops-v{version}.linux.amd64"
+        bin_path = os.path.join(install_dir, "sops")
+        print(f"Downloading {bin_url}...")
+        urllib.request.urlretrieve(bin_url, bin_path)
+        run_cmd(f"chmod +x {bin_path}")
+    elif system == "darwin":
+        run_cmd("brew install sops")
+    else:
+        print(f"Unsupported OS: {system}")
+        sys.exit(1)
+    print(f"✓ SOPS {version} installed")
+
+
+def task_install_sops():
+    """Install SOPS secrets manager."""
+    return {
+        "actions": [_install_sops],
+        "verbosity": 2,
+    }
+
+
+def _install_terraform():
+    # Get latest version
+    url = "https://api.github.com/repos/hashicorp/terraform/releases/latest"
+    try:
+        with urllib.request.urlopen(url) as response:
+            data = json.loads(response.read().decode())
+            latest_version = data["tag_name"].lstrip("v")
+    except Exception as e:
+        print(f"Failed to fetch latest terraform version: {e}")
+        return
+
+    if shutil.which("terraform"):
+        current_json = subprocess.getoutput("terraform version -json")
+        try:
+            current_version = json.loads(current_json)["terraform_version"]
+            if current_version == latest_version:
+                print(f"✓ Terraform already up to date: {latest_version}")
+                return
+            print(f"Current version: {current_version}, upgrading to: {latest_version}")
+        except Exception:
+            print("Could not parse current terraform version, reinstalling...")
+
+    print(f"Installing Terraform {latest_version}...")
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    # Map machine to terraform arch
+    if machine == "x86_64":
+        arch = "amd64"
+    elif machine == "aarch64" or machine == "arm64":
+        arch = "arm64"
+    else:
+        arch = "amd64"  # Fallback
+
+    if system == "linux":
+        os_name = "linux"
+    elif system == "darwin":
+        os_name = "darwin"
+    else:
+        print(f"Unsupported OS: {system}")
+        sys.exit(1)
+
+    download_url = f"https://releases.hashicorp.com/terraform/{latest_version}/terraform_{latest_version}_{os_name}_{arch}.zip"
+    zip_path = "/tmp/terraform.zip"
+
+    print(f"Downloading {download_url}...")
+    urllib.request.urlretrieve(download_url, zip_path)
+
+    install_dir = os.path.expanduser("~/.local/bin")
+    if not os.path.exists(install_dir):
+        os.makedirs(install_dir, exist_ok=True)
+
+    print(f"Unzipping to {install_dir}...")
+    run_cmd(f"unzip -o {zip_path} -d {install_dir}")
+    run_cmd(f"chmod +x {install_dir}/terraform")
+    os.remove(zip_path)
+    print(f"✓ Terraform {latest_version} installed to {install_dir}")
+
+
+def task_install_terraform():
+    """Install Terraform."""
+    return {
+        "actions": [_install_terraform],
+        "verbosity": 2,
+    }
+
+
+def task_install_ansible():
+    """Install Ansible via uv."""
+
+    def install_ansible():
+        if not shutil.which("uv"):
+            print("⚠ uv not found. Installing uv first...")
+            _install_uv()
+
+        if os.path.exists("pyproject.toml"):
+            print("Installing InfraFoundry with Ansible...")
+            run_cmd("uv pip install -e .")
+        else:
+            print("Installing Ansible directly...")
+            run_cmd("uv pip install ansible")
+
+    return {
+        "actions": [install_ansible],
+        "verbosity": 2,
+    }
+
+
+def task_install_deps():
+    """Install all system dependencies."""
+    return {
+        "actions": [lambda: print("✓ All dependencies installed successfully!")],
+        "task_dep": [
+            "install_direnv",
+            "install_age",
+            "install_sops",
+            "install_terraform",
+            "install_ansible",
+        ],
+        "verbosity": 2,
+    }
+
+
+def task_setup_vscode():
+    """Display VS Code extension installation tips."""
+    msg = """
+VS Code Extensions Setup
+========================
+
+When you open this workspace in VS Code, you'll be prompted to install
+recommended extensions. Alternatively, you can:
+
+1. Press Ctrl+Shift+P (Cmd+Shift+P on Mac)
+2. Type 'Extensions: Show Recommended Extensions'
+3. Click 'Install All' button
+
+Recommended extensions include:
+  • Python development tools (Pylance, debugpy)
+  • Code quality (Ruff, Black)
+  • Testing (pytest)
+  • Infrastructure (Terraform, Ansible)
+  • Git tools (GitLens)
+
+See .vscode/extensions.json for the complete list.
+"""
+    return {
+        "actions": [lambda: print(msg)],
+        "verbosity": 2,
+    }
