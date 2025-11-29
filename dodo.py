@@ -193,38 +193,7 @@ def _run_cmd_internal(cmd, shell=True, check=True):
     subprocess.run(cmd, shell=shell, check=check)
 
 
-def _install_uv():
-    if shutil.which("uv"):
-        print(f"✓ uv already installed: {subprocess.getoutput('uv --version')}")
-        return
 
-    print("Installing uv package manager...")
-    # Try pip first if available (safest cross-platform)
-    if shutil.which("pip") or shutil.which("pip3"):
-        cmd = "pip install uv" if shutil.which("pip") else "pip3 install uv"
-        try:
-            _run_cmd_internal(cmd)
-            print("✓ uv installed via pip")
-            return
-        except subprocess.CalledProcessError:
-            pass
-
-    # Fallback to install script
-    print("Downloading install script...")
-    try:
-        subprocess.run("curl -LsSf https://astral.sh/uv/install.sh | sh", shell=True, check=True)
-        print("✓ uv installed via script")
-    except subprocess.CalledProcessError:
-        print("✗ Failed to install uv. Please install manually: https://github.com/astral-sh/uv")
-        sys.exit(1)
-
-
-def task_install_uv():
-    """Install uv package manager."""
-    return {
-        "actions": [_install_uv],
-        "title": title_with_actions,
-    }
 
 
 def _install_direnv():
@@ -430,10 +399,7 @@ def task_install_ansible():
     """Install Ansible via uv."""
 
     def install_ansible():
-        if not shutil.which("uv"):
-            print("⚠ uv not found. Installing uv first...")
-            _install_uv()
-
+        # uv is assumed to be installed
         if os.path.exists("pyproject.toml"):
             print("Installing InfraFoundry with Ansible...")
             _run_cmd_internal("uv pip install -e .")
