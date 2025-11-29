@@ -7,17 +7,13 @@ import sys
 import tarfile
 import urllib.request
 
+from doit.tools import title_with_actions
+
 # Doit configuration
 DOIT_CONFIG = {
     "verbosity": 2,
     "default_tasks": ["list"],
 }
-
-
-def run_cmd(cmd, shell=True, check=True):
-    """Run a shell command."""
-    print(f"Running: {cmd}")
-    subprocess.run(cmd, shell=shell, check=check)
 
 
 # --- Setup / Install Tasks ---
@@ -26,14 +22,16 @@ def run_cmd(cmd, shell=True, check=True):
 def task_install():
     """Install dependencies with uv."""
     return {
-        "actions": [(run_cmd, ["uv pip install -e ."])],
+        "actions": ["uv pip install -e ."],
+        "title": title_with_actions,
     }
 
 
 def task_dev():
     """Install with dev dependencies."""
     return {
-        "actions": [(run_cmd, ['uv pip install -e ".[dev]"'])],
+        "actions": ['uv pip install -e ".[dev]"'],
+        "title": title_with_actions,
     }
 
 
@@ -73,6 +71,7 @@ def task_cleanup():
 
     return {
         "actions": [clean_artifacts],
+        "title": title_with_actions,
     }
 
 
@@ -82,7 +81,8 @@ def task_cleanup():
 def task_test():
     """Run pytest."""
     return {
-        "actions": [(run_cmd, ["pytest -v"])],
+        "actions": ["pytest -v"],
+        "title": title_with_actions,
     }
 
 
@@ -94,59 +94,63 @@ def task_coverage():
     )
     return {
         "actions": [
-            (run_cmd, [cmd]),
+            cmd,
             lambda: print(
                 "\nCoverage report generated:\n  HTML: tmp/htmlcov/index.html\n"
                 "  XML:  tmp/coverage.xml\n\n"
                 "Target: 90% coverage"
             ),
         ],
+        "title": title_with_actions,
     }
 
 
 def task_test_unit():
     """Run unit tests only."""
     return {
-        "actions": [(run_cmd, ["pytest -v -m unit tests/unit/"])],
+        "actions": ["pytest -v -m unit tests/unit/"],
+        "title": title_with_actions,
     }
 
 
 def task_test_integration():
     """Run integration tests only."""
     return {
-        "actions": [(run_cmd, ["pytest -v -m integration tests/integration/"])],
+        "actions": ["pytest -v -m integration tests/integration/"],
+        "title": title_with_actions,
     }
 
 
 def task_test_fast():
     """Run fast tests (skip slow ones)."""
     return {
-        "actions": [(run_cmd, ['pytest -v -m "not slow"'])],
+        "actions": ['pytest -v -m "not slow"'],
+        "title": title_with_actions,
     }
 
 
 def task_lint():
     """Run ruff linter."""
     return {
-        "actions": [(run_cmd, ["ruff check src/ tests/"])],
+        "actions": ["ruff check src/ tests/"],
+        "title": title_with_actions,
     }
 
 
 def task_format():
     """Format code with ruff."""
     return {
-        "actions": [
-            (run_cmd, ["ruff format src/ tests/"]),
-            (run_cmd, ["ruff check --fix src/ tests/"]),
-        ],
+        "actions": ["ruff format src/ tests/", "ruff check --fix src/ tests/"],
+        "title": title_with_actions,
     }
 
 
 def task_check():
     """Run all checks (lint + type check)."""
     return {
-        "actions": [(run_cmd, ["mypy src/"])],
+        "actions": ["mypy src/"],
         "task_dep": ["lint"],
+        "title": title_with_actions,
     }
 
 
@@ -156,28 +160,37 @@ def task_check():
 def task_plan():
     """Generate and plan infrastructure (dry-run)."""
     return {
-        "actions": [(run_cmd, ["infra plan --env %(env)s --dry-run"])],
+        "actions": ["infra plan --env %(env)s --dry-run"],
         "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
+        "title": title_with_actions,
     }
 
 
 def task_apply():
     """Apply infrastructure changes."""
     return {
-        "actions": [(run_cmd, ["infra apply --env %(env)s"])],
+        "actions": ["infra apply --env %(env)s"],
         "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
+        "title": title_with_actions,
     }
 
 
 def task_destroy():
     """Destroy infrastructure."""
     return {
-        "actions": [(run_cmd, ["infra destroy --env %(env)s"])],
+        "actions": ["infra destroy --env %(env)s"],
         "params": [{"name": "env", "short": "e", "default": "dev", "help": "Environment name"}],
+        "title": title_with_actions,
     }
 
 
 # --- Installation Helpers (Converted from Bash) ---
+
+
+def _run_cmd_internal(cmd, shell=True, check=True):
+    """Internal helper to run shell commands within python actions."""
+    print(f"Executing: {cmd}")  # Print the command here.
+    subprocess.run(cmd, shell=shell, check=check)
 
 
 def _install_uv():
@@ -190,7 +203,7 @@ def _install_uv():
     if shutil.which("pip") or shutil.which("pip3"):
         cmd = "pip install uv" if shutil.which("pip") else "pip3 install uv"
         try:
-            run_cmd(cmd)
+            _run_cmd_internal(cmd)
             print("✓ uv installed via pip")
             return
         except subprocess.CalledProcessError:
@@ -210,6 +223,7 @@ def task_install_uv():
     """Install uv package manager."""
     return {
         "actions": [_install_uv],
+        "title": title_with_actions,
     }
 
 
@@ -234,9 +248,9 @@ def _install_direnv():
         bin_path = os.path.join(install_dir, "direnv")
         print(f"Downloading {bin_url}...")
         urllib.request.urlretrieve(bin_url, bin_path)
-        run_cmd(f"chmod +x {bin_path}")
+        _run_cmd_internal(f"chmod +x {bin_path}")
     elif system == "darwin":
-        run_cmd("brew install direnv")
+        _run_cmd_internal("brew install direnv")
     else:
         print(f"Unsupported OS: {system}")
         sys.exit(1)
@@ -249,6 +263,7 @@ def task_install_direnv():
     """Install direnv."""
     return {
         "actions": [_install_direnv],
+        "title": title_with_actions,
     }
 
 
@@ -282,10 +297,10 @@ def _install_age():
                     tar.extract(member, path=install_dir)
 
         os.remove(tar_path)
-        run_cmd(f"chmod +x {install_dir}/age {install_dir}/age-keygen")
+        _run_cmd_internal(f"chmod +x {install_dir}/age {install_dir}/age-keygen")
 
     elif system == "darwin":
-        run_cmd("brew install age")
+        _run_cmd_internal("brew install age")
     else:
         print(f"Unsupported OS: {system}")
         sys.exit(1)
@@ -296,6 +311,7 @@ def task_install_age():
     """Install age encryption tool."""
     return {
         "actions": [_install_age],
+        "title": title_with_actions,
     }
 
 
@@ -326,9 +342,9 @@ def _install_sops():
         bin_path = os.path.join(install_dir, "sops")
         print(f"Downloading {bin_url}...")
         urllib.request.urlretrieve(bin_url, bin_path)
-        run_cmd(f"chmod +x {bin_path}")
+        _run_cmd_internal(f"chmod +x {bin_path}")
     elif system == "darwin":
-        run_cmd("brew install sops")
+        _run_cmd_internal("brew install sops")
     else:
         print(f"Unsupported OS: {system}")
         sys.exit(1)
@@ -339,6 +355,7 @@ def task_install_sops():
     """Install SOPS secrets manager."""
     return {
         "actions": [_install_sops],
+        "title": title_with_actions,
     }
 
 
@@ -395,8 +412,8 @@ def _install_terraform():
         os.makedirs(install_dir, exist_ok=True)
 
     print(f"Unzipping to {install_dir}...")
-    run_cmd(f"unzip -o {zip_path} -d {install_dir}")
-    run_cmd(f"chmod +x {install_dir}/terraform")
+    _run_cmd_internal(f"unzip -o {zip_path} -d {install_dir}")
+    _run_cmd_internal(f"chmod +x {install_dir}/terraform")
     os.remove(zip_path)
     print(f"✓ Terraform {latest_version} installed to {install_dir}")
 
@@ -405,6 +422,7 @@ def task_install_terraform():
     """Install Terraform."""
     return {
         "actions": [_install_terraform],
+        "title": title_with_actions,
     }
 
 
@@ -418,13 +436,14 @@ def task_install_ansible():
 
         if os.path.exists("pyproject.toml"):
             print("Installing InfraFoundry with Ansible...")
-            run_cmd("uv pip install -e .")
+            _run_cmd_internal("uv pip install -e .")
         else:
             print("Installing Ansible directly...")
-            run_cmd("uv pip install ansible")
+            _run_cmd_internal("uv pip install ansible")
 
     return {
         "actions": [install_ansible],
+        "title": title_with_actions,
     }
 
 
@@ -439,6 +458,7 @@ def task_install_deps():
             "install_terraform",
             "install_ansible",
         ],
+        "title": title_with_actions,
     }
 
 
@@ -466,4 +486,5 @@ See .vscode/extensions.json for the complete list.
 """
     return {
         "actions": [lambda: print(msg)],
+        "title": title_with_actions,
     }
