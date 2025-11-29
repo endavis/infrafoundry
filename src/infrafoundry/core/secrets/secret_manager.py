@@ -68,8 +68,8 @@ class SecretManager(PathBasedManager):
         if provider:
             self.provider = provider
         else:
-            # Use SopsSecretProvider by default, passing check_binary flag based on env vars
-            self.provider = SopsSecretProvider(check_binary=should_check)
+            # Use SopsSecretProvider by default
+            self.provider = SopsSecretProvider()
 
         if should_check and isinstance(self.provider, SopsSecretProvider):
             check_age_key()

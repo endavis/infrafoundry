@@ -78,12 +78,7 @@ class CredentialLoader:
             self.config_dir = Path(config_dir)
 
         self._debug_mode = os.getenv("INFRAFOUNDRY_LOG_LEVEL") == "DEBUG"
-
-        skip_sops_checks = os.getenv("INFRAFOUNDRY_SKIP_SOPS_CHECK")
-        force_sops_checks = os.getenv("INFRAFOUNDRY_FORCE_SOPS_CHECK")
-        should_check_sops = bool(force_sops_checks) or not bool(skip_sops_checks)
-
-        self.secret_provider = secret_provider or SopsSecretProvider(check_binary=should_check_sops)
+        self.secret_provider = secret_provider or SopsSecretProvider()
 
     def get_secrets_dir(self, env_name: str) -> Path:
         """Get the environment directory containing secrets.
