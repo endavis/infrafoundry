@@ -43,10 +43,10 @@ InfraFoundry includes comprehensive CI/CD workflows for both **testing** and **i
 
 **Local Testing:**
 ```bash
-just test          # Run all tests
-just coverage      # Full coverage report
-just lint          # Run linting
-just format        # Format code
+doit test          # Run all tests
+doit coverage      # Full coverage report
+doit lint          # Run linting
+doit format        # Format code
 ```
 
 **See [docs/development/ci-cd-testing.md](../docs/development/ci-cd-testing.md) for complete testing guide.**

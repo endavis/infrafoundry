@@ -294,19 +294,18 @@ jobs:
       - name: Install InfraFoundry
         run: |
           cd infrafoundry
-          # Install just and use it to install dependencies
-          curl -LsSf https://just.systems/install.sh | bash -s -- --to $HOME/.local/bin
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          just install-uv
-          just install
+          # Install uv and dependencies
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          uv pip install -e .
 
       - name: Install infrastructure tools
         working-directory: infrafoundry
         run: |
-          # Use just recipes to install all tools
-          just install-terraform
-          just install-ansible
-          just install-sops
+          # Use doit tasks to install all tools
+          uv run doit install_terraform
+          uv run doit install_ansible
+          uv run doit install_sops
 
       - name: Set up age key
         run: |
@@ -368,17 +367,16 @@ variables:
 
 .setup_template: &setup
   before_script:
-    # Install just and InfraFoundry
+    # Install uv and InfraFoundry
     - apt-get update && apt-get install -y git curl wget
-    - curl -LsSf https://just.systems/install.sh | bash -s -- --to $HOME/.local/bin
-    - export PATH="$HOME/.local/bin:$PATH"
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - export PATH="$HOME/.cargo/bin:$PATH"
     - git clone --depth 1 --branch $INFRAFOUNDRY_VERSION https://github.com/your-org/infrafoundry.git
     - cd infrafoundry
-    - just install-uv
-    - just install
-    - just install-terraform
-    - just install-ansible
-    - just install-sops
+    - uv pip install -e .
+    - uv run doit install_terraform
+    - uv run doit install_ansible
+    - uv run doit install_sops
     - cd ..
 
     # Set up secrets
