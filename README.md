@@ -39,14 +39,14 @@ InfraFoundry generates Terraform and Ansible configurations from YAML definition
 
 ### Prerequisites
 
+- [uv](https://github.com/astral-sh/uv) (install first)
 - Python 3.12+
-- [doit](https://pydoit.org/) - Task runner (installed automatically via uv)
-- [uv](https://github.com/astral-sh/uv) - Fast Python package installer (installed automatically)
-- [Terraform](https://www.terraform.io/) >= 1.6 (installed automatically)
-- [Ansible](https://www.ansible.com/) >= 2.15 (installed automatically)
-- [SOPS](https://github.com/getsops/sops) - For secret management (installed automatically)
-- [age](https://github.com/FiloSottile/age) - For encryption keys (installed automatically)
-- [direnv](https://direnv.net/) - Optional but recommended (installed automatically)
+- [doit](https://pydoit.org/) - Task runner (installed via uv)
+- Terraform >= 1.6 (installed via doit)
+- Ansible >= 2.15 (installed via doit)
+- SOPS (installed via doit)
+- age (installed via doit)
+- direnv (installed via doit)
 
 ### Installation
 

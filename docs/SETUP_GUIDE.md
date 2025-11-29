@@ -9,12 +9,10 @@ This guide walks you through setting up InfraFoundry for your environment with P
 Run the setup scripts to install all dependencies and configure your environment:
 
 ```bash
-# Step 1: Install all system dependencies (uv, terraform, ansible, sops, age, direnv)
+# Step 1: Run the setup-dependencies script
 ./scripts/setup-dependencies.sh
 
-# - Install uv if not already present
-# - Install dependencies via doit
-# - Use the interactive wizard for config
+# This script will install uv (if not present), doit, and all other system dependencies.
 #
 # Key Scripts:
 # - scripts/setup-dependencies.sh: Installs uv, doit, terraform, ansible, sops, age
