@@ -65,5 +65,6 @@ This index provides a structured overview of the available documentation.
 - **[Maintenance Report](testing/TESTING_MAINTENANCE_REPORT.md)**: Status and maintenance notes for the test suite.
 
 ## Meta
+- **[Project To-Do & Roadmap](TODO.md)**: Planned features and enhancements.
 - **[Documentation Template](meta/documentation-template.md)**: Standard template for new documentation files.
 - **[Code Quality Analysis](meta/code-quality-analysis.md)**: Reports and metrics on code quality.
