@@ -1,119 +1,85 @@
 # PyInfra Runner Guide
 
-InfraFoundry supports [pyinfra](https://pyinfra.com/) as a pure-Python alternative to Ansible for configuration management. It offers faster execution and allows you to write deployment logic in standard Python.
-
-For an overview of how runners interact and their fixed execution order, please refer to the [Runner Execution Overview](overview.md).
-
 ## Overview
 
-The PyInfra runner:
-1. Generates a `inventory.py` from your resource state.
-2. Generates a `deploy.py` that orchestrates your configured operations.
-3. Executes `pyinfra` over SSH.
+The PyInfra runner executes Python-based deploys for post-provision configuration. InfraFoundry generates inventory and deploy files from your YAML definitions and runs `pyinfra` over SSH.
 
-## Configuration
+## Audience and Prerequisites
 
-You can define operations inline or point to reusable Python functions.
+- **Audience:** Operators preferring Python-based automation for configuration and app deploys.
+- **Prereqs:** PyInfra installed, SSH access to provisioned hosts, and optional reusable deploy modules in `pyinfra/`.
 
-### 1. Inline Operations (`pyinfra_ops`)
+## When to Use This
 
-For simple tasks, you can define operations directly in your YAML. This maps directly to `pyinfra.operations`.
+- Application deployment or configuration logic best expressed in Python.
+- Faster/lighter alternative to Ansible for some workflows.
+- Combining inline operations with reusable deploy functions.
 
-```yaml
-vms:
-  - name: web-node-01
-    # ... VM config ...
-    pyinfra_ops:
-      - name: Install Nginx
-        operation: apt.packages
-        params:
-          packages: ["nginx"]
-          update: true
-          _sudo: true
-      
-      - name: Ensure Service Started
-        operation: systemd.service
-        params:
-          service: "nginx"
-          running: true
-          enabled: true
-          _sudo: true
-```
+## Quick Start
 
-### 2. Reusable Deploy Functions (`pyinfra_deploy_funcs`)
+1. Add PyInfra fields to a resource:
+   ```yaml
+   resources:
+     - provider: proxmox
+       type: vm
+       name: web-node-01
+       config:
+         pyinfra_ops:
+           - name: Install Nginx
+             operation: apt.packages
+             params:
+               packages: ["nginx"]
+               update: true
+               _sudo: true
+   ```
+2. Apply:
+   ```bash
+   infra apply --env dev
+   ```
+   Inventory and deploy scripts are generated under `generated/{env}/pyinfra/{provider}/` and executed.
 
-For complex logic, reusable components, or when you want to utilize the full power of Python, use custom deploy functions.
+## Configuration Details
 
-#### Directory Structure
+- **Inline operations:** `pyinfra_ops` map to `pyinfra.operations` with `name`, `operation`, `params`.
+- **Reusable deploy functions:** `pyinfra_deploy_funcs` reference dotted functions from `pyinfra/` modules in the config repo (e.g., `web.setup_nginx`).
+- **Inventory:** Generated from resource state; groups and connection data are auto-populated.
+- **Execution order:** Runs after Terraform (and after Ansible if it shares the same priority/registration order) per runner priorities.
 
-Create a `pyinfra/` directory at the root of your configuration repository. InfraFoundry automatically copies this directory to the execution environment.
+## Validation and Checks
 
-```text
-config-repo/
-├── envs/
-│   └── dev/
-│       └── ...
-└── pyinfra/
-    ├── __init__.py
-    ├── web.py        <-- Your custom module
-    └── database.py
-```
+- Validate configs: `infra validate --env <env> --check-api --check-refs`.
+- Ensure SSH connectivity and credentials from `settings.yaml`/`provider_ssh`.
+- Optionally dry-run via `infra plan --env <env>` to see generation without execution.
 
-#### Writing a Deploy Function
+## Examples
 
-**`pyinfra/web.py`**:
-```python
-from pyinfra.operations import apt, server, systemd
+- **Deploy function module (`pyinfra/web.py`):**
+  ```python
+  from pyinfra.operations import apt, systemd
 
-def setup_nginx():
-    """Install and configure Nginx."""
-    apt.packages(
-        name="Install Nginx",
-        packages=["nginx"],
-        update=True,
-        _sudo=True,
-    )
-    
-    systemd.service(
-        name="Restart Nginx",
-        service="nginx",
-        running=True,
-        enabled=True,
-        _sudo=True,
-    )
-```
+  def setup_nginx():
+      apt.packages(name="Install Nginx", packages=["nginx"], update=True, _sudo=True)
+      systemd.service(name="Restart Nginx", service="nginx", running=True, enabled=True, _sudo=True)
+  ```
+- **Use deploy function in YAML:**
+  ```yaml
+  pyinfra_deploy_funcs:
+    - web.setup_nginx
+  ```
 
-#### Usage in YAML
+## Related Documentation
 
-Reference the function using the dotted path `module.function`.
+- [Runner Execution Overview](overview.md)
+- [SSH Authentication](../ssh-authentication.md)
+- [Configuration Guide](../configuration.md)
+- [Pluggable Runner System](../architecture/pluggable-runners.md)
 
-```yaml
-vms:
-  - name: web-cluster-01
-    pyinfra_deploy_funcs:
-      - web.setup_nginx
-```
+## Troubleshooting
 
-## Inventory Generation
+- **Symptom:** Operations not executed. **Fix:** Ensure `pyinfra_ops` or `pyinfra_deploy_funcs` are present; check generated PyInfra files.
+- **Symptom:** SSH connection issues. **Fix:** Verify SSH settings and host reachability; align with runner priorities if bootstrapping Python is needed.
+- **Symptom:** Module not found. **Fix:** Place modules under `pyinfra/` in the config repo and reference with dotted paths.
 
-InfraFoundry automatically generates the inventory based on the resources managed by the provider. 
-- **Groups**: Resources are grouped by their snake_case name (e.g., `web_cluster_01`).
-- **Connection Data**: IP addresses and SSH users are automatically populated from the infrastructure state.
+---
 
-## Execution
-
-PyInfra runs automatically during the apply phase.
-
-```bash
-# Plan shows what would happen (dry-run)
-infra plan --env dev
-
-# Apply executes the changes
-infra apply --env dev
-```
-
-## Best Practices
-
-1. **Idempotency**: Ensure your Python functions are idempotent (safe to run multiple times). PyInfra operations are idempotent by default.
-2. **Conditionals**: Use standard Python `if` statements in your deploy functions for logic that is hard to express in YAML.
-3. **Secrets**: (Future) Access secrets injected into the environment variables or host data.
+Last updated: 2025-11-29 14:27 GMT
