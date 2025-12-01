@@ -39,7 +39,7 @@ This index provides a structured overview of the available documentation.
 - **[SSH Authentication](guides/ssh-authentication.md)**: Setting up and managing SSH authentication.
 
 ## Development
-- **[Plugin Development](development/plugin-development.md)**: Guide for creating new plugins for InfraFoundry.
+- **[Implementing Providers](development/implementing-providers.md)**: Guide for creating new providers for InfraFoundry.
 - **[Manager Patterns](development/manager-patterns.md)**: implementation patterns for Manager classes.
 - **[Event System](development/event-system.md)**: Documentation of the internal event system.
 - **[Credential Loader](development/credential-loader-system.md)**: How the credential loading system works.
