@@ -61,7 +61,7 @@ doit coverage
 
 - [Coding Standards](coding-standards.md)
 - [Manager Patterns](manager-patterns.md)
-- [Plugin Development](plugin-development.md)
+- [Implementing Providers](implementing-providers.md)
 
 ## Troubleshooting
 

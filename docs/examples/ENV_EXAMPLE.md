@@ -50,8 +50,8 @@ This example illustrates a legacy `.env` file for CI/local use, defining InfraFo
 
 ## Related Documentation
 
-- [Configuration Guide](../configuration.md)
-- [Per-Environment Credentials](../per-environment-credentials.md)
+- [Configuration Guide](../configuration/overview.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
 - [CI/CD Testing Guide](../development/ci-cd-testing.md)
 
 ## Troubleshooting

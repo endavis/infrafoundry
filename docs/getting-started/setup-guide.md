@@ -78,11 +78,11 @@ This guide helps you stand up InfraFoundry with Proxmox and OPNsense, covering b
 
 ## Related Documentation
 
-- [Configuration](configuration.md)
-- [YAML-Only Config](yaml-only-config.md)
-- [Per-Environment Credentials](per-environment-credentials.md)
+- [Configuration](../configuration/overview.md)
+- [YAML-Only Config](../configuration/yaml-only-config.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
 - [Direnv Setup](direnv.md)
-- [Validation and Pre-Flight Checks](validation.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
 
 ## Troubleshooting
 

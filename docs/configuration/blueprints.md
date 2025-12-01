@@ -59,9 +59,9 @@ infra new create basic-vm ./my-new-vm
 
 ## Related Documentation
 
-- [InfraFoundry CLI Reference](../CLI_REFERENCE.md)
-- [Configuration Guide](../configuration.md)
-- [YAML-Only Configuration](../yaml-only-config.md)
+- [InfraFoundry CLI Reference](../usage/cli-reference.md)
+- [Configuration Guide](overview.md)
+- [YAML-Only Configuration](yaml-only-config.md)
 
 ## Troubleshooting
 

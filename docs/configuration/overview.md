@@ -108,9 +108,9 @@ InfraFoundry environments are defined entirely in YAML: `settings.yaml` for envi
 
 - [YAML-Only Configuration](yaml-only-config.md)
 - [Separate Config Repo](separate-config-repo.md)
-- [SSH Authentication](ssh-authentication.md)
+- [SSH Authentication](../guides/ssh-authentication.md)
 - [Per-Environment Credentials](per-environment-credentials.md)
-- [Validation and Pre-Flight Checks](validation.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
 
 ## Troubleshooting
 

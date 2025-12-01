@@ -67,9 +67,9 @@ with loader.temporary_credentials("prod"):
 ## Related Documentation
 
 - [Implementing Custom Secret Providers](implementing-secret-providers.md)
-- [Per-Environment Credentials](../per-environment-credentials.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
 - [Secrets Management Architecture](../architecture/secrets-architecture.md)
-- [Age Key Management Best Practices](../age-key-management.md)
+- [Age Key Management Best Practices](../guides/age-key-management.md)
 
 ## Troubleshooting
 

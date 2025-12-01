@@ -97,10 +97,10 @@ InfraFoundry manages three artifacts: Terraform state, the InfraFoundry state da
 
 ## Related Documentation
 
-- [Validation and Pre-Flight Checks](validation.md)
-- [Configuration Guide](configuration.md)
-- [Separate Config Repo](separate-config-repo.md)
-- [State Management Architecture](architecture/orchestrator-architecture.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
+- [Configuration Guide](../configuration/overview.md)
+- [Separate Config Repo](../configuration/separate-config-repo.md)
+- [State Management Architecture](orchestrator-architecture.md)
 
 ## Troubleshooting
 

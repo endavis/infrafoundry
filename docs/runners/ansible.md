@@ -76,8 +76,8 @@ The Ansible runner configures provisioned resources by generating inventory and 
 ## Related Documentation
 
 - [Runner Execution Overview](overview.md)
-- [Configuration Guide](../configuration.md)
-- [SSH Authentication](../ssh-authentication.md)
+- [Configuration Guide](../configuration/overview.md)
+- [SSH Authentication](../guides/ssh-authentication.md)
 - [Pluggable Runner System](../architecture/pluggable-runners.md)
 
 ## Troubleshooting

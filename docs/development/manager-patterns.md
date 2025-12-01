@@ -82,7 +82,7 @@ Managers inherit from `BaseManager` or `PathBasedManager` for consistent logging
 
 - [Architectural Patterns](../architecture/architectural-patterns.md)
 - [Coding Standards](coding-standards.md)
-- [Plugin Development](plugin-development.md)
+- [Implementing Providers](implementing-providers.md)
 - [Implementing Secret Providers](implementing-secret-providers.md)
 
 ## Troubleshooting

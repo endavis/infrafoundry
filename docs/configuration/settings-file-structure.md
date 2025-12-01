@@ -111,10 +111,10 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
 
 ## Related Documentation
 
-- [Configuration Guide](configuration.md)
+- [Configuration Guide](overview.md)
 - [YAML-Only Configuration](yaml-only-config.md)
 - [Per-Environment Credentials](per-environment-credentials.md)
-- [SSH Authentication](ssh-authentication.md)
+- [SSH Authentication](../guides/ssh-authentication.md)
 
 ## Troubleshooting
 

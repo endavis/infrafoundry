@@ -99,11 +99,11 @@ infra destroy --env dev --auto-approve
 
 ## Related Documentation
 
-- [Configuration Guide](configuration.md)
+- [Configuration Guide](../configuration/overview.md)
 - [Validation and Pre-Flight Checks](validation.md)
-- [Policy Configuration Guide](policy-configuration.md)
-- [State Management](state-management.md)
-- [Per-Environment Credentials](per-environment-credentials.md)
+- [Policy Configuration Guide](../configuration/policy-configuration.md)
+- [State Management](../architecture/state-management.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
 
 ## Troubleshooting
 

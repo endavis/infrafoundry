@@ -2,7 +2,7 @@
 
 ## Overview
 
-Age keys secure SOPS-encrypted secrets in InfraFoundry. This guide outlines how to generate, distribute, and safeguard keys so environments stay isolated and compliant. InfraFoundry supports other secret backends (Vault, AWS Secrets Manager, etc.); see [Secrets Architecture](architecture/secrets-architecture.md) for details.
+Age keys secure SOPS-encrypted secrets in InfraFoundry. This guide outlines how to generate, distribute, and safeguard keys so environments stay isolated and compliant. InfraFoundry supports other secret backends (Vault, AWS Secrets Manager, etc.); see [Secrets Architecture](../architecture/secrets-architecture.md) for details.
 
 ## Audience and Prerequisites
 
@@ -76,9 +76,9 @@ Age keys secure SOPS-encrypted secrets in InfraFoundry. This guide outlines how 
 
 ## Related Documentation
 
-- [Secrets Architecture](architecture/secrets-architecture.md)
-- [Per-Environment Credentials](per-environment-credentials.md)
-- [Validation and Pre-Flight Checks](validation.md)
+- [Secrets Architecture](../architecture/secrets-architecture.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
 
 ## Troubleshooting
 
@@ -381,4 +381,4 @@ chmod 600 envs/*/age.key
 
 - [age encryption tool](https://github.com/FiloSottile/age)
 - [SOPS documentation](https://github.com/mozilla/sops)
-- [InfraFoundry per-environment credentials](./per-environment-credentials.md)
+- [InfraFoundry per-environment credentials](../configuration/per-environment-credentials.md)

@@ -58,10 +58,10 @@ manager.save_secret("envs/dev/settings.yaml", data)
 
 ## Related Documentation
 
-- [Age Key Management Best Practices](../age-key-management.md)
-- [Per-Environment Credentials](../per-environment-credentials.md)
-- [Configuration Guide](../configuration.md)
-- [Validation and Pre-Flight Checks](../validation.md)
+- [Age Key Management Best Practices](../guides/age-key-management.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
+- [Configuration Guide](../configuration/overview.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
 
 ## Troubleshooting
 

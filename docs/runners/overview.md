@@ -56,7 +56,7 @@ runner_priorities:
 ## Related Documentation
 
 - [Pluggable Runner System](../architecture/pluggable-runners.md)
-- [Configuration Guide](../configuration.md)
+- [Configuration Guide](../configuration/overview.md)
 - [Terraform Runner](terraform.md)
 - [Ansible Runner](ansible.md)
 - [PyInfra Runner](pyinfra.md)

@@ -71,9 +71,9 @@
 
 ## Related Documentation
 
-- [Per-Environment Credentials](per-environment-credentials.md)
-- [Configuration Guide](configuration.md)
-- [YAML-Only Configuration](yaml-only-config.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
+- [Configuration Guide](../configuration/overview.md)
+- [YAML-Only Configuration](../configuration/yaml-only-config.md)
 
 ## Troubleshooting
 

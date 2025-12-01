@@ -91,8 +91,8 @@ InfraFoundry uses **pure YAML** for all environment, resource, and credential co
 
 ## Related Documentation
 
-- [Configuration Guide](configuration.md)
-- [SSH Authentication](ssh-authentication.md)
+- [Configuration Guide](overview.md)
+- [SSH Authentication](../guides/ssh-authentication.md)
 - [Per-Environment Credentials](per-environment-credentials.md)
 - [Separate Config Repo](separate-config-repo.md)
 

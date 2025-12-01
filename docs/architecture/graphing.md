@@ -54,9 +54,9 @@ Render with Mermaid Live Editor or embed in Markdown. Use DOT for alternative to
 
 ## Related Documentation
 
-- [InfraFoundry CLI Reference](../CLI_REFERENCE.md)
-- [Configuration Guide](../configuration.md)
-- [Validation and Pre-Flight Checks](../validation.md)
+- [InfraFoundry CLI Reference](../usage/cli-reference.md)
+- [Configuration Guide](../configuration/overview.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
 - [Orchestrator Architecture](orchestrator-architecture.md)
 
 ## Troubleshooting

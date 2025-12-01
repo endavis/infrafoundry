@@ -59,9 +59,9 @@ python tools/opnsense-parser.py config.xml -o $INFRAFOUNDRY_CONFIG_REPO/envs/pro
 
 ## Related Documentation
 
-- [Configuration Guide](../configuration.md)
-- [YAML-Only Configuration](../yaml-only-config.md)
-- [Validation and Pre-Flight Checks](../validation.md)
+- [Configuration Guide](../configuration/overview.md)
+- [YAML-Only Configuration](../configuration/yaml-only-config.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
 
 ## Troubleshooting
 
