@@ -36,6 +36,31 @@ InfraFoundry separates code generation from execution: YAML configs are rendered
 - **Orchestration layer:** Orchestrator coordinates multi-provider runs; CLI (Click) drives commands; StateManager tracks deployments; Event system powers notifications/integrations; Policy engine enforces guardrails.
 - **Data flow:**  
   `YAML configs → ConfigManager → Providers → Jinja2 templates → generated/{env}/{terraform|ansible}/{provider} → (optional) terraform init/apply + ansible-playbook → infrastructure`
+
+  ```mermaid
+  graph LR
+      A[YAML Configs] -->|Load & Validate| B[ConfigManager]
+      B -->|Group Resources| C[Providers]
+      C -->|Render| D[Jinja2 Templates]
+      D -->|Generate| E[Generated Artifacts]
+      E -->|Execute| F[Runners]
+      F -->|Apply| G[Infrastructure]
+      
+      subgraph "Framework"
+      B
+      C
+      D
+      end
+      
+      subgraph "Artifacts"
+      E
+      end
+      
+      subgraph "Execution"
+      F
+      end
+  ```
+
 - **Key principles:** Generate before execute; provider plugins; tool-agnostic outputs; separate framework and config repos.
 
 ## Validation and Checks
@@ -66,3 +91,7 @@ InfraFoundry separates code generation from execution: YAML configs are rendered
 ---
 
 Last updated: 2025-11-29 14:27 GMT
+
+
+---
+[Back to Table of Contents](../TABLE_OF_CONTENTS.md)

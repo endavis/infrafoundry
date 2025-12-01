@@ -129,3 +129,7 @@ InfraFoundry can emit deployment, drift, and policy events to Slack, Discord, or
 ---
 
 Last updated: 2025-11-29 14:19 GMT
+
+
+---
+[Back to Table of Contents](../TABLE_OF_CONTENTS.md)

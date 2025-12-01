@@ -24,3 +24,7 @@ Testability: Design code to be easily tested, which often involves keeping compl
 Continuous refactoring: Improve code quality and structure over time without changing its external behavior.
 Error handling: Make code robust by handling errors and unexpected situations gracefully.
 Global dependencies: Minimize the use of global variables to reduce confusing state management. 
+
+
+---
+[Back to Table of Contents](../TABLE_OF_CONTENTS.md)

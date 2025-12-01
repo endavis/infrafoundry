@@ -382,3 +382,7 @@ chmod 600 envs/*/age.key
 - [age encryption tool](https://github.com/FiloSottile/age)
 - [SOPS documentation](https://github.com/mozilla/sops)
 - [InfraFoundry per-environment credentials](../configuration/per-environment-credentials.md)
+
+
+---
+[Back to Table of Contents](../TABLE_OF_CONTENTS.md)
