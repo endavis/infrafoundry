@@ -1,130 +1,86 @@
-# direnv setup for InfraFoundry
+# direnv Setup for InfraFoundry
 
-## What is direnv?
+## Overview
 
-[direnv](https://direnv.net/) is a shell extension that automatically loads/unloads environment variables based on the current directory. It makes working with environment-specific settings seamless.
+`direnv` loads environment variables automatically based on the current directory, keeping InfraFoundry defaults and personal overrides in sync without manual exports.
 
-## Installation
+## Audience and Prerequisites
 
-### macOS
-```bash
-brew install direnv
-```
+- **Audience:** Local developers working on InfraFoundry or config repos.
+- **Prereqs:** Shell access to install `direnv`, ability to edit shell init files, and the project root checked out.
 
-### Linux (Debian/Ubuntu)
-```bash
-sudo apt install direnv
-```
+## When to Use This
 
-### Other systems
-See https://direnv.net/docs/installation.html
+- You want project-scoped environment variables without editing your global shell profile.
+- You need personal overrides (`.envrc.local`) that stay out of git.
+- You want quick reloads after changing secrets or paths.
 
-## Setup
+## Quick Start
 
-1. **Hook direnv into your shell** (add to `~/.bashrc`, `~/.zshrc`, etc.):
-
+1. Install `direnv`:
+   - macOS: `brew install direnv`
+   - Debian/Ubuntu: `sudo apt install direnv`
+   - Others: follow https://direnv.net/docs/installation.html
+2. Hook `direnv` into your shell (`~/.bashrc`, `~/.zshrc`, etc.):
    ```bash
-   # Bash
-   eval "$(direnv hook bash)"
-
-   # Zsh
-   eval "$(direnv hook zsh)"
-
-   # Fish
-   direnv hook fish | source
+   eval "$(direnv hook bash)"   # or zsh/fish equivalents
    ```
-
-2. **Allow direnv in this project** (first time only):
-
+3. Allow the project and create personal overrides:
    ```bash
    cd /path/to/infrafoundry
    direnv allow
-   ```
-
-3. **Create your personal settings file**:
-
-   ```bash
    cp docs/examples/.envrc.local.example .envrc.local
-   # Edit .envrc.local with your actual credentials
+   # Edit .envrc.local with your credentials/preferences
+   ```
+4. Reload after edits:
+   ```bash
+   direnv reload
    ```
 
-4. **That's it!** Now whenever you `cd` into this project directory:
-   - Framework defaults from `.envrc` load automatically
-   - Your personal settings from `.envrc.local` override defaults
-   - Credentials stay local and git-ignored
+## Configuration Details
 
-## Usage
+- **Files:**
+  - `.envrc` — framework defaults (committed).
+  - `.envrc.local` — personal overrides (git-ignored).
+  - `docs/examples/.envrc.local.example` — starter template.
+- **Behavior:** Entering the repo loads `.envrc` then `.envrc.local`; leaving unloads them. Credentials remain local.
+- **Customizations:** Set `INFRAFOUNDRY_*`, provider credentials, Terraform/Ansible flags, or choose a Python version (`layout python python3.11`).
 
-### Automatic loading
-```bash
-cd ~/projects/infrafoundry
-# Output: 🔧 InfraFoundry environment loaded
-#         Config: envs
-#         Secrets: secrets
-#         Output: generated
-```
+## Validation and Checks
 
-### Reload after changes
-```bash
-# After editing .env or .envrc
-direnv reload
-```
+- Verify load status: `direnv status`.
+- Inspect variables: `printenv | grep INFRAFOUNDRY`.
+- If changes do not apply, re-run `direnv allow` or `direnv reload`.
 
-### Check loaded variables
-```bash
-direnv status
-printenv | grep INFRAFOUNDRY
-```
+## Examples
 
-### Disable temporarily
-```bash
-direnv deny
-# To re-enable:
-direnv allow
-```
+- **Sample `.envrc.local`:**
+  ```bash
+  export INFRAFOUNDRY_CONFIG_REPO=$HOME/my-infra-config
+  export INFRAFOUNDRY_LOG_LEVEL=DEBUG
+  export PROXMOX_API_URL=https://proxmox.local:8006/api2/json
+  export PROXMOX_API_TOKEN_ID=myuser@pam!mytoken
+  export PROXMOX_API_TOKEN_SECRET=abc123-secret
+  layout python python3.11
+  ```
+- **Temporary disable/enable:**
+  ```bash
+  direnv deny
+  direnv allow
+  ```
 
-## Benefits for InfraFoundry
+## Related Documentation
 
-1. **Clean separation**:
-   - `.envrc` = framework defaults (version-controlled)
-   - `.envrc.local` = your credentials and preferences (git-ignored)
-2. **No manual exports**: Automatically sets all environment variables
-3. **Environment isolation**: Variables only active in this project directory
-4. **Team consistency**: Everyone uses the same `.envrc`, customizes via `.envrc.local`
-5. **CI/CD compatibility**: CI uses traditional env vars, local dev uses direnv
-6. **Security warnings**: Alerts if SOPS keys are missing
+- [Per-Environment Credentials](per-environment-credentials.md)
+- [Configuration Guide](configuration.md)
+- [YAML-Only Configuration](yaml-only-config.md)
 
-## File Structure
+## Troubleshooting
 
-```
-.envrc                  # Framework defaults (committed to git)
-.envrc.local           # Your personal settings (git-ignored)
-docs/examples/.envrc.local.example   # Template for .envrc.local (committed to git)
-docs/examples/.env.example           # Legacy, kept for CI/CD compatibility
-```
+- **Symptom:** `.envrc.local` not applied. **Fix:** Ensure the file exists, run `direnv allow`, then `direnv reload`.
+- **Symptom:** Wrong Python version. **Fix:** Adjust `layout python ...` in `.envrc.local` and reload.
+- **Symptom:** CI picks up direnv settings. **Fix:** Do not use direnv in CI; rely on CI env vars or `ci/setup-ci.sh`.
 
-## Advanced: Customizing .envrc.local
+---
 
-Your `.envrc.local` can override any defaults and add credentials:
-
-```bash
-# .envrc.local - personal settings
-export INFRAFOUNDRY_LOG_LEVEL=DEBUG
-export TF_LOG=DEBUG
-
-# Proxmox credentials
-export PROXMOX_API_URL=https://proxmox.local:8006/api2/json
-export PROXMOX_API_TOKEN_ID=myuser@pam!mytoken
-export PROXMOX_API_TOKEN_SECRET=abc123-secret
-
-# Use a custom Python environment
-layout python python3.11
-```
-
-**Never commit `.envrc.local`** - it's git-ignored by default.
-
-## CI/CD Note
-
-direnv is for **local development only**. CI/CD pipelines should still use:
-- GitHub Secrets / GitLab CI/CD variables
-- The `ci/setup-ci.sh` script handles CI environment setup
+Last updated: 2025-11-29 14:19 GMT

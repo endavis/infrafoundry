@@ -2,126 +2,95 @@
 
 ## Overview
 
-InfraFoundry supports automatic integration between OPNsense DHCP static mappings and Proxmox VMs. This allows VMs to use DHCP while still receiving predictable, consistent IP addresses.
+InfraFoundry can align OPNsense DHCP static mappings with Proxmox VMs so VMs use DHCP while still receiving predictable IPs.
 
-## How It Works
+## Audience and Prerequisites
 
-### Provider Execution Order
+- **Audience:** Operators configuring Proxmox + OPNsense environments.
+- **Prereqs:** OPNsense API access, Proxmox API access, environment config repo set, and matching MAC addresses for DHCP reservations and VM NICs.
 
-InfraFoundry applies providers in a specific order to ensure dependencies are met:
+## When to Use This
 
-1. **OPNsense** - Network configuration, firewall rules, DHCP mappings
-2. **Proxmox** - Virtual machines
-3. **Kubernetes** - Container orchestration
+- You want deterministic VM IPs without manual static addressing.
+- You need firewall rules and DHCP reservations ready before VM creation.
+- You manage multi-provider stacks where network readiness must precede compute.
 
-This ordering ensures that:
-- DHCP reservations exist before VMs request IPs
-- Firewall rules are in place before VMs start
-- Network configuration is ready before infrastructure
+## Quick Start
 
-### Configuration Pattern
+1. Add a DHCP static map:
+   ```yaml
+   # envs/{env}/resources/dhcp-mappings.yaml
+   resources:
+     - provider: opnsense
+       type: dhcp_static_maps
+       name: my-vm-dhcp
+       config:
+         interface: opt1
+         mac: "BC:24:11:10:00:96"
+         ip: "192.168.10.50"
+         hostname: "my-vm-01"
+         description: "My VM - Managed by InfraFoundry"
+   ```
+2. Create a VM using the same MAC:
+   ```yaml
+   # envs/{env}/resources/my-vm.yaml
+   resources:
+     - provider: proxmox
+       type: vm
+       name: my-vm-01
+       config:
+         target_node: pve1
+         clone: ubuntu-template
+         network:
+           bridge: vmbr1
+           tag: 10
+           macaddr: "BC:24:11:10:00:96"
+         ipconfig: ip=dhcp
+         oncreate: false
+   ```
+3. Apply:
+   ```bash
+   infra apply --env homelab
+   ```
 
-**Step 1: Create DHCP Static Mapping**
+## Configuration Details
 
-File: `envs/{env}/resources/dhcp-mappings.yaml`
+- **Provider execution order:** OPNsense → Proxmox → Kubernetes. DHCP reservations and firewall rules are ready before VMs request IPs.
+- **Required fields:** Matching MAC between DHCP map and VM NIC; correct OPNsense interface and VLAN tag; Proxmox bridge/tag align with network design.
+- **Defaults:** VMs can remain powered off on creation (`oncreate: false`) if desired.
+- **Naming:** Keep resource names descriptive and consistent across providers for easier troubleshooting.
 
-```yaml
-resources:
-  - provider: opnsense
-    type: dhcp_static_maps
-    name: my-vm-dhcp
-    config:
-      interface: opt1           # VLAN interface in OPNsense
-      mac: "BC:24:11:10:00:96"  # Must match VM MAC
-      ip: "192.168.10.50"       # Reserved IP
-      hostname: "my-vm-01"
-      description: "My VM - Managed by InfraFoundry"
-```
+## Validation and Checks
 
-**Step 2: Create VM with Matching MAC**
+- Run `infra validate --env <env> --check-api --check-refs` to confirm OPNsense aliases/interfaces and Proxmox templates/bridges exist.
+- Verify MAC format is colon-separated and unique per VM.
+- After apply, confirm DHCP leases in OPNsense and VM IP assignment in Proxmox.
 
-File: `envs/{env}/resources/my-vm.yaml`
+## Examples
 
-```yaml
-resources:
-  - provider: proxmox
-    type: vm
-    name: my-vm-01
-    config:
-      target_node: pve1
-      clone: ubuntu-template
+- **Apply with validation:**
+  ```bash
+  infra validate --env homelab --check-api --check-refs
+  infra apply --env homelab
+  ```
+- **Destroy if you need to recreate mappings/VMs:**
+  ```bash
+  infra destroy --env homelab
+  ```
 
-      # Network with SAME MAC as DHCP mapping
-      network:
-        bridge: vmbr1
-        tag: 10
-        macaddr: "BC:24:11:10:00:96"  # Must match DHCP mapping
+## Related Documentation
 
-      # Use DHCP - will get reserved IP
-      ipconfig: ip=dhcp
-
-      # Don't start on creation (optional)
-      oncreate: false
-```
-
-**Step 3: Deploy**
-
-```bash
-infra apply --env homelab
-```
-
-InfraFoundry will:
-1. Create the DHCP static mapping in OPNsense
-2. Create the VM in Proxmox
-3. VM requests DHCP and receives its reserved IP (192.168.10.50)
-
-## MAC Address Format
-
-Proxmox uses a specific MAC address scheme:
-
-```
-BC:24:11:VV:HH:HH
-│  │  │  │  └─────── Host/VM identifier (hex)
-│  │  │  └────────── VLAN ID (hex)
-│  │  └───────────── Proxmox prefix
-│  └──────────────── Proxmox prefix
-└─────────────────── Proxmox prefix (locally administered)
-```
-
-Example:
-- VLAN 10 (0x0A), VM ID 150 (0x96): `BC:24:11:0A:00:96`
-- VLAN 20 (0x14), VM ID 200 (0xC8): `BC:24:11:14:00:C8`
-
-## Benefits
-
-1. **Predictable IPs**: VMs always get the same IP address
-2. **DHCP Flexibility**: Easy to change IPs without reconfiguring VMs
-3. **Centralized Management**: All IP assignments in one place (OPNsense)
-4. **DNS Integration**: OPNsense can automatically register hostnames in DNS
-5. **Audit Trail**: Clear record of which MAC gets which IP
+- [Validation and Pre-Flight Checks](validation.md)
+- [Configuration](configuration.md)
+- [YAML-Only Config](yaml-only-config.md)
+- [Per-Environment Credentials](per-environment-credentials.md)
 
 ## Troubleshooting
 
-### VM Gets Wrong IP
+- **Symptom:** VM gets unexpected IP. **Fix:** Ensure VM MAC matches the DHCP static mapping and bridge/VLAN align with the DHCP interface.
+- **Symptom:** DHCP mapping not created. **Fix:** Check OPNsense API credentials and interface name; rerun with `--check-api --check-refs`.
+- **Symptom:** VM creation fails. **Fix:** Validate Proxmox template, storage, and bridge exist; confirm provider order by reviewing apply logs.
 
-- Check that MAC addresses match exactly between DHCP mapping and VM
-- Verify DHCP mapping was created (check OPNsense UI)
-- Check VM is on the correct VLAN
+---
 
-### DHCP Mapping Not Created
-
-- Check OPNsense credentials in `envs/credentials.yaml`
-- Verify interface name (e.g., `opt1`) matches OPNsense configuration
-- Check Terraform apply output for errors
-
-### VM Created Before DHCP Mapping
-
-This should not happen with InfraFoundry's provider ordering, but if it does:
-- Run `infra apply` again - Terraform will update the DHCP mapping
-- Restart the VM to request a new DHCP lease
-
-## See Also
-
-- [Separate Configuration Repository Pattern](separate-config-repo.md)
-- [Per-Environment Credentials](per-environment-credentials.md)
-- [State Management](state-management.md)
+Last updated: 2025-11-29 14:12 GMT
