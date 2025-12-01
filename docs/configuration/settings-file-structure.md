@@ -125,3 +125,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
 ---
 
 Last updated: 2025-11-29 14:19 GMT
+
+
+---
+[Back to Table of Contents](../TABLE_OF_CONTENTS.md)
