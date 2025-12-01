@@ -40,6 +40,23 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 - [ ] **Refactor: Console Output**: ([Issue](https://github.com/endavis/infrafoundry/issues/46))
 - [ ] **Refactor: Orchestrator God Class**: ([Issue](https://github.com/endavis/infrafoundry/issues/47))
 
+
+
+## Architecture & Design (from Design Assessment)
+- [ ] **Refactor: Use Protocol Classes**: ([Issue](https://github.com/endavis/infrafoundry/issues/49))
+- [ ] **Documentation: Architecture Decision Records**: ([Issue](https://github.com/endavis/infrafoundry/issues/50))
+- [ ] **Documentation: Sequence Diagrams**: ([Issue](https://github.com/endavis/infrafoundry/issues/51))
+
+
+## Code Quality & Refactoring (from Code Quality Analysis)
+- [ ] **Refactor: BaseRunner Interface Segregation**: ([Issue](https://github.com/endavis/infrafoundry/issues/48))
+- [ ] **Refactor: KeaDHCPManager Duplication**: ([Issue](https://github.com/endavis/infrafoundry/issues/52))
+- [ ] **Refactor: KeaClient CRUD Duplication**: ([Issue](https://github.com/endavis/infrafoundry/issues/53))
+- [ ] **Refactor: BaseProviderValidator**: ([Issue](https://github.com/endavis/infrafoundry/issues/54))
+- [ ] **Refactor: Policy Evaluator Boilerplate**: ([Issue](https://github.com/endavis/infrafoundry/issues/55))
+- [ ] **Refactor: Normalize OPNsense Interface Data**: ([Issue](https://github.com/endavis/infrafoundry/issues/56))
+- [ ] **Bug Fix: Print Statement in Policy Evaluator**: ([Issue](https://github.com/endavis/infrafoundry/issues/57))
+
 ## Completed Features
 - [x] Configuration templating/blueprints
 - [x] Visual topology/graphing
