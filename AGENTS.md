@@ -71,8 +71,8 @@ InfraFoundry generates Terraform `.tf` files and Ansible playbooks from YAML con
 - Separate commits for refactoring, docs, tests, cleanup, dependencies
 
 ### Development Workflow
-**Rule:** All changes must originate from a GitHub Issue.
-1.  **Issue:** Ensure a GitHub Issue exists for the task (e.g., "Refactor BaseRunner").
+**Rule:** All *code* changes must originate from a GitHub Issue. Documentation updates are exempt from this rule.
+1.  **Issue:** Ensure a GitHub Issue exists for the code task (e.g., "Refactor BaseRunner").
 2.  **Branch:** Create a branch linked to the issue (format: `issue/<number>-<short-desc>` or `feat/<number>-<desc>`).
 3.  **Commit:** Use Conventional Commits.
 4.  **Pull Request:** Submit a PR from your branch to `main` (or `dev` if active), referencing the issue (e.g., "Closes #123").
