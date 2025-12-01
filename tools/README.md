@@ -24,16 +24,6 @@ python tools/opnsense-parser.py config.xml
 
 **Full Documentation:** [docs/tools/opnsense-parser.md](../docs/tools/opnsense-parser.md)
 
-## Future Tools
-
-Planned tools for the InfraFoundry ecosystem:
-
-- **Proxmox Config Exporter** - Extract Proxmox cluster configuration
-- **Config Diff Tool** - Compare configurations between environments
-- **Resource Validator** - Validate YAML configs against provider schemas
-- **Dependency Analyzer** - Visualize resource dependencies
-- **Cost Calculator** - Estimate infrastructure costs
-
 ## Contributing
 
 To add a new tool:
