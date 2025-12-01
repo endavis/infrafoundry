@@ -1,10 +1,13 @@
 """Naming convention policy evaluator."""
 
+import logging
 import re
 from typing import Any
 
 from ..models import Policy, PolicyViolation
 from .base_evaluator import PolicyEvaluator
+
+logger = logging.getLogger(__name__)
 
 
 class NamingConventionEvaluator(PolicyEvaluator):
@@ -40,6 +43,6 @@ class NamingConventionEvaluator(PolicyEvaluator):
                             )
                         )
                 except re.error as e:
-                    print(f"Warning: Invalid regex pattern {pattern_str}: {e}")
+                    logger.warning(f"Invalid regex pattern {pattern_str}: {e}")
 
         return violations
