@@ -38,10 +38,7 @@ infra apply --env dev
 
 ## Documentation
 
-- Getting started: [CLI Reference](docs/CLI_REFERENCE.md), [Setup Guide](docs/SETUP_GUIDE.md), [Architecture Overview](docs/architecture/overview.md)
-- Core guides: Configuration, secrets, notifications, state, policies, migrations, direnv (see `docs/`)
-- Development: Plugin/secret providers, credential loader, event system, manager patterns, CI/CD testing
-- Tools: [OPNsense Parser](docs/tools/opnsense-parser.md)
+For a comprehensive overview of all documentation, including getting started guides, configuration details, architectural insights, development practices, and more, please refer to the [Table of Contents](docs/TABLE_OF_CONTENTS.md).
 
 ## Contributing
 
