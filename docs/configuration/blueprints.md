@@ -1,77 +1,73 @@
 # Configuration Blueprints Guide
 
-InfraFoundry supports creating new infrastructure projects from templates called "Blueprints". This allows teams to standardize their configuration patterns and get started quickly with best practices.
+## Overview
 
-## Usage
+Blueprints are template projects that scaffold new InfraFoundry configuration repositories or services with best practices baked in.
 
-Use the `infra new` command to interact with blueprints:
+## Audience and Prerequisites
+
+- **Audience:** Operators and platform teams standardizing configuration patterns.
+- **Prereqs:** InfraFoundry installed (`uv run infra`), access to built-in or custom blueprints, and a target directory to create into.
+
+## When to Use This
+
+- Bootstrapping a new config repo or service quickly.
+- Enforcing consistent structure across teams/tenants.
+- Sharing common patterns for VMs, networks, or multi-provider stacks.
+
+## Quick Start
 
 ```bash
-# List available blueprints
 infra new list
-
-# Instantiate a blueprint
-infra new create <blueprint-name> <target-directory>
-```
-
-Example:
-```bash
-# Create a new project from the 'basic-vm' blueprint
 infra new create basic-vm ./my-new-vm
 ```
 
-## Creating Blueprints
+## Configuration Details
 
-A blueprint is simply a directory containing a metadata file and template files.
+- **Command:** `infra new create <blueprint-name> <target-directory>`.
+- **Built-in location:** `src/infrafoundry/blueprints/`.
+- **Blueprint contents:** `blueprint.yaml` metadata + template files (copied as-is). Future versions may add Jinja2 templating.
+- **Metadata (`blueprint.yaml`):**
+  ```yaml
+  name: basic-vm
+  description: A simple Ubuntu VM on Proxmox
+  version: 1.0.0
+  author: InfraFoundry Team
+  # Optional: files section to control included files
+  # files:
+  #   vm.yaml: "vms:\n  ..."
+  ```
 
-### Directory Structure
+## Validation and Checks
 
-Blueprints can be stored in:
-1. The built-in `src/infrafoundry/blueprints/` directory (for core blueprints).
-2. (Future) An external blueprints repository configured via settings.
+- List available blueprints to confirm discovery: `infra new list`.
+- After creation, run `infra validate --env <env>` within the generated repo to ensure configs are sound.
 
-Example structure for `basic-vm`:
-```
-basic-vm/
-├── blueprint.yaml    # Metadata
-├── vm.yaml           # Configuration template
-└── README.md         # Instructions (optional)
-```
+## Examples
 
-### blueprint.yaml
+- **Instantiate a VM blueprint:**
+  ```bash
+  infra new create basic-vm ./my-new-vm
+  ```
+- **Example structure:**
+  ```
+  basic-vm/
+  ├── blueprint.yaml
+  ├── vm.yaml
+  └── README.md
+  ```
 
-This required file defines the blueprint's metadata:
+## Related Documentation
 
-```yaml
-name: basic-vm
-description: A simple Ubuntu VM on Proxmox
-version: 1.0.0
-author: InfraFoundry Team
-# Optional: explicitly list files to include (defaults to all files in dir)
-# files:
-#   vm.yaml: "vms:\n  ..."
-```
+- [InfraFoundry CLI Reference](../CLI_REFERENCE.md)
+- [Configuration Guide](../configuration.md)
+- [YAML-Only Configuration](../yaml-only-config.md)
 
-### Template Files
+## Troubleshooting
 
-All other files in the directory are copied as-is to the target directory when the blueprint is instantiated. In future versions, these will support Jinja2 templating for dynamic variable substitution.
+- **Symptom:** Blueprint not found. **Fix:** Check name from `infra new list`; verify custom blueprints are placed in the expected directory.
+- **Symptom:** Generated files missing. **Fix:** Ensure `blueprint.yaml` lists files if selective inclusion is used; otherwise include all files in the blueprint directory.
 
-**vm.yaml example:**
-```yaml
-vms:
-  - name: ubuntu-vm-01
-    target_node: pve01
-    clone: ubuntu-22-04-template
-    cores: 2
-    memory: 4096
-    disk:
-      size: 32G
-      storage: local-lvm
-    network:
-      bridge: vmbr0
-      tag: 100
-    ipconfig: ip=dhcp
-    onboot: true
-    tags:
-      - basic
-```
+---
+
+Last updated: 2025-11-29 14:27 GMT

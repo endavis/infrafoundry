@@ -1,50 +1,70 @@
 # Visualizing Infrastructure Topology
 
-InfraFoundry creates a sophisticated dependency graph of your infrastructure resources to determine the correct order for planning, applying, and destroying resources. You can visualize this graph to understand relationships and debug dependencies.
+## Overview
 
-## Usage
+`infra graph` builds a dependency graph of resources to show creation/destruction order. Output is Mermaid (or DOT) so you can visualize relationships and debug dependencies.
 
-Use the `infra graph` command to generate a visualization:
+## Audience and Prerequisites
+
+- **Audience:** Operators and reviewers inspecting dependencies before apply/destroy.
+- **Prereqs:** Config repo available; `uv run infra` installed; a target environment with resources.
+
+## When to Use This
+
+- Understanding cross-provider dependencies before applying changes.
+- Reviewing sequencing for complex environments.
+- Debugging unexpected ordering or missing references.
+
+## Quick Start
 
 ```bash
-# Generate a Mermaid diagram for the 'dev' environment
-infra graph --env dev
+infra graph --env dev --format mermaid > graph.mmd
 ```
 
-The output is a Mermaid diagram definition that can be rendered by tools like [Mermaid Live Editor](https://mermaid.live) or embedded in Markdown documentation on GitHub/GitLab.
+Render with Mermaid Live Editor or embed in Markdown. Use DOT for alternative tooling (`--format dot`).
 
-## Graph Structure
+## Configuration Details
 
-### Nodes
-Nodes represent individual resources managed by InfraFoundry. They are labeled with their full provider-scoped name:
-*   `proxmox:vm-01`
-*   `opnsense:firewall-rule-100`
-*   `kubernetes:deployment-web`
+- **Command:** `infra graph --env <env> [--format mermaid|dot]`.
+- **Nodes:** Provider-scoped resources (e.g., `proxmox:vm-01`, `opnsense:firewall-rule-100`).
+- **Edges:** `A --> B` means A depends on B (B created before A; A destroyed before B).
+- **Sources of dependencies:** Provider rules, cross-resource references, and future explicit `depends_on`.
 
-### Edges (Arrows)
-Arrows represent dependencies. An arrow from **A --> B** means **A depends on B**.
-*   **Creation Order:** B must be created *before* A.
-*   **Deletion Order:** A must be destroyed *before* B.
+## Validation and Checks
 
-## Example Output
+- Run `infra validate --env <env> --check-refs` to ensure referenced resources exist before graphing.
+- Review generated graph to confirm expected ordering; missing edges can signal missing references.
 
-```mermaid
-graph TD
-    proxmox_vm_web_01["proxmox:vm-web-01"]
-    proxmox_network_vlan_10["proxmox:network-vlan-10"]
-    opnsense_firewall_web["opnsense:firewall-web"]
-    
-    proxmox_vm_web_01 --> proxmox_network_vlan_10
-    opnsense_firewall_web --> proxmox_vm_web_01
-```
+## Examples
 
-In this example:
-1.  The VM `vm-web-01` depends on the network `vlan-10`.
-2.  The firewall rule `firewall-web` depends on the VM `vm-web-01` (perhaps needing its IP address).
+- **Mermaid output sample:**
+  ```mermaid
+  graph TD
+      proxmox_vm_web_01["proxmox:vm-web-01"]
+      proxmox_network_vlan_10["proxmox:network-vlan-10"]
+      opnsense_firewall_web["opnsense:firewall-web"]
 
-## Dependency Sources
+      proxmox_vm_web_01 --> proxmox_network_vlan_10
+      opnsense_firewall_web --> proxmox_vm_web_01
+  ```
+- **Generate DOT:**
+  ```bash
+  infra graph --env prod --format dot > graph.dot
+  ```
 
-Dependencies are automatically calculated from:
-1.  **Provider Rules:** Providers define implicit dependencies (e.g., a VM depends on its network interface).
-2.  **References:** When one resource references another by name in its configuration.
-3.  **Explicit `depends_on`:** (Future) Explicit dependency declaration in YAML.
+## Related Documentation
+
+- [InfraFoundry CLI Reference](../CLI_REFERENCE.md)
+- [Configuration Guide](../configuration.md)
+- [Validation and Pre-Flight Checks](../validation.md)
+- [Orchestrator Architecture](orchestrator-architecture.md)
+
+## Troubleshooting
+
+- **Symptom:** Missing nodes or edges. **Fix:** Ensure resources declare correct references; rerun `infra validate --check-refs`.
+- **Symptom:** Unexpected ordering. **Fix:** Check provider rules and references; verify resource names match between configs.
+- **Symptom:** Graph output unreadable. **Fix:** Switch format (`--format dot`) and render with DOT tools; simplify by filtering resources before generation (future enhancement).
+
+---
+
+Last updated: 2025-11-29 14:27 GMT
