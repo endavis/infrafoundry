@@ -884,6 +884,8 @@ Consider adding to CI/CD:
 
 The InfraFoundry codebase is well-architected with strong foundations. The identified issues are localized opportunities for improvement rather than systemic problems.
 
+**Note:** Actionable tasks from this report are tracked in [Project To-Do & Roadmap](../TODO.md).
+
 **Key Takeaway:** Addressing the HIGH priority items (KeaDHCPManager, KeaClient, and print() statement) will provide immediate value with minimal effort (~4 hours, -150 lines).
 
 The MEDIUM and LOW priority items can be addressed incrementally as those areas of the code are touched for other reasons, following the Boy Scout Rule: "Leave the code better than you found it."
