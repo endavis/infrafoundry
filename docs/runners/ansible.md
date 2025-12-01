@@ -1,97 +1,91 @@
 # Ansible Runner Guide
 
-InfraFoundry integrates Ansible for post-deployment configuration management. This runner allows you to apply Ansible roles and tasks to resources provisioned by Terraform.
-
-For an overview of how runners interact and their fixed execution order, please refer to the [Runner Execution Overview](overview.md).
-
 ## Overview
 
-The Ansible runner automatically:
-1. Generates an Ansible inventory from your resource state (Terraform outputs).
-2. Generates a `playbook.yml` applying your configured roles and tasks.
-3. Executes `ansible-playbook` against the provisioned infrastructure.
+The Ansible runner configures provisioned resources by generating inventory and playbooks from your YAML definitions, then running `ansible-playbook`.
 
-## Configuration
+## Audience and Prerequisites
 
-Configuration is done per-resource in your YAML files.
+- **Audience:** Operators adding Ansible roles/tasks to InfraFoundry resources.
+- **Prereqs:** Ansible installed, roles/tasks available in the config repo, and Terraform-provisioned resources with reachable SSH.
 
-### 1. Inline Tasks (`ansible_tasks`)
+## When to Use This
 
-For simple, one-off configurations specific to a resource.
+- Post-provision configuration and service setup.
+- Reusable roles across environments.
+- Inline tasks for small, resource-specific changes.
 
-```yaml
-vms:
-  - name: web-server-01
-    # ... VM config ...
-    ansible_tasks:
-      - name: Install Nginx
-        module: apt
-        params:
-          name: nginx
-          state: present
-          update_cache: yes
-```
+## Quick Start
 
-### 2. Reusable Roles (`ansible_roles`)
+1. Add Ansible fields to a resource:
+   ```yaml
+   resources:
+     - provider: proxmox
+       type: vm
+       name: web-01
+       config:
+         ansible_roles:
+           - common
+           - webserver
+         ansible_vars:
+           webserver_port: 8080
+   ```
+2. Run:
+   ```bash
+   infra apply --env dev
+   ```
+   Ansible inventory/playbook is generated and executed after provisioning.
 
-For complex, reusable configuration logic. This is the preferred method for standard services.
+## Configuration Details
 
-#### Directory Structure
-Place your roles in a `roles/` directory in your configuration repository:
+- **Per-resource fields:** `ansible_roles`, `ansible_tasks`, `ansible_vars`.
+- **Roles location:** `roles/` in the config repo (e.g., `roles/common`, `roles/webserver`).
+- **Generated files:** Inventory/playbook under `generated/{env}/ansible/{provider}/`.
+- **Execution order:** Runs after Terraform (see `runner_priorities`).
 
-```text
-config-repo/
-├── envs/
-│   └── dev/
-│       └── ...
-└── roles/
-    ├── common/
-    │   └── tasks/
-    │       └── main.yml
-    └── webserver/
-        ├── tasks/
-        │   └── main.yml
-        └── templates/
-            └── nginx.conf.j2
-```
+## Validation and Checks
 
-#### Usage in YAML
+- Validate configs: `infra validate --env <env> --check-api --check-refs`.
+- Ensure SSH connectivity for hosts produced by Terraform.
+- Use Ansible syntax/lint checks locally if needed.
 
-```yaml
-vms:
-  - name: app-server
-    ansible_roles:
-      - common
-      - webserver
-    ansible_vars:
-      webserver_port: 8080
-      upstream_servers:
-        - 10.0.0.5
-        - 10.0.0.6
-```
+## Examples
 
-## Variables
+- **Inline task:**
+  ```yaml
+  ansible_tasks:
+    - name: Install Nginx
+      module: apt
+      params:
+        name: nginx
+        state: present
+        update_cache: yes
+  ```
+- **Roles with vars:**
+  ```yaml
+  ansible_roles:
+    - common
+    - webserver
+  ansible_vars:
+    webserver_port: 8080
+    upstream_servers:
+      - 10.0.0.5
+      - 10.0.0.6
+  ```
 
-Variables can be passed directly to Ansible via `ansible_vars`. These are available in your tasks and templates.
+## Related Documentation
 
-```yaml
-vms:
-  - name: db-server
-    ansible_vars:
-      db_name: production
-      max_connections: 100
-```
+- [Runner Execution Overview](overview.md)
+- [Configuration Guide](../configuration.md)
+- [SSH Authentication](../ssh-authentication.md)
+- [Pluggable Runner System](../architecture/pluggable-runners.md)
 
-Sensitive variables should be managed via SOPS secrets in your environment configuration, which are passed securely to Ansible.
+## Troubleshooting
 
-## Execution
+- **Symptom:** Playbook not generated. **Fix:** Ensure resource includes Ansible fields; check `generated/{env}/ansible/{provider}`.
+- **Symptom:** SSH fails. **Fix:** Verify SSH settings in `settings.yaml` and host reachability; confirm keys/ports.
+- **Symptom:** Roles not found. **Fix:** Place roles under `roles/` in config repo and reference by directory name.
 
-The Ansible runner executes automatically during `infra apply` if Ansible configurations are present.
+---
 
-```bash
-# Plan includes Ansible dry-run (check mode)
-infra plan --env dev
-
-# Apply executes the playbook
-infra apply --env dev
-```
+Last updated: 2025-11-29 14:27 GMT

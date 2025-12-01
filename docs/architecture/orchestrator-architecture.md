@@ -1,259 +1,85 @@
 # Orchestrator Architecture
 
-This document explains the architecture of the Orchestrator class and its delegation pattern.
-
 ## Overview
 
-The **Orchestrator** (827 lines) is the central coordinator for infrastructure deployments. While large, it follows a clear delegation pattern, pushing most logic to specialized helper classes.
+The Orchestrator is a thin coordinator that wires providers, runners, policy checks, drift detection, state, events, and notifications. Dedicated workflow classes handle plan/apply/destroy/rollback/status while the Orchestrator focuses on delegation and ordering.
 
-## Architecture Pattern: Thin Coordinator + Specialized Helpers
+## Audience and Prerequisites
 
-The Orchestrator uses a **delegation pattern** where it coordinates specialized helpers rather than implementing logic itself:
+- **Audience:** Contributors extending orchestration workflows or debugging execution order.
+- **Prereqs:** Understanding of InfraFoundry providers, runners, and state/event systems.
 
-```
-Orchestrator (Thin Coordinator)
-├── DeploymentExecutor     → Executes Terraform/Ansible
-├── PolicyChecker          → Validates policies
-├── DriftDetector          → Detects configuration drift
-├── TerraformRunner        → Runs terraform commands
-├── AnsibleRunner          → Runs ansible commands
-├── StateManager           → Tracks deployment history
-├── EventManager           → Emits lifecycle events
-├── ConfigManager          → Loads configurations
-├── SecretManager          → Manages secrets
-├── NotificationManager    → Sends notifications
-└── Provider Registry      → Registered provider plugins
-```
+## When to Use This
 
-## Key Responsibilities
+- Tracing how plan/apply/destroy invoke helpers.
+- Adding new workflow steps or hooks.
+- Ensuring providers are registered and grouped correctly.
 
-### 1. Provider Management (40 lines)
-- `register_provider()` - Register provider plugins
-- `validate_resources()` - Validate resources against provider capabilities
-- Provider registry dict: `self.providers`
+## Quick Start
 
-### 2. Resource Planning (50 lines)
-- `build_dependency_graph()` - Build resource dependencies
-- Resource loading via ConfigManager
-- Resource grouping by provider
+1. Run a workflow to see orchestration in action:
+   ```bash
+   infra plan --env dev
+   infra apply --env dev
+   infra destroy --env dev
+   ```
+2. Inspect generated artifacts and events to verify order and outputs.
 
-### 3. Workflow Orchestration (600+ lines)
-- `plan()` - Plan infrastructure changes (160 lines)
-- `apply()` - Apply changes (120 lines)
-- `destroy()` - Destroy infrastructure (145 lines)
-- `rollback()` - Rollback to previous state (80 lines)
+## Architecture Details
 
-### 4. Helper Coordination (40 lines)
-- `check_policies()` - Delegates to PolicyChecker
-- `detect_drift()` - Delegates to DriftDetector
-- `status()` - Display deployment status
+- **Delegation pattern:** Top-level Orchestrator is a facade; workflow classes (`Validation/Plan/Apply/Destroy/Rollback/Drift/Status` orchestrators in `core/orchestrator_workflows.py`) implement steps.
+- **Helpers coordinated:**
+  - ConfigManager (resource loading/validation)
+  - PolicyEngine (pre-deployment checks)
+  - Dependency graph builder (ordering)
+  - SecretManager (exports for Terraform/Ansible)
+  - Providers (render Terraform/Ansible)
+  - Runners via DeploymentExecutor (Terraform/Ansible execution)
+  - StateManager (deployments/resources/events)
+  - EventManager (BEFORE/AFTER/FAILED events across lifecycle)
+  - NotificationManager (subscribed to events)
+- **Workflow outline:**
+  1. Create deployment record; emit BEFORE event.
+  2. Load/validate resources; check policies; group by provider.
+  3. Track resources in state; render Terraform/Ansible; export secrets.
+  4. Execute via runners; update state; emit AFTER or FAILED events.
+- **Provider registry:** Providers registered once; grouped resources dispatched per provider.
 
-## Workflow Pattern
+## Validation and Checks
 
-> **Update (2025-01-13):** The primary workflows now live in dedicated coordinator classes:
-> `ValidationOrchestrator`, `PlanOrchestrator`, `ApplyOrchestrator`, `DestroyOrchestrator`,
-> `RollbackOrchestrator`, `DriftOrchestrator`, and `StatusOrchestrator`
-> (`src/infrafoundry/core/orchestrator_workflows.py`). Each orchestrator encapsulates the workflow
-> steps below while the top-level `Orchestrator` acts as a thin facade that wires dependencies and
-> delegates to the appropriate orchestrator method.
+- Use `infra validate --env <env> --check-api --check-refs` before workflows.
+- Check state updates with `infra history`/`infra status`.
+- Review event emissions (notifications/logs) to ensure hooks fire.
 
-All major workflows (`plan`, `apply`, `destroy`) follow this pattern:
+## Examples
 
-```python
-def workflow(self, env_name, **kwargs):
-    # 1. Create deployment record
-    deployment_id = self.state_manager.create_deployment(...)
+- **Dependency grouping concept:**
+  ```python
+  resources_by_provider = group_resources(resources)
+  for provider_name, items in resources_by_provider.items():
+      provider = providers[provider_name]
+      provider.generate_terraform(items)
+      deployment_executor.execute(provider_name, items)
+  ```
+- **Event emission concept:**
+  ```python
+  event_manager.emit_event(EventType.BEFORE_APPLY, environment=env, data={...})
+  ```
 
-    # 2. Emit before event
-    self.event_manager.emit_event(EventType.BEFORE_*, ...)
+## Related Documentation
 
-    try:
-        # 3. Load and validate resources
-        resources = self.config_manager.get_all_resources_all_providers(env_name)
-        self.validate_resources(resources)
+- [Infrastructure Architecture](ARCHITECTURE.md)
+- [Pluggable Runners](pluggable-runners.md)
+- [Architecture Overview](overview.md)
+- [State Management](../state-management.md)
+- [Notifications Guide](../notifications.md)
 
-        # 4. Check policies (optional)
-        if self.policy_engine.policies:
-            self.check_policies(env_name, resources)
+## Troubleshooting
 
-        # 5. Group resources by provider
-        resources_by_provider = {...}
+- **Symptom:** Providers not executed. **Fix:** Ensure provider registration and resource grouping; check resource `provider` fields.
+- **Symptom:** Events/notifications missing. **Fix:** Verify subscribers are registered; run with higher log level.
+- **Symptom:** State not updated. **Fix:** Confirm database backend connectivity and that workflow calls StateManager methods.
 
-        # 6. For each provider:
-        for provider_name, provider_resources in resources_by_provider.items():
-            provider = self.providers[provider_name]
+---
 
-            # 7. Track resources in state
-            for resource in provider_resources:
-                self.state_manager.track_resource(...)
-
-            # 8. Generate configs
-            provider.set_environment(env_name)
-            provider.generate_terraform(provider_resources)
-            provider.generate_ansible(provider_resources)
-
-            # 9. Export secrets
-            self.secret_manager.export_for_terraform(...)
-
-            # 10. Execute (delegate to DeploymentExecutor/runners)
-            self.deployment_executor.execute(...)
-
-        # 11. Update deployment status
-        self.state_manager.update_deployment_status(...)
-
-        # 12. Emit after event
-        self.event_manager.emit_event(EventType.AFTER_*, ...)
-
-    except Exception as e:
-        # Handle failure
-        self.state_manager.update_deployment_status(..., FAILED)
-        self.event_manager.emit_event(EventType.*_FAILED, ...)
-        raise
-```
-
-## Why the Orchestrator is Large
-
-The Orchestrator is 827 lines because it:
-
-1. **Coordinates 10+ helper classes** - Each workflow step requires coordination
-2. **Implements 3 major workflows** - plan (160), apply (120), destroy (145), rollback (80)
-3. **Handles comprehensive error handling** - Try/catch blocks with state tracking
-4. **Provides rich console output** - User feedback for each step
-5. **Tracks detailed state** - Resource-level state tracking throughout
-
-## Delegation in Action
-
-Most complexity is already delegated:
-
-| Responsibility | Delegated To | Lines |
-|----------------|--------------|-------|
-| Terraform execution | TerraformRunner | 350 |
-| Ansible execution | AnsibleRunner | 187 |
-| State tracking | StateManager | 298 |
-| Config loading | ConfigManager | 250 |
-| Secret management | SecretManager | 221 |
-| Policy checking | PolicyChecker | 131 |
-| Drift detection | DriftDetector | 180 |
-| Provider execution | DeploymentExecutor | 268 |
-| Event handling | EventManager | 196 |
-| Notifications | NotificationManager | 117 |
-
-**Total delegated**: ~2,200 lines across 10 helper classes
-
-## Why Not Extract Further?
-
-### Option 1: Extract WorkflowEngine ❌
-**Problem:** The workflows are similar but have critical differences:
-- `plan()` - Reads state, generates files, runs `terraform plan`
-- `apply()` - Modifies infrastructure, creates snapshots, runs both Terraform and Ansible
-- `destroy()` - Requires confirmation, deletes infrastructure
-- `rollback()` - Restores from snapshots, complex rollback logic
-
-Extracting to a generic WorkflowEngine would create a complex abstraction that's harder to understand than the current explicit workflows.
-
-### Option 2: Extract ProviderCoordinator ❌
-**Problem:** Provider coordination is simple:
-- `register_provider()` - 10 lines
-- Provider registry - 1 dict
-- `validate_resources()` - 30 lines
-
-Creating a separate class for ~40 lines of simple logic adds indirection without benefit.
-
-### Option 3: Extract ResourcePlanner ❌
-**Problem:** Resource planning is tightly coupled to workflows:
-- Loading resources - delegated to ConfigManager
-- Grouping resources - simple dict comprehension
-- Building dependency graph - already a separate method
-
-The "planning" is really just preparation within each workflow, not an independent concern.
-
-## Current State: Well-Architected ✅
-
-The Orchestrator follows good design principles:
-
-1. **Single Responsibility** - Coordinates workflows (doesn't implement details)
-2. **Dependency Injection** - All helpers injected in constructor
-3. **Delegation** - Most logic in specialized helper classes
-4. **Clear Interfaces** - Public methods (`plan`, `apply`, `destroy`) are the API
-5. **Testable** - Helper classes can be mocked (see 429 passing tests)
-
-## Comparison to Other Large Files
-
-| File | Lines | Reason for Size | Complexity |
-|------|-------|-----------------|------------|
-| **Orchestrator** | 827 | 3 major workflows × 150 lines each, plus coordination | **Medium** - mostly linear workflows |
-| TerraformRunner | 350 | Complex terraform CLI parsing | Medium |
-| StateManager | 298 | Database operations + repositories | Low - simple CRUD |
-| ConfigManager | 250 | Multiple config formats + loaders | Low - delegated to loaders |
-
-The Orchestrator is large but **linear and explicit** - each workflow is easy to follow from top to bottom.
-
-## Potential Future Improvements
-
-If the Orchestrator needs to shrink in the future, consider:
-
-### 1. Extract Common Workflow Steps (Low Priority)
-Create methods for repeated patterns:
-```python
-def _prepare_workflow(self, env_name, command):
-    """Common workflow preparation."""
-    deployment_id = self.state_manager.create_deployment(...)
-    self.event_manager.emit_event(...)
-    return deployment_id
-
-def _finalize_workflow(self, deployment_id, env_name, results):
-    """Common workflow finalization."""
-    self.state_manager.update_deployment_status(...)
-    self.event_manager.emit_event(...)
-```
-
-**Impact:** Save ~30-40 lines by reducing duplication
-**Risk:** Low - simple refactoring
-**Benefit:** Minimal - workflows are already clear
-
-### 2. Strategy Pattern for Workflows (Medium Priority)
-If we add more workflow types (upgrade, migrate, etc.):
-```python
-class WorkflowStrategy(ABC):
-    @abstractmethod
-    def execute(self, orchestrator, env_name, **kwargs): pass
-
-class PlanOrchestrator(WorkflowStrategy): ...
-class ApplyOrchestrator(WorkflowStrategy): ...
-```
-
-**Impact:** Enable new workflow types without modifying Orchestrator
-**Risk:** Medium - significant abstraction
-**Benefit:** High if we need 5+ workflow types, Low otherwise
-
-### 3. Resource Loading Helper (Low Priority)
-```python
-class ResourceLoader:
-    def load_and_validate(self, env_name, filter=None):
-        resources = self.config_manager.get_all_resources(...)
-        grouped = self._group_by_provider(resources)
-        self._validate_all(resources)
-        return grouped
-```
-
-**Impact:** Save ~20 lines per workflow
-**Risk:** Low - simple extraction
-**Benefit:** Minimal - current code is already clear
-
-## Conclusion
-
-**The Orchestrator is well-designed as-is.**
-
-It's large (827 lines) but:
-- ✅ Follows clear patterns
-- ✅ Delegates appropriately
-- ✅ Is easy to understand
-- ✅ Has 100% test coverage
-- ✅ Serves as the clear "entry point" for all workflows
-
-**Recommendation:** Document and maintain current structure. Only refactor if:
-1. We need to add 2+ new major workflows
-2. The workflows become significantly more complex
-3. We need to support workflow customization/plugins
-
-The principle of **"if it ain't broke, don't fix it"** applies here. The Orchestrator works well, tests pass, and the structure is clear.
+Last updated: 2025-11-29 14:27 GMT

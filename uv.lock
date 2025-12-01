@@ -624,6 +624,7 @@ source = { editable = "." }
 dependencies = [
     { name = "ansible" },
     { name = "click" },
+    { name = "doit" },
     { name = "jinja2" },
     { name = "opnsense-openapi" },
     { name = "pydantic" },
@@ -638,7 +639,6 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "coverage-badge" },
-    { name = "doit" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -653,7 +653,7 @@ requires-dist = [
     { name = "ansible", specifier = ">=2.15.0" },
     { name = "click", specifier = ">=8.1.0" },
     { name = "coverage-badge", marker = "extra == 'dev'", specifier = ">=1.1.0" },
-    { name = "doit", marker = "extra == 'dev'", specifier = ">=0.36.0" },
+    { name = "doit", specifier = ">=0.36.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "opnsense-openapi", specifier = ">=0.1.0" },

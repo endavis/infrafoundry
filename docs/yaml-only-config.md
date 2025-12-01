@@ -2,115 +2,106 @@
 
 ## Overview
 
-InfraFoundry now uses **pure YAML configuration** for all settings. No need to write HCL (Terraform) configuration files - everything is defined in YAML and automatically converted as needed.
+InfraFoundry uses **pure YAML** for all environment, resource, and credential configuration. The framework converts YAML to the required Terraform/Ansible inputs automatically—no hand-written HCL needed.
 
-## What Changed
+## Audience and Prerequisites
 
-**Before:** Users had to write both YAML and HCL
-- Resources: YAML files (`envs/{env}/{provider}/*.yaml`)
-- SSH config: HCL files (`terraform.tfvars`)
+- **Audience:** Config repo maintainers and operators defining environments/resources.
+- **Prereqs:** Config repo available, `sops`/`age` for secrets, `uv run infra` installed, and provider credentials ready.
 
-**After:** Everything is YAML
-- Resources: YAML files (`envs/{env}/{provider}/*.yaml` or `envs/{env}/resources/*.yaml`)
-- Configuration: YAML in `settings.yaml` → automatically converted to `terraform.tfvars`
-- Credentials: YAML in `settings.yaml` (encrypted with SOPS) → passed to Terraform
+## When to Use This
 
-## Configuration File
+- Migrating from mixed YAML+HCL to a single YAML workflow.
+- Creating new environments or services without writing HCL.
+- Applying per-provider SSH or credential overrides in YAML.
 
-All environment configuration, including SSH settings and provider credentials, goes in `settings.yaml`:
+## Quick Start
 
-### Global Config (Simple)
+1. Add or update `envs/{env}/settings.yaml` with SSH and provider settings.
+2. Define resources in YAML (`envs/{env}/resources/*.yaml` or provider folders).
+3. Encrypt secrets with SOPS/age as needed.
+4. Generate and validate:
+   ```bash
+   infra validate --env dev
+   infra plan --env dev
+   ```
 
-When all providers use the same SSH credentials:
+## Configuration Details
 
-```yaml
-# endavis-infra/envs/test/settings.yaml
-name: test
-description: Test environment
+- **Settings location:** `envs/{env}/settings.yaml` holds environment metadata, SSH, and `provider_settings`. Per-provider SSH overrides live under `provider_ssh`.
+- **Resource layouts:** Use resource-centric (`envs/{env}/resources/*.yaml`) for multi-provider services, or provider-centric (`envs/{env}/{provider}/*.yaml`) when grouping by provider. Mixing is supported.
+- **Auto-generated tfvars:** Terraform variables are rendered from `settings.yaml` into `generated/{env}/terraform/{provider}/terraform.tfvars`.
+- **Secrets:** Store sensitive values in `settings.yaml` and encrypt with SOPS/age; InfraFoundry decrypts during generate/apply.
 
-ssh:
-  user: endavis
-  key_path: /home/endavis/.ssh/id_ed25519
-  port: 22  # Optional, defaults to 22
+## Validation and Checks
 
-provider_settings:
-  proxmox:
-    api_url: https://pve01.example.com:8006
-    api_token: your-api-token
-    node: pve01
-    storage: local-lvm
-```
+- Run `infra validate --env <env> --check-api --check-refs` to confirm YAML structure, provider discovery, connectivity, and referenced templates/networks/aliases.
+- Inspect generated Terraform inputs under `generated/{env}/terraform/{provider}/terraform.tfvars` to confirm values and SSH overrides.
 
-### Per-Provider Config (Advanced)
+## Examples
 
-When different providers need different SSH credentials:
-
-```yaml
-# endavis-infra/envs/prod/settings.yaml
-name: prod
-description: Production environment
-
-# Global default (used if provider-specific not defined)
-ssh:
-  user: automation
-  key_path: /home/automation/.ssh/id_ed25519
-
-# Provider-specific SSH overrides
-provider_ssh:
-  proxmox:
-    user: proxmox-admin
-    key_path: /secure/keys/proxmox_prod
-    port: 2222
-  opnsense:
-    user: opnsense-admin
-    key_path: /secure/keys/opnsense_prod
-
-# Provider credentials and settings
-provider_settings:
-  proxmox:
-    api_url: https://pve01.example.com:8006
-    api_token: prod-api-token
-    node: pve01
-    storage: local-zfs
-  opnsense:
-    api_url: https://opn.example.com
-    api_key: prod-api-key
-    api_secret: prod-api-secret
-```
-
-### Auto-generated terraform.tfvars
-
-For the per-provider example, Proxmox gets:
-
-```hcl
-# Configuration from settings.yaml
-proxmox_api_url = "https://pve01.example.com:8006"
-proxmox_api_token = "prod-api-token"
-proxmox_node = "pve01"
-proxmox_storage = "local-zfs"
-proxmox_ssh_user = "proxmox-admin"
-proxmox_ssh_key_path = "/secure/keys/proxmox_prod"
-proxmox_ssh_port = 2222
-```
-
-While OPNsense would get its own provider-specific settings.
-
-## Benefits
-
-1. **Consistency**: All configuration uses the same format
-2. **Simplicity**: No need to learn HCL syntax
-3. **Flexibility**: Per-environment SSH settings without duplicating HCL
-4. **Automation**: Framework handles conversion automatically
-
-## Implementation Details
-
-- **Location**: `src/infrafoundry/providers/proxmox/__init__.py`
-- **Method**: `_generate_tfvars()` - called during `generate_terraform()`
-- **Config Model**: `SSHConfig` in `src/infrafoundry/core/config.py`
-- **Generated File**: `generated/{env}/terraform/proxmox/terraform.tfvars`
+- **Global SSH and provider settings (`settings.yaml`):**
+  ```yaml
+  name: test
+  description: Test environment
+  ssh:
+    user: endavis
+    key_path: /home/endavis/.ssh/id_ed25519
+  provider_settings:
+    proxmox:
+      api_url: https://pve01.example.com:8006
+      api_token: your-api-token
+      node: pve01
+      storage: local-lvm
+  ```
+- **Per-provider SSH overrides:**
+  ```yaml
+  provider_ssh:
+    proxmox:
+      user: proxmox-admin
+      key_path: /secure/keys/proxmox_prod
+      port: 2222
+    opnsense:
+      user: opnsense-admin
+      key_path: /secure/keys/opnsense_prod
+  ```
+- **Resource-centric service file:**
+  ```yaml
+  resources:
+    - provider: proxmox
+      type: vm
+      name: web-server-01
+      config:
+        target_node: pve1
+        clone: ubuntu-22-04-template
+        network:
+          bridge: vmbr0
+          tag: 10
+        ipconfig: ip=dhcp
+    - provider: opnsense
+      type: firewall_rule
+      name: allow-web-80
+      config:
+        action: pass
+        interface: LAN
+        protocol: tcp
+        destination_port: 80
+        destination: web-server-01
+  ```
 
 ## Related Documentation
 
-- [SSH Authentication](ssh-authentication.md) - Detailed SSH setup guide
-- [Separate Config Repo](separate-config-repo.md) - Repository structure
-- [Per-Environment Credentials](per-environment-credentials.md) - Managing secrets
+- [Configuration Guide](configuration.md)
+- [SSH Authentication](ssh-authentication.md)
+- [Per-Environment Credentials](per-environment-credentials.md)
+- [Separate Config Repo](separate-config-repo.md)
+
+## Troubleshooting
+
+- **Symptom:** Generated `terraform.tfvars` missing values. **Fix:** Ensure fields exist in `settings.yaml`; rerun `infra plan`.
+- **Symptom:** Providers not discovered. **Fix:** Confirm resource files include `provider` keys and are placed under `resources/` or provider directories.
+- **Symptom:** SSH fails during Proxmox operations. **Fix:** Verify `ssh` or `provider_ssh` entries and that keys are accessible; re-run `infra validate --check-api`.
+
+---
+
+Last updated: 2025-11-29 14:19 GMT

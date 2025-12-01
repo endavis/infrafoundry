@@ -2,239 +2,126 @@
 
 ## Overview
 
-InfraFoundry uses a single, SOPS-encrypted `settings.yaml` file per environment containing all configuration and secrets. **You write only YAML** - InfraFoundry automatically generates Terraform `.tf` and `.tfvars` files from your settings. No HCL knowledge required!
+Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata, SSH defaults, provider credentials, and overrides. InfraFoundry renders Terraform/Ansible inputs from this YAML—no HCL required.
 
-## File Location
+## Audience and Prerequisites
 
-```
-envs/
-├── dev/
-│   ├── settings.yaml        # All config + secrets (SOPS encrypted)
-│   ├── proxmox/             # Resource definitions (not encrypted)
-│   │   └── vm.yaml
-│   └── resources/           # Multi-provider resources (not encrypted)
-│       └── app.yaml
-├── staging/
-│   └── settings.yaml
-└── prod/
-    └── settings.yaml
-```
+- **Audience:** Config repo maintainers defining environment settings and secrets.
+- **Prereqs:** Config repo with `envs/{env}`, `sops` + `age` installed, and provider credentials for targeted platforms.
 
-## Structure
+## When to Use This
 
-```yaml
-# envs/prod/settings.yaml (can be encrypted with SOPS)
+- Creating or updating environment settings and credentials.
+- Adding provider-specific SSH overrides or defaults.
+- Auditing the required fields for `settings.yaml`.
 
-# Environment metadata
-name: prod
-description: Production environment
-variables:
-  datacenter: dc1
-  domain: example.com
-  managed_by: infrafoundry
+## Quick Start
 
-# Global SSH defaults (applies to all providers unless overridden)
-ssh:
-  user: automation
-  key_path: /home/automation/.ssh/id_ed25519
-  port: 22
+1. Create `envs/{env}/settings.yaml` and add metadata, SSH, and provider settings.
+2. Encrypt with SOPS/age:
+   ```bash
+   sops --encrypt --in-place envs/dev/settings.yaml
+   ```
+3. Validate and plan:
+   ```bash
+   infra validate --env dev --check-api
+   infra plan --env dev
+   ```
 
-# Provider-specific SSH overrides (optional)
-provider_ssh:
-  proxmox:
-    user: root
-    key_path: /secure/keys/proxmox_ed25519
-    port: 2222
-  opnsense:
-    user: root
-    key_path: /secure/keys/opnsense_ed25519
+## Configuration Details
 
-# Provider-specific settings (credentials, endpoints, defaults)
-provider_settings:
-  proxmox:
-    # API credentials
-    api_url: https://pve01.example.com:8006
-    api_token: pve-token-id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+- **File location:** `envs/{env}/settings.yaml` (encrypted with SOPS/age).
+- **Key sections:**
+  - `name`, `description`, optional `variables` (for templates).
+  - `ssh` (global SSH defaults) and `provider_ssh` (per-provider overrides).
+  - `provider_settings` per provider (credentials, endpoints, defaults).
+- **Example structure:**
+  ```yaml
+  name: prod
+  description: Production environment
+  variables:
+    datacenter: dc1
+    domain: example.com
 
-    # Provider defaults
-    node: pve01
-    storage: local-zfs
+  ssh:
+    user: automation
+    key_path: /home/automation/.ssh/id_ed25519
 
-  opnsense:
-    # API credentials
-    api_url: https://fw.example.com
-    api_key: xxxxxxxxxxxxxxxxxxxx
-    api_secret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
+  provider_ssh:
+    proxmox:
+      user: root
+      key_path: /secure/keys/proxmox_ed25519
+      port: 2222
 
-## Schema
+  provider_settings:
+    proxmox:
+      api_url: https://pve01.example.com:8006
+      api_token: pve-token-id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      node: pve01
+      storage: local-zfs
+    opnsense:
+      api_url: https://fw.example.com
+      api_key: xxxxxxxxxxxxxxxxxxxx
+      api_secret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    kubernetes:
+      kubeconfig_path: ~/.kube/config
+      namespace: infra
+  ```
+- **Schema hints:**
+  - `ssh.user`/`key_path`/`port` (optional, defaults to current user and port 22).
+  - `provider_ssh.<provider>` overrides global SSH.
+  - `provider_settings.<provider>` holds credentials/endpoints; fields vary by provider.
+- **Generated outputs:** Values populate `generated/{env}/terraform/{provider}/terraform.tfvars` and Ansible vars automatically.
 
-### Top-Level Fields
+## Validation and Checks
 
-```yaml
-name: string                # Required: Environment name
-description: string         # Optional: Human-readable description
-variables: dict            # Optional: Environment variables for templates
-ssh: SSHConfig             # Optional: Global SSH defaults
-provider_ssh: dict         # Optional: Per-provider SSH overrides
-provider_settings: dict    # Optional: Provider-specific settings
-```
+- Run `infra validate --env <env> --check-api` to confirm structure and credentials.
+- Inspect generated tfvars to verify SSH overrides and provider settings:
+  ```bash
+  cat generated/dev/terraform/proxmox/terraform.tfvars
+  ```
+- Ensure `settings.yaml` is encrypted and keys are git-ignored.
 
-### SSH Configuration
+## Examples
 
-```yaml
-ssh:
-  user: string             # Optional: Default SSH user
-  key_path: string         # Optional: Path to SSH private key
-  port: int                # Optional: SSH port (default: 22)
-```
+- **Dev settings with minimal fields:**
+  ```yaml
+  name: dev
+  description: Development environment
+  provider_settings:
+    proxmox:
+      api_url: https://pve-dev.example.com:8006
+      api_token: pve-dev-token
+  ```
+- **Per-provider SSH override:**
+  ```yaml
+  provider_ssh:
+    opnsense:
+      user: opnsense-admin
+      key_path: /secure/keys/opnsense_prod
+      port: 22
+  ```
+- **Kubernetes settings:**
+  ```yaml
+  provider_settings:
+    kubernetes:
+      kubeconfig_path: ~/.kube/config
+      namespace: platform
+  ```
 
-### Provider SSH Overrides
+## Related Documentation
 
-```yaml
-provider_ssh:
-  <provider_name>:
-    user: string           # Optional: Override SSH user for this provider
-    key_path: string       # Optional: Override SSH key for this provider
-    port: int              # Optional: Override SSH port for this provider
-```
+- [Configuration Guide](configuration.md)
+- [YAML-Only Configuration](yaml-only-config.md)
+- [Per-Environment Credentials](per-environment-credentials.md)
+- [SSH Authentication](ssh-authentication.md)
 
-### Provider Settings
+## Troubleshooting
 
-Each provider can have custom settings for credentials, endpoints, and defaults:
+- **Symptom:** Missing values in generated tfvars. **Fix:** Ensure fields exist in `settings.yaml` and rerun `infra plan`.
+- **Symptom:** SSH fails during Proxmox operations. **Fix:** Verify `ssh`/`provider_ssh` entries and key paths; re-validate with `--check-api`.
+- **Symptom:** Secrets exposed in git. **Fix:** Encrypt `settings.yaml` with SOPS/age and confirm ignore rules include keys.
 
-```yaml
-provider_settings:
-  <provider_name>:
-    # Provider-specific fields (varies by provider)
-```
+---
 
-## Provider-Specific Fields
-
-### Proxmox
-
-```yaml
-provider_settings:
-  proxmox:
-    api_url: string                    # Required: Proxmox API URL
-    api_token: string                  # Required: API token (format: id=secret)
-    node: string                       # Optional: Default node
-    storage: string                    # Optional: Default storage
-```
-
-### OPNsense
-
-```yaml
-provider_settings:
-  opnsense:
-    api_url: string                    # Required: OPNsense API URL
-    api_key: string                    # Required: API key
-    api_secret: string                 # Required: API secret
-```
-
-### Kubernetes
-
-```yaml
-provider_settings:
-  kubernetes:
-    kubeconfig_path: string            # Required: Path to kubeconfig
-    context: string                    # Optional: Kube context
-    namespace: string                  # Optional: Default namespace
-```
-
-## Encryption
-
-The entire `settings.yaml` file should be encrypted with SOPS using age encryption:
-
-```bash
-# Create age key (one-time setup)
-age-keygen -o envs/age.key
-
-# Get public key for .sops.yaml
-age-keygen -y envs/age.key
-
-# Create .sops.yaml configuration
-cat > .sops.yaml << EOF
-creation_rules:
-  - path_regex: envs/.*/settings\.yaml$
-    age: <PUBLIC_KEY>
-EOF
-
-# Encrypt settings
-sops --encrypt --age <PUBLIC_KEY> envs/prod/settings.yaml.plain > envs/prod/settings.yaml
-
-# Decrypt for editing
-sops envs/prod/settings.yaml
-
-# Decrypt for InfraFoundry (automatic)
-export SOPS_AGE_KEY_FILE=envs/age.key
-infra plan --env prod
-```
-
-## Migration from Old Structure
-
-### From environment.yaml to settings.yaml
-
-Old structure:
-```yaml
-# environment.yaml
-name: prod
-description: Production environment
-variables:
-  datacenter: dc1
-```
-
-New structure - same fields at top level:
-```yaml
-# settings.yaml
-name: prod
-description: Production environment
-variables:
-  datacenter: dc1
-provider_settings:
-  proxmox:
-    # ... provider config
-```
-
-### From envs/ directory to settings.yaml
-
-Old structure:
-```
-envs/prod/
-├── environment.yaml
-└── ../../envs/
-    ├── proxmox.yaml (encrypted)
-    └── opnsense.yaml (encrypted)
-```
-
-New structure:
-```
-envs/prod/
-└── settings.yaml (encrypted, contains everything)
-```
-
-Merge credentials from `envs/*.yaml` into `provider_settings`:
-
-```yaml
-# Old: envs/proxmox.yaml
-api_url: https://pve01.example.com:8006
-api_token: token-value
-
-# New: settings.yaml
-provider_settings:
-  proxmox:
-    api_url: https://pve01.example.com:8006
-    api_token: token-value
-```
-
-## Benefits
-
-1. **Single source of truth**: One file per environment
-2. **Everything encrypted**: All credentials in one SOPS-encrypted file
-3. **Provider isolation**: Each provider's config clearly separated
-4. **Flexible SSH**: Global defaults with per-provider overrides
-5. **Better CI/CD**: One SOPS key, one file to manage
-
-## Complete Example
-
-See `/endavis-infra/envs/test/settings.yaml` for a comprehensive example with all supported fields.
+Last updated: 2025-11-29 14:19 GMT
