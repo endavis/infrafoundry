@@ -1,336 +1,74 @@
 # CI/CD Testing Guide
 
-This document describes InfraFoundry's automated testing and CI/CD setup.
-
 ## Overview
 
-InfraFoundry uses GitHub Actions for automated testing on every push and pull request. The workflow ensures code quality, maintains test coverage, and prevents regressions.
+CI runs lint/format, tests, coverage, and integration checks to guard regressions. GitHub Actions pipelines target multiple Python versions and publish coverage artifacts/comments.
 
-## Test Workflow
+## Audience and Prerequisites
 
-**Location:** `.github/workflows/tests.yml`
+- **Audience:** Contributors and reviewers ensuring CI health.
+- **Prereqs:** GitHub Actions access; local tools (`uv`, `doit`, pytest, ruff, mypy) to replicate checks.
 
-**Triggers:**
-- Push to `main`, `dev`, or `develop` branches
-- Pull requests to `main` or `dev`
-- Manual workflow dispatch
+## When to Use This
 
-### Jobs
+- Before opening/merging PRs to mirror CI locally.
+- Understanding pipeline stages and coverage expectations.
+- Expanding integration tests or adjusting thresholds.
 
-The workflow runs 4 parallel jobs:
+## Quick Start
 
-#### 1. Main Test Job (`test`)
-
-**Purpose:** Run full test suite with coverage enforcement
-
-**Steps:**
-1. Check out code
-2. Set up Python 3.12
-3. Install uv package manager
-4. Install dependencies with `uv pip install -e ".[dev]"`
-5. Run linting (ruff) - non-blocking
-6. Run tests with coverage: `pytest --cov=src/infrafoundry --cov-fail-under=69`
-7. Upload coverage to Codecov
-8. Upload coverage reports as artifacts
-9. Comment coverage on PR
-10. Generate coverage badge (main/dev branches only)
-
-**Coverage Threshold:** 69% (actual coverage: 69.89%, rounds to 70%)
-
-**Artifacts:**
-- `tmp/htmlcov/` - HTML coverage report
-- `tmp/coverage.xml` - XML coverage report for Codecov
-- `tmp/.coverage` - Raw coverage data
-
-#### 2. Python Matrix Job (`test-matrix`)
-
-**Purpose:** Ensure compatibility with multiple Python versions
-
-**Matrix:**
-- Python 3.12 (project minimum)
-- Python 3.13 (latest stable)
-
-**Steps:**
-1. Check out code
-2. Set up Python version from matrix
-3. Install dependencies
-4. Run tests (without coverage)
-
-**Fail-fast:** Disabled - all Python versions tested even if one fails
-
-#### 3. Integration Test Job (`integration-test`)
-
-**Purpose:** Test with external tools (Terraform, Ansible)
-
-**Dependencies:** Runs after `test` job passes
-
-**Steps:**
-1. Check out code
-2. Set up Python 3.12
-3. Install Terraform 1.6.0
-4. Install Ansible via uv
-5. Run integration tests: `pytest tests/integration/`
-
-**Note:** Currently, integration tests are minimal. See [#5 in todo list](../README.md#development-roadmap) for expansion plans.
-
-#### 4. Code Quality Job (`code-quality`)
-
-**Purpose:** Enforce code style and type safety
-
-**Checks:**
-1. **ruff format** - Code formatting (blocking)
-2. **ruff check** - Linting and import sorting (blocking)
-3. **mypy** - Static type checking (non-blocking)
-
-**Non-blocking checks** use `continue-on-error: true` to provide feedback without failing the build.
-
-## Coverage Reporting
-
-### Codecov Integration
-
-Coverage reports are uploaded to [Codecov](https://codecov.io) for:
-- Historical trend tracking
-- PR coverage comparisons
-- Coverage visualizations
-
-**Setup:**
-1. Create Codecov account linked to GitHub repo
-2. Add `CODECOV_TOKEN` to GitHub Secrets
-3. Codecov action automatically uploads `coverage.xml`
-
-**Note:** `fail_ci_if_error: false` prevents CI failures if Codecov is unavailable
-
-### PR Comments
-
-The `python-coverage-comment-action` posts coverage info on PRs:
-- Total coverage percentage
-- Coverage change vs base branch
-- Color-coded badge (green ≥80%, orange ≥70%, red <70%)
-
-**Configuration:**
-- `MINIMUM_GREEN: 80` - Green badge threshold
-- `MINIMUM_ORANGE: 70` - Orange badge threshold
-
-### Coverage Badge
-
-A coverage badge is generated and committed to the repo on pushes to `main` or `dev`:
-
+Local commands:
 ```bash
-coverage-badge -o coverage.svg -f
-```
-
-Badge URL: `https://img.shields.io/badge/coverage-70%25-brightgreen`
-
-## Local Testing
-
-### Quick Tests
-
-```bash
-doit test          # Run all tests
-doit coverage      # Run with full coverage report
-```
-
-### Manual Coverage
-
-```bash
-# Run with coverage
-pytest --cov=src/infrafoundry --cov-report=term-missing --cov-report=html
-
-# Open HTML report
-open tmp/htmlcov/index.html  # macOS
-xdg-open tmp/htmlcov/index.html  # Linux
-```
-
-### Test Specific Modules
-
-```bash
-# Unit tests only
-pytest tests/unit/
-
-# Specific test file
-pytest tests/unit/test_config.py -v
-
-# Specific test
-pytest tests/unit/test_config.py::TestConfigManager::test_load_environment -v
-
-# With coverage for specific module
-pytest tests/unit/test_config.py --cov=src/infrafoundry/core/config --cov-report=term-missing
-```
-
-### Code Quality Checks
-
-```bash
-doit format        # Format with ruff
-doit lint          # Run ruff
-doit check         # Run all checks
-
-# Individual tools
-ruff format src/ tests/
-ruff check src/ tests/
-mypy src/
-```
-
-## Required GitHub Secrets
-
-### For Test Workflow
-
-- `CODECOV_TOKEN` (optional) - Codecov API token for coverage upload
-
-### For Infrastructure Deployment Workflow
-
-- `SOPS_AGE_KEY` - Base64-encoded age encryption key
-- `PROXMOX_API_URL`, `PROXMOX_API_TOKEN_ID`, `PROXMOX_API_TOKEN_SECRET`
-- `OPNSENSE_API_URL`, `OPNSENSE_API_KEY`, `OPNSENSE_API_SECRET`
-- `KUBECONFIG` (optional) - Kubernetes configuration
-
-## Coverage Targets
-
-**Current Status (as of last update):**
-- **Overall:** 69.89% (70% target ✅)
-- **Core modules:** 94-100%
-  - config.py: 98%
-  - dependencies.py: 99%
-  - events.py: 100%
-  - notifications.py: 94%
-  - policy.py: 100%
-  - secrets.py: 100%
-  - state.py: 95%
-- **Providers:** 98-100%
-  - proxmox: 100%
-  - opnsense: 98%
-  - kubernetes: 99%
-
-**Areas needing improvement:**
-- cli.py: 29% (CLI commands, interactive prompts)
-- orchestrator.py: 46% (multi-provider workflows, error handling)
-
-See [Development Roadmap](../README.md#development-roadmap) for coverage improvement plans.
-
-## Troubleshooting
-
-### Tests Pass Locally but Fail in CI
-
-**Common causes:**
-1. **Python version difference** - CI uses 3.12, check local version: `python --version`
-2. **Missing dependencies** - CI installs from `pyproject.toml`, ensure it's up to date
-3. **Environment variables** - CI doesn't have local `.envrc.local`, mock external dependencies
-
-**Solution:**
-```bash
-# Test with exact CI environment
-docker run -it --rm -v $(pwd):/app -w /app python:3.12 bash
-pip install uv
-uv pip install -e ".[dev]"
-pytest --cov=src/infrafoundry --cov-fail-under=69 -v
-```
-
-### Coverage Below Threshold
-
-**Error:** `FAIL Required test coverage of 69% not reached. Total coverage: XX.XX%`
-
-**Solutions:**
-1. Add tests for uncovered code
-2. Remove dead code
-3. Lower threshold (update `COVERAGE_THRESHOLD` in `.github/workflows/tests.yml`)
-
-**Check coverage locally:**
-```bash
+doit format && doit lint
+uv run pytest
 doit coverage
 ```
 
-### Codecov Upload Fails
+## Pipeline Details (GitHub Actions)
 
-**Non-blocking:** CI continues even if Codecov fails
+- **Workflow:** `.github/workflows/tests.yml`
+- **Triggers:** Push to main/dev/develop; PR to main/dev; manual dispatch.
+- **Jobs:**
+  - `test`: Python 3.12, installs via `uv pip install -e ".[dev]"`; runs ruff (non-blocking), `pytest --cov=src/infrafoundry --cov-fail-under=69`; uploads coverage artifacts and Codecov.
+  - `test-matrix`: Python 3.12 and 3.13 without coverage to ensure compatibility.
+  - `integration-test`: After `test`; installs Terraform 1.6.0, Ansible; runs `pytest tests/integration/`.
+  - `code-quality`: `ruff format` (blocking), `ruff check` (blocking), `mypy` (non-blocking via `continue-on-error`).
+- **Coverage:** Threshold 69% (rounds to ~70%); artifacts `tmp/htmlcov/`, `tmp/coverage.xml`.
+- **PR comments:** Coverage comment via `python-coverage-comment-action`; badge thresholds green ≥80, orange ≥70.
 
-**Causes:**
-1. Missing `CODECOV_TOKEN` secret
-2. Codecov service outage
-3. Network issues
+## Validation and Checks
 
-**Fix:**
-- Add token to GitHub Secrets: Settings → Secrets → Actions → New secret
-- Check [Codecov status](https://status.codecov.io)
+- Replicate CI locally with `doit format && doit lint && uv run pytest`.
+- For coverage gates, run `doit coverage` or `pytest --cov=src/infrafoundry --cov-fail-under=69`.
+- Ensure Terraform/Ansible present if touching integration tests.
 
-### Linting Failures
+## Examples
 
-**ruff errors:**
-```bash
-# Fix automatically
-ruff check --fix src/ tests/
+- **Run specific tests:**
+  ```bash
+  pytest tests/unit/test_config.py::TestConfigManager::test_load_environment -v
+  ```
+- **Open HTML coverage:**
+  ```bash
+  xdg-open tmp/htmlcov/index.html
+  ```
+- **Matrix check locally (Python 3.13):**
+  ```bash
+  pyenv local 3.13 && uv run pytest
+  ```
 
-# Check specific rules
-ruff check --select E,F,I,N,W,UP src/
-```
+## Related Documentation
 
-**ruff formatting:**
-```bash
-# Format code
-ruff format src/ tests/
+- [Coding Standards](coding-standards.md)
+- [Manager Patterns](manager-patterns.md)
+- [Plugin Development](plugin-development.md)
 
-# Check without changes
-ruff format --check src/ tests/
-```
+## Troubleshooting
 
-## Best Practices
+- **Symptom:** Coverage below threshold. **Fix:** Add tests for new/changed code paths; re-run coverage.
+- **Symptom:** Ruff/mypy failures. **Fix:** Run `doit format` and address lint/type errors; for non-blocking mypy, still fix issues proactively.
+- **Symptom:** Integration tests fail locally. **Fix:** Ensure Terraform/Ansible versions match CI and required binaries are installed.
 
-### Before Committing
+---
 
-```bash
-# Run full check
-doit format && doit lint && doit coverage
-
-# Or individual steps
-ruff format src/ tests/        # Format
-ruff check --fix src/ tests/   # Fix linting
-pytest --cov=src/infrafoundry --cov-fail-under=69  # Test with coverage
-```
-
-### Writing Tests
-
-1. **Follow naming convention:** `test_*.py`, `Test*` classes, `test_*()` functions
-2. **Use fixtures:** Share setup code with pytest fixtures
-3. **Mock external calls:** Don't call real APIs, use `unittest.mock`
-4. **Test edge cases:** Empty inputs, missing files, network errors
-5. **Check coverage:** Run with `--cov` to see what's missed
-
-### Maintaining Coverage
-
-- **Add tests with new features** - Don't let coverage drop
-- **Test error paths** - Exception handling is often uncovered
-- **Review coverage reports** - Check `tmp/htmlcov/` after each test run
-- **Track trends** - Use Codecov to see coverage over time
-
-## CI/CD Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Push / PR to main/dev                                      │
-└─────────────────┬───────────────────────────────────────────┘
-                  │
-                  ▼
-         ┌────────────────────┐
-         │  GitHub Actions    │
-         │  tests.yml         │
-         └────────┬───────────┘
-                  │
-        ┌─────────┴─────────┬─────────────┬──────────────┐
-        │                   │             │              │
-        ▼                   ▼             ▼              ▼
-   ┌────────┐        ┌──────────┐   ┌─────────┐   ┌─────────┐
-   │  Test  │        │ Py Matrix│   │ Integ   │   │  Code   │
-   │ +Cov   │        │ 3.12/3.13│   │ Tests   │   │ Quality │
-   └───┬────┘        └──────────┘   └─────────┘   └─────────┘
-       │
-       ├─ Upload to Codecov
-       ├─ Generate artifacts (tmp/htmlcov, tmp/coverage.xml)
-       ├─ Comment on PR
-       └─ Generate badge (main/dev only)
-```
-
-## Further Reading
-
-- [pytest documentation](https://docs.pytest.org/)
-- [pytest-cov documentation](https://pytest-cov.readthedocs.io/)
-- [Codecov documentation](https://docs.codecov.com/)
-- [GitHub Actions documentation](https://docs.github.com/en/actions)
-- [Python coverage.py](https://coverage.readthedocs.io/)
+Last updated: 2025-11-29 14:27 GMT

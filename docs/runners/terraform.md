@@ -1,88 +1,79 @@
 # Terraform Runner Guide
 
-InfraFoundry uses Terraform as its core provisioning engine. While you configure your infrastructure using simplified YAML, InfraFoundry generates, validates, and executes standard Terraform code behind the scenes.
-
 ## Overview
 
-The Terraform runner:
-1. **Generates**: Converts your YAML resource definitions into `.tf` files using Jinja2 templates.
-2. **Configures**: Maps environment settings and secrets into `terraform.tfvars`.
-3. **Executes**: Runs `terraform init`, `plan`, and `apply` to manage the resource lifecycle.
-4. **Tracks**: Captures resource IDs (like VM IDs) to map them to your configuration.
+The Terraform runner provisions infrastructure from YAML by rendering `.tf` files, mapping settings/secrets into `terraform.tfvars`, and executing `terraform init/plan/apply`.
 
-## Configuration
+## Audience and Prerequisites
 
-You do not write Terraform HCL directly. Instead, you define resources in YAML, and providers map them to Terraform resources.
+- **Audience:** Operators provisioning with InfraFoundry’s Terraform backend.
+- **Prereqs:** Terraform installed, config repo available, provider credentials/SSH configured.
 
-### Resource Definition
+## When to Use This
 
-```yaml
-vms:
-  - name: db-prod-01
-    node: pve01
-    cores: 4
-    memory: 16384
-    ipconfig: ip=10.0.0.5/24,gw=10.0.0.1
-```
+- Provisioning compute/network/storage resources.
+- Inspecting generated Terraform for debugging.
+- Configuring state backends and provider options via YAML.
 
-This is automatically compiled into a Terraform resource block (e.g., `proxmox_vm_qemu`).
-
-### Settings & Secrets
-
-Global settings (like API URLs) and secrets are defined in your environment's `settings.yaml` and passed to Terraform as variables.
-
-```yaml
-# settings.yaml
-provider_settings:
-  proxmox:
-    api_url: https://pve.example.com:8006
-    storage: local-zfs
-```
-
-This generates a `terraform.tfvars` file in the output directory.
-
-## Customization
-
-InfraFoundry is designed to abstract Terraform complexity. However, you can influence the generated Terraform through specific provider features:
-
-*   **Cloud-Init Snippets**: Some providers (like Proxmox) allow injecting raw cloud-init user data via snippet files referenced in your YAML.
-*   **Provider Options**: Advanced options in `settings.yaml` often map directly to Terraform provider configuration blocks.
-
-*Note: Direct injection of raw HCL snippets is generally not supported to ensure state consistency and validity.*
-
-## State Management
-
-InfraFoundry manages the Terraform state file (`terraform.tfstate`) for you.
-
-*   **Location**: `generated/{env}/terraform/{provider}/.terraform/terraform.tfstate`
-*   **Persistence**: InfraFoundry ensures this state is preserved across runs.
-*   **Backends**: By default, local state is used. Remote backends (S3, Postgres, etc.) can be configured via environment variables or settings if supported by the provider plugin.
-
-## Execution
-
-Terraform runs automatically during the plan and apply phases.
+## Quick Start
 
 ```bash
-# Plan: Generates .tf files and runs 'terraform plan'
 infra plan --env dev
-
-# Apply: Runs 'terraform apply -auto-approve'
 infra apply --env dev
 ```
 
-## Debugging
+## Configuration Details
 
-If a Terraform error occurs, `infra` will display the output. You can inspect the generated files to debug issues:
+- **Resource definitions:** YAML resources map to provider Terraform resources; no direct HCL authoring.
+- **Settings/secrets:** `settings.yaml` → `terraform.tfvars` in `generated/{env}/terraform/{provider}/`.
+- **State location:** `generated/{env}/terraform/{provider}/.terraform/terraform.tfstate` (remote backends configurable via env vars/provider settings).
+- **Customization:** Provider-specific options (e.g., cloud-init snippets) are surfaced via YAML fields; raw HCL injection is intentionally limited to preserve consistency.
 
-```bash
-# Inspect generated configuration
-cat generated/dev/terraform/proxmox/main.tf
-cat generated/dev/terraform/proxmox/terraform.tfvars
-```
+## Validation and Checks
 
-You can also manually run terraform commands in the generated directory for debugging:
+- Validate configs and references before running:
+  ```bash
+  infra validate --env dev --check-api --check-refs
+  ```
+- Inspect generated files for debugging:
+  ```bash
+  cat generated/dev/terraform/proxmox/main.tf
+  cat generated/dev/terraform/proxmox/terraform.tfvars
+  ```
 
-```bash
-cd generated/dev/terraform/proxmox/
-terraform plan
-```
+## Examples
+
+- **YAML VM definition (maps to Terraform resource):**
+  ```yaml
+  resources:
+    - provider: proxmox
+      type: vm
+      name: db-prod-01
+      config:
+        node: pve01
+        cores: 4
+        memory: 16384
+        ipconfig: ip=10.0.0.5/24,gw=10.0.0.1
+  ```
+- **Run Terraform manually for debugging:**
+  ```bash
+  cd generated/dev/terraform/proxmox
+  terraform plan
+  ```
+
+## Related Documentation
+
+- [Runner Execution Overview](overview.md)
+- [Configuration Guide](../configuration.md)
+- [State Management](../state-management.md)
+- [SSH Authentication](../ssh-authentication.md)
+
+## Troubleshooting
+
+- **Symptom:** Terraform errors on apply. **Fix:** Inspect generated `.tf`/`terraform.tfvars`; rerun `infra validate --check-api --check-refs`.
+- **Symptom:** State conflicts. **Fix:** Configure remote backend with locking (e.g., S3 + DynamoDB) and avoid sharing local state dirs.
+- **Symptom:** Missing credentials. **Fix:** Ensure `settings.yaml` contains provider credentials and is decrypted; confirm env vars if using remote backend.
+
+---
+
+Last updated: 2025-11-29 14:27 GMT

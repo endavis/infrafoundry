@@ -1,140 +1,68 @@
 # InfraFoundry Architecture Overview
 
-## System Architecture
+## Overview
 
-InfraFoundry is built around a clear separation of concerns:
+InfraFoundry separates code generation from execution: YAML configs are rendered into Terraform/Ansible, then optionally orchestrated. Providers are pluggable, orchestration is event-driven, and configs live outside the framework.
 
-**Code Generation Layer:**
-- **Providers**: Pluggable modules (Proxmox, OPNsense, Kubernetes) that implement `ProviderBase`
-- **Templates**: Jinja2 templates for generating Terraform `.tf` files and Ansible playbooks
-- **Config Manager**: Loads and validates YAML configurations
-- **Secret Manager**: Handles SOPS encryption/decryption, exports secrets to Terraform/Ansible
+## Audience and Prerequisites
 
-**Orchestration Layer:**
-- **Orchestrator**: Coordinates multi-provider deployments, manages dependencies, optionally executes tools
-- **CLI**: Click-based command-line interface with rich console output
-- **State Manager**: SQLite database tracking deployment history and resource lifecycle
-- **Event System**: Hooks for notifications and custom integrations
-- **Policy Engine**: Validates resources against organizational policies
+- **Audience:** Engineers extending or operating InfraFoundry.
+- **Prereqs:** Familiarity with Terraform/Ansible basics and access to the config repo.
 
-## Data Flow
+## When to Use This
 
-```
-YAML Configs → ConfigManager → Providers → Jinja2 Templates → Generated Files
-                                    ↓
-                              Orchestrator (optional)
-                                    ↓
-                    terraform init/apply  +  ansible-playbook
-                                    ↓
-                              Infrastructure
-```
+- Understanding high-level data flow and responsibilities.
+- Explaining how plan/apply/destroy map to generation vs execution.
+- Onboarding contributors to the architecture.
 
-## Key Design Principles
+## Quick Start
 
-1. **Generation before execution** - Always generate configs first, optionally execute
-2. **Provider plugins** - Easy to add new providers (ESXi, AWS, Azure, etc.)
-3. **Tool agnostic** - Generated files are standard Terraform/Ansible, work without InfraFoundry
-4. **Separate configs** - Framework code separate from infrastructure definitions
+1. Generate only:
+   ```bash
+   infra plan --env dev
+   ```
+2. Generate + execute:
+   ```bash
+   infra apply --env dev
+   ```
+3. Destroy:
+   ```bash
+   infra destroy --env dev
+   ```
 
-## How It Works
+## Architecture Details
 
-InfraFoundry follows a clear workflow that separates code generation from execution:
+- **Code generation layer:** Providers (Proxmox/OPNsense/Kubernetes) implement `ProviderBase`; Jinja2 templates emit Terraform/Ansible; ConfigManager loads/validates YAML; SecretManager decrypts SOPS and exports to tools.
+- **Orchestration layer:** Orchestrator coordinates multi-provider runs; CLI (Click) drives commands; StateManager tracks deployments; Event system powers notifications/integrations; Policy engine enforces guardrails.
+- **Data flow:**  
+  `YAML configs → ConfigManager → Providers → Jinja2 templates → generated/{env}/{terraform|ansible}/{provider} → (optional) terraform init/apply + ansible-playbook → infrastructure`
+- **Key principles:** Generate before execute; provider plugins; tool-agnostic outputs; separate framework and config repos.
 
-### 1. Plan (Generate Only)
+## Validation and Checks
 
-```bash
-infra plan --env dev
-```
+- `infra validate --env <env> --check-api --check-refs` before plan/apply.
+- Inspect generated Terraform/Ansible under `generated/{env}/...` to verify outputs before execution.
 
-**What happens:**
-- ✅ Reads YAML configs from `envs/dev/`
-- ✅ Validates resources and dependencies
-- ✅ Generates Terraform files → `generated/{env}/terraform/{provider}/`
-- ✅ Generates Ansible playbooks → `generated/{env}/ansible/{provider}/`
-- ❌ Does NOT execute terraform or ansible
-- ❌ Does NOT create any infrastructure
+## Examples
 
-**Output:** Generated `.tf` files and playbooks ready for review
+- **Review without applying:** `infra plan --env dev --dry-run` (validate only).
+- **Full run:** `infra apply --env prod` (generate + terraform + ansible + state tracking).
+- **Remove:** `infra destroy --env prod` (tears down resources via Terraform/Ansible).
 
-### 2. Apply (Generate + Execute)
+## Related Documentation
 
-```bash
-infra apply --env dev
-```
+- [Orchestrator Architecture](orchestrator-architecture.md)
+- [Pluggable Runners](pluggable-runners.md)
+- [Secrets Architecture](secrets-architecture.md)
+- [Configuration Guide](../configuration.md)
+- [State Management](../state-management.md)
 
-**What happens:**
-- ✅ Generates configs (same as plan)
-- ✅ Runs `terraform init` (first time only)
-- ✅ Runs `terraform apply` for each provider
-- ✅ Runs `ansible-playbook` (if playbooks exist)
-- ✅ Tracks deployment in state database
+## Troubleshooting
 
-**Result:** Infrastructure is provisioned and configured
+- **Symptom:** Generated files missing. **Fix:** Run `infra plan --env <env>` and ensure configs are present; check `generated/{env}`.
+- **Symptom:** Execution fails after generation. **Fix:** Inspect generated Terraform/Ansible, rerun `infra validate --check-api --check-refs`, and address provider-specific errors.
+- **Symptom:** Policies or events not triggered. **Fix:** Confirm event subscriptions and policy files are present; run with validation/policy checks to surface issues.
 
-### 3. Destroy (Execute Removal)
+---
 
-```bash
-infra destroy --env dev
-```
-
-**What happens:**
-- ✅ Runs `terraform destroy` for each provider
-- ✅ Updates state database
-
-## Generated Files Structure
-
-```
-generated/
-├── dev/                         # Environment: dev
-│   ├── terraform/
-│   │   ├── proxmox/
-│   │   │   ├── main.tf          # Generated from YAML
-│   │   │   ├── variables.tf     # Generated from YAML
-│   │   │   ├── outputs.tf       # Generated from YAML
-│   │   │   └── .terraform/      # Created by terraform init
-│   │   ├── opnsense/
-│   │   │   └── ...
-│   │   └── kubernetes/
-│   │       └── ...
-│   └── ansible/
-│       ├── proxmox/
-│       │   ├── playbook.yml     # Generated from YAML
-│       │   ├── inventory.yml    # Generated from YAML
-│       │   └── roles/           # Your custom roles
-│       └── ...
-├── staging/                     # Environment: staging
-│   ├── terraform/
-│   └── ansible/
-└── prod/                        # Environment: prod
-    ├── terraform/
-    └── ansible/
-```
-
-**Key Point:** Each environment has its own directory with separate Terraform state!
-
-- ✅ Can work on dev and prod simultaneously
-- ✅ Terraform state isolated per environment
-- ✅ No risk of overwriting one environment with another
-- ✅ Clear separation for team collaboration
-
-**You can review and manually execute the generated files if you prefer:**
-
-```bash
-# Generate configs only
-infra plan --env dev
-
-# Manually review generated files
-cd generated/dev/terraform/proxmox
-cat main.tf
-
-# Manually execute (instead of infra apply)
-terraform init
-terraform plan
-terraform apply
-
-# Run Ansible separately
-cd ../../ansible/proxmox
-ansible-playbook -i inventory.yml playbook.yml
-```
-
-**For production:** Configure remote Terraform backend in your generated files to share state with your team.
+Last updated: 2025-11-29 14:27 GMT

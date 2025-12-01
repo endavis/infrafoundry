@@ -1,81 +1,73 @@
 # Event System Guide
 
-InfraFoundry includes a lightweight, synchronous event system that allows components to communicate without tight coupling. This system is primarily used for:
-- Notifications (sending Slack/Discord alerts on deployment status).
-- Audit logging.
-- Triggering side effects during the orchestration lifecycle.
+## Overview
 
-## Core Concepts
+InfraFoundry’s synchronous event system enables decoupled notifications, auditing, and lifecycle hooks across orchestration workflows.
 
-The event system is implemented in `src/infrafoundry/core/events.py`.
+## Audience and Prerequisites
 
-### Event Types
+- **Audience:** Contributors adding integrations, notifications, or custom side effects.
+- **Prereqs:** Familiarity with Python and access to `src/infrafoundry/core/events.py`.
 
-Events are typed using the `EventType` enum. Available events include:
+## When to Use This
 
-**Lifecycle Events:**
-- `BEFORE_PLAN`, `AFTER_PLAN`, `PLAN_FAILED`
-- `BEFORE_APPLY`, `AFTER_APPLY`, `APPLY_FAILED`
-- `BEFORE_DESTROY`, `AFTER_DESTROY`, `DESTROY_FAILED`
+- Emitting lifecycle/resource events from providers or workflows.
+- Subscribing to deployment events for notifications or auditing.
+- Extending drift/policy hooks.
 
-**Resource Events:**
-- `RESOURCE_PLANNED`
-- `RESOURCE_CREATING`, `RESOURCE_CREATED`
-- `RESOURCE_DELETING`, `RESOURCE_DELETED`
-
-**Advanced Events:**
-- `DRIFT_CHECK_STARTED`, `DRIFT_DETECTED`, `DRIFT_CHECK_COMPLETED`
-- `POLICY_CHECK_STARTED`, `POLICY_VIOLATION`, `POLICY_CHECK_COMPLETED`
-
-### Event Object
-
-Handlers receive an `Event` object containing:
-- `event_type`: The `EventType`.
-- `environment`: The name of the environment (e.g., "dev").
-- `data`: A dictionary containing context-specific data (e.g., `deployment_id`, `resource_name`, error details).
-- `timestamp`: When the event occurred.
-
-## Usage for Developers
-
-### Subscribing to Events
-
-If you are developing a plugin or extending the orchestrator, you can subscribe to events using the global `EventManager`.
+## Quick Start
 
 ```python
 from infrafoundry.core.events import Event, EventType, EventManager
 
 def on_apply_complete(event: Event):
-    deploy_id = event.data.get("deployment_id")
-    print(f"Deployment {deploy_id} finished in {event.environment}!")
+    print(f"Deployment {event.data.get('deployment_id')} finished in {event.environment}")
 
-# Get the event manager (usually passed into your component)
 event_manager = EventManager()
-
-# Subscribe to a specific event
 event_manager.subscribe(EventType.AFTER_APPLY, on_apply_complete)
-
-# Subscribe to ALL events (useful for logging)
-event_manager.subscribe_all(lambda e: print(f"Event: {e.event_type}"))
+event_manager.emit_event(EventType.RESOURCE_CREATED, environment="prod", data={"resource_name": "web-01"})
 ```
 
-### Emitting Events
+## Architecture Details
 
-To emit an event from your component:
+- **Event types:** Lifecycle (`BEFORE/AFTER/FAILED` for PLAN/APPLY/DESTROY), resource lifecycle (`RESOURCE_*`), drift (`DRIFT_*`), policy (`POLICY_*`), validation.
+- **Event object:** `event_type`, `environment`, `data` (context), `timestamp`.
+- **Managers:** `EventManager` supports `subscribe`, `subscribe_all`, and `emit_event`.
+- **Integration:** `NotificationManager` listens to events and forwards to configured channels.
 
-```python
-event_manager.emit_event(
-    event_type=EventType.RESOURCE_CREATED,
-    environment="prod",
-    data={
-        "resource_name": "web-server-01",
-        "provider": "proxmox",
-        "ip": "10.0.0.5"
-    }
-)
-```
+## Validation and Checks
 
-## Notification Integration
+- Use consistent event types to ensure subscribers receive expected notifications.
+- Include contextual data (e.g., `deployment_id`, `resource_name`) for consumers.
+- Avoid heavy work in handlers to keep emission responsive.
 
-The `NotificationManager` (`src/infrafoundry/core/notifications/`) subscribes to all events and forwards them to configured channels (e.g., Webhooks, Slack) based on `notifications.yaml`.
+## Examples
 
-This allows users to receive real-time updates on their deployments without modifying the core orchestration code.
+- **Subscribe to all events for audit logging:**
+  ```python
+  event_manager.subscribe_all(lambda e: log.info("%s %s", e.event_type, e.data))
+  ```
+- **Emit policy violation:**
+  ```python
+  event_manager.emit_event(
+      EventType.POLICY_VIOLATION,
+      environment="prod",
+      data={"policy": "strict-naming", "resource": "vm-01"}
+  )
+  ```
+
+## Related Documentation
+
+- [Notifications Guide](../notifications.md)
+- [Orchestrator Architecture](../architecture/orchestrator-architecture.md)
+- [Policy Configuration Guide](../policy-configuration.md)
+
+## Troubleshooting
+
+- **Symptom:** Handlers not called. **Fix:** Ensure `subscribe` uses the correct `EventType`; check for multiple EventManager instances.
+- **Symptom:** Missing context in notifications. **Fix:** Include required fields in `data` when emitting events.
+- **Symptom:** Slow emission. **Fix:** Keep handlers lightweight or offload heavy work to async/background tasks.
+
+---
+
+Last updated: 2025-11-29 14:27 GMT
