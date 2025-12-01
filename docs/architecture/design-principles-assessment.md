@@ -1427,6 +1427,8 @@ def cli(ctx, config_dir, strict_mode, ...):
 
 ## Recommendations
 
+> **Note:** Specific recommendations from this report have been moved to [Project To-Do & Roadmap](../TODO.md) and are tracked via GitHub Issues.
+
 ### 1. Interface Segregation for BaseRunner
 
 **Current State**:
