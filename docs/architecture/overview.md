@@ -54,8 +54,8 @@ InfraFoundry separates code generation from execution: YAML configs are rendered
 - [Orchestrator Architecture](orchestrator-architecture.md)
 - [Pluggable Runners](pluggable-runners.md)
 - [Secrets Architecture](secrets-architecture.md)
-- [Configuration Guide](../configuration.md)
-- [State Management](../state-management.md)
+- [Configuration Guide](../configuration/overview.md)
+- [State Management](state-management.md)
 
 ## Troubleshooting
 

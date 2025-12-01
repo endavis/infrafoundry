@@ -80,7 +80,7 @@ Provider plugins implement `ProviderBase`, render Terraform/Ansible via Jinja2, 
 - [Architectural Patterns](../architecture/architectural-patterns.md)
 - [Pluggable Runners](../architecture/pluggable-runners.md)
 - [Implementing Secret Providers](implementing-secret-providers.md)
-- [ISC to Kea Migration (example)](../isc-to-kea-migration.md)
+- [ISC to Kea Migration (example)](../guides/isc-to-kea-migration.md)
 
 ## Troubleshooting
 

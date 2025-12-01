@@ -98,10 +98,10 @@ InfraFoundry automatically loads credentials for the environment you target with
 
 ## Related Documentation
 
-- [Age Key Management Best Practices](age-key-management.md)
-- [Configuration Guide](configuration.md)
-- [Validation and Pre-Flight Checks](validation.md)
-- [Secrets Architecture](architecture/secrets-architecture.md)
+- [Age Key Management Best Practices](../guides/age-key-management.md)
+- [Configuration Guide](overview.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
+- [Secrets Architecture](../architecture/secrets-architecture.md)
 - [Separate Config Repo](separate-config-repo.md)
 
 ## Troubleshooting

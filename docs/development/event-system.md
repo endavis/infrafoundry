@@ -58,9 +58,9 @@ event_manager.emit_event(EventType.RESOURCE_CREATED, environment="prod", data={"
 
 ## Related Documentation
 
-- [Notifications Guide](../notifications.md)
+- [Notifications Guide](../configuration/notifications.md)
 - [Orchestrator Architecture](../architecture/orchestrator-architecture.md)
-- [Policy Configuration Guide](../policy-configuration.md)
+- [Policy Configuration Guide](../configuration/policy-configuration.md)
 
 ## Troubleshooting
 

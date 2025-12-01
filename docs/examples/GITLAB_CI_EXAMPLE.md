@@ -53,8 +53,8 @@ This example shows a GitLab CI pipeline configuration for running InfraFoundry l
 ## Related Documentation
 
 - [CI/CD Testing Guide](../development/ci-cd-testing.md)
-- [Configuration Guide](../configuration.md)
-- [Validation and Pre-Flight Checks](../validation.md)
+- [Configuration Guide](../configuration/overview.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
 
 ## Troubleshooting
 

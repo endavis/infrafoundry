@@ -70,8 +70,8 @@ The PyInfra runner executes Python-based deploys for post-provision configuratio
 ## Related Documentation
 
 - [Runner Execution Overview](overview.md)
-- [SSH Authentication](../ssh-authentication.md)
-- [Configuration Guide](../configuration.md)
+- [SSH Authentication](../guides/ssh-authentication.md)
+- [Configuration Guide](../configuration/overview.md)
 - [Pluggable Runner System](../architecture/pluggable-runners.md)
 
 ## Troubleshooting

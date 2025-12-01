@@ -48,9 +48,9 @@ This example shows a personal `.envrc.local` for direnv to load InfraFoundry con
 
 ## Related Documentation
 
-- [direnv Setup](../direnv.md)
-- [Per-Environment Credentials](../per-environment-credentials.md)
-- [Configuration Guide](../configuration.md)
+- [direnv Setup](../getting-started/direnv.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
+- [Configuration Guide](../configuration/overview.md)
 
 ## Troubleshooting
 

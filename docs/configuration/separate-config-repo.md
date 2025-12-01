@@ -90,11 +90,11 @@ Keep InfraFoundry framework code and infrastructure configs in distinct reposito
 
 ## Related Documentation
 
-- [Configuration Guide](configuration.md)
+- [Configuration Guide](overview.md)
 - [Per-Environment Credentials](per-environment-credentials.md)
-- [Age Key Management Best Practices](age-key-management.md)
+- [Age Key Management Best Practices](../guides/age-key-management.md)
 - [YAML-Only Configuration](yaml-only-config.md)
-- [Validation and Pre-Flight Checks](validation.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
 
 ## Troubleshooting
 
