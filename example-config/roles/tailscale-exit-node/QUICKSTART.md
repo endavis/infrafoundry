@@ -544,4 +544,4 @@ ansible_tasks:
 - [Tailscale Exit Nodes](https://tailscale.com/kb/1103/exit-nodes/)
 - [Tailscale ACLs](https://tailscale.com/kb/1018/acls/)
 - [Ubuntu Core with Tailscale](https://tailscale.com/kb/1112/userspace-networking/)
-- [InfraFoundry Ansible Integration](../../docs/ansible-integration.md)
+- [InfraFoundry Ansible Integration](../../../docs/runners/ansible.md)

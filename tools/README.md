@@ -39,7 +39,7 @@ Planned tools for the InfraFoundry ecosystem:
 To add a new tool:
 
 1. Create the tool in `tools/`
-2. Add documentation in `docs/tools/`
+2. Add documentation in [`docs/tools/`](../docs/tools/)
 3. Update this README
 4. Add example usage to main README
 5. Include tests if applicable

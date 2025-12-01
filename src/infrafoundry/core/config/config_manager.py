@@ -39,7 +39,7 @@ class ConfigManager(PathBasedManager):
                 raise ValueError(
                     "INFRAFOUNDRY_CONFIG_REPO environment variable must be set. "
                     "Please point it to your configuration repository. "
-                    "See docs/separate-config-repo.md for setup instructions."
+                    "See docs/configuration/separate-config-repo.md for setup instructions."
                 )
             # Config repo is specified - use its envs subdirectory
             base_dir = Path(config_repo) / "envs"

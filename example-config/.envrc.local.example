@@ -48,7 +48,7 @@ export INFRA_ENV="${INFRA_ENV:-dev}"
 #   export SOPS_AGE_KEY_FILE="$(pwd)/envs/dev/age.key"
 #   sops envs/dev/settings.yaml
 #
-# See: docs/per-environment-credentials.md for full guide
+# See: docs/configuration/per-environment-credentials.md for full guide
 # ============================================================================
 
 # ============================================================================
