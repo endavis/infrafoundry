@@ -86,7 +86,7 @@ InfraFoundry generates Terraform `.tf` files and Ansible playbooks from YAML con
 - Inspect files with `cat -pp` or `batcat -pp` for consistent output
 
 ## Help & Resources
-- Repository docs: `docs/`
+- Repository docs: [docs/](docs/TABLE_OF_CONTENTS.md)
 - Example configs: `example-config/`
 - Policies: `policies/`
 - Issues/roadmap: GitHub issues referenced in `AGENTS.md`

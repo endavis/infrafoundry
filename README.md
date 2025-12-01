@@ -44,12 +44,12 @@ For a comprehensive overview of all documentation, including getting started gui
 
 - Use Conventional Commits; maintain ≥69% coverage.
 - Run locally: `doit format && doit lint && uv run pytest` (or `doit coverage`).
-- See `docs/development/ci-cd-testing.md` and `docs/development/coding-standards.md`.
+- See [docs/development/ci-cd-testing.md](docs/development/ci-cd-testing.md) and [docs/development/coding-standards.md](docs/development/coding-standards.md).
 
 ## Support
 
 - Issues/Discussions: project GitHub
-- Docs: `docs/` in repo
+- Docs: [docs/](docs/TABLE_OF_CONTENTS.md) in repo
 
 ---
 
