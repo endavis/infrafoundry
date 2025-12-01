@@ -28,6 +28,18 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 
 ---
 
+
+
+## Testing & Refactoring (from Maintenance Report)
+- [ ] **Unit Test Coverage: CLI Commands**: ([Issue](https://github.com/endavis/infrafoundry/issues/40))
+- [ ] **Unit Test Coverage: Orchestration Workflows**: ([Issue](https://github.com/endavis/infrafoundry/issues/41))
+- [ ] **Unit Test Coverage: Deployment Executor**: ([Issue](https://github.com/endavis/infrafoundry/issues/42))
+- [ ] **Unit Test Coverage: Runners**: ([Issue](https://github.com/endavis/infrafoundry/issues/43))
+- [ ] **Refactor & Test: Validators**: ([Issue](https://github.com/endavis/infrafoundry/issues/44))
+- [ ] **Refactor: Provider Terraform Generation**: ([Issue](https://github.com/endavis/infrafoundry/issues/45))
+- [ ] **Refactor: Console Output**: ([Issue](https://github.com/endavis/infrafoundry/issues/46))
+- [ ] **Refactor: Orchestrator God Class**: ([Issue](https://github.com/endavis/infrafoundry/issues/47))
+
 ## Completed Features
 - [x] Configuration templating/blueprints
 - [x] Visual topology/graphing
