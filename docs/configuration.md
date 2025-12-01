@@ -1,220 +1,123 @@
 # InfraFoundry Configuration Guide
 
-This guide details how to configure InfraFoundry environments, providers, and resources.
+## Overview
 
-## Environment Structure
+InfraFoundry environments are defined entirely in YAML: `settings.yaml` for environment metadata/credentials and resource files organized by provider or service. Providers are auto-discovered from the resources you declare—no extra registration step required.
 
-Each environment (dev, staging, prod) uses a `settings.yaml` file containing all configuration and credentials:
+## Audience and Prerequisites
 
-```yaml
-# envs/dev/settings.yaml (encrypt with SOPS)
-name: dev
-description: Development environment
-variables:
-  environment: development
-  region: us-east
+- **Audience:** Config repo maintainers and operators creating or updating environments.
+- **Prereqs:** Config repo path (`--config-dir` or `INFRAFOUNDRY_CONFIG_REPO`), `sops`/`age` for secrets, `uv run infra` installed, and provider credentials.
 
-# Optional: Global SSH configuration (all providers)
-ssh:
-  user: your-username
-  key_path: /path/to/ssh/key
-  port: 22  # Optional, defaults to 22
+## When to Use This
 
-# Optional: Per-provider SSH configuration (overrides global)
-provider_ssh:
-  proxmox:
-    user: proxmox-admin
-    key_path: /path/to/proxmox/key
-    port: 2222
+- Standing up new environments (dev/staging/prod) or services.
+- Choosing between provider-centric and resource-centric layouts.
+- Adding provider credentials, SSH settings, or shared variables.
 
-# Optional: Provider-specific settings (credentials, endpoints)
-provider_settings:
-  proxmox:
-    api_url: https://pve01.example.com:8006
-    api_token: your-api-token
-    node: pve01
-    storage: local-lvm
-  opnsense:
-    api_url: https://opn.example.com
-    api_key: your-api-key
-    api_secret: your-api-secret
-```
+## Quick Start
 
-**Note:** Providers are auto-discovered from resource files. No need to declare them in `settings.yaml`.
+1. Create `envs/{env}/settings.yaml` with environment metadata, SSH (optional), and `provider_settings`.
+2. Choose a layout:
+   - Resource-centric: `envs/{env}/resources/*.yaml` (recommended for multi-provider services).
+   - Provider-centric: `envs/{env}/{provider}/*.yaml`.
+3. Encrypt secrets in `settings.yaml` with SOPS/age.
+4. Validate and plan:
+   ```bash
+   infra validate --env dev --check-api --check-refs
+   infra plan --env dev
+   ```
 
-**SSH Configuration**: Some Proxmox operations (extracting compressed images, disk imports) require SSH access. Configure per-environment SSH settings in `settings.yaml`. Supports both global and per-provider configurations. InfraFoundry will automatically generate the needed Terraform variables. See [docs/ssh-authentication.md](../ssh-authentication.md) for details.
+## Configuration Details
 
-## Provider Resources
+- **Environment file:** `envs/{env}/settings.yaml`
+  - Metadata: `name`, `description`, optional `variables`.
+  - SSH: `ssh` (global) and `provider_ssh` (overrides).
+  - Credentials/endpoints: `provider_settings` per provider.
+- **Resource layouts:**
+  - **Provider-centric:** `envs/{env}/{provider}/{resource_type}.yaml`; scalable to multiple files per type (e.g., `vm-web.yaml`, `vm-db.yaml`).
+  - **Resource-centric:** `envs/{env}/resources/*.yaml` combining multiple providers per service/app.
+  - Mixing both is supported; InfraFoundry groups by `provider` and `type`.
+- **Generated artifacts:** Terraform vars land in `generated/{env}/terraform/{provider}/terraform.tfvars`; Ansible content under `generated/{env}/ansible/{provider}/`.
+- **Secrets:** Keep sensitive values in `settings.yaml` and encrypt with SOPS/age. InfraFoundry decrypts during validate/plan/apply.
 
-InfraFoundry supports two configuration patterns:
+## Validation and Checks
 
-### 1. Provider-Centric (Traditional)
+- Run `infra validate --env <env>` for structure and type checks; add `--check-api --check-refs` to verify connectivity and referenced resources.
+- Confirm provider discovery by checking per-provider sections in validation output.
+- Inspect generated tfvars under `generated/{env}/terraform/{provider}/` to confirm SSH overrides and credentials.
 
-Resources are organized by provider and type in separate directories:
+## Examples
 
-**Single file per type:**
-```
-envs/dev/
-├── proxmox/
-│   ├── vm.yaml
-│   ├── template.yaml
-│   └── network.yaml
-├── opnsense/
-│   ├── firewall_rule.yaml
-│   ├── vlan.yaml
-│   └── alias.yaml
-└── kubernetes/
-    ├── namespace.yaml
-    ├── deployment.yaml
-    ├── service.yaml
-    └── configmap.yaml
-```
-
-**Multiple files per type (recommended for large environments):**
-```
-envs/prod/
-├── proxmox/
-│   ├── vm-webservers.yaml       # Web tier VMs
-│   ├── vm-databases.yaml        # Database VMs
-│   ├── vm-infrastructure.yaml   # Infrastructure VMs
-│   ├── template.yaml
-│   └── network.yaml
-└── kubernetes/
-    ├── deployment-frontend.yaml
-    ├── deployment-backend.yaml
-    └── service.yaml
-```
-
-Files are grouped by the prefix before the first dash. For example:
-- `vm.yaml`, `vm-web.yaml`, `vm-db.yaml` all map to resource type `vm`
-- `deployment.yaml`, `deployment-api.yaml` both map to type `deployment`
-
-**Example provider-centric file:**
-```yaml
-# envs/dev/proxmox/vm.yaml
-vm:
-  - name: web-server-01
-    target_node: pve01
-    clone: ubuntu-22-04-template
-    cores: 2
-    memory: 4096
-```
-
-### 2. Resource-Centric (Recommended for Multi-Provider Services)
-
-Group all infrastructure for a service/application in one file, regardless of provider:
-
-```
-envs/prod/
-├── resources/
-│   ├── web-server.yaml          # VM + firewall + DNS for web server
-│   ├── database-cluster.yaml    # Database VMs + networking
-│   └── monitoring.yaml          # Monitoring stack across providers
-├── proxmox/
-│   └── shared-templates.yaml    # Shared resources
-└── environment.yaml
-```
-
-**Example resource-centric file:**
-```yaml
-# envs/prod/resources/web-server.yaml
-resources:
-  - provider: proxmox
-    type: vm
-    name: web-server-01
-    config:
-      node: pve1
-      cores: 4
-      memory: 8192
-      disk_size: 50
-      network:
-        bridge: vmbr0
-        vlan: 10
-      template: ubuntu-22.04-cloudinit
-
-  - provider: opnsense
-    type: firewall_rule
-    name: allow-web-80
-    config:
-      action: pass
-      interface: LAN
-      protocol: tcp
-      destination_port: 80
-      destination: web-server-01
-
-  - provider: opnsense
-    type: firewall_rule
-    name: allow-web-443
-    config:
-      action: pass
-      interface: LAN
-      protocol: tcp
-      destination_port: 443
-      destination: web-server-01
-```
-
-**Benefits of resource-centric:**
-- All infrastructure for a service in one place
-- Easier to understand complete service architecture
-- Better for GitOps (service changes touch one file)
-- Natural cross-provider dependencies
-- Organize by business logic, not technical boundaries
-
-**Use provider-centric when:**
-- Single provider environment
-- Bulk operations on similar resources
-- Simple infrastructure
-
-**Use resource-centric when:**
-- Multi-provider services
-- Complex applications with many components
-- Team-based infrastructure (one file per team/service)
-- GitOps workflows with PR-based reviews
-
-### Example: Proxmox VM
-
-```yaml
-# envs/dev/proxmox/vm.yaml
-vm:
-  - name: web-server-01
-    target_node: pve01
-    clone: ubuntu-22-04-template
-    cores: 2
-    memory: 4096
-    disk:
-      size: 50G
+- **Minimal `settings.yaml`:**
+  ```yaml
+  name: dev
+  description: Development environment
+  ssh:
+    user: your-username
+    key_path: /path/to/ssh/key
+  provider_settings:
+    proxmox:
+      api_url: https://pve01.example.com:8006
+      api_token: your-api-token
+      node: pve01
       storage: local-lvm
-    network:
-      bridge: vmbr0
-      tag: 100
-    ipconfig: ip=192.168.100.10/24,gw=192.168.100.1
-    tags:
-      - webserver
-      - nginx
-```
+  ```
+- **Provider-centric file (Proxmox VMs):**
+  ```yaml
+  # envs/dev/proxmox/vm.yaml
+  vm:
+    - name: web-server-01
+      target_node: pve01
+      clone: ubuntu-22-04-template
+      cores: 2
+      memory: 4096
+  ```
+- **Resource-centric service definition:**
+  ```yaml
+  # envs/prod/resources/web-server.yaml
+  resources:
+    - provider: proxmox
+      type: vm
+      name: web-server-01
+      config:
+        node: pve1
+        cores: 4
+        memory: 8192
+        network:
+          bridge: vmbr0
+          vlan: 10
+    - provider: opnsense
+      type: firewall_rule
+      name: allow-web-80
+      config:
+        action: pass
+        interface: LAN
+        protocol: tcp
+        destination_port: 80
+        destination: web-server-01
+  ```
+- **Secrets workflow:**
+  ```bash
+  infra secrets init
+  infra secrets encrypt envs/dev/settings.yaml
+  infra secrets decrypt envs/dev/settings.yaml
+  ```
 
-## Secret Management
+## Related Documentation
 
-InfraFoundry uses SOPS with age encryption for secrets:
+- [YAML-Only Configuration](yaml-only-config.md)
+- [Separate Config Repo](separate-config-repo.md)
+- [SSH Authentication](ssh-authentication.md)
+- [Per-Environment Credentials](per-environment-credentials.md)
+- [Validation and Pre-Flight Checks](validation.md)
 
-```bash
-# Initialize secrets
-infra secrets init
+## Troubleshooting
 
-# Encrypt a secrets file
-infra secrets encrypt envs/dev/settings.yaml
+- **Symptom:** Providers not detected. **Fix:** Ensure resource files include `provider` keys and live under `resources/` or provider directories.
+- **Symptom:** SSH operations fail in Proxmox. **Fix:** Verify `ssh`/`provider_ssh` entries and key paths; rerun `infra validate --check-api`.
+- **Symptom:** Secrets not decrypted. **Fix:** Confirm SOPS/age keys are available and `settings.yaml` is encrypted with the expected rules.
 
-# Decrypt and view
-infra secrets decrypt envs/dev/settings.yaml
+---
 
-# Secrets are automatically decrypted during deployment
-```
-
-### Example Secrets File
-
-```yaml
-# envs/dev/settings.yaml (before encryption)
-proxmox_api_url: https://proxmox.example.com:8006/api2/json
-proxmox_api_token_id: user@pam!token
-proxmox_api_token_secret: your-secret-token
-```
+Last updated: 2025-11-29 14:19 GMT

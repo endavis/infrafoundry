@@ -2,81 +2,93 @@
 
 ## Overview
 
-Age keys are used to encrypt/decrypt your infrastructure secrets with SOPS. This guide covers best practices for managing these sensitive keys.
+Age keys secure SOPS-encrypted secrets in InfraFoundry. This guide outlines how to generate, distribute, and safeguard keys so environments stay isolated and compliant. InfraFoundry supports other secret backends (Vault, AWS Secrets Manager, etc.); see [Secrets Architecture](architecture/secrets-architecture.md) for details.
 
-> **Note:** This guide focuses on SOPS/age encryption (the default provider). InfraFoundry also supports pluggable secret backends like HashiCorp Vault, AWS Secrets Manager, and more. See [Secrets Architecture](architecture/secrets-architecture.md) for details.
+## Audience and Prerequisites
 
-## Critical Rules
+- **Audience:** Infra operators and config repo maintainers responsible for secrets.
+- **Prereqs:** `sops`, `age`, access to the config repo, and `.gitignore` entries for `*.key`.
 
-### ⚠️ Rule #1: NEVER Commit Private Keys to Git
+## When to Use This
 
-**Private age keys (`age.key` files) must NEVER be committed to version control.**
+- Setting up or rotating SOPS/age keys for environments.
+- Auditing key handling to ensure keys are not in version control.
+- Deciding how to distribute keys to teams with different access levels.
 
-Your `.gitignore` should always include:
-```gitignore
-*.key
-envs/*/age.key
-envs/**/age.key
-```
+## Quick Start
 
-## Per-Environment Keys (Recommended)
+1. Create per-environment keys and git-ignore them:
+   ```bash
+   cd $INFRAFOUNDRY_CONFIG_REPO
+   mkdir -p envs/dev envs/staging envs/prod
+   age-keygen -o envs/dev/age.key
+   age-keygen -o envs/staging/age.key
+   age-keygen -o envs/prod/age.key
+   printf \"*.key\nenvs/*/age.key\nenvs/**/age.key\n\" >> .gitignore
+   ```
+2. Configure SOPS rules in `.sops.yaml` to target the right key per environment.
+3. Encrypt secrets with the matching key:
+   ```bash
+   sops --encrypt --age $(cat envs/dev/age.key | grep public | cut -d' ' -f3) envs/dev/proxmox.yaml > envs/dev/proxmox.yaml
+   ```
+4. Run InfraFoundry commands; the correct key is picked up by `--env`:
+   ```bash
+   infra plan --env dev
+   infra apply --env prod
+   ```
 
-InfraFoundry supports per-environment age keys for enhanced security:
+## Configuration Details
 
-```
-config-repo/
-├── envs/
-│   ├── dev/
-│   │   ├── age.key          # Development key (git-ignored)
-│   │   ├── proxmox.yaml     # Encrypted with dev key
-│   │   └── opnsense.yaml    # Encrypted with dev key
-│   ├── staging/
-│   │   ├── age.key          # Staging key (git-ignored)
-│   │   └── *.yaml           # Encrypted with staging key
-│   └── prod/
-│       ├── age.key          # Production key (git-ignored, highly restricted!)
-│       └── *.yaml           # Encrypted with prod key
-└── .sops.yaml               # SOPS config with per-env rules
-```
+- **File locations:** `envs/{env}/age.key` (git-ignored). Keep `.sops.yaml` at repo root with per-environment rules.
+- **Key selection:** InfraFoundry auto-selects the key based on `--env`; ensure keys exist for every environment you plan or apply.
+- **Access control:** Limit prod key distribution; prefer password managers or KMS for storage.
+- **Backups:** Store recovery copies in a secure vault with auditing.
 
-### Benefits
+## Validation and Checks
 
-1. **Security Isolation**: Compromising one environment's key doesn't expose others
-2. **Access Control**: Give developers dev keys only, ops team gets prod keys
-3. **Audit Trail**: Track who can access which environments
-4. **Compliance**: Meet regulatory requirements for production key restrictions
+- Confirm keys are not tracked: `git status --ignored` should not list `age.key`.
+- Dry-run encryption/decryption to ensure rules are correct:
+  ```bash
+  sops --decrypt envs/dev/proxmox.yaml >/dev/null
+  ```
+- Verify InfraFoundry picks the right key by running `infra plan --env <env>` and checking for missing key errors.
 
-### Automatic Key Selection
+## Examples
 
-InfraFoundry automatically uses the correct key based on `--env`:
+- **Per-environment layout:**
+  ```
+  config-repo/
+  ├── envs/
+  │   ├── dev/
+  │   │   ├── age.key
+  │   │   ├── proxmox.yaml
+  │   │   └── opnsense.yaml
+  │   ├── staging/
+  │   │   ├── age.key
+  │   │   └── *.yaml
+  │   └── prod/
+  │       ├── age.key
+  │       └── *.yaml
+  └── .sops.yaml
+  ```
+- **Automatic key selection:** `infra plan --env dev` uses `envs/dev/age.key`; `infra apply --env prod` uses `envs/prod/age.key`.
+- **Distribution options:** Vault, AWS Secrets Manager, Azure Key Vault, 1Password/Bitwarden (preferred for audit and rotation).
 
-```bash
-# Uses envs/dev/age.key
-infra plan --env dev
+## Related Documentation
 
-# Uses envs/staging/age.key
-infra apply --env staging
+- [Secrets Architecture](architecture/secrets-architecture.md)
+- [Per-Environment Credentials](per-environment-credentials.md)
+- [Validation and Pre-Flight Checks](validation.md)
 
-# Uses envs/prod/age.key (if you have it!)
-infra plan --env prod
-```
+## Troubleshooting
 
-## Key Distribution Methods
+- **Symptom:** Key committed to git. **Fix:** Add ignore patterns, rotate keys, re-encrypt, and purge history if needed.
+- **Symptom:** `sops` cannot decrypt. **Cause:** Wrong key selected or `.sops.yaml` rule mismatch. **Fix:** Verify `--env` matches the key path and public key values in `.sops.yaml`.
+- **Symptom:** InfraFoundry warns about missing keys. **Fix:** Ensure `envs/{env}/age.key` exists and permissions allow reading.
 
-### Method 1: Secure Key Management System (Most Secure)
+---
 
-Store keys in a dedicated key management system:
-
-- **HashiCorp Vault**: Enterprise-grade secret management
-- **AWS Secrets Manager**: Cloud-native secret storage
-- **Azure Key Vault**: Microsoft's key management service
-- **1Password / Bitwarden**: Team password managers with CLI access
-
-**Pros:**
-- Centralized management
-- Audit logs
-- Automatic rotation
-- Fine-grained access control
+Last updated: 2025-11-29 14:12 GMT
 
 **Cons:**
 - Additional infrastructure

@@ -1,684 +1,116 @@
 # InfraFoundry CLI Reference
 
-Complete reference for all InfraFoundry CLI commands.
+## Overview
 
-## Global Options
+`infra` drives environment discovery, generation, validation, apply/destroy flows, and policy/secrets management. Use this reference to run common workflows and explore command options.
 
-- `--config-dir / -c PATH` – Override `INFRAFOUNDRY_CONFIG_REPO` for configs.
-- `--strict-mode / --no-strict-mode` – Toggle strict mode (fails on missing secrets/snippets).
-- `--fail-on-missing-secrets / --allow-missing-secrets` – Control behavior when secrets files are missing.
-- `--fail-on-missing-snippets / --allow-missing-snippets` – Control behavior when cloud-init snippets are missing.
+## Audience and Prerequisites
 
-Environment equivalents:
+- **Audience:** Operators and CI systems running InfraFoundry workflows.
+- **Prereqs:** Config repo available (`--config-dir` or `INFRAFOUNDRY_CONFIG_REPO`), `uv run infra` installed, and provider credentials/secrets configured.
 
-- `INFRAFOUNDRY_STRICT_MODE`
-- `INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS`
-- `INFRAFOUNDRY_FAIL_ON_MISSING_SNIPPETS`
+## When to Use This
 
-When strict mode is enabled, both snippet and secret warnings become errors automatically.
+- Running plan/apply/destroy for environments or specific resources.
+- Inspecting environments, state, history, or drift.
+- Managing secrets, policies, blueprints, and helpers.
 
-## Core Commands
-
-### `infra init`
-Initialize InfraFoundry state database.
+## Quick Start
 
 ```bash
-infra init
-```
-
-Creates `~/.infrafoundry/state.db` (SQLite) for tracking deployments and resources.
-
----
-
-### `infra new`
-Create new infrastructure configurations from blueprints.
-
-```bash
-# List available blueprints
-infra new list
-
-# Create a new project from a blueprint
-infra new create basic-vm ./my-project
-```
-
-See the **[Blueprints Guide](configuration/blueprints.md)** for details on creating and managing blueprints.
-
----
-
-### `infra envs`
-List available environments.
-
-```bash
+# List environments
 infra envs
-```
 
-Shows all environments found in the configuration directory.
-
----
-
-### `infra plan`
-Generate infrastructure configurations (Terraform + Ansible).
-
-```bash
-# Plan entire environment
+# Validate + plan
+infra validate --env dev --check-api --check-refs
 infra plan --env dev
 
-# Plan specific resources
-infra plan --env dev --resource vm-01 --resource vm-02
-
-# Dry-run (validate only, no file generation)
-infra plan --env dev --dry-run
-```
-
-**Options:**
-- `--env`, `-e` - Environment name (required)
-- `--resource`, `-r` - Target specific resources (multiple allowed)
-- `--dry-run` - Validate without generating files
-
----
-
-### `infra apply`
-Apply infrastructure changes (generate + execute Terraform/Ansible).
-
-```bash
-# Apply entire environment
+# Apply/destroy
 infra apply --env dev
-
-# Apply specific resources
-infra apply --env dev --resource vm-01
-
-# Auto-approve (skip confirmation)
-infra apply --env dev --auto-approve
-```
-
-**Options:**
-- `--env`, `-e` - Environment name (required)
-- `--resource`, `-r` - Target specific resources (multiple allowed)
-- `--auto-approve` - Skip confirmation prompts
-
-**What it does:**
-1. Generates Terraform `.tf` files
-2. Generates Ansible playbooks
-3. Runs `terraform init` (first time)
-4. Runs `terraform apply`
-5. Runs `ansible-playbook`
-6. Tracks deployment in state database
-
----
-
-### `infra destroy`
-Destroy infrastructure resources.
-
-```bash
-# Destroy entire environment
-infra destroy --env dev
-
-# Destroy specific resources
-infra destroy --env dev --resource vm-01
-
-# Auto-approve (skip confirmation)
 infra destroy --env dev --auto-approve
 ```
 
-**Options:**
-- `--env`, `-e` - Environment name (required)
-- `--resource`, `-r` - Target specific resources (multiple allowed)
-- `--auto-approve` - Skip confirmation prompts
-
----
-
-### `infra status`
-Show deployment status for an environment.
-
-```bash
-infra status --env prod
-```
-
-Shows current state of all resources in the environment.
-
----
-
-### `infra list`
-List resources defined in configuration files.
-
-```bash
-# List all configured resources
-infra list --env dev
-
-# Filter by provider
-infra list --env dev --provider proxmox
-
-# Filter by resource type
-infra list --env dev --type vms
-
-# Combine filters
-infra list --env dev --provider proxmox --type vms
-```
-
-**Options:**
-- `--env`, `-e` - Environment name (required)
-- `--provider` - Filter by provider (proxmox, opnsense, kubernetes)
-- `--type` - Filter by resource type (vms, networks, firewall_rules, etc.)
-
-**Note:** Lists resources from YAML configuration files. Use `infra resources` to see tracked resources in the state database.
-
----
-
-### `infra resources`
-List tracked infrastructure resources from state database.
-
-```bash
-# List all tracked resources
-infra resources
-
-# Filter by environment
-infra resources --env prod
-
-# Filter by provider
-infra resources --provider proxmox
-
-# Filter by resource type
-infra resources --type vm
-
-# Filter by state
-infra resources --state ACTIVE
-infra resources --state FAILED
-
-# Combine filters
-infra resources --env prod --provider proxmox --state ACTIVE
-```
-
-**Options:**
-- `--env`, `-e` - Filter by environment name
-- `--provider`, `-p` - Filter by provider (proxmox, opnsense, kubernetes)
-- `--type`, `-t` - Filter by resource type (vm, deployment, firewall_rule, etc.)
-- `--state`, `-s` - Filter by state (PLANNED, CREATING, ACTIVE, DELETING, DELETED, FAILED)
-
-**Note:** Shows resources tracked in the state database with their current status. Use `infra list` to see resources defined in configuration files.
-
----
-
-### `infra history`
-View deployment history.
-
-```bash
-# All deployments
-infra history
-
-# Filter by environment
-infra history --env prod
-
-# Limit results
-infra history --limit 20
-```
-
-**Options:**
-- `--env`, `-e` - Filter by environment
-- `--limit`, `-l` - Limit number of results (default: 50)
-
-Shows:
-- Deployment ID
-- Environment
-- Command (plan/apply/destroy)
-- Status (completed/failed/in_progress)
-- Timestamp
-- User
-
----
-
-## Advanced Operations
-
-### `infra drift`
-Detect infrastructure drift from declared configuration.
-
-```bash
-infra drift --env prod
-```
-
-**What it checks:**
-- Resources modified outside InfraFoundry
-- Resources manually added
-- Resources unexpectedly deleted
-- Configuration changes not in YAML
-
-**Output:**
-- Per-provider drift summary
-- Count of resources to add/change/destroy
-- Detailed change descriptions
-
----
-
-### `infra graph`
-Visualize infrastructure dependencies.
-
-```bash
-# Generate dependency graph (Mermaid format)
-infra graph --env dev --format mermaid
-```
-
-Generates a text-based graph description that can be rendered into a visual diagram showing resource dependencies.
-See the **[Graphing Guide](architecture/graphing.md)** for more details.
-
----
-
-### `infra impact`
-Analyze impact of changing a resource.
-
-```bash
-infra impact --env prod --resource db-template
-```
-
-**Shows:**
-- All resources that depend on the specified resource
-- Risk level (LOW, MEDIUM, HIGH, CRITICAL)
-- Total number of dependent resources
-- Suggested actions
-
-**Risk Levels:**
-- **LOW**: 0 dependents
-- **MEDIUM**: 1-5 dependents
-- **HIGH**: 6-20 dependents
-- **CRITICAL**: 21+ dependents
-
----
-
-### `infra validate`
-Validate infrastructure configuration before deployment.
-
-```bash
-# Validate entire environment
-infra validate --env test
-
-# Validate specific resources
-infra validate --env test --resource vm-01 --resource vm-02
-
-# Show detailed output
-infra validate --env test --verbose
-```
-
-**Options:**
-- `--env`, `-e` - Environment name (required)
-- `--resource`, `-r` - Validate specific resources (multiple allowed)
-- `--verbose`, `-v` - Show detailed validation including passing checks
-
-**Validation Checks:**
-- ✅ API connectivity to all providers
-- ✅ Nodes/hosts exist and are online
-- ✅ Storage pools exist and are active
-- ✅ Network bridges are configured
-- ✅ Templates/images exist for cloning
-- ✅ VMIDs/resource IDs are available
-- ✅ No MAC address conflicts
-- ✅ Referenced resources exist
-
----
-
-### `infra policies`
-Manage and check infrastructure policies.
-
-```bash
-# List available policies
-infra policies list
-
-# Check resources against policies
-infra policies check --env prod
-
-# Enforce policies (block on errors)
-infra policies check --env prod --enforce
-```
-
-**Policy Types:**
-- Resource limits (CPU, memory, disk)
-- Naming conventions
-- Security requirements
-- Compliance rules
-
-**Policy Levels:**
-- **ERROR**: Blocks deployment
-- **WARNING**: Shows warning but allows deployment
-- **INFO**: Informational only
-
-**Policy Location:**
-- Policies are loaded from `policies/` directory in your configuration repository
-- Set via `INFRAFOUNDRY_CONFIG_REPO` environment variable or `--config-dir` flag
-- Example structure: `my-infra-config/policies/naming.yaml`
-- This allows policies to be versioned alongside your infrastructure configurations
-
-For complete configuration details and schema, see the **[Policy Configuration Guide](policy-configuration.md)**.
-
----
-
-### `infra rollback`
-Rollback to a previous deployment.
-
-```bash
-# List available rollback points
-infra rollback-points --env prod
-
-# Rollback to specific deployment
-infra rollback --env prod --to-deployment 42
-
-# Rollback to previous deployment
-infra rollback --env prod --to-previous
-
-# Auto-approve
-infra rollback --env prod --to-previous --auto-approve
-```
-
-**Options:**
-- `--env`, `-e` - Environment name (required)
-- `--to-deployment` - Specific deployment ID to rollback to
-- `--to-previous` - Rollback to previous deployment
-- `--auto-approve` - Skip confirmation
-
----
-
-### `infra rollback-points`
-List available rollback points for an environment.
-
-```bash
-# List rollback points
-infra rollback-points --env prod
-
-# Limit results
-infra rollback-points --env prod --limit 20
-```
-
-**Options:**
-- `--env`, `-e` - Environment name (required)
-- `--limit`, `-l` - Maximum number of rollback points to show (default: 10)
-
-Displays:
-- Deployment ID
-- Date and time
-- User who deployed
-- Number of resources
-- Git commit SHA
-
-Use the deployment ID with `infra rollback --to-deployment <ID>` to rollback to that point.
-
----
-
-## Secret Management
-
-### `infra secrets init`
-Initialize age encryption for secrets.
-
-```bash
-infra secrets init
-```
-
-Creates age encryption keys for each environment:
-- `envs/dev/age.key`
-- `envs/prod/age.key`
-- `.sops.yaml` configuration
-
----
-
-### `infra secrets encrypt`
-Encrypt a secrets file with SOPS.
-
-```bash
-infra secrets encrypt envs/dev/settings.yaml
-```
-
-Encrypts the file in-place using age encryption.
-
----
-
-### `infra secrets decrypt`
-Decrypt and view a secrets file.
-
-```bash
-infra secrets decrypt envs/dev/settings.yaml
-```
-
-Displays decrypted contents (does not modify file).
-
----
-
-### `infra state`
-Manage InfraFoundry state database (backup, restore, migrate).
-
-```bash
-# Create a backup of the state database
-infra state backup
-
-# Backup creates timestamped file in backups/ directory
-# Output: backups/infrafoundry-state-YYYYMMDD-HHMMSS.db
-```
-
-**Use Cases:**
-- Create regular backups before major operations
-- Backup before production deployments
-- Disaster recovery preparation
-- State migration between environments
-
-**State Database Location:**
-- Default: `~/.infrafoundry/state.db`
-- Tracks deployment history, resource lifecycle, and audit trail
-- Can be configured to use PostgreSQL for team collaboration
-
-**Related Commands:**
-- See [State Management Guide](state-management.md) for backup strategies
-- Use with `infra history` and `infra status` for state inspection
-
----
-
-## Provider-Specific Commands
-
-### `infra reset`
-Reset (wipe) specific infrastructure components.
-
-```bash
-# Reset Kea DHCPv4 configuration
-infra reset --env prod --provider opnsense --component kea/dhcpv4
-
-# Reset Kea DHCPv6 configuration
-infra reset --env prod --provider opnsense --component kea/dhcpv6
-
-# Reset both DHCPv4 and DHCPv6
-infra reset --env prod --provider opnsense --component kea/dhcp
-
-# Auto-approve
-infra reset --env prod --provider opnsense --component kea/dhcp --auto-approve
-```
-
-**Use Cases:**
-- Clear existing DHCP config before applying InfraFoundry-managed configuration
-- Resolve configuration drift by wiping and reapplying
-- Clean slate for testing configuration changes
-
----
-
-### `infra migrate`
-Migrate existing infrastructure to InfraFoundry YAML.
-
-```bash
-# Migrate existing Kea DHCP configuration
-infra migrate --env prod --provider opnsense --component kea/dhcp
-
-# Migrate legacy ISC DHCP to Kea DHCP format
-infra migrate --env prod --provider opnsense --component isc-to-kea
-
-# Migrate specific interfaces only
-infra migrate --env prod --provider opnsense --component isc-to-kea -i lan -i wan
-
-# Preview migration without writing files
-infra migrate --env prod --provider opnsense --component isc-to-kea --dry-run
-
-# Custom output location
-infra migrate --env prod --provider opnsense --component isc-to-kea \
-    -o custom/path/dhcp-config.yaml
-```
-
-**Supported Migrations:**
-- **kea/dhcp**: Export existing Kea DHCP configuration to YAML
-- **isc-to-kea**: Convert legacy ISC DHCP to Kea DHCP format
-
-**ISC to Kea Migration:**
-- Converts both DHCPv4 and DHCPv6 configurations
-- Preserves all settings: subnets, pools, DNS, gateway, NTP, static reservations
-- Generates InfraFoundry YAML ready for deployment
-
----
-
-## Global Options
-
-All commands support these global options:
-
-- `--config-dir` - Override configuration directory (default: `$INFRAFOUNDRY_CONFIG_REPO` or `./example-config`)
-- `--help` - Show help for command
-
-**Examples:**
-
-```bash
-# Use custom config directory
-infra --config-dir /path/to/config plan --env dev
-
-# Show help for any command
-infra plan --help
-infra apply --help
-```
-
----
-
-## Environment Variables
-
-These environment variables affect CLI behavior:
-
-- `INFRAFOUNDRY_CONFIG_REPO` - Configuration repository path
-- `INFRAFOUNDRY_OUTPUT_DIR` - Generated files output directory (default: `generated/`)
-- `INFRAFOUNDRY_STATE_BACKEND` - State backend type (`sqlite` or `postgresql`)
-- `INFRAFOUNDRY_STATE_CONNECTION` - Custom state database connection string
-- `INFRAFOUNDRY_STATE_HOME` - Override directory for the local SQLite state database
-- `INFRAFOUNDRY_LOG_LEVEL` - Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)
-- `SOPS_AGE_KEY_FILE` - Path to age encryption key for SOPS
-
-**Example `.envrc.local`:**
-
-```bash
-# Configuration
-export INFRAFOUNDRY_CONFIG_REPO="/path/to/my-infra-config"
-export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"
-
-# State backend (optional - defaults to local SQLite)
-export INFRAFOUNDRY_STATE_BACKEND=postgresql
-export INFRAFOUNDRY_STATE_CONNECTION=postgresql://user:pass@localhost/infrafoundry
-
-# Logging (optional)
-export INFRAFOUNDRY_LOG_LEVEL=INFO
-
-# SOPS (if using encryption)
-export SOPS_AGE_KEY_FILE="${INFRAFOUNDRY_CONFIG_REPO}/envs/dev/age.key"
-```
-
----
-
-## Command Workflow Examples
-
-### Basic Deployment Workflow
-
-```bash
-# 1. List environments
-infra envs
-
-# 2. Validate configuration
-infra validate --env dev
-
-# 3. Preview changes
-infra plan --env dev
-
-# 4. Check for drift
-infra drift --env dev
-
-# 5. Apply changes
-infra apply --env dev
-
-# 6. Check status
-infra status --env dev
-
-# 7. View deployment history
-infra history --env dev
-```
-
----
-
-### Production Deployment Workflow
-
-```bash
-# 1. Validate configuration
-infra validate --env prod --verbose
-
-# 2. Check policies
-infra policies check --env prod --enforce
-
-# 3. Analyze impact of critical changes
-infra impact --env prod --resource db-template
-
-# 4. Preview changes
-infra plan --env prod
-
-# 5. Apply with auto-approve (in CI/CD)
-infra apply --env prod --auto-approve
-
-# 6. Verify no drift
-infra drift --env prod
-```
-
----
-
-### Troubleshooting Workflow
-
-```bash
-# 1. Check deployment history
-infra history --env prod --limit 10
-
-# 2. Detect drift
-infra drift --env prod
-
-# 3. Validate current configuration
-infra validate --env prod --verbose
-
-# 4. List available rollback points
-infra rollback-points --env prod
-
-# 5. Rollback if needed
-infra rollback --env prod --to-previous
-```
-
----
-
-## Exit Codes
-
-InfraFoundry commands use standard exit codes:
-
-- `0` - Success
-- `1` - General error (configuration, validation, execution)
-- `2` - Command-line usage error
-
-**Example in scripts:**
-
-```bash
-#!/bin/bash
-infra validate --env prod
-if [ $? -ne 0 ]; then
-    echo "Validation failed!"
-    exit 1
-fi
-
-infra apply --env prod --auto-approve
-if [ $? -ne 0 ]; then
-    echo "Deployment failed!"
-    exit 1
-fi
-```
-
----
+## Configuration Details
+
+- **Global options:**
+  - `--config-dir/-c PATH` (overrides `INFRAFOUNDRY_CONFIG_REPO`)
+  - `--strict-mode/--no-strict-mode`
+  - `--fail-on-missing-secrets | --allow-missing-secrets`
+  - `--fail-on-missing-snippets | --allow-missing-snippets`
+  - Environment equivalents: `INFRAFOUNDRY_STRICT_MODE`, `INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS`, `INFRAFOUNDRY_FAIL_ON_MISSING_SNIPPETS`.
+- **State:** InfraFoundry DB at `~/.infrafoundry/state.db` (unless overridden); Terraform state under `generated/{env}/terraform/{provider}`.
+- **Generated artifacts:** `generated/{env}/{terraform|ansible}/{provider}`; always reproducible from YAML.
+
+## Commands and Examples
+
+- **Initialization**
+  - `infra init` — create state DB (SQLite by default).
+- **Blueprints**
+  - `infra new list` — list blueprints.
+  - `infra new create <blueprint> <path>` — scaffold from blueprint.
+- **Environment introspection**
+  - `infra envs` — list environments.
+  - `infra list --env <env> [--provider ... --type ...]` — list resources from YAML.
+  - `infra resources [--env ... --provider ... --type ... --state ...]` — list tracked resources from state DB.
+  - `infra status --env <env>` — show deployment status.
+  - `infra history [--env <env>]` — view deployment history.
+- **Plan/Apply/Destroy**
+  - `infra plan --env <env> [--resource ...] [--dry-run]`
+  - `infra apply --env <env> [--resource ...] [--auto-approve]`
+  - `infra destroy --env <env> [--resource ...] [--auto-approve]`
+- **Validation and Drift**
+  - `infra validate --env <env> [--check-api] [--check-refs]`
+  - `infra drift --env <env>`
+- **Policies**
+  - `infra policies check --env <env> [--enforce]`
+- **Secrets**
+  - `infra secrets init|encrypt|decrypt`
+- **Graphing**
+  - `infra graph --env <env> --format mermaid|dot`
+- **Migrations/Helpers**
+  - `infra isc-to-kea ...` — migrate ISC DHCP to Kea format.
+  - `infra download-template ...` — fetch templates where supported.
+
+## Validation and Checks
+
+- Prefer `infra validate --env <env> --check-api --check-refs` before `plan`/`apply`.
+- Use `--strict-mode` to treat missing secrets/snippets as errors.
+- Inspect generated files under `generated/` if behavior is unexpected.
+
+## Examples
+
+- **Target specific resources:**
+  ```bash
+  infra plan --env dev --resource vm-01 --resource vm-02
+  infra apply --env dev --resource vm-01 --auto-approve
+  ```
+- **Policy enforcement in CI:**
+  ```bash
+  infra policies check --env prod --enforce
+  ```
+- **Drift detection:**
+  ```bash
+  infra drift --env prod
+  ```
+- **Graph dependencies:**
+  ```bash
+  infra graph --env dev --format mermaid > graph.mmd
+  ```
 
 ## Related Documentation
 
-- [Setup Guide](SETUP_GUIDE.md) - Initial configuration and setup
-- [State Management](state-management.md) - Understanding state types and backends
-- [ISC to Kea Migration](isc-to-kea-migration.md) - DHCP migration guide
-- [Architecture](architecture/ARCHITECTURE.md) - System architecture and design
+- [Configuration Guide](configuration.md)
+- [Validation and Pre-Flight Checks](validation.md)
+- [Policy Configuration Guide](policy-configuration.md)
+- [State Management](state-management.md)
+- [Per-Environment Credentials](per-environment-credentials.md)
+
+## Troubleshooting
+
+- **Symptom:** Missing configs. **Fix:** Set `--config-dir` or `INFRAFOUNDRY_CONFIG_REPO`; ensure `envs/{env}` exists.
+- **Symptom:** Commands fail due to missing secrets/snippets. **Fix:** Enable `--strict-mode` to surface early, or allow missing during development; ensure SOPS keys are available.
+- **Symptom:** Unexpected resource lists. **Fix:** Use `infra list` (YAML view) vs `infra resources` (state DB view) to differentiate declared vs tracked resources.
+
+---
+
+Last updated: 2025-11-29 14:27 GMT
