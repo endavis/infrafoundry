@@ -64,9 +64,9 @@ infra apply --env dev
 ## Related Documentation
 
 - [Runner Execution Overview](overview.md)
-- [Configuration Guide](../configuration.md)
-- [State Management](../state-management.md)
-- [SSH Authentication](../ssh-authentication.md)
+- [Configuration Guide](../configuration/overview.md)
+- [State Management](../architecture/state-management.md)
+- [SSH Authentication](../guides/ssh-authentication.md)
 
 ## Troubleshooting
 

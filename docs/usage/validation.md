@@ -74,10 +74,10 @@ infra validate --env prod --check-api --check-refs
 
 ## Related Documentation
 
-- [CLI Reference](CLI_REFERENCE.md)
-- [Settings File Structure](settings-file-structure.md)
-- [Per-Environment Credentials](per-environment-credentials.md)
-- [State Management](state-management.md)
+- [CLI Reference](cli-reference.md)
+- [Settings File Structure](../configuration/settings-file-structure.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
+- [State Management](../architecture/state-management.md)
 
 ## Troubleshooting
 

@@ -80,9 +80,9 @@ Create a `SecretProvider` to integrate InfraFoundry with alternate secret backen
 ## Related Documentation
 
 - [Secrets Management Architecture](../architecture/secrets-architecture.md)
-- [Per-Environment Credentials](../per-environment-credentials.md)
-- [Age Key Management Best Practices](../age-key-management.md)
-- [Plugin Development](plugin-development.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
+- [Age Key Management Best Practices](../guides/age-key-management.md)
+- [Implementing Providers](implementing-providers.md)
 
 ## Troubleshooting
 

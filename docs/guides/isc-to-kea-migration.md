@@ -69,10 +69,10 @@ infra migrate --env prod --provider opnsense --component isc-to-kea --dry-run
 
 ## Related Documentation
 
-- [Configuration Guide](configuration.md)
-- [Validation and Pre-Flight Checks](validation.md)
+- [Configuration Guide](../configuration/overview.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
 - [DHCP Static Mapping and VM Integration](dhcp-vm-integration.md)
-- [Notifications Guide](notifications.md)
+- [Notifications Guide](../configuration/notifications.md)
 
 ## Troubleshooting
 

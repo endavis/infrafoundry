@@ -65,7 +65,7 @@ InfraFoundry’s architecture combines pluggable providers, template-driven code
 - [Orchestrator Architecture](orchestrator-architecture.md)
 - [Pluggable Runners](pluggable-runners.md)
 - [Secrets Architecture](secrets-architecture.md)
-- [State Management](../state-management.md)
+- [State Management](state-management.md)
 
 ## Troubleshooting
 

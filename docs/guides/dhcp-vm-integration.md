@@ -80,10 +80,10 @@ InfraFoundry can align OPNsense DHCP static mappings with Proxmox VMs so VMs use
 
 ## Related Documentation
 
-- [Validation and Pre-Flight Checks](validation.md)
-- [Configuration](configuration.md)
-- [YAML-Only Config](yaml-only-config.md)
-- [Per-Environment Credentials](per-environment-credentials.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
+- [Configuration](../configuration/overview.md)
+- [YAML-Only Config](../configuration/yaml-only-config.md)
+- [Per-Environment Credentials](../configuration/per-environment-credentials.md)
 
 ## Troubleshooting
 

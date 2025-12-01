@@ -93,8 +93,8 @@ InfraFoundry’s policy engine enforces rules before deployment. Policies can bl
 
 ## Related Documentation
 
-- [Validation and Pre-Flight Checks](validation.md)
-- [Configuration Guide](configuration.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
+- [Configuration Guide](overview.md)
 - [Separate Config Repo](separate-config-repo.md)
 
 ## Troubleshooting

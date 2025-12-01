@@ -116,9 +116,9 @@ InfraFoundry can emit deployment, drift, and policy events to Slack, Discord, or
 
 ## Related Documentation
 
-- [Validation and Pre-Flight Checks](validation.md)
-- [Configuration Guide](configuration.md)
-- [Architecture: Event System](development/event-system.md)
+- [Validation and Pre-Flight Checks](../usage/validation.md)
+- [Configuration Guide](overview.md)
+- [Architecture: Event System](../development/event-system.md)
 
 ## Troubleshooting
 

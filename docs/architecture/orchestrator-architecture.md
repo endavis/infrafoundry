@@ -71,8 +71,8 @@ The Orchestrator is a thin coordinator that wires providers, runners, policy che
 - [Infrastructure Architecture](ARCHITECTURE.md)
 - [Pluggable Runners](pluggable-runners.md)
 - [Architecture Overview](overview.md)
-- [State Management](../state-management.md)
-- [Notifications Guide](../notifications.md)
+- [State Management](state-management.md)
+- [Notifications Guide](../configuration/notifications.md)
 
 ## Troubleshooting
 

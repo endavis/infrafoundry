@@ -71,7 +71,7 @@ Guidelines for exceptions, typing, structure, testing, and docs to keep InfraFou
 ## Related Documentation
 
 - [Manager Patterns](manager-patterns.md)
-- [Plugin Development](plugin-development.md)
+- [Implementing Providers](implementing-providers.md)
 - [CI/CD Testing](ci-cd-testing.md)
 - [Implementing Secret Providers](implementing-secret-providers.md)
 
