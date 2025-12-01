@@ -62,3 +62,7 @@ This example illustrates a legacy `.env` file for CI/local use, defining InfraFo
 ---
 
 Last updated: 2025-11-29 14:27 GMT
+
+
+---
+[Back to Table of Contents](../TABLE_OF_CONTENTS.md)
