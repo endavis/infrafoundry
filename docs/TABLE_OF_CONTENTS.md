@@ -31,6 +31,7 @@ This index provides a structured overview of the available documentation.
 - **[Design Principles](architecture/principles.md)**: Core principles guiding the design of InfraFoundry.
 - **[Design Principles Assessment](architecture/design-principles-assessment.md)**: Evaluation of the architecture against the design principles.
 - **[Architectural Patterns](architecture/architectural-patterns.md)**: Common software patterns employed in the codebase.
+- **[Architecture Decision Records](architecture/decisions/README.md)**: Historical record of key architectural decisions.
 
 ## Guides
 - **[ISC to Kea Migration](guides/isc-to-kea-migration.md)**: Walkthrough for migrating DHCP services from ISC to Kea.
