@@ -42,7 +42,7 @@ Potential enhancements to expand InfraFoundry’s capabilities across templating
 - [Architecture Overview](docs/architecture/overview.md)
 - [Secrets Architecture](docs/architecture/secrets-architecture.md)
 - [Configuration Blueprints](docs/configuration/blueprints.md)
-- [Policy Configuration Guide](docs/policy-configuration.md)
+- [Policy Configuration Guide](docs/configuration/policy-configuration.md)
 
 ## Troubleshooting
 

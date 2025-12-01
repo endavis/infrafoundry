@@ -456,13 +456,13 @@ InfraFoundry manages three types of state:
    - Reproducible from YAML configs
    - Git-ignored, regenerated on each plan/apply
 
-For more details, see [State Management Guide](../docs/state-management.md).
+For more details, see [State Management Guide](../docs/architecture/state-management.md).
 
 ## Related Documentation
 
 - [InfraFoundry Framework](https://github.com/your-org/infrafoundry)
-- [State Management Strategies](../docs/state-management.md)
-- [Separate Config Repository Guide](../docs/separate-config-repo.md)
+- [State Management Strategies](../docs/architecture/state-management.md)
+- [Separate Config Repository Guide](../docs/configuration/separate-config-repo.md)
 - [Provider Documentation](https://github.com/your-org/infrafoundry/tree/main/docs)
 - [SOPS Documentation](https://github.com/getsops/sops)
 - [age Encryption](https://github.com/FiloSottile/age)

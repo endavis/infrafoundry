@@ -435,6 +435,6 @@ Always ensure you're in the config repo:
 
 ## Additional Resources
 
-- [Separate Config Repo Guide](../docs/separate-config-repo.md)
+- [Separate Config Repo Guide](../docs/configuration/separate-config-repo.md)
 - [GitHub Actions Documentation](https://docs.github.com/actions)
 - [GitLab CI/CD Documentation](https://docs.gitlab.com/ee/ci/)

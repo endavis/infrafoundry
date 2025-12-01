@@ -79,7 +79,7 @@ jobs:
 
 ## GitLab CI
 
-See `docs/examples/.gitlab-ci.yml.example` for GitLab CI/CD configuration.
+See [`docs/examples/.gitlab-ci.yml.example`](../docs/examples/.gitlab-ci.yml.example) for GitLab CI/CD configuration.
 
 ---
 
