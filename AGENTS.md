@@ -70,9 +70,12 @@ InfraFoundry generates Terraform `.tf` files and Ansible playbooks from YAML con
 - Markdown formatting for detailed commits
 - Separate commits for refactoring, docs, tests, cleanup, dependencies
 
-### Branching Strategy
-- **General Fixes:** For minor bug fixes and small improvements, directly branch from and target the `dev` branch.
-- **Refactors & Feature Additions:** For larger changes, refactorings, or new features, create a dedicated branch (e.g., `feat/my-new-feature`, `refactor/api-cleanup`) branched off `dev`. These branches should be merged into `main` via a Pull Request once completed and reviewed.
+### Development Workflow
+**Rule:** All changes must originate from a GitHub Issue.
+1.  **Issue:** Ensure a GitHub Issue exists for the task (e.g., "Refactor BaseRunner").
+2.  **Branch:** Create a branch linked to the issue (format: `issue/<number>-<short-desc>` or `feat/<number>-<desc>`).
+3.  **Commit:** Use Conventional Commits.
+4.  **Pull Request:** Submit a PR from your branch to `main` (or `dev` if active), referencing the issue (e.g., "Closes #123").
 
 ## Testing Expectations
 - Maintain ≥69% coverage
@@ -86,11 +89,13 @@ InfraFoundry generates Terraform `.tf` files and Ansible playbooks from YAML con
 - Inspect files with `cat -pp` or `batcat -pp` for consistent output
 
 ## Help & Resources
-- Repository docs: [docs/](docs/TABLE_OF_CONTENTS.md)
-- Example configs: `example-config/`
-- Policies: `policies/`
-- Issues/roadmap: GitHub issues referenced in `AGENTS.md`
-- Contact: Use repo discussion/issues per AGENTS guidance.
+- **Documentation Index:** [Table of Contents](docs/TABLE_OF_CONTENTS.md)
+- **Getting Started:** `docs/getting-started/`
+- **Configuration:** `docs/configuration/`
+- **Architecture:** `docs/architecture/`
+- **Development:** `docs/development/`
+- **Example Configs:** `example-config/`
+- **Roadmap & TODOs:** [docs/TODO.md](docs/TODO.md)
 
 ---
 This file unifies essential agent instructions for InfraFoundry. For coding/development specifics, see dedicated documentation files.
