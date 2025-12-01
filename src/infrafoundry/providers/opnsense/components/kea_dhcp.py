@@ -1,5 +1,7 @@
 """Kea DHCP component manager for OPNsense."""
 
+from typing import Literal
+
 from ..services.kea_dhcp import KeaDHCPService
 from .base import BaseComponentManager
 
@@ -11,6 +13,27 @@ class KeaDHCPManager(BaseComponentManager):
     and configuration management for both DHCPv4 and DHCPv6.
     """
 
+    def _reset_dhcp(
+        self,
+        env_name: str,
+        version: Literal["v4", "v6"],
+        provider_name: str = "opnsense",
+    ) -> None:
+        """Reset (delete) all Kea DHCP configuration for specified version."""
+        service: KeaDHCPService = KeaDHCPService.from_environment(
+            env_name, provider_name, self.config_dir
+        )
+
+        # Delete all reservations first (they depend on subnets)
+        if version == "v4":
+            service.delete_all_dhcpv4_reservations()
+            service.delete_all_dhcpv4_subnets()
+        else:
+            service.delete_all_dhcpv6_reservations()
+            service.delete_all_dhcpv6_subnets()
+
+        service.reconfigure()
+
     def reset_dhcpv4(self, env_name: str, provider_name: str = "opnsense") -> None:
         """Reset (delete) all Kea DHCPv4 configuration.
 
@@ -21,18 +44,7 @@ class KeaDHCPManager(BaseComponentManager):
             env_name: Environment name to reset
             provider_name: Provider name (defaults to 'opnsense')
         """
-        service: KeaDHCPService = KeaDHCPService.from_environment(
-            env_name, provider_name, self.config_dir
-        )
-
-        # Delete all reservations first (they depend on subnets)
-        service.delete_all_dhcpv4_reservations()
-
-        # Delete all subnets
-        service.delete_all_dhcpv4_subnets()
-
-        # Reconfigure service to apply changes
-        service.reconfigure()
+        self._reset_dhcp(env_name, "v4", provider_name)
 
     def reset_dhcpv6(self, env_name: str, provider_name: str = "opnsense") -> None:
         """Reset (delete) all Kea DHCPv6 configuration.
@@ -44,18 +56,7 @@ class KeaDHCPManager(BaseComponentManager):
             env_name: Environment name to reset
             provider_name: Provider name (defaults to 'opnsense')
         """
-        service: KeaDHCPService = KeaDHCPService.from_environment(
-            env_name, provider_name, self.config_dir
-        )
-
-        # Delete all reservations first (they depend on subnets)
-        service.delete_all_dhcpv6_reservations()
-
-        # Delete all subnets
-        service.delete_all_dhcpv6_subnets()
-
-        # Reconfigure service to apply changes
-        service.reconfigure()
+        self._reset_dhcp(env_name, "v6", provider_name)
 
     def reset_all(self, env_name: str, provider_name: str = "opnsense") -> None:
         """Reset both DHCPv4 and DHCPv6 configurations.
