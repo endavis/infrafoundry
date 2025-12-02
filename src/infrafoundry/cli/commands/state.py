@@ -5,14 +5,11 @@ import shutil
 from pathlib import Path
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-from ..utils import raise_cli_error
-
-console = Console()
+from ..utils import console, raise_cli_error
 
 
 @click.group()
@@ -64,14 +61,13 @@ def state_backup(
             state_db_path = Path(db_path_str)
         else:
             # If not SQLite, it's likely a remote DB, so backup is not a file copy.
-            console.print(
-                "[yellow]InfraFoundry state is not a local SQLite database. "
-                "Skipping file backup.[/yellow]"
+            console.warning(
+                "InfraFoundry state is not a local SQLite database. Skipping file backup."
             )
             return
 
         if not state_db_path or not state_db_path.exists():
-            console.print("[red]InfraFoundry state database file not found.[/red]")
+            console.error("InfraFoundry state database file not found.")
             return
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -79,7 +75,7 @@ def state_backup(
         db_backup_path = output_path / db_backup_name
 
         shutil.copy2(state_db_path, db_backup_path)
-        console.print(f"[green]✓ State database backed up to: {db_backup_path}[/green]")
+        console.success(f"State database backed up to: {db_backup_path}")
 
         if include_generated:
             generated_dir = (
@@ -96,13 +92,9 @@ def state_backup(
                     root_dir=str(generated_dir.parent),  # Parent directory
                     base_dir=generated_dir.name,  # The directory itself
                 )
-                console.print(
-                    f"[green]✓ 'generated/' directory archived to: {generated_backup_path}[/green]"
-                )
+                console.success(f"'generated/' directory archived to: {generated_backup_path}")
             else:
-                console.print(
-                    "[yellow]'generated/' directory not found. Skipping archive.[/yellow]"
-                )
+                console.warning("'generated/' directory not found. Skipping archive.")
 
     except Exception as exc:
         raise_cli_error("State backup failed", exc)

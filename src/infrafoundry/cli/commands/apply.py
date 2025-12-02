@@ -1,13 +1,11 @@
 """Apply infrastructure changes command."""
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command()
@@ -44,14 +42,11 @@ def apply(
     # If not auto-approve, ask for confirmation at InfraFoundry level
     if not auto_approve:
         resource_desc = f" (resources: {', '.join(resource)})" if resource else ""
-        console.print(
-            f"\n[yellow]About to apply infrastructure for environment: "
-            f"{env}{resource_desc}[/yellow]"
-        )
-        console.print("[yellow]This will make real changes to your infrastructure.[/yellow]")
+        console.warning(f"About to apply infrastructure for environment: {env}{resource_desc}")
+        console.warning("This will make real changes to your infrastructure.")
 
         if not click.confirm("Do you want to continue?", default=False):
-            console.print("[yellow]Apply cancelled.[/yellow]")
+            console.warning("Apply cancelled.")
             return
 
         # User confirmed, so pass auto_approve=True to Terraform
@@ -64,4 +59,4 @@ def apply(
         parallel=parallel,
         max_workers=max_workers,
     )
-    console.print("\n[bold green]Apply complete![/bold green]")
+    console.success("Apply complete!")
