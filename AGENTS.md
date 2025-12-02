@@ -76,6 +76,7 @@ InfraFoundry generates Terraform `.tf` files and Ansible playbooks from YAML con
 2.  **Branch:** Create a branch linked to the issue (format: `issue/<number>-<short-desc>` or `feat/<number>-<desc>`).
 3.  **Commit:** Use Conventional Commits.
 4.  **Pull Request:** Submit a PR from your branch to `main` (or `dev` if active), referencing the issue (e.g., "Closes #123").
+5.  **PR merges:** all PR merges shoould include "(merges PR #XXX, closes #YYY)" where #XXX is the PR# and #YYY is the issue number
 
 ## Testing Expectations
 - Maintain ≥69% coverage
