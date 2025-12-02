@@ -31,31 +31,31 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 
 
 ## Testing & Refactoring (from Maintenance Report)
-- [ ] **Unit Test Coverage: CLI Commands**: ([Issue](https://github.com/endavis/infrafoundry/issues/40))
-- [ ] **Unit Test Coverage: Orchestration Workflows**: ([Issue](https://github.com/endavis/infrafoundry/issues/41))
-- [ ] **Unit Test Coverage: Deployment Executor**: ([Issue](https://github.com/endavis/infrafoundry/issues/42))
-- [ ] **Unit Test Coverage: Runners**: ([Issue](https://github.com/endavis/infrafoundry/issues/43))
-- [ ] **Refactor & Test: Validators**: ([Issue](https://github.com/endavis/infrafoundry/issues/44))
-- [ ] **Refactor: Provider Terraform Generation**: ([Issue](https://github.com/endavis/infrafoundry/issues/45))
+- [x] **Unit Test Coverage: CLI Commands**: ([Issue](https://github.com/endavis/infrafoundry/issues/40))
+- [ ] **Unit Test Coverage: Orchestration Workflows** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/41))
+- [ ] **Unit Test Coverage: Deployment Executor** [Complexity: 6/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/42))
+- [ ] **Unit Test Coverage: Runners** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/43))
+- [ ] **Refactor & Test: Validators** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/44))
+- [ ] **Refactor: Provider Terraform Generation** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/45))
 - [x] **Refactor: Console Output**: ([Issue](https://github.com/endavis/infrafoundry/issues/46))
-- [ ] **Refactor: Orchestrator God Class**: ([Issue](https://github.com/endavis/infrafoundry/issues/47))
+- [ ] **Refactor: Orchestrator God Class** [Complexity: 6/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/47))
 
 
 
 ## Architecture & Design (from Design Assessment)
-- [ ] **Refactor: Use Protocol Classes**: ([Issue](https://github.com/endavis/infrafoundry/issues/49))
-- [ ] **Documentation: Architecture Decision Records**: ([Issue](https://github.com/endavis/infrafoundry/issues/50))
-- [ ] **Documentation: Sequence Diagrams**: ([Issue](https://github.com/endavis/infrafoundry/issues/51))
+- [ ] **Refactor: Use Protocol Classes** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/49))
+- [x] **Documentation: Architecture Decision Records**: ([Issue](https://github.com/endavis/infrafoundry/issues/50))
+- [x] **Documentation: Sequence Diagrams**: ([Issue](https://github.com/endavis/infrafoundry/issues/51))
 
 
 ## Code Quality & Refactoring (from Code Quality Analysis)
-- [ ] **Refactor: BaseRunner Interface Segregation**: ([Issue](https://github.com/endavis/infrafoundry/issues/48))
-- [ ] **Refactor: KeaDHCPManager Duplication**: ([Issue](https://github.com/endavis/infrafoundry/issues/52))
-- [ ] **Refactor: KeaClient CRUD Duplication**: ([Issue](https://github.com/endavis/infrafoundry/issues/53))
-- [ ] **Refactor: BaseProviderValidator**: ([Issue](https://github.com/endavis/infrafoundry/issues/54))
-- [ ] **Refactor: Policy Evaluator Boilerplate**: ([Issue](https://github.com/endavis/infrafoundry/issues/55))
-- [ ] **Refactor: Normalize OPNsense Interface Data**: ([Issue](https://github.com/endavis/infrafoundry/issues/56))
-- [ ] **Bug Fix: Print Statement in Policy Evaluator**: ([Issue](https://github.com/endavis/infrafoundry/issues/57))
+- [ ] **Refactor: BaseRunner Interface Segregation** [Complexity: 7/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/48))
+- [x] **Refactor: KeaDHCPManager Duplication**: ([Issue](https://github.com/endavis/infrafoundry/issues/52))
+- [ ] **Refactor: KeaClient CRUD Duplication** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/53))
+- [ ] **Refactor: BaseProviderValidator** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/54))
+- [ ] **Refactor: Policy Evaluator Boilerplate** [Complexity: 3/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/55))
+- [ ] **Refactor: Normalize OPNsense Interface Data** [Complexity: 3/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/56))
+- [x] **Bug Fix: Print Statement in Policy Evaluator** [Complexity: 1/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/57))
 
 ## Completed Features
 - [x] Configuration templating/blueprints
