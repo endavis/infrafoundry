@@ -1,15 +1,12 @@
-"""Show deployment history command."""
-
 import click
-from rich.console import Console
 from rich.table import Table
 
 from infrafoundry.core.exceptions import InfraFoundryError, StateError
-from infrafoundry.core.state import DeploymentStatus, StateManager
+from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.state import DeploymentStatus
 
-from ..utils import raise_cli_error
-
-console = Console()
+from ..decorators import with_orchestrator
+from ..utils import console, raise_cli_error
 
 
 @click.command()
@@ -28,7 +25,10 @@ console = Console()
 )
 @click.option("--limit", "-n", default=50, help="Number of deployments to show")
 @click.option("--exclude-dry-runs", is_flag=True, help="Exclude dry-run deployments from history")
+@with_orchestrator("Failed to show history", require_env=False, load_credentials=False)
 def history(
+    _ctx: click.Context,  # Added ctx argument to capture orchestrator
+    orchestrator: Orchestrator,  # Added orchestrator argument
     env: str | None,
     command: str | None,
     status: str | None,
@@ -37,7 +37,8 @@ def history(
 ) -> None:
     """Show deployment history."""
     try:
-        state_manager = StateManager()
+        # Use orchestrator's state_manager
+        state_manager = orchestrator.state_manager
 
         # Convert status string to enum if provided
         status_enum = None
@@ -53,8 +54,14 @@ def history(
         )
 
         if not deployments:
-            console.print("[yellow]No deployment history found.[/yellow]")
-            console.print("\n[dim]Run 'infra init' to initialize state tracking.[/dim]")
+            console.warning("No deployment history found.")
+            # This info is relevant if the state DB is not initialized.
+            # However, orchestrator._setup_state_manager should handle this.
+            # If the DB doesn't exist, get_deployment_history would raise StateError.
+            # So, we can remove the explicit "Run 'infra init'" here if StateError is caught below.
+            console.info(
+                "Run 'infra init' to initialize state tracking."
+            )  # Keep for now, will remove below
             return
 
         table = Table(title="Deployment History")
@@ -67,7 +74,6 @@ def history(
         table.add_column("User", style="yellow")
 
         for deployment in deployments:
-            # Get status value (handle both enum and string)
             status_str = (
                 deployment.status.value
                 if hasattr(deployment.status, "value")
@@ -81,7 +87,6 @@ def history(
                 "planned": "cyan",
             }.get(status_str, "white")
 
-            # Format dry_run indicator
             dry_run_indicator = "✓" if deployment.dry_run else ""
 
             table.add_row(
@@ -104,11 +109,11 @@ def history(
         raise
     except StateError as exc:
         if "no such table" in str(exc).lower():
-            console.print("\n[dim]Run 'infra init' to initialize state tracking.[/dim]")
+            console.info("Run 'infra init' to initialize state tracking.")
         raise_cli_error("Failed to show history", exc)
     except InfraFoundryError as exc:
         raise_cli_error("Failed to show history", exc)
     except Exception as exc:
         if "no such table" in str(exc).lower():
-            console.print("\n[dim]Run 'infra init' to initialize state tracking.[/dim]")
+            console.info("Run 'infra init' to initialize state tracking.")
         raise_cli_error("Failed to show history", exc)

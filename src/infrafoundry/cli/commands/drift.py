@@ -1,15 +1,12 @@
 """Detect infrastructure drift command."""
 
 import click
-from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command()
@@ -25,8 +22,8 @@ def drift(_ctx: click.Context, orchestrator: Orchestrator, env: str) -> None:
     results = orchestrator.detect_drift(env)
 
     # Display detailed results
-    console.print("\n")
-    console.print(Panel("[bold]Drift Detection Results[/bold]", style="cyan"))
+    console.info("")
+    console.header("Drift Detection Results")
 
     total_drift = False
     for provider_name, drift_info in results.items():
@@ -46,14 +43,10 @@ def drift(_ctx: click.Context, orchestrator: Orchestrator, env: str) -> None:
 
             console.print(table)
 
-            console.print(f"\n[yellow]Summary:[/yellow] {drift_info['summary']}")
+            console.warning(f"Summary: {drift_info['summary']}")
 
     if not total_drift:
-        console.print(
-            "\n[bold green]✓ No drift detected - infrastructure matches configuration[/bold green]"
-        )
+        console.success("No drift detected - infrastructure matches configuration")
     else:
-        console.print("\n[bold yellow]⚠ Drift detected![/bold yellow]")
-        console.print(
-            "[dim]Run 'infra plan' to see detailed changes, or 'infra apply' to reconcile.[/dim]"
-        )
+        console.warning("Drift detected!")
+        console.status("Run 'infra plan' to see detailed changes, or 'infra apply' to reconcile.")
