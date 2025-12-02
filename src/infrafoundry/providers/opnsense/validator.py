@@ -251,6 +251,53 @@ class OPNsenseValidator:
                 aliases[name] = row
         return aliases
 
+    def _normalize_interface_data(self, data: Any) -> list[dict[str, Any]]:
+        """Normalize interface data to list format.
+
+        The OPNsense API may return interface data in different formats:
+        - As a dict keyed by interface name
+        - As a list of interface dicts
+
+        This method normalizes both formats to a consistent list format.
+
+        Args:
+            data: Raw interface data from API
+
+        Returns:
+            List of interface dicts
+        """
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+        elif isinstance(data, dict):
+            return [
+                {"name": name, **iface_data}
+                for name, iface_data in data.items()
+                if isinstance(iface_data, dict)
+            ]
+        return []
+
+    def _extract_interface_name(self, iface_data: dict[str, Any]) -> str | None:
+        """Extract interface name from various possible fields.
+
+        Different interface types may store the name in different fields:
+        - name: Standard field
+        - device: Physical device name
+        - if: Short form
+        - interface: Full form
+
+        Args:
+            iface_data: Interface data dict
+
+        Returns:
+            Interface name if found, None otherwise
+        """
+        return (
+            iface_data.get("name")
+            or iface_data.get("device")
+            or iface_data.get("if")
+            or iface_data.get("interface")
+        )
+
     def _get_existing_interfaces(
         self, api_url: str, api_key: str, api_secret: str
     ) -> dict[str, InterfaceData]:
@@ -279,30 +326,15 @@ class OPNsenseValidator:
         if not data:
             return {}
 
-        interfaces: dict[str, InterfaceData] = {}
-        # API may return a dict keyed by interface name, or a list of interface dicts.
-        if isinstance(data, dict):
-            for iface_name, iface_data in data.items():
-                if isinstance(iface_data, dict):
-                    interfaces[iface_name] = cast(InterfaceData, iface_data)
-            return interfaces
+        # Normalize to list of interface dicts
+        interface_list = self._normalize_interface_data(data)
 
-        if isinstance(data, list):
-            for iface_data in data:
-                if not isinstance(iface_data, dict):
-                    continue
-                name = (
-                    iface_data.get("name")
-                    or iface_data.get("device")
-                    or iface_data.get("if")
-                    or iface_data.get("interface")
-                )
-                if name:
-                    interfaces[str(name)] = cast(InterfaceData, iface_data)
-            return interfaces
-
-        # Unexpected structure, return empty to avoid crashes while keeping validation non-fatal.
-        return interfaces
+        # Convert to dict keyed by name
+        return {
+            name: cast(InterfaceData, iface)
+            for iface in interface_list
+            if (name := self._extract_interface_name(iface))
+        }
 
     def _validate_firewall_rules(
         self, resource_refs: dict[str, Any], existing_aliases: dict[str, Any]
