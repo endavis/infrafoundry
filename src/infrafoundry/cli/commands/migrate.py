@@ -78,7 +78,7 @@ def migrate(
     provider_instance._current_environment = env
 
     if not output:
-        config_dir = ctx.obj.get("config_dir", ".")
+        config_dir = (ctx.obj or {}).get("config_dir", ".")
         component_name = component.replace("/", "-")
         output_path = (
             Path(config_dir) / "envs" / env / "resources" / f"migrated-{component_name}.yaml"
