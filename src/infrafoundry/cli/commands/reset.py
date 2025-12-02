@@ -1,13 +1,11 @@
 """Reset infrastructure components command."""
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command()
@@ -59,25 +57,24 @@ def reset(
 
     if not auto_approve:
         component_desc = component.upper()
-        console.print(
-            f"\n[bold yellow]Warning:[/bold yellow] This will completely remove all "
-            f"{component_desc} configuration from OPNsense."
+        console.warning(
+            f"This will completely remove all {component_desc} configuration from OPNsense."
         )
-        console.print("[yellow]All subnets, reservations, and settings will be deleted.[/yellow]")
+        console.warning("All subnets, reservations, and settings will be deleted.")
         if not click.confirm("\nDo you want to continue?", default=False):
-            console.print("[yellow]Reset cancelled.[/yellow]")
+            console.warning("Reset cancelled.")
             return
 
     component_lower = component.lower()
     if component_lower in ["kea/dhcpv4", "kea/dhcp"]:
-        console.print("[cyan]Resetting Kea DHCPv4 configuration...[/cyan]")
+        console.info("Resetting Kea DHCPv4 configuration...")
         provider_instance.reset_kea_dhcpv4(env)
-        console.print("[green]✓ Kea DHCPv4 reset complete[/green]")
+        console.success("Kea DHCPv4 reset complete")
 
     if component_lower in ["kea/dhcpv6", "kea/dhcp"]:
-        console.print("[cyan]Resetting Kea DHCPv6 configuration...[/cyan]")
+        console.info("Resetting Kea DHCPv6 configuration...")
         provider_instance.reset_kea_dhcpv6(env)
-        console.print("[green]✓ Kea DHCPv6 reset complete[/green]")
+        console.success("Kea DHCPv6 reset complete")
 
-    console.print("\n[bold green]Reset complete![/bold green]")
-    console.print("\n[cyan]You can now run 'infra apply' to apply fresh configuration.[/cyan]")
+    console.success("Reset complete!")
+    console.info("You can now run 'infra apply' to apply fresh configuration.")

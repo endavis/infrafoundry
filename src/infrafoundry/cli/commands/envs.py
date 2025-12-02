@@ -1,7 +1,6 @@
 """Envs command - List available environments."""
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.exceptions import (
@@ -10,9 +9,7 @@ from infrafoundry.core.exceptions import (
     InfraFoundryError,
 )
 
-from ..utils import raise_cli_error
-
-console = Console()
+from ..utils import console, raise_cli_error
 
 
 @click.command()
@@ -28,17 +25,16 @@ def envs(ctx: click.Context) -> None:
         environments = config_manager.list_environments()
 
         if not environments:
-            console.print(
-                "[yellow]No environments found. "
-                "Check that INFRAFOUNDRY_CONFIG_REPO is set correctly.[/yellow]"
+            console.warning(
+                "No environments found. Check that INFRAFOUNDRY_CONFIG_REPO is set correctly."
             )
             return
 
-        console.print("[bold cyan]Available environments:[/bold cyan]")
+        console.header("Available environments:")
         for env_name in environments:
             env_config = config_manager.load_environment(env_name)
-            console.print(f"  • {env_name}: {env_config.description or 'No description'}")
-            console.print(f"    Providers: {', '.join(env_config.providers)}")
+            console.info(f"  • {env_name}: {env_config.description or 'No description'}")
+            console.info(f"    Providers: {', '.join(env_config.providers)}")
 
     except click.ClickException:
         raise

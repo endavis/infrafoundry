@@ -1,7 +1,6 @@
 """List resources in an environment command."""
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.exceptions import (
@@ -10,9 +9,7 @@ from infrafoundry.core.exceptions import (
     InfraFoundryError,
 )
 
-from ..utils import raise_cli_error
-
-console = Console()
+from ..utils import console, raise_cli_error
 
 
 @click.command(name="list")
@@ -40,31 +37,25 @@ def list_resources(ctx: click.Context, env: str, provider: str | None, type: str
 
         if not all_resources:
             if type and provider:
-                console.print(
-                    f"[yellow]No resources found with provider '{provider}' "
-                    f"and type '{type}'[/yellow]"
-                )
+                console.warning(f"No resources found with provider '{provider}' and type '{type}'")
             elif type:
-                console.print(f"[yellow]No resources found with type '{type}'[/yellow]")
+                console.warning(f"No resources found with type '{type}'")
             elif provider:
-                console.print(f"[yellow]No resources found with provider '{provider}'[/yellow]")
+                console.warning(f"No resources found with provider '{provider}'")
             else:
-                console.print("[yellow]No resources found[/yellow]")
+                console.warning("No resources found")
             return
 
-        console.print(f"[bold cyan]Resources in {env}:[/bold cyan]\n")
+        console.header(f"Resources in {env}:")
 
         # Sort all resources by name
         all_resources.sort(key=lambda r: r.name)
 
         # Display each resource on a single line
         for resource in all_resources:
-            console.print(
-                f"  • {resource.name:<40} [bold]{resource.provider:<12}[/bold] "
-                f"[dim]({resource.type})[/dim]"
-            )
+            console.info(f"  • {resource.name:<40} {resource.provider:<12} ({resource.type})")
 
-        console.print(f"\n[dim]Total: {len(all_resources)} resources[/dim]")
+        console.info(f"Total: {len(all_resources)} resources")
 
     except click.ClickException:
         raise

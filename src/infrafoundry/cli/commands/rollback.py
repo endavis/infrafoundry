@@ -1,13 +1,10 @@
 """Rollback infrastructure to previous deployment command."""
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
 
 
 @click.command()

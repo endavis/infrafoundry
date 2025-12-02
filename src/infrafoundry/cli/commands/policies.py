@@ -1,14 +1,12 @@
 """List infrastructure policies command."""
 
 import click
-from rich.console import Console
 from rich.table import Table
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command()
@@ -18,14 +16,14 @@ def policies(_ctx: click.Context, orchestrator: Orchestrator, env: str | None) -
     """List available infrastructure policies."""
     if env:
         policies_list = orchestrator.policy_engine.get_policies_for_environment(env)
-        console.print(f"\n[bold]Policies for {env}:[/bold]")
+        console.header(f"Policies for {env}")
     else:
         policies_list = orchestrator.policy_engine.policies
-        console.print("\n[bold]All Policies:[/bold]")
+        console.header("All Policies")
 
     if not policies_list:
-        console.print("[yellow]No policies found.[/yellow]")
-        console.print("[dim]Create policy files in the 'policies' directory.[/dim]")
+        console.warning("No policies found.")
+        console.info("Create policy files in the 'policies' directory.")
         return
 
     # Display policies in a table
@@ -38,20 +36,14 @@ def policies(_ctx: click.Context, orchestrator: Orchestrator, env: str | None) -
     table.add_column("Description", style="dim")
 
     for policy in policies_list:
-        level_color = {
-            "error": "red",
-            "warning": "yellow",
-            "info": "blue",
-        }.get(policy.level.value, "white")
-
         table.add_row(
             policy.name,
             policy.type.value,
-            f"[{level_color}]{policy.level.value}[/{level_color}]",
+            policy.level.value,
             "✓" if policy.enabled else "✗",
             ", ".join(policy.environments) if policy.environments else "all",
             policy.description,
         )
 
     console.print(table)
-    console.print(f"\n[dim]Total: {len(policies_list)} policy/policies[/dim]")
+    console.info(f"Total: {len(policies_list)} policy/policies")

@@ -1,14 +1,12 @@
 """List available rollback points command."""
 
 import click
-from rich.console import Console
 from rich.table import Table
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command(name="rollback-points")
@@ -23,8 +21,8 @@ def rollback_points(_ctx: click.Context, orchestrator: Orchestrator, env: str, l
     deployments = orchestrator.state_manager.get_rollback_points(env, limit=limit)
 
     if not deployments:
-        console.print(f"\n[yellow]No rollback points found for {env}.[/yellow]")
-        console.print("[dim]Rollback points are created from successful apply operations.[/dim]")
+        console.warning(f"No rollback points found for {env}.")
+        console.info("Rollback points are created from successful apply operations.")
         return
 
     table = Table(title=f"Rollback Points for {env}", show_header=True)
@@ -53,6 +51,4 @@ def rollback_points(_ctx: click.Context, orchestrator: Orchestrator, env: str, l
 
     console.print()
     console.print(table)
-    console.print(
-        "\n[dim]Use 'infra rollback --deployment-id <ID>' to rollback to a specific point[/dim]"
-    )
+    console.info("Use 'infra rollback --deployment-id <ID>' to rollback to a specific point")

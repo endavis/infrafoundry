@@ -1,14 +1,12 @@
 """List tracked infrastructure resources command."""
 
 import click
-from rich.console import Console
 from rich.table import Table
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command()
@@ -54,7 +52,7 @@ def resources(
     )
 
     if not resources_list:
-        console.print("\n[yellow]No resources found matching filters.[/yellow]")
+        console.warning("No resources found matching filters.")
         return
 
     table = Table(title="Infrastructure Resources", show_header=True)
@@ -84,10 +82,10 @@ def resources(
             resource.resource_type,
             resource.name,
             state_text,
-            resource.terraform_id or "[dim]N/A[/dim]",
+            resource.terraform_id or "[dim]N/A",
             resource.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
     console.print()
     console.print(table)
-    console.print(f"\n[dim]Total: {len(resources_list)} resource(s)[/dim]")
+    console.print(f"\n[dim]Total: {len(resources_list)} resource(s)")

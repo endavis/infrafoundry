@@ -4,14 +4,11 @@ import os
 from pathlib import Path
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.exceptions import InfraFoundryError, SecretError
 from infrafoundry.core.secrets import SecretManager
 
-from ..utils import raise_cli_error
-
-console = Console()
+from ..utils import console, raise_cli_error
 
 
 @click.group()
@@ -41,7 +38,7 @@ def secrets_init(ctx: click.Context, key_file: str | None) -> None:
         key_path = base_dir / "envs" / "age.key"
 
     if key_path.exists():
-        console.print(f"[yellow]Key file already exists: {key_path}[/yellow]")
+        console.warning(f"Key file already exists: {key_path}")
         return
 
     key_path.parent.mkdir(parents=True, exist_ok=True)
@@ -67,10 +64,10 @@ def secrets_init(ctx: click.Context, key_file: str | None) -> None:
             secret_manager = SecretManager(str(key_path.parent))
             secret_manager.create_sops_config(public_key)
 
-            console.print(f"[green]Created age key: {key_path}[/green]")
-            console.print(f"[green]Created .sops.yaml with public key: {public_key}[/green]")
-            console.print("\n[bold]Add to .env:[/bold]")
-            console.print(f"SOPS_AGE_KEY_FILE={key_path}")
+            console.success(f"Created age key: {key_path}")
+            console.success(f"Created .sops.yaml with public key: {public_key}")
+            console.info("Add to .env:")
+            console.info(f"SOPS_AGE_KEY_FILE={key_path}")
             return
 
     raise click.ClickException("Failed to extract age public key from age-keygen output")
@@ -104,7 +101,7 @@ def secrets_encrypt(file: str) -> None:
         if result.returncode != 0:
             raise click.ClickException(f"Encryption failed: {result.stderr}")
 
-        console.print(f"[green]Encrypted: {file_path}[/green]")
+        console.success(f"Encrypted: {file_path}")
     except click.ClickException:
         raise
     except SecretError as exc:

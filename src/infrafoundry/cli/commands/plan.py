@@ -1,13 +1,11 @@
 """Plan infrastructure changes command."""
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command()
@@ -42,7 +40,7 @@ def plan(
     )
 
     if dry_run:
-        console.print("\n[bold cyan]Dry run complete. No files generated.[/bold cyan]")
+        console.info("Dry run complete. No files generated.")
     else:
-        console.print("\n[bold green]Plan generated successfully![/bold green]")
-        console.print("Generated files are in: [cyan]generated/[/cyan]")
+        console.success("Plan generated successfully!")
+        console.info("Generated files are in: generated/")

@@ -1,12 +1,11 @@
 """New command to scaffold projects from blueprints."""
 
 import click
-from rich.console import Console
 from rich.table import Table
 
 from infrafoundry.core.blueprints import BlueprintManager
 
-console = Console()
+from ..utils import console
 
 
 @click.group(invoke_without_command=True)
@@ -24,7 +23,7 @@ def list_blueprints() -> None:
     blueprints = manager.list_blueprints()
 
     if not blueprints:
-        console.print("[yellow]No blueprints found.[/yellow]")
+        console.warning("No blueprints found.")
         return
 
     table = Table(title="Available Blueprints")
@@ -53,8 +52,8 @@ def create(blueprint_name: str, target_dir: str) -> None:
         from pathlib import Path
 
         manager.instantiate_blueprint(blueprint_name, Path(target_dir), context={})
-        console.print(f"[green]✓ Successfully created project in {target_dir}[/green]")
+        console.success(f"Successfully created project in {target_dir}")
     except ValueError as e:
-        console.print(f"[red]Error: {e}[/red]")
+        console.error(f"Error: {e}")
     except Exception as e:
-        console.print(f"[red]Unexpected error: {e}[/red]")
+        console.error(f"Unexpected error: {e}")
