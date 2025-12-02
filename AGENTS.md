@@ -66,17 +66,61 @@ InfraFoundry generates Terraform `.tf` files and Ansible playbooks from YAML con
 - Do not modify public CLI signatures, BaseManager APIs, provider plugin contracts, state schema (introduce migrations instead), or event enums except additive changes.
 
 ## Commit Guidelines
-- Use Conventional Commits: `feat`, `fix`, `refactor`, `docs`, etc.
-- Markdown formatting for detailed commits
+
+### Commit Message Format
+All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>: <subject> [(<merges PR #XX, closes #YY>)]
+```
+
+**Commit Types:**
+- `feat`: New feature or capability
+- `fix`: Bug fix
+- `refactor`: Code restructuring without behavior change
+- `docs`: Documentation updates
+- `test`: Adding or updating tests
+- `chore`: Dependency updates, tooling changes
+- `ci`: CI/CD configuration changes
+- `perf`: Performance improvements
+
+**Format Rules:**
+- Subject must be lowercase and concise (no period at end)
+- Use imperative mood ("add feature" not "added feature")
 - Separate commits for refactoring, docs, tests, cleanup, dependencies
+- Use markdown formatting for detailed commit bodies (optional)
+
+### PR Merge Commit Format
+
+**When PR has an associated issue:**
+```
+<type>: <subject> (merges PR #XX, closes #YY)
+```
+
+**When PR has no associated issue (legacy/docs-only):**
+```
+<type>: <subject> (merges PR #XX)
+```
+
+**Examples - Correct Format:**
+- `feat: add PyInfra runner support and configurable execution order (merges PR #18)`
+- `refactor: normalize OPNsense interface data (merges PR #63, closes #56)`
+- `docs: comprehensive documentation overhaul with testing report and templates (merges PR #29)`
+- `fix: handle None ctx.obj in migrate command (merges PR #64, closes #57)`
+
+**Examples - Incorrect Format:**
+- ❌ `Merge pull request #18 from endavis/feat/pyinfra-support`
+- ❌ `feat: Add PyInfra Support` (capitalized subject)
+- ❌ `added pyinfra support` (wrong tense, missing type)
+- ❌ `refactor: normalize OPNsense interface data (#56)` (missing PR reference)
 
 ### Development Workflow
 **Rule:** All *code* changes must originate from a GitHub Issue. Documentation updates are exempt from this rule.
 1.  **Issue:** Ensure a GitHub Issue exists for the code task (e.g., "Refactor BaseRunner").
 2.  **Branch:** Create a branch linked to the issue (format: `issue/<number>-<short-desc>` or `feat/<number>-<desc>`).
-3.  **Commit:** Use Conventional Commits.
+3.  **Commit:** Use Conventional Commits format as described above.
 4.  **Pull Request:** Submit a PR from your branch to `main` (or `dev` if active), referencing the issue (e.g., "Closes #123").
-5.  **PR merges:** all PR merges shoould include "(merges PR #XXX, closes #YYY)" where #XXX is the PR# and #YYY is the issue number
+5.  **PR Merge:** When merging, ensure the merge commit follows the format: `<type>: <subject> (merges PR #XX, closes #YY)`
 
 ## Testing Expectations
 - Maintain ≥69% coverage
