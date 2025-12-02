@@ -43,7 +43,7 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 
 
 ## Architecture & Design (from Design Assessment)
-- [ ] **Refactor: Use Protocol Classes** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/49))
+- [x] **Refactor: Use Protocol Classes** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/49))
 - [x] **Documentation: Architecture Decision Records**: ([Issue](https://github.com/endavis/infrafoundry/issues/50))
 - [x] **Documentation: Sequence Diagrams**: ([Issue](https://github.com/endavis/infrafoundry/issues/51))
 
