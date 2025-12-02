@@ -106,6 +106,82 @@ class KeaClient:
     def __init__(self, client: OPNsenseClient) -> None:
         self.client = client
 
+    # Generic CRUD helper methods
+
+    def _crud_search(self, resource_type: str) -> list[dict[str, Any]]:
+        """Generic search operation for Kea DHCPv6 resources.
+
+        Args:
+            resource_type: Resource type (e.g., "Subnet", "Reservation")
+
+        Returns:
+            List of resource dictionaries from the 'rows' field
+        """
+        endpoint = f"kea/dhcpv6/search{resource_type}"
+        response = self.client.request("GET", endpoint)
+        return cast(list[dict[str, Any]], response.get("rows", []))
+
+    def _crud_get(self, resource_type: str, uuid: str) -> dict[str, Any]:
+        """Generic get operation for a specific Kea DHCPv6 resource.
+
+        Args:
+            resource_type: Resource type (e.g., "Subnet", "Reservation")
+            uuid: Resource UUID
+
+        Returns:
+            Resource configuration dictionary
+        """
+        endpoint = f"kea/dhcpv6/get{resource_type}/{uuid}"
+        return self.client.request("GET", endpoint)
+
+    def _crud_add(
+        self, resource_type: str, resource_key: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Generic add operation for a new Kea DHCPv6 resource.
+
+        Args:
+            resource_type: Resource type (e.g., "Subnet", "Reservation")
+            resource_key: Key to wrap data in request (e.g., "subnet", "reservation")
+            data: Resource configuration
+
+        Returns:
+            Response with 'result' and 'uuid' fields
+        """
+        endpoint = f"kea/dhcpv6/add{resource_type}"
+        request_data = {resource_key: data}
+        return self.client.request("POST", endpoint, data=request_data)
+
+    def _crud_update(
+        self, resource_type: str, uuid: str, resource_key: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Generic update operation for an existing Kea DHCPv6 resource.
+
+        Args:
+            resource_type: Resource type (e.g., "Subnet", "Reservation")
+            uuid: Resource UUID
+            resource_key: Key to wrap data in request (e.g., "subnet", "reservation")
+            data: Updated resource configuration
+
+        Returns:
+            Response with 'result' field
+        """
+        endpoint = f"kea/dhcpv6/set{resource_type}/{uuid}"
+        request_data = {resource_key: data}
+        return self.client.request("POST", endpoint, data=request_data)
+
+    def _crud_delete(self, resource_type: str, uuid: str) -> dict[str, Any]:
+        """Generic delete operation for a Kea DHCPv6 resource.
+
+        Args:
+            resource_type: Resource type (e.g., "Subnet", "Reservation")
+            uuid: Resource UUID
+
+        Returns:
+            Response with 'result' field
+        """
+        endpoint = f"kea/dhcpv6/del{resource_type}/{uuid}"
+        return self.client.request("POST", endpoint)
+
     # DHCPv6 Subnet operations
 
     def search_dhcp6_subnets(self) -> list[dict[str, Any]]:
@@ -114,8 +190,7 @@ class KeaClient:
         Returns:
             List of subnet dictionaries with 'uuid', 'subnet', 'interface', etc.
         """
-        response = self.client.request("GET", "kea/dhcpv6/searchSubnet")
-        return cast(list[dict[str, Any]], response.get("rows", []))
+        return self._crud_search("Subnet")
 
     def get_dhcp6_subnet(self, uuid: str) -> dict[str, Any]:
         """Get a specific DHCPv6 subnet by UUID.
@@ -126,7 +201,7 @@ class KeaClient:
         Returns:
             Subnet configuration dictionary
         """
-        return self.client.request("GET", f"kea/dhcpv6/getSubnet/{uuid}")
+        return self._crud_get("Subnet", uuid)
 
     def add_dhcp6_subnet(self, subnet_data: dict[str, Any]) -> dict[str, Any]:
         """Add a new DHCPv6 subnet.
@@ -144,9 +219,7 @@ class KeaClient:
         Returns:
             Response with 'result' and 'uuid' fields
         """
-        # Wrap data in expected format
-        request_data = {"subnet": subnet_data}
-        return self.client.request("POST", "kea/dhcpv6/addSubnet", data=request_data)
+        return self._crud_add("Subnet", "subnet", subnet_data)
 
     def update_dhcp6_subnet(self, uuid: str, subnet_data: dict[str, Any]) -> dict[str, Any]:
         """Update an existing DHCPv6 subnet.
@@ -158,8 +231,7 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        request_data = {"subnet": subnet_data}
-        return self.client.request("POST", f"kea/dhcpv6/setSubnet/{uuid}", data=request_data)
+        return self._crud_update("Subnet", uuid, "subnet", subnet_data)
 
     def delete_dhcp6_subnet(self, uuid: str) -> dict[str, Any]:
         """Delete a DHCPv6 subnet.
@@ -170,7 +242,7 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        return self.client.request("POST", f"kea/dhcpv6/delSubnet/{uuid}")
+        return self._crud_delete("Subnet", uuid)
 
     # DHCPv6 Reservation operations
 
@@ -180,8 +252,7 @@ class KeaClient:
         Returns:
             List of reservation dictionaries with 'uuid', 'subnet_id', 'duid', etc.
         """
-        response = self.client.request("GET", "kea/dhcpv6/searchReservation")
-        return cast(list[dict[str, Any]], response.get("rows", []))
+        return self._crud_search("Reservation")
 
     def get_dhcp6_reservation(self, uuid: str) -> dict[str, Any]:
         """Get a specific DHCPv6 reservation by UUID.
@@ -192,7 +263,7 @@ class KeaClient:
         Returns:
             Reservation configuration dictionary
         """
-        return self.client.request("GET", f"kea/dhcpv6/getReservation/{uuid}")
+        return self._crud_get("Reservation", uuid)
 
     def add_dhcp6_reservation(self, reservation_data: dict[str, Any]) -> dict[str, Any]:
         """Add a new DHCPv6 reservation.
@@ -208,8 +279,7 @@ class KeaClient:
         Returns:
             Response with 'result' and 'uuid' fields
         """
-        request_data = {"reservation": reservation_data}
-        return self.client.request("POST", "kea/dhcpv6/addReservation", data=request_data)
+        return self._crud_add("Reservation", "reservation", reservation_data)
 
     def update_dhcp6_reservation(
         self, uuid: str, reservation_data: dict[str, Any]
@@ -223,8 +293,7 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        request_data = {"reservation": reservation_data}
-        return self.client.request("POST", f"kea/dhcpv6/setReservation/{uuid}", data=request_data)
+        return self._crud_update("Reservation", uuid, "reservation", reservation_data)
 
     def delete_dhcp6_reservation(self, uuid: str) -> dict[str, Any]:
         """Delete a DHCPv6 reservation.
@@ -235,7 +304,7 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        return self.client.request("POST", f"kea/dhcpv6/delReservation/{uuid}")
+        return self._crud_delete("Reservation", uuid)
 
     # Service operations
 
