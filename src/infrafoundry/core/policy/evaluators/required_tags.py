@@ -19,10 +19,9 @@ class RequiredTagsEvaluator(PolicyEvaluator):
         Returns:
             List of policy violations
         """
-        violations = []
         required_tags = policy.rules.get("tags", [])
 
-        for resource in resources:
+        def check_tags(resource: Any) -> PolicyViolation | None:
             config = resource.config if hasattr(resource, "config") else {}
             tags_val = config.get("tags", "")
 
@@ -37,13 +36,12 @@ class RequiredTagsEvaluator(PolicyEvaluator):
             # Check for missing required tags
             missing_tags = set(required_tags) - resource_tags
             if missing_tags:
-                violations.append(
-                    self._create_violation(
-                        policy=policy,
-                        resource=resource,
-                        message=f"Missing required tags: {', '.join(missing_tags)}",
-                        details={"missing": list(missing_tags), "has": list(resource_tags)},
-                    )
+                return self._create_violation(
+                    policy=policy,
+                    resource=resource,
+                    message=f"Missing required tags: {', '.join(missing_tags)}",
+                    details={"missing": list(missing_tags), "has": list(resource_tags)},
                 )
+            return None
 
-        return violations
+        return self._evaluate_resources(resources, check_tags)

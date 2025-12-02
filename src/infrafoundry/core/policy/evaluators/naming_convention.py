@@ -23,10 +23,9 @@ class NamingConventionEvaluator(PolicyEvaluator):
         Returns:
             List of policy violations
         """
-        violations = []
         patterns = policy.rules.get("patterns", {})
 
-        for resource in resources:
+        def check_naming_convention(resource: Any) -> PolicyViolation | None:
             # Check if there's a pattern for this resource type
             pattern_key = f"{resource.provider}:{resource.type}"
             if pattern_key in patterns or "*" in patterns:
@@ -34,15 +33,14 @@ class NamingConventionEvaluator(PolicyEvaluator):
                 try:
                     pattern = re.compile(pattern_str)
                     if not pattern.match(resource.name):
-                        violations.append(
-                            self._create_violation(
-                                policy=policy,
-                                resource=resource,
-                                message=f"Name does not match pattern: {pattern_str}",
-                                details={"pattern": pattern_str, "name": resource.name},
-                            )
+                        return self._create_violation(
+                            policy=policy,
+                            resource=resource,
+                            message=f"Name does not match pattern: {pattern_str}",
+                            details={"pattern": pattern_str, "name": resource.name},
                         )
                 except re.error as e:
                     logger.warning(f"Invalid regex pattern {pattern_str}: {e}")
+            return None
 
-        return violations
+        return self._evaluate_resources(resources, check_naming_convention)
