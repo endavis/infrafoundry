@@ -19,21 +19,19 @@ class AllowedProvidersEvaluator(PolicyEvaluator):
         Returns:
             List of policy violations
         """
-        violations: list[PolicyViolation] = []
         allowed = policy.rules.get("allowed", [])
 
         if not allowed:
-            return violations
+            return []
 
-        for resource in resources:
+        def check_provider(resource: Any) -> PolicyViolation | None:
             if resource.provider not in allowed:
-                violations.append(
-                    self._create_violation(
-                        policy=policy,
-                        resource=resource,
-                        message=f"Provider '{resource.provider}' is not allowed",
-                        details={"allowed": allowed, "actual": resource.provider},
-                    )
+                return self._create_violation(
+                    policy=policy,
+                    resource=resource,
+                    message=f"Provider '{resource.provider}' is not allowed",
+                    details={"allowed": allowed, "actual": resource.provider},
                 )
+            return None
 
-        return violations
+        return self._evaluate_resources(resources, check_provider)
