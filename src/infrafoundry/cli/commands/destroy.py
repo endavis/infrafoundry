@@ -1,13 +1,11 @@
 """Destroy infrastructure command."""
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command()
@@ -38,4 +36,4 @@ def destroy(
         resource_filter=list(resource) if resource else None,
         confirm_callback=confirm_callback,
     )
-    console.print("\n[bold green]Destroy complete![/bold green]")
+    console.success("Destroy complete!")

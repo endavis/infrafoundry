@@ -1,14 +1,12 @@
 """Graph command to visualize infrastructure dependencies."""
 
 import click
-from rich.console import Console
 from rich.syntax import Syntax
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command()
@@ -34,4 +32,4 @@ def graph(
         output = dependency_graph.export_to_mermaid()
         console.print(Syntax(output, "mermaid", theme="monokai", word_wrap=True))
     else:
-        console.print(f"[red]Unsupported format: {format}[/red]")
+        console.error(f"Unsupported format: {format}")

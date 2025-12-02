@@ -3,13 +3,11 @@
 from pathlib import Path
 
 import click
-from rich.console import Console
 
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ..decorators import with_orchestrator
-
-console = Console()
+from ..utils import console
 
 
 @click.command()
@@ -90,31 +88,29 @@ def migrate(
 
     component_lower = component.lower()
     if component_lower == "kea/dhcp":
-        console.print("[cyan]Migrating Kea DHCP configuration from OPNsense...[/cyan]")
+        console.info("Migrating Kea DHCP configuration from OPNsense...")
         yaml_content = provider_instance.migrate_kea_dhcp(env)
     elif component_lower == "isc-to-kea":
-        console.print("[cyan]Migrating ISC DHCP to Kea DHCP configuration from OPNsense...[/cyan]")
+        console.info("Migrating ISC DHCP to Kea DHCP configuration from OPNsense...")
         interfaces_list = list(interfaces) if interfaces else None
 
         if interfaces_list:
-            console.print(f"[dim]Targeting interfaces: {', '.join(interfaces_list)}[/dim]")
+            console.info(f"Targeting interfaces: {', '.join(interfaces_list)}")
         else:
-            console.print("[dim]Migrating all interfaces with ISC DHCP enabled[/dim]")
+            console.info("Migrating all interfaces with ISC DHCP enabled")
 
         yaml_content = provider_instance.migrate_isc_to_kea(env, interfaces_list)
     else:
         raise click.ClickException(f"Unsupported component: {component}")
 
     if dry_run:
-        console.print(
-            "\n[bold yellow]Dry-run mode - configuration would be written to:[/bold yellow]"
-        )
-        console.print(f"[yellow]{output_path}[/yellow]\n")
-        console.print("[bold cyan]Generated configuration:[/bold cyan]")
+        console.warning("Dry-run mode - configuration would be written to:")
+        console.info(f"{output_path}\n")
+        console.info("Generated configuration:")
         console.print(yaml_content)
     else:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(yaml_content)
-        console.print(f"[green]✓ Configuration written to: {output_path}[/green]")
+        console.success(f"Configuration written to: {output_path}")
 
-    console.print("\n[bold green]Migration complete![/bold green]")
+    console.success("Migration complete!")
