@@ -19,17 +19,17 @@ class ResourceLimitEvaluator(PolicyEvaluator):
         Returns:
             List of policy violations
         """
-        violations = []
         limits = policy.rules.get("limits", {})
 
-        for resource in resources:
+        def check_limits(resource: Any) -> list[PolicyViolation]:
+            resource_violations = []
             config = resource.config if hasattr(resource, "config") else {}
 
             # Check CPU limit
             if "max_cpu" in limits:
                 cpu = config.get("cores") or config.get("cpu")
                 if cpu and cpu > limits["max_cpu"]:
-                    violations.append(
+                    resource_violations.append(
                         self._create_violation(
                             policy=policy,
                             resource=resource,
@@ -42,7 +42,7 @@ class ResourceLimitEvaluator(PolicyEvaluator):
             if "max_memory_mb" in limits:
                 memory = config.get("memory")
                 if memory and memory > limits["max_memory_mb"]:
-                    violations.append(
+                    resource_violations.append(
                         self._create_violation(
                             policy=policy,
                             resource=resource,
@@ -56,4 +56,6 @@ class ResourceLimitEvaluator(PolicyEvaluator):
                         )
                     )
 
-        return violations
+            return resource_violations
+
+        return self._evaluate_resources(resources, check_limits)
