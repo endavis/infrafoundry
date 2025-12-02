@@ -37,104 +37,115 @@ def mock_opnsense_provider():
 def test_migrate_kea_dhcp(cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path):
     """Test migrate command for Kea DHCP."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
+    output_file = tmp_path / "migrated-kea-dhcp.yaml"
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        with cli_runner.isolated_filesystem(temp_dir=tmp_path):
-            result = cli_runner.invoke(
-                main,
-                [
-                    "migrate",
-                    "--env",
-                    "test",
-                    "--provider",
-                    "opnsense",
-                    "--component",
-                    "kea/dhcp",
-                ],
-            )
+        result = cli_runner.invoke(
+            main,
+            [
+                "migrate",
+                "--env",
+                "test",
+                "--provider",
+                "opnsense",
+                "--component",
+                "kea/dhcp",
+                "--output",
+                str(output_file),
+            ],
+        )
 
-            assert result.exit_code == 0
-            assert "Migration complete!" in result.output
-            mock_opnsense_provider.migrate_kea_dhcp.assert_called_once_with("test")
+        assert result.exit_code == 0
+        assert "Migration complete!" in result.output
+        assert output_file.exists()
+        mock_opnsense_provider.migrate_kea_dhcp.assert_called_once_with("test")
 
 
 def test_migrate_isc_to_kea(cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path):
     """Test migrate command for ISC to Kea DHCP."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
+    output_file = tmp_path / "migrated-isc-to-kea.yaml"
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        with cli_runner.isolated_filesystem(temp_dir=tmp_path):
-            result = cli_runner.invoke(
-                main,
-                [
-                    "migrate",
-                    "--env",
-                    "test",
-                    "--provider",
-                    "opnsense",
-                    "--component",
-                    "isc-to-kea",
-                ],
-            )
+        result = cli_runner.invoke(
+            main,
+            [
+                "migrate",
+                "--env",
+                "test",
+                "--provider",
+                "opnsense",
+                "--component",
+                "isc-to-kea",
+                "--output",
+                str(output_file),
+            ],
+        )
 
-            assert result.exit_code == 0
-            assert "Migration complete!" in result.output
-            mock_opnsense_provider.migrate_isc_to_kea.assert_called_once_with("test", None)
+        assert result.exit_code == 0
+        assert "Migration complete!" in result.output
+        assert output_file.exists()
+        mock_opnsense_provider.migrate_isc_to_kea.assert_called_once_with("test", None)
 
 
 def test_migrate_with_interfaces(cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path):
     """Test migrate command with specific interfaces."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
+    output_file = tmp_path / "migrated-interfaces.yaml"
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        with cli_runner.isolated_filesystem(temp_dir=tmp_path):
-            result = cli_runner.invoke(
-                main,
-                [
-                    "migrate",
-                    "--env",
-                    "test",
-                    "--provider",
-                    "opnsense",
-                    "--component",
-                    "isc-to-kea",
-                    "-i",
-                    "lan",
-                    "-i",
-                    "wan",
-                ],
-            )
+        result = cli_runner.invoke(
+            main,
+            [
+                "migrate",
+                "--env",
+                "test",
+                "--provider",
+                "opnsense",
+                "--component",
+                "isc-to-kea",
+                "-i",
+                "lan",
+                "-i",
+                "wan",
+                "--output",
+                str(output_file),
+            ],
+        )
 
-            assert result.exit_code == 0
-            mock_opnsense_provider.migrate_isc_to_kea.assert_called_once_with(
-                "test", ["lan", "wan"]
-            )
+        assert result.exit_code == 0
+        assert output_file.exists()
+        mock_opnsense_provider.migrate_isc_to_kea.assert_called_once_with("test", ["lan", "wan"])
 
 
 def test_migrate_with_dry_run(cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path):
     """Test migrate command with dry-run flag."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
+    output_file = tmp_path / "dry-run-output.yaml"
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        with cli_runner.isolated_filesystem(temp_dir=tmp_path):
-            result = cli_runner.invoke(
-                main,
-                [
-                    "migrate",
-                    "--env",
-                    "test",
-                    "--provider",
-                    "opnsense",
-                    "--component",
-                    "kea/dhcp",
-                    "--dry-run",
-                ],
-            )
+        result = cli_runner.invoke(
+            main,
+            [
+                "migrate",
+                "--env",
+                "test",
+                "--provider",
+                "opnsense",
+                "--component",
+                "kea/dhcp",
+                "--output",
+                str(output_file),
+                "--dry-run",
+            ],
+        )
 
-            assert result.exit_code == 0
-            assert "Dry-run mode" in result.output
-            assert "Generated configuration:" in result.output
-            assert "Migration complete!" in result.output
+        assert result.exit_code == 0
+        assert "Dry-run mode" in result.output
+        assert "Generated configuration:" in result.output
+        assert "Migration complete!" in result.output
+        # In dry-run mode, file should not be created
+        assert not output_file.exists()
 
 
 def test_migrate_with_custom_output(
@@ -167,20 +178,24 @@ def test_migrate_with_custom_output(
 
 def test_migrate_provider_not_found(cli_runner, mock_orchestrator, tmp_path):
     """Test migrate command when provider is not found."""
-    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        with cli_runner.isolated_filesystem(temp_dir=tmp_path):
-            result = cli_runner.invoke(
-                main,
-                [
-                    "migrate",
-                    "--env",
-                    "test",
-                    "--provider",
-                    "opnsense",
-                    "--component",
-                    "kea/dhcp",
-                ],
-            )
+    output_file = tmp_path / "should-not-exist.yaml"
 
-            assert result.exit_code != 0
-            assert "OPNsense provider not found" in result.output
+    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+        result = cli_runner.invoke(
+            main,
+            [
+                "migrate",
+                "--env",
+                "test",
+                "--provider",
+                "opnsense",
+                "--component",
+                "kea/dhcp",
+                "--output",
+                str(output_file),
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "OPNsense provider not found" in result.output
+        assert not output_file.exists()
