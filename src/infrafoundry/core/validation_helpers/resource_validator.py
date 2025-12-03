@@ -79,9 +79,21 @@ class ResourceValidator:
 
         This is a lightweight structural check to guard against obvious
         misconfigurations before deeper provider validation. It intentionally
-        avoids external dependencies; callers can pass a subset of JSON Schema:
-        - ``type`` for expected Python type (str, int, list, dict, bool)
-        - ``required`` list of required keys (for object types)
+        avoids external dependencies; callers can pass a subset of JSON Schema.
+
+        **Supported Features:**
+            - ``type``: Expected Python type (str, int, list, dict, bool)
+            - ``required``: List of required keys (for dict types)
+
+        **NOT Supported (Intentional Limitations):**
+            - Value constraints (minimum, maximum, pattern, enum)
+            - Nested object/property schemas
+            - Array item schemas
+            - Conditional validation
+            - String formats, uniqueItems, etc.
+
+        For complex validation needs, use full JSON Schema libraries or
+        provider-specific validation logic.
 
         Args:
             resource: Resource configuration mapping.
@@ -90,6 +102,14 @@ class ResourceValidator:
 
         Returns:
             True when resource satisfies the schema, False otherwise.
+
+        Example:
+            >>> validator.validate_schema(
+            ...     resource={"name": "vm1", "cpu": 2},
+            ...     schema={"type": dict, "required": ["name", "cpu"]},
+            ...     check_name="vm_schema"
+            ... )
+            True
         """
         expected_type = schema.get("type")
         if expected_type and not isinstance(resource, expected_type):
