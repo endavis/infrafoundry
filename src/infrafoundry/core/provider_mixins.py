@@ -8,7 +8,7 @@ import json
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from jinja2 import Environment, FileSystemLoader, Template, TemplateNotFound
 
@@ -19,8 +19,6 @@ from infrafoundry.core.provider import ResourceConfig
 
 if TYPE_CHECKING:
     # Type stubs for mixin expectations - not used at runtime
-    from typing import Protocol
-
     class _TerraformGeneratorBase(Protocol):
         """Protocol defining attributes expected by TerraformGeneratorMixin."""
 
@@ -28,6 +26,22 @@ if TYPE_CHECKING:
         terraform_dir: Path
 
         def _write_terraform_file(self, filename: str, content: str) -> None: ...
+
+    class _TerraformProviderProtocol(_TerraformGeneratorBase, Protocol):
+        """Protocol capturing provider attributes used by TerraformGeneratorMixin helpers."""
+
+        name: str
+
+        def ensure_directories(self) -> None: ...
+
+        def group_resources_by_type(
+            self, resources: list[ResourceConfig]
+        ) -> dict[str, list[ResourceConfig]]: ...
+
+        def render_template(self, template_name: str, **context: Any) -> str: ...
+else:
+    _TerraformGeneratorBase = object  # pragma: no cover - runtime stub
+    _TerraformProviderProtocol = object  # pragma: no cover - runtime stub
 
 
 class TemplateRendererMixin:
@@ -486,3 +500,84 @@ class TerraformGeneratorMixin:
 
         rendered = self.render_template(template_name, context or {})
         self._write_terraform_file(output_name, rendered)
+
+    def prepare_terraform_generation(
+        self,
+        resources: list[ResourceConfig],
+    ) -> dict[str, list[ResourceConfig]]:
+        """Ensure directories exist and group resources for Terraform generation.
+
+        Args:
+            resources: Resources to generate Terraform for.
+
+        Returns:
+            Resources grouped by type for downstream template rendering.
+
+        Raises:
+            AttributeError: If required provider helpers are missing.
+        """
+        if not hasattr(self, "ensure_directories"):
+            raise AttributeError(
+                "prepare_terraform_generation requires ProviderBase.ensure_directories"
+            )
+
+        provider = cast("_TerraformProviderProtocol", self)
+        provider.ensure_directories()
+
+        group_resources = getattr(provider, "group_resources_by_type", None)
+        if not group_resources:
+            raise AttributeError(
+                "prepare_terraform_generation requires ResourceGrouperMixin.group_resources_by_type"
+            )
+
+        return cast(dict[str, list[ResourceConfig]], group_resources(resources))
+
+    def render_provider_and_variables(
+        self,
+        *,
+        provider_template: str | None = None,
+        variables_template: str | None = None,
+        variables_context: dict[str, Any] | None = None,
+    ) -> None:
+        """Render provider.tf and variables.tf using common defaults.
+
+        Args:
+            provider_template: Template name for provider configuration. Defaults to
+                ``{self.name}/provider.tf.j2`` when omitted.
+            variables_template: Template name for variables. Defaults to
+                ``{self.name}/variables.tf.j2`` when omitted.
+            variables_context: Context passed to the variables template.
+        """
+        provider = cast("_TerraformProviderProtocol", self)
+
+        self.render_and_write_terraform(
+            provider_template or f"{provider.name}/provider.tf.j2",
+            output_name="provider.tf",
+        )
+
+        variables_template_name = variables_template or f"{provider.name}/variables.tf.j2"
+        self.render_and_write_terraform(
+            variables_template_name,
+            context=variables_context or {},
+            output_name="variables.tf",
+        )
+
+    def render_outputs_terraform(
+        self,
+        resources_by_type: dict[str, list[ResourceConfig]],
+        *,
+        template_name: str | None = None,
+    ) -> None:
+        """Render outputs.tf using grouped resources.
+
+        Args:
+            resources_by_type: Resources grouped by type for templating.
+            template_name: Optional template override. Defaults to
+                ``{self.name}/outputs.tf.j2``.
+        """
+        provider = cast("_TerraformProviderProtocol", self)
+        self.render_and_write_terraform(
+            template_name or f"{provider.name}/outputs.tf.j2",
+            context={"resources_by_type": resources_by_type},
+            output_name="outputs.tf",
+        )
