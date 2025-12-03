@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
-from infrafoundry.core.validation_helpers import BaseProviderValidator
+from infrafoundry.core.validation_helpers import BaseProviderValidator, ResourceValidator
 
 
 class TestBaseProviderValidator:
@@ -367,3 +367,58 @@ class TestBaseProviderValidator:
         call_args = report.add_check.call_args[1]
         assert "firewall_rule_2" in call_args["message"]
         assert "not found" in call_args["message"]
+
+
+class TestResourceValidatorSchema:
+    """Tests for ResourceValidator schema checks."""
+
+    def test_validate_schema_success(self):
+        """Valid schema passes and records info-level success."""
+        report = Mock(spec=ValidationReport)
+        rv = ResourceValidator("test", report)
+
+        result = rv.validate_schema(
+            resource={"name": "vm1", "cpu": 2},
+            schema={"type": dict, "required": ["name", "cpu"]},
+            check_name="schema_vm",
+        )
+
+        assert result is True
+        report.add_check.assert_called_once()
+        args = report.add_check.call_args[1]
+        assert args["passed"] is True
+        assert args["level"] == ValidationLevel.INFO
+
+    def test_validate_schema_missing_field(self):
+        """Missing fields are reported as errors."""
+        report = Mock(spec=ValidationReport)
+        rv = ResourceValidator("test", report)
+
+        result = rv.validate_schema(
+            resource={"name": "vm1"},
+            schema={"type": dict, "required": ["name", "cpu"]},
+            check_name="schema_vm",
+        )
+
+        assert result is False
+        args = report.add_check.call_args[1]
+        assert args["passed"] is False
+        assert "cpu" in args["message"]
+        assert args["level"] == ValidationLevel.ERROR
+
+    def test_validate_schema_type_mismatch(self):
+        """Type mismatches are reported as errors."""
+        report = Mock(spec=ValidationReport)
+        rv = ResourceValidator("test", report)
+
+        result = rv.validate_schema(
+            resource=["not a dict"],
+            schema={"type": dict, "required": ["name"]},
+            check_name="schema_vm",
+        )
+
+        assert result is False
+        args = report.add_check.call_args[1]
+        assert args["passed"] is False
+        assert "Invalid type" in args["message"]
+        assert args["level"] == ValidationLevel.ERROR

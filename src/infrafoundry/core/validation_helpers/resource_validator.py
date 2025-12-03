@@ -3,7 +3,9 @@
 This module validates that resources referenced by other resources actually exist.
 """
 
+import json
 import logging
+from typing import Any
 
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 
@@ -61,11 +63,87 @@ class ResourceValidator:
                 check_name, resource_type, resource_name, parent_resource
             )
             return True
-        else:
-            self._add_resource_missing_error(
-                check_name, resource_type, resource_name, existing_resources, parent_resource
+
+        self._add_resource_missing_error(
+            check_name, resource_type, resource_name, existing_resources, parent_resource
+        )
+        return False
+
+    def validate_schema(
+        self,
+        resource: dict[str, Any],
+        schema: dict[str, Any],
+        check_name: str,
+    ) -> bool:
+        """Validate a resource dict against a JSON Schema-like mapping.
+
+        This is a lightweight structural check to guard against obvious
+        misconfigurations before deeper provider validation. It intentionally
+        avoids external dependencies; callers can pass a subset of JSON Schema.
+
+        **Supported Features:**
+            - ``type``: Expected Python type (str, int, list, dict, bool)
+            - ``required``: List of required keys (for dict types)
+
+        **NOT Supported (Intentional Limitations):**
+            - Value constraints (minimum, maximum, pattern, enum)
+            - Nested object/property schemas
+            - Array item schemas
+            - Conditional validation
+            - String formats, uniqueItems, etc.
+
+        For complex validation needs, use full JSON Schema libraries or
+        provider-specific validation logic.
+
+        Args:
+            resource: Resource configuration mapping.
+            schema: Schema mapping with keys like ``type`` and ``required``.
+            check_name: Validation check name for report entries.
+
+        Returns:
+            True when resource satisfies the schema, False otherwise.
+
+        Example:
+            >>> validator.validate_schema(
+            ...     resource={"name": "vm1", "cpu": 2},
+            ...     schema={"type": dict, "required": ["name", "cpu"]},
+            ...     check_name="vm_schema"
+            ... )
+            True
+        """
+        expected_type = schema.get("type")
+        if expected_type and not isinstance(resource, expected_type):
+            self.report.add_check(
+                check_name=check_name,
+                passed=False,
+                message=(
+                    f"Invalid type for resource. Expected {expected_type.__name__}, "
+                    f"got {type(resource).__name__}"
+                ),
+                level=ValidationLevel.ERROR,
             )
             return False
+
+        required_fields = schema.get("required", [])
+        missing = [field for field in required_fields if field not in resource]
+        if missing:
+            self.report.add_check(
+                check_name=check_name,
+                passed=False,
+                message=f"Missing required fields: {', '.join(missing)}",
+                level=ValidationLevel.ERROR,
+                details={"required": required_fields, "resource": resource},
+            )
+            return False
+
+        self.report.add_check(
+            check_name=check_name,
+            passed=True,
+            message="Resource schema validation passed",
+            level=ValidationLevel.INFO,
+            details={"schema": json.dumps(schema, default=str), "resource": resource},
+        )
+        return True
 
     def _add_resource_exists_success(
         self,
