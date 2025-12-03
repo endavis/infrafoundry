@@ -47,22 +47,10 @@ class OPNsenseProvider(
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OPNsense resources."""
-        self.ensure_directories()
-
-        # Use ResourceGrouperMixin to group resources by type
-        resources_by_type = self.group_resources_by_type(resources)
+        resources_by_type = self.prepare_terraform_generation(resources)
 
         # Generate provider configuration
-        self.render_and_write_terraform(
-            "opnsense/provider.tf.j2",
-            output_name="provider.tf",
-        )
-
-        # Generate variables file
-        self.render_and_write_terraform(
-            "opnsense/variables.tf.j2",
-            output_name="variables.tf",
-        )
+        self.render_provider_and_variables()
 
         # Generate terraform.tfvars from settings.yaml
         self.generate_provider_tfvars(
@@ -96,11 +84,7 @@ class OPNsenseProvider(
             self._generate_kea_dhcp6_resources(kea_dhcp6_subnets, kea_dhcp6_reservations)
 
         # Generate outputs
-        self.render_and_write_terraform(
-            "opnsense/outputs.tf.j2",
-            context={"resources_by_type": resources_by_type},
-            output_name="outputs.tf",
-        )
+        self.render_outputs_terraform(resources_by_type)
 
     def _generate_firewall_rules_terraform(self, rules: list[ResourceConfig]) -> None:
         """Generate Terraform for OPNsense firewall rules."""
