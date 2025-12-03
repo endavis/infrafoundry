@@ -71,6 +71,18 @@ class BaseAPIValidator:
             details=details,
         )
 
+    def handle_validation_exception(
+        self,
+        *,
+        check_name: str,
+        error: Exception,
+        warning_level: ValidationLevel = ValidationLevel.WARNING,
+    ) -> None:
+        """Delegate to BaseProviderValidator for standardized error handling."""
+        self._validator.handle_validation_exception(
+            check_name=check_name, error=error, warning_level=warning_level
+        )
+
     def api_request(
         self,
         *,
