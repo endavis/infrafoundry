@@ -1,0 +1,59 @@
+"""Unit tests for the 'dependencies' CLI command."""
+
+import importlib
+
+from click.testing import CliRunner
+
+from infrafoundry.cli.main import main
+
+cli_main = importlib.import_module("infrafoundry.cli.main")
+
+
+def test_dependencies_mermaid_output(monkeypatch):
+    """Dependencies command emits mermaid when requested."""
+    runner = CliRunner()
+
+    class FakeGraph:
+        def export_to_mermaid(self):
+            return "graph TD; A-->B"
+
+        def get_execution_batches(self):
+            return [["proxmox:vm1"]]
+
+    class FakeOrchestrator:
+        def build_dependency_graph(self, env):
+            return FakeGraph()
+
+    def fake_load_orchestrator(*args, **kwargs):
+        return FakeOrchestrator()
+
+    monkeypatch.setattr(cli_main, "_get_orchestrator", fake_load_orchestrator)
+
+    result = runner.invoke(main, ["dependencies", "--env", "dev", "--format", "mermaid"])
+
+    assert result.exit_code == 0
+    assert "graph TD" in result.output
+
+
+def test_dependencies_list_output(monkeypatch):
+    """Dependencies command lists batches by default."""
+    runner = CliRunner()
+
+    class FakeGraph:
+        def get_execution_batches(self):
+            return [["proxmox:net"], ["proxmox:vm1", "proxmox:vm2"]]
+
+    class FakeOrchestrator:
+        def build_dependency_graph(self, env):
+            return FakeGraph()
+
+    def fake_load_orchestrator(*args, **kwargs):
+        return FakeOrchestrator()
+
+    monkeypatch.setattr(cli_main, "_get_orchestrator", fake_load_orchestrator)
+
+    result = runner.invoke(main, ["dependencies", "--env", "dev"])
+
+    assert result.exit_code == 0
+    assert "Batch 1" in result.output
+    assert "proxmox:vm1" in result.output
