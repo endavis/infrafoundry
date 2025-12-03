@@ -34,7 +34,7 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 - [x] **Unit Test Coverage: CLI Commands**: ([Issue](https://github.com/endavis/infrafoundry/issues/40), [PR #61](https://github.com/endavis/infrafoundry/pull/61))
 - [ ] **Unit Test Coverage: Orchestration Workflows** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/41))
 - [ ] **Unit Test Coverage: Deployment Executor** [Complexity: 6/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/42))
-- [ ] **Unit Test Coverage: Runners** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/43))
+- [x] **Unit Test Coverage: Runners** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/43), [PR #69](https://github.com/endavis/infrafoundry/pull/69))
 - [ ] **Refactor & Test: Validators** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/44))
 - [ ] **Refactor: Provider Terraform Generation** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/45))
 - [x] **Refactor: Console Output**: ([Issue](https://github.com/endavis/infrafoundry/issues/46), [PR #60](https://github.com/endavis/infrafoundry/pull/60))
