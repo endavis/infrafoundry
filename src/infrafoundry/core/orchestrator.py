@@ -27,7 +27,8 @@ from infrafoundry.core.orchestrator_workflows import (
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.runners import AnsibleRunner, PyInfraRunner, RunnerRegistry, TerraformRunner
+from infrafoundry.core.provider_registry_service import ProviderRegistryService
+from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
 
@@ -74,7 +75,6 @@ class Orchestrator:
         self.output_dir = output_dir or Path.cwd() / "generated"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.console = Console()
-        self.providers: dict[str, ProviderBase] = {}
         self.strict_config = strict_config or OrchestratorStrictConfig()
 
         # Initialize state, event, policy, and notification managers
@@ -84,11 +84,12 @@ class Orchestrator:
         self.policy_engine = PolicyEngine(policy_dir)
         self.notification_manager = NotificationManager(notifications_config)
 
-        # Set up runner registry
-        self.runner_registry = RunnerRegistry()
-        self.runner_registry.register(TerraformRunner)
-        self.runner_registry.register(AnsibleRunner)
-        self.runner_registry.register(PyInfraRunner)
+        # Provider and runner management
+        self.provider_registry = ProviderRegistryService(
+            base_output_dir=self.output_dir, runner_registry_factory=RunnerRegistry
+        )
+        self._providers = self.provider_registry.providers
+        self.runner_registry = self.provider_registry.runner_registry
 
         # Initialize helper classes for orchestration tasks
         self.policy_checker = PolicyChecker(self.policy_engine, self.event_manager, self.console)
@@ -127,7 +128,7 @@ class Orchestrator:
             secret_manager_factory=self._create_secret_manager,
             get_current_user=self._get_current_user,
             fail_on_missing_secrets=self.strict_config.fail_on_missing_secrets,
-            get_runner_priorities=self._get_runner_priorities,
+            get_runner_priorities=self.provider_registry.get_runner_priorities,
         )
         self.apply_orchestrator = ApplyOrchestrator(
             console=self.console,
@@ -210,12 +211,24 @@ class Orchestrator:
         Args:
             provider: Provider instance to register
         """
-        self.providers[provider.name] = provider
+        self._providers[provider.name] = provider
         if hasattr(provider, "fail_on_missing_snippets"):
             provider.fail_on_missing_snippets = self.strict_config.fail_on_missing_snippets
         # Sync providers to helper classes that need them
-        self.deployment_executor.providers = self.providers
-        self.drift_detector.providers = self.providers
+        self.deployment_executor.providers = self._providers
+        self.drift_detector.providers = self._providers
+
+    @property
+    def providers(self) -> dict[str, ProviderBase]:
+        """Registered providers."""
+        return self._providers
+
+    @providers.setter
+    def providers(self, value: dict[str, ProviderBase]) -> None:
+        """Set providers and propagate to dependent components."""
+        self._providers = value
+        self.deployment_executor.providers = self._providers
+        self.drift_detector.providers = self._providers
 
     def _load_resources(
         self, env_name: str
@@ -446,11 +459,6 @@ class Orchestrator:
             max_workers=max_workers,
         )
 
-    def _get_runner_priorities(self, env_name: str) -> dict[str, int]:
-        """Get runner priorities for an environment."""
-        env_config = self.config_manager.load_environment(env_name)
-        return env_config.runner_priorities if env_config else {}
-
     def _apply_providers_serial(
         self,
         env_name: str,
@@ -465,7 +473,6 @@ class Orchestrator:
         if env_config:
             self.deployment_executor.runner_priorities = env_config.runner_priorities
 
-        self.deployment_executor.providers = self.providers
         return self.deployment_executor.apply_serial(
             env_name, deployment_id, resources_by_provider, resource_filter, auto_approve
         )
@@ -485,7 +492,6 @@ class Orchestrator:
         if env_config:
             self.deployment_executor.runner_priorities = env_config.runner_priorities
 
-        self.deployment_executor.providers = self.providers
         return self.deployment_executor.apply_parallel(
             env_name,
             deployment_id,
