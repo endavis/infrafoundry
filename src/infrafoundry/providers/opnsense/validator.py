@@ -14,6 +14,12 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData, OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.opnsense.validators import (
+    DHCPValidator,
+    FirewallValidator,
+    ResourceNameValidator,
+    VLANValidator,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -62,6 +68,12 @@ class OPNsenseValidator:
         self.provider_settings = cast(
             OPNsenseProviderSettings, self.api_validator.provider_settings
         )
+
+        # Initialize specialized validators
+        self.firewall_validator = FirewallValidator(report)
+        self.dhcp_validator = DHCPValidator(report)
+        self.vlan_validator = VLANValidator(report)
+        self.resource_name_validator = ResourceNameValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -163,17 +175,22 @@ class OPNsenseValidator:
             # Get existing interfaces/VLANs
             existing_interfaces = self._get_existing_interfaces(api_url, api_key, api_secret)
 
-            # Validate firewall rule references
-            self._validate_firewall_rules(resource_refs, existing_aliases)
-
-            # Validate DHCP static map references
-            self._validate_dhcp_maps(resource_refs, existing_interfaces)
-
-            # Validate VLANs
-            self._validate_vlans(resource_refs, existing_interfaces)
-
-            # Check for duplicate names
-            self._validate_unique_names(resources)
+            # Validate using specialized validators
+            self.firewall_validator.validate(
+                resource_refs["firewall_rules"],
+                resource_refs["alias_names"],
+                existing_aliases,
+            )
+            self.dhcp_validator.validate(
+                resource_refs["dhcp_maps"],
+                resource_refs["vlan_names"],
+                existing_interfaces,
+            )
+            self.vlan_validator.validate(
+                resource_refs["vlans"],
+                existing_interfaces,
+            )
+            self.resource_name_validator.validate(resources)
 
         except Exception as exc:
             check_name = "opnsense_validation"
@@ -327,153 +344,3 @@ class OPNsenseValidator:
             for iface in interface_list
             if (name := self._extract_interface_name(iface))
         }
-
-    def _validate_firewall_rules(
-        self, resource_refs: dict[str, Any], existing_aliases: dict[str, Any]
-    ) -> None:
-        """Validate firewall rules reference valid aliases.
-
-        Args:
-            resource_refs: Collected resource references
-            existing_aliases: Existing aliases from API
-        """
-        firewall_rules = resource_refs["firewall_rules"]
-        alias_names = resource_refs["alias_names"]
-
-        for rule in firewall_rules:
-            rule_config = rule.config or {}
-            source_alias = rule_config.get("source", {}).get("alias")
-            dest_alias = rule_config.get("destination", {}).get("alias")
-
-            # Check source alias
-            if source_alias:
-                # Check if it's in our config or exists in OPNsense
-                if source_alias not in alias_names and source_alias not in existing_aliases:
-                    self.report.add_check(
-                        check_name=f"firewall_rule_{rule.name}_source_alias",
-                        passed=False,
-                        message=(
-                            f"Firewall rule '{rule.name}' references "
-                            f"undefined source alias '{source_alias}'"
-                        ),
-                        level=ValidationLevel.ERROR,
-                    )
-                else:
-                    self.report.add_check(
-                        check_name=f"firewall_rule_{rule.name}_source_alias",
-                        passed=True,
-                        message=f"Source alias '{source_alias}' found for rule '{rule.name}'",
-                        level=ValidationLevel.INFO,
-                    )
-
-            # Check destination alias
-            if dest_alias:
-                if dest_alias not in alias_names and dest_alias not in existing_aliases:
-                    self.report.add_check(
-                        check_name=f"firewall_rule_{rule.name}_dest_alias",
-                        passed=False,
-                        message=(
-                            f"Firewall rule '{rule.name}' references "
-                            f"undefined destination alias '{dest_alias}'"
-                        ),
-                        level=ValidationLevel.ERROR,
-                    )
-                else:
-                    self.report.add_check(
-                        check_name=f"firewall_rule_{rule.name}_dest_alias",
-                        passed=True,
-                        message=f"Destination alias '{dest_alias}' found for rule '{rule.name}'",
-                        level=ValidationLevel.INFO,
-                    )
-
-    def _validate_dhcp_maps(
-        self, resource_refs: dict[str, Any], existing_interfaces: dict[str, Any]
-    ) -> None:
-        """Validate DHCP static maps reference valid interfaces.
-
-        Args:
-            resource_refs: Collected resource references
-            existing_interfaces: Existing interfaces from API
-        """
-        dhcp_maps = resource_refs["dhcp_maps"]
-        vlan_names = resource_refs["vlan_names"]
-
-        for dhcp_map in dhcp_maps:
-            interface = dhcp_map.config.get("interface")
-            if interface:
-                # Check if it's in our VLAN config or exists in OPNsense
-                if interface not in vlan_names and interface not in existing_interfaces:
-                    self.report.add_check(
-                        check_name=f"dhcp_static_map_{dhcp_map.name}_interface",
-                        passed=False,
-                        message=(
-                            f"DHCP static map '{dhcp_map.name}' references "
-                            f"undefined interface '{interface}'"
-                        ),
-                        level=ValidationLevel.WARNING,
-                    )
-                else:
-                    self.report.add_check(
-                        check_name=f"dhcp_static_map_{dhcp_map.name}_interface",
-                        passed=True,
-                        message=f"Interface '{interface}' found for DHCP map '{dhcp_map.name}'",
-                        level=ValidationLevel.INFO,
-                    )
-
-    def _validate_vlans(
-        self, resource_refs: dict[str, Any], existing_interfaces: dict[str, Any]
-    ) -> None:
-        """Validate VLANs configuration.
-
-        Args:
-            resource_refs: Collected resource references
-            existing_interfaces: Existing interfaces from API
-        """
-        vlans = resource_refs["vlans"]
-
-        for vlan in vlans:
-            parent_if = vlan.config.get("parent")
-
-            # Check if parent interface exists
-            if parent_if and parent_if not in existing_interfaces:
-                self.report.add_check(
-                    check_name=f"vlan_{vlan.name}_parent",
-                    passed=False,
-                    message=(
-                        f"VLAN '{vlan.name}' references undefined parent interface '{parent_if}'"
-                    ),
-                    level=ValidationLevel.ERROR,
-                )
-            elif parent_if:
-                self.report.add_check(
-                    check_name=f"vlan_{vlan.name}_parent",
-                    passed=True,
-                    message=f"Parent interface '{parent_if}' found for VLAN '{vlan.name}'",
-                    level=ValidationLevel.INFO,
-                )
-
-    def _validate_unique_names(self, resources: list[ResourceConfig]) -> None:
-        """Check for duplicate resource names within each type.
-
-        Args:
-            resources: List of resources to check
-        """
-        # Group by type
-        by_type: dict[str, list[str]] = {}
-        for resource in resources:
-            if resource.type not in by_type:
-                by_type[resource.type] = []
-            by_type[resource.type].append(resource.name)
-
-        # Check for duplicates
-        for resource_type, names in by_type.items():
-            seen = set()
-            for name in names:
-                if name in seen:
-                    self.report.add_check(
-                        check_name=f"opnsense_{resource_type}_duplicate_{name}",
-                        passed=False,
-                        message=f"Duplicate {resource_type} name: '{name}'",
-                        level=ValidationLevel.ERROR,
-                    )
-                seen.add(name)
