@@ -11,6 +11,13 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData, ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.proxmox.validators import (
+    NetworkValidator,
+    NodeValidator,
+    StorageValidator,
+    TemplateValidator,
+    VMIDValidator,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -62,6 +69,13 @@ class ProxmoxValidator:
         self.provider_settings = cast(ProxmoxProviderSettings, self.api_validator.provider_settings)
         self._cluster_vm_cache: list[ClusterVM] | None = None
         self._cluster_vm_cache_populated = False
+
+        # Initialize specialized validators
+        self.node_validator = NodeValidator(self.api_validator, report)
+        self.storage_validator = StorageValidator(self.api_validator, report)
+        self.network_validator = NetworkValidator(self.api_validator, report)
+        self.template_validator = TemplateValidator(report)
+        self.vmid_validator = VMIDValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to Proxmox API.
@@ -154,12 +168,17 @@ class ProxmoxValidator:
             # Collect all references from resources
             resource_refs = self._collect_resource_references(resources, default_node)
 
-            # Validate each type of reference
-            self._validate_nodes(api_url, headers, resource_refs.nodes)
-            self._validate_storage(api_url, headers, resource_refs.storage_pools)
-            self._validate_bridges(api_url, headers, resource_refs.bridges)
-            self._validate_templates(api_url, headers, resource_refs.template_refs)
-            self._validate_vmids(api_url, headers, resource_refs.vmids)
+            # Get cluster VMs once for template and VMID validation
+            cluster_vms = self._get_cluster_vms(
+                api_url, headers, check_name="proxmox_cluster_resources"
+            )
+
+            # Validate each type of reference using specialized validators
+            self.node_validator.validate(api_url, headers, resource_refs.nodes)
+            self.storage_validator.validate(api_url, headers, resource_refs.storage_pools)
+            self.network_validator.validate(api_url, headers, resource_refs.bridges)
+            self.template_validator.validate(cluster_vms, resource_refs.template_refs)
+            self.vmid_validator.validate(cluster_vms, resource_refs.vmids)
 
         except Exception as exc:
             self.api_validator.handle_validation_exception(
@@ -249,7 +268,7 @@ class ProxmoxValidator:
                             check_name=f"proxmox_mac_{mac}_duplicate",
                             passed=False,
                             message=(
-                                f"MAC {mac} used by multiple resources: "
+                                f"MAC address {mac} used by multiple resources: "
                                 f"{mac_addresses[mac_upper]} and {resource_name}"
                             ),
                             level=ValidationLevel.ERROR,
@@ -292,291 +311,3 @@ class ProxmoxValidator:
             return None
         self._cluster_vm_cache = data.get("data", [])
         return self._cluster_vm_cache
-
-    def _format_uptime(self, seconds: int) -> str:
-        """Convert uptime in seconds to human-readable format.
-
-        Args:
-            seconds: Uptime in seconds
-
-        Returns:
-            Human-readable uptime string (e.g., "29 days, 3 hours, 15 minutes")
-        """
-        if seconds < 60:
-            return f"{seconds} seconds"
-
-        minutes = seconds // 60
-        if minutes < 60:
-            return f"{minutes} minutes"
-
-        hours = minutes // 60
-        remaining_minutes = minutes % 60
-        if hours < 24:
-            if remaining_minutes > 0:
-                return f"{hours} hours, {remaining_minutes} minutes"
-            return f"{hours} hours"
-
-        days = hours // 24
-        remaining_hours = hours % 24
-        if remaining_hours > 0:
-            return f"{days} days, {remaining_hours} hours"
-        return f"{days} days"
-
-    def _validate_nodes(self, api_url: str, headers: dict[str, str], nodes: set[str]) -> None:
-        """Validate that nodes exist and are online.
-
-        Args:
-            api_url: Proxmox API base URL
-            headers: HTTP headers with authorization
-            nodes: Set of node names to validate
-        """
-        for node in nodes:
-            status_data = self.api_validator.fetch_json(
-                url=f"{api_url}/nodes/{node}/status",
-                headers=headers,
-                verify_ssl=False,
-                timeout=10,
-                check_name=f"proxmox_node_{node}",
-                error_message=f"Node '{node}' not accessible (status {{status}})",
-            )
-            if not status_data:
-                continue
-
-            status = status_data.get("data", {})
-            uptime_seconds = status.get("uptime", 0)
-            uptime_formatted = self._format_uptime(uptime_seconds)
-            self.report.add_check(
-                check_name=f"proxmox_node_{node}",
-                passed=True,
-                message=f"Node '{node}' is online (uptime: {uptime_formatted})",
-                level=ValidationLevel.INFO,
-            )
-
-    def _validate_storage(
-        self, api_url: str, headers: dict[str, str], storage_pools: set[tuple[str, str]]
-    ) -> None:
-        """Validate that storage pools exist and are active.
-
-        Args:
-            api_url: Proxmox API base URL
-            headers: HTTP headers with authorization
-            storage_pools: Set of (node, storage) tuples to validate
-        """
-        checked_storage = set()
-        for node, storage in storage_pools:
-            if (node, storage) in checked_storage:
-                continue
-            checked_storage.add((node, storage))
-
-            storage_data = self.api_validator.fetch_json(
-                url=f"{api_url}/nodes/{node}/storage",
-                headers=headers,
-                verify_ssl=False,
-                timeout=10,
-                check_name=f"proxmox_storage_{node}_{storage}",
-                error_message=(
-                    f"Storage '{storage}' on node '{node}' not accessible (status {{status}})"
-                ),
-                error_level=ValidationLevel.WARNING,
-            )
-            if not storage_data:
-                continue
-
-            storages = storage_data.get("data", [])
-            storage_info = next((s for s in storages if s.get("storage") == storage), None)
-            if storage_info:
-                active = storage_info.get("active", 0)
-                storage_type = storage_info.get("type", "unknown")
-                if active:
-                    self.report.add_check(
-                        check_name=f"proxmox_storage_{node}_{storage}",
-                        passed=True,
-                        message=(
-                            f"Storage '{storage}' on node '{node}' is active (type: {storage_type})"
-                        ),
-                        level=ValidationLevel.INFO,
-                    )
-                else:
-                    self.report.add_check(
-                        check_name=f"proxmox_storage_{node}_{storage}",
-                        passed=False,
-                        message=f"Storage '{storage}' on node '{node}' is inactive",
-                        level=ValidationLevel.ERROR,
-                    )
-            else:
-                available = [s.get("storage") for s in storages]
-                self.report.add_check(
-                    check_name=f"proxmox_storage_{node}_{storage}",
-                    passed=False,
-                    message=(
-                        f"Storage '{storage}' not found on node '{node}'. Available: {available}"
-                    ),
-                    level=ValidationLevel.ERROR,
-                )
-
-    def _validate_bridges(
-        self, api_url: str, headers: dict[str, str], bridges: set[tuple[str, str]]
-    ) -> None:
-        """Validate that network bridges exist.
-
-        Args:
-            api_url: Proxmox API base URL
-            headers: HTTP headers with authorization
-            bridges: Set of (node, bridge) tuples to validate
-        """
-        checked_bridges = set()
-        for node, bridge in bridges:
-            if (node, bridge) in checked_bridges:
-                continue
-            checked_bridges.add((node, bridge))
-
-            network_data = self.api_validator.fetch_json(
-                url=f"{api_url}/nodes/{node}/network",
-                headers=headers,
-                verify_ssl=False,
-                timeout=10,
-                check_name=f"proxmox_bridge_{node}_{bridge}",
-                error_message=(
-                    f"Bridge '{bridge}' on node '{node}' not accessible (status {{status}})"
-                ),
-                error_level=ValidationLevel.WARNING,
-            )
-            if not network_data:
-                continue
-
-            networks = network_data.get("data", [])
-            bridge_info = next(
-                (n for n in networks if n.get("type") == "bridge" and n.get("iface") == bridge),
-                None,
-            )
-            if bridge_info:
-                self.report.add_check(
-                    check_name=f"proxmox_bridge_{node}_{bridge}",
-                    passed=True,
-                    message=f"Bridge '{bridge}' exists on node '{node}'",
-                    level=ValidationLevel.INFO,
-                )
-            else:
-                available = [n.get("iface") for n in networks if n.get("type") == "bridge"]
-                self.report.add_check(
-                    check_name=f"proxmox_bridge_{node}_{bridge}",
-                    passed=False,
-                    message=(
-                        f"Bridge '{bridge}' not found on node '{node}'. "
-                        f"Available bridges: {available}"
-                    ),
-                    level=ValidationLevel.ERROR,
-                )
-
-    def _validate_templates(
-        self, api_url: str, headers: dict[str, str], template_refs: dict[str, list[str]]
-    ) -> None:
-        """Validate that templates exist (by VMID or name).
-
-        Args:
-            api_url: Proxmox API base URL
-            headers: HTTP headers with authorization
-            template_refs: Dict of {vmid_or_name: [resource_names]}
-        """
-        if not template_refs:
-            return
-
-        vms_data = self._get_cluster_vms(api_url, headers, check_name="proxmox_templates")
-        if vms_data is None:
-            return
-
-        templates_by_vmid = {vm["vmid"]: vm for vm in vms_data if vm.get("template") == 1}
-        templates_by_name = {vm["name"]: vm for vm in vms_data if vm.get("template") == 1}
-
-        for template_ref, resource_names in template_refs.items():
-            # Check if it's a VMID (integer) or name (string)
-            try:
-                vmid = int(template_ref)
-                if vmid in templates_by_vmid:
-                    template = templates_by_vmid[vmid]
-                    self.report.add_check(
-                        check_name=f"proxmox_template_vmid_{vmid}",
-                        passed=True,
-                        message=f"Template VMID {vmid} exists: {template.get('name', 'N/A')}",
-                        level=ValidationLevel.INFO,
-                    )
-                else:
-                    self.report.add_check(
-                        check_name=f"proxmox_template_vmid_{vmid}",
-                        passed=False,
-                        message=(
-                            f"Template VMID {vmid} not found. Used by: {', '.join(resource_names)}"
-                        ),
-                        level=ValidationLevel.ERROR,
-                    )
-            except ValueError:
-                # It's a name reference
-                if template_ref in templates_by_name:
-                    template = templates_by_name[template_ref]
-                    self.report.add_check(
-                        check_name=f"proxmox_template_{template_ref}",
-                        passed=True,
-                        message=(
-                            f"Template '{template_ref}' exists (VMID: {template.get('vmid')})"
-                        ),
-                        level=ValidationLevel.INFO,
-                    )
-                else:
-                    available_names = list(templates_by_name.keys())
-                    self.report.add_check(
-                        check_name=f"proxmox_template_{template_ref}",
-                        passed=False,
-                        message=(
-                            f"Template '{template_ref}' not found. "
-                            f"Used by: {', '.join(resource_names)}. "
-                            f"Available: {available_names[:5]}"
-                        ),
-                        level=ValidationLevel.ERROR,
-                    )
-
-    def _validate_vmids(self, api_url: str, headers: dict[str, str], vmids: dict[int, str]) -> None:
-        """Validate that VMIDs are available (not already in use).
-
-        Args:
-            api_url: Proxmox API base URL
-            headers: HTTP headers with authorization
-            vmids: Dict of {vmid: resource_name}
-        """
-        if not vmids:
-            return
-
-        vms_data = self._get_cluster_vms(api_url, headers, check_name="proxmox_vmids")
-        if vms_data is None:
-            return
-
-        existing_vmids = {vm["vmid"]: vm.get("name", "N/A") for vm in vms_data}
-
-        for vmid, resource_name in vmids.items():
-            if vmid in existing_vmids:
-                existing_name = existing_vmids[vmid]
-                if existing_name == resource_name:
-                    self.report.add_check(
-                        check_name=f"proxmox_vmid_{vmid}_exists",
-                        passed=True,
-                        message=(
-                            f"VMID {vmid} ({resource_name}) already exists (update/recreation)"
-                        ),
-                        level=ValidationLevel.INFO,
-                    )
-                else:
-                    self.report.add_check(
-                        check_name=f"proxmox_vmid_{vmid}_conflict",
-                        passed=False,
-                        message=(
-                            f"VMID {vmid} already in use by '{existing_name}' "
-                            f"(wanted by: {resource_name})"
-                        ),
-                        level=ValidationLevel.ERROR,
-                    )
-            else:
-                self.report.add_check(
-                    check_name=f"proxmox_vmid_{vmid}_available",
-                    passed=True,
-                    message=f"VMID {vmid} is available for {resource_name}",
-                    level=ValidationLevel.INFO,
-                )
