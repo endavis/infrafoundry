@@ -21,8 +21,14 @@ from ..utils import console, raise_cli_error
     "-p",
     help="Scope diff to a single provider (e.g., proxmox, opnsense, kubernetes)",
 )
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show detailed configuration differences for changed resources",
+)
 @click.pass_context
-def diff(ctx: click.Context, env_a: str, env_b: str, provider: str | None) -> None:
+def diff(ctx: click.Context, env_a: str, env_b: str, provider: str | None, verbose: bool) -> None:
     """Compare configurations between two environments."""
     try:
         config_repo = ctx.obj.get("config_dir")
@@ -55,6 +61,9 @@ def diff(ctx: click.Context, env_a: str, env_b: str, provider: str | None) -> No
             console.header("Resources changed")
             for key in result.resources_changed:
                 console.info(f"  • {key}")
+                if verbose and key in result.resources_changed_details:
+                    for detail in result.resources_changed_details[key]:
+                        console.info(f"    {detail}")
 
     except click.ClickException:
         raise

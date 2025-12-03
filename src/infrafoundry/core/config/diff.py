@@ -31,6 +31,7 @@ class ConfigDiffResult:
     resources_added: list[str]
     resources_removed: list[str]
     resources_changed: list[str]
+    resources_changed_details: dict[str, list[str]]
 
     def is_empty(self) -> bool:
         """Return True when no differences exist."""
@@ -69,7 +70,9 @@ def diff_environments(
     resources_a = config_manager.get_all_resources_all_providers(env_a)
     resources_b = config_manager.get_all_resources_all_providers(env_b)
 
-    added, removed, changed = _diff_resources(resources_a, resources_b, provider_filter)
+    added, removed, changed, changed_details = _diff_resources(
+        resources_a, resources_b, provider_filter
+    )
 
     return ConfigDiffResult(
         env_a=env_a,
@@ -78,11 +81,24 @@ def diff_environments(
         resources_added=added,
         resources_removed=removed,
         resources_changed=changed,
+        resources_changed_details=changed_details,
     )
 
 
 def _diff_settings(env_a: EnvironmentConfig, env_b: EnvironmentConfig) -> list[str]:
-    """Compute differences between two EnvironmentConfig objects."""
+    """Compute differences between two EnvironmentConfig objects.
+
+    Note: List and dict fields are order-sensitive. For example:
+    - providers: ["proxmox", "opnsense"] != ["opnsense", "proxmox"]
+    This is intentional as provider execution order may be significant.
+
+    Args:
+        env_a: First environment configuration
+        env_b: Second environment configuration
+
+    Returns:
+        List of human-readable change descriptions
+    """
     dict_a = env_a.model_dump()
     dict_b = env_b.model_dump()
 
@@ -102,12 +118,40 @@ def _diff_settings(env_a: EnvironmentConfig, env_b: EnvironmentConfig) -> list[s
     return changes
 
 
+def _compute_config_diff(config_a: dict[str, Any], config_b: dict[str, Any]) -> list[str]:
+    """Compute detailed differences between two config dictionaries.
+
+    Args:
+        config_a: First config dictionary
+        config_b: Second config dictionary
+
+    Returns:
+        List of human-readable change descriptions
+    """
+    changes: list[str] = []
+    all_keys = set(config_a.keys()) | set(config_b.keys())
+
+    for key in sorted(all_keys):
+        val_a = config_a.get(key)
+        val_b = config_b.get(key)
+
+        if val_a != val_b:
+            if key not in config_a:
+                changes.append(f"{key}: (added) -> {_to_json(val_b)}")
+            elif key not in config_b:
+                changes.append(f"{key}: {_to_json(val_a)} -> (removed)")
+            else:
+                changes.append(f"{key}: {_to_json(val_a)} -> {_to_json(val_b)}")
+
+    return changes
+
+
 def _diff_resources(
     resources_a: list[ResourceConfig],
     resources_b: list[ResourceConfig],
     provider_filter: str | None,
-) -> tuple[list[str], list[str], list[str]]:
-    """Compare resource collections and return added/removed/changed keys."""
+) -> tuple[list[str], list[str], list[str], dict[str, list[str]]]:
+    """Compare resource collections and return added/removed/changed keys with details."""
     if provider_filter:
         resources_a = [r for r in resources_a if r.provider == provider_filter]
         resources_b = [r for r in resources_b if r.provider == provider_filter]
@@ -119,15 +163,23 @@ def _diff_resources(
     removed_keys = sorted(set(map_a) - set(map_b))
 
     changed_keys: list[str] = []
+    changed_details: dict[str, list[str]] = {}
+
     for key in sorted(set(map_a) & set(map_b)):
         a = map_a[key]
         b = map_b[key]
 
+        details: list[str] = []
+
         if a.type != b.type:
             changed_keys.append(key)
+            details.append(f"type: {a.type} -> {b.type}")
+            changed_details[key] = details
             continue
 
         if _to_json(a.config) != _to_json(b.config):
             changed_keys.append(key)
+            details.extend(_compute_config_diff(a.config, b.config))
+            changed_details[key] = details
 
-    return added_keys, removed_keys, changed_keys
+    return added_keys, removed_keys, changed_keys, changed_details

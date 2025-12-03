@@ -107,3 +107,83 @@ def test_diff_environments_provider_filter():
 
     result_proxmox = diff_environments(manager, "dev", "prod", provider_filter="proxmox")
     assert result_proxmox.resources_changed == ["proxmox:vm-dev"]
+
+
+def test_diff_environments_same_name_different_type():
+    """Detect when resource has same name/provider but different type."""
+    env_a = EnvironmentConfig(name="dev", providers=["proxmox"])
+    env_b = EnvironmentConfig(name="prod", providers=["proxmox"])
+
+    dev_resources = [
+        ResourceConfig(name="web-server", type="vm", provider="proxmox", config={"cpu": 2}),
+    ]
+    prod_resources = [
+        ResourceConfig(name="web-server", type="container", provider="proxmox", config={"cpu": 2}),
+    ]
+
+    manager = DummyConfigManager(
+        {"dev": env_a, "prod": env_b},
+        {"dev": dev_resources, "prod": prod_resources},
+    )
+
+    result = diff_environments(manager, "dev", "prod")
+
+    # Same name/provider but different type should be marked as changed
+    assert result.resources_changed == ["proxmox:web-server"]
+    assert result.resources_added == []
+    assert result.resources_removed == []
+
+
+def test_diff_environments_empty_resources():
+    """Handle environments with no resources."""
+    env_a = EnvironmentConfig(name="empty", providers=["proxmox"])
+    env_b = EnvironmentConfig(name="prod", providers=["proxmox"])
+
+    prod_resources = [
+        ResourceConfig(name="vm-prod", type="vm", provider="proxmox", config={"cpu": 4}),
+    ]
+
+    manager = DummyConfigManager(
+        {"empty": env_a, "prod": env_b},
+        {"empty": [], "prod": prod_resources},
+    )
+
+    result = diff_environments(manager, "empty", "prod")
+
+    assert result.resources_added == ["proxmox:vm-prod"]
+    assert result.resources_removed == []
+    assert result.resources_changed == []
+
+
+def test_diff_environments_both_empty():
+    """Handle when both environments have no resources."""
+    env_a = EnvironmentConfig(name="empty-a", providers=["proxmox"])
+    env_b = EnvironmentConfig(name="empty-b", providers=["proxmox"])
+
+    manager = DummyConfigManager(
+        {"empty-a": env_a, "empty-b": env_b},
+        {"empty-a": [], "empty-b": []},
+    )
+
+    result = diff_environments(manager, "empty-a", "empty-b")
+
+    assert result.is_empty()
+    assert result.resources_added == []
+    assert result.resources_removed == []
+    assert result.resources_changed == []
+
+
+def test_diff_environments_nonexistent_environment():
+    """Raise error when environment doesn't exist."""
+    import pytest
+
+    env_a = EnvironmentConfig(name="dev", providers=["proxmox"])
+
+    manager = DummyConfigManager(
+        {"dev": env_a},
+        {"dev": []},
+    )
+
+    # Should raise KeyError when trying to load nonexistent environment
+    with pytest.raises(KeyError):
+        diff_environments(manager, "nonexistent", "dev")
