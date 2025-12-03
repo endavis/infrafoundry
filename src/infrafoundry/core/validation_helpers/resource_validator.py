@@ -1,4 +1,7 @@
-"""Resource validation utilities."""
+"""Resource reference validation for infrastructure providers.
+
+This module validates that resources referenced by other resources actually exist.
+"""
 
 import json
 import logging
@@ -10,7 +13,20 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceValidator:
-    """Validates resource references and dependencies."""
+    """Validates resource references and dependencies.
+
+    Checks that resources referenced by other resources (e.g., templates,
+    networks, aliases) actually exist in the configuration.
+
+    Example:
+        validator = ResourceValidator("proxmox", report)
+        exists = validator.validate_resource_exists(
+            resource_type="template",
+            resource_name="ubuntu-22.04",
+            existing_resources={"ubuntu-22.04", "debian-12"},
+            parent_resource="web-server-01"
+        )
+    """
 
     def __init__(self, provider_name: str, report: ValidationReport) -> None:
         """Initialize resource validator.
