@@ -34,22 +34,10 @@ class KubernetesProvider(
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Kubernetes resources."""
-        self.ensure_directories()
+        resources_by_type = self.prepare_terraform_generation(resources)
 
-        # Use ResourceGrouperMixin to group resources by type
-        resources_by_type = self.group_resources_by_type(resources)
-
-        # Generate provider configuration
-        self.render_and_write_terraform(
-            "kubernetes/provider.tf.j2",
-            output_name="provider.tf",
-        )
-
-        # Generate variables file
-        self.render_and_write_terraform(
-            "kubernetes/variables.tf.j2",
-            output_name="variables.tf",
-        )
+        # Generate provider and variables configuration
+        self.render_provider_and_variables()
 
         # Generate resources by type
         if "deployments" in resources_by_type:
@@ -65,11 +53,7 @@ class KubernetesProvider(
             self._generate_namespaces_terraform(resources_by_type["namespaces"])
 
         # Generate outputs
-        self.render_and_write_terraform(
-            "kubernetes/outputs.tf.j2",
-            context={"resources_by_type": resources_by_type},
-            output_name="outputs.tf",
-        )
+        self.render_outputs_terraform(resources_by_type)
 
     def _generate_deployments_terraform(self, deployments: list[ResourceConfig]) -> None:
         """Generate Terraform for Kubernetes deployments."""

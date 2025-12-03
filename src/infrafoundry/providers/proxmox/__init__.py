@@ -1,5 +1,6 @@
 """Proxmox provider for InfraFoundry."""
 
+import os
 from pathlib import Path
 from typing import Any, override
 
@@ -60,24 +61,11 @@ class ProxmoxProvider(
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Proxmox resources."""
-        self.ensure_directories()
+        resources_by_type = self.prepare_terraform_generation(resources)
 
-        # Use ResourceGrouperMixin to group resources by type
-        resources_by_type = self.group_resources_by_type(resources)
-
-        # Generate provider configuration
-        self.render_and_write_terraform(
-            "proxmox/provider.tf.j2",
-            output_name="provider.tf",
-        )
-
-        # Generate variables file with environment context
-        import os
-
-        self.render_and_write_terraform(
-            "proxmox/variables.tf.j2",
-            context={"default_ssh_user": os.getenv("USER", "root")},
-            output_name="variables.tf",
+        # Generate provider configuration with environment context
+        self.render_provider_and_variables(
+            variables_context={"default_ssh_user": os.getenv("USER", "root")},
         )
 
         # Copy or generate terraform.tfvars from environment config
@@ -99,11 +87,7 @@ class ProxmoxProvider(
             self._generate_networks_terraform(resources_by_type["network"])
 
         # Generate outputs
-        self.render_and_write_terraform(
-            "proxmox/outputs.tf.j2",
-            context={"resources_by_type": resources_by_type},
-            output_name="outputs.tf",
-        )
+        self.render_outputs_terraform(resources_by_type)
 
     def _generate_vms_terraform(self, vms: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox VMs."""
