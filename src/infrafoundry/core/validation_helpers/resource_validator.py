@@ -61,11 +61,11 @@ class ResourceValidator:
                 check_name, resource_type, resource_name, parent_resource
             )
             return True
-        else:
-            self._add_resource_missing_error(
-                check_name, resource_type, resource_name, existing_resources, parent_resource
-            )
-            return False
+
+        self.add_resource_missing_error(
+            check_name, resource_type, resource_name, existing_resources, parent_resource
+        )
+        return False
 
     def _add_resource_exists_success(
         self,
@@ -93,7 +93,7 @@ class ResourceValidator:
             level=ValidationLevel.INFO,
         )
 
-    def _add_resource_missing_error(
+    def add_resource_missing_error(
         self,
         check_name: str,
         resource_type: str,
@@ -107,8 +107,8 @@ class ResourceValidator:
             check_name: Validation check name
             resource_type: Type of resource
             resource_name: Name of resource
-            existing_resources: Set of existing resources
-            parent_resource: Optional parent resource name
+        existing_resources: Set of existing resources
+        parent_resource: Optional parent resource name
         """
         msg = f"{resource_type.title()} '{resource_name}' not found"
         if parent_resource:
