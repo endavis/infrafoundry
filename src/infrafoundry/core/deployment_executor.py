@@ -7,6 +7,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.protocols import StateAware
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
@@ -283,7 +284,11 @@ class DeploymentExecutor:
             run_result = runner.run(provider, command, auto_approve)
             runner_results[tool_name] = run_result
 
-            if tool_name == "terraform" and run_result["success"]:
+            if (
+                tool_name == "terraform"
+                and run_result["success"]
+                and isinstance(runner, StateAware)
+            ):
                 terraform_ids = runner.get_resource_ids(provider)
                 # Update tracked resources with Terraform IDs
                 for resource_name, terraform_id in terraform_ids.items():

@@ -128,7 +128,7 @@ class BaseRunner(ABC):
 
     @abstractmethod
     def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
-        """Extract resource IDs from tool state.
+        """Extract resource IDs from tool state, if supported.
 
         Args:
             provider: Provider instance
@@ -136,11 +136,10 @@ class BaseRunner(ABC):
         Returns:
             Dict mapping resource names to their IDs in the tool's state
         """
-        pass
+        raise NotImplementedError("State inspection not supported for this runner")
 
-    @abstractmethod
     def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
-        """Parse plan output to detect infrastructure drift.
+        """Parse plan output to detect infrastructure drift, if supported.
 
         Args:
             plan_result: Result dictionary from run() with plan command
@@ -148,7 +147,7 @@ class BaseRunner(ABC):
         Returns:
             Dict with drift information including has_changes and summary
         """
-        pass
+        raise NotImplementedError("Drift detection not supported for this runner")
 
     def get_version(self) -> str | None:
         """Get the version of the installed tool.
