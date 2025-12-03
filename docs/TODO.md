@@ -31,31 +31,31 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 
 
 ## Testing & Refactoring (from Maintenance Report)
-- [x] **Unit Test Coverage: CLI Commands**: ([Issue](https://github.com/endavis/infrafoundry/issues/40))
+- [x] **Unit Test Coverage: CLI Commands**: ([Issue](https://github.com/endavis/infrafoundry/issues/40), [PR #61](https://github.com/endavis/infrafoundry/pull/61))
 - [ ] **Unit Test Coverage: Orchestration Workflows** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/41))
 - [ ] **Unit Test Coverage: Deployment Executor** [Complexity: 6/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/42))
 - [ ] **Unit Test Coverage: Runners** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/43))
 - [ ] **Refactor & Test: Validators** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/44))
 - [ ] **Refactor: Provider Terraform Generation** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/45))
-- [x] **Refactor: Console Output**: ([Issue](https://github.com/endavis/infrafoundry/issues/46))
+- [x] **Refactor: Console Output**: ([Issue](https://github.com/endavis/infrafoundry/issues/46), [PR #60](https://github.com/endavis/infrafoundry/pull/60))
 - [ ] **Refactor: Orchestrator God Class** [Complexity: 6/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/47))
 
 
 
 ## Architecture & Design (from Design Assessment)
-- [x] **Refactor: Use Protocol Classes** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/49))
-- [x] **Documentation: Architecture Decision Records**: ([Issue](https://github.com/endavis/infrafoundry/issues/50))
-- [x] **Documentation: Sequence Diagrams**: ([Issue](https://github.com/endavis/infrafoundry/issues/51))
+- [x] **Refactor: Use Protocol Classes** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/49), [PR #65](https://github.com/endavis/infrafoundry/pull/65))
+- [x] **Documentation: Architecture Decision Records**: ([Issue](https://github.com/endavis/infrafoundry/issues/50), [PR #59](https://github.com/endavis/infrafoundry/pull/59))
+- [x] **Documentation: Sequence Diagrams**: ([Issue](https://github.com/endavis/infrafoundry/issues/51), direct commit 4afac0c)
 
 
 ## Code Quality & Refactoring (from Code Quality Analysis)
 - [ ] **Refactor: BaseRunner Interface Segregation** [Complexity: 7/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/48))
-- [x] **Refactor: KeaDHCPManager Duplication**: ([Issue](https://github.com/endavis/infrafoundry/issues/52))
-- [x] **Refactor: KeaClient CRUD Duplication** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/53))
+- [x] **Refactor: KeaDHCPManager Duplication**: ([Issue](https://github.com/endavis/infrafoundry/issues/52), [PR #58](https://github.com/endavis/infrafoundry/pull/58))
+- [x] **Refactor: KeaClient CRUD Duplication** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/53), [PR #64](https://github.com/endavis/infrafoundry/pull/64))
 - [ ] **Refactor: BaseProviderValidator** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/54))
-- [x] **Refactor: Policy Evaluator Boilerplate** [Complexity: 3/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/55))
-- [x] **Refactor: Normalize OPNsense Interface Data** [Complexity: 3/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/56))
-- [x] **Bug Fix: Print Statement in Policy Evaluator** [Complexity: 1/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/57))
+- [x] **Refactor: Policy Evaluator Boilerplate** [Complexity: 3/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/55), [PR #62](https://github.com/endavis/infrafoundry/pull/62))
+- [x] **Refactor: Normalize OPNsense Interface Data** [Complexity: 3/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/56), [PR #63](https://github.com/endavis/infrafoundry/pull/63))
+- [x] **Bug Fix: Print Statement in Policy Evaluator** [Complexity: 1/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/57), PR not recorded)
 
 ## Completed Features
 - [x] Configuration templating/blueprints
