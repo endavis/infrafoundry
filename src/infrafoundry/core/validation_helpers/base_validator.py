@@ -5,8 +5,10 @@ specialized validators for credentials, connectivity, resources, and reporting.
 """
 
 import logging
+import traceback
 from typing import Any
 
+from infrafoundry.core.exceptions import APIError, InfraFoundryError, ValidationError
 from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers.connectivity_validator import ConnectivityValidator
@@ -208,3 +210,36 @@ class BaseProviderValidator:
             details: Optional additional details
         """
         self._report_helper.add_error_check(check_name, message, level, details)
+
+    def handle_validation_exception(
+        self,
+        *,
+        check_name: str,
+        error: Exception,
+        warning_level: ValidationLevel = ValidationLevel.WARNING,
+    ) -> None:
+        """Standardize exception handling for provider validations.
+
+        Maps common InfraFoundry exceptions to validation levels and records the
+        failure on the report. Unexpected exceptions include a traceback for
+        easier debugging.
+
+        Args:
+            check_name: Validation check name to record on the report.
+            error: Exception encountered during validation.
+            warning_level: Level to use for warnings (defaults to WARNING).
+        """
+        if isinstance(error, (APIError, ValidationError)):
+            level = ValidationLevel.ERROR
+        elif isinstance(error, InfraFoundryError):
+            level = warning_level
+        else:
+            level = warning_level
+            logger.debug(traceback.format_exc())
+
+        self.report.add_check(
+            check_name=check_name,
+            passed=False,
+            message=f"{error.__class__.__name__}: {error}",
+            level=level,
+        )
