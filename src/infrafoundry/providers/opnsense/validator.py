@@ -5,7 +5,6 @@ configurations against live API state before deployment.
 """
 
 import logging
-import traceback
 from typing import Any, TypedDict, cast
 
 import urllib3
@@ -176,22 +175,15 @@ class OPNsenseValidator:
             # Check for duplicate names
             self._validate_unique_names(resources)
 
-        except ReferenceValidationError as e:
-            # Structured validation errors
-            self.report.add_check(
-                check_name="opnsense_validation",
-                passed=False,
-                message=f"Reference validation failed: {e}",
-                level=ValidationLevel.ERROR,
+        except Exception as exc:
+            check_name = "opnsense_validation"
+            if isinstance(exc, ReferenceValidationError):
+                check_name = "opnsense_reference_validation"
+            self.api_validator.handle_validation_exception(
+                check_name=check_name,
+                error=exc,
+                warning_level=ValidationLevel.ERROR,
             )
-        except Exception as e:
-            self.report.add_check(
-                check_name="opnsense_validation_error",
-                passed=False,
-                message=f"Error validating OPNsense references: {e}",
-                level=ValidationLevel.ERROR,
-            )
-            logger.debug(traceback.format_exc())  # Log full traceback
 
     def _collect_resource_references(self, resources: list[ResourceConfig]) -> dict[str, Any]:
         """Collect all resource references from configurations.

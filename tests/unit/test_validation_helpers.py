@@ -209,6 +209,27 @@ class TestBaseProviderValidator:
         assert call_args["passed"] is False
         assert "requests library" in call_args["message"]
 
+    def test_handle_validation_exception_maps_levels(self, validator, report):
+        """Validate error mapping and report integration."""
+        from infrafoundry.core.exceptions import APIError, InfraFoundryError
+
+        validator.handle_validation_exception(
+            check_name="api_check",
+            error=APIError("boom"),
+        )
+        call_args = report.add_check.call_args_list[-1][1]
+        assert call_args["level"] == ValidationLevel.ERROR
+        assert call_args["check_name"] == "api_check"
+
+        validator.handle_validation_exception(
+            check_name="infra_check",
+            error=InfraFoundryError("warn"),
+            warning_level=ValidationLevel.WARNING,
+        )
+        call_args = report.add_check.call_args_list[-1][1]
+        assert call_args["level"] == ValidationLevel.WARNING
+        assert call_args["check_name"] == "infra_check"
+
     def test_check_api_connectivity_with_auth(self, validator, report):
         """Test API connectivity with basic auth."""
         mock_response = Mock()
