@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import logging
-import traceback
 from dataclasses import dataclass
 from typing import TypedDict, cast
 
 import urllib3
 
-from infrafoundry.core.exceptions import APIError, InfraFoundryError, ValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData, ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
@@ -164,35 +161,12 @@ class ProxmoxValidator:
             self._validate_templates(api_url, headers, resource_refs.template_refs)
             self._validate_vmids(api_url, headers, resource_refs.vmids)
 
-        except APIError as e:
-            self.report.add_check(
+        except Exception as exc:
+            self.api_validator.handle_validation_exception(
                 check_name="proxmox_validation",
-                passed=False,
-                message=f"API error during validation: {e}",
-                level=ValidationLevel.ERROR,
+                error=exc,
+                warning_level=ValidationLevel.WARNING,
             )
-        except ValidationError as e:
-            self.report.add_check(
-                check_name="proxmox_validation",
-                passed=False,
-                message=f"Validation error: {e}",
-                level=ValidationLevel.ERROR,
-            )
-        except InfraFoundryError as e:
-            self.report.add_check(
-                check_name="proxmox_validation",
-                passed=False,
-                message=f"InfraFoundry error during validation: {e}",
-                level=ValidationLevel.WARNING,
-            )
-        except Exception as e:
-            self.report.add_check(
-                check_name="proxmox_validation",
-                passed=False,
-                message=f"Unexpected error during validation: {e}",
-                level=ValidationLevel.WARNING,
-            )
-            logging.debug(traceback.format_exc())  # Log full traceback
 
     def _get_api_token(self) -> str | None:
         """Get API token from provider settings.
