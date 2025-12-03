@@ -52,7 +52,7 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 - [ ] **Refactor: BaseRunner Interface Segregation** [Complexity: 7/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/48))
 - [x] **Refactor: KeaDHCPManager Duplication**: ([Issue](https://github.com/endavis/infrafoundry/issues/52), [PR #58](https://github.com/endavis/infrafoundry/pull/58))
 - [x] **Refactor: KeaClient CRUD Duplication** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/53), [PR #64](https://github.com/endavis/infrafoundry/pull/64))
-- [ ] **Refactor: BaseProviderValidator** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/54))
+- [x] **Refactor: BaseProviderValidator** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/54), [PR #67](https://github.com/endavis/infrafoundry/pull/67))
 - [x] **Refactor: Policy Evaluator Boilerplate** [Complexity: 3/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/55), [PR #62](https://github.com/endavis/infrafoundry/pull/62))
 - [x] **Refactor: Normalize OPNsense Interface Data** [Complexity: 3/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/56), [PR #63](https://github.com/endavis/infrafoundry/pull/63))
 - [x] **Bug Fix: Print Statement in Policy Evaluator** [Complexity: 1/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/57), PR not recorded)
