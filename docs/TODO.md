@@ -49,7 +49,7 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 
 
 ## Code Quality & Refactoring (from Code Quality Analysis)
-- [ ] **Refactor: BaseRunner Interface Segregation** [Complexity: 7/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/48))
+- [x] **Refactor: BaseRunner Interface Segregation** [Complexity: 7/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/48), [PR #77](https://github.com/endavis/infrafoundry/pull/77))
 - [x] **Refactor: KeaDHCPManager Duplication**: ([Issue](https://github.com/endavis/infrafoundry/issues/52), [PR #58](https://github.com/endavis/infrafoundry/pull/58))
 - [x] **Refactor: KeaClient CRUD Duplication** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/53), [PR #64](https://github.com/endavis/infrafoundry/pull/64))
 - [x] **Refactor: BaseProviderValidator** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/54), [PR #67](https://github.com/endavis/infrafoundry/pull/67))
