@@ -38,7 +38,7 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 - [x] **Refactor & Test: Validators** [Complexity: 5/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/44), [PR #73](https://github.com/endavis/infrafoundry/pull/73))
 - [ ] **Refactor: Provider Terraform Generation** [Complexity: 4/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/45))
 - [x] **Refactor: Console Output**: ([Issue](https://github.com/endavis/infrafoundry/issues/46), [PR #60](https://github.com/endavis/infrafoundry/pull/60))
-- [ ] **Refactor: Orchestrator God Class** [Complexity: 6/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/47))
+- [x] **Refactor: Orchestrator God Class** [Complexity: 6/10]: ([Issue](https://github.com/endavis/infrafoundry/issues/47), [PR #75](https://github.com/endavis/infrafoundry/pull/75))
 
 
 
