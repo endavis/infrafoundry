@@ -23,7 +23,7 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 - [x] **Proxmox Config Exporter** [Complexity: 5/10]: Extract Proxmox cluster configuration. ([Issue](https://github.com/endavis/infrafoundry/issues/35), [PR #74](https://github.com/endavis/infrafoundry/pull/74))
 - [x] **Config Diff Tool** [Complexity: 4/10]: Compare configurations between environments. ([Issue](https://github.com/endavis/infrafoundry/issues/36), [PR #68](https://github.com/endavis/infrafoundry/pull/68))
 - [x] **Resource Validator** [Complexity: 5/10]: Validate YAML configs against provider schemas. ([Issue](https://github.com/endavis/infrafoundry/issues/37), [PR #72](https://github.com/endavis/infrafoundry/pull/72))
-- [ ] **Dependency Analyzer** [Complexity: 6/10]: Visualize resource dependencies. ([Issue](https://github.com/endavis/infrafoundry/issues/38))
+- [x] **Dependency Analyzer** [Complexity: 6/10]: Visualize resource dependencies. ([Issue](https://github.com/endavis/infrafoundry/issues/38), [PR #76](https://github.com/endavis/infrafoundry/pull/76))
 - [ ] **Cost Calculator** [Complexity: 4/10]: Estimate infrastructure costs. ([Issue](https://github.com/endavis/infrafoundry/issues/39))
 
 ---
