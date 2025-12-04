@@ -97,7 +97,7 @@ def test_run_plan(runner: PyInfraRunner, mock_provider: MagicMock) -> None:
     with patch("shutil.which", return_value="/bin/pyinfra"), patch("subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
 
-        result = runner.run(mock_provider, "plan")
+        result = runner.plan(mock_provider)
 
         assert result["success"]
         args = mock_run.call_args[0][0]
@@ -115,7 +115,7 @@ def test_run_apply(runner: PyInfraRunner, mock_provider: MagicMock) -> None:
     with patch("shutil.which", return_value="/bin/pyinfra"), patch("subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
 
-        result = runner.run(mock_provider, "apply")
+        result = runner.apply(mock_provider)
 
         assert result["success"]
         args = mock_run.call_args[0][0]

@@ -215,29 +215,6 @@ class PulumiRunner(BaseRunner):
 
         return {"valid": True, "message": "Pulumi configuration valid"}
 
-    @override
-    def run(
-        self, provider: ProviderBase, command: str, auto_approve: bool = False
-    ) -> dict[str, Any]:
-        """Run Pulumi command for a provider.
-
-        Args:
-            provider: Provider instance
-            command: Command to run ('preview', 'up', 'destroy')
-            auto_approve: Whether to auto-approve changes
-
-        Returns:
-            Dict with command results
-        """
-        if command == "plan":
-            return self.plan(provider)
-        elif command == "apply":
-            return self.apply(provider, auto_approve=auto_approve)
-        elif command == "destroy":
-            return self.destroy(provider, auto_approve=auto_approve)
-        else:
-            return {"success": False, "error": f"Unknown command: {command}"}
-
     def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
         """Get resource IDs from Pulumi state.
 

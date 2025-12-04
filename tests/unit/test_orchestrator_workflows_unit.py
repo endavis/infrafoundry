@@ -136,10 +136,10 @@ def test_plan_orchestrator_runs_runners_in_priority_order(console):
 
     provider.generate_terraform.assert_called_once()
     provider.generate_ansible.assert_called_once()
-    # Ensure terraform run happens before ansible
-    assert tf_runner.run.call_args_list[0][0][1] == "plan"
-    assert ansible_runner.run.call_args_list[0][0][1] == "plan"
-    assert tf_runner.run.call_args_list[0][0][0] == provider
+    # Ensure terraform plan happens before ansible
+    assert tf_runner.plan.called
+    assert ansible_runner.plan.called
+    assert tf_runner.plan.call_args_list[0][0][0] == provider
 
 
 def test_apply_orchestrator_uses_parallel_when_multiple_providers(console):

@@ -12,7 +12,7 @@ from infrafoundry.core.exceptions import (
     InfraFoundryError,
     TerraformError,
 )
-from infrafoundry.core.protocols import DriftDetectable
+from infrafoundry.core.protocols import DriftDetectable, Plannable
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import RunnerRegistry
 
@@ -102,9 +102,13 @@ class DriftDetector:
 
                 self.console.print(f"\n[bold]Checking {provider_name}...[/bold]")
 
-                # Run terraform plan to detect drift
-                # This will compare current state with declared config
-                plan_result = terraform_runner.run(provider, "plan", auto_approve=False)
+                # Check if runner supports plan and drift detection
+                if not isinstance(terraform_runner, Plannable):
+                    self.console.print(
+                        f"  [yellow]⚠ Runner {terraform_runner.tool_name} "
+                        "does not support plan operation[/yellow]"
+                    )
+                    continue
 
                 if not isinstance(terraform_runner, DriftDetectable):
                     self.console.print(
@@ -112,6 +116,10 @@ class DriftDetector:
                         "does not support drift detection[/yellow]"
                     )
                     continue
+
+                # Run terraform plan to detect drift
+                # This will compare current state with declared config
+                plan_result = terraform_runner.plan(provider)
 
                 # Parse the plan output to detect changes
                 drift_info = terraform_runner.parse_plan_for_drift(plan_result)

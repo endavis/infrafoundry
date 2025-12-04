@@ -280,41 +280,27 @@ class DeploymentExecutor:
 
             self.console.print(f"  [dim]Running {tool_name} apply...[/dim]")
 
-            command = "apply"
-            if tool_name == "ansible" and not auto_approve:
-                # Ansible's 'apply' with auto_approve=False implies check mode (plan)
-                command = "plan"
-
-            run_result = runner.run(provider, command, auto_approve)
+            # Ansible interprets auto_approve=False as check mode (dry-run)
+            # Other runners use it to skip confirmation prompts
+            run_result = runner.apply(provider, auto_approve=auto_approve)
             runner_results[tool_name] = run_result
 
-            is_state_aware = isinstance(runner, StateAware)
-            self.console.print(f"  [dim]Runner {tool_name} is StateAware: {is_state_aware}[/dim]")
-
+            # Update state with Terraform resource IDs if available
             if (
                 tool_name == "terraform"
                 and run_result["success"]
                 and isinstance(runner, StateAware)
             ):
-                # We only try to get resource IDs if the runner supports it.
-                # Since we removed get_resource_ids from BaseRunner, the protocol check
-                # now correctly identifies runners that actually implement it.
-                try:
-                    # Cast to StateAware to satisfy type checker
-                    # isinstance check above guarantees this is safe
-                    state_runner = cast(StateAware, runner)
-                    terraform_ids = state_runner.get_resource_ids(provider)
-                    self.console.print(f"  [dim]Got terraform IDs: {terraform_ids}[/dim]")
-                    # Update tracked resources with Terraform IDs
-                    for resource_name, terraform_id in terraform_ids.items():
-                        if resource_name in resource_ids:
-                            db_resource_id = resource_ids[resource_name]
-                            self.state_manager.update_resource(
-                                resource_id=db_resource_id,
-                                terraform_id=terraform_id,
-                            )
-                except NotImplementedError:
-                    pass  # Should be caught by protocol check, but safe guard
+                state_runner = cast(StateAware, runner)
+                terraform_ids = state_runner.get_resource_ids(provider)
+                # Update tracked resources with Terraform IDs
+                for resource_name, terraform_id in terraform_ids.items():
+                    if resource_name in resource_ids:
+                        db_resource_id = resource_ids[resource_name]
+                        self.state_manager.update_resource(
+                            resource_id=db_resource_id,
+                            terraform_id=terraform_id,
+                        )
 
         # Update resource states to ACTIVE after successful apply
         for resource in resources:

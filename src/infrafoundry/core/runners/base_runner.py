@@ -71,22 +71,6 @@ class BaseRunner(ABC):
         """
         pass
 
-    @abstractmethod
-    def run(
-        self, provider: ProviderBase, command: str, auto_approve: bool = False
-    ) -> dict[str, Any]:
-        """Run a tool command for a provider.
-
-        Args:
-            provider: Provider instance
-            command: Command to run (e.g., 'plan', 'apply', 'destroy')
-            auto_approve: Whether to auto-approve changes
-
-        Returns:
-            Dict with command results including exit_code and success
-        """
-        pass
-
     def get_version(self) -> str | None:
         """Get the version of the installed tool.
 

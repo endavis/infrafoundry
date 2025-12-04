@@ -382,7 +382,7 @@ class PlanOrchestrator:
                             )
                             generate_method(provider_resources)
                             self.console.print(f"  [dim]Running {tool_name} plan...[/dim]")
-                            runner_result = runner.run(provider, "plan", auto_approve=False)
+                            runner_result = runner.plan(provider)
                             provider_results[f"{tool_name}_plan"] = runner_result
                         else:
                             self.console.print(
@@ -829,7 +829,7 @@ class DestroyOrchestrator:
                         continue
 
                     self.console.print(f"  [dim]Running {tool_name} destroy...[/dim]")
-                    runner_result = runner.run(provider, "destroy", auto_approve)
+                    runner_result = runner.destroy(provider, auto_approve=auto_approve)
                     provider_results[tool_name] = runner_result
 
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)

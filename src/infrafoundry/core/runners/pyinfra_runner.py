@@ -119,31 +119,6 @@ class PyInfraRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"valid": False, "error": f"Syntax error: {e}"}
 
-    @override
-    def run(
-        self, provider: ProviderBase, command: str, auto_approve: bool = False
-    ) -> dict[str, Any]:
-        """Run pyinfra command for a provider.
-
-        Args:
-            provider: Provider instance
-            command: Command to run ('plan', 'apply')
-            auto_approve: Not used directly (pyinfra is non-interactive by default usually)
-
-        Returns:
-            Dict with command results
-        """
-        if command == "plan":
-            return self.plan(provider)
-        elif command == "apply":
-            return self.apply(provider)
-        else:
-            return {
-                "success": False,
-                "exit_code": 1,
-                "message": f"Unknown command: {command}",
-            }
-
     def _run_pyinfra(self, provider: ProviderBase, dry_run: bool = True) -> dict[str, Any]:
         """Run pyinfra for a provider.
 

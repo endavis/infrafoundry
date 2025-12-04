@@ -153,21 +153,6 @@ class TerraformRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"valid": False, "error": str(e)}
 
-    def run(
-        self, provider: ProviderBase, command: str, auto_approve: bool = False
-    ) -> dict[str, Any]:
-        """Run Terraform command for a provider (legacy compatibility).
-
-        Args:
-            provider: Provider instance
-            command: Terraform command (plan, apply, destroy)
-            auto_approve: If True, add -auto-approve flag
-
-        Returns:
-            Dict with command results including exit_code and success
-        """
-        return self._run_terraform(provider, command, auto_approve=auto_approve)
-
     def _run_terraform(
         self, provider: ProviderBase, command: str, auto_approve: bool = False
     ) -> dict[str, Any]:
