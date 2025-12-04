@@ -92,7 +92,6 @@ class PulumiRunner(BaseRunner):
 
         return {"success": False, "error": "Unknown error"}
 
-    @override
     def plan(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Generate Pulumi preview (plan).
 
@@ -124,7 +123,6 @@ class PulumiRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": str(e)}
 
-    @override
     def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Apply Pulumi program.
 
@@ -155,7 +153,6 @@ class PulumiRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": str(e)}
 
-    @override
     def destroy(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Destroy Pulumi-managed infrastructure.
 
@@ -241,7 +238,6 @@ class PulumiRunner(BaseRunner):
         else:
             return {"success": False, "error": f"Unknown command: {command}"}
 
-    @override
     def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
         """Get resource IDs from Pulumi state.
 
@@ -272,7 +268,6 @@ class PulumiRunner(BaseRunner):
         except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError):
             return {}
 
-    @override
     def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
         """Parse Pulumi preview for drift.
 

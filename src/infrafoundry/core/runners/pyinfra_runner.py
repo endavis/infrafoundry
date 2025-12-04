@@ -38,7 +38,6 @@ class PyInfraRunner(BaseRunner):
             return {"success": False, "error": "pyinfra command not found"}
         return {"success": True, "message": "pyinfra is available"}
 
-    @override
     def plan(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Run pyinfra in dry-run mode.
 
@@ -51,7 +50,6 @@ class PyInfraRunner(BaseRunner):
         """
         return self._run_pyinfra(provider, dry_run=True)
 
-    @override
     def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Run pyinfra.
 
@@ -63,23 +61,6 @@ class PyInfraRunner(BaseRunner):
             Dict with apply results
         """
         return self._run_pyinfra(provider, dry_run=False)
-
-    @override
-    def destroy(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
-        """Destroy is not applicable for pyinfra.
-
-        Args:
-            provider: Provider instance
-            **kwargs: Additional options
-
-        Returns:
-            Dict indicating operation not supported
-        """
-        return {
-            "success": False,
-            "error": "Destroy operation not supported for pyinfra",
-            "message": "pyinfra manages configuration, not resource lifecycle",
-        }
 
     @override
     def get_version(self) -> str | None:
@@ -156,8 +137,6 @@ class PyInfraRunner(BaseRunner):
             return self.plan(provider)
         elif command == "apply":
             return self.apply(provider)
-        elif command == "destroy":
-            return self.destroy(provider)
         else:
             return {
                 "success": False,
@@ -212,14 +191,3 @@ class PyInfraRunner(BaseRunner):
             return {"exit_code": result.returncode, "success": result.returncode == 0}
         except FileNotFoundError:
             return {"error": "pyinfra not found", "success": False}
-
-    def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
-        """Get resource IDs (not applicable)."""
-        return {}
-
-    def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
-        """Parse plan for drift (not applicable)."""
-        return {
-            "has_changes": False,
-            "summary": "Drift detection not supported for pyinfra",
-        }

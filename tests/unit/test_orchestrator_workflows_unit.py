@@ -91,8 +91,11 @@ def test_plan_orchestrator_runs_runners_in_priority_order(console):
 
     tf_runner = MagicMock()
     tf_runner.priority = 0
+    tf_runner.plan = MagicMock()  # Satisfy Plannable
+
     ansible_runner = MagicMock()
     ansible_runner.priority = 50
+    ansible_runner.plan = MagicMock()  # Satisfy Plannable
 
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform", "ansible"]

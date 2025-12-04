@@ -38,7 +38,6 @@ class AnsibleRunner(BaseRunner):
             return {"success": False, "error": "ansible-playbook command not found"}
         return {"success": True, "message": "Ansible is available"}
 
-    @override
     def plan(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Run Ansible playbook in check mode (dry run).
 
@@ -51,7 +50,6 @@ class AnsibleRunner(BaseRunner):
         """
         return self._run_ansible(provider, check_mode=True)
 
-    @override
     def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Run Ansible playbook.
 
@@ -63,23 +61,6 @@ class AnsibleRunner(BaseRunner):
             Dict with apply results
         """
         return self._run_ansible(provider, check_mode=False)
-
-    @override
-    def destroy(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
-        """Destroy is not applicable for Ansible.
-
-        Args:
-            provider: Provider instance
-            **kwargs: Additional options
-
-        Returns:
-            Dict indicating operation not supported
-        """
-        return {
-            "success": False,
-            "error": "Destroy operation not supported for Ansible",
-            "message": "Ansible manages configuration, not resource lifecycle",
-        }
 
     @override
     def get_version(self) -> str | None:
@@ -153,8 +134,6 @@ class AnsibleRunner(BaseRunner):
             return self.plan(provider)
         elif command == "apply":
             return self.apply(provider)
-        elif command == "destroy":
-            return self.destroy(provider)
         else:
             return {
                 "success": False,
@@ -200,28 +179,3 @@ class AnsibleRunner(BaseRunner):
             return {"exit_code": result.returncode, "success": result.returncode == 0}
         except FileNotFoundError:
             return {"error": "ansible-playbook not found", "success": False}
-
-    def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
-        """Get resource IDs from Ansible (not applicable for Ansible).
-
-        Args:
-            provider: Provider instance
-
-        Returns:
-            Empty dict (Ansible doesn't track resource IDs like Terraform)
-        """
-        return {}
-
-    def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
-        """Parse plan for drift (not applicable for Ansible).
-
-        Args:
-            plan_result: Result from run command
-
-        Returns:
-            Dict indicating no drift detection (Ansible doesn't support drift detection)
-        """
-        return {
-            "has_changes": False,
-            "summary": "Drift detection not supported for Ansible",
-        }

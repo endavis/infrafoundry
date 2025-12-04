@@ -1,13 +1,13 @@
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
+from typing import Any, cast
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError
-from infrafoundry.core.protocols import StateAware
+from infrafoundry.core.protocols import Applyable, StateAware
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
@@ -274,6 +274,10 @@ class DeploymentExecutor:
         terraform_ids: dict[str, str] = {}
 
         for tool_name, runner in self._get_sorted_runners():
+            if not isinstance(runner, Applyable):
+                self.console.print(f"  [dim]Skipping {tool_name}: does not support apply[/dim]")
+                continue
+
             self.console.print(f"  [dim]Running {tool_name} apply...[/dim]")
 
             command = "apply"
@@ -284,20 +288,33 @@ class DeploymentExecutor:
             run_result = runner.run(provider, command, auto_approve)
             runner_results[tool_name] = run_result
 
+            is_state_aware = isinstance(runner, StateAware)
+            self.console.print(f"  [dim]Runner {tool_name} is StateAware: {is_state_aware}[/dim]")
+
             if (
                 tool_name == "terraform"
                 and run_result["success"]
                 and isinstance(runner, StateAware)
             ):
-                terraform_ids = runner.get_resource_ids(provider)
-                # Update tracked resources with Terraform IDs
-                for resource_name, terraform_id in terraform_ids.items():
-                    if resource_name in resource_ids:
-                        db_resource_id = resource_ids[resource_name]
-                        self.state_manager.update_resource(
-                            resource_id=db_resource_id,
-                            terraform_id=terraform_id,
-                        )
+                # We only try to get resource IDs if the runner supports it.
+                # Since we removed get_resource_ids from BaseRunner, the protocol check
+                # now correctly identifies runners that actually implement it.
+                try:
+                    # Cast to StateAware to satisfy type checker
+                    # isinstance check above guarantees this is safe
+                    state_runner = cast(StateAware, runner)
+                    terraform_ids = state_runner.get_resource_ids(provider)
+                    self.console.print(f"  [dim]Got terraform IDs: {terraform_ids}[/dim]")
+                    # Update tracked resources with Terraform IDs
+                    for resource_name, terraform_id in terraform_ids.items():
+                        if resource_name in resource_ids:
+                            db_resource_id = resource_ids[resource_name]
+                            self.state_manager.update_resource(
+                                resource_id=db_resource_id,
+                                terraform_id=terraform_id,
+                            )
+                except NotImplementedError:
+                    pass  # Should be caught by protocol check, but safe guard
 
         # Update resource states to ACTIVE after successful apply
         for resource in resources:
