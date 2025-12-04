@@ -7,7 +7,10 @@ import sys
 import tarfile
 import urllib.request
 
+from rich.console import Console
 from doit.tools import title_with_actions
+
+console = Console()
 
 # Doit configuration
 DOIT_CONFIG = {
@@ -15,6 +18,10 @@ DOIT_CONFIG = {
     "default_tasks": ["list"],
 }
 
+def success_message():
+    console.print("\n[bold green]--------------------------[/bold green]"
+                    " All tasks succeeded! "
+                    "[bold green]--------------------------[/bold green]\n")
 
 # --- Setup / Install Tasks ---
 
@@ -137,6 +144,14 @@ def task_lint():
     }
 
 
+def task_type_check():
+    """Run ruff linter."""
+    return {
+        "actions": ["mypy src/"],
+        "title": title_with_actions,
+    }
+
+
 def task_format():
     """Format code with ruff."""
     return {
@@ -145,11 +160,19 @@ def task_format():
     }
 
 
-def task_check():
-    """Run all checks (lint + type check)."""
+def task_format_check():
+    """Format code with ruff."""
     return {
-        "actions": ["mypy src/"],
-        "task_dep": ["lint"],
+        "actions": ["ruff format --check src/ tests/"],
+        "title": title_with_actions,
+    }
+
+
+def task_check():
+    """Run all checks (lint + type check + format + coverage)."""
+    return {
+        "actions": [success_message],
+        "task_dep": ["format_check", "lint", "type_check", "coverage"],
         "title": title_with_actions,
     }
 
