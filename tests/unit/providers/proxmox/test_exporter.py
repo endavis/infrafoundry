@@ -213,7 +213,7 @@ class TestProxmoxConfigExporter:
                             "vmid": 100,
                             "name": "test-vm",
                             "cores": 2,
-                            "maxmem": 2147483648,
+                            "maxmem": 2147483648,  # 2GB in bytes
                             "status": "running",
                         }
                     ]
@@ -238,6 +238,8 @@ class TestProxmoxConfigExporter:
         assert vm_data["resources"][0]["provider"] == "proxmox"
         assert vm_data["resources"][0]["config"]["vmid"] == 100
         assert vm_data["resources"][0]["config"]["cores"] == 2
+        # Verify memory conversion: 2147483648 bytes = 2048 MiB
+        assert vm_data["resources"][0]["config"]["memory"] == 2048
 
     def test_export_vms_generates_name_when_missing(self, exporter):
         """Test that VM export generates name from vmid when name is missing."""
@@ -264,6 +266,36 @@ class TestProxmoxConfigExporter:
 
         vm_data = yaml.safe_load(result["pve1-vms.yaml"])
         assert vm_data["resources"][0]["name"] == "vm-100"
+
+    def test_export_vms_memory_conversion(self, exporter):
+        """Test that VM memory is correctly converted from bytes to MiB."""
+        nodes = [{"node": "pve1"}]
+
+        mock_response = Mock()
+        mock_response.raise_for_status = Mock()
+        mock_response.json.return_value = {
+            "data": [
+                {"vmid": 100, "name": "vm-2gb", "maxmem": 2147483648},  # 2GB = 2048 MiB
+                {"vmid": 101, "name": "vm-4gb", "maxmem": 4294967296},  # 4GB = 4096 MiB
+                {"vmid": 102, "name": "vm-512mb", "maxmem": 536870912},  # 512MB = 512 MiB
+                {"vmid": 103, "name": "vm-none", "maxmem": None},  # Should handle None
+            ]
+        }
+
+        mock_session = Mock()
+        mock_session.get.return_value = mock_response
+        exporter._session = mock_session
+
+        result = exporter._export_vms(nodes)
+
+        vm_data = yaml.safe_load(result["pve1-vms.yaml"])
+        assert len(vm_data["resources"]) == 4
+
+        # Verify conversions
+        assert vm_data["resources"][0]["config"]["memory"] == 2048
+        assert vm_data["resources"][1]["config"]["memory"] == 4096
+        assert vm_data["resources"][2]["config"]["memory"] == 512
+        assert vm_data["resources"][3]["config"]["memory"] is None
 
     def test_export_networks(self, exporter):
         """Test exporting networks."""

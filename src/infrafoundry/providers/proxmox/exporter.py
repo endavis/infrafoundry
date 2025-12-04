@@ -166,6 +166,8 @@ class ProxmoxConfigExporter:
     def _export_vms(self, nodes: list[dict[str, Any]]) -> dict[str, str]:
         """Export VM configurations from Proxmox nodes.
 
+        Note: Converts memory from bytes (Proxmox API) to MiB (Terraform).
+
         Args:
             nodes: List of node data dictionaries
 
@@ -179,6 +181,12 @@ class ProxmoxConfigExporter:
             vms = self._fetch(f"/nodes/{node_name}/qemu")
             vm_resources = []
             for vm in vms:
+                # Convert memory from bytes to MiB for Terraform compatibility
+                maxmem_bytes = vm.get("maxmem")
+                memory_mib = None
+                if maxmem_bytes is not None:
+                    memory_mib = maxmem_bytes // (1024 * 1024)
+
                 vm_resources.append(
                     {
                         "name": vm.get("name") or f"vm-{vm.get('vmid')}",
@@ -188,7 +196,7 @@ class ProxmoxConfigExporter:
                             "vmid": vm.get("vmid"),
                             "target_node": node_name,
                             "cores": vm.get("cores"),
-                            "memory": vm.get("maxmem"),
+                            "memory": memory_mib,
                             "status": vm.get("status"),
                         },
                     }
