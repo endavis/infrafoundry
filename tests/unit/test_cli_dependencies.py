@@ -57,3 +57,38 @@ def test_dependencies_list_output(monkeypatch):
     assert result.exit_code == 0
     assert "Batch 1" in result.output
     assert "proxmox:vm1" in result.output
+
+
+def test_dependencies_with_resource_flag(monkeypatch):
+    """Dependencies command with --resource shows specific resource analysis."""
+    runner = CliRunner()
+
+    class FakeGraph:
+        def get_all_dependencies(self, resource):
+            if resource == "proxmox:vm1":
+                return ["proxmox:net", "proxmox:storage"]
+            return []
+
+        def get_all_dependents(self, resource):
+            if resource == "proxmox:vm1":
+                return ["proxmox:vm2"]
+            return []
+
+    class FakeOrchestrator:
+        def build_dependency_graph(self, env):
+            return FakeGraph()
+
+    def fake_load_orchestrator(*args, **kwargs):
+        return FakeOrchestrator()
+
+    monkeypatch.setattr(cli_main, "_get_orchestrator", fake_load_orchestrator)
+
+    result = runner.invoke(main, ["dependencies", "--env", "dev", "--resource", "proxmox:vm1"])
+
+    assert result.exit_code == 0
+    assert "Dependency analysis for proxmox:vm1" in result.output
+    assert "proxmox:net" in result.output
+    assert "proxmox:storage" in result.output
+    assert "proxmox:vm2" in result.output
+    assert "Depends on:" in result.output
+    assert "Required by:" in result.output
