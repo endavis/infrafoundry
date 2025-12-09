@@ -22,10 +22,12 @@ class VaultwardenProvider(SecretProvider):
         Initialize Vaultwarden provider.
 
         Args:
-            session_key: BW_SESSION key. If None, expects it in environment.
+            session_key: BW_SESSION key. If None, tries environment BW_SESSION,
+                         or attempts auto-login if credentials are present.
         """
-        self.session_key = session_key
+        self.session_key = session_key or os.getenv("BW_SESSION")
         self._ensure_bw_installed()
+        self._authenticate_if_needed()
 
     def _ensure_bw_installed(self) -> None:
         """Check if bw CLI is installed."""
@@ -61,6 +63,69 @@ class VaultwardenProvider(SecretProvider):
             if "not found" in stderr:
                 raise SecretNotFoundError(f"Bitwarden item not found: {args}")
             raise SecretError(f"Bitwarden CLI error: {e.stderr}") from e
+
+    def _authenticate_if_needed(self) -> None:
+        """
+        Check status and authenticate/unlock if necessary.
+        """
+        try:
+            status_json = self._run_bw(["status"])
+            status = json.loads(status_json).get("status")
+        except Exception:
+            # If status fails, assume unauthenticated
+            status = "unauthenticated"
+
+        if status == "unlocked":
+            return
+
+        if status == "unauthenticated":
+            self._login()
+            status = "locked"
+
+        if status == "locked":
+            self._unlock()
+
+    def _login(self) -> None:
+        """Log in using API Key."""
+        client_id = os.getenv("BW_CLIENTID")
+        client_secret = os.getenv("BW_CLIENTSECRET")
+
+        if not client_id or not client_secret:
+            logger.debug("Cannot auto-login: BW_CLIENTID or BW_CLIENTSECRET missing")
+            return
+
+        logger.info("Logging into Bitwarden/Vaultwarden...")
+        try:
+            # bw login --apikey uses the env vars
+            self._run_bw(["login", "--apikey"])
+        except Exception as e:
+            raise SecretError(f"Failed to login to Bitwarden: {e}") from e
+
+    def _unlock(self) -> None:
+        """Unlock the vault using password."""
+        if self.session_key:
+            # If we have a session key but status says locked, maybe key is invalid?
+            # Or we are just checking.
+            return
+
+        password = os.getenv("BW_PASSWORD")
+        if not password:
+            if os.getenv("CI"):
+                raise SecretError(
+                    "Vault is locked and BW_PASSWORD is not set. Cannot unlock in CI environment."
+                )
+            logger.debug("Vault is locked and BW_PASSWORD missing. Skipping auto-unlock.")
+            return
+
+        logger.info("Unlocking Bitwarden/Vaultwarden vault...")
+        try:
+            # bw unlock <password> --raw returns just the session key
+            key = self._run_bw(["unlock", password, "--raw"])
+            self.session_key = key.strip()
+            # Export to env so subsequent calls use it
+            os.environ["BW_SESSION"] = self.session_key
+        except Exception as e:
+            raise SecretError(f"Failed to unlock vault: {e}") from e
 
     def load_secret(self, location: str | Path) -> dict[str, Any]:
         """
