@@ -15,6 +15,9 @@ This index provides a structured overview of the available documentation.
 - **[Settings File Structure](configuration/settings-file-structure.md)**: Detailed specification of the settings file layout.
 - **[YAML Only Config](configuration/yaml-only-config.md)**: Guide to using the pure YAML configuration approach.
 - **[Per-Environment Credentials](configuration/per-environment-credentials.md)**: Managing credentials specific to different environments.
+- **[Secret Provider: Vaultwarden](configuration/secrets-vaultwarden.md)**: Using Vaultwarden/Bitwarden for secrets.
+- **[Secret Provider: AWS](configuration/secrets-aws.md)**: Using AWS Secrets Manager for secrets.
+- **[Secret Provider: Azure](configuration/secrets-azure.md)**: Using Azure Key Vault for secrets.
 - **[Policy Configuration](configuration/policy-configuration.md)**: Defining and enforcing infrastructure policies.
 - **[Separate Config Repo](configuration/separate-config-repo.md)**: Best practices for maintaining configurations in a separate repository.
 - **[Notifications](configuration/notifications.md)**: Setting up and customizing system notifications.
