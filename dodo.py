@@ -18,10 +18,14 @@ DOIT_CONFIG = {
     "default_tasks": ["list"],
 }
 
+
 def success_message():
-    console.print("\n[bold green]--------------------------[/bold green]"
-                    " All tasks succeeded! "
-                    "[bold green]--------------------------[/bold green]\n")
+    console.print(
+        "\n[bold green]--------------------------[/bold green]"
+        " All tasks succeeded! "
+        "[bold green]--------------------------[/bold green]\n"
+    )
+
 
 # --- Setup / Install Tasks ---
 
@@ -214,9 +218,6 @@ def _run_cmd_internal(cmd, shell=True, check=True):
     """Internal helper to run shell commands within python actions."""
     print(f"Executing: {cmd}")  # Print the command here.
     subprocess.run(cmd, shell=shell, check=check)
-
-
-
 
 
 def _install_direnv():
@@ -431,8 +432,10 @@ def task_install_ansible():
     def install_ansible():
         # uv is assumed to be installed
         # Check if we're in a virtual environment or need --system
-        in_venv = os.environ.get("VIRTUAL_ENV") or hasattr(sys, "real_prefix") or (
-            hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+        in_venv = (
+            os.environ.get("VIRTUAL_ENV")
+            or hasattr(sys, "real_prefix")
+            or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
         )
         system_flag = "" if in_venv else "--system"
 
