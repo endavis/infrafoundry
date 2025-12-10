@@ -260,6 +260,7 @@ List any breaking changes or "None"
 - [ ] CI checks passing (tests, lint, type checking)
 - [ ] Commit messages follow format guidelines
 - [ ] PR title follows format guidelines
+- [ ] Documentation updated
 
 **Authors should:**
 - Self-review code before submitting
@@ -347,19 +348,18 @@ be awaited. Update all custom providers to use async def.
 - **Tests**: All pytest tests pass, ≥69% coverage maintained
 - **Lint**: ruff checks pass with no errors
 - **Type checking**: mypy passes with no type errors
-- **Format**: Black formatting applied
+- **Format**: ruff formatting applied
 - **Pre-commit hooks**: All hooks pass
 
 ### Running CI Checks Locally
 ```bash
 # Run all checks
-doit lint test
+doit check coverage
 
 # Individual checks
-uv run pytest --cov=src/infrafoundry
-uv run ruff check .
-uv run mypy src/infrafoundry
-uv run black --check .
+doit lint
+doit format
+doit coverage
 ```
 
 ### CI Workflow

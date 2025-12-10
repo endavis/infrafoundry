@@ -13,7 +13,7 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 
 ### Security
 - [ ] **Secrets rotation** [Complexity: 9/10]: `infra secrets rotate` to re-encrypt/update secrets. ([Issue](https://github.com/endavis/infrafoundry/issues/33))
-- [ ] **External vault integration** [Complexity: 7/10]: Expand `SecretProvider` implementations for Vault/AWS and others. ([Issue](https://github.com/endavis/infrafoundry/issues/34))
+- [x] **External vault integration** [Complexity: 7/10]: Expand `SecretProvider` implementations for Vault/AWS and others. ([Issue](https://github.com/endavis/infrafoundry/issues/34))
 
 ---
 
