@@ -86,7 +86,9 @@ class Orchestrator:
 
         # Provider and runner management
         self.provider_registry = ProviderRegistryService(
-            base_output_dir=self.output_dir, runner_registry_factory=RunnerRegistry
+            base_output_dir=self.output_dir,
+            config_manager=self.config_manager,
+            runner_registry_factory=RunnerRegistry,
         )
         self._providers = self.provider_registry.providers
         self.runner_registry = self.provider_registry.runner_registry
