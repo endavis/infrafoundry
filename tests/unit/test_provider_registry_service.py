@@ -1,7 +1,7 @@
 """Unit tests for ProviderRegistryService."""
 
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.provider import ProviderBase
@@ -93,12 +93,30 @@ class TestProviderRegistryService:
         mock_registry = Mock(spec=RunnerRegistry)
         factory = Mock(return_value=mock_registry)
 
-        ProviderRegistryService(
-            base_output_dir=tmp_path,
-            config_manager=config_manager,
-            runner_registry_factory=factory,
-        )
+        with patch.dict("os.environ", {}, clear=True):
+            ProviderRegistryService(
+                base_output_dir=tmp_path,
+                config_manager=config_manager,
+                runner_registry_factory=factory,
+            )
 
         # Verify registration calls
         # We expect register to be called for TerraformRunner, AnsibleRunner, PyInfraRunner
         assert mock_registry.register.call_count == 3
+
+    def test_register_experimental_runners(self, tmp_path):
+        """Test that experimental runners are registered when enabled."""
+        config_manager = Mock(spec=ConfigManager)
+        mock_registry = Mock(spec=RunnerRegistry)
+        factory = Mock(return_value=mock_registry)
+
+        with patch.dict("os.environ", {"INFRA_ENABLE_EXPERIMENTAL": "1"}):
+            ProviderRegistryService(
+                base_output_dir=tmp_path,
+                config_manager=config_manager,
+                runner_registry_factory=factory,
+            )
+
+        # We expect register to be called for TerraformRunner, AnsibleRunner,
+        # PyInfraRunner, PulumiRunner
+        assert mock_registry.register.call_count == 4

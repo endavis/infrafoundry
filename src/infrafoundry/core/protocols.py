@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from jinja2 import Template
 
+from infrafoundry.core.result_types import ApplyResult, DestroyResult, DriftInfo, PlanResult
+
 if TYPE_CHECKING:
     from infrafoundry.core.provider import ProviderBase, ResourceConfig
 
@@ -116,11 +118,11 @@ class Plannable(Protocol):
     Runners supporting plan operations (like Terraform) satisfy this protocol.
 
     Example:
-        >>> def create_plan(runner: Plannable, provider: ProviderBase) -> dict:
+        >>> def create_plan(runner: Plannable, provider: ProviderBase) -> PlanResult:
         ...     return runner.plan(provider)
     """
 
-    def plan(self, provider: "ProviderBase", **kwargs: Any) -> dict[str, Any]:
+    def plan(self, provider: "ProviderBase", **kwargs: Any) -> PlanResult:
         """Generate an execution plan.
 
         Args:
@@ -128,7 +130,7 @@ class Plannable(Protocol):
             **kwargs: Additional plan options
 
         Returns:
-            Plan result dictionary
+            Plan result with success flag and optional changes info
         """
         ...
 
@@ -140,19 +142,23 @@ class Applyable(Protocol):
     All runners supporting apply operations satisfy this protocol.
 
     Example:
-        >>> def apply_changes(runner: Applyable, provider: ProviderBase) -> dict:
+        >>> def apply_changes(runner: Applyable, provider: ProviderBase) -> ApplyResult:
         ...     return runner.apply(provider, auto_approve=True)
     """
 
-    def apply(self, provider: "ProviderBase", **kwargs: Any) -> dict[str, Any]:
+    def apply(
+        self, provider: "ProviderBase", auto_approve: bool = True, **kwargs: Any
+    ) -> ApplyResult:
         """Apply infrastructure changes.
 
         Args:
             provider: Provider instance to apply
-            **kwargs: Additional apply options (e.g., auto_approve)
+            auto_approve: Whether to auto-approve changes (default: True)
+                         Interpretation is runner-specific (e.g., Ansible uses for check mode)
+            **kwargs: Additional apply options
 
         Returns:
-            Apply result dictionary
+            Apply result with success flag and optional resource counts
         """
         ...
 
@@ -164,19 +170,22 @@ class Destroyable(Protocol):
     All runners supporting destroy operations satisfy this protocol.
 
     Example:
-        >>> def cleanup(runner: Destroyable, provider: ProviderBase) -> dict:
+        >>> def cleanup(runner: Destroyable, provider: ProviderBase) -> DestroyResult:
         ...     return runner.destroy(provider, auto_approve=True)
     """
 
-    def destroy(self, provider: "ProviderBase", **kwargs: Any) -> dict[str, Any]:
+    def destroy(
+        self, provider: "ProviderBase", auto_approve: bool = True, **kwargs: Any
+    ) -> DestroyResult:
         """Destroy infrastructure resources.
 
         Args:
             provider: Provider instance to destroy
+            auto_approve: Whether to auto-approve destruction (default: True)
             **kwargs: Additional destroy options
 
         Returns:
-            Destroy result dictionary
+            Destroy result with success flag and optional resource counts
         """
         ...
 
@@ -188,18 +197,18 @@ class DriftDetectable(Protocol):
     Runners supporting drift detection (like Terraform) satisfy this protocol.
 
     Example:
-        >>> def check_drift(runner: DriftDetectable, plan: dict) -> dict:
+        >>> def check_drift(runner: DriftDetectable, plan: PlanResult) -> DriftInfo:
         ...     return runner.parse_plan_for_drift(plan)
     """
 
-    def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
+    def parse_plan_for_drift(self, plan_result: PlanResult) -> DriftInfo:
         """Parse plan output to detect configuration drift.
 
         Args:
             plan_result: Plan result to analyze for drift
 
         Returns:
-            Dictionary with drift information (changes, additions, deletions)
+            Drift information with has_changes flag and summary
         """
         ...
 

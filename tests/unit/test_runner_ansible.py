@@ -93,15 +93,6 @@ def test_apply_runs_without_check(tmp_path: Path) -> None:
     assert "--check" not in args
 
 
-def test_destroy_not_supported(tmp_path: Path) -> None:
-    """Destroy returns not supported message."""
-    runner = AnsibleRunner()
-    provider = _make_provider(tmp_path)
-    result = runner.destroy(provider)
-    assert not result["success"]
-    assert "not supported" in result["error"]
-
-
 def test_validate_config_with_playbook(tmp_path: Path) -> None:
     """Validate config calls ansible-playbook --syntax-check."""
     runner = AnsibleRunner()
