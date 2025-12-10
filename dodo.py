@@ -7,13 +7,24 @@ import sys
 import tarfile
 import urllib.request
 
+from rich.console import Console
 from doit.tools import title_with_actions
+
+console = Console()
 
 # Doit configuration
 DOIT_CONFIG = {
     "verbosity": 2,
     "default_tasks": ["list"],
 }
+
+
+def success_message():
+    console.print(
+        "\n[bold green]--------------------------[/bold green]"
+        " All tasks succeeded! "
+        "[bold green]--------------------------[/bold green]\n"
+    )
 
 
 # --- Setup / Install Tasks ---
@@ -137,6 +148,14 @@ def task_lint():
     }
 
 
+def task_type_check():
+    """Run ruff linter."""
+    return {
+        "actions": ["mypy src/"],
+        "title": title_with_actions,
+    }
+
+
 def task_format():
     """Format code with ruff."""
     return {
@@ -145,11 +164,19 @@ def task_format():
     }
 
 
-def task_check():
-    """Run all checks (lint + type check)."""
+def task_format_check():
+    """Format code with ruff."""
     return {
-        "actions": ["mypy src/"],
-        "task_dep": ["lint"],
+        "actions": ["ruff format --check src/ tests/"],
+        "title": title_with_actions,
+    }
+
+
+def task_check():
+    """Run all checks (lint + type check + format + coverage)."""
+    return {
+        "actions": [success_message],
+        "task_dep": ["format_check", "lint", "type_check", "coverage"],
         "title": title_with_actions,
     }
 
@@ -191,9 +218,6 @@ def _run_cmd_internal(cmd, shell=True, check=True):
     """Internal helper to run shell commands within python actions."""
     print(f"Executing: {cmd}")  # Print the command here.
     subprocess.run(cmd, shell=shell, check=check)
-
-
-
 
 
 def _install_direnv():
@@ -408,8 +432,10 @@ def task_install_ansible():
     def install_ansible():
         # uv is assumed to be installed
         # Check if we're in a virtual environment or need --system
-        in_venv = os.environ.get("VIRTUAL_ENV") or hasattr(sys, "real_prefix") or (
-            hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+        in_venv = (
+            os.environ.get("VIRTUAL_ENV")
+            or hasattr(sys, "real_prefix")
+            or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
         )
         system_flag = "" if in_venv else "--system"
 

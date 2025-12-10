@@ -14,6 +14,7 @@ from rich.table import Table
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.protocols import Destroyable, Plannable
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
@@ -370,12 +371,18 @@ class PlanOrchestrator:
                     for tool_name, runner in self._get_sorted_runners(runner_priorities):
                         generate_method = getattr(provider, f"generate_{tool_name}", None)
                         if generate_method and callable(generate_method):
+                            if not isinstance(runner, Plannable):
+                                self.console.print(
+                                    f"  [dim]Skipping {tool_name}: does not support plan[/dim]"
+                                )
+                                continue
+
                             self.console.print(
                                 f"  [dim]Generating {tool_name} configuration...[/dim]"
                             )
                             generate_method(provider_resources)
                             self.console.print(f"  [dim]Running {tool_name} plan...[/dim]")
-                            runner_result = runner.run(provider, "plan", auto_approve=False)
+                            runner_result = runner.plan(provider)
                             provider_results[f"{tool_name}_plan"] = runner_result
                         else:
                             self.console.print(
@@ -815,8 +822,14 @@ class DestroyOrchestrator:
 
                 provider_results: dict[str, Any] = {}
                 for tool_name, runner in self.runners.items():
+                    if not isinstance(runner, Destroyable):
+                        self.console.print(
+                            f"  [dim]Skipping {tool_name}: does not support destroy[/dim]"
+                        )
+                        continue
+
                     self.console.print(f"  [dim]Running {tool_name} destroy...[/dim]")
-                    runner_result = runner.run(provider, "destroy", auto_approve)
+                    runner_result = runner.destroy(provider, auto_approve=auto_approve)
                     provider_results[tool_name] = runner_result
 
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)

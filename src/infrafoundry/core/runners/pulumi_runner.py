@@ -92,7 +92,6 @@ class PulumiRunner(BaseRunner):
 
         return {"success": False, "error": "Unknown error"}
 
-    @override
     def plan(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Generate Pulumi preview (plan).
 
@@ -124,7 +123,6 @@ class PulumiRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": str(e)}
 
-    @override
     def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Apply Pulumi program.
 
@@ -155,7 +153,6 @@ class PulumiRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": str(e)}
 
-    @override
     def destroy(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Destroy Pulumi-managed infrastructure.
 
@@ -218,30 +215,6 @@ class PulumiRunner(BaseRunner):
 
         return {"valid": True, "message": "Pulumi configuration valid"}
 
-    @override
-    def run(
-        self, provider: ProviderBase, command: str, auto_approve: bool = False
-    ) -> dict[str, Any]:
-        """Run Pulumi command for a provider.
-
-        Args:
-            provider: Provider instance
-            command: Command to run ('preview', 'up', 'destroy')
-            auto_approve: Whether to auto-approve changes
-
-        Returns:
-            Dict with command results
-        """
-        if command == "plan":
-            return self.plan(provider)
-        elif command == "apply":
-            return self.apply(provider, auto_approve=auto_approve)
-        elif command == "destroy":
-            return self.destroy(provider, auto_approve=auto_approve)
-        else:
-            return {"success": False, "error": f"Unknown command: {command}"}
-
-    @override
     def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
         """Get resource IDs from Pulumi state.
 
@@ -272,7 +245,6 @@ class PulumiRunner(BaseRunner):
         except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError):
             return {}
 
-    @override
     def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
         """Parse Pulumi preview for drift.
 

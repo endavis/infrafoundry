@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from infrafoundry.core.provider import ProviderBase
-from infrafoundry.core.runners import AnsibleRunner, PyInfraRunner, RunnerRegistry, TerraformRunner
+from infrafoundry.core.runners import (
+    AnsibleRunner,
+    PulumiRunner,
+    PyInfraRunner,
+    RunnerRegistry,
+    TerraformRunner,
+)
 
 if TYPE_CHECKING:
     from infrafoundry.core.config import ConfigManager
@@ -49,3 +56,6 @@ class ProviderRegistryService:
         self.runner_registry.register(TerraformRunner)
         self.runner_registry.register(AnsibleRunner)
         self.runner_registry.register(PyInfraRunner)
+        # Register experimental runners if enabled
+        if os.getenv("INFRA_ENABLE_EXPERIMENTAL"):
+            self.runner_registry.register(PulumiRunner)

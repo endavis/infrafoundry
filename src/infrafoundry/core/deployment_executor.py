@@ -1,12 +1,13 @@
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
+from typing import Any, cast
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.protocols import Applyable, StateAware
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
@@ -273,18 +274,25 @@ class DeploymentExecutor:
         terraform_ids: dict[str, str] = {}
 
         for tool_name, runner in self._get_sorted_runners():
+            if not isinstance(runner, Applyable):
+                self.console.print(f"  [dim]Skipping {tool_name}: does not support apply[/dim]")
+                continue
+
             self.console.print(f"  [dim]Running {tool_name} apply...[/dim]")
 
-            command = "apply"
-            if tool_name == "ansible" and not auto_approve:
-                # Ansible's 'apply' with auto_approve=False implies check mode (plan)
-                command = "plan"
-
-            run_result = runner.run(provider, command, auto_approve)
+            # Ansible interprets auto_approve=False as check mode (dry-run)
+            # Other runners use it to skip confirmation prompts
+            run_result = runner.apply(provider, auto_approve=auto_approve)
             runner_results[tool_name] = run_result
 
-            if tool_name == "terraform" and run_result["success"]:
-                terraform_ids = runner.get_resource_ids(provider)
+            # Update state with Terraform resource IDs if available
+            if (
+                tool_name == "terraform"
+                and run_result["success"]
+                and isinstance(runner, StateAware)
+            ):
+                state_runner = cast(StateAware, runner)
+                terraform_ids = state_runner.get_resource_ids(provider)
                 # Update tracked resources with Terraform IDs
                 for resource_name, terraform_id in terraform_ids.items():
                     if resource_name in resource_ids:

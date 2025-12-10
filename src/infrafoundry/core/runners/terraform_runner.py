@@ -72,7 +72,6 @@ class TerraformRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": str(e), "output": e.stderr}
 
-    @override
     def plan(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Generate Terraform execution plan.
 
@@ -85,7 +84,6 @@ class TerraformRunner(BaseRunner):
         """
         return self._run_terraform(provider, "plan", **kwargs)
 
-    @override
     def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Apply Terraform configuration.
 
@@ -99,7 +97,6 @@ class TerraformRunner(BaseRunner):
         auto_approve = kwargs.get("auto_approve", False)
         return self._run_terraform(provider, "apply", auto_approve=auto_approve)
 
-    @override
     def destroy(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Destroy Terraform-managed infrastructure.
 
@@ -155,21 +152,6 @@ class TerraformRunner(BaseRunner):
             }
         except subprocess.CalledProcessError as e:
             return {"valid": False, "error": str(e)}
-
-    def run(
-        self, provider: ProviderBase, command: str, auto_approve: bool = False
-    ) -> dict[str, Any]:
-        """Run Terraform command for a provider (legacy compatibility).
-
-        Args:
-            provider: Provider instance
-            command: Terraform command (plan, apply, destroy)
-            auto_approve: If True, add -auto-approve flag
-
-        Returns:
-            Dict with command results including exit_code and success
-        """
-        return self._run_terraform(provider, command, auto_approve=auto_approve)
 
     def _run_terraform(
         self, provider: ProviderBase, command: str, auto_approve: bool = False

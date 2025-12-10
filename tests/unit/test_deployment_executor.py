@@ -24,8 +24,13 @@ def test_apply_serial_orders_providers_and_tracks_states():
     runner_registry.list_runners.return_value = ["terraform"]
     tf_runner = MagicMock()
     tf_runner.priority = 0
-    tf_runner.run.return_value = {"success": True}
-    tf_runner.get_resource_ids.return_value = {"vm1": "proxmox_vm.vm1"}
+
+    # Set protocol methods with return values
+    tf_runner.apply = MagicMock(return_value={"success": True})
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={"vm1": "proxmox_vm.vm1"})
+
     runner_registry.create_runner.return_value = tf_runner
 
     state_manager = MagicMock()
@@ -91,6 +96,11 @@ def test_apply_parallel_uses_executor_and_handles_runner_errors():
     runner_registry.list_runners.return_value = ["terraform"]
     tf_runner = MagicMock()
     tf_runner.priority = 0
+    # Ensure protocol checks pass
+    tf_runner.apply = MagicMock()
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock()
 
     def create_runner(name, console=None):
         return tf_runner
@@ -109,12 +119,12 @@ def test_apply_parallel_uses_executor_and_handles_runner_errors():
         "opnsense": [_resource("fw1", provider="opnsense")],
     }
 
-    def runner_run(provider, command, auto_approve):
+    def runner_apply(provider, auto_approve=True):
         if provider is provider_err:
             raise RuntimeError("boom")
         return {"success": True}
 
-    tf_runner.run.side_effect = runner_run
+    tf_runner.apply.side_effect = runner_apply
 
     executor = DeploymentExecutor(
         runner_registry=runner_registry,
@@ -144,12 +154,21 @@ def test_apply_single_provider_tracks_resources_and_emits_events():
 
     tf_runner = MagicMock()
     tf_runner.priority = 0
-    tf_runner.run.return_value = {"success": True}
-    tf_runner.get_resource_ids.return_value = {"vm1": "proxmox_vm.vm1", "vm2": "proxmox_vm.vm2"}
+
+    # Set protocol methods with return values
+    tf_runner.apply = MagicMock(return_value={"success": True})
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(
+        return_value={"vm1": "proxmox_vm.vm1", "vm2": "proxmox_vm.vm2"}
+    )
 
     ansible_runner = MagicMock()
     ansible_runner.priority = 50
-    ansible_runner.run.return_value = {"success": True}
+    # Ansible supports apply/plan but not destroy/state
+    ansible_runner.apply = MagicMock(return_value={"success": True})
+    ansible_runner.plan = MagicMock()
+    # Not setting get_resource_ids/destroy for ansible_runner
 
     def create_runner(name, console=None):
         return tf_runner if name == "terraform" else ansible_runner
@@ -239,21 +258,26 @@ def test_apply_single_provider_runs_runners_in_priority_order():
     tf_runner = MagicMock()
     tf_runner.priority = 0
 
-    def tf_run(provider, command, auto_approve):
+    # Set protocol methods with side effects for execution tracking
+    def tf_apply(provider, auto_approve=True):
         execution_order.append("terraform")
         return {"success": True}
 
-    tf_runner.run.side_effect = tf_run
-    tf_runner.get_resource_ids.return_value = {}
+    tf_runner.apply = MagicMock(side_effect=tf_apply)
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={})
 
     ansible_runner = MagicMock()
     ansible_runner.priority = 50
 
-    def ansible_run(provider, command, auto_approve):
+    def ansible_apply(provider, auto_approve=True):
         execution_order.append("ansible")
         return {"success": True}
 
-    ansible_runner.run.side_effect = ansible_run
+    # Ansible supports apply/plan
+    ansible_runner.apply = MagicMock(side_effect=ansible_apply)
+    ansible_runner.plan = MagicMock()
 
     def create_runner(name, console=None):
         return tf_runner if name == "terraform" else ansible_runner
@@ -370,7 +394,11 @@ def test_apply_parallel_with_all_providers_failing():
 
     tf_runner = MagicMock()
     tf_runner.priority = 0
-    tf_runner.run.side_effect = RuntimeError("Connection timeout")
+    # Set protocol methods - apply raises error
+    tf_runner.apply = MagicMock(side_effect=RuntimeError("Connection timeout"))
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock()
 
     runner_registry.create_runner.return_value = tf_runner
 
@@ -417,8 +445,11 @@ def test_apply_single_provider_handles_multiple_resources():
 
     tf_runner = MagicMock()
     tf_runner.priority = 0
-    tf_runner.run.return_value = {"success": True}
-    tf_runner.get_resource_ids.return_value = {}
+    # Set protocol methods with return values
+    tf_runner.apply = MagicMock(return_value={"success": True})
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={})
 
     runner_registry.create_runner.return_value = tf_runner
 
