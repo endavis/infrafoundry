@@ -35,6 +35,10 @@ This index provides a structured overview of the available documentation.
 - **[Design Principles Assessment](architecture/design-principles-assessment.md)**: Evaluation of the architecture against the design principles.
 - **[Architectural Patterns](architecture/architectural-patterns.md)**: Common software patterns employed in the codebase.
 - **[Architecture Decision Records](architecture/decisions/README.md)**: Historical record of key architectural decisions.
+  - [ADR-0001: Repository Pattern for State](architecture/decisions/0001-repository-pattern-for-state.md)
+  - [ADR-0002: Mixin Pattern for Providers](architecture/decisions/0002-mixin-pattern-for-providers.md)
+  - [ADR-0003: Granular Event Types](architecture/decisions/0003-granular-event-types.md)
+  - [ADR-0004: Protocol-Based Runner Interfaces](architecture/decisions/0004-protocol-based-runner-interfaces.md)
 
 ## Guides
 - **[ISC to Kea Migration](guides/isc-to-kea-migration.md)**: Walkthrough for migrating DHCP services from ISC to Kea.
@@ -44,6 +48,8 @@ This index provides a structured overview of the available documentation.
 
 ## Development
 - **[Implementing Providers](development/implementing-providers.md)**: Guide for creating new providers for InfraFoundry.
+- **[Implementing Runners](development/implementing-runners.md)**: Comprehensive guide for creating custom infrastructure tool runners.
+- **[Runner Protocol Quick Reference](development/runner-protocol-quick-reference.md)**: Quick reference for protocol-based runner system.
 - **[Manager Patterns](development/manager-patterns.md)**: implementation patterns for Manager classes.
 - **[Event System](development/event-system.md)**: Documentation of the internal event system.
 - **[Credential Loader](development/credential-loader-system.md)**: How the credential loading system works.
@@ -61,6 +67,7 @@ This index provides a structured overview of the available documentation.
 - **[Env Example](examples/ENV_EXAMPLE.md)**: Annotated example of environment configuration.
 - **[Envrc Local](examples/ENVRC_LOCAL.md)**: Example usage of local environment variables.
 - **[Gitlab CI](examples/GITLAB_CI_EXAMPLE.md)**: Example GitLab CI workflow configuration.
+- **[Custom Runner Example](examples/custom-runner-example.md)**: Complete example of implementing a CloudFormation runner.
 
 ## Tools
 - **[OpnSense Parser](tools/opnsense-parser.md)**: Documentation for the OpnSense configuration parser.
