@@ -93,7 +93,7 @@ InfraFoundry can align OPNsense DHCP static mappings with Proxmox VMs so VMs use
 
 ---
 
-Last updated: 2025-11-29 14:12 GMT
+Last updated: 2025-12-23 14:12 GMT
 
 
 ---

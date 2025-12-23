@@ -104,7 +104,7 @@ InfraFoundry uses **pure YAML** for all environment, resource, and credential co
 
 ---
 
-Last updated: 2025-11-29 14:19 GMT
+Last updated: 2025-12-23 14:19 GMT
 
 
 ---

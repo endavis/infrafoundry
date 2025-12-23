@@ -88,7 +88,7 @@ Age keys secure SOPS-encrypted secrets in InfraFoundry. This guide outlines how 
 
 ---
 
-Last updated: 2025-11-29 14:12 GMT
+Last updated: 2025-12-23 14:12 GMT
 
 **Cons:**
 - Additional infrastructure
