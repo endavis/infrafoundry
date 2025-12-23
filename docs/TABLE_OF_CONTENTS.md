@@ -62,6 +62,7 @@ This index provides a structured overview of the available documentation.
 - **[Ansible](runners/ansible.md)**: Specifics of the Ansible runner implementation.
 - **[Terraform](runners/terraform.md)**: Specifics of the Terraform runner implementation.
 - **[PyInfra](runners/pyinfra.md)**: Specifics of the PyInfra runner implementation.
+- **[Pulumi](runners/pulumi.md)**: Specifics of the Pulumi runner implementation (experimental).
 
 ## Examples
 - **[Env Example](examples/ENV_EXAMPLE.md)**: Annotated example of environment configuration.

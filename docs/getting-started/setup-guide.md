@@ -92,7 +92,7 @@ This guide helps you stand up InfraFoundry with Proxmox and OPNsense, covering b
 
 ---
 
-Last updated: 2025-11-29 14:12 GMT
+Last updated: 2025-12-23 14:12 GMT
 
 
 ---

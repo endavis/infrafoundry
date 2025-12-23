@@ -102,8 +102,9 @@ sequenceDiagram
                 PlanOrchestrator->>Provider: generate_{tool}(resources)
                 Provider-->>PlanOrchestrator: config generated
 
-                PlanOrchestrator->>Runner: run(provider, "plan", auto_approve=False)
-                Runner-->>PlanOrchestrator: runner_result
+                Note over PlanOrchestrator,Runner: Check if isinstance(runner, Plannable)
+                PlanOrchestrator->>Runner: plan(provider)
+                Runner-->>PlanOrchestrator: PlanResult
             end
         end
     end
@@ -169,8 +170,9 @@ sequenceDiagram
                 ApplyOrchestrator->>Provider: generate_{tool}(resources)
                 Provider-->>ApplyOrchestrator: config generated
 
-                ApplyOrchestrator->>Runner: run(provider, "apply", auto_approve)
-                Runner-->>ApplyOrchestrator: runner_result
+                Note over ApplyOrchestrator,Runner: Check if isinstance(runner, Applyable)
+                ApplyOrchestrator->>Runner: apply(provider, auto_approve)
+                Runner-->>ApplyOrchestrator: ApplyResult
             end
 
             ApplyOrchestrator->>StateManager: update_resource_state(resource_id, DEPLOYED)
@@ -232,7 +234,8 @@ sequenceDiagram
     loop for each provider
         ApplyOrchestrator->>Provider: set_environment(env_name)
         ApplyOrchestrator->>Provider: generate_{tool}(resources)
-        ApplyOrchestrator->>Runner: run(provider, "apply", True)
+        Note over ApplyOrchestrator,Runner: Check if isinstance(runner, Applyable)
+        ApplyOrchestrator->>Runner: apply(provider, auto_approve=True)
     end
 
     ApplyOrchestrator-->>RollbackOrchestrator: results
@@ -281,7 +284,7 @@ sequenceDiagram
 
 ---
 
-Last updated: 2025-12-02
+Last updated: 2025-12-23
 
 
 ---

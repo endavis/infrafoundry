@@ -70,7 +70,7 @@ event_manager.emit_event(EventType.RESOURCE_CREATED, environment="prod", data={"
 
 ---
 
-Last updated: 2025-11-29 14:27 GMT
+Last updated: 2025-12-23 14:27 GMT
 
 
 ---
