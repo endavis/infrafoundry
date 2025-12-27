@@ -21,6 +21,8 @@ def _create_backend_group() -> click.Group:
 
 # Create the backend group
 _backend = _create_backend_group()
+# Export for command loader
+backend = _backend
 
 
 @_backend.command("validate")
