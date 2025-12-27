@@ -149,7 +149,7 @@ def task_lint():
 
 
 def task_type_check():
-    """Run ruff linter."""
+    """Run mypy for type checking."""
     return {
         "actions": ["mypy src/"],
         "title": title_with_actions,
@@ -165,7 +165,7 @@ def task_format():
 
 
 def task_format_check():
-    """Format code with ruff."""
+    """Check code formatting with ruff."""
     return {
         "actions": ["ruff format --check src/ tests/"],
         "title": title_with_actions,
