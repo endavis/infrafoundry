@@ -12,7 +12,7 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 - [ ] **Cost estimation** [Complexity: 6/10]: Integrate Infracost; budget-aware policies. ([Issue](https://github.com/endavis/infrafoundry/issues/32))
 
 ### Security
-- [ ] **Secrets rotation** [Complexity: 9/10]: `infra secrets rotate` to re-encrypt/update secrets. ([Issue](https://github.com/endavis/infrafoundry/issues/33))
+- [x] **Secrets rotation** [Complexity: 9/10]: `infra secrets rotate` to re-encrypt/update secrets. ([Issue](https://github.com/endavis/infrafoundry/issues/33))
 - [x] **External vault integration** [Complexity: 7/10]: Expand `SecretProvider` implementations for Vault/AWS and others. ([Issue](https://github.com/endavis/infrafoundry/issues/34))
 
 ---
