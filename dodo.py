@@ -57,8 +57,12 @@ def task_cleanup():
             ".pytest_cache",
             ".mypy_cache",
             ".ruff_cache",
+            "htmlcov",
+            ".coverage",
+            "coverage.xml",
             "tmp/htmlcov",
             "tmp/.coverage",
+            "tmp/coverage.xml",
             "tmp/.pytest_cache",
             "tmp/.mypy_cache",
             "tmp/.ruff_cache",
@@ -101,14 +105,14 @@ def task_coverage():
     """Run tests with full coverage report."""
     cmd = (
         "pytest --cov=src/infrafoundry --cov-report=term-missing "
-        "--cov-report=html:tmp/htmlcov --cov-report=xml:tmp/coverage.xml -v"
+        "--cov-report=html:htmlcov --cov-report=xml:coverage.xml -v"
     )
     return {
         "actions": [
             cmd,
             lambda: print(
-                "\nCoverage report generated:\n  HTML: tmp/htmlcov/index.html\n"
-                "  XML:  tmp/coverage.xml\n\n"
+                "\nCoverage report generated:\n  HTML: htmlcov/index.html\n"
+                "  XML:  coverage.xml\n\n"
                 "Target: 90% coverage"
             ),
         ],
