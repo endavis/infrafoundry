@@ -36,6 +36,9 @@ class KubernetesProvider(
         """Generate Terraform configuration for Kubernetes resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
 
+        # Generate backend configuration if remote backend is configured
+        self.render_backend()
+
         # Generate provider and variables configuration
         self.render_provider_and_variables()
 

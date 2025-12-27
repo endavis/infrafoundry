@@ -49,6 +49,9 @@ class OPNsenseProvider(
         """Generate Terraform configuration for OPNsense resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
 
+        # Generate backend configuration if remote backend is configured
+        self.render_backend()
+
         # Generate provider configuration
         self.render_provider_and_variables()
 

@@ -63,6 +63,9 @@ class ProxmoxProvider(
         """Generate Terraform configuration for Proxmox resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
 
+        # Generate backend configuration if remote backend is configured
+        self.render_backend()
+
         # Generate provider configuration with environment context
         self.render_provider_and_variables(
             variables_context={"default_ssh_user": os.getenv("USER", "root")},
