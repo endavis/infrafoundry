@@ -74,9 +74,13 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
   ```
 - **Schema hints:**
   - `providers` (optional, list[str]): List of provider names to enable. If omitted, all registered providers are enabled.
+  - `runner_priorities` (optional, dict[str, int]): Override default runner execution priorities. See [Runner Execution Overview](../runners/overview.md) for details.
   - `ssh.user`/`key_path`/`port` (optional, defaults to current user and port 22).
   - `provider_ssh.<provider>` overrides global SSH.
   - `provider_settings.<provider>` holds credentials/endpoints; fields vary by provider.
+    - **Proxmox authentication:** Supports two methods:
+      - Single token: `api_token: "user@pve!tokenid=secret"`
+      - Separate fields: `api_token_id: "user@pve!tokenid"` + `api_token_secret: "secret"`
 - **Generated outputs:** Values populate `generated/{env}/terraform/{provider}/terraform.tfvars` and Ansible vars automatically.
 
 ## Validation and Checks
@@ -127,6 +131,16 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
       kubeconfig_path: ~/.kube/config
       namespace: platform
   ```
+- **Proxmox dual authentication (separate token fields):**
+  ```yaml
+  provider_settings:
+    proxmox:
+      api_url: https://pve01.example.com:8006
+      api_token_id: "automation@pve!infra-token"
+      api_token_secret: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      node: pve01
+      storage: local-zfs
+  ```
 
 ## Related Documentation
 
@@ -144,7 +158,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
 
 ---
 
-Last updated: 2025-12-27 13:35 GMT
+Last updated: 2025-12-27 14:10 GMT
 
 
 ---
