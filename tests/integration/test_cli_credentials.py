@@ -160,7 +160,14 @@ class TestCLICredentialLoading:
 
                 _result = cli_runner.invoke(
                     cli,
-                    ["--config-dir", str(mock_credentials_setup), "drift", "--env", "prod"],
+                    [
+                        "--config-dir",
+                        str(mock_credentials_setup),
+                        "drift",
+                        "detect",
+                        "--env",
+                        "prod",
+                    ],
                 )
 
                 # Verify credential loading was called

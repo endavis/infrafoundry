@@ -23,14 +23,14 @@ def mock_orchestrator():
 
 
 def test_drift_no_drift_detected(cli_runner, mock_orchestrator):
-    """Test drift command when no drift is detected."""
+    """Test drift detect command when no drift is detected."""
     mock_orchestrator.detect_drift.return_value = {
         "proxmox": {"has_changes": False},
         "opnsense": {"has_changes": False},
     }
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["drift", "--env", "test"])
+        result = cli_runner.invoke(main, ["drift", "detect", "--env", "test"])
 
         assert result.exit_code == 0
         assert "No drift detected" in result.output
@@ -38,7 +38,7 @@ def test_drift_no_drift_detected(cli_runner, mock_orchestrator):
 
 
 def test_drift_detected(cli_runner, mock_orchestrator):
-    """Test drift command when drift is detected."""
+    """Test drift detect command when drift is detected."""
     mock_orchestrator.detect_drift.return_value = {
         "proxmox": {
             "has_changes": True,
@@ -51,7 +51,7 @@ def test_drift_detected(cli_runner, mock_orchestrator):
     }
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["drift", "--env", "test"])
+        result = cli_runner.invoke(main, ["drift", "detect", "--env", "test"])
 
         assert result.exit_code == 0
         assert "Drift detected!" in result.output
@@ -59,11 +59,11 @@ def test_drift_detected(cli_runner, mock_orchestrator):
 
 
 def test_drift_orchestrator_failure(cli_runner, mock_orchestrator):
-    """Test drift command when orchestrator.detect_drift raises an error."""
+    """Test drift detect command when orchestrator.detect_drift raises an error."""
     mock_orchestrator.detect_drift.side_effect = Exception("Drift detection failed")
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["drift", "--env", "test"])
+        result = cli_runner.invoke(main, ["drift", "detect", "--env", "test"])
 
         assert result.exit_code == 1
-        assert "Drift command failed" in result.output
+        assert "Drift detection failed" in result.output

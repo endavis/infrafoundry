@@ -6,7 +6,7 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 
 ### State & Backends
 - [x] **State locking & remote backend management** [Complexity: 8/10]: Safe team collaboration; backend configs from `settings.yaml`; locking (e.g., S3/GCS/Postgres). ([Issue](https://github.com/endavis/infrafoundry/issues/30))
-- [ ] **Automated drift remediation** [Complexity: 8/10]: Periodic drift checks with optional auto-apply thresholds. ([Issue](https://github.com/endavis/infrafoundry/issues/31))
+- [x] **Automated drift remediation** [Complexity: 8/10]: Periodic drift checks with optional auto-apply thresholds. ([Issue](https://github.com/endavis/infrafoundry/issues/31))
 
 ### Cost & FinOps
 - [ ] **Cost estimation** [Complexity: 6/10]: Integrate Infracost; budget-aware policies. ([Issue](https://github.com/endavis/infrafoundry/issues/32))
