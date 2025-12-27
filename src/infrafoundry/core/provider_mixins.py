@@ -387,7 +387,10 @@ class TerraformGeneratorMixin:
         if not env_name:
             return None
 
-        config_manager = ConfigManager(self.config_dir)
+        # ConfigManager expects the parent envs directory, not the specific env directory
+        # config_dir points to envs/{env}, so we need to use its parent
+        envs_dir = self.config_dir.parent
+        config_manager = ConfigManager(envs_dir)
         try:
             return config_manager.load_environment(env_name)
         except FileNotFoundError:
@@ -581,3 +584,67 @@ class TerraformGeneratorMixin:
             context={"resources_by_type": resources_by_type},
             output_name="outputs.tf",
         )
+
+    def render_backend(self) -> bool:
+        """Render backend.tf from environment backend configuration.
+
+        Loads the backend configuration from the current environment's settings.yaml
+        and generates a backend.tf file if a remote backend is configured.
+
+        Returns:
+            True if backend was rendered, False if no backend config or using local default
+
+        Example:
+            >>> provider.set_environment("prod")
+            >>> provider.render_backend()  # Generates backend.tf if backend is configured
+        """
+        # Load environment configuration
+        env_config = self._load_environment_config()
+        if not env_config:
+            return False
+
+        # Check if backend is configured
+        backend_config = env_config.backend
+        if not backend_config:
+            return False
+
+        # Skip rendering for local backend (default)
+        if backend_config.type.value == "local":
+            return False
+
+        # Validate backend configuration
+        is_valid, error = backend_config.validate_backend()
+        if not is_valid:
+            raise ValueError(f"Invalid backend configuration: {error}")
+
+        # Get backend configuration dict
+        backend_dict = backend_config.get_backend_config()
+
+        # Render backend.tf using common template
+        # Template is in src/infrafoundry/templates/common/backend.tf.j2
+        # We need to use render_template directly since the template is in a common location
+        if hasattr(self, "render_template") and hasattr(self, "_write_terraform_file"):
+            from pathlib import Path
+
+            from jinja2 import Environment, FileSystemLoader
+
+            # Load from common templates directory
+            common_templates_dir = Path(__file__).parent.parent / "templates" / "common"
+            env = Environment(
+                loader=FileSystemLoader(str(common_templates_dir)),
+                trim_blocks=True,
+                lstrip_blocks=True,
+                keep_trailing_newline=True,
+            )
+
+            template = env.get_template("backend.tf.j2")
+            content = template.render(
+                backend_type=backend_config.type.value,
+                backend_config=backend_dict,
+                supports_locking=backend_config.supports_locking(),
+            )
+
+            self._write_terraform_file("backend.tf", content)
+            return True
+
+        return False
