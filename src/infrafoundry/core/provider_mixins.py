@@ -387,7 +387,10 @@ class TerraformGeneratorMixin:
         if not env_name:
             return None
 
-        config_manager = ConfigManager(self.config_dir)
+        # ConfigManager expects the parent envs directory, not the specific env directory
+        # config_dir points to envs/{env}, so we need to use its parent
+        envs_dir = self.config_dir.parent
+        config_manager = ConfigManager(envs_dir)
         try:
             return config_manager.load_environment(env_name)
         except FileNotFoundError:
