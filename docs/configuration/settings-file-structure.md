@@ -33,12 +33,17 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
 - **File location:** `envs/{env}/settings.yaml` (encrypted with SOPS/age).
 - **Key sections:**
   - `name`, `description`, optional `variables` (for templates).
+  - `providers` (list of provider names to enable for this environment).
   - `ssh` (global SSH defaults) and `provider_ssh` (per-provider overrides).
   - `provider_settings` per provider (credentials, endpoints, defaults).
 - **Example structure:**
   ```yaml
   name: prod
   description: Production environment
+  providers:
+    - proxmox
+    - opnsense
+    - kubernetes
   variables:
     datacenter: dc1
     domain: example.com
@@ -68,6 +73,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
       namespace: infra
   ```
 - **Schema hints:**
+  - `providers` (optional, list[str]): List of provider names to enable. If omitted, all registered providers are enabled.
   - `ssh.user`/`key_path`/`port` (optional, defaults to current user and port 22).
   - `provider_ssh.<provider>` overrides global SSH.
   - `provider_settings.<provider>` holds credentials/endpoints; fields vary by provider.
@@ -92,6 +98,19 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
     proxmox:
       api_url: https://pve-dev.example.com:8006
       api_token: pve-dev-token
+  ```
+- **Selectively enable providers:**
+  ```yaml
+  name: prod
+  description: Production environment - Proxmox only
+  providers:
+    - proxmox
+  provider_settings:
+    proxmox:
+      api_url: https://pve-prod.example.com:8006
+      api_token: pve-prod-token
+  # Note: Only Proxmox provider will be loaded, even if opnsense/kubernetes
+  # configs exist in the resources directory
   ```
 - **Per-provider SSH override:**
   ```yaml
@@ -121,10 +140,11 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
 - **Symptom:** Missing values in generated tfvars. **Fix:** Ensure fields exist in `settings.yaml` and rerun `infra plan`.
 - **Symptom:** SSH fails during Proxmox operations. **Fix:** Verify `ssh`/`provider_ssh` entries and key paths; re-validate with `--check-api`.
 - **Symptom:** Secrets exposed in git. **Fix:** Encrypt `settings.yaml` with SOPS/age and confirm ignore rules include keys.
+- **Symptom:** Provider not loading despite having resources defined. **Fix:** Check `providers` list in `settings.yaml`; if specified, only listed providers will be enabled.
 
 ---
 
-Last updated: 2025-12-23 14:19 GMT
+Last updated: 2025-12-27 13:35 GMT
 
 
 ---
