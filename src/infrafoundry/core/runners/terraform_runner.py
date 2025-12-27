@@ -48,7 +48,10 @@ class TerraformRunner(BaseRunner):
 
         Args:
             working_dir: Directory to initialize
-            **kwargs: Additional terraform init options
+            **kwargs: Additional terraform init options:
+                - reconfigure (bool): Force reconfiguration of backend
+                - migrate_state (bool): Migrate state to new backend
+                - upgrade (bool): Upgrade provider plugins
 
         Returns:
             Dict with initialization results
@@ -56,13 +59,66 @@ class TerraformRunner(BaseRunner):
         if not self.is_available():
             return {"success": False, "error": "terraform command not found"}
 
-        if (working_dir / ".terraform").exists():
-            return {"success": True, "message": "Already initialized"}
+        # Check if backend configuration exists
+        backend_file = working_dir / "backend.tf"
+        has_backend = backend_file.exists()
+
+        # Check if already initialized
+        is_initialized = (working_dir / ".terraform").exists()
+
+        # Determine if we need to reinitialize for backend changes
+        reconfigure = kwargs.get("reconfigure", False)
+        migrate_state = kwargs.get("migrate_state", False)
+        upgrade = kwargs.get("upgrade", False)
+
+        # If already initialized and no special flags, check if backend changed
+        if is_initialized and not (reconfigure or migrate_state or upgrade):
+            # If backend.tf exists now but wasn't used before, or vice versa,
+            # we need to reconfigure
+            terraform_state = working_dir / ".terraform" / "terraform.tfstate"
+            if terraform_state.exists():
+                import json
+
+                try:
+                    with open(terraform_state) as f:
+                        state_data = json.load(f)
+                        backend_type = state_data.get("backend", {}).get("type")
+
+                        # If we have a backend.tf but state shows local backend (or no backend),
+                        # or we don't have backend.tf but state shows remote backend,
+                        # we need to reconfigure
+                        if (has_backend and backend_type == "local") or (
+                            not has_backend and backend_type and backend_type != "local"
+                        ):
+                            reconfigure = True
+                            self.console.print(
+                                "[yellow]Backend configuration changed, reconfiguring...[/yellow]"
+                            )
+                except (json.JSONDecodeError, FileNotFoundError):
+                    pass
+
+            if not reconfigure:
+                return {"success": True, "message": "Already initialized"}
+
+        # Build init command
+        cmd = ["terraform", "init"]
+        if reconfigure:
+            cmd.append("-reconfigure")
+        if migrate_state:
+            cmd.append("-migrate-state")
+        if upgrade:
+            cmd.append("-upgrade")
 
         try:
-            self.console.print("[dim]Initializing Terraform...[/dim]")
+            msg = "Initializing Terraform..."
+            if reconfigure:
+                msg = "Reconfiguring Terraform backend..."
+            elif migrate_state:
+                msg = "Migrating Terraform state..."
+            self.console.print(f"[dim]{msg}[/dim]")
+
             result = subprocess.run(
-                ["terraform", "init"],
+                cmd,
                 cwd=working_dir,
                 capture_output=True,
                 text=True,
