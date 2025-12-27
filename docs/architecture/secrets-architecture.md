@@ -55,6 +55,71 @@ manager.save_secret("envs/dev/settings.yaml", data)
   manager = SecretManager(env_name="prod", provider=VaultSecretProvider())
   manager.save_secret("secret/data/prod/app", {"token": "value"})
   ```
+- **Rotate encryption keys:**
+  ```python
+  manager = SecretManager(env_name="prod")
+  # Generate new key and rotate all secrets
+  result = manager.rotate_secrets(generate_new_key=True)
+
+  # Or use existing new key
+  result = manager.rotate_secrets(new_key_file=Path("new_age.key"))
+  ```
+
+## Secrets Rotation
+
+InfraFoundry supports safe rotation of age encryption keys for compliance and security best practices.
+
+### Rotation Process
+
+The rotation workflow:
+1. **Backup**: Creates timestamped backup of all encrypted files
+2. **Generate/Use Key**: Generates new age key or uses provided key
+3. **Decrypt**: Decrypts all secrets with old key
+4. **Update Config**: Updates .sops.yaml with new public key
+5. **Re-encrypt**: Re-encrypts all secrets with new key
+6. **Verify**: Verifies decryption works with new key (optional)
+7. **Cleanup**: Keeps backup by default, removes on request
+
+On failure, automatically rolls back to the backup.
+
+### CLI Usage
+
+```bash
+# Generate new key and rotate all secrets for dev environment
+infra secrets rotate --env dev --generate-new-key
+
+# Rotate with an existing new key file
+infra secrets rotate --env prod --new-key-file /path/to/new_age.key
+
+# Rotate specific files only
+infra secrets rotate --env dev --generate-new-key --files proxmox.yaml --files opnsense.yaml
+
+# Dry run to preview rotation
+infra secrets rotate --env dev --generate-new-key --dry-run
+
+# Skip verification (not recommended)
+infra secrets rotate --env dev --generate-new-key --no-verify
+
+# Don't keep backup after rotation (not recommended)
+infra secrets rotate --env dev --generate-new-key --no-backup
+```
+
+### Post-Rotation Steps
+
+After successful rotation:
+1. Update `SOPS_AGE_KEY_FILE` environment variable to point to new key
+2. Test decryption with new key
+3. Securely delete or archive the old key
+4. Distribute new key to team members (if applicable)
+5. Update CI/CD pipelines with new key
+
+### Safety Features
+
+- **Automatic backup**: All encrypted files are backed up before rotation
+- **Transaction-like semantics**: All-or-nothing operation
+- **Verification**: Optional verification that re-encrypted secrets match originals
+- **Rollback**: Automatic rollback to backup on any failure
+- **Dry-run mode**: Preview rotation without making changes
 
 ## Related Documentation
 
@@ -68,10 +133,13 @@ manager.save_secret("envs/dev/settings.yaml", data)
 - **Symptom:** Decryption fails. **Fix:** Point `SOPS_AGE_KEY_FILE` to the correct env key; verify `.sops.yaml` rules.
 - **Symptom:** Wrong backend used. **Fix:** Inject the intended `SecretProvider` when initializing `SecretManager`.
 - **Symptom:** Secrets committed to git. **Fix:** Ensure keys and encrypted files are git-ignored; rotate keys and re-encrypt.
+- **Symptom:** Rotation fails during re-encryption. **Fix:** Check that `SOPS_AGE_KEY_FILE` points to the old key before rotation; verify new key is valid; check backup was created.
+- **Symptom:** Can't decrypt after rotation. **Fix:** Ensure `SOPS_AGE_KEY_FILE` points to the new key; verify rotation completed successfully; restore from backup if needed.
+- **Symptom:** Rotation rolled back unexpectedly. **Fix:** Check rotation error messages; verify age-keygen is installed; ensure sufficient disk space for backups.
 
 ---
 
-Last updated: 2025-12-23 14:27 GMT
+Last updated: 2025-12-27 19:30 GMT
 
 
 ---
