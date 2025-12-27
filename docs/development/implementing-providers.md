@@ -24,7 +24,8 @@ Provider plugins implement `ProviderBase`, render Terraform/Ansible via Jinja2, 
 ## Architecture Details
 
 - **ProviderBase responsibilities:** set `name`, configure template dirs/env, validate configs, generate Terraform/Ansible, expose `get_resource_types()` and `get_dependencies()`.
-- **Templates:** Use Jinja2; leverage mixins (`TemplateRendererMixin`, `ResourceGrouperMixin`) to render and group resources; output to `generated/{env}/{terraform|ansible}/{provider}/`.
+- **Environment setup:** **CRITICAL** - Call `set_environment(env_name)` before any `generate_*()` methods to configure environment-specific output directories. Orchestrator handles this automatically, but direct provider usage requires manual invocation.
+- **Templates:** Use Jinja2; leverage mixins (`TemplateRendererMixin`) to render and group resources; output to `generated/{env}/{terraform|ansible}/{provider}/`.
 - **3-layer stack:** Provider (orchestration) → Component Manager (complex workflows) → Service (API layer).
 - **Dependencies:** `get_dependencies()` returns ordering (e.g., servers depend on networks).
 - **Backward compatibility:** Re-export public APIs in `__init__.py`; keep provider module imports stable.
@@ -34,6 +35,35 @@ Provider plugins implement `ProviderBase`, render Terraform/Ansible via Jinja2, 
 - Validate required fields per resource type; surface clear errors.
 - Ensure templates produce deterministic output; keep secrets out of generated files.
 - Run `infra validate --env <env> --check-api --check-refs` for new providers; add provider-specific validators as needed.
+
+## Environment Configuration
+
+**The `set_environment()` method must be called before any generate methods:**
+
+```python
+def set_environment(self, env_name: str) -> None:
+    """Set the current environment and update output directories.
+
+    This should be called before generate_terraform(), generate_ansible(),
+    or generate_pyinfra() to ensure files are generated in the correct
+    environment-specific directory.
+
+    Args:
+        env_name: Environment name (e.g., 'dev', 'staging', 'prod')
+    """
+```
+
+**What it does:**
+- Sets `self._current_environment = env_name`
+- Updates `self.output_dir = base_output_dir / env_name`
+- Updates `self.terraform_dir = output_dir / "terraform" / provider_name`
+- Updates `self.ansible_dir = output_dir / "ansible" / provider_name`
+- Updates `self.pyinfra_dir = output_dir / "pyinfra" / provider_name`
+
+**When to call:**
+- **Orchestrator usage:** Called automatically by the orchestrator
+- **Direct provider usage:** Must be called manually before generate methods
+- **Testing:** Always call in test setup before generating files
 
 ## Examples
 
@@ -56,6 +86,15 @@ Provider plugins implement `ProviderBase`, render Terraform/Ansible via Jinja2, 
       def generate_terraform(self, resources: list[ResourceConfig]) -> None:
           self.ensure_directories()
           # render templates ...
+
+  # Usage example:
+  provider = YourProvider(config_dir, output_dir)
+
+  # CRITICAL: Set environment before generating files
+  provider.set_environment("dev")
+
+  # Now safe to generate - files will go to generated/dev/terraform/yourprovider/
+  provider.generate_terraform(resources)
   ```
 - **Template snippet (provider.tf.j2):**
   ```hcl
@@ -87,10 +126,11 @@ Provider plugins implement `ProviderBase`, render Terraform/Ansible via Jinja2, 
 - **Symptom:** Resources out of order. **Fix:** Update `get_dependencies()` and verify resource references.
 - **Symptom:** Templates fail to render. **Fix:** Check template paths and Jinja2 variables; use mixins for consistent filters.
 - **Symptom:** New provider not discovered. **Fix:** Ensure it is registered and exposed via `__init__.py`.
+- **Symptom:** Generated files appear in wrong directory or base output dir. **Fix:** Ensure `set_environment(env_name)` is called before any `generate_*()` methods. The orchestrator calls this automatically, but direct provider usage requires manual invocation.
 
 ---
 
-Last updated: 2025-12-23 14:27 GMT
+Last updated: 2025-12-27 13:40 GMT
 
 
 ---
