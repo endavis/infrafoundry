@@ -3,8 +3,8 @@ import logging
 from pathlib import Path
 from typing import Any, cast
 
-import boto3  # type: ignore[import-untyped]
-from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+import boto3
+from botocore.exceptions import ClientError
 
 from infrafoundry.core.exceptions import SecretError, SecretNotFoundError
 from infrafoundry.core.secrets.provider import SecretProvider
