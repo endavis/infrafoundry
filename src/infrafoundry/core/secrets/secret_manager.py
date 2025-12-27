@@ -10,6 +10,7 @@ from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.secrets.age_key_manager import check_age_key, create_sops_config
 from infrafoundry.core.secrets.provider import SecretProvider
 from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
+from infrafoundry.core.secrets.rotation import SecretsRotator
 
 
 class SecretManager(PathBasedManager):
@@ -163,3 +164,55 @@ class SecretManager(PathBasedManager):
         persistent connections or file handles.
         """
         self._log_debug("SecretManager cleanup complete")
+
+    def rotate_secrets(
+        self,
+        new_key_file: Path | None = None,
+        generate_new_key: bool = False,
+        file_patterns: list[str] | None = None,
+        verify: bool = True,
+        keep_backup: bool = True,
+    ) -> dict[str, Any]:
+        """Rotate secrets with a new age encryption key.
+
+        This re-encrypts all secrets with a new age key, providing safe key rotation
+        with automatic backup and rollback capabilities.
+
+        Args:
+            new_key_file: Path to new age key file (required if generate_new_key=False)
+            generate_new_key: Generate a new age key automatically
+            file_patterns: Optional file patterns to rotate (default: all .yaml files)
+            verify: Verify re-encryption was successful (default: True)
+            keep_backup: Keep backup after successful rotation (default: True)
+
+        Returns:
+            Dictionary with rotation results:
+                - success: bool
+                - files_rotated: list[str]
+                - new_public_key: str
+                - backup_path: str
+                - errors: list[str] (if any)
+
+        Raises:
+            SecretError: If rotation fails
+
+        Example:
+            # Generate new key and rotate all secrets
+            manager = SecretManager(env_name="dev")
+            result = manager.rotate_secrets(generate_new_key=True)
+
+            # Rotate with existing new key
+            result = manager.rotate_secrets(new_key_file=Path("new_age.key"))
+        """
+        rotator = SecretsRotator(
+            secrets_dir=self.secrets_dir,
+            provider=self.provider,
+        )
+
+        return rotator.rotate(
+            new_key_file=new_key_file,
+            generate_new_key=generate_new_key,
+            file_patterns=file_patterns,
+            verify=verify,
+            keep_backup=keep_backup,
+        )
