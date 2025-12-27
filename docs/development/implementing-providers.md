@@ -65,6 +65,163 @@ def set_environment(self, env_name: str) -> None:
 - **Direct provider usage:** Must be called manually before generate methods
 - **Testing:** Always call in test setup before generating files
 
+## Optional Provider Methods
+
+Providers can override these optional methods to add advanced functionality:
+
+### validate_connectivity()
+
+**Purpose:** Validate connectivity to provider API and verify credentials.
+
+```python
+def validate_connectivity(
+    self, env_config: EnvironmentData, report: ValidationReport
+) -> None:
+    """Validate connectivity to provider API.
+
+    Optional method for providers to implement API connectivity checks.
+    Should add results to the validation report.
+
+    Args:
+        env_config: Environment configuration including credentials
+        report: ValidationReport to add results to
+    """
+    # Default: no connectivity validation
+    return None
+```
+
+**When to implement:**
+- Provider has an API that can be pinged/tested
+- Credentials can be validated before deployment
+- Network connectivity needs verification
+
+**Example implementation:**
+```python
+def validate_connectivity(self, env_config, report):
+    try:
+        # Test API connection
+        response = self.api_client.ping()
+        if response.status_code == 200:
+            report.add_success(f"{self.name}: API connectivity verified")
+        else:
+            report.add_error(f"{self.name}: API returned {response.status_code}")
+    except Exception as e:
+        report.add_error(f"{self.name}: Connection failed - {e}")
+```
+
+**Usage:** Called by `infra validate --env <env> --check-api`
+
+---
+
+### validate_references()
+
+**Purpose:** Validate that resources referenced in configs actually exist in the provider.
+
+```python
+def validate_references(
+    self,
+    resources: list[ResourceConfig],
+    env_config: EnvironmentData,
+    report: ValidationReport
+) -> None:
+    """Validate that referenced resources exist in the provider.
+
+    Optional method for providers to check that templates, networks,
+    aliases, etc. referenced in configs actually exist.
+
+    Args:
+        resources: Resources to validate
+        env_config: Environment configuration including credentials
+        report: ValidationReport to add results to
+    """
+    # Default: no reference validation
+    return None
+```
+
+**When to implement:**
+- Resources reference templates, images, or base configs
+- Resources reference networks, storage pools, or other infrastructure
+- Want to catch missing references before deployment
+
+**Example implementation:**
+```python
+def validate_references(self, resources, env_config, report):
+    for resource in resources:
+        # Check if referenced template exists
+        if template_id := resource.config.get('template'):
+            if not self.api_client.template_exists(template_id):
+                report.add_error(
+                    f"{resource.name}: Template '{template_id}' not found"
+                )
+
+        # Check if referenced network exists
+        if network := resource.config.get('network'):
+            if not self.api_client.network_exists(network):
+                report.add_error(
+                    f"{resource.name}: Network '{network}' not found"
+                )
+```
+
+**Usage:** Called by `infra validate --env <env> --check-refs`
+
+---
+
+### generate_pyinfra()
+
+**Purpose:** Generate PyInfra deployment scripts and inventory.
+
+```python
+def generate_pyinfra(self, resources: list[ResourceConfig]) -> None:
+    """Generate pyinfra deploy scripts and inventory.
+
+    Optional method. Providers can override this to support pyinfra.
+
+    Args:
+        resources: List of resources to generate pyinfra for
+    """
+    return
+```
+
+**When to implement:**
+- Provider wants to support PyInfra in addition to Terraform/Ansible
+- Resources have pyinfra_ops or pyinfra_deploy_funcs configurations
+- Want to use PyInfra for configuration management
+
+**Example implementation:**
+```python
+def generate_pyinfra(self, resources):
+    # Filter resources with PyInfra configs
+    pyinfra_resources = [
+        r for r in resources
+        if r.config.get('pyinfra_ops') or r.config.get('pyinfra_deploy_funcs')
+    ]
+
+    if not pyinfra_resources:
+        return
+
+    self.ensure_directories()
+
+    # Render deploy.py
+    self.render_template(
+        "deploy.py.j2",
+        self.pyinfra_dir / "deploy.py",
+        {"resources": pyinfra_resources}
+    )
+
+    # Render inventory.py
+    self.render_template(
+        "inventory.py.j2",
+        self.pyinfra_dir / "inventory.py",
+        {"resources": pyinfra_resources}
+    )
+```
+
+**Usage:** Called automatically by orchestrator if provider implements this method and resources have pyinfra configurations.
+
+**Template requirements:**
+- `templates/<provider>/deploy.py.j2` - PyInfra deployment script
+- `templates/<provider>/inventory.py.j2` - PyInfra inventory
+
 ## Examples
 
 - **Provider skeleton:**
@@ -130,7 +287,7 @@ def set_environment(self, env_name: str) -> None:
 
 ---
 
-Last updated: 2025-12-27 13:40 GMT
+Last updated: 2025-12-27 13:55 GMT
 
 
 ---
