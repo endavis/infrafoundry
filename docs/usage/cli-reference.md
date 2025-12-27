@@ -58,6 +58,10 @@ infra destroy --env dev --auto-approve
   - `infra plan --env <env> [--resource ...] [--dry-run]`
   - `infra apply --env <env> [--resource ...] [--auto-approve]`
   - `infra destroy --env <env> [--resource ...] [--auto-approve]`
+- **Rollback and Recovery**
+  - `infra rollback --deployment-id <id> [--auto-approve]` — rollback infrastructure to a previous deployment state.
+- **State Management**
+  - `infra state backup [--output-dir <dir>] [--include-generated]` — create timestamped backup of state database and optionally the generated/ directory.
 - **Validation and Drift**
   - `infra validate --env <env> [--check-api] [--check-refs]`
   - `infra drift --env <env>`
@@ -83,6 +87,29 @@ infra destroy --env dev --auto-approve
   ```bash
   infra plan --env dev --resource vm-01 --resource vm-02
   infra apply --env dev --resource vm-01 --auto-approve
+  ```
+- **Rollback to previous deployment:**
+  ```bash
+  # View deployment history to find deployment ID
+  infra history --env prod
+
+  # Rollback to deployment ID 42
+  infra rollback --deployment-id 42
+
+  # Rollback without confirmation prompt (use with caution)
+  infra rollback --deployment-id 42 --auto-approve
+  ```
+- **Backup state and generated files:**
+  ```bash
+  # Backup state database only
+  infra state backup --output-dir ./backups
+
+  # Backup state database and generated/ directory
+  infra state backup --output-dir ./backups --include-generated
+
+  # Creates timestamped files:
+  # - infrafoundry_state_20250127_143022.db
+  # - infrafoundry_generated_20250127_143022.tar.gz (if --include-generated)
   ```
 - **Policy enforcement in CI:**
   ```bash
@@ -110,10 +137,12 @@ infra destroy --env dev --auto-approve
 - **Symptom:** Missing configs. **Fix:** Set `--config-dir` or `INFRAFOUNDRY_CONFIG_REPO`; ensure `envs/{env}` exists.
 - **Symptom:** Commands fail due to missing secrets/snippets. **Fix:** Enable `--strict-mode` to surface early, or allow missing during development; ensure SOPS keys are available.
 - **Symptom:** Unexpected resource lists. **Fix:** Use `infra list` (YAML view) vs `infra resources` (state DB view) to differentiate declared vs tracked resources.
+- **Symptom:** Rollback fails with "deployment not found". **Fix:** Use `infra history` to verify deployment ID exists and has rollback data available.
+- **Symptom:** State backup skips database file. **Fix:** Ensure using SQLite backend (default); PostgreSQL and other remote databases cannot be backed up via file copy.
 
 ---
 
-Last updated: 2025-12-23 14:27 GMT
+Last updated: 2025-12-27 13:30 GMT
 
 
 ---
