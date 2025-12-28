@@ -54,7 +54,7 @@ def test_resources_list_all(cli_runner, mock_orchestrator, sample_resources):
     mock_orchestrator.state_manager.get_resources.return_value = sample_resources
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["resources"])
+        result = cli_runner.invoke(main, ["state", "resources"])
 
         assert result.exit_code == 0
         assert "Infrastructure Resources" in result.output
@@ -137,7 +137,7 @@ def test_resources_no_resources_found(cli_runner, mock_orchestrator):
     mock_orchestrator.state_manager.get_resources.return_value = []
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["resources"])
+        result = cli_runner.invoke(main, ["state", "resources"])
 
         assert result.exit_code == 0
         assert "No resources found matching filters" in result.output

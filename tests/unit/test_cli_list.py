@@ -48,7 +48,9 @@ def test_list_all_resources(cli_runner, mock_config_manager, sample_resources):
     """Test list command shows all resources."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
-    with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
+    with patch(
+        "infrafoundry.cli.commands.state.list.ConfigManager", return_value=mock_config_manager
+    ):
         result = cli_runner.invoke(main, ["state", "list", "--env", "test"])
 
         assert result.exit_code == 0
@@ -63,7 +65,9 @@ def test_list_filter_by_provider(cli_runner, mock_config_manager, sample_resourc
     """Test list command with provider filter."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
-    with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
+    with patch(
+        "infrafoundry.cli.commands.state.list.ConfigManager", return_value=mock_config_manager
+    ):
         result = cli_runner.invoke(
             main, ["state", "list", "--env", "test", "--provider", "proxmox"]
         )
@@ -79,7 +83,9 @@ def test_list_filter_by_type(cli_runner, mock_config_manager, sample_resources):
     """Test list command with type filter."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
-    with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
+    with patch(
+        "infrafoundry.cli.commands.state.list.ConfigManager", return_value=mock_config_manager
+    ):
         result = cli_runner.invoke(main, ["state", "list", "--env", "test", "--type", "vms"])
 
         assert result.exit_code == 0
@@ -93,7 +99,9 @@ def test_list_filter_by_both(cli_runner, mock_config_manager, sample_resources):
     """Test list command with both provider and type filters."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
-    with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
+    with patch(
+        "infrafoundry.cli.commands.state.list.ConfigManager", return_value=mock_config_manager
+    ):
         result = cli_runner.invoke(
             main, ["state", "list", "--env", "test", "--provider", "proxmox", "--type", "vms"]
         )
@@ -108,7 +116,9 @@ def test_list_no_resources_found(cli_runner, mock_config_manager):
     """Test list command when no resources are found."""
     mock_config_manager.get_all_resources_all_providers.return_value = []
 
-    with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
+    with patch(
+        "infrafoundry.cli.commands.state.list.ConfigManager", return_value=mock_config_manager
+    ):
         result = cli_runner.invoke(main, ["state", "list", "--env", "test"])
 
         assert result.exit_code == 0
@@ -119,7 +129,9 @@ def test_list_no_matching_provider(cli_runner, mock_config_manager, sample_resou
     """Test list command when provider filter matches nothing."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
-    with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
+    with patch(
+        "infrafoundry.cli.commands.state.list.ConfigManager", return_value=mock_config_manager
+    ):
         result = cli_runner.invoke(
             main, ["state", "list", "--env", "test", "--provider", "nonexistent"]
         )
