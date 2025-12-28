@@ -24,14 +24,22 @@ from infrafoundry.core.plugin_system.exceptions import (
     PluginValidationError,
     PluginVersionError,
 )
+from infrafoundry.core.plugin_system.plugin_type import (
+    PluginMetadata,
+    PluginType,
+    ValidationResult,
+)
 
 __all__ = [
     "PluginConflictError",
     "PluginDiscoveryError",
     "PluginError",
     "PluginLoadError",
+    "PluginMetadata",
     "PluginNotFoundError",
+    "PluginType",
     "PluginTypeError",
     "PluginValidationError",
     "PluginVersionError",
+    "ValidationResult",
 ]
