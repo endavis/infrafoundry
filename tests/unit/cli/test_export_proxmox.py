@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 from click.testing import CliRunner
 
-from infrafoundry.cli.commands.export_proxmox import export_proxmox
+from infrafoundry.cli.commands.proxmox.export_proxmox import export_proxmox
 
 
 @pytest.fixture

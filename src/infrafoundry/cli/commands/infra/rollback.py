@@ -1,22 +1,28 @@
-"""List available rollback points command."""
+"""Rollback infrastructure to previous deployment commands."""
 
 import click
 from rich.table import Table
 
 from infrafoundry.core.orchestrator import Orchestrator
 
-from ..decorators import with_orchestrator
-from ..utils import console
+from ...decorators import with_orchestrator
+from ...utils import console
 
 
-@click.command(name="rollback-points")
+@click.group()
+def rollback() -> None:
+    """Rollback infrastructure to a previous deployment state."""
+    pass
+
+
+@rollback.command("list")
 @click.option("--env", "-e", required=True, help="Environment name")
 @click.option("--limit", "-l", default=10, help="Maximum number of rollback points to show")
 @with_orchestrator(
     "Failed to list rollback points",
     load_credentials=False,
 )
-def rollback_points(_ctx: click.Context, orchestrator: Orchestrator, env: str, limit: int) -> None:
+def rollback_list(_ctx: click.Context, orchestrator: Orchestrator, env: str, limit: int) -> None:
     """List available rollback points for an environment."""
     deployments = orchestrator.state_manager.get_rollback_points(env, limit=limit)
 
@@ -51,4 +57,27 @@ def rollback_points(_ctx: click.Context, orchestrator: Orchestrator, env: str, l
 
     console.print()
     console.print(table)
-    console.info("Use 'infra rollback --deployment-id <ID>' to rollback to a specific point")
+    console.info("Use 'foundry infra rollback to <ID>' to rollback to a specific point")
+
+
+@rollback.command("to")
+@click.argument("deployment_id", type=int)
+@click.option(
+    "--auto-approve",
+    is_flag=True,
+    help="Skip confirmation prompt and apply immediately",
+)
+@with_orchestrator("Rollback command failed", require_env=False, load_credentials=False)
+def rollback_to(
+    _ctx: click.Context, orchestrator: Orchestrator, deployment_id: int, auto_approve: bool
+) -> None:
+    """Rollback infrastructure to a specific deployment ID."""
+
+    def confirm_callback() -> bool:
+        return click.confirm("Are you sure you want to rollback?")
+
+    orchestrator.rollback(
+        deployment_id=deployment_id,
+        auto_approve=auto_approve,
+        confirm_callback=confirm_callback,
+    )

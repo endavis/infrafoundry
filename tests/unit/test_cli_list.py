@@ -49,7 +49,7 @@ def test_list_all_resources(cli_runner, mock_config_manager, sample_resources):
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
     with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
-        result = cli_runner.invoke(main, ["list", "--env", "test"])
+        result = cli_runner.invoke(main, ["state", "list", "--env", "test"])
 
         assert result.exit_code == 0
         assert "Resources in test:" in result.output
@@ -64,7 +64,9 @@ def test_list_filter_by_provider(cli_runner, mock_config_manager, sample_resourc
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
     with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
-        result = cli_runner.invoke(main, ["list", "--env", "test", "--provider", "proxmox"])
+        result = cli_runner.invoke(
+            main, ["state", "list", "--env", "test", "--provider", "proxmox"]
+        )
 
         assert result.exit_code == 0
         assert "vm-01" in result.output
@@ -78,7 +80,7 @@ def test_list_filter_by_type(cli_runner, mock_config_manager, sample_resources):
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
     with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
-        result = cli_runner.invoke(main, ["list", "--env", "test", "--type", "vms"])
+        result = cli_runner.invoke(main, ["state", "list", "--env", "test", "--type", "vms"])
 
         assert result.exit_code == 0
         assert "vm-01" in result.output
@@ -93,7 +95,7 @@ def test_list_filter_by_both(cli_runner, mock_config_manager, sample_resources):
 
     with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
         result = cli_runner.invoke(
-            main, ["list", "--env", "test", "--provider", "proxmox", "--type", "vms"]
+            main, ["state", "list", "--env", "test", "--provider", "proxmox", "--type", "vms"]
         )
 
         assert result.exit_code == 0
@@ -107,7 +109,7 @@ def test_list_no_resources_found(cli_runner, mock_config_manager):
     mock_config_manager.get_all_resources_all_providers.return_value = []
 
     with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
-        result = cli_runner.invoke(main, ["list", "--env", "test"])
+        result = cli_runner.invoke(main, ["state", "list", "--env", "test"])
 
         assert result.exit_code == 0
         assert "No resources found" in result.output
@@ -118,7 +120,9 @@ def test_list_no_matching_provider(cli_runner, mock_config_manager, sample_resou
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
     with patch("infrafoundry.cli.commands.list.ConfigManager", return_value=mock_config_manager):
-        result = cli_runner.invoke(main, ["list", "--env", "test", "--provider", "nonexistent"])
+        result = cli_runner.invoke(
+            main, ["state", "list", "--env", "test", "--provider", "nonexistent"]
+        )
 
         assert result.exit_code == 0
         assert "No resources found with provider 'nonexistent'" in result.output

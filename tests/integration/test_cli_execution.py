@@ -68,7 +68,7 @@ class TestCLIPlan:
                     "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
                     return_value=None,
                 ):
-                    result = cli_runner.invoke(cli, ["plan", "--env", "dev"], env=test_env)
+                    result = cli_runner.invoke(cli, ["infra", "plan", "--env", "dev"], env=test_env)
 
                     assert result.exit_code == 0
                     mock_orchestrator.plan.assert_called_once()
@@ -87,7 +87,7 @@ class TestCLIPlan:
                     return_value=None,
                 ):
                     result = cli_runner.invoke(
-                        cli, ["plan", "--env", "dev", "--dry-run"], env=test_env
+                        cli, ["infra", "plan", "--env", "dev", "--dry-run"], env=test_env
                     )
 
                     assert result.exit_code == 0
@@ -105,7 +105,7 @@ class TestCLIPlan:
                     return_value=None,
                 ):
                     result = cli_runner.invoke(
-                        cli, ["plan", "--env", "dev", "--enforce-policies"], env=test_env
+                        cli, ["infra", "plan", "--env", "dev", "--enforce-policies"], env=test_env
                     )
 
                     assert result.exit_code == 0
@@ -123,7 +123,7 @@ class TestCLIPlan:
                     "infrafoundry.core.secrets.secret_manager.SecretManager.__init__",
                     return_value=None,
                 ):
-                    result = cli_runner.invoke(cli, ["plan", "--env", "dev"], env=test_env)
+                    result = cli_runner.invoke(cli, ["infra", "plan", "--env", "dev"], env=test_env)
 
                     assert result.exit_code == 1
                     assert "Plan failed" in result.output
@@ -144,7 +144,7 @@ class TestCLIApply:
                     return_value=None,
                 ):
                     result = cli_runner.invoke(
-                        cli, ["apply", "--env", "dev", "--auto-approve"], env=test_env
+                        cli, ["infra", "apply", "--env", "dev", "--auto-approve"], env=test_env
                     )
 
                     assert result.exit_code == 0
@@ -163,7 +163,7 @@ class TestCLIApply:
                 ):
                     result = cli_runner.invoke(
                         cli,
-                        ["apply", "--env", "dev", "--auto-approve", "--parallel"],
+                        ["infra", "apply", "--env", "dev", "--auto-approve", "--parallel"],
                         env=test_env,
                     )
 
@@ -183,7 +183,7 @@ class TestCLIApply:
                     return_value=None,
                 ):
                     result = cli_runner.invoke(
-                        cli, ["apply", "--env", "dev", "--auto-approve"], env=test_env
+                        cli, ["infra", "apply", "--env", "dev", "--auto-approve"], env=test_env
                     )
 
                     assert result.exit_code == 1
@@ -205,7 +205,7 @@ class TestCLIDestroy:
                     return_value=None,
                 ):
                     result = cli_runner.invoke(
-                        cli, ["destroy", "--env", "dev", "--auto-approve"], env=test_env
+                        cli, ["infra", "destroy", "--env", "dev", "--auto-approve"], env=test_env
                     )
 
                     assert result.exit_code == 0
@@ -225,7 +225,7 @@ class TestCLIDestroy:
                     return_value=None,
                 ):
                     result = cli_runner.invoke(
-                        cli, ["destroy", "--env", "dev", "--auto-approve"], env=test_env
+                        cli, ["infra", "destroy", "--env", "dev", "--auto-approve"], env=test_env
                     )
 
                     assert result.exit_code == 1
