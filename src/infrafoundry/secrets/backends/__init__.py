@@ -1,3 +1,5 @@
 """Built-in secret backends."""
 
-__all__ = []
+from infrafoundry.secrets.backends.env import EnvSecretBackend
+
+__all__ = ["EnvSecretBackend"]
