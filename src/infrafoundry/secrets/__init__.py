@@ -3,4 +3,6 @@
 This module provides pluggable secret management for InfraFoundry.
 """
 
-__all__ = []
+from infrafoundry.secrets.resolver import SecretResolver, get_resolver
+
+__all__ = ["SecretResolver", "get_resolver"]
