@@ -90,20 +90,39 @@ class CommandLoader:
                 return
 
             # Fallback: auto-discover Click commands/groups
-            for attr_name in dir(module):
-                attr = getattr(module, attr_name)
+            # First, collect all Click objects in the module
+            click_objects: list[tuple[str, click.Command | click.Group]] = []
+            groups: list[click.Group] = []
 
-                # Skip private attributes and non-Click objects
+            for attr_name in dir(module):
+                # Skip private attributes
                 if attr_name.startswith("_"):
                     continue
 
-                # Register Click commands
-                if isinstance(attr, (click.Command, click.Group)):
-                    # Don't register if it's already attached to a parent
-                    if not hasattr(attr, "parent") or attr.parent is None:
-                        self.main_group.add_command(attr, name=attr.name or attr_name.lower())
-                        registered_count += 1
-                        logger.debug(f"Registered command '{attr.name}' from {module_name}")
+                attr = getattr(module, attr_name)
+
+                if isinstance(attr, click.Group):
+                    groups.append(attr)
+                    click_objects.append((attr_name, attr))
+                elif isinstance(attr, click.Command):
+                    click_objects.append((attr_name, attr))
+
+            # Collect all subcommands from groups
+            subcommands: set[click.Command] = set()
+            for group in groups:
+                if hasattr(group, "commands"):
+                    subcommands.update(group.commands.values())
+
+            # Register only top-level commands/groups (not subcommands)
+            for attr_name, attr in click_objects:
+                # Skip if this is a subcommand of a group
+                if attr in subcommands:
+                    logger.debug(f"Skipping subcommand '{attr.name}' from {module_name}")
+                    continue
+
+                self.main_group.add_command(attr, name=attr.name or attr_name.lower())
+                registered_count += 1
+                logger.debug(f"Registered command '{attr.name}' from {module_name}")
 
             if registered_count > 0:
                 logger.debug(f"Auto-registered {registered_count} command(s) from {module_name}")
