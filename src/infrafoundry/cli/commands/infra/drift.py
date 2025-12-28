@@ -7,8 +7,8 @@ from infrafoundry.core.config.models import DriftRemediationConfig
 from infrafoundry.core.drift_remediation import DriftRemediator
 from infrafoundry.core.orchestrator import Orchestrator
 
-from ..decorators import with_orchestrator
-from ..utils import console, raise_cli_error
+from ...decorators import with_orchestrator
+from ...utils import console, raise_cli_error
 
 
 @click.group()

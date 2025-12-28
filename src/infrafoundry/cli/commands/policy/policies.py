@@ -5,8 +5,8 @@ from rich.table import Table
 
 from infrafoundry.core.orchestrator import Orchestrator
 
-from ..decorators import with_orchestrator
-from ..utils import console
+from ...decorators import with_orchestrator
+from ...utils import console
 
 
 @click.command()

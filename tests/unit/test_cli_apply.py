@@ -26,7 +26,7 @@ def test_apply_with_confirmation(cli_runner, mock_orchestrator):
     """Test apply command with user confirmation."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         # User confirms
-        result = cli_runner.invoke(main, ["apply", "--env", "test"], input="y\n")
+        result = cli_runner.invoke(main, ["infra", "apply", "--env", "test"], input="y\n")
 
         assert result.exit_code == 0
         assert "About to apply infrastructure for environment: test" in result.output
@@ -44,7 +44,7 @@ def test_apply_user_cancels(cli_runner, mock_orchestrator):
     """Test apply command when user cancels confirmation."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         # User cancels
-        result = cli_runner.invoke(main, ["apply", "--env", "test"], input="n\n")
+        result = cli_runner.invoke(main, ["infra", "apply", "--env", "test"], input="n\n")
 
         assert result.exit_code == 0
         assert "Apply cancelled." in result.output
@@ -54,7 +54,7 @@ def test_apply_user_cancels(cli_runner, mock_orchestrator):
 def test_apply_with_auto_approve(cli_runner, mock_orchestrator):
     """Test apply command with auto-approve flag."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["apply", "--env", "test", "--auto-approve"])
+        result = cli_runner.invoke(main, ["infra", "apply", "--env", "test", "--auto-approve"])
 
         assert result.exit_code == 0
         assert "Apply complete!" in result.output
@@ -72,7 +72,7 @@ def test_apply_with_resource_filter(cli_runner, mock_orchestrator):
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
             main,
-            ["apply", "--env", "test", "--auto-approve", "-r", "vm-01", "-r", "vm-02"],
+            ["infra", "apply", "--env", "test", "--auto-approve", "-r", "vm-01", "-r", "vm-02"],
         )
 
         assert result.exit_code == 0
@@ -90,7 +90,16 @@ def test_apply_with_parallel(cli_runner, mock_orchestrator):
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
             main,
-            ["apply", "--env", "test", "--auto-approve", "--parallel", "--max-workers", "8"],
+            [
+                "infra",
+                "apply",
+                "--env",
+                "test",
+                "--auto-approve",
+                "--parallel",
+                "--max-workers",
+                "8",
+            ],
         )
 
         assert result.exit_code == 0
@@ -108,7 +117,7 @@ def test_apply_orchestrator_failure(cli_runner, mock_orchestrator):
     mock_orchestrator.apply.side_effect = Exception("Apply failed")
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["apply", "--env", "test", "--auto-approve"])
+        result = cli_runner.invoke(main, ["infra", "apply", "--env", "test", "--auto-approve"])
 
         assert result.exit_code == 1
         assert "Apply failed" in result.output

@@ -9,7 +9,7 @@ from infrafoundry.core.exceptions import (
     InfraFoundryError,
 )
 
-from ..utils import console, raise_cli_error
+from ...utils import console, raise_cli_error
 
 
 @click.command()

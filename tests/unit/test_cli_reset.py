@@ -40,6 +40,7 @@ def test_reset_dhcpv4_with_auto_approve(cli_runner, mock_orchestrator, mock_opns
         result = cli_runner.invoke(
             main,
             [
+                "infra",
                 "reset",
                 "--env",
                 "test",
@@ -65,6 +66,7 @@ def test_reset_dhcpv6_with_auto_approve(cli_runner, mock_orchestrator, mock_opns
         result = cli_runner.invoke(
             main,
             [
+                "infra",
                 "reset",
                 "--env",
                 "test",
@@ -90,6 +92,7 @@ def test_reset_both_dhcp_versions(cli_runner, mock_orchestrator, mock_opnsense_p
         result = cli_runner.invoke(
             main,
             [
+                "infra",
                 "reset",
                 "--env",
                 "test",
@@ -116,6 +119,7 @@ def test_reset_with_confirmation(cli_runner, mock_orchestrator, mock_opnsense_pr
         result = cli_runner.invoke(
             main,
             [
+                "infra",
                 "reset",
                 "--env",
                 "test",
@@ -141,6 +145,7 @@ def test_reset_user_cancels(cli_runner, mock_orchestrator, mock_opnsense_provide
         result = cli_runner.invoke(
             main,
             [
+                "infra",
                 "reset",
                 "--env",
                 "test",
@@ -163,6 +168,7 @@ def test_reset_provider_not_found(cli_runner, mock_orchestrator):
         result = cli_runner.invoke(
             main,
             [
+                "infra",
                 "reset",
                 "--env",
                 "test",

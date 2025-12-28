@@ -75,7 +75,7 @@ def test_resources_filter_by_environment(cli_runner, mock_orchestrator, sample_r
     mock_orchestrator.state_manager.get_resources.return_value = [sample_resources[0]]
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["resources", "--env", "test"])
+        result = cli_runner.invoke(main, ["state", "resources", "--env", "test"])
 
         assert result.exit_code == 0
         mock_orchestrator.state_manager.get_resources.assert_called_once_with(
@@ -91,7 +91,7 @@ def test_resources_filter_by_provider(cli_runner, mock_orchestrator, sample_reso
     mock_orchestrator.state_manager.get_resources.return_value = [sample_resources[0]]
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["resources", "--provider", "proxmox"])
+        result = cli_runner.invoke(main, ["state", "resources", "--provider", "proxmox"])
 
         assert result.exit_code == 0
         mock_orchestrator.state_manager.get_resources.assert_called_once_with(
@@ -107,7 +107,7 @@ def test_resources_filter_by_type(cli_runner, mock_orchestrator, sample_resource
     mock_orchestrator.state_manager.get_resources.return_value = [sample_resources[0]]
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["resources", "--type", "vm"])
+        result = cli_runner.invoke(main, ["state", "resources", "--type", "vm"])
 
         assert result.exit_code == 0
         mock_orchestrator.state_manager.get_resources.assert_called_once_with(
@@ -123,7 +123,7 @@ def test_resources_filter_by_state(cli_runner, mock_orchestrator, sample_resourc
     mock_orchestrator.state_manager.get_resources.return_value = sample_resources
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["resources", "--state", "ACTIVE"])
+        result = cli_runner.invoke(main, ["state", "resources", "--state", "ACTIVE"])
 
         assert result.exit_code == 0
         # Check that ACTIVE state appears somewhere in the output
@@ -146,7 +146,7 @@ def test_resources_no_resources_found(cli_runner, mock_orchestrator):
 def test_resources_invalid_state(cli_runner, mock_orchestrator):
     """Test resources command with invalid state."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["resources", "--state", "INVALID"])
+        result = cli_runner.invoke(main, ["state", "resources", "--state", "INVALID"])
 
         assert result.exit_code != 0
         assert "Invalid state" in result.output

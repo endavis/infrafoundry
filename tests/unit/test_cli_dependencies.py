@@ -29,7 +29,7 @@ def test_dependencies_mermaid_output(monkeypatch):
 
     monkeypatch.setattr(cli_main, "_get_orchestrator", fake_load_orchestrator)
 
-    result = runner.invoke(main, ["dependencies", "--env", "dev", "--format", "mermaid"])
+    result = runner.invoke(main, ["analyze", "dependencies", "--env", "dev", "--format", "mermaid"])
 
     assert result.exit_code == 0
     assert "graph TD" in result.output
@@ -52,7 +52,7 @@ def test_dependencies_list_output(monkeypatch):
 
     monkeypatch.setattr(cli_main, "_get_orchestrator", fake_load_orchestrator)
 
-    result = runner.invoke(main, ["dependencies", "--env", "dev"])
+    result = runner.invoke(main, ["analyze", "dependencies", "--env", "dev"])
 
     assert result.exit_code == 0
     assert "Batch 1" in result.output
@@ -83,7 +83,9 @@ def test_dependencies_with_resource_flag(monkeypatch):
 
     monkeypatch.setattr(cli_main, "_get_orchestrator", fake_load_orchestrator)
 
-    result = runner.invoke(main, ["dependencies", "--env", "dev", "--resource", "proxmox:vm1"])
+    result = runner.invoke(
+        main, ["analyze", "dependencies", "--env", "dev", "--resource", "proxmox:vm1"]
+    )
 
     assert result.exit_code == 0
     assert "Dependency analysis for proxmox:vm1" in result.output

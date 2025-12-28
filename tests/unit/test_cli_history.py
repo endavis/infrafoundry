@@ -78,7 +78,7 @@ def test_history_filter_by_env(cli_runner, mock_orchestrator, sample_deployments
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployments[0]]
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["history", "--env", "test"])
+        result = cli_runner.invoke(main, ["infra", "history", "--env", "test"])
 
         assert result.exit_code == 0, (
             f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
@@ -97,7 +97,7 @@ def test_history_filter_by_command(cli_runner, mock_orchestrator, sample_deploym
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployments[0]]
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["history", "--command", "apply"])
+        result = cli_runner.invoke(main, ["infra", "history", "--command", "apply"])
 
         assert result.exit_code == 0, (
             f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
@@ -116,7 +116,7 @@ def test_history_filter_by_status(cli_runner, mock_orchestrator, sample_deployme
     mock_orchestrator.state_manager.get_deployment_history.return_value = sample_deployments
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["history", "--status", "completed"])
+        result = cli_runner.invoke(main, ["infra", "history", "--status", "completed"])
 
         assert result.exit_code == 0
         call_args = mock_orchestrator.state_manager.get_deployment_history.call_args[1]
@@ -128,7 +128,7 @@ def test_history_with_limit(cli_runner, mock_orchestrator, sample_deployments):
     mock_orchestrator.state_manager.get_deployment_history.return_value = sample_deployments
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["history", "--limit", "10"])
+        result = cli_runner.invoke(main, ["infra", "history", "--limit", "10"])
 
         assert result.exit_code == 0
         mock_orchestrator.state_manager.get_deployment_history.assert_called_once_with(
@@ -145,7 +145,7 @@ def test_history_exclude_dry_runs(cli_runner, mock_orchestrator, sample_deployme
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployments[0]]
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["history", "--exclude-dry-runs"])
+        result = cli_runner.invoke(main, ["infra", "history", "--exclude-dry-runs"])
 
         assert result.exit_code == 0
         mock_orchestrator.state_manager.get_deployment_history.assert_called_once_with(

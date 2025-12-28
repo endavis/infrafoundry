@@ -39,7 +39,7 @@ def test_diff_no_changes():
         mock_cm.return_value = Mock()
         mock_diff.return_value = _make_result("dev", "prod", [], [], [], [])
 
-        result = runner.invoke(main, ["diff", "--env-a", "dev", "--env-b", "prod"])
+        result = runner.invoke(main, ["config", "diff", "--env-a", "dev", "--env-b", "prod"])
 
         assert result.exit_code == 0
         assert "No differences found." in result.output
@@ -63,7 +63,7 @@ def test_diff_with_changes():
             changed=["proxmox:vm-changed"],
         )
 
-        result = runner.invoke(main, ["diff", "--env-a", "dev", "--env-b", "prod"])
+        result = runner.invoke(main, ["config", "diff", "--env-a", "dev", "--env-b", "prod"])
 
         assert result.exit_code == 0
         assert "Settings differences" in result.output
@@ -85,7 +85,9 @@ def test_diff_with_nonexistent_environment():
         mock_cm.return_value = Mock()
         mock_diff.side_effect = EnvironmentNotFoundError("Environment 'nonexistent' not found")
 
-        result = runner.invoke(main, ["diff", "--env-a", "nonexistent", "--env-b", "prod"])
+        result = runner.invoke(
+            main, ["config", "diff", "--env-a", "nonexistent", "--env-b", "prod"]
+        )
 
         assert result.exit_code == 1
         assert "Failed to diff configurations" in result.output
@@ -115,7 +117,9 @@ def test_diff_with_verbose_mode():
             },
         )
 
-        result = runner.invoke(main, ["diff", "--env-a", "dev", "--env-b", "prod", "--verbose"])
+        result = runner.invoke(
+            main, ["config", "diff", "--env-a", "dev", "--env-b", "prod", "--verbose"]
+        )
 
         assert result.exit_code == 0
         assert "Resources changed" in result.output

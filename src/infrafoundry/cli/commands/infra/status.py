@@ -4,7 +4,7 @@ import click
 
 from infrafoundry.core.orchestrator import Orchestrator
 
-from ..decorators import with_orchestrator
+from ...decorators import with_orchestrator
 
 
 @click.command()

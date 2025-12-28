@@ -6,7 +6,7 @@ import click
 
 from infrafoundry.core.config import ConfigManager
 
-from ..utils import console
+from ...utils import console
 
 
 def _create_backend_group() -> click.Group:

@@ -42,7 +42,9 @@ def test_impact_low_risk(cli_runner, mock_orchestrator, mock_dependency_graph):
     mock_orchestrator.build_dependency_graph.return_value = mock_dependency_graph
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["impact", "--env", "test", "--resource", "vm-01"])
+        result = cli_runner.invoke(
+            main, ["analyze", "impact", "--env", "test", "--resource", "vm-01"]
+        )
 
         assert result.exit_code == 0
         assert "Impact Analysis for: vm-01" in result.output
@@ -64,7 +66,9 @@ def test_impact_medium_risk(cli_runner, mock_orchestrator, mock_dependency_graph
     mock_orchestrator.build_dependency_graph.return_value = mock_dependency_graph
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["impact", "--env", "test", "--resource", "vm-01"])
+        result = cli_runner.invoke(
+            main, ["analyze", "impact", "--env", "test", "--resource", "vm-01"]
+        )
 
         assert result.exit_code == 0
         assert "MEDIUM" in result.output
@@ -84,7 +88,9 @@ def test_impact_high_risk(cli_runner, mock_orchestrator, mock_dependency_graph):
     mock_orchestrator.build_dependency_graph.return_value = mock_dependency_graph
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["impact", "--env", "test", "--resource", "vm-01"])
+        result = cli_runner.invoke(
+            main, ["analyze", "impact", "--env", "test", "--resource", "vm-01"]
+        )
 
         assert result.exit_code == 0
         assert "HIGH" in result.output
@@ -97,7 +103,9 @@ def test_impact_resource_not_found(cli_runner, mock_orchestrator, mock_dependenc
     mock_orchestrator.build_dependency_graph.return_value = mock_dependency_graph
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["impact", "--env", "test", "--resource", "nonexistent"])
+        result = cli_runner.invoke(
+            main, ["analyze", "impact", "--env", "test", "--resource", "nonexistent"]
+        )
 
         assert result.exit_code == 0
         assert "Resource 'nonexistent' not found" in result.output
@@ -109,7 +117,9 @@ def test_impact_orchestrator_failure(cli_runner, mock_orchestrator):
     mock_orchestrator.build_dependency_graph.side_effect = Exception("Impact analysis failed")
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["impact", "--env", "test", "--resource", "vm-01"])
+        result = cli_runner.invoke(
+            main, ["analyze", "impact", "--env", "test", "--resource", "vm-01"]
+        )
 
         assert result.exit_code == 1
         assert "Impact analysis failed" in result.output
