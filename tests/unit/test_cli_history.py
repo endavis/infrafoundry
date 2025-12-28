@@ -54,7 +54,7 @@ def test_history_basic(cli_runner, mock_orchestrator, sample_deployments):
     mock_orchestrator.state_manager.get_deployment_history.return_value = sample_deployments
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["history"])
+        result = cli_runner.invoke(main, ["infra", "history"])
 
         assert result.exit_code == 0, (
             f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
@@ -162,7 +162,7 @@ def test_history_no_deployments(cli_runner, mock_orchestrator):
     mock_orchestrator.state_manager.get_deployment_history.return_value = []
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["history"])
+        result = cli_runner.invoke(main, ["infra", "history"])
 
         assert result.exit_code == 0
         assert "No deployment history found" in result.output

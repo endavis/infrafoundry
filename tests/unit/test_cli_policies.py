@@ -50,7 +50,7 @@ def test_policies_list_all(cli_runner, mock_orchestrator, sample_policies):
     mock_orchestrator.policy_engine.policies = sample_policies
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["policies"])
+        result = cli_runner.invoke(main, ["policy", "list"])
 
         assert result.exit_code == 0
         assert "All Policies" in result.output
@@ -79,7 +79,7 @@ def test_policies_no_policies_found(cli_runner, mock_orchestrator):
     mock_orchestrator.policy_engine.policies = []
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["policies"])
+        result = cli_runner.invoke(main, ["policy", "list"])
 
         assert result.exit_code == 0
         assert "No policies found" in result.output

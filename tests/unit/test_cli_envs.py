@@ -36,8 +36,10 @@ def test_envs_list_environments(cli_runner, mock_config_manager):
     mock_config_manager.list_environments.return_value = ["test", "prod"]
     mock_config_manager.load_environment.side_effect = [mock_env1, mock_env2]
 
-    with patch("infrafoundry.cli.commands.envs.ConfigManager", return_value=mock_config_manager):
-        result = cli_runner.invoke(main, ["envs"])
+    with patch(
+        "infrafoundry.cli.commands.config.envs.ConfigManager", return_value=mock_config_manager
+    ):
+        result = cli_runner.invoke(main, ["config", "envs"])
 
         assert result.exit_code == 0
         assert "Available environments:" in result.output
@@ -50,8 +52,10 @@ def test_envs_no_environments(cli_runner, mock_config_manager):
     """Test envs command when no environments are found."""
     mock_config_manager.list_environments.return_value = []
 
-    with patch("infrafoundry.cli.commands.envs.ConfigManager", return_value=mock_config_manager):
-        result = cli_runner.invoke(main, ["envs"])
+    with patch(
+        "infrafoundry.cli.commands.config.envs.ConfigManager", return_value=mock_config_manager
+    ):
+        result = cli_runner.invoke(main, ["config", "envs"])
 
         assert result.exit_code == 0
         assert "No environments found" in result.output
@@ -65,10 +69,12 @@ def test_envs_with_config_dir(cli_runner, mock_config_manager, tmp_path):
     mock_env.providers = ["proxmox"]
     mock_config_manager.load_environment.return_value = mock_env
 
-    with patch("infrafoundry.cli.commands.envs.ConfigManager", return_value=mock_config_manager):
+    with patch(
+        "infrafoundry.cli.commands.config.envs.ConfigManager", return_value=mock_config_manager
+    ):
         result = cli_runner.invoke(
             main,
-            ["--config-dir", str(tmp_path), "envs"],
+            ["--config-dir", str(tmp_path), "config", "envs"],
         )
 
         assert result.exit_code == 0
@@ -84,8 +90,10 @@ def test_envs_no_description(cli_runner, mock_config_manager):
     mock_config_manager.list_environments.return_value = ["test"]
     mock_config_manager.load_environment.return_value = mock_env
 
-    with patch("infrafoundry.cli.commands.envs.ConfigManager", return_value=mock_config_manager):
-        result = cli_runner.invoke(main, ["envs"])
+    with patch(
+        "infrafoundry.cli.commands.config.envs.ConfigManager", return_value=mock_config_manager
+    ):
+        result = cli_runner.invoke(main, ["config", "envs"])
 
         assert result.exit_code == 0
         assert "test: No description" in result.output

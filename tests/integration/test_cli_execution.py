@@ -243,7 +243,7 @@ class TestCLIEnvs:
             with patch(
                 "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
             ):
-                result = cli_runner.invoke(cli, ["envs"], env=test_env)
+                result = cli_runner.invoke(cli, ["config", "envs"], env=test_env)
 
                 # Command should execute (exit codes may vary based on implementation)
                 assert "dev" in result.output or result.exit_code in [0, 1]

@@ -33,8 +33,8 @@ def test_diff_no_changes():
     runner = CliRunner()
 
     with (
-        patch("infrafoundry.cli.commands.diff.ConfigManager") as mock_cm,
-        patch("infrafoundry.cli.commands.diff.diff_environments") as mock_diff,
+        patch("infrafoundry.cli.commands.config.diff.ConfigManager") as mock_cm,
+        patch("infrafoundry.cli.commands.config.diff.diff_environments") as mock_diff,
     ):
         mock_cm.return_value = Mock()
         mock_diff.return_value = _make_result("dev", "prod", [], [], [], [])
@@ -50,8 +50,8 @@ def test_diff_with_changes():
     runner = CliRunner()
 
     with (
-        patch("infrafoundry.cli.commands.diff.ConfigManager") as mock_cm,
-        patch("infrafoundry.cli.commands.diff.diff_environments") as mock_diff,
+        patch("infrafoundry.cli.commands.config.diff.ConfigManager") as mock_cm,
+        patch("infrafoundry.cli.commands.config.diff.diff_environments") as mock_diff,
     ):
         mock_cm.return_value = Mock()
         mock_diff.return_value = _make_result(
@@ -79,8 +79,8 @@ def test_diff_with_nonexistent_environment():
     runner = CliRunner()
 
     with (
-        patch("infrafoundry.cli.commands.diff.ConfigManager") as mock_cm,
-        patch("infrafoundry.cli.commands.diff.diff_environments") as mock_diff,
+        patch("infrafoundry.cli.commands.config.diff.ConfigManager") as mock_cm,
+        patch("infrafoundry.cli.commands.config.diff.diff_environments") as mock_diff,
     ):
         mock_cm.return_value = Mock()
         mock_diff.side_effect = EnvironmentNotFoundError("Environment 'nonexistent' not found")
@@ -98,8 +98,8 @@ def test_diff_with_verbose_mode():
     runner = CliRunner()
 
     with (
-        patch("infrafoundry.cli.commands.diff.ConfigManager") as mock_cm,
-        patch("infrafoundry.cli.commands.diff.diff_environments") as mock_diff,
+        patch("infrafoundry.cli.commands.config.diff.ConfigManager") as mock_cm,
+        patch("infrafoundry.cli.commands.config.diff.diff_environments") as mock_diff,
     ):
         mock_cm.return_value = Mock()
         mock_diff.return_value = _make_result(
