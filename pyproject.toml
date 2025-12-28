@@ -38,6 +38,14 @@ dev = [
 [project.scripts]
 foundry = "infrafoundry.cli:foundry"
 
+[project.entry-points."infrafoundry.plugin_types"]
+provider = "infrafoundry.providers.plugin_type:ProviderPluginType"
+secret_backend = "infrafoundry.secrets.plugin_type:SecretBackendPluginType"
+
+[project.entry-points."infrafoundry.secrets"]
+env = "infrafoundry.secrets.backends.env:register"
+file = "infrafoundry.secrets.backends.file:register"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
