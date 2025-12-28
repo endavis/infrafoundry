@@ -215,11 +215,11 @@ def drift_remediate(
         raise_cli_error("Drift remediation failed", exc)
 
 
-@drift.command("log")
+@drift.command("history")
 @click.option("--env", "-e", help="Filter by environment name")
 @click.option("--limit", "-n", type=int, default=10, help="Number of entries to show (default: 10)")
 @with_orchestrator("Failed to retrieve remediation history")
-def drift_log(
+def drift_history(
     _ctx: click.Context,
     orchestrator: Orchestrator,
     env: str | None,
