@@ -35,7 +35,7 @@ def test_graph_mermaid_format(cli_runner, mock_orchestrator, mock_dependency_gra
     mock_orchestrator.build_dependency_graph.return_value = mock_dependency_graph
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["graph", "--env", "test"])
+        result = cli_runner.invoke(main, ["analyze", "graph", "--env", "test"])
 
         assert result.exit_code == 0
         assert "graph TD" in result.output
@@ -48,7 +48,9 @@ def test_graph_explicit_mermaid_format(cli_runner, mock_orchestrator, mock_depen
     mock_orchestrator.build_dependency_graph.return_value = mock_dependency_graph
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["graph", "--env", "test", "--format", "mermaid"])
+        result = cli_runner.invoke(
+            main, ["analyze", "graph", "--env", "test", "--format", "mermaid"]
+        )
 
         assert result.exit_code == 0
         assert "graph TD" in result.output
@@ -59,7 +61,7 @@ def test_graph_orchestrator_failure(cli_runner, mock_orchestrator):
     mock_orchestrator.build_dependency_graph.side_effect = Exception("Graph generation failed")
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["graph", "--env", "test"])
+        result = cli_runner.invoke(main, ["analyze", "graph", "--env", "test"])
 
         assert result.exit_code == 1
         assert "Graph generation failed" in result.output

@@ -43,6 +43,7 @@ def test_migrate_kea_dhcp(cli_runner, mock_orchestrator, mock_opnsense_provider,
         result = cli_runner.invoke(
             main,
             [
+                "config",
                 "migrate",
                 "--env",
                 "test",
@@ -70,6 +71,7 @@ def test_migrate_isc_to_kea(cli_runner, mock_orchestrator, mock_opnsense_provide
         result = cli_runner.invoke(
             main,
             [
+                "config",
                 "migrate",
                 "--env",
                 "test",
@@ -97,6 +99,7 @@ def test_migrate_with_interfaces(cli_runner, mock_orchestrator, mock_opnsense_pr
         result = cli_runner.invoke(
             main,
             [
+                "config",
                 "migrate",
                 "--env",
                 "test",
@@ -127,6 +130,7 @@ def test_migrate_with_dry_run(cli_runner, mock_orchestrator, mock_opnsense_provi
         result = cli_runner.invoke(
             main,
             [
+                "config",
                 "migrate",
                 "--env",
                 "test",
@@ -159,6 +163,7 @@ def test_migrate_with_custom_output(
         result = cli_runner.invoke(
             main,
             [
+                "config",
                 "migrate",
                 "--env",
                 "test",
@@ -184,6 +189,7 @@ def test_migrate_provider_not_found(cli_runner, mock_orchestrator, tmp_path):
         result = cli_runner.invoke(
             main,
             [
+                "config",
                 "migrate",
                 "--env",
                 "test",

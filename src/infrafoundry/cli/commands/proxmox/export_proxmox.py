@@ -9,7 +9,7 @@ import click
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.providers.proxmox.exporter import ProxmoxConfigExporter
 
-from ..utils import console, raise_cli_error
+from ...utils import console, raise_cli_error
 
 
 @click.command(name="export-proxmox")

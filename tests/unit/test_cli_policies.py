@@ -65,7 +65,7 @@ def test_policies_list_for_environment(cli_runner, mock_orchestrator, sample_pol
     mock_orchestrator.policy_engine.get_policies_for_environment.return_value = [sample_policies[0]]
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["policies", "--env", "dev"])
+        result = cli_runner.invoke(main, ["policy", "list", "--env", "dev"])
 
         assert result.exit_code == 0
         assert "Policies for dev" in result.output

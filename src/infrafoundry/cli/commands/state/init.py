@@ -7,7 +7,7 @@ import click
 
 from infrafoundry.core.exceptions import InfraFoundryError, StateError
 
-from ..utils import console, raise_cli_error
+from ...utils import console, raise_cli_error
 
 
 @click.command()

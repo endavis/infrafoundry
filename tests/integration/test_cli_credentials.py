@@ -322,7 +322,7 @@ class TestCLICredentialLoading:
                 mock_orchestrator.return_value = mock_orch
 
                 # Don't pass --config-dir
-                _result = cli_runner.invoke(cli, ["plan", "--env", "dev"])
+                _result = cli_runner.invoke(cli, ["infra", "plan", "--env", "dev"])
 
                 # Should still call credential loader (with None or default path)
                 mock_load.assert_called_once()

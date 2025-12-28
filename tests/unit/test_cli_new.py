@@ -75,7 +75,7 @@ def test_new_create_blueprint(cli_runner, mock_blueprint_manager, tmp_path):
     with patch(
         "infrafoundry.cli.commands.new.BlueprintManager", return_value=mock_blueprint_manager
     ):
-        result = cli_runner.invoke(main, ["new", "create", "basic-vm", str(target_dir)])
+        result = cli_runner.invoke(main, ["config", "new", "create", "basic-vm", str(target_dir)])
 
         assert result.exit_code == 0
         assert "Successfully created project" in result.output
@@ -92,7 +92,9 @@ def test_new_create_blueprint_not_found(cli_runner, mock_blueprint_manager, tmp_
     with patch(
         "infrafoundry.cli.commands.new.BlueprintManager", return_value=mock_blueprint_manager
     ):
-        result = cli_runner.invoke(main, ["new", "create", "nonexistent", str(target_dir)])
+        result = cli_runner.invoke(
+            main, ["config", "new", "create", "nonexistent", str(target_dir)]
+        )
 
         assert result.exit_code == 0  # Error is caught and printed
         assert "Error:" in result.output
@@ -106,7 +108,7 @@ def test_new_create_blueprint_unexpected_error(cli_runner, mock_blueprint_manage
     with patch(
         "infrafoundry.cli.commands.new.BlueprintManager", return_value=mock_blueprint_manager
     ):
-        result = cli_runner.invoke(main, ["new", "create", "basic-vm", str(target_dir)])
+        result = cli_runner.invoke(main, ["config", "new", "create", "basic-vm", str(target_dir)])
 
         assert result.exit_code == 0  # Error is caught and printed
         assert "Unexpected error:" in result.output

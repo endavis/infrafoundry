@@ -5,7 +5,7 @@ from rich.table import Table
 
 from infrafoundry.core.blueprints import BlueprintManager
 
-from ..utils import console
+from ...utils import console
 
 
 @click.group(invoke_without_command=True)

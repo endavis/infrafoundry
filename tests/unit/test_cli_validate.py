@@ -30,7 +30,7 @@ def test_validate_success(cli_runner, mock_orchestrator):
     }
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["validate", "--env", "test"])
+        result = cli_runner.invoke(main, ["config", "validate", "--env", "test"])
 
         assert result.exit_code == 0
         mock_orchestrator.validate.assert_called_once_with(
@@ -48,7 +48,7 @@ def test_validate_with_errors(cli_runner, mock_orchestrator):
     }
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["validate", "--env", "test"])
+        result = cli_runner.invoke(main, ["config", "validate", "--env", "test"])
 
         assert result.exit_code == 1
 
@@ -62,7 +62,7 @@ def test_validate_with_resource_filter(cli_runner, mock_orchestrator):
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
             main,
-            ["validate", "--env", "test", "-r", "vm-01", "-r", "vm-02"],
+            ["config", "validate", "--env", "test", "-r", "vm-01", "-r", "vm-02"],
         )
 
         assert result.exit_code == 0
@@ -80,7 +80,7 @@ def test_validate_verbose(cli_runner, mock_orchestrator):
     }
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["validate", "--env", "test", "--verbose"])
+        result = cli_runner.invoke(main, ["config", "validate", "--env", "test", "--verbose"])
 
         assert result.exit_code == 0
         mock_orchestrator.validate.assert_called_once_with(
@@ -95,7 +95,7 @@ def test_validate_orchestrator_failure(cli_runner, mock_orchestrator):
     mock_orchestrator.validate.side_effect = Exception("Validation failed")
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["validate", "--env", "test"])
+        result = cli_runner.invoke(main, ["config", "validate", "--env", "test"])
 
         assert result.exit_code == 1
         assert "Validation failed" in result.output

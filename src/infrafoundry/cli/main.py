@@ -147,7 +147,7 @@ def _load_env_credentials(env_name: str, config_dir: Path | None = None) -> None
 
 
 @click.group()
-@click.version_option(version="0.1.0", prog_name="infrafoundry")
+@click.version_option(version="0.1.0", prog_name="foundry")
 @click.option(
     "--config-dir",
     "-c",
@@ -170,7 +170,7 @@ def _load_env_credentials(env_name: str, config_dir: Path | None = None) -> None
     help="Fail when cloud-init snippets are missing. Env: INFRAFOUNDRY_FAIL_ON_MISSING_SNIPPETS",
 )
 @click.pass_context
-def main(
+def foundry(
     ctx: click.Context,
     config_dir: Path | None,
     strict_mode: bool | None,
@@ -195,13 +195,25 @@ def main(
     ctx.obj["strict_config"] = strict_config
 
 
-# Auto-discover and register commands from commands/ directory
-from infrafoundry.cli.command_loader import load_commands
+# Import and register command groups
+from infrafoundry.cli.commands.analyze import analyze
+from infrafoundry.cli.commands.config import config
+from infrafoundry.cli.commands.infra import infra
+from infrafoundry.cli.commands.policy import policy
+from infrafoundry.cli.commands.proxmox import proxmox
+from infrafoundry.cli.commands.secrets import secrets
 from infrafoundry.cli.commands.state import state
 
-load_commands(main)
-main.add_command(state)
+foundry.add_command(infra)
+foundry.add_command(config)
+foundry.add_command(state)
+foundry.add_command(secrets)
+foundry.add_command(analyze)
+foundry.add_command(policy)
+foundry.add_command(proxmox)
 
+# Alias for backwards compatibility during development
+main = foundry
 
 if __name__ == "__main__":
-    main()
+    foundry()

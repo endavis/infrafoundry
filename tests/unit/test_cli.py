@@ -36,14 +36,14 @@ class TestCLICommands:
     def test_list_command_requires_env(self):
         """Test list command requires --env flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["list"])
+        result = runner.invoke(cli, ["state", "list"])
 
         assert result.exit_code != 0
 
     def test_plan_command_requires_env(self):
         """Test plan command requires --env flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["plan"])
+        result = runner.invoke(cli, ["infra", "plan"])
 
         assert result.exit_code != 0
 
@@ -58,7 +58,7 @@ class TestCLICommands:
             mock_orchestrator.plan.return_value = {}
             mock_get.return_value = mock_orchestrator
 
-            result = runner.invoke(cli, ["--strict-mode", "plan", "--env", "dev"])
+            result = runner.invoke(cli, ["--strict-mode", "infra", "plan", "--env", "dev"])
 
             assert result.exit_code == 0
             call_args, _ = mock_get.call_args
@@ -79,7 +79,7 @@ class TestCLICommands:
             mock_get.return_value = mock_orchestrator
 
             monkeypatch.setenv("INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS", "1")
-            result = runner.invoke(cli, ["plan", "--env", "dev"])
+            result = runner.invoke(cli, ["infra", "plan", "--env", "dev"])
 
             assert result.exit_code == 0
             call_args, _ = mock_get.call_args
@@ -90,35 +90,35 @@ class TestCLICommands:
     def test_apply_command_requires_env(self):
         """Test apply command requires --env flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["apply"])
+        result = runner.invoke(cli, ["infra", "apply"])
 
         assert result.exit_code != 0
 
     def test_destroy_command_requires_env(self):
         """Test destroy command requires --env flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["destroy"])
+        result = runner.invoke(cli, ["infra", "destroy"])
 
         assert result.exit_code != 0
 
     def test_status_command_requires_env(self):
         """Test status command requires --env flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["status"])
+        result = runner.invoke(cli, ["infra", "status"])
 
         assert result.exit_code != 0
 
     def test_drift_command_requires_env(self):
         """Test drift command requires --env flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["drift"])
+        result = runner.invoke(cli, ["infra", "drift"])
 
         assert result.exit_code != 0
 
     def test_rollback_command_requires_deployment_id(self):
         """Test rollback command requires deployment ID."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["rollback"])
+        result = runner.invoke(cli, ["infra", "rollback"])
 
         assert result.exit_code != 0
 
@@ -158,28 +158,28 @@ class TestSecretsCommands:
     def test_reset_command_requires_env(self):
         """Test reset command requires --env flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["reset"])
+        result = runner.invoke(cli, ["infra", "reset"])
 
         assert result.exit_code != 0
 
     def test_reset_command_requires_provider(self):
         """Test reset command requires --provider flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["reset", "--env", "test"])
+        result = runner.invoke(cli, ["infra", "reset", "--env", "test"])
 
         assert result.exit_code != 0
 
     def test_reset_command_requires_component(self):
         """Test reset command requires --component flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["reset", "--env", "test", "--provider", "opnsense"])
+        result = runner.invoke(cli, ["infra", "reset", "--env", "test", "--provider", "opnsense"])
 
         assert result.exit_code != 0
 
     def test_reset_command_help(self):
         """Test reset command help output."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["reset", "--help"])
+        result = runner.invoke(cli, ["infra", "reset", "--help"])
 
         assert result.exit_code == 0
         assert "reset" in result.output.lower()
@@ -188,28 +188,30 @@ class TestSecretsCommands:
     def test_migrate_command_requires_env(self):
         """Test migrate command requires --env flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["migrate"])
+        result = runner.invoke(cli, ["config", "migrate"])
 
         assert result.exit_code != 0
 
     def test_migrate_command_requires_provider(self):
         """Test migrate command requires --provider flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["migrate", "--env", "test"])
+        result = runner.invoke(cli, ["config", "migrate", "--env", "test"])
 
         assert result.exit_code != 0
 
     def test_migrate_command_requires_component(self):
         """Test migrate command requires --component flag."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["migrate", "--env", "test", "--provider", "opnsense"])
+        result = runner.invoke(
+            cli, ["config", "migrate", "--env", "test", "--provider", "opnsense"]
+        )
 
         assert result.exit_code != 0
 
     def test_migrate_command_help(self):
         """Test migrate command help output."""
         runner = CliRunner()
-        result = runner.invoke(cli, ["migrate", "--help"])
+        result = runner.invoke(cli, ["config", "migrate", "--help"])
 
         assert result.exit_code == 0
         assert "migrate" in result.output.lower()

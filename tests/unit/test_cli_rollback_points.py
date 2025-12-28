@@ -49,7 +49,7 @@ def test_rollback_points_list(cli_runner, mock_orchestrator, sample_rollback_poi
     mock_orchestrator.state_manager.get_rollback_points.return_value = sample_rollback_points
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["rollback-points", "--env", "test"])
+        result = cli_runner.invoke(main, ["infra", "rollback", "list", "--env", "test"])
 
         assert result.exit_code == 0
         assert "Rollback Points for test" in result.output
@@ -67,7 +67,9 @@ def test_rollback_points_with_limit(cli_runner, mock_orchestrator, sample_rollba
     mock_orchestrator.state_manager.get_rollback_points.return_value = sample_rollback_points
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["rollback-points", "--env", "test", "--limit", "5"])
+        result = cli_runner.invoke(
+            main, ["infra", "rollback", "list", "--env", "test", "--limit", "5"]
+        )
 
         assert result.exit_code == 0
         mock_orchestrator.state_manager.get_rollback_points.assert_called_once_with("test", limit=5)
@@ -78,7 +80,7 @@ def test_rollback_points_no_points_found(cli_runner, mock_orchestrator):
     mock_orchestrator.state_manager.get_rollback_points.return_value = []
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["rollback-points", "--env", "test"])
+        result = cli_runner.invoke(main, ["infra", "rollback", "list", "--env", "test"])
 
         assert result.exit_code == 0
         assert "No rollback points found for test" in result.output
@@ -90,7 +92,7 @@ def test_rollback_points_orchestrator_failure(cli_runner, mock_orchestrator):
     mock_orchestrator.state_manager.get_rollback_points.side_effect = Exception("Database error")
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["rollback-points", "--env", "test"])
+        result = cli_runner.invoke(main, ["infra", "rollback", "list", "--env", "test"])
 
         assert result.exit_code == 1
         assert "Failed to list rollback points" in result.output

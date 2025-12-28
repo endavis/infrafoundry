@@ -8,7 +8,7 @@ import click
 from infrafoundry.core.exceptions import InfraFoundryError, SecretError
 from infrafoundry.core.secrets import SecretManager
 
-from ..utils import console, raise_cli_error
+from ...utils import console, raise_cli_error
 
 
 @click.group()
