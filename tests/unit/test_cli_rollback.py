@@ -25,9 +25,7 @@ def mock_orchestrator():
 def test_rollback_with_auto_approve(cli_runner, mock_orchestrator):
     """Test rollback command with auto-approve."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(
-            main, ["infra", "rollback", "to", "--deployment-id", "123", "--auto-approve"]
-        )
+        result = cli_runner.invoke(main, ["infra", "rollback", "to", "123", "--auto-approve"])
 
         assert result.exit_code == 0
         # Verify confirm_callback is passed
@@ -40,7 +38,7 @@ def test_rollback_with_auto_approve(cli_runner, mock_orchestrator):
 def test_rollback_basic(cli_runner, mock_orchestrator):
     """Test basic rollback command (orchestrator handles confirmation)."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["infra", "rollback", "to", "--deployment-id", "123"])
+        result = cli_runner.invoke(main, ["infra", "rollback", "to", "123"])
 
         assert result.exit_code == 0
         call_args = mock_orchestrator.rollback.call_args
@@ -54,9 +52,7 @@ def test_rollback_orchestrator_failure(cli_runner, mock_orchestrator):
     mock_orchestrator.rollback.side_effect = Exception("Rollback failed")
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(
-            main, ["infra", "rollback", "to", "--deployment-id", "123", "--auto-approve"]
-        )
+        result = cli_runner.invoke(main, ["infra", "rollback", "to", "123", "--auto-approve"])
 
         assert result.exit_code == 1
         assert "Rollback command failed" in result.output
