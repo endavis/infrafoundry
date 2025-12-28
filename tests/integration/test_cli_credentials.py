@@ -64,7 +64,7 @@ class TestCLICredentialLoading:
 
                 _result = cli_runner.invoke(
                     cli,
-                    ["--config-dir", str(mock_credentials_setup), "plan", "--env", "dev"],
+                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
                 )
 
                 # Verify credential loading was called
@@ -92,6 +92,7 @@ class TestCLICredentialLoading:
                     [
                         "--config-dir",
                         str(mock_credentials_setup),
+                        "infra",
                         "apply",
                         "--env",
                         "prod",
@@ -117,6 +118,7 @@ class TestCLICredentialLoading:
                     [
                         "--config-dir",
                         str(mock_credentials_setup),
+                        "infra",
                         "destroy",
                         "--env",
                         "staging",
@@ -140,7 +142,14 @@ class TestCLICredentialLoading:
 
                 _result = cli_runner.invoke(
                     cli,
-                    ["--config-dir", str(mock_credentials_setup), "status", "--env", "dev"],
+                    [
+                        "--config-dir",
+                        str(mock_credentials_setup),
+                        "infra",
+                        "status",
+                        "--env",
+                        "dev",
+                    ],
                 )
 
                 # Verify credential loading was called
@@ -163,6 +172,7 @@ class TestCLICredentialLoading:
                     [
                         "--config-dir",
                         str(mock_credentials_setup),
+                        "infra",
                         "drift",
                         "detect",
                         "--env",
@@ -202,7 +212,14 @@ class TestCLICredentialLoading:
 
                     _result = cli_runner.invoke(
                         cli,
-                        ["--config-dir", str(mock_credentials_setup), "plan", "--env", "test"],
+                        [
+                            "--config-dir",
+                            str(mock_credentials_setup),
+                            "infra",
+                            "plan",
+                            "--env",
+                            "test",
+                        ],
                     )
 
                     # After invocation, credentials should have been set
@@ -227,7 +244,7 @@ class TestCLICredentialLoading:
 
                 result = cli_runner.invoke(
                     cli,
-                    ["--config-dir", str(mock_credentials_setup), "plan", "--env", "dev"],
+                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
                 )
 
                 # Command should still run (credentials may be in env vars)
@@ -270,13 +287,13 @@ class TestCLICredentialLoading:
                 # Run plan for dev
                 _result_dev = cli_runner.invoke(
                     cli,
-                    ["--config-dir", str(mock_credentials_setup), "plan", "--env", "dev"],
+                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
                 )
 
                 # Run plan for prod
                 _result_prod = cli_runner.invoke(
                     cli,
-                    ["--config-dir", str(mock_credentials_setup), "plan", "--env", "prod"],
+                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "prod"],
                 )
 
                 # Verify both environments were loaded
@@ -304,7 +321,7 @@ class TestCLICredentialLoading:
 
                 _result = cli_runner.invoke(
                     cli,
-                    ["--config-dir", str(custom_config_dir), "plan", "--env", "dev"],
+                    ["--config-dir", str(custom_config_dir), "infra", "plan", "--env", "dev"],
                 )
 
                 # Verify the custom config dir was passed
@@ -349,7 +366,7 @@ class TestCredentialLoadingDebugLogging:
                 # Enable debug logging
                 result = cli_runner.invoke(
                     cli,
-                    ["--config-dir", str(mock_credentials_setup), "plan", "--env", "dev"],
+                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
                     env={"INFRAFOUNDRY_LOG_LEVEL": "DEBUG"},
                 )
 
@@ -370,7 +387,7 @@ class TestCredentialLoadingDebugLogging:
 
                 result = cli_runner.invoke(
                     cli,
-                    ["--config-dir", str(mock_credentials_setup), "plan", "--env", "dev"],
+                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
                 )
 
                 # Command should run without debug output
