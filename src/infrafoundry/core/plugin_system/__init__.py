@@ -14,6 +14,7 @@ Example:
     >>> providers = registry.list("provider")
 """
 
+from infrafoundry.core.plugin_system.discovery import PluginDiscovery
 from infrafoundry.core.plugin_system.exceptions import (
     PluginConflictError,
     PluginDiscoveryError,
@@ -40,6 +41,7 @@ from infrafoundry.core.plugin_system.registry import (
 
 __all__ = [
     "PluginConflictError",
+    "PluginDiscovery",
     "PluginDiscoveryError",
     "PluginError",
     "PluginLoadError",
