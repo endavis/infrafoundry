@@ -29,6 +29,10 @@ from infrafoundry.core.plugin_system.plugin_type import (
     PluginType,
     ValidationResult,
 )
+from infrafoundry.core.plugin_system.plugin_type_registry import (
+    PluginTypeRegistry,
+    get_type_registry,
+)
 
 __all__ = [
     "PluginConflictError",
@@ -39,7 +43,9 @@ __all__ = [
     "PluginNotFoundError",
     "PluginType",
     "PluginTypeError",
+    "PluginTypeRegistry",
     "PluginValidationError",
     "PluginVersionError",
     "ValidationResult",
+    "get_type_registry",
 ]
