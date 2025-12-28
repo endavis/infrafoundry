@@ -247,7 +247,8 @@ def test_export_proxmox_handles_config_load_error(cli_runner, tmp_path):
     mock_config_manager.load_environment.side_effect = Exception("Environment not found")
 
     with patch(
-        "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager", return_value=mock_config_manager
+        "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager",
+        return_value=mock_config_manager,
     ):
         result = cli_runner.invoke(
             export_proxmox,
