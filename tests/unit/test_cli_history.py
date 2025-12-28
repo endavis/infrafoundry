@@ -56,20 +56,6 @@ def test_history_basic(cli_runner, mock_orchestrator, sample_deployments):
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["history"])
 
-        # Debug output for CI failures
-        if result.exit_code != 0:
-            print("\n=== DEBUG: test_history_basic ===")
-            print(f"Exit code: {result.exit_code}")
-            print(f"Output: {result.output}")
-            if result.exception:
-                print(f"Exception: {result.exception}")
-                import traceback
-
-                traceback.print_exception(
-                    type(result.exception), result.exception, result.exception.__traceback__
-                )
-            print("=================================\n")
-
         assert result.exit_code == 0, (
             f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
         )
@@ -94,20 +80,6 @@ def test_history_filter_by_env(cli_runner, mock_orchestrator, sample_deployments
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["history", "--env", "test"])
 
-        # Debug output for CI failures
-        if result.exit_code != 0:
-            print("\n=== DEBUG: test_history_filter_by_env ===")
-            print(f"Exit code: {result.exit_code}")
-            print(f"Output: {result.output}")
-            if result.exception:
-                print(f"Exception: {result.exception}")
-                import traceback
-
-                traceback.print_exception(
-                    type(result.exception), result.exception, result.exception.__traceback__
-                )
-            print("=================================\n")
-
         assert result.exit_code == 0, (
             f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
         )
@@ -126,20 +98,6 @@ def test_history_filter_by_command(cli_runner, mock_orchestrator, sample_deploym
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["history", "--command", "apply"])
-
-        # Debug output for CI failures
-        if result.exit_code != 0:
-            print("\n=== DEBUG: test_history_filter_by_command ===")
-            print(f"Exit code: {result.exit_code}")
-            print(f"Output: {result.output}")
-            if result.exception:
-                print(f"Exception: {result.exception}")
-                import traceback
-
-                traceback.print_exception(
-                    type(result.exception), result.exception, result.exception.__traceback__
-                )
-            print("=================================\n")
 
         assert result.exit_code == 0, (
             f"Expected exit code 0, got {result.exit_code}. Output: {result.output}"
