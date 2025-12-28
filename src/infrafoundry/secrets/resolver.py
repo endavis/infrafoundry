@@ -14,7 +14,11 @@ import logging
 import re
 from typing import Any
 
-from infrafoundry.secrets.protocol import SecretBackend, SecretBackendError
+from infrafoundry.secrets.protocol import (
+    SecretBackend,
+    SecretBackendError,
+    SecretNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +220,7 @@ class SecretResolver:
             logger.debug(f"Resolved secret: {value}")
             return secret_value
 
-        except SecretBackendError as e:
+        except (SecretBackendError, SecretNotFoundError) as e:
             raise SecretResolutionError(f"Failed to resolve secret '{value}': {e}") from e
 
     def resolve_config(self, config: dict[str, Any]) -> dict[str, Any]:
