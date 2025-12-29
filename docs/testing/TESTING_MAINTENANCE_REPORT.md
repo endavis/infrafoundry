@@ -431,4 +431,4 @@ Identified in `DeploymentExecutor` (using provider internals) and `Orchestrators
 Identified in `PlanOrchestrator.__init__`, `OPNsenseClient.request`, and various Orchestrator methods.
 
 ---
-[Back to Table of Contents](../TABLE_OF_CONTENTS.md)
+[Back to Table of Contents](../index.md)

@@ -187,4 +187,4 @@ Last updated: 2025-12-04 (Protocol-based refactoring - Issue #48 / PR #77)
 
 
 ---
-[Back to Table of Contents](../TABLE_OF_CONTENTS.md)
+[Back to Table of Contents](../index.md)
