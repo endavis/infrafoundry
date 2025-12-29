@@ -154,17 +154,82 @@ def generate_terraform(self, resources: list[dict[str, Any]]) -> Path:
 - **Stale State**: Always refresh state before operations
 - **Lost State**: Never delete generated configs without destroy first
 
+## Development Workflow
+
+**Rule:** All *code* changes must originate from a GitHub Issue. Documentation updates are exempt from this rule.
+
+### Issue-Driven Development Flow
+
+1. **Issue:** Ensure a GitHub Issue exists for the code task (e.g., "Add PyInfra runner support").
+   - Use YAML issue forms to create structured, validated issues
+   - Required fields ensure all necessary information is captured
+   - Auto-labeling helps with project management and triage
+
+2. **Branch:** Create a branch linked to the issue
+   - Format: `issue/<number>-<short-desc>`, `feat/<number>-<desc>`, or `fix/<number>-<desc>`
+   - Examples:
+     - `issue/42-add-cloudflare-provider`
+     - `feat/42-cloudflare-provider`
+     - `fix/123-handle-null-values`
+   - Branch naming is enforced by pre-commit hooks
+
+3. **Commit:** Use Conventional Commits format for all commits
+   - Format: `<type>: <subject>`
+   - Enforced by pre-commit hooks locally and PR checks in CI
+   - Use `uv run cz commit` for interactive commit message creation (if commitizen is installed)
+
+4. **Pull Request:** Submit a PR from your branch to `main` (or `develop` if active)
+   - Reference the issue in PR description (e.g., "Closes #42")
+   - PR title must follow conventional commit format
+   - Automated checks validate:
+     - PR title format
+     - Issue link presence (except docs-only PRs)
+     - PR description completeness
+     - Breaking change documentation
+
+5. **PR Merge:** When merging, ensure the merge commit follows the format:
+   - `<type>: <subject> (merges PR #XX, closes #YY)` - when PR has associated issue
+   - `<type>: <subject> (merges PR #XX)` - when PR has no issue (docs-only)
+
+**Examples - Correct Merge Commit Format:**
+```
+feat: add PyInfra runner support and configurable execution order (merges PR #18, closes #42)
+fix: handle None values in OPNsense provider (merges PR #23, closes #19)
+docs: update provider implementation guide (merges PR #29)
+refactor: extract common validation logic (merges PR #31, closes #28)
+```
+
+**Examples - Incorrect Format:**
+```
+❌ Merge pull request #18 from endavis/feat/pyinfra-support
+❌ feat: Add PyInfra Support (capitalized subject)
+❌ added pyinfra support (missing type)
+❌ feat: add pyinfra support (missing PR reference)
+```
+
+### Why Issue-Driven Development?
+
+- **Traceability:** Every code change is linked to a documented need
+- **Context:** Issues capture the "why" behind changes
+- **Planning:** Better project management and prioritization
+- **History:** Searchable record of decisions and rationale
+- **Collaboration:** Clear communication about work in progress
+
 ## Commit Guidelines
 
 ### Commit Message Format
-All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-<type>: <subject> [(<merges PR #XX, closes #YY>)]
+<type>: <subject>
+
+[optional body]
+
+[optional footer]
 ```
 
 **Commit Types:**
-- `feat`: New feature or capability
+- `feat`: New feature
 - `fix`: Bug fix
 - `refactor`: Code restructuring without behavior change
 - `docs`: Documentation updates
@@ -173,174 +238,220 @@ All commits must follow [Conventional Commits](https://www.conventionalcommits.o
 - `ci`: CI/CD configuration changes
 - `perf`: Performance improvements
 
-**Format Rules:**
-- Subject must be lowercase and concise (no period at end)
+**Rules:**
+- Subject must be lowercase, concise (no period at end)
 - Use imperative mood ("add feature" not "added feature")
-- Separate commits for refactoring, docs, tests, cleanup, dependencies
-- Use markdown formatting for detailed commit bodies (optional)
-
-### PR Merge Commit Format
-
-**When PR has an associated issue:**
-```
-<type>: <subject> (merges PR #XX, closes #YY)
-```
-
-**When PR has no associated issue (legacy/docs-only):**
-```
-<type>: <subject> (merges PR #XX)
-```
-
-**Examples - Correct Format:**
-- `feat: add PyInfra runner support and configurable execution order (merges PR #18)`
-- `refactor: normalize OPNsense interface data (merges PR #63, closes #56)`
-- `docs: comprehensive documentation overhaul with testing report and templates (merges PR #29)`
-- `fix: handle None ctx.obj in migrate command (merges PR #64, closes #57)`
-
-**Examples - Incorrect Format:**
-- ❌ `Merge pull request #18 from endavis/feat/pyinfra-support`
-- ❌ `feat: Add PyInfra Support` (capitalized subject)
-- ❌ `added pyinfra support` (wrong tense, missing type)
-- ❌ `refactor: normalize OPNsense interface data (#56)` (missing PR reference)
-
-### Development Workflow
-**Rule:** All *code* changes must originate from a GitHub Issue. Documentation updates are exempt from this rule.
-1.  **Issue:** Ensure a GitHub Issue exists for the code task (e.g., "Refactor BaseRunner").
-2.  **Branch:** Create a branch linked to the issue (format: `issue/<number>-<short-desc>` or `feat/<number>-<desc>`).
-3.  **Commit:** Use Conventional Commits format as described above.
-4.  **Pull Request:** Submit a PR from your branch to `main` (or `dev` if active), referencing the issue (e.g., "Closes #123").
-5.  **PR Merge:** When merging, ensure the merge commit follows the format: `<type>: <subject> (merges PR #XX, closes #YY)`
-
-## Pull Request Guidelines
-
-### PR Title Format
-Follow the same format as commit messages:
-```
-<type>: <subject>
-```
+- Separate concerns: one commit per logical change
+- Write clear, descriptive messages
 
 **Examples:**
-- `feat: add PyInfra runner support and configurable execution order`
-- `refactor: normalize OPNsense interface data`
-- `docs: add comprehensive commit message format guidelines`
+```
+feat: add support for CloudFlare DNS provider
 
-### PR Description Template
-```markdown
-## Summary
-Brief overview of changes (2-3 sentences)
+fix: handle None values in OPNsense interface parsing
 
-## Changes
-- Bullet point list of specific changes
-- Include file paths for major changes
+refactor: extract common provider validation logic
 
-## Related Issues
-Closes #123
+docs: update provider implementation guide with new patterns
 
-## Testing
-- [ ] Unit tests added/updated
-- [ ] Integration tests passing
-- [ ] Manual testing completed
+test: add tests for edge cases in state manager
 
-## Breaking Changes
-List any breaking changes or "None"
-
-## Documentation
-- [ ] Updated relevant documentation
-- [ ] Added/updated docstrings
+chore: update dependencies to latest versions
 ```
 
-### Code Review Checklist
+### Breaking Changes Policy
 
-**Reviewers should verify:**
-- [ ] Code follows project conventions (imports, docstrings, type hints)
-- [ ] Tests added/updated with adequate coverage
-- [ ] No security vulnerabilities (secrets, injection, path traversal)
-- [ ] Error handling with proper logging
-- [ ] Breaking changes properly documented
-- [ ] CI checks passing (tests, lint, type checking)
-- [ ] Commit messages follow format guidelines
-- [ ] PR title follows format guidelines
-- [ ] Documentation updated
+**What Constitutes a Breaking Change:**
+- Changes to public function/method signatures
+- Removal of public functions, classes, or modules
+- Changes to CLI command syntax or options
+- Changes to configuration file formats
+- Changes to default behavior that affects existing code
+- Changes to exception types or error handling
+- Removal of deprecated features
 
-**Authors should:**
-- Self-review code before submitting
-- Ensure all CI checks pass
-- Respond to review comments promptly
-- Keep PRs focused (one feature/fix per PR)
-- Update PR if main has advanced
+**How to Handle Breaking Changes:**
+
+1. **Document in Commit Message:**
+   ```
+   refactor: change provider API to use async/await
+
+   Migrate to async for better concurrency handling.
+
+   BREAKING CHANGE: All provider methods are now async and must be awaited.
+   Update custom providers to use async def for generate(), validate(), etc.
+   See docs/migration.md for detailed migration guide.
+   ```
+
+2. **Document in PR Description:**
+   - Add "BREAKING CHANGE" section to PR description
+   - Explain what changed and why
+   - Provide migration guide with before/after examples
+   - List affected APIs or features
+
+3. **Update CHANGELOG.md:**
+   - Add breaking changes to "Breaking Changes" section
+   - Include migration instructions
+   - Provide code examples showing the change
+
+4. **Version Bump:**
+   - Breaking changes require a major version bump (e.g., 1.x.x → 2.0.0)
+   - Follow semantic versioning principles
+
+5. **Consider Deprecation Period:**
+   - For widely-used features, consider deprecating first (with warnings)
+   - Remove in next major version
+   - Gives users time to migrate
+
+**Automated Detection:**
+- PR checks will scan for potential breaking changes
+- Comments will be added to PRs highlighting concerns
+- CI will fail if breaking changes are not documented
 
 ## Issue Creation Guidelines
 
 ### Issue Title Format
-Use clear, actionable titles with type prefix:
+Use clear, actionable titles with type prefix matching conventional commits:
+
 ```
 <type>: <brief description>
 ```
 
 **Examples:**
-- `feat: Add state locking for concurrent operations`
-- `bug: Silent failures in policy evaluator`
-- `refactor: Extract Kea CRUD duplication into helper`
-- `docs: Document provider 3-layer architecture`
+- `feat: add support for CloudFlare DNS provider`
+- `bug: infrafoundry crashes when processing OPNsense config`
+- `refactor: extract duplicate provider validation logic`
+- `docs: add examples for custom provider implementation`
 
-### Issue Description Template
-```markdown
-## Description
-Clear description of the issue/feature
+### Issue Templates
 
-## Current Behavior
-What currently happens (for bugs/refactors)
+The project uses GitHub YAML issue forms with required fields:
 
-## Expected Behavior
-What should happen
+**Bug Reports (bug_report.yml):**
+- Required: title, description, steps to reproduce, expected/actual behavior
+- Dropdowns: Python version, OS, priority (CRITICAL/HIGH/MEDIUM/LOW)
+- Optional: error output, additional context, possible solution
+- Auto-labels: `bug`, `needs-triage`
 
-## Proposed Solution
-High-level approach (optional)
+**Feature Requests (feature_request.yml):**
+- Required: title, problem statement, proposed solution, use cases
+- Dropdowns: complexity (1-10 scale), priority
+- Optional: alternatives, implementation ideas, benefits
+- Checkbox: breaking changes flag
+- Auto-labels: `enhancement`, `needs-triage`
 
-## Complexity
-Estimated complexity: X/10
-
-## Priority
-CRITICAL / HIGH / MEDIUM / LOW
-
-## Related Issues
-Links to related issues (if any)
-```
+**Refactor Requests (refactor.yml):**
+- Required: title, current situation, proposed improvement, technical debt impact
+- Dropdowns: complexity, priority
+- Optional: affected areas, benefits
+- Checkboxes: breaking changes, test updates, doc updates, API impact
+- Auto-labels: `refactor`, `needs-triage`
 
 ### When to Create an Issue
-- **Always** for code changes (features, bugs, refactors)
-- **Optional** for documentation-only changes
-- **Before** starting work on a task
-- **Link** to related issues or PRs
 
-## Breaking Changes Policy
+**Always create an issue for:**
+- New features or enhancements
+- Bug fixes
+- Refactoring work
+- Performance improvements
+- Security updates
 
-### What Constitutes a Breaking Change
-- Changes to public CLI signatures
-- Changes to BaseManager/BaseProvider APIs
-- Changes to state schema without migration
-- Changes to event enum values (non-additive)
-- Changes to configuration file formats
-- Removal of public functions/classes
+**Optional for:**
+- Documentation-only changes (can PR directly)
+- Typo fixes in comments
+- Minor README updates
 
-### How to Handle Breaking Changes
-1. **Document in CHANGELOG.md**: List all breaking changes with migration guide
-2. **Update version**: Follow semantic versioning (major version bump)
-3. **Provide migration path**: Include scripts or clear instructions
-4. **Deprecation period**: Deprecate first if possible, remove in next major version
-5. **PR description**: Clearly mark as `BREAKING CHANGE` in description
-6. **Commit body**: Include `BREAKING CHANGE:` footer in commit message
+**Before starting work:**
+- Check if an issue already exists
+- Create the issue first, then the branch
+- Link the branch to the issue number
 
-**Example commit with breaking change:**
-```
-refactor: change BaseProvider API to use async/await
+### Issue Best Practices
 
-Migrate all providers to use async/await pattern for better
-concurrency handling.
+- **Be specific:** Clear, concise descriptions
+- **Be complete:** Fill all required fields
+- **Add context:** Include examples, screenshots, or code snippets
+- **Estimate complexity:** Helps with prioritization and planning
+- **Set priority:** CRITICAL for blockers, HIGH for important work, MEDIUM/LOW otherwise
+- **Link related issues:** Reference related issues or PRs
+- **Update as needed:** Add information as you learn more
 
-BREAKING CHANGE: BaseProvider.generate() is now async and must
-be awaited. Update all custom providers to use async def.
-```
+## Pull Request Guidelines
+
+### PR Title Format
+Same as commit messages: `<type>: <subject>`
+
+**The PR title becomes the merge commit message, so make it clear and descriptive.**
+
+**Examples:**
+- ✅ `feat: add CloudFlare DNS provider`
+- ✅ `fix: handle None values in OPNsense interface parsing`
+- ✅ `docs: update provider implementation guide`
+- ❌ `Add CloudFlare provider` (missing type)
+- ❌ `Feat: Add CloudFlare Provider` (capitalization wrong)
+
+### PR Description Requirements
+
+**Minimum requirements (enforced by CI):**
+- At least 50 characters
+- Include reference to related issue (except docs-only PRs)
+- Describe what changed and why
+- Include testing information
+
+**Complete PR template includes:**
+- **Summary:** 2-3 sentence overview of changes
+- **Changes:** Bullet list of specific changes with file paths
+- **Related Issues:** "Closes #123" or "Fixes #123"
+- **Testing:** How changes were tested
+- **Breaking Changes:** Document any breaking changes
+- **Documentation:** List doc updates
+
+### Automated PR Checks
+
+All PRs are automatically validated for:
+
+✅ **PR Title Format** - Must follow conventional commits
+✅ **Issue Link** - Must reference an issue (code changes only)
+✅ **Description Length** - Minimum 50 characters
+✅ **Breaking Changes** - Detects and requires documentation
+✅ **Tests** - All tests must pass
+✅ **Coverage** - Must maintain ≥69% coverage
+✅ **Linting** - Ruff checks must pass
+✅ **Type Checking** - Mypy must pass
+✅ **Format** - Code must be formatted with ruff
+
+**Docs-only PRs are exempt from issue linking requirement.**
+
+### Code Review Checklist
+
+**Before submitting:**
+- [ ] Created and linked GitHub Issue (for code changes)
+- [ ] Branch name follows convention (`feat/123-description`)
+- [ ] Self-reviewed code
+- [ ] All CI checks passing locally (`doit check coverage`)
+- [ ] Tests added/updated with ≥69% coverage
+- [ ] Documentation updated (README, docstrings, guides)
+- [ ] CHANGELOG.md updated (for notable changes)
+- [ ] Breaking changes documented (if applicable)
+
+**Reviewers verify:**
+- [ ] Code follows project conventions (style, patterns, architecture)
+- [ ] Tests adequate and passing
+- [ ] No security vulnerabilities (injection, secrets, path traversal)
+- [ ] Error handling appropriate with clear messages
+- [ ] Documentation clear and accurate
+- [ ] Breaking changes properly documented
+- [ ] Issue is fully addressed
+
+### Merge Process
+
+1. **All CI checks must pass** - No exceptions
+2. **At least one approval required** - From code owner or maintainer
+3. **Merge commit format** - Must include PR and issue numbers:
+   - `<type>: <subject> (merges PR #XX, closes #YY)`
+   - PR title is automatically used as merge commit message
+4. **Squash and merge** - Preferred for clean history (multiple commits → one)
+5. **Delete branch** - After successful merge
 
 ## CI/CD Requirements
 

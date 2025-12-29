@@ -1,0 +1,130 @@
+name: ✨ Feature Request
+description: Propose a new feature or enhancement
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a new feature! Please fill out the form below to help us understand your proposal.
+
+  - type: input
+    id: title
+    attributes:
+      label: Feature Title
+      description: "Use format: feat: <brief description>"
+      placeholder: "feat: add support for CloudFlare provider"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What need does it address?
+      placeholder: |
+        Describe the problem or limitation you're experiencing.
+        Example: "I'm always frustrated when I have to manually manage CloudFlare DNS records..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe how you envision this feature working
+      placeholder: A clear description of what you want to happen...
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use Cases
+      description: Describe specific scenarios where this feature would be beneficial
+      placeholder: |
+        1. Use case 1: When managing multiple DNS zones...
+        2. Use case 2: In situations where infrastructure needs to...
+        3. Use case 3: For projects that require...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Estimated Complexity
+      description: How complex do you think this feature would be to implement? (1=trivial, 10=extremely complex)
+      options:
+        - "1 - Trivial"
+        - "2"
+        - "3 - Simple"
+        - "4"
+        - "5 - Moderate"
+        - "6"
+        - "7 - Complex"
+        - "8"
+        - "9 - Very Complex"
+        - "10 - Extremely Complex"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - "🔴 CRITICAL - Blocking major use case"
+        - "🟠 HIGH - Important for common workflows"
+        - "🟡 MEDIUM - Nice to have"
+        - "🟢 LOW - Minor enhancement"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What alternative solutions or workarounds have you considered?
+      placeholder: Describe any alternative approaches...
+    validations:
+      required: false
+
+  - type: textarea
+    id: implementation-ideas
+    attributes:
+      label: Implementation Ideas
+      description: If you have ideas about how this could be implemented, share them here
+      placeholder: Technical suggestions or approaches...
+    validations:
+      required: false
+
+  - type: textarea
+    id: benefits
+    attributes:
+      label: Expected Benefits
+      description: What are the main benefits of implementing this feature?
+      placeholder: |
+        - Benefit 1: Reduced manual configuration
+        - Benefit 2: Improved automation
+        - Benefit 3: Better integration with existing tools
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, links, or examples
+      placeholder: Additional information...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: breaking-changes
+    attributes:
+      label: Breaking Changes
+      description: Would this feature require breaking changes to the API?
+      options:
+        - label: This feature may require breaking changes
+          required: false
