@@ -9,8 +9,12 @@ import urllib.request
 
 from rich.console import Console
 from doit.tools import title_with_actions
+from rich.text import Text
 
 console = Console()
+
+# Use direnv-managed UV_CACHE_DIR if available, otherwise use tmp/
+UV_CACHE_DIR = os.environ.get("UV_CACHE_DIR", "tmp/.uv_cache")
 
 # Doit configuration
 DOIT_CONFIG = {
@@ -491,5 +495,351 @@ See .vscode/extensions.json for the complete list.
 """
     return {
         "actions": [lambda: print(msg)],
+        "title": title_with_actions,
+    }
+
+
+# ==============================================================================
+# Governance Validation Helpers
+# ==============================================================================
+
+
+def validate_merge_commits(console: "Console") -> bool:
+    """Validate that all merge commits follow the required format.
+
+    Returns:
+        bool: True if all merge commits are valid, False otherwise.
+    """
+    import re
+
+    console.print("\n[cyan]Validating merge commit format...[/cyan]")
+
+    # Get merge commits since last tag (or all if no tags)
+    try:
+        last_tag = subprocess.getoutput("git describe --tags --abbrev=0 2>/dev/null").strip()
+        if last_tag:
+            range_spec = f"{last_tag}..HEAD"
+        else:
+            range_spec = "HEAD"
+
+        merge_commits = subprocess.getoutput(
+            f'git log --merges --pretty=format:"%h %s" {range_spec}'
+        ).strip().split('\n')
+
+    except Exception as e:
+        console.print(f"[yellow]⚠ Could not check merge commits: {e}[/yellow]")
+        return True  # Don't block on this check
+
+    if not merge_commits or merge_commits == ['']:
+        console.print("[green]✓ No merge commits to validate.[/green]")
+        return True
+
+    # Pattern: <type>: <subject> (merges PR #XX, closes #YY) or (merges PR #XX)
+    merge_pattern = re.compile(
+        r'^[a-f0-9]+\s+(feat|fix|refactor|docs|test|chore|ci|perf):\s.+\s\(merges PR #\d+(?:, closes #\d+)?\)$'
+    )
+
+    invalid_commits = []
+    for commit in merge_commits:
+        if commit and not merge_pattern.match(commit):
+            invalid_commits.append(commit)
+
+    if invalid_commits:
+        console.print("[bold red]❌ Invalid merge commit format found:[/bold red]")
+        for commit in invalid_commits:
+            console.print(f"  [red]{commit}[/red]")
+        console.print("\n[yellow]Expected format:[/yellow]")
+        console.print("  <type>: <subject> (merges PR #XX, closes #YY)")
+        console.print("  <type>: <subject> (merges PR #XX)")
+        return False
+
+    console.print("[green]✓ All merge commits follow required format.[/green]")
+    return True
+
+
+def validate_issue_links(console: "Console") -> bool:
+    """Validate that commits (except docs) reference issues.
+
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    import re
+
+    console.print("\n[cyan]Validating issue links in commits...[/cyan]")
+
+    try:
+        # Get commits since last tag
+        last_tag = subprocess.getoutput("git describe --tags --abbrev=0 2>/dev/null").strip()
+        if last_tag:
+            range_spec = f"{last_tag}..HEAD"
+        else:
+            # If no tags, check last 10 commits
+            range_spec = "HEAD~10..HEAD"
+
+        commits = subprocess.getoutput(
+            f'git log --pretty=format:"%h %s" {range_spec}'
+        ).strip().split('\n')
+
+    except Exception as e:
+        console.print(f"[yellow]⚠ Could not check issue links: {e}[/yellow]")
+        return True  # Don't block on this check
+
+    if not commits or commits == ['']:
+        console.print("[green]✓ No commits to validate.[/green]")
+        return True
+
+    issue_pattern = re.compile(r'#\d+')
+    docs_pattern = re.compile(r'^[a-f0-9]+\s+docs:', re.IGNORECASE)
+
+    commits_without_issues = []
+    for commit in commits:
+        if commit:
+            # Skip docs commits
+            if docs_pattern.match(commit):
+                continue
+            # Skip merge commits (already validated separately)
+            if 'merge' in commit.lower():
+                continue
+            # Check for issue reference
+            if not issue_pattern.search(commit):
+                commits_without_issues.append(commit)
+
+    if commits_without_issues:
+        console.print("[bold yellow]⚠ Warning: Some commits don't reference issues:[/bold yellow]")
+        for commit in commits_without_issues[:5]:  # Show first 5
+            console.print(f"  [yellow]{commit}[/yellow]")
+        if len(commits_without_issues) > 5:
+            console.print(f"  [dim]...and {len(commits_without_issues) - 5} more[/dim]")
+        console.print("\n[dim]This is a warning only - release can continue.[/dim]")
+        console.print("[dim]Consider linking commits to issues for better traceability.[/dim]")
+    else:
+        console.print("[green]✓ All non-docs commits reference issues.[/green]")
+
+    return True  # Warning only, don't block release
+
+
+# ==============================================================================
+# Release Tasks
+# ==============================================================================
+
+
+def task_release_dev(type="alpha"):
+    """Create a pre-release (alpha/beta/rc) tag for TestPyPI and push to GitHub.
+
+    Args:
+        type (str): Pre-release type (e.g., 'alpha', 'beta', 'rc'). Defaults to 'alpha'.
+    """
+
+    def create_dev_release():
+        console = Console()
+        console.print("=" * 70)
+        console.print(f"[bold green]Starting {type} release tagging...[/bold green]")
+        console.print("=" * 70)
+        console.print()
+
+        # Check if on main branch
+        current_branch = subprocess.getoutput("git branch --show-current").strip()
+        if current_branch != "main":
+            console.print(f"[bold yellow]⚠ Warning: Not on main branch (currently on {current_branch})[/bold yellow]")
+            response = input("Continue anyway? (y/N) ").strip().lower()
+            if response != "y":
+                console.print("[bold red]❌ Release cancelled.[/bold red]")
+                sys.exit(1)
+
+        # Check for uncommitted changes
+        status = subprocess.getoutput("git status -s").strip()
+        if status:
+            console.print("[bold red]❌ Error: Uncommitted changes detected.[/bold red]")
+            console.print(status)
+            sys.exit(1)
+
+        # Pull latest changes
+        console.print("\n[cyan]Pulling latest changes...[/cyan]")
+        try:
+            subprocess.run("git pull", shell=True, check=True, capture_output=True, text=True)
+            console.print("[green]✓ Git pull successful.[/green]")
+        except subprocess.CalledProcessError as e:
+            console.print(f"[bold red]❌ Error pulling latest changes:[/bold red]")
+            console.print(f"[red]Stdout: {e.stdout}[/red]")
+            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            sys.exit(1)
+
+        # Run checks
+        console.print("\n[cyan]Running all pre-release checks...[/cyan]")
+        try:
+            subprocess.run("doit check", shell=True, check=True, capture_output=True, text=True)
+            console.print("[green]✓ All checks passed.[/green]")
+        except subprocess.CalledProcessError as e:
+            console.print("[bold red]❌ Pre-release checks failed! Please fix issues before tagging.[/bold red]")
+            console.print(f"[red]Stdout: {e.stdout}[/red]")
+            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            sys.exit(1)
+
+        # Automated version bump and tagging
+        console.print(f"\n[cyan]Bumping version ({type}) and updating changelog...[/cyan]")
+        try:
+            # Use cz bump --prerelease <type> --changelog
+            result = subprocess.run(
+                f"UV_CACHE_DIR={UV_CACHE_DIR} uv run cz bump --prerelease {type} --changelog",
+                shell=True, check=True, capture_output=True, text=True
+            )
+            console.print(f"[green]✓ Version bumped to {type}.[/green]")
+            console.print(f"[dim]{result.stdout}[/dim]")
+            # Extract new version
+            version_match = Text(result.stdout).search(r"Bumping to version (\d+\.\d+\.\d+[^\s]*)")
+            if version_match:
+                new_version = version_match.group(1)
+            else:
+                new_version = "unknown"
+
+        except subprocess.CalledProcessError as e:
+            console.print("[bold red]❌ commitizen bump failed![/bold red]")
+            console.print(f"[red]Stdout: {e.stdout}[/red]")
+            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            sys.exit(1)
+
+        console.print(f"\n[cyan]Pushing tag v{new_version} to origin...[/cyan]")
+        try:
+            subprocess.run(f"git push --follow-tags origin {current_branch}", shell=True, check=True, capture_output=True, text=True)
+            console.print("[green]✓ Tags pushed to origin.[/green]")
+        except subprocess.CalledProcessError as e:
+            console.print("[bold red]❌ Error pushing tag to origin:[/bold red]")
+            console.print(f"[red]Stdout: {e.stdout}[/red]")
+            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            sys.exit(1)
+
+        console.print("\n" + "=" * 70)
+        console.print(f"[bold green]✓ Development release {new_version} complete![/bold green]")
+        console.print("=" * 70)
+        console.print("\nNext steps:")
+        console.print("1. Monitor GitHub Actions (testpypi.yml) for the TestPyPI publish.")
+        console.print("2. Verify on TestPyPI once the workflow completes.")
+
+    return {
+        "actions": [create_dev_release],
+        "params": [
+            {
+                "name": "type",
+                "short": "t",
+                "long": "type",
+                "default": "alpha",
+                "help": "Pre-release type (alpha, beta, rc)",
+            }
+        ],
+        "title": title_with_actions,
+    }
+
+
+def task_release():
+    """Automate release: bump version, update CHANGELOG, and push to GitHub (triggers CI/CD)."""
+
+    def automated_release():
+        console = Console()
+        console.print("=" * 70)
+        console.print("[bold green]Starting automated release process...[/bold green]")
+        console.print("=" * 70)
+        console.print()
+
+        # Check if on main branch
+        current_branch = subprocess.getoutput("git branch --show-current").strip()
+        if current_branch != "main":
+            console.print(f"[bold yellow]⚠ Warning: Not on main branch (currently on {current_branch})[/bold yellow]")
+            response = input("Continue anyway? (y/N) ").strip().lower()
+            if response != "y":
+                console.print("[bold red]❌ Release cancelled.[/bold red]")
+                sys.exit(1)
+
+        # Check for uncommitted changes
+        status = subprocess.getoutput("git status -s").strip()
+        if status:
+            console.print("[bold red]❌ Error: Uncommitted changes detected.[/bold red]")
+            console.print(status)
+            sys.exit(1)
+
+        # Pull latest changes
+        console.print("\n[cyan]Pulling latest changes...[/cyan]")
+        try:
+            subprocess.run("git pull", shell=True, check=True, capture_output=True, text=True)
+            console.print("[green]✓ Git pull successful.[/green]")
+        except subprocess.CalledProcessError as e:
+            console.print(f"[bold red]❌ Error pulling latest changes:[/bold red]")
+            console.print(f"[red]Stdout: {e.stdout}[/red]")
+            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            sys.exit(1)
+
+        # Governance validation
+        console.print("\n[bold cyan]Running governance validations...[/bold cyan]")
+
+        # Validate merge commit format (blocking)
+        if not validate_merge_commits(console):
+            console.print("\n[bold red]❌ Merge commit validation failed![/bold red]")
+            console.print("[yellow]Please ensure all merge commits follow the format:[/yellow]")
+            console.print("[yellow]  <type>: <subject> (merges PR #XX, closes #YY)[/yellow]")
+            sys.exit(1)
+
+        # Validate issue links (warning only)
+        validate_issue_links(console)
+
+        console.print("[bold green]✓ Governance validations complete.[/bold green]")
+
+        # Run all checks
+        console.print("\n[cyan]Running all pre-release checks...[/cyan]")
+        try:
+            subprocess.run("doit check", shell=True, check=True, capture_output=True, text=True)
+            console.print("[green]✓ All checks passed.[/green]")
+        except subprocess.CalledProcessError as e:
+            console.print("[bold red]❌ Pre-release checks failed! Please fix issues before releasing.[/bold red]")
+            console.print(f"[red]Stdout: {e.stdout}[/red]")
+            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            sys.exit(1)
+
+        # Automated version bump and CHANGELOG generation using commitizen
+        console.print("\n[cyan]Bumping version and generating CHANGELOG with commitizen...[/cyan]")
+        try:
+            # Use cz bump --changelog --merge-prerelease to update version, changelog, commit, and tag
+            # This consolidates pre-release changes into the final release entry
+            result = subprocess.run(
+                f"UV_CACHE_DIR={UV_CACHE_DIR} uv run cz bump --changelog --merge-prerelease",
+                shell=True, check=True, capture_output=True, text=True
+            )
+            console.print("[green]✓ Version bumped and CHANGELOG updated (merged pre-releases).[/green]")
+            console.print(f"[dim]{result.stdout}[/dim]")
+            # Extract new version from cz output (example: "Bumping to version 1.0.0")
+            version_match = Text(result.stdout).search(r"Bumping to version (\d+\.\d+\.\d+)")
+            if version_match:
+                new_version = version_match.group(1)
+            else:
+                new_version = "unknown" # Fallback if regex fails
+
+        except subprocess.CalledProcessError as e:
+            console.print("[bold red]❌ commitizen bump failed! Ensure your commit history is conventional.[/bold red]")
+            console.print(f"[red]Stdout: {e.stdout}[/red]")
+            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            sys.exit(1)
+        except Exception as e:
+            console.print(f"[bold red]❌ An unexpected error occurred during commitizen bump: {e}[/bold red]")
+            sys.exit(1)
+
+        # Push commits and tags to GitHub
+        console.print("\n[cyan]Pushing commits and tags to GitHub...[/cyan]")
+        try:
+            subprocess.run(f"git push --follow-tags origin {current_branch}", shell=True, check=True, capture_output=True, text=True)
+            console.print("[green]✓ Pushed new commits and tags to GitHub.[/green]")
+        except subprocess.CalledProcessError as e:
+            console.print("[bold red]❌ Error pushing to GitHub:[/bold red]")
+            console.print(f"[red]Stdout: {e.stdout}[/red]")
+            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            sys.exit(1)
+
+        console.print("\n" + "=" * 70)
+        console.print(f"[bold green]✓ Automated release {new_version} complete![/bold green]")
+        console.print("=" * 70)
+        console.print("\nNext steps:")
+        console.print("1. Monitor GitHub Actions for build and publish.")
+        console.print("2. Check PyPI: https://pypi.org/project/infrafoundry/")
+        console.print("3. Verify the updated CHANGELOG.md in the repository.")
+
+    return {
+        "actions": [automated_release],
         "title": title_with_actions,
     }
