@@ -103,8 +103,10 @@ ignore = [
     "E402",    # Module level import not at top of file - needed for CLI command loading
     "SIM102",  # Use single if statement instead of nested - fix incrementally
     "SIM105",  # Use contextlib.suppress instead of try-except-pass - fix incrementally
+    "SIM114",  # Combine if branches using logical or - fix incrementally
     "SIM117",  # Use single with statement with multiple contexts - fix incrementally
     "SIM118",  # Use `key in dict` instead of `key in dict.keys()` - fix incrementally
+    "SIM300",  # Yoda conditions - fix incrementally
 ]
 
 [tool.ruff.format]
