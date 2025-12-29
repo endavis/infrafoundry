@@ -82,6 +82,7 @@ output/
 *-PLAINTEXT.yaml
 *-decrypted.yaml
 REFACTORING_TODO.md
+_version.py
 
 
 

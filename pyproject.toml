@@ -1,9 +1,9 @@
 [project]
 name = "infrafoundry"
-version = "0.1.0"
 description = "Infrastructure automation framework with pluggable providers (Proxmox, OPNsense, Kubernetes)"
 readme = "README.md"
 requires-python = ">=3.12"
+dynamic = ["version"]
 dependencies = [
     "click>=8.1.0",
     "doit>=0.36.0",
@@ -24,6 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "commitizen>=3.0",
     "coverage-badge>=1.1.0",
     "mypy>=1.0.0",
     "pre-commit>=3.7.0",
@@ -47,13 +48,25 @@ env = "infrafoundry.secrets.backends.env:register"
 file = "infrafoundry.secrets.backends.file:register"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.24", "hatch-vcs>=0.4"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/infrafoundry"]
+
+[tool.hatch.version]
+source = "vcs"
+tag-pattern = "^(?:v|d)(?P<version>.+)$"
+fallback-version = "0.0.0"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/infrafoundry/_version.py"
 
 [tool.ruff]
 cache-dir = "tmp/.ruff_cache"
 line-length = 100
 target-version = "py312"
+extend-exclude = ["**/_version.py"]
 
 [tool.ruff.lint]
 select = [
@@ -104,3 +117,18 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.0.0"
+tag_format = "v$version"
+version_provider = "scm"
+update_changelog_on_bump = true
+major_version_zero = true
+# Merge pre-release entries into final release in CHANGELOG
+merge_prerelease = true
+# Commit types that trigger version bumps
+bump_pattern = "^(feat|fix|refactor|perf)"
+bump_map = { "feat" = "MINOR", "fix" = "PATCH", "refactor" = "PATCH", "perf" = "PATCH" }
+# BREAKING CHANGE in commit message triggers MAJOR bump
+change_type_order = ["BREAKING CHANGE", "feat", "fix", "refactor", "perf"]
