@@ -11,12 +11,17 @@ Tests complex workflows including:
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from sklearn.utils import suppress
+
 import pytest
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.orchestrator import Orchestrator
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState
+
+from contextlib import suppress
+
 
 
 @pytest.fixture
@@ -302,11 +307,10 @@ class TestRollbackScenarios:
             mock_apply.return_value = {"exit_code": 1, "success": False}
 
             with patch.object(provider, "generate_terraform"):
-                try:
-                    orchestrator.rollback(deployment_id, auto_approve=True)
-                except Exception:
-                    # Rollback should handle or propagate errors appropriately
-                    pass
+                with patch.object(provider, "generate_terraform"):
+                    with suppress(Exception):
+                        orchestrator.rollback(deployment_id, auto_approve=True)
+
 
     def test_rollback_nonexistent_deployment(self, advanced_orchestrator):
         """Test rollback with invalid deployment ID."""

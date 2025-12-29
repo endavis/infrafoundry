@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from ..services.isc_dhcp import ISCDHCPService
 from .base import BaseComponentManager
+from contextlib import suppress
 
 
 class _BaseDHCPConverter:
@@ -77,16 +78,12 @@ class _BaseDHCPConverter:
             fields["dns_servers"] = dns_servers
 
         if "defaultleasetime" in isc_config:
-            try:
+            with suppress(TypeError, ValueError):
                 fields["valid_lifetime"] = int(isc_config["defaultleasetime"])
-            except (TypeError, ValueError):
-                pass
-
+ 
         if "maxleasetime" in isc_config:
-            try:
+            with suppress(TypeError, ValueError):
                 fields["max_lifetime"] = int(isc_config["maxleasetime"])
-            except (TypeError, ValueError):
-                pass
 
         return fields
 
