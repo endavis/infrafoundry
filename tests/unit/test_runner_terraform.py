@@ -41,7 +41,8 @@ def test_initialize_skips_when_already_initialized(
 ) -> None:
     """Initialization short-circuits when .terraform exists."""
     (provider.terraform_dir / ".terraform").mkdir()
-    result = runner.initialize(provider.terraform_dir)
+    with patch("shutil.which", return_value="/usr/bin/terraform"):
+        result = runner.initialize(provider.terraform_dir)
     assert result["success"]
     assert "Already initialized" in result["message"]
 
