@@ -1,0 +1,146 @@
+site_name: InfraFoundry
+site_description: Infrastructure automation framework with pluggable providers (Proxmox, OPNsense, Kubernetes)
+site_author: Eric Davis
+site_url: https://endavis.github.io/infrafoundry
+
+repo_name: endavis/infrafoundry
+repo_url: https://github.com/endavis/infrafoundry
+edit_uri: edit/main/docs/
+
+# Theme configuration
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+nav:
+  - Home: TABLE_OF_CONTENTS.md
+
+  - Getting Started:
+    - Setup Guide: getting-started/setup-guide.md
+    - Direnv Integration: getting-started/direnv.md
+
+  - Usage:
+    - CLI Reference: usage/cli-reference.md
+    - Validation: usage/validation.md
+
+  - Configuration:
+    - Overview: configuration/overview.md
+    - Settings File Structure: configuration/settings-file-structure.md
+    - YAML Only Config: configuration/yaml-only-config.md
+    - Per-Environment Credentials: configuration/per-environment-credentials.md
+    - Secret Providers:
+      - Vaultwarden: configuration/secrets-vaultwarden.md
+      - AWS Secrets Manager: configuration/secrets-aws.md
+      - Azure Key Vault: configuration/secrets-azure.md
+    - Policy Configuration: configuration/policy-configuration.md
+    - Separate Config Repo: configuration/separate-config-repo.md
+    - Notifications: configuration/notifications.md
+    - Blueprints: configuration/blueprints.md
+
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Detailed Architecture: architecture/ARCHITECTURE.md
+    - State Management: architecture/state-management.md
+    - Secrets Architecture: architecture/secrets-architecture.md
+    - Orchestrator: architecture/orchestrator-architecture.md
+    - Pluggable Runners: architecture/pluggable-runners.md
+    - Graphing: architecture/graphing.md
+    - Design Principles: architecture/principles.md
+    - Principles Assessment: architecture/design-principles-assessment.md
+    - Architectural Patterns: architecture/architectural-patterns.md
+    - Decision Records:
+      - Overview: architecture/decisions/README.md
+      - ADR-0001 Repository Pattern: architecture/decisions/0001-repository-pattern-for-state.md
+      - ADR-0002 Mixin Pattern: architecture/decisions/0002-mixin-pattern-for-providers.md
+      - ADR-0003 Granular Events: architecture/decisions/0003-granular-event-types.md
+      - ADR-0004 Protocol Runners: architecture/decisions/0004-protocol-based-runner-interfaces.md
+
+  - Guides:
+    - ISC to Kea Migration: guides/isc-to-kea-migration.md
+    - DHCP VM Integration: guides/dhcp-vm-integration.md
+    - Age Key Management: guides/age-key-management.md
+    - SSH Authentication: guides/ssh-authentication.md
+
+  - Development:
+    - Implementing Providers: development/implementing-providers.md
+    - Implementing Runners: development/implementing-runners.md
+    - Runner Protocol Reference: development/runner-protocol-quick-reference.md
+    - Manager Patterns: development/manager-patterns.md
+    - Event System: development/event-system.md
+    - Credential Loader: development/credential-loader-system.md
+    - Coding Standards: development/coding-standards.md
+    - CI/CD Testing: development/ci-cd-testing.md
+    - Release & Automation: development/release-and-automation.md
+    - Implementing Secret Providers: development/implementing-secret-providers.md
+
+  - Runners:
+    - Overview: runners/overview.md
+    - Ansible: runners/ansible.md
+    - Terraform: runners/terraform.md
+    - PyInfra: runners/pyinfra.md
+    - Pulumi: runners/pulumi.md
+
+  - Examples:
+    - Environment Example: examples/ENV_EXAMPLE.md
+    - Envrc Local: examples/ENVRC_LOCAL.md
+    - GitLab CI: examples/GITLAB_CI_EXAMPLE.md
+    - Custom Runner: examples/custom-runner-example.md
+
+  - Tools:
+    - OPNsense Parser: tools/opnsense-parser.md
+
+  - Testing:
+    - Maintenance Report: testing/TESTING_MAINTENANCE_REPORT.md
+
+  - Meta:
+    - Roadmap: TODO.md
+    - Documentation Template: meta/documentation-template.md
+    - Code Quality Analysis: meta/code-quality-analysis.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/endavis
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/infrafoundry
