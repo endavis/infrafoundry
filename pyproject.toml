@@ -24,16 +24,23 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "codespell>=2.2",
     "commitizen>=3.0",
     "coverage-badge>=1.1.0",
     "mypy>=1.0.0",
     "pre-commit>=3.7.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "pyproject-fmt>=2.0",
     "ruff>=0.1.0",
     "types-PyYAML>=6.0.0",
     "types-requests>=2.32.0",
     "types-boto3>=1.35.0",
+]
+security = [
+    "pip-audit>=2.6",
+    "bandit>=1.7",
+    "pip-licenses>=4.0",
 ]
 
 [project.scripts]
@@ -132,3 +139,11 @@ bump_pattern = "^(feat|fix|refactor|perf)"
 bump_map = { "feat" = "MINOR", "fix" = "PATCH", "refactor" = "PATCH", "perf" = "PATCH" }
 # BREAKING CHANGE in commit message triggers MAJOR bump
 change_type_order = ["BREAKING CHANGE", "feat", "fix", "refactor", "perf"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "tmp", ".venv"]
+skips = ["B101"]  # Skip assert_used - asserts are fine in tests
+
+[tool.codespell]
+skip = "tmp,.venv,.git,*.lock,*.pyc,__pycache__"
+ignore-words-list = "crate"
