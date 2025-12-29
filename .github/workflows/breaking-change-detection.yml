@@ -1,0 +1,192 @@
+name: Breaking Change Detection
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited]
+
+jobs:
+  detect-breaking-changes:
+    name: Detect Potential Breaking Changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Analyze changes for breaking patterns
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+
+            // Get changed files
+            const files = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number
+            });
+
+            // Patterns that may indicate breaking changes
+            const breakingPatterns = [
+              {
+                pattern: /^-\s*def\s+\w+\(/m,
+                description: 'Function signature removed or modified',
+                severity: 'high'
+              },
+              {
+                pattern: /^-\s*class\s+\w+/m,
+                description: 'Class definition removed or modified',
+                severity: 'high'
+              },
+              {
+                pattern: /^-\s*async\s+def\s+\w+\(/m,
+                description: 'Async function removed or modified',
+                severity: 'high'
+              },
+              {
+                pattern: /^-.*__init__\s*\(/m,
+                description: 'Constructor signature changed',
+                severity: 'high'
+              },
+              {
+                pattern: /^-.*raise\s+\w+Error/m,
+                description: 'Exception type changed',
+                severity: 'medium'
+              },
+              {
+                pattern: /__all__.*=/,
+                description: 'Public API exports modified',
+                severity: 'high'
+              },
+              {
+                pattern: /^-.*@property/m,
+                description: 'Property removed or modified',
+                severity: 'medium'
+              }
+            ];
+
+            let potentialBreaking = [];
+            const pythonFiles = files.data.filter(f =>
+              f.filename.match(/\.py$/) &&
+              !f.filename.match(/^tests?\//) &&
+              !f.filename.match(/test_\w+\.py$/)
+            );
+
+            for (const file of pythonFiles) {
+              if (!file.patch) continue;
+
+              const matches = [];
+              for (const {pattern, description, severity} of breakingPatterns) {
+                if (pattern.test(file.patch)) {
+                  matches.push({description, severity});
+                }
+              }
+
+              if (matches.length > 0) {
+                potentialBreaking.push({
+                  file: file.filename,
+                  additions: file.additions,
+                  deletions: file.deletions,
+                  changes: file.changes,
+                  issues: matches
+                });
+              }
+            }
+
+            // Check if BREAKING CHANGE is documented
+            const hasBreakingChangeDoc = /BREAKING CHANGE:/i.test(body) ||
+                                        /breaking change/i.test(body);
+
+            if (potentialBreaking.length > 0) {
+              const hasHighSeverity = potentialBreaking.some(item =>
+                item.issues.some(issue => issue.severity === 'high')
+              );
+
+              // Build detailed report
+              let report = '## ⚠️ Potential Breaking Changes Detected\n\n';
+              report += 'This PR modifies code that may constitute a breaking change.\n\n';
+              report += '### Files with Potential Breaking Changes:\n\n';
+
+              for (const item of potentialBreaking) {
+                report += `**${item.file}** (+${item.additions}/-${item.deletions}):\n`;
+                for (const issue of item.issues) {
+                  const emoji = issue.severity === 'high' ? '🔴' : '🟡';
+                  report += `  ${emoji} ${issue.description}\n`;
+                }
+                report += '\n';
+              }
+
+              if (!hasBreakingChangeDoc) {
+                report += '### ❌ Required Actions\n\n';
+                report += 'Breaking changes detected but not documented!\n\n';
+                report += '**You must:**\n';
+                report += '1. Add `BREAKING CHANGE:` footer to your commit message\n';
+                report += '2. Document the breaking change in the PR description\n';
+                report += '3. Add migration guide to CHANGELOG.md\n';
+                report += '4. Update documentation\n\n';
+                report += '**Commit message format:**\n';
+                report += '```\n';
+                report += 'feat: add new provider architecture\n\n';
+                report += 'Migrate providers to use new 3-layer architecture.\n\n';
+                report += 'BREAKING CHANGE: BaseProvider interface changed. Providers must now implement\n';
+                report += 'component managers. See docs/migration.md for migration guide.\n';
+                report += '```\n\n';
+                report += '**PR description must include:**\n';
+                report += '- What changed and why\n';
+                report += '- How to migrate existing code\n';
+                report += '- Examples of before/after usage\n';
+              } else {
+                report += '### ✅ Breaking Change Documented\n\n';
+                report += 'Good! This PR includes breaking change documentation.\n\n';
+                report += '**Before merging, verify:**\n';
+                report += '- [ ] Migration guide in CHANGELOG.md\n';
+                report += '- [ ] Documentation updated\n';
+                report += '- [ ] Examples updated\n';
+                report += '- [ ] Version will be bumped appropriately (major version)\n';
+              }
+
+              // Create or update comment
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number
+              });
+
+              const botComment = comments.data.find(c =>
+                c.user.type === 'Bot' &&
+                c.body.includes('Potential Breaking Changes Detected')
+              );
+
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: report
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: report
+                });
+              }
+
+              // Fail if high severity and not documented
+              if (hasHighSeverity && !hasBreakingChangeDoc) {
+                core.setFailed(
+                  '❌ Breaking changes detected but not documented!\n' +
+                  'Add BREAKING CHANGE: footer to commit message and document in PR description.'
+                );
+              } else if (!hasBreakingChangeDoc) {
+                core.warning(
+                  '⚠️ Potential breaking changes detected. Please review and document if needed.'
+                );
+              } else {
+                console.log('✅ Breaking changes properly documented');
+              }
+            } else {
+              console.log('✅ No potential breaking changes detected');
+            }
