@@ -27,6 +27,7 @@ dev = [
     "codespell>=2.2",
     "commitizen>=3.0",
     "coverage-badge>=1.1.0",
+    "mkdocs-material>=9.5",
     "mypy>=1.0.0",
     "pre-commit>=3.7.0",
     "pytest>=7.0.0",
