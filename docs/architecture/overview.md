@@ -34,7 +34,7 @@ InfraFoundry separates code generation from execution: YAML configs are rendered
 
 - **Code generation layer:** Providers (Proxmox/OPNsense/Kubernetes) implement `ProviderBase`; Jinja2 templates emit Terraform/Ansible; ConfigManager loads/validates YAML; SecretManager decrypts SOPS and exports to tools.
 - **Orchestration layer:** Orchestrator coordinates multi-provider runs; CLI (Click) drives commands; StateManager tracks deployments; Event system powers notifications/integrations; Policy engine enforces guardrails.
-- **Data flow:**  
+- **Data flow:**
   `YAML configs → ConfigManager → Providers → Jinja2 templates → generated/{env}/{terraform|ansible}/{provider} → (optional) terraform init/apply + ansible-playbook → infrastructure`
 
   ```mermaid
@@ -45,17 +45,17 @@ InfraFoundry separates code generation from execution: YAML configs are rendered
       D -->|Generate| E[Generated Artifacts]
       E -->|Execute| F[Runners]
       F -->|Apply| G[Infrastructure]
-      
+
       subgraph "Framework"
       B
       C
       D
       end
-      
+
       subgraph "Artifacts"
       E
       end
-      
+
       subgraph "Execution"
       F
       end
@@ -94,4 +94,4 @@ Last updated: 2025-12-23 14:27 GMT
 
 
 ---
-[Back to Table of Contents](../TABLE_OF_CONTENTS.md)
+[Back to Table of Contents](../index.md)

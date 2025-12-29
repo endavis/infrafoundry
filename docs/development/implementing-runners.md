@@ -1187,4 +1187,4 @@ See `src/infrafoundry/core/runners/terraform_runner.py` for a complete, producti
 **Last Updated:** 2025-12-23 (Protocol-based runner system - PR #77)
 
 ---
-[Back to Table of Contents](../TABLE_OF_CONTENTS.md)
+[Back to Table of Contents](../index.md)

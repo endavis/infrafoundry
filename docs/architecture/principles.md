@@ -8,7 +8,7 @@ Dependency Inversion Principle (DIP): Modules should not depend on concrete impl
 Abstraction: Hiding complex implementation details and showing only the necessary parts of an object to reduce complexity.
 Encapsulation: Bundling data and methods that operate on the data within a single unit, and restricting direct access to some of the object's components.
 Separation of Concerns (SoC): Dividing a program into distinct sections, where each section addresses a separate concern or domain.
-Design Patterns: Using proven solutions to common, recurring problems in software design. 
+Design Patterns: Using proven solutions to common, recurring problems in software design.
 
 Code quality and readability
 DRY (Don't Repeat Yourself): Avoid duplicating code; reuse it instead.
@@ -17,14 +17,14 @@ YAGNI (You Ain't Gonna Need It): Avoid adding functionality until it is actually
 Readability: Write code that is easy for other humans to understand. Avoid overly clever or complex one-liners.
 Naming: Use descriptive, meaningful names for variables and functions.
 Documentation and commenting: Write comments to explain the "why," not just the "what," especially for complex logic.
-Function size: Keep functions small and focused on a single task. 
+Function size: Keep functions small and focused on a single task.
 
 Maintenance and testing
 Testability: Design code to be easily tested, which often involves keeping complexity low.
 Continuous refactoring: Improve code quality and structure over time without changing its external behavior.
 Error handling: Make code robust by handling errors and unexpected situations gracefully.
-Global dependencies: Minimize the use of global variables to reduce confusing state management. 
+Global dependencies: Minimize the use of global variables to reduce confusing state management.
 
 
 ---
-[Back to Table of Contents](../TABLE_OF_CONTENTS.md)
+[Back to Table of Contents](../index.md)

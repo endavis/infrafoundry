@@ -11,4 +11,4 @@ This directory contains Architecture Decision Records (ADRs) for InfraFoundry.
 - [0004-protocol-based-runner-interfaces.md](0004-protocol-based-runner-interfaces.md): Use Protocol-Based Runner Interfaces for ISP Compliance
 
 ---
-[Back to Table of Contents](../../TABLE_OF_CONTENTS.md)
+[Back to Table of Contents](../../index.md)
