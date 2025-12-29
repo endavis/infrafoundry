@@ -895,3 +895,30 @@ def task_release():
         "actions": [automated_release],
         "title": title_with_actions,
     }
+
+
+# --- Documentation Tasks ---
+
+
+def task_docs_serve():
+    """Serve documentation locally with live reload."""
+    return {
+        "actions": [f"UV_CACHE_DIR={UV_CACHE_DIR} uv run mkdocs serve"],
+        "title": title_with_actions,
+    }
+
+
+def task_docs_build():
+    """Build documentation site."""
+    return {
+        "actions": [f"UV_CACHE_DIR={UV_CACHE_DIR} uv run mkdocs build"],
+        "title": title_with_actions,
+    }
+
+
+def task_docs_deploy():
+    """Deploy documentation to GitHub Pages."""
+    return {
+        "actions": [f"UV_CACHE_DIR={UV_CACHE_DIR} uv run mkdocs gh-deploy --force"],
+        "title": title_with_actions,
+    }

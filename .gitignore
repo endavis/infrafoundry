@@ -78,6 +78,7 @@ terraform.tfvars
 # Generated files
 generated/
 output/
+site/
 *.log
 *-PLAINTEXT.yaml
 *-decrypted.yaml
