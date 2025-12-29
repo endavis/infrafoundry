@@ -61,7 +61,8 @@ jobs:
               /^README\.md$/,
               /^CHANGELOG\.md$/,
               /\.md$/,
-              /^\.github\/.*\.md$/,
+              /^\.github\//,  // GitHub config files (workflows, issue templates, etc.)
+              /^\.claude\//,  // Claude configuration
               /^example-config\/.*\.md$/
             ];
 
