@@ -87,6 +87,8 @@ select = [
     "B",    # flake8-bugbear
     "C4",   # flake8-comprehensions
     "RUF",  # Ruff-specific rules
+    "SIM",  # flake8-simplify
+    "ASYNC", # flake8-async
 ]
 ignore = [
     "ANN401",  # Dynamically typed expressions (Any) - allow for now, fix incrementally
@@ -99,7 +101,18 @@ ignore = [
     "B904",    # raise-without-from - fix incrementally
     "RUF012",  # Mutable class default - fix incrementally
     "E402",    # Module level import not at top of file - needed for CLI command loading
+    "SIM102",  # Use single if statement instead of nested - fix incrementally
+    "SIM105",  # Use contextlib.suppress instead of try-except-pass - fix incrementally
+    "SIM114",  # Combine if branches using logical or - fix incrementally
+    "SIM117",  # Use single with statement with multiple contexts - fix incrementally
+    "SIM118",  # Use `key in dict` instead of `key in dict.keys()` - fix incrementally
+    "SIM300",  # Yoda conditions - fix incrementally
 ]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
 
 [tool.mypy]
 cache_dir = "tmp/.mypy_cache"
@@ -120,6 +133,8 @@ warn_redundant_casts = true
 warn_unreachable = true
 
 [tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "--strict-config --strict-markers"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -147,3 +162,27 @@ skips = ["B101"]  # Skip assert_used - asserts are fine in tests
 [tool.codespell]
 skip = "tmp,.venv,.git,*.lock,*.pyc,__pycache__"
 ignore-words-list = "crate"
+
+[tool.coverage.run]
+branch = true
+source = ["infrafoundry"]
+
+[tool.coverage.report]
+skip_covered = false
+show_missing = true
+precision = 2
+fail_under = 70
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.coverage.html]
+directory = "tmp/htmlcov"
+
+[tool.coverage.xml]
+output = "tmp/coverage.xml"
