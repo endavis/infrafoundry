@@ -101,6 +101,10 @@ ignore = [
     "B904",    # raise-without-from - fix incrementally
     "RUF012",  # Mutable class default - fix incrementally
     "E402",    # Module level import not at top of file - needed for CLI command loading
+    "SIM102",  # Use single if statement instead of nested - fix incrementally
+    "SIM105",  # Use contextlib.suppress instead of try-except-pass - fix incrementally
+    "SIM117",  # Use single with statement with multiple contexts - fix incrementally
+    "SIM118",  # Use `key in dict` instead of `key in dict.keys()` - fix incrementally
 ]
 
 [tool.ruff.format]
