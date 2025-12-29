@@ -28,7 +28,7 @@ def impact(_ctx: click.Context, orchestrator: Orchestrator, env: str, resource: 
     if not analysis or "error" in analysis:
         console.warning(f"Resource '{resource}' not found in environment '{env}'")
         console.info("\nAvailable resources:")
-        for node_name in graph.nodes.keys():
+        for node_name in graph.nodes:
             console.info(f"  - {node_name}")
         return
 
