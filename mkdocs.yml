@@ -54,7 +54,7 @@ markdown_extensions:
       toc_depth: 3
 
 nav:
-  - Home: TABLE_OF_CONTENTS.md
+  - Home: index.md
 
   - Getting Started:
     - Setup Guide: getting-started/setup-guide.md
