@@ -5,7 +5,7 @@ This guide covers the automated versioning, release management, governance valid
 ## Table of Contents
 - [Automated Versioning](#automated-versioning)
 - [Release Management](#release-management)
-- [Security & Quality Tasks](#security--quality-tasks)
+- [Security & Quality Tasks](#security-quality-tasks)
 - [Governance Validation](#governance-validation)
 - [Environment Configuration](#environment-configuration)
 
@@ -226,7 +226,7 @@ uv run doit fmt_pyproject
 - **Example**:
   ```bash
   $ uv run doit spell_check
-  docs/README.md:42: recieve ==> receive
+  docs/README.md:42: receive ==> receive
   ```
 
 #### `doit fmt_pyproject`
@@ -576,5 +576,4 @@ ignore-words-list = "crate,kubernetes,terraform"
 
 - [Coding Standards](coding-standards.md) - Code style guidelines
 - [CI/CD Testing](ci-cd-testing.md) - Continuous integration setup
-- [Contributing](../../CONTRIBUTING.md) - Contribution guidelines (if exists)
-- [AGENTS.md](../../AGENTS.md) - Issue-driven development workflow
+- [AGENTS.md](../AGENTS.md) - Issue-driven development workflow
