@@ -55,6 +55,7 @@ This index provides a structured overview of the available documentation.
 - **[Credential Loader](development/credential-loader-system.md)**: How the credential loading system works.
 - **[Coding Standards](development/coding-standards.md)**: Style guides and standards for contributing code.
 - **[CI/CD Testing](development/ci-cd-testing.md)**: Strategies and setups for CI/CD pipelines.
+- **[Release Automation & Security](development/release-and-automation.md)**: Automated versioning, release management, governance validation, and security tooling.
 - **[Implementing Secret Providers](development/implementing-secret-providers.md)**: Guide to adding new secret storage providers.
 
 ## Runners
