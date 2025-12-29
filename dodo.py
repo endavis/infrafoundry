@@ -185,6 +185,58 @@ def task_check():
     }
 
 
+# --- Security Tasks ---
+
+
+def task_audit():
+    """Run security audit with pip-audit (requires security extras)."""
+    return {
+        "actions": [
+            f"UV_CACHE_DIR={UV_CACHE_DIR} uv run pip-audit || "
+            "echo 'pip-audit not installed. Run: uv sync --extra security'"
+        ],
+        "title": title_with_actions,
+    }
+
+
+def task_security():
+    """Run security checks with bandit (requires security extras)."""
+    return {
+        "actions": [
+            f"UV_CACHE_DIR={UV_CACHE_DIR} uv run bandit -c pyproject.toml -r src/ || "
+            "echo 'bandit not installed. Run: uv sync --extra security'"
+        ],
+        "title": title_with_actions,
+    }
+
+
+def task_spell_check():
+    """Check spelling in code and documentation."""
+    return {
+        "actions": [f"UV_CACHE_DIR={UV_CACHE_DIR} uv run codespell src/ tests/ docs/ README.md"],
+        "title": title_with_actions,
+    }
+
+
+def task_fmt_pyproject():
+    """Format pyproject.toml with pyproject-fmt."""
+    return {
+        "actions": [f"UV_CACHE_DIR={UV_CACHE_DIR} uv run pyproject-fmt pyproject.toml"],
+        "title": title_with_actions,
+    }
+
+
+def task_licenses():
+    """Check licenses of dependencies (requires security extras)."""
+    return {
+        "actions": [
+            f"UV_CACHE_DIR={UV_CACHE_DIR} uv run pip-licenses --format=markdown --order=license || "
+            "echo 'pip-licenses not installed. Run: uv sync --extra security'"
+        ],
+        "title": title_with_actions,
+    }
+
+
 # --- Infrastructure Tasks ---
 
 
