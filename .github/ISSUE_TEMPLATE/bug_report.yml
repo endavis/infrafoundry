@@ -1,0 +1,130 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug! Please fill out the form below to help us understand and fix the issue.
+
+  - type: input
+    id: title
+    attributes:
+      label: Bug Title
+      description: "Use format: bug: <brief description>"
+      placeholder: "bug: infrafoundry crashes when processing OPNsense config"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the issue
+      placeholder: |
+        1. Run 'infra plan --env dev'
+        2. Check generated files in 'generated/'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: Describe what should happen...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: Describe what actually happened...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: python-version
+    attributes:
+      label: Python Version
+      description: Which Python version are you using?
+      options:
+        - "3.12"
+        - "3.13"
+        - "3.11"
+        - "Other (specify in additional context)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: Which operating system are you using?
+      options:
+        - "Linux"
+        - "macOS"
+        - "Windows"
+        - "Other (specify in additional context)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How critical is this bug?
+      options:
+        - "🔴 CRITICAL - System unusable"
+        - "🟠 HIGH - Major feature broken"
+        - "🟡 MEDIUM - Feature partially broken"
+        - "🟢 LOW - Minor issue or cosmetic"
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error Messages / Stack Trace
+      description: If applicable, paste any error messages or stack traces
+      placeholder: Paste error output here...
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context about the problem here:
+        - InfraFoundry version
+        - Provider being used (OPNsense, Proxmox, etc.)
+        - Environment details
+        - Configuration snippets (sanitized)
+        - Related issues or PRs
+      placeholder: Additional information...
+    validations:
+      required: false
+
+  - type: textarea
+    id: possible-solution
+    attributes:
+      label: Possible Solution
+      description: If you have suggestions on how to fix the bug, please describe them here
+      placeholder: Suggestions for fixing...
+    validations:
+      required: false
