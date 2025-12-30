@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import Any, cast
 
 from ..services.isc_dhcp import ISCDHCPService
 from .base import BaseComponentManager
-from contextlib import suppress
 
 
 class _BaseDHCPConverter:
@@ -80,7 +80,7 @@ class _BaseDHCPConverter:
         if "defaultleasetime" in isc_config:
             with suppress(TypeError, ValueError):
                 fields["valid_lifetime"] = int(isc_config["defaultleasetime"])
- 
+
         if "maxleasetime" in isc_config:
             with suppress(TypeError, ValueError):
                 fields["max_lifetime"] = int(isc_config["maxleasetime"])

@@ -8,10 +8,9 @@ Tests complex workflows including:
 - Error recovery and cleanup
 """
 
+from contextlib import suppress
 from pathlib import Path
 from unittest.mock import Mock, patch
-
-from sklearn.utils import suppress
 
 import pytest
 
@@ -19,9 +18,6 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.orchestrator import Orchestrator
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState
-
-from contextlib import suppress
-
 
 
 @pytest.fixture
@@ -307,9 +303,8 @@ class TestRollbackScenarios:
             mock_apply.return_value = {"exit_code": 1, "success": False}
 
             with patch.object(provider, "generate_terraform"):
-                with patch.object(provider, "generate_terraform"):
-                    with suppress(Exception):
-                        orchestrator.rollback(deployment_id, auto_approve=True)
+                with suppress(Exception):
+                    orchestrator.rollback(deployment_id, auto_approve=True)
 
 
     def test_rollback_nonexistent_deployment(self, advanced_orchestrator):
@@ -473,12 +468,11 @@ deployments:
                 mock_apply.return_value = {"exit_code": 1, "success": False}
 
                 with patch.object(provider, "generate_terraform"):
-                    try:
+                    with pytest.raises(Exception) as exc:
                         orchestrator.apply("dev", auto_approve=True)
-                        # Should handle error gracefully
-                    except Exception as e:
-                        # Error should be informative
-                        assert "error" in str(e).lower() or "fail" in str(e).lower()
+
+                assert "error" in str(exc.value).lower() or "fail" in str(exc.value).lower()
+
 
 
 @pytest.mark.integration
@@ -493,11 +487,9 @@ class TestErrorRecoveryAndCleanup:
             # Simulate generation failure
             mock_gen.side_effect = Exception("Template rendering failed")
 
-            try:
+            with suppress(Exception):
                 orchestrator.plan("dev")
-            except Exception:
-                # Should handle cleanup
-                pass
+
 
             # Verify proper error handling occurred
             mock_gen.assert_called()
@@ -514,11 +506,9 @@ class TestErrorRecoveryAndCleanup:
                 mock_apply.side_effect = Exception("Terraform crashed")
 
                 with patch.object(provider, "generate_terraform"):
-                    try:
+                    with suppress(Exception):
                         orchestrator.apply("dev", auto_approve=True)
-                    except Exception:
-                        # Should handle cleanup and state updates
-                        pass
+
 
     def test_state_consistency_after_errors(self, advanced_orchestrator):
         """Test that state remains consistent after errors."""
@@ -535,10 +525,9 @@ class TestErrorRecoveryAndCleanup:
                 mock_apply.side_effect = Exception("Infrastructure error")
 
                 with patch.object(provider, "generate_terraform"):
-                    try:
+                    with suppress(Exception):
                         orchestrator.apply("dev", auto_approve=True)
-                    except Exception:
-                        pass
+
 
         # State should still be queryable
         final_deployments = orchestrator.state_manager.get_deployment_history("dev", limit=10)
