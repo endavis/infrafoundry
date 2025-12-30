@@ -23,9 +23,9 @@ Practical examples and reference configurations for InfraFoundry.
 
 For more detailed documentation, see:
 
-- [Configuration Documentation](../configuration/) - Complete configuration reference
-- [Development Guides](../development/) - Guides for extending InfraFoundry
-- [Architecture Documentation](../architecture/) - System design and patterns
+- [Configuration Documentation](../configuration/overview.md) - Complete configuration reference
+- [Development Guides](../development/README.md) - Guides for extending InfraFoundry
+- [Architecture Documentation](../architecture/overview.md) - System design and patterns
 
 ---
 
