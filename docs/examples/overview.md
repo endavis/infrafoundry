@@ -50,7 +50,7 @@ If you're new to InfraFoundry, start with these examples in order:
 
 - [Configuration Overview](../configuration/overview.md) - Detailed configuration documentation
 - [Getting Started Guide](../getting-started/setup-guide.md) - Initial setup instructions
-- [Development Guides](../development/) - Guides for extending InfraFoundry
+- [Development Guides](../development/README.md) - Guides for extending InfraFoundry
 
 ---
 
