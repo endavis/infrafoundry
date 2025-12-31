@@ -12,7 +12,6 @@ from contextlib import suppress
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from infrafoundry.tests.integration.test_orchestrator_workflows import orchestrator
 import pytest
 
 from infrafoundry.core.config import ConfigManager
