@@ -70,4 +70,4 @@ This document consolidates planned features, enhancements, and tools for InfraFo
 - [Policy Configuration Guide](configuration/policy-configuration.md)
 
 ---
-[Back to Table of Contents](TABLE_OF_CONTENTS.md)
+[Back to Table of Contents](index.md)

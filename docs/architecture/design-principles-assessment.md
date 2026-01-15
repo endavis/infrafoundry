@@ -1632,4 +1632,4 @@ This codebase serves as an **exemplary reference implementation** of applying so
 
 
 ---
-[Back to Table of Contents](../TABLE_OF_CONTENTS.md)
+[Back to Table of Contents](../index.md)

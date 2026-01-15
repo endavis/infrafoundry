@@ -54,7 +54,7 @@ markdown_extensions:
       toc_depth: 3
 
 nav:
-  - Home: TABLE_OF_CONTENTS.md
+  - Home: index.md
 
   - Getting Started:
     - Setup Guide: getting-started/setup-guide.md
@@ -85,6 +85,7 @@ nav:
     - Secrets Architecture: architecture/secrets-architecture.md
     - Orchestrator: architecture/orchestrator-architecture.md
     - Pluggable Runners: architecture/pluggable-runners.md
+    - Event System: architecture/events.md
     - Graphing: architecture/graphing.md
     - Design Principles: architecture/principles.md
     - Principles Assessment: architecture/design-principles-assessment.md
@@ -101,8 +102,11 @@ nav:
     - DHCP VM Integration: guides/dhcp-vm-integration.md
     - Age Key Management: guides/age-key-management.md
     - SSH Authentication: guides/ssh-authentication.md
+    - Drift Detection: guides/drift-detection.md
+    - Drift Remediation: guides/drift-remediation.md
 
   - Development:
+    - Overview: development/README.md
     - Implementing Providers: development/implementing-providers.md
     - Implementing Runners: development/implementing-runners.md
     - Runner Protocol Reference: development/runner-protocol-quick-reference.md
@@ -122,6 +126,8 @@ nav:
     - Pulumi: runners/pulumi.md
 
   - Examples:
+    - Overview: examples/overview.md
+    - Quick Start: examples/README.md
     - Environment Example: examples/ENV_EXAMPLE.md
     - Envrc Local: examples/ENVRC_LOCAL.md
     - GitLab CI: examples/GITLAB_CI_EXAMPLE.md
@@ -135,6 +141,7 @@ nav:
 
   - Meta:
     - Roadmap: TODO.md
+    - Agent Instructions: AGENTS.md
     - Documentation Template: meta/documentation-template.md
     - Code Quality Analysis: meta/code-quality-analysis.md
 
