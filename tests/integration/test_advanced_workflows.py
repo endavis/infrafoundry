@@ -306,7 +306,6 @@ class TestRollbackScenarios:
                 with suppress(Exception):
                     orchestrator.rollback(deployment_id, auto_approve=True)
 
-
     def test_rollback_nonexistent_deployment(self, advanced_orchestrator):
         """Test rollback with invalid deployment ID."""
         orchestrator, _provider = advanced_orchestrator
@@ -474,7 +473,6 @@ deployments:
                         assert "error" in str(e).lower() or "fail" in str(e).lower()
 
 
-
 @pytest.mark.integration
 class TestErrorRecoveryAndCleanup:
     """Tests for error recovery and cleanup operations."""
@@ -489,7 +487,6 @@ class TestErrorRecoveryAndCleanup:
 
             with suppress(Exception):
                 orchestrator.plan("dev")
-
 
             # Verify proper error handling occurred
             mock_gen.assert_called()
@@ -509,7 +506,6 @@ class TestErrorRecoveryAndCleanup:
                     with suppress(Exception):
                         orchestrator.apply("dev", auto_approve=True)
 
-
     def test_state_consistency_after_errors(self, advanced_orchestrator):
         """Test that state remains consistent after errors."""
         orchestrator, provider = advanced_orchestrator
@@ -527,7 +523,6 @@ class TestErrorRecoveryAndCleanup:
                 with patch.object(provider, "generate_terraform"):
                     with suppress(Exception):
                         orchestrator.apply("dev", auto_approve=True)
-
 
         # State should still be queryable
         final_deployments = orchestrator.state_manager.get_deployment_history("dev", limit=10)
