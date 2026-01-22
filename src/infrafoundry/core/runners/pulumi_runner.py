@@ -1,8 +1,7 @@
 """Pulumi runner implementation (example of pluggable runner)."""
 
 import json
-import shutil
-import subprocess
+import subprocess  # nosec B404 - required for running pulumi
 from pathlib import Path
 from typing import Any, override
 
@@ -38,7 +37,11 @@ class PulumiRunner(BaseRunner):
     @override
     def is_available(self) -> bool:
         """Check if Pulumi is installed."""
-        return shutil.which("pulumi") is not None
+        try:
+            _ = self.tool_path
+            return True
+        except FileNotFoundError:
+            return False
 
     @override
     def initialize(self, working_dir: Path, **kwargs: Any) -> dict[str, Any]:
@@ -58,8 +61,8 @@ class PulumiRunner(BaseRunner):
 
         try:
             # Check if stack exists
-            result = subprocess.run(
-                ["pulumi", "stack", "ls", "--json"],
+            result = subprocess.run(  # nosec B603
+                [self.tool_path, "stack", "ls", "--json"],
                 cwd=working_dir,
                 capture_output=True,
                 text=True,
@@ -72,15 +75,15 @@ class PulumiRunner(BaseRunner):
                 if not stack_exists:
                     # Create stack if it doesn't exist
                     self.console.print(f"[dim]Creating Pulumi stack: {stack}...[/dim]")
-                    subprocess.run(
-                        ["pulumi", "stack", "init", stack],
+                    subprocess.run(  # nosec B603
+                        [self.tool_path, "stack", "init", stack],
                         cwd=working_dir,
                         check=True,
                     )
                 else:
                     # Select existing stack
-                    subprocess.run(
-                        ["pulumi", "stack", "select", stack],
+                    subprocess.run(  # nosec B603
+                        [self.tool_path, "stack", "select", stack],
                         cwd=working_dir,
                         check=True,
                     )
@@ -108,8 +111,8 @@ class PulumiRunner(BaseRunner):
             return {"success": False, "error": "Pulumi directory does not exist"}
 
         try:
-            result = subprocess.run(
-                ["pulumi", "preview", "--non-interactive"],
+            result = subprocess.run(  # nosec B603
+                [self.tool_path, "preview", "--non-interactive"],
                 cwd=pulumi_dir,
                 capture_output=True,
                 text=True,
@@ -140,11 +143,11 @@ class PulumiRunner(BaseRunner):
             return {"success": False, "error": "Pulumi directory does not exist"}
 
         try:
-            cmd = ["pulumi", "up"]
+            cmd = [self.tool_path, "up"]
             if auto_approve:
                 cmd.append("--yes")
 
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603
                 cmd,
                 cwd=pulumi_dir,
                 capture_output=False,
@@ -170,11 +173,11 @@ class PulumiRunner(BaseRunner):
             return {"success": False, "error": "Pulumi directory does not exist"}
 
         try:
-            cmd = ["pulumi", "destroy"]
+            cmd = [self.tool_path, "destroy"]
             if auto_approve:
                 cmd.append("--yes")
 
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603
                 cmd,
                 cwd=pulumi_dir,
                 capture_output=False,
@@ -190,8 +193,8 @@ class PulumiRunner(BaseRunner):
             return None
 
         try:
-            result = subprocess.run(
-                ["pulumi", "version"],
+            result = subprocess.run(  # nosec B603
+                [self.tool_path, "version"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -230,8 +233,8 @@ class PulumiRunner(BaseRunner):
             return {}
 
         try:
-            result = subprocess.run(
-                ["pulumi", "stack", "export"],
+            result = subprocess.run(  # nosec B603
+                [self.tool_path, "stack", "export"],
                 cwd=pulumi_dir,
                 capture_output=True,
                 text=True,

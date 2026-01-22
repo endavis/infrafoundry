@@ -1,5 +1,6 @@
 """Base runner interface for infrastructure tools."""
 
+import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,26 @@ class BaseRunner(ABC):
             Tool name (e.g., 'terraform', 'ansible', 'pulumi')
         """
         pass
+
+    @property
+    def tool_path(self) -> str:
+        """Return the full path to the tool executable.
+
+        Uses shutil.which() to resolve the full path, which is more secure
+        than using a partial path that relies on PATH lookup at runtime.
+
+        Returns:
+            Full path to the tool executable, or tool_name if not found
+
+        Raises:
+            FileNotFoundError: If the tool is not found on PATH
+        """
+        path = shutil.which(self.tool_name)
+        if path is None:
+            raise FileNotFoundError(
+                f"{self.tool_name} not found on PATH. Please install {self.tool_name}."
+            )
+        return path
 
     @abstractmethod
     def is_available(self) -> bool:
