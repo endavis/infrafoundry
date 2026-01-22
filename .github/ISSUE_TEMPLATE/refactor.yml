@@ -1,30 +1,23 @@
 name: 🔧 Refactor Request
 description: Propose code refactoring or improvement
-title: "refactor: "
 labels: ["refactor", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for proposing a refactoring! This helps improve code quality and maintainability.
+        ## Propose a Refactoring
 
-  - type: input
-    id: title
-    attributes:
-      label: Refactor Title
-      description: "Use format: refactor: <brief description>"
-      placeholder: "refactor: extract duplicate provider validation logic"
-    validations:
-      required: true
+        Describe the current code issue and how you propose to improve it.
 
   - type: textarea
-    id: current-situation
+    id: current-code-issue
     attributes:
-      label: Current Situation
-      description: Describe the current code structure or pattern that needs refactoring
+      label: Current Code Issue
+      description: Describe the code that needs refactoring and why
       placeholder: |
-        Describe what code/pattern currently exists and where it's located.
-        Example: "The validation logic in src/providers/ is duplicated across 5 providers..."
+        Describe what code currently exists, where it's located, and what problems it causes.
+        Example: "The validation logic in src/module.py is duplicated across 5 functions,
+        making it difficult to maintain and test..."
     validations:
       required: true
 
@@ -33,101 +26,35 @@ body:
     attributes:
       label: Proposed Improvement
       description: Describe how you propose to refactor the code
-      placeholder: Describe the refactoring approach...
+      placeholder: |
+        Describe the refactoring approach and what the code will look like after.
+        Include specific files/modules that will be affected.
     validations:
       required: true
 
   - type: textarea
-    id: technical-debt
+    id: success-criteria
     attributes:
-      label: Technical Debt Impact
-      description: What technical debt does this address? What are the consequences of not refactoring?
+      label: Success Criteria
+      description: How will we know the refactoring is complete and successful?
       placeholder: |
-        - Maintainability issues
-        - Testing challenges
-        - Performance concerns
-        - Code duplication
-    validations:
-      required: true
-
-  - type: dropdown
-    id: complexity
-    attributes:
-      label: Estimated Complexity
-      description: How complex is this refactoring? (1=trivial, 10=extremely complex)
-      options:
-        - "1 - Trivial"
-        - "2"
-        - "3 - Simple"
-        - "4"
-        - "5 - Moderate"
-        - "6"
-        - "7 - Complex"
-        - "8"
-        - "9 - Very Complex"
-        - "10 - Extremely Complex"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: priority
-    attributes:
-      label: Priority
-      description: How urgent is this refactoring?
-      options:
-        - "🔴 CRITICAL - Blocking development"
-        - "🟠 HIGH - Causing significant issues"
-        - "🟡 MEDIUM - Should be addressed soon"
-        - "🟢 LOW - Nice to have"
-    validations:
-      required: true
-
-  - type: textarea
-    id: affected-areas
-    attributes:
-      label: Affected Code Areas
-      description: List files, modules, or components that would be affected
-      placeholder: |
-        - src/providers/opnsense/provider.py
-        - src/providers/proxmox/provider.py
-        - src/core/base_provider.py
-        - tests/providers/test_validation.py
+        - [ ] Code duplication eliminated
+        - [ ] All existing tests still pass
+        - [ ] New tests added for refactored code
+        - [ ] No breaking changes to public API
+        - [ ] Code is more maintainable/readable
     validations:
       required: false
-
-  - type: textarea
-    id: benefits
-    attributes:
-      label: Expected Benefits
-      description: What improvements will this refactoring bring?
-      placeholder: |
-        - Improved code readability
-        - Easier testing
-        - Better performance
-        - Reduced duplication
-    validations:
-      required: false
-
-  - type: checkboxes
-    id: breaking-changes
-    attributes:
-      label: Impact Assessment
-      description: Check all that apply
-      options:
-        - label: This may introduce breaking changes
-          required: false
-        - label: This requires test updates
-          required: false
-        - label: This requires documentation updates
-          required: false
-        - label: This affects public API
-          required: false
 
   - type: textarea
     id: additional-context
     attributes:
       label: Additional Context
-      description: Add any other context, code examples, or references
-      placeholder: Additional information...
+      description: Any other relevant information
+      placeholder: |
+        - Performance impact
+        - Breaking change considerations
+        - Migration steps needed
+        - Related issues or PRs
     validations:
       required: false
