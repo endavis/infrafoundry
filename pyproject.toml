@@ -135,11 +135,17 @@ warn_unreachable = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "--strict-config --strict-markers"
+cache_dir = "tmp/.pytest_cache"
+addopts = "-v --tb=short --strict-config --strict-markers --disable-warnings"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests for individual components",
+    "integration: Integration tests for full workflows",
+    "slow: Tests that take significant time to run",
+]
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -162,11 +168,17 @@ skips = ["B101"]  # Skip assert_used - asserts are fine in tests
 
 [tool.codespell]
 skip = "tmp,.venv,.git,*.lock,*.pyc,__pycache__"
-ignore-words-list = "crate"
+ignore-words-list = "crate,applyable"
 
 [tool.coverage.run]
 branch = true
-source = ["infrafoundry"]
+data_file = "tmp/.coverage"
+source = ["src/infrafoundry"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+]
 
 [tool.coverage.report]
 skip_covered = false
@@ -180,6 +192,7 @@ exclude_lines = [
     "raise AssertionError",
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
+    "@abstractmethod",
 ]
 
 [tool.coverage.html]
