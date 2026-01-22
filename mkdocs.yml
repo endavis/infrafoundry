@@ -1,5 +1,5 @@
 site_name: InfraFoundry
-site_description: Infrastructure automation framework with pluggable providers (Proxmox, OPNsense, Kubernetes)
+site_description: Infrastructure automation framework with pluggable providers (Proxmox, OPNsense, Kubernetes, OCI)
 site_author: Eric Davis
 site_url: https://endavis.github.io/infrafoundry
 
@@ -96,6 +96,9 @@ nav:
       - ADR-0002 Mixin Pattern: architecture/decisions/0002-mixin-pattern-for-providers.md
       - ADR-0003 Granular Events: architecture/decisions/0003-granular-event-types.md
       - ADR-0004 Protocol Runners: architecture/decisions/0004-protocol-based-runner-interfaces.md
+
+  - Providers:
+    - OCI: providers/oci.md
 
   - Guides:
     - ISC to Kea Migration: guides/isc-to-kea-migration.md

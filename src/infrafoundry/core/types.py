@@ -21,6 +21,17 @@ class ProxmoxEnvironmentConfig(TypedDict, total=False):
     provider_settings: dict[str, ProxmoxProviderSettings | dict[str, Any]]
 
 
+class OCIProviderSettings(TypedDict, total=False):
+    """Provider settings expected by the OCI provider."""
+
+    tenancy_ocid: str
+    user_ocid: str
+    fingerprint: str
+    private_key_path: str
+    region: str
+    compartment_ocid: str
+
+
 class OPNsenseProviderSettings(TypedDict, total=False):
     """Provider settings expected by the OPNsense provider."""
 
@@ -135,6 +146,7 @@ __all__ = [
     "DeploymentMetadata",
     "DestroyDeploymentMetadata",
     "EnvironmentData",
+    "OCIProviderSettings",
     "OPNsenseEnvironmentConfig",
     "OPNsenseProviderSettings",
     "PlanDeploymentMetadata",

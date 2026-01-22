@@ -1,0 +1,29 @@
+variable "oci_tenancy_ocid" {
+  description = "OCID of the tenancy"
+  type        = string
+}
+
+variable "oci_user_ocid" {
+  description = "OCID of the user"
+  type        = string
+}
+
+variable "oci_fingerprint" {
+  description = "Fingerprint of the API signing key"
+  type        = string
+}
+
+variable "oci_private_key_path" {
+  description = "Path to the private key for API signing"
+  type        = string
+}
+
+variable "oci_region" {
+  description = "OCI region"
+  type        = string
+}
+
+variable "oci_compartment_ocid" {
+  description = "OCID of the compartment for resources"
+  type        = string
+}
