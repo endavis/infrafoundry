@@ -1,0 +1,99 @@
+# OCI Virtual Cloud Networks and Subnets
+
+{% for vcn in vcns %}
+resource "oci_core_vcn" "{{ vcn.name | to_terraform_name }}" {
+  compartment_id = var.oci_compartment_ocid
+  cidr_blocks    = ["{{ vcn.config.cidr_block }}"]
+  display_name   = "{{ vcn.name }}"
+  {% if vcn.config.get('dns_label') %}
+  dns_label      = "{{ vcn.config.dns_label }}"
+  {% endif %}
+}
+
+{% if vcn.config.get('internet_gateway', false) %}
+resource "oci_core_internet_gateway" "{{ vcn.name | to_terraform_name }}_igw" {
+  compartment_id = var.oci_compartment_ocid
+  vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
+  display_name   = "{{ vcn.name }}-igw"
+}
+
+resource "oci_core_route_table" "{{ vcn.name | to_terraform_name }}_public_rt" {
+  compartment_id = var.oci_compartment_ocid
+  vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
+  display_name   = "{{ vcn.name }}-public-rt"
+
+  route_rules {
+    destination       = "0.0.0.0/0"
+    network_entity_id = oci_core_internet_gateway.{{ vcn.name | to_terraform_name }}_igw.id
+  }
+}
+{% endif %}
+
+{% if vcn.config.get('security_list') %}
+resource "oci_core_security_list" "{{ vcn.name | to_terraform_name }}_sl" {
+  compartment_id = var.oci_compartment_ocid
+  vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
+  display_name   = "{{ vcn.name }}-security-list"
+
+  {% if vcn.config.security_list.get('egress_rules') %}
+  {% for rule in vcn.config.security_list.egress_rules %}
+  egress_security_rules {
+    destination = "{{ rule.destination }}"
+    protocol    = "{{ rule.protocol }}"
+    stateless   = {{ rule.get('stateless', false) | lower }}
+  }
+  {% endfor %}
+  {% else %}
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "all"
+    stateless   = false
+  }
+  {% endif %}
+
+  {% if vcn.config.security_list.get('ingress_rules') %}
+  {% for rule in vcn.config.security_list.ingress_rules %}
+  ingress_security_rules {
+    source   = "{{ rule.source }}"
+    protocol = "{{ rule.protocol }}"
+    stateless = {{ rule.get('stateless', false) | lower }}
+    {% if rule.get('tcp_options') %}
+    tcp_options {
+      min = {{ rule.tcp_options.min }}
+      max = {{ rule.tcp_options.max }}
+    }
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+}
+{% endif %}
+
+{% endfor %}
+
+{% for subnet in subnets %}
+resource "oci_core_subnet" "{{ subnet.name | to_terraform_name }}" {
+  compartment_id = var.oci_compartment_ocid
+  vcn_id         = oci_core_vcn.{{ subnet.config.vcn | to_terraform_name }}.id
+  cidr_block     = "{{ subnet.config.cidr_block }}"
+  display_name   = "{{ subnet.name }}"
+  {% if subnet.config.get('dns_label') %}
+  dns_label      = "{{ subnet.config.dns_label }}"
+  {% endif %}
+  {% if subnet.config.get('public', false) %}
+  prohibit_public_ip_on_vnic = false
+  {% else %}
+  prohibit_public_ip_on_vnic = true
+  {% endif %}
+  {% if subnet.config.get('vcn') %}
+  {% set vcn_name = subnet.config.vcn | to_terraform_name %}
+  {% if subnet.config.get('public', false) %}
+  route_table_id = oci_core_route_table.{{ vcn_name }}_public_rt.id
+  {% endif %}
+  {% if subnet.config.get('security_list_id') %}
+  security_list_ids = [{{ subnet.config.security_list_id }}]
+  {% endif %}
+  {% endif %}
+}
+
+{% endfor %}

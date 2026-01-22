@@ -1,0 +1,16 @@
+---
+# OCI Inventory - Generated from resource configurations
+all:
+  children:
+    oci_instances:
+      hosts:
+{% for instance in instances %}
+        {{ instance.name }}:
+          ansible_host: "{{ '${oci_core_instance.' ~ (instance.name | to_terraform_name) ~ '.public_ip}' }}"
+          ansible_user: "{{ instance.config.get('ssh_user', 'ubuntu') }}"
+{% if instance.config.get('ansible_vars') %}
+{% for key, value in instance.config.ansible_vars.items() %}
+          {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+{% endfor %}

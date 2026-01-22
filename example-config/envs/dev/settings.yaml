@@ -14,6 +14,13 @@ description: Development environment for testing InfraFoundry
 #     api_url: https://firewall.example.com
 #     api_key: your-api-key
 #     api_secret: your-api-secret
+#   oci:
+#     tenancy_ocid: ocid1.tenancy.oc1..aaaaaa...
+#     user_ocid: ocid1.user.oc1..aaaaaa...
+#     fingerprint: aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99
+#     private_key_path: ~/.oci/oci_api_key.pem
+#     region: us-ashburn-1
+#     compartment_ocid: ocid1.compartment.oc1..aaaaaa...
 
 variables:
   environment: development

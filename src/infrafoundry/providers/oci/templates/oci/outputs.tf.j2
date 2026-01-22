@@ -1,0 +1,43 @@
+# Outputs for OCI resources
+
+{% if resources_by_type.get('vcn') %}
+output "vcn_ids" {
+  description = "OCIDs of created VCNs"
+  value = {
+    {% for vcn in resources_by_type['vcn'] %}
+    "{{ vcn.name }}" = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
+    {% endfor %}
+  }
+}
+{% endif %}
+
+{% if resources_by_type.get('subnet') %}
+output "subnet_ids" {
+  description = "OCIDs of created subnets"
+  value = {
+    {% for subnet in resources_by_type['subnet'] %}
+    "{{ subnet.name }}" = oci_core_subnet.{{ subnet.name | to_terraform_name }}.id
+    {% endfor %}
+  }
+}
+{% endif %}
+
+{% if resources_by_type.get('instance') %}
+output "instance_ips" {
+  description = "Public IPs of created instances"
+  value = {
+    {% for instance in resources_by_type['instance'] %}
+    "{{ instance.name }}" = oci_core_instance.{{ instance.name | to_terraform_name }}.public_ip
+    {% endfor %}
+  }
+}
+
+output "instance_private_ips" {
+  description = "Private IPs of created instances"
+  value = {
+    {% for instance in resources_by_type['instance'] %}
+    "{{ instance.name }}" = oci_core_instance.{{ instance.name | to_terraform_name }}.private_ip
+    {% endfor %}
+  }
+}
+{% endif %}
