@@ -1,7 +1,7 @@
 """PyInfra runner implementation."""
 
-import shutil
-import subprocess
+import subprocess  # nosec B404 - required for running pyinfra
+import sys
 from pathlib import Path
 from typing import Any, override
 
@@ -21,7 +21,11 @@ class PyInfraRunner(BaseRunner):
     @override
     def is_available(self) -> bool:
         """Check if pyinfra is installed."""
-        return shutil.which("pyinfra") is not None
+        try:
+            _ = self.tool_path
+            return True
+        except FileNotFoundError:
+            return False
 
     @override
     def initialize(self, working_dir: Path, **kwargs: Any) -> dict[str, Any]:
@@ -69,8 +73,8 @@ class PyInfraRunner(BaseRunner):
             return None
 
         try:
-            result = subprocess.run(
-                ["pyinfra", "--version"],
+            result = subprocess.run(  # nosec B603
+                [self.tool_path, "--version"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -105,13 +109,13 @@ class PyInfraRunner(BaseRunner):
 
         # Basic syntax check using python -m py_compile
         try:
-            subprocess.run(
-                ["python3", "-m", "py_compile", str(deploy_file)],
+            subprocess.run(  # nosec B603
+                [sys.executable, "-m", "py_compile", str(deploy_file)],
                 check=True,
                 capture_output=True,
             )
-            subprocess.run(
-                ["python3", "-m", "py_compile", str(inventory_file)],
+            subprocess.run(  # nosec B603
+                [sys.executable, "-m", "py_compile", str(inventory_file)],
                 check=True,
                 capture_output=True,
             )
@@ -146,9 +150,9 @@ class PyInfraRunner(BaseRunner):
             )
             return {"error": "pyinfra not found", "success": False}
 
-        # Build command
+        # Build command using full path to pyinfra binary
         # pyinfra [options] INVENTORY DEPLOY
-        cmd = ["pyinfra"]
+        cmd = [self.tool_path]
         if dry_run:
             cmd.append("--dry")
             self.console.print("[dim]Running pyinfra in dry-run mode...[/dim]")
@@ -162,7 +166,7 @@ class PyInfraRunner(BaseRunner):
         # Run command
         try:
             # pyinfra outputs to stderr mostly for progress
-            result = subprocess.run(cmd, cwd=pyinfra_dir, capture_output=False)
+            result = subprocess.run(cmd, cwd=pyinfra_dir, capture_output=False)  # nosec B603
             return {"exit_code": result.returncode, "success": result.returncode == 0}
         except FileNotFoundError:
             return {"error": "pyinfra not found", "success": False}

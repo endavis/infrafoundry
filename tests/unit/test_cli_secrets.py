@@ -24,7 +24,7 @@ def test_secrets_init_basic(cli_runner, tmp_path):
     mock_result.stderr = "# public key: age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
     with patch("subprocess.run", return_value=mock_result):
-        with patch("infrafoundry.core.secrets.SecretManager.create_sops_config"):
+        with patch("infrafoundry.cli.commands.secrets.secrets.create_sops_config"):
             result = cli_runner.invoke(main, ["secrets", "init", "--key-file", str(key_file)])
 
             assert result.exit_code == 0

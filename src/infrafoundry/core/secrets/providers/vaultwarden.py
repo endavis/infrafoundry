@@ -1,7 +1,8 @@
 import json
 import logging
 import os
-import subprocess
+import shutil
+import subprocess  # nosec B404 - required for running bitwarden CLI
 from pathlib import Path
 from typing import Any
 
@@ -29,18 +30,19 @@ class VaultwardenProvider(SecretProvider):
         self._ensure_bw_installed()
         self._authenticate_if_needed()
 
-    def _ensure_bw_installed(self) -> None:
-        """Check if bw CLI is installed."""
-        try:
-            subprocess.run(
-                ["bw", "--version"],
-                capture_output=True,
-                check=True,
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError):
+    @property
+    def _bw_path(self) -> str:
+        """Return the full path to the bw executable."""
+        path = shutil.which("bw")
+        if path is None:
             raise SecretError(
                 "Bitwarden CLI (bw) not found. Please install it to use VaultwardenProvider."
             )
+        return path
+
+    def _ensure_bw_installed(self) -> None:
+        """Check if bw CLI is installed."""
+        _ = self._bw_path  # Will raise SecretError if not found
 
     def _run_bw(self, args: list[str], input_data: str | None = None) -> str:
         """Run Bitwarden CLI command."""
@@ -49,8 +51,8 @@ class VaultwardenProvider(SecretProvider):
             env["BW_SESSION"] = self.session_key
 
         try:
-            result = subprocess.run(
-                ["bw", *args, "--nointeraction"],
+            result = subprocess.run(  # nosec B603
+                [self._bw_path, *args, "--nointeraction"],
                 input=input_data,
                 capture_output=True,
                 check=True,
@@ -201,8 +203,8 @@ class VaultwardenProvider(SecretProvider):
             else:
                 item_data["fields"].append({"name": k, "value": str(v), "type": 0})
 
-        encoded_data = subprocess.run(
-            ["bw", "encode"],
+        encoded_data = subprocess.run(  # nosec B603
+            [self._bw_path, "encode"],
             input=json.dumps(item_data),
             text=True,
             capture_output=True,

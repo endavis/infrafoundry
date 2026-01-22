@@ -7,6 +7,7 @@ import click
 
 from infrafoundry.core.exceptions import InfraFoundryError, SecretError
 from infrafoundry.core.secrets import SecretManager
+from infrafoundry.core.secrets.age_key_manager import create_sops_config
 
 from ...utils import console, raise_cli_error
 
@@ -43,10 +44,10 @@ def secrets_init(ctx: click.Context, key_file: str | None) -> None:
 
     key_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Generate age key
-    import subprocess
+    # Generate age key using subprocess with hardcoded command (not user input)
+    import subprocess  # nosec B404
 
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603, B607
         ["age-keygen", "-o", str(key_path)],
         capture_output=True,
         text=True,
@@ -60,9 +61,8 @@ def secrets_init(ctx: click.Context, key_file: str | None) -> None:
         if line.startswith("# public key:"):
             public_key = line.split(": ")[1]
 
-            # Create .sops.yaml
-            secret_manager = SecretManager(str(key_path.parent))
-            secret_manager.create_sops_config(public_key)
+            # Create .sops.yaml (call directly - SecretManager requires SOPS_AGE_KEY_FILE)
+            create_sops_config(key_path.parent, public_key)
 
             console.success(f"Created age key: {key_path}")
             console.success(f"Created .sops.yaml with public key: {public_key}")
@@ -78,7 +78,7 @@ def secrets_init(ctx: click.Context, key_file: str | None) -> None:
 def secrets_encrypt(file: str) -> None:
     """Encrypt a file with SOPS."""
     try:
-        import subprocess
+        import subprocess  # nosec B404
 
         config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
         if config_repo and not Path(file).is_absolute():
@@ -91,7 +91,7 @@ def secrets_encrypt(file: str) -> None:
         if not file_path.exists():
             raise click.ClickException(f"File not found: {file_path}")
 
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603, B607
             ["sops", "--encrypt", "--in-place", str(file_path)],
             capture_output=True,
             text=True,
@@ -117,7 +117,7 @@ def secrets_encrypt(file: str) -> None:
 def secrets_decrypt(file: str) -> None:
     """Decrypt and display a SOPS-encrypted file."""
     try:
-        import subprocess
+        import subprocess  # nosec B404
 
         config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
         if config_repo and not Path(file).is_absolute():
@@ -128,7 +128,7 @@ def secrets_decrypt(file: str) -> None:
         if not file_path.exists():
             raise click.ClickException(f"File not found: {file_path}")
 
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603, B607
             ["sops", "--decrypt", str(file_path)],
             capture_output=True,
             text=True,

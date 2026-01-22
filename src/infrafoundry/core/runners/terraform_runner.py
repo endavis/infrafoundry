@@ -3,8 +3,7 @@
 import json
 import os
 import re
-import shutil
-import subprocess
+import subprocess  # nosec B404 - required for running terraform
 from pathlib import Path
 from typing import Any, cast, override
 
@@ -40,7 +39,11 @@ class TerraformRunner(BaseRunner):
     @override
     def is_available(self) -> bool:
         """Check if Terraform is installed."""
-        return shutil.which("terraform") is not None
+        try:
+            _ = self.tool_path
+            return True
+        except FileNotFoundError:
+            return False
 
     @override
     def initialize(self, working_dir: Path, **kwargs: Any) -> dict[str, Any]:
@@ -100,8 +103,8 @@ class TerraformRunner(BaseRunner):
             if not reconfigure:
                 return {"success": True, "message": "Already initialized"}
 
-        # Build init command
-        cmd = ["terraform", "init"]
+        # Build init command using full path to terraform binary
+        cmd = [self.tool_path, "init"]
         if reconfigure:
             cmd.append("-reconfigure")
         if migrate_state:
@@ -117,7 +120,7 @@ class TerraformRunner(BaseRunner):
                 msg = "Migrating Terraform state..."
             self.console.print(f"[dim]{msg}[/dim]")
 
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603
                 cmd,
                 cwd=working_dir,
                 capture_output=True,
@@ -173,8 +176,8 @@ class TerraformRunner(BaseRunner):
             return None
 
         try:
-            result = subprocess.run(
-                ["terraform", "version", "-json"],
+            result = subprocess.run(  # nosec B603
+                [self.tool_path, "version", "-json"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -194,8 +197,8 @@ class TerraformRunner(BaseRunner):
 
         try:
             env = self._prepare_environment(provider)
-            result = subprocess.run(
-                ["terraform", "validate"],
+            result = subprocess.run(  # nosec B603
+                [self.tool_path, "validate"],
                 cwd=tf_dir,
                 capture_output=True,
                 text=True,
@@ -232,14 +235,14 @@ class TerraformRunner(BaseRunner):
         if not init_result.get("success"):
             return init_result
 
-        # Build command
-        cmd = ["terraform", command]
+        # Build command using full path to terraform binary
+        cmd = [self.tool_path, command]
         if auto_approve and command in {"apply", "destroy"}:
             cmd.append("-auto-approve")
 
         # Run command with environment variables; capture output for plan so drift parsing works
         capture = command == "plan"
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603
             cmd,
             cwd=tf_dir,
             capture_output=capture,
@@ -270,8 +273,8 @@ class TerraformRunner(BaseRunner):
 
         try:
             # Run terraform show -json to get state
-            result = subprocess.run(
-                ["terraform", "show", "-json"],
+            result = subprocess.run(  # nosec B603
+                [self.tool_path, "show", "-json"],
                 cwd=tf_dir,
                 capture_output=True,
                 text=True,

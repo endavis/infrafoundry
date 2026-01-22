@@ -1,7 +1,7 @@
 """Secrets rotation utilities for re-encrypting secrets with new keys."""
 
 import shutil
-import subprocess
+import subprocess  # nosec B404 - required for running age-keygen
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -41,6 +41,17 @@ class SecretsRotator:
         self.backup_dir = backup_dir or secrets_dir.parent / ".secrets_backups"
         self.current_backup: Path | None = None
 
+    @property
+    def _age_keygen_path(self) -> str:
+        """Return the full path to the age-keygen executable."""
+        path = shutil.which("age-keygen")
+        if path is None:
+            raise SecretError(
+                "age-keygen not found. Install with: brew install age (macOS) "
+                "or see https://github.com/FiloSottile/age"
+            )
+        return path
+
     def generate_age_key(self, key_file: Path) -> str:
         """Generate a new age key pair.
 
@@ -59,8 +70,8 @@ class SecretsRotator:
         key_file.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            result = subprocess.run(
-                ["age-keygen", "-o", str(key_file)],
+            result = subprocess.run(  # nosec B603
+                [self._age_keygen_path, "-o", str(key_file)],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -75,11 +86,6 @@ class SecretsRotator:
 
         except subprocess.CalledProcessError as e:
             raise SecretError(f"Failed to generate age key: {e.stderr}") from e
-        except FileNotFoundError:
-            raise SecretError(
-                "age-keygen not found. Install with: brew install age (macOS) "
-                "or see https://github.com/FiloSottile/age"
-            ) from None
 
     def create_backup(self) -> Path:
         """Create timestamped backup of encrypted files.
@@ -300,8 +306,8 @@ class SecretsRotator:
             Age public key
         """
         try:
-            result = subprocess.run(
-                ["age-keygen", "-y", str(key_file)],
+            result = subprocess.run(  # nosec B603
+                [self._age_keygen_path, "-y", str(key_file)],
                 capture_output=True,
                 text=True,
                 check=True,

@@ -2,6 +2,7 @@
 
 import logging
 import os
+import tempfile
 from pathlib import Path
 from types import TracebackType
 
@@ -51,7 +52,8 @@ class CredentialLoader:
         result = {}
         for name, loader_class in self.PROVIDER_LOADERS.items():
             # Create a temporary instance to get properties
-            temp_secrets_dir = Path("/tmp")
+            # Use tempfile.gettempdir() instead of hardcoded /tmp for security
+            temp_secrets_dir = Path(tempfile.gettempdir())
             # Loader classes in registry are concrete implementations, not abstract
             loader = loader_class(temp_secrets_dir, False)  # type: ignore[abstract]
             result[name] = {
