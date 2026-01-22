@@ -57,7 +57,8 @@ jobs:
               {
                 pattern: /__all__.*=/,
                 description: 'Public API exports modified',
-                severity: 'high'
+                severity: 'high',
+                requiresDeletions: true
               },
               {
                 pattern: /^-.*@property/m,
@@ -77,7 +78,8 @@ jobs:
               if (!file.patch) continue;
 
               const matches = [];
-              for (const {pattern, description, severity} of breakingPatterns) {
+              for (const {pattern, description, severity, requiresDeletions} of breakingPatterns) {
+                if (requiresDeletions && file.deletions === 0) continue;
                 if (pattern.test(file.patch)) {
                   matches.push({description, severity});
                 }
