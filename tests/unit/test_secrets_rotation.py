@@ -64,8 +64,9 @@ class TestSecretsRotator:
 
         assert rotator.backup_dir == custom_backup
 
+    @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
-    def test_generate_age_key_success(self, mock_run, temp_secrets_dir):
+    def test_generate_age_key_success(self, mock_run, mock_which, temp_secrets_dir):
         """Test successful age key generation."""
         mock_run.return_value = Mock(
             stderr="# public key: age1newkey456789",
@@ -78,7 +79,8 @@ class TestSecretsRotator:
 
         assert public_key == "age1newkey456789"
         mock_run.assert_called_once()
-        assert "age-keygen" in mock_run.call_args[0][0]
+        # Check that the command uses the full path
+        assert mock_run.call_args[0][0][0].endswith("age-keygen")
 
     def test_generate_age_key_existing_file(self, temp_secrets_dir):
         """Test that generation fails if key file already exists."""
@@ -90,8 +92,9 @@ class TestSecretsRotator:
         with pytest.raises(SecretError, match="already exists"):
             rotator.generate_age_key(key_file)
 
+    @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
-    def test_generate_age_key_command_failure(self, mock_run, temp_secrets_dir):
+    def test_generate_age_key_command_failure(self, mock_run, mock_which, temp_secrets_dir):
         """Test handling of age-keygen command failure."""
         mock_run.side_effect = subprocess.CalledProcessError(1, "age-keygen", stderr="error")
 
@@ -101,11 +104,9 @@ class TestSecretsRotator:
         with pytest.raises(SecretError, match="Failed to generate age key"):
             rotator.generate_age_key(key_file)
 
-    @patch("subprocess.run")
-    def test_generate_age_key_age_not_found(self, mock_run, temp_secrets_dir):
+    @patch("shutil.which", return_value=None)
+    def test_generate_age_key_age_not_found(self, mock_which, temp_secrets_dir):
         """Test handling when age-keygen is not installed."""
-        mock_run.side_effect = FileNotFoundError()
-
         key_file = temp_secrets_dir / "age.key.new"
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
 
@@ -245,9 +246,12 @@ class TestSecretsRotator:
         assert result["new_public_key"] == "age1newpublickey789"
         assert len(result["files_rotated"]) > 0
 
+    @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
     @patch.dict("os.environ", {}, clear=True)
-    def test_rotate_with_generate_new_key(self, mock_run, temp_secrets_dir, mock_provider):
+    def test_rotate_with_generate_new_key(
+        self, mock_run, mock_which, temp_secrets_dir, mock_provider
+    ):
         """Test rotation with automatic key generation."""
         # Mock age-keygen for key generation
         mock_run.return_value = Mock(
@@ -274,7 +278,8 @@ class TestSecretsRotator:
         assert result["success"] is True
         assert result["new_public_key"] == "age1generatedkey123"
 
-    def test_rotate_no_encrypted_files(self, temp_secrets_dir):
+    @patch("shutil.which", return_value="/usr/bin/age-keygen")
+    def test_rotate_no_encrypted_files(self, mock_which, temp_secrets_dir):
         """Test rotation when no encrypted files exist."""
         # Remove all yaml files
         for yaml_file in temp_secrets_dir.glob("*.yaml"):
@@ -293,8 +298,9 @@ class TestSecretsRotator:
         assert result["success"] is False
         assert "No encrypted files found" in result["errors"][0]
 
+    @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
-    def test_extract_public_key(self, mock_run, temp_secrets_dir, tmp_path):
+    def test_extract_public_key(self, mock_run, mock_which, temp_secrets_dir, tmp_path):
         """Test extracting public key from private key file."""
         mock_run.return_value = Mock(stdout="age1extractedkey456\n", returncode=0)
 
@@ -308,8 +314,9 @@ class TestSecretsRotator:
         mock_run.assert_called_once()
         assert "-y" in mock_run.call_args[0][0]
 
+    @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
-    def test_extract_public_key_failure(self, mock_run, temp_secrets_dir, tmp_path):
+    def test_extract_public_key_failure(self, mock_run, mock_which, temp_secrets_dir, tmp_path):
         """Test handling of public key extraction failure."""
         mock_run.side_effect = subprocess.CalledProcessError(1, "age-keygen", stderr="error")
 
