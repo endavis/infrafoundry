@@ -162,7 +162,7 @@ skips = ["B101"]  # Skip assert_used - asserts are fine in tests
 
 [tool.codespell]
 skip = "tmp,.venv,.git,*.lock,*.pyc,__pycache__"
-ignore-words-list = "crate"
+ignore-words-list = "crate,applyable"
 
 [tool.coverage.run]
 branch = true
