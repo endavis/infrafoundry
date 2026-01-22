@@ -1,28 +1,22 @@
 name: 🐛 Bug Report
 description: Report a bug or unexpected behavior
-title: "bug: "
 labels: ["bug", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for taking the time to report a bug! Please fill out the form below to help us understand and fix the issue.
+        ## Report a Bug
 
-  - type: input
-    id: title
-    attributes:
-      label: Bug Title
-      description: "Use format: bug: <brief description>"
-      placeholder: "bug: infrafoundry crashes when processing OPNsense config"
-    validations:
-      required: true
+        Help us fix the issue by providing clear reproduction steps.
 
   - type: textarea
-    id: description
+    id: bug-description
     attributes:
       label: Bug Description
       description: A clear and concise description of what the bug is
-      placeholder: Describe the bug...
+      placeholder: |
+        Describe the bug and its impact.
+        Example: "Application crashes when processing files larger than 10MB..."
     validations:
       required: true
 
@@ -32,74 +26,41 @@ body:
       label: Steps to Reproduce
       description: Step-by-step instructions to reproduce the issue
       placeholder: |
-        1. Run 'infra plan --env dev'
-        2. Check generated files in 'generated/'
-        3. See error
+        1. Run command `...`
+        2. With input `...`
+        3. Observe error `...`
     validations:
       required: true
 
   - type: textarea
-    id: expected-behavior
+    id: expected-vs-actual
     attributes:
-      label: Expected Behavior
-      description: What you expected to happen
-      placeholder: Describe what should happen...
+      label: Expected vs Actual Behavior
+      description: What should happen vs what actually happens
+      placeholder: |
+        **Expected:** The function should return a valid result
+        **Actual:** The function raises ValueError
     validations:
       required: true
 
   - type: textarea
-    id: actual-behavior
+    id: environment
     attributes:
-      label: Actual Behavior
-      description: What actually happened
-      placeholder: Describe what actually happened...
+      label: Environment
+      description: System information (Python version, OS, package version)
+      placeholder: |
+        - Python: 3.12
+        - OS: Ubuntu 22.04
+        - Package version: 1.2.3
+      render: markdown
     validations:
-      required: true
-
-  - type: dropdown
-    id: python-version
-    attributes:
-      label: Python Version
-      description: Which Python version are you using?
-      options:
-        - "3.12"
-        - "3.13"
-        - "3.11"
-        - "Other (specify in additional context)"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: os
-    attributes:
-      label: Operating System
-      description: Which operating system are you using?
-      options:
-        - "Linux"
-        - "macOS"
-        - "Windows"
-        - "Other (specify in additional context)"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: priority
-    attributes:
-      label: Priority
-      description: How critical is this bug?
-      options:
-        - "🔴 CRITICAL - System unusable"
-        - "🟠 HIGH - Major feature broken"
-        - "🟡 MEDIUM - Feature partially broken"
-        - "🟢 LOW - Minor issue or cosmetic"
-    validations:
-      required: true
+      required: false
 
   - type: textarea
     id: error-output
     attributes:
-      label: Error Messages / Stack Trace
-      description: If applicable, paste any error messages or stack traces
+      label: Error Output
+      description: Paste any error messages, stack traces, or relevant logs
       placeholder: Paste error output here...
       render: shell
     validations:
@@ -109,22 +70,11 @@ body:
     id: additional-context
     attributes:
       label: Additional Context
-      description: |
-        Add any other context about the problem here:
-        - InfraFoundry version
-        - Provider being used (OPNsense, Proxmox, etc.)
-        - Environment details
-        - Configuration snippets (sanitized)
-        - Related issues or PRs
-      placeholder: Additional information...
-    validations:
-      required: false
-
-  - type: textarea
-    id: possible-solution
-    attributes:
-      label: Possible Solution
-      description: If you have suggestions on how to fix the bug, please describe them here
-      placeholder: Suggestions for fixing...
+      description: Any other relevant information
+      placeholder: |
+        - Screenshots
+        - Related issues
+        - Workarounds attempted
+        - Possible solutions
     validations:
       required: false
