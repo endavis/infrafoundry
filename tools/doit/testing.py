@@ -23,3 +23,11 @@ def task_coverage() -> dict[str, Any]:
         ],
         "title": title_with_actions,
     }
+
+
+def task_test_integration() -> dict[str, Any]:
+    """Run integration tests only."""
+    return {
+        "actions": ["uv run pytest -v -m integration tests/integration/"],
+        "title": title_with_actions,
+    }
