@@ -95,12 +95,15 @@ class TemplateRendererMixin:
         if "jinja2.ext.do" not in extensions:
             extensions.append("jinja2.ext.do")
 
+        # autoescape=False is intentional - we're generating Terraform/Ansible code,
+        # not HTML. HTML escaping would break infrastructure configuration syntax.
         self.jinja_env = Environment(
             loader=FileSystemLoader(str(self.template_dir)),
             trim_blocks=env_kwargs.pop("trim_blocks", True),
             lstrip_blocks=env_kwargs.pop("lstrip_blocks", True),
             keep_trailing_newline=env_kwargs.pop("keep_trailing_newline", True),
             extensions=extensions,
+            autoescape=False,  # nosec B701 - infrastructure code, not HTML
             **env_kwargs,  # Pass through any additional parameters
         )
 
@@ -629,12 +632,14 @@ class TerraformGeneratorMixin:
             from jinja2 import Environment, FileSystemLoader
 
             # Load from common templates directory
+            # autoescape=False is intentional - generating Terraform code, not HTML
             common_templates_dir = Path(__file__).parent.parent / "templates" / "common"
             env = Environment(
                 loader=FileSystemLoader(str(common_templates_dir)),
                 trim_blocks=True,
                 lstrip_blocks=True,
                 keep_trailing_newline=True,
+                autoescape=False,  # nosec B701 - infrastructure code, not HTML
             )
 
             template = env.get_template("backend.tf.j2")

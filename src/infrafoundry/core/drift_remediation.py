@@ -1,5 +1,6 @@
 """Automated drift remediation for infrastructure management."""
 
+import logging
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +12,8 @@ from infrafoundry.core.config.models import DriftRemediationConfig
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError
+
+logger = logging.getLogger(__name__)
 
 
 class DriftRemediationError(InfraFoundryError):
@@ -252,8 +255,10 @@ class DriftRemediator:
                         history.append(entry)
                         if len(history) >= limit:
                             break
-            except Exception:
-                continue  # Skip corrupted history files
+            except Exception as e:
+                # Skip corrupted history files but log the issue
+                logger.debug("Skipping corrupted history file %s: %s", history_file, e)
+                continue
 
         return history
 
@@ -270,7 +275,6 @@ class DriftRemediator:
         try:
             with open(history_file, "w") as f:
                 yaml.dump(results, f, default_flow_style=False)
-        except Exception:
-            # Don't fail remediation if history save fails
-            # Silently ignore history save errors
-            pass
+        except Exception as e:
+            # Don't fail remediation if history save fails, but log the issue
+            logger.warning("Failed to save remediation history to %s: %s", history_file, e)
