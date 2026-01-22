@@ -1,5 +1,6 @@
 import logging
-import subprocess
+import shutil
+import subprocess  # nosec B404 - required for running sops
 from pathlib import Path
 from typing import Any, cast
 
@@ -20,20 +21,21 @@ class SopsSecretProvider(SecretProvider):
     Secret provider implementation using Mozilla SOPS.
     """
 
-    def _ensure_sops_installed(self) -> None:
-        """Check if sops is installed."""
-        try:
-            subprocess.run(
-                ["sops", "--version"],
-                capture_output=True,
-                check=True,
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError):
+    @property
+    def _sops_path(self) -> str:
+        """Return the full path to the sops executable."""
+        path = shutil.which("sops")
+        if path is None:
             error_msg = (
                 "sops not found. Install with: brew install sops (macOS) "
                 "or see https://github.com/getsops/sops"
             )
             raise SecretError(error_msg)
+        return path
+
+    def _ensure_sops_installed(self) -> None:
+        """Check if sops is installed."""
+        _ = self._sops_path  # Will raise SecretError if not found
 
     def load_secret(self, location: str | Path) -> dict[str, Any]:
         """
@@ -51,8 +53,8 @@ class SopsSecretProvider(SecretProvider):
             raise SecretNotFoundError(f"Encrypted file not found: {file_path}")
 
         try:
-            result = subprocess.run(
-                ["sops", "--decrypt", str(file_path)],
+            result = subprocess.run(  # nosec B603
+                [self._sops_path, "--decrypt", str(file_path)],
                 capture_output=True,
                 check=True,
                 text=True,
@@ -92,8 +94,8 @@ class SopsSecretProvider(SecretProvider):
                 yaml.dump(data, f)
 
             # Encrypt in place
-            subprocess.run(
-                ["sops", "--encrypt", "--in-place", str(temp_file)],
+            subprocess.run(  # nosec B603
+                [self._sops_path, "--encrypt", "--in-place", str(temp_file)],
                 capture_output=True,
                 check=True,
             )

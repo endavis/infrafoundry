@@ -101,7 +101,8 @@ def test_run_plan(runner: PyInfraRunner, mock_provider: MagicMock) -> None:
 
         assert result["success"]
         args = mock_run.call_args[0][0]
-        assert args[0] == "pyinfra"
+        # Check that the command uses the full path from shutil.which
+        assert args[0].endswith("pyinfra")
         assert "--dry" in args
         assert str(mock_provider.pyinfra_dir / "inventory.py") in args
         assert str(mock_provider.pyinfra_dir / "deploy.py") in args
@@ -119,6 +120,7 @@ def test_run_apply(runner: PyInfraRunner, mock_provider: MagicMock) -> None:
 
         assert result["success"]
         args = mock_run.call_args[0][0]
-        assert args[0] == "pyinfra"
+        # Check that the command uses the full path from shutil.which
+        assert args[0].endswith("pyinfra")
         assert "--yes" in args
         assert "--dry" not in args
