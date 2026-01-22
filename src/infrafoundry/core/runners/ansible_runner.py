@@ -1,7 +1,6 @@
 """Ansible runner implementation."""
 
-import shutil
-import subprocess
+import subprocess  # nosec B404 - required for running ansible-playbook
 from pathlib import Path
 from typing import Any, override
 
@@ -16,12 +15,16 @@ class AnsibleRunner(BaseRunner):
     @override
     def tool_name(self) -> str:
         """Return the name of the tool."""
-        return "ansible"
+        return "ansible-playbook"
 
     @override
     def is_available(self) -> bool:
         """Check if Ansible is installed."""
-        return shutil.which("ansible-playbook") is not None
+        try:
+            _ = self.tool_path
+            return True
+        except FileNotFoundError:
+            return False
 
     @override
     def initialize(self, working_dir: Path, **kwargs: Any) -> dict[str, Any]:
@@ -69,8 +72,8 @@ class AnsibleRunner(BaseRunner):
             return None
 
         try:
-            result = subprocess.run(
-                ["ansible-playbook", "--version"],
+            result = subprocess.run(  # nosec B603 - trusted command
+                [self.tool_path, "--version"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -102,8 +105,8 @@ class AnsibleRunner(BaseRunner):
             return {"valid": True, "message": "No playbook found (optional)"}
 
         try:
-            result = subprocess.run(
-                ["ansible-playbook", "--syntax-check", str(playbook)],
+            result = subprocess.run(  # nosec B603 - trusted command
+                [self.tool_path, "--syntax-check", str(playbook)],
                 cwd=ansible_dir,
                 capture_output=True,
                 text=True,
@@ -140,17 +143,17 @@ class AnsibleRunner(BaseRunner):
             )
             return {"error": "ansible-playbook not found", "success": False}
 
-        # Build command
-        cmd = ["ansible-playbook", "-i", str(inventory), str(playbook)]
+        # Build command using full path to ansible-playbook binary
+        cmd = [self.tool_path, "-i", str(inventory), str(playbook)]
         if check_mode:
             cmd.append("--check")
             self.console.print("[dim]Running Ansible in check mode (dry run)...[/dim]")
         else:
             self.console.print("[dim]Running Ansible playbook...[/dim]")
 
-        # Run command
+        # Run command - nosec B603: trusted command with validated inputs
         try:
-            result = subprocess.run(cmd, cwd=ansible_dir, capture_output=False)
+            result = subprocess.run(cmd, cwd=ansible_dir, capture_output=False)  # nosec B603
             return {"exit_code": result.returncode, "success": result.returncode == 0}
         except FileNotFoundError:
             return {"error": "ansible-playbook not found", "success": False}
