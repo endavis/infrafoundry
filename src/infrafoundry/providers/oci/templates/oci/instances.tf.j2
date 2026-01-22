@@ -1,0 +1,57 @@
+# OCI Compute Instances
+
+{% for instance in instances %}
+resource "oci_core_instance" "{{ instance.name | to_terraform_name }}" {
+  compartment_id      = var.oci_compartment_ocid
+  availability_domain = "{{ instance.config.get('availability_domain', 'data.oci_identity_availability_domains.ads.availability_domains[0].name') }}"
+  display_name        = "{{ instance.name }}"
+  shape               = "{{ instance.config.shape }}"
+
+  {% if instance.config.get('shape_config') %}
+  shape_config {
+    ocpus         = {{ instance.config.shape_config.ocpus }}
+    memory_in_gbs = {{ instance.config.shape_config.memory_in_gbs }}
+  }
+  {% endif %}
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.{{ instance.config.subnet | to_terraform_name }}.id
+    assign_public_ip = {{ instance.config.get('public_ip', true) | lower }}
+    display_name     = "{{ instance.name }}-vnic"
+  }
+
+  source_details {
+    source_type = "image"
+    source_id   = "{{ instance.config.image }}"
+    {% if instance.config.get('boot_volume_size_in_gbs') %}
+    boot_volume_size_in_gbs = {{ instance.config.boot_volume_size_in_gbs }}
+    {% endif %}
+  }
+
+  metadata = {
+    {% if instance.config.get('ssh_authorized_keys') %}
+    ssh_authorized_keys = "{{ instance.config.ssh_authorized_keys | join('\\n') }}"
+    {% endif %}
+    {% if instance.config.get('cloud_init_merged') %}
+    user_data = base64encode(yamlencode({{ instance.config.cloud_init_merged | tojson }}))
+    {% elif instance.config.get('user_data') %}
+    user_data = base64encode({{ instance.config.user_data | tojson }})
+    {% endif %}
+  }
+
+  {% if instance.config.get('freeform_tags') %}
+  freeform_tags = {
+    {% for key, value in instance.config.freeform_tags.items() %}
+    "{{ key }}" = "{{ value }}"
+    {% endfor %}
+  }
+  {% endif %}
+}
+
+{% endfor %}
+
+{% if instances %}
+data "oci_identity_availability_domains" "ads" {
+  compartment_id = var.oci_tenancy_ocid
+}
+{% endif %}

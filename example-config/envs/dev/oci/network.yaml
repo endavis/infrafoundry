@@ -1,0 +1,50 @@
+# OCI Network Resources
+# Creates a VCN with public and private subnets
+
+vcn:
+  - name: dev-vcn
+    cidr_block: "10.0.0.0/16"
+    dns_label: "devvcn"
+    internet_gateway: true
+    security_list:
+      egress_rules:
+        - destination: "0.0.0.0/0"
+          protocol: "all"
+      ingress_rules:
+        # SSH
+        - source: "0.0.0.0/0"
+          protocol: "6"
+          tcp_options:
+            min: 22
+            max: 22
+        # HTTP
+        - source: "0.0.0.0/0"
+          protocol: "6"
+          tcp_options:
+            min: 80
+            max: 80
+        # HTTPS
+        - source: "0.0.0.0/0"
+          protocol: "6"
+          tcp_options:
+            min: 443
+            max: 443
+        # Kubernetes API
+        - source: "10.0.0.0/16"
+          protocol: "6"
+          tcp_options:
+            min: 6443
+            max: 6443
+
+subnet:
+  - name: public-subnet
+    vcn: dev-vcn
+    cidr_block: "10.0.0.0/24"
+    dns_label: "public"
+    public: true
+
+  - name: private-subnet
+    vcn: dev-vcn
+    cidr_block: "10.0.1.0/24"
+    dns_label: "private"
+    public: false

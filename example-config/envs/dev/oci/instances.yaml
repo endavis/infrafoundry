@@ -1,0 +1,59 @@
+# OCI Compute Instances
+# Example: K3s cluster on ARM (free tier eligible)
+
+instance:
+  # K3s control plane node
+  - name: k3s-control
+    shape: "VM.Standard.A1.Flex"
+    shape_config:
+      ocpus: 2
+      memory_in_gbs: 12
+    subnet: public-subnet
+    image: "ocid1.image.oc1.iad.aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    boot_volume_size_in_gbs: 50
+    ssh_authorized_keys:
+      - "ssh-rsa AAAA... user@workstation"
+    freeform_tags:
+      role: control-plane
+      cluster: k3s-dev
+    ansible_roles:
+      - common
+      - k3s-server
+    ssh_user: ubuntu
+
+  # K3s worker nodes
+  - name: k3s-worker-1
+    shape: "VM.Standard.A1.Flex"
+    shape_config:
+      ocpus: 1
+      memory_in_gbs: 6
+    subnet: public-subnet
+    image: "ocid1.image.oc1.iad.aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    boot_volume_size_in_gbs: 50
+    ssh_authorized_keys:
+      - "ssh-rsa AAAA... user@workstation"
+    freeform_tags:
+      role: worker
+      cluster: k3s-dev
+    ansible_roles:
+      - common
+      - k3s-agent
+    ssh_user: ubuntu
+
+  - name: k3s-worker-2
+    shape: "VM.Standard.A1.Flex"
+    shape_config:
+      ocpus: 1
+      memory_in_gbs: 6
+    subnet: public-subnet
+    image: "ocid1.image.oc1.iad.aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    boot_volume_size_in_gbs: 50
+    ssh_authorized_keys:
+      - "ssh-rsa AAAA... user@workstation"
+    freeform_tags:
+      role: worker
+      cluster: k3s-dev
+    ansible_roles:
+      - common
+      - k3s-agent
+    ssh_user: ubuntu
