@@ -378,6 +378,34 @@ def test_generate_terraform_only_instances(provider, tmp_dirs):
     assert not (terraform_dir / "vcn.tf").exists()
 
 
+def test_generate_ansible_with_ansible_host_override(provider, tmp_dirs):
+    """Test ansible inventory uses ansible_host override when set."""
+    _config_dir, output_dir = tmp_dirs
+    provider.set_environment("test")
+
+    custom_host = "custom-ansible-host-override"
+    resources = [
+        ResourceConfig(
+            name="ts-node",
+            type="instance",
+            provider="oci",
+            config={
+                "shape": "VM.Standard.A1.Flex",
+                "subnet": "public-subnet",
+                "image": "ocid1.image.oc1.iad.example",
+                "ansible_host": custom_host,
+            },
+        ),
+    ]
+
+    provider.generate_ansible(resources)
+
+    ansible_dir = output_dir / "test" / "ansible" / "oci"
+    content = (ansible_dir / "inventory.yml").read_text()
+    assert custom_host in content
+    assert "oci_core_instance" not in content
+
+
 def test_generate_ansible_filters_non_instances(provider, tmp_dirs):
     """Test that generate_ansible only includes instance resources."""
     _config_dir, output_dir = tmp_dirs

@@ -419,6 +419,43 @@ class TestInventoryTemplate:
         assert "opc" in content
         assert "oci_instances" in content
 
+    def test_ansible_host_override(self, provider):
+        """Test ansible_host config override takes priority over Terraform output."""
+        custom_host = "custom-ansible-host-override"
+        instances = [
+            ResourceConfig(
+                name="ts-host",
+                type="instance",
+                provider="oci",
+                config={
+                    "shape": "VM.Standard.A1.Flex",
+                    "subnet": "s",
+                    "image": "img",
+                    "ansible_host": custom_host,
+                },
+            )
+        ]
+        content = provider.render_template("oci/inventory.yml.j2", {"instances": instances})
+        assert custom_host in content
+        assert "oci_core_instance" not in content
+
+    def test_ansible_host_default(self, provider):
+        """Test ansible_host falls back to Terraform output when not set."""
+        instances = [
+            ResourceConfig(
+                name="pub-host",
+                type="instance",
+                provider="oci",
+                config={
+                    "shape": "VM.Standard.A1.Flex",
+                    "subnet": "s",
+                    "image": "img",
+                },
+            )
+        ]
+        content = provider.render_template("oci/inventory.yml.j2", {"instances": instances})
+        assert "oci_core_instance.pub_host.public_ip" in content
+
     def test_default_ssh_user(self, provider):
         """Test inventory uses ubuntu as default ssh user."""
         instances = [
