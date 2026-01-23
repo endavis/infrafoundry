@@ -2,7 +2,7 @@
 
 import base64
 from pathlib import Path
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
@@ -24,7 +24,7 @@ class OPNsenseProvider(
 ):
     """OPNsense provider for managing firewall rules, VLANs, and routing."""
 
-    _OPNSENSE_TFVARS_MAPPING = {
+    _OPNSENSE_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
         "api_url": "opnsense_api_url",
         "api_key": "opnsense_api_key",
         "api_secret": "opnsense_api_secret",  # nosec B105

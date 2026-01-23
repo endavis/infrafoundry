@@ -153,12 +153,8 @@ class ProxmoxValidator:
 
         # Build API token
         api_token = self._get_api_token()
-        if not all([api_url, api_token]):
+        if api_url is None or api_token is None:
             return  # Already reported in validate_connectivity
-
-        # Type narrowing: at this point we know both are not None
-        assert api_url is not None
-        assert api_token is not None
 
         try:
             # Build auth header

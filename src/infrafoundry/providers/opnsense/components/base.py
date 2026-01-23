@@ -4,7 +4,7 @@ from abc import ABC
 from pathlib import Path
 
 
-class BaseComponentManager(ABC):
+class BaseComponentManager(ABC):  # noqa: B024
     """Base class for OPNsense component managers.
 
     Component managers provide high-level orchestration of service operations

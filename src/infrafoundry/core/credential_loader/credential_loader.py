@@ -5,6 +5,7 @@ import os
 import tempfile
 from pathlib import Path
 from types import TracebackType
+from typing import Any, ClassVar
 
 from infrafoundry.core.credential_loader.base_loader import (
     BaseCredentialLoader,
@@ -39,7 +40,7 @@ class CredentialLoader:
     """
 
     # Registry of available provider loaders
-    PROVIDER_LOADERS = {
+    PROVIDER_LOADERS: ClassVar[dict[str, type[BaseCredentialLoader]]] = {
         "proxmox": ProxmoxCredentialLoader,
         "opnsense": OPNsenseCredentialLoader,
         "kubernetes": KubernetesCredentialLoader,
@@ -47,7 +48,7 @@ class CredentialLoader:
 
     # Legacy attribute for backward compatibility with tests
     @property
-    def provider_credentials(self) -> dict:
+    def provider_credentials(self) -> dict[str, Any]:
         """Return provider credentials in old format for backward compatibility."""
         result = {}
         for name, loader_class in self.PROVIDER_LOADERS.items():
@@ -55,7 +56,7 @@ class CredentialLoader:
             # Use tempfile.gettempdir() instead of hardcoded /tmp for security
             temp_secrets_dir = Path(tempfile.gettempdir())
             # Loader classes in registry are concrete implementations, not abstract
-            loader = loader_class(temp_secrets_dir, False)  # type: ignore[abstract]
+            loader = loader_class(temp_secrets_dir, False)
             result[name] = {
                 "file": loader.credential_file,
                 "fields": loader.field_mapping,
@@ -162,7 +163,7 @@ class CredentialLoader:
         loader_class = self.PROVIDER_LOADERS[provider]
         # Loader classes in registry are concrete implementations, not abstract
         # Pass the shared secret_provider instance
-        loader = loader_class(secrets_dir, self._debug_mode, self.secret_provider)  # type: ignore[abstract]
+        loader = loader_class(secrets_dir, self._debug_mode, self.secret_provider)
         try:
             return loader.load_credentials()
         except CredentialLoaderError as exc:

@@ -2,6 +2,7 @@
 
 import logging
 import traceback
+from typing import Any
 
 from infrafoundry.core.exceptions import APIError
 
@@ -24,7 +25,7 @@ class ISCDHCPService(BaseService):
         """
         super().__init__(client)
 
-    def _get_system_config(self) -> dict:
+    def _get_system_config(self) -> dict[str, Any]:
         """Get the entire system configuration.
 
         Uses the Core API to retrieve the full OPNsense configuration.
@@ -47,7 +48,7 @@ class ISCDHCPService(BaseService):
             # This allows graceful degradation for legacy ISC DHCP configs
             return {}
 
-    def _parse_dhcpd_config(self) -> dict:
+    def _parse_dhcpd_config(self) -> dict[str, Any]:
         """Parse the dhcpd section from system configuration.
 
         Returns:
@@ -60,7 +61,7 @@ class ISCDHCPService(BaseService):
         return {}
 
     # DHCPv4 Operations
-    def get_dhcpv4_config(self, interface: str | None = None) -> dict[str, dict]:
+    def get_dhcpv4_config(self, interface: str | None = None) -> dict[str, dict[str, Any]]:
         """Get ISC DHCPv4 configuration for interfaces.
 
         Args:
@@ -90,7 +91,9 @@ class ISCDHCPService(BaseService):
         # }
         return {}
 
-    def get_dhcpv4_static_maps(self, interface: str | None = None) -> dict[str, list[dict]]:
+    def get_dhcpv4_static_maps(
+        self, interface: str | None = None
+    ) -> dict[str, list[dict[str, Any]]]:
         """Get ISC DHCPv4 static mappings (reservations) by interface.
 
         Args:
@@ -126,7 +129,7 @@ class ISCDHCPService(BaseService):
         return []
 
     # DHCPv6 Operations
-    def get_dhcpv6_config(self, interface: str | None = None) -> dict[str, dict]:
+    def get_dhcpv6_config(self, interface: str | None = None) -> dict[str, dict[str, Any]]:
         """Get ISC DHCPv6 configuration for interfaces.
 
         Args:
@@ -140,7 +143,9 @@ class ISCDHCPService(BaseService):
         # Structure similar to DHCPv4 but with IPv6-specific fields
         return {}
 
-    def get_dhcpv6_static_maps(self, interface: str | None = None) -> dict[str, list[dict]]:
+    def get_dhcpv6_static_maps(
+        self, interface: str | None = None
+    ) -> dict[str, list[dict[str, Any]]]:
         """Get ISC DHCPv6 static mappings (reservations) by interface.
 
         Args:

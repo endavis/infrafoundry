@@ -92,16 +92,17 @@ select = [
     "ASYNC", # flake8-async
 ]
 ignore = [
-    "ANN401",  # Dynamically typed expressions (Any) - allow for now, fix incrementally
-    "ANN001",  # Missing type annotation for function argument - fix incrementally
-    "ANN002",  # Missing type annotation for *args
-    "ANN003",  # Missing type annotation for **kwargs
-    "ANN201",  # Missing return type annotation for public function
-    "ANN202",  # Missing return type annotation for private function
-    "B024",    # Abstract base class without abstract methods - intentional in some cases
-    "B904",    # raise-without-from - fix incrementally
-    "RUF012",  # Mutable class default - fix incrementally
-    "E402",    # Module level import not at top of file - needed for CLI command loading
+    "ANN401",  # Dynamically typed expressions (Any) - intentional in plugin interfaces
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/infrafoundry/cli/main.py" = ["E402"]  # CLI command imports after group setup
+"tests/**/*.py" = [
+    "ANN001",   # Missing type annotation for function argument
+    "ANN002",   # Missing type annotation for *args
+    "ANN003",   # Missing type annotation for **kwargs
+    "ANN201",   # Missing return type annotation for public function
+    "ANN202",   # Missing return type annotation for private function
 ]
 
 [tool.ruff.format]
@@ -119,7 +120,7 @@ warn_unused_configs = true
 warn_unused_ignores = true
 # Additional strict checks
 check_untyped_defs = true
-disallow_any_generics = false  # Can enable later for even stricter checking
+disallow_any_generics = true
 disallow_incomplete_defs = true
 disallow_subclassing_any = true
 no_implicit_optional = true
@@ -130,7 +131,7 @@ warn_unreachable = true
 [tool.pytest.ini_options]
 minversion = "7.0"
 cache_dir = "tmp/.pytest_cache"
-addopts = "-v --tb=short --strict-config --strict-markers --disable-warnings"
+addopts = "-v --tb=short --strict-config --strict-markers"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -158,11 +159,11 @@ change_type_order = ["BREAKING CHANGE", "feat", "fix", "refactor", "perf"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "tmp", ".venv"]
-skips = ["B101"]  # Skip assert_used - asserts are fine in tests
+skips = []
 
 [tool.codespell]
 skip = "tmp,.venv,.git,*.lock,*.pyc,__pycache__"
-ignore-words-list = "crate,applyable"
+ignore-words-list = "applyable"
 
 [tool.coverage.run]
 branch = true

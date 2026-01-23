@@ -263,7 +263,7 @@ class ISCToKeaMigrationManager(BaseComponentManager):
 
     def migrate_dhcpv4(
         self, env_name: str, provider_name: str = "opnsense", interfaces: list[str] | None = None
-    ) -> dict[str, list[dict]]:
+    ) -> dict[str, list[dict[str, Any]]]:
         """Migrate ISC DHCPv4 configuration to Kea DHCPv4.
 
         Reads the ISC DHCPv4 configuration and generates equivalent Kea DHCP
@@ -288,7 +288,7 @@ class ISCToKeaMigrationManager(BaseComponentManager):
 
     def migrate_dhcpv6(
         self, env_name: str, provider_name: str = "opnsense", interfaces: list[str] | None = None
-    ) -> dict[str, list[dict]]:
+    ) -> dict[str, list[dict[str, Any]]]:
         """Migrate ISC DHCPv6 configuration to Kea DHCPv6.
 
         Reads the ISC DHCPv6 configuration and generates equivalent Kea DHCPv6
@@ -353,7 +353,7 @@ class ISCToKeaMigrationManager(BaseComponentManager):
 
     def migrate_all(
         self, env_name: str, provider_name: str = "opnsense", interfaces: list[str] | None = None
-    ) -> dict[str, dict[str, list[dict]]]:
+    ) -> dict[str, dict[str, list[dict[str, Any]]]]:
         """Migrate both ISC DHCPv4 and DHCPv6 to Kea.
 
         Args:

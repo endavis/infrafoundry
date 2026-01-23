@@ -5,7 +5,7 @@ from typing import Any
 from rich.console import Console
 
 from infrafoundry.core.events import EventManager, EventType
-from infrafoundry.core.policy import PolicyEngine, PolicyLevel
+from infrafoundry.core.policy import PolicyEngine, PolicyLevel, PolicyViolation
 
 
 class PolicyChecker:
@@ -30,7 +30,7 @@ class PolicyChecker:
 
     def check(
         self, env_name: str, resources: list[Any], enforce: bool = False
-    ) -> tuple[bool, list]:
+    ) -> tuple[bool, list[PolicyViolation]]:
         """Check resources against policies.
 
         Args:

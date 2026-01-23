@@ -5,7 +5,7 @@ from __future__ import annotations
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from rich.console import Console
@@ -695,7 +695,7 @@ class ApplyOrchestrator:
     ) -> None:
         snapshot: RollbackData = {
             "environment": env_name,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "resources": [
                 {"provider": r.provider, "type": r.type, "name": r.name, "config": r.config}
                 for r in all_resources
