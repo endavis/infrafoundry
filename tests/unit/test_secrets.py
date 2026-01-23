@@ -81,25 +81,29 @@ class TestSecretManager:
 
     def test_init_no_age_key_env(self, mock_sops_age, temp_secrets_dir):
         """Test initialization fails when SOPS_AGE_KEY_FILE is not set."""
-        with patch.dict(
-            "os.environ",
-            {"INFRAFOUNDRY_CONFIG_REPO": str(temp_secrets_dir)},
-            clear=True,
+        with (
+            patch.dict(
+                "os.environ",
+                {"INFRAFOUNDRY_CONFIG_REPO": str(temp_secrets_dir)},
+                clear=True,
+            ),
+            pytest.raises(ValueError, match="SOPS_AGE_KEY_FILE not set"),
         ):
-            with pytest.raises(ValueError, match="SOPS_AGE_KEY_FILE not set"):
-                SecretManager(env_name="dev")
+            SecretManager(env_name="dev")
 
     def test_init_age_key_file_missing(self, mock_sops_age):
         """Test initialization fails when age key file doesn't exist."""
-        with patch.dict(
-            "os.environ",
-            {
-                "SOPS_AGE_KEY_FILE": "/nonexistent/age.key",
-                "INFRAFOUNDRY_FORCE_SOPS_CHECK": "1",
-            },
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "SOPS_AGE_KEY_FILE": "/nonexistent/age.key",
+                    "INFRAFOUNDRY_FORCE_SOPS_CHECK": "1",
+                },
+            ),
+            pytest.raises(FileNotFoundError, match="Age key file not found"),
         ):
-            with pytest.raises(FileNotFoundError, match="Age key file not found"):
-                SecretManager(env_name="dev")
+            SecretManager(env_name="dev")
 
     def test_decrypt_file(self, temp_secrets_dir, mock_provider):
         """Test decrypting a file using injected provider."""
