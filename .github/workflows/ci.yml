@@ -89,10 +89,22 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
-      - name: Install system tools
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run doit install_deps
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Install system tools (age, sops)
+        run: |
+          mkdir -p ~/.local/bin
+          # age + age-keygen
+          AGE_VERSION=$(curl -s https://api.github.com/repos/FiloSottile/age/releases/latest -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" | jq -r .tag_name)
+          curl -sL "https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-amd64.tar.gz" | tar xz -C /tmp
+          mv /tmp/age/age /tmp/age/age-keygen ~/.local/bin/
+          # sops
+          SOPS_VERSION=$(curl -s https://api.github.com/repos/getsops/sops/releases/latest -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" | jq -r .tag_name)
+          curl -sL "https://github.com/getsops/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux.amd64" -o ~/.local/bin/sops
+          chmod +x ~/.local/bin/sops
 
       - name: Check code formatting
         run: uv run ruff format --check src/ tests/
