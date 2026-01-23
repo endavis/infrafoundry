@@ -132,6 +132,82 @@ class TestVCNTemplate:
         content = provider.render_template("oci/vcn.tf.j2", {"vcns": [], "subnets": subnets})
         assert "prohibit_public_ip_on_vnic = true" in content
 
+    def test_renders_nat_gateway(self, provider):
+        """Test VCN with nat_gateway creates NAT gateway and private route table."""
+        vcns = [
+            ResourceConfig(
+                name="nat-vcn",
+                type="vcn",
+                provider="oci",
+                config={
+                    "cidr_block": "10.0.0.0/16",
+                    "nat_gateway": True,
+                },
+            )
+        ]
+        content = provider.render_template("oci/vcn.tf.j2", {"vcns": vcns, "subnets": []})
+        assert "oci_core_nat_gateway" in content
+        assert 'display_name   = "nat-vcn-nat-gw"' in content
+        assert "nat_vcn_private_rt" in content
+        assert "oci_core_nat_gateway.nat_vcn_nat.id" in content
+
+    def test_private_subnet_with_nat_gets_private_rt(self, provider):
+        """Test private subnet gets private_rt when VCN has NAT gateway."""
+        vcns = [
+            ResourceConfig(
+                name="my-vcn",
+                type="vcn",
+                provider="oci",
+                config={
+                    "cidr_block": "10.0.0.0/16",
+                    "internet_gateway": True,
+                    "nat_gateway": True,
+                },
+            )
+        ]
+        subnets = [
+            ResourceConfig(
+                name="private-sub",
+                type="subnet",
+                provider="oci",
+                config={
+                    "vcn": "my-vcn",
+                    "cidr_block": "10.0.1.0/24",
+                    "public": False,
+                },
+            )
+        ]
+        content = provider.render_template("oci/vcn.tf.j2", {"vcns": vcns, "subnets": subnets})
+        assert "oci_core_route_table.my_vcn_private_rt.id" in content
+
+    def test_private_subnet_without_nat_no_route_table(self, provider):
+        """Test private subnet without NAT gateway gets no route table."""
+        vcns = [
+            ResourceConfig(
+                name="my-vcn",
+                type="vcn",
+                provider="oci",
+                config={
+                    "cidr_block": "10.0.0.0/16",
+                    "internet_gateway": True,
+                },
+            )
+        ]
+        subnets = [
+            ResourceConfig(
+                name="private-sub",
+                type="subnet",
+                provider="oci",
+                config={
+                    "vcn": "my-vcn",
+                    "cidr_block": "10.0.1.0/24",
+                    "public": False,
+                },
+            )
+        ]
+        content = provider.render_template("oci/vcn.tf.j2", {"vcns": vcns, "subnets": subnets})
+        assert "private_rt" not in content
+
     def test_vcn_with_security_list(self, provider):
         """Test VCN with security list configuration."""
         vcns = [

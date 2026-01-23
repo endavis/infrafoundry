@@ -29,6 +29,25 @@ resource "oci_core_route_table" "{{ vcn.name | to_terraform_name }}_public_rt" {
 }
 {% endif %}
 
+{% if vcn.config.get('nat_gateway', false) %}
+resource "oci_core_nat_gateway" "{{ vcn.name | to_terraform_name }}_nat" {
+  compartment_id = var.oci_compartment_ocid
+  vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
+  display_name   = "{{ vcn.name }}-nat-gw"
+}
+
+resource "oci_core_route_table" "{{ vcn.name | to_terraform_name }}_private_rt" {
+  compartment_id = var.oci_compartment_ocid
+  vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
+  display_name   = "{{ vcn.name }}-private-rt"
+
+  route_rules {
+    destination       = "0.0.0.0/0"
+    network_entity_id = oci_core_nat_gateway.{{ vcn.name | to_terraform_name }}_nat.id
+  }
+}
+{% endif %}
+
 {% if vcn.config.get('security_list') %}
 resource "oci_core_security_list" "{{ vcn.name | to_terraform_name }}_sl" {
   compartment_id = var.oci_compartment_ocid
@@ -89,6 +108,12 @@ resource "oci_core_subnet" "{{ subnet.name | to_terraform_name }}" {
   {% set vcn_name = subnet.config.vcn | to_terraform_name %}
   {% if subnet.config.get('public', false) %}
   route_table_id = oci_core_route_table.{{ vcn_name }}_public_rt.id
+  {% else %}
+  {% for vcn in vcns %}
+  {% if vcn.name == subnet.config.vcn and vcn.config.get('nat_gateway', false) %}
+  route_table_id = oci_core_route_table.{{ vcn_name }}_private_rt.id
+  {% endif %}
+  {% endfor %}
   {% endif %}
   {% if subnet.config.get('security_list_id') %}
   security_list_ids = [{{ subnet.config.security_list_id }}]

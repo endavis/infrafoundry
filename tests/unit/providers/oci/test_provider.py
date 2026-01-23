@@ -378,6 +378,61 @@ def test_generate_terraform_only_instances(provider, tmp_dirs):
     assert not (terraform_dir / "vcn.tf").exists()
 
 
+def test_generate_terraform_with_nat_gateway(provider, tmp_dirs):
+    """Test full terraform generation with NAT gateway produces correct vcn.tf."""
+    _config_dir, output_dir = tmp_dirs
+    provider.set_environment("test")
+
+    resources = [
+        ResourceConfig(
+            name="k3s-vcn",
+            type="vcn",
+            provider="oci",
+            config={
+                "cidr_block": "10.0.0.0/16",
+                "internet_gateway": True,
+                "nat_gateway": True,
+            },
+        ),
+        ResourceConfig(
+            name="public-subnet",
+            type="subnet",
+            provider="oci",
+            config={
+                "vcn": "k3s-vcn",
+                "cidr_block": "10.0.0.0/24",
+                "public": True,
+            },
+        ),
+        ResourceConfig(
+            name="private-subnet",
+            type="subnet",
+            provider="oci",
+            config={
+                "vcn": "k3s-vcn",
+                "cidr_block": "10.0.1.0/24",
+                "public": False,
+            },
+        ),
+    ]
+
+    provider.generate_terraform(resources)
+
+    terraform_dir = output_dir / "test" / "terraform" / "oci"
+    vcn_content = (terraform_dir / "vcn.tf").read_text()
+
+    # NAT gateway and private route table present
+    assert "oci_core_nat_gateway" in vcn_content
+    assert "k3s_vcn_private_rt" in vcn_content
+    assert "k3s_vcn_nat" in vcn_content
+
+    # Public subnet uses public_rt
+    assert "oci_core_route_table.k3s_vcn_public_rt.id" in vcn_content
+
+    # Private subnet uses private_rt
+    assert "oci_core_route_table.k3s_vcn_private_rt.id" in vcn_content
+
+
 def test_generate_ansible_with_ansible_host_override(provider, tmp_dirs):
     """Test ansible inventory uses ansible_host override when set."""
     _config_dir, output_dir = tmp_dirs
