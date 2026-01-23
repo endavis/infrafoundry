@@ -1,6 +1,6 @@
 """Repository for deployment operations."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -70,7 +70,7 @@ class DeploymentRepository:
             deployment = session.query(Deployment).filter_by(id=deployment_id).first()
             if deployment:
                 deployment.status = status
-                deployment.completed_at = datetime.utcnow()
+                deployment.completed_at = datetime.now(UTC)
                 if error_message:
                     deployment.error_message = error_message
                 session.commit()

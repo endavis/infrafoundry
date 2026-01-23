@@ -218,7 +218,8 @@ class SecretsRotator:
                 new_key_file = new_key_path
             else:
                 # Extract public key from provided key file
-                assert new_key_file is not None  # For type checker
+                if new_key_file is None:
+                    raise SecretError("new_key_file is required when generate_new_key is False")
                 if not new_key_file.exists():
                     raise SecretError(f"New key file not found: {new_key_file}")
                 new_public_key = self._extract_public_key(new_key_file)

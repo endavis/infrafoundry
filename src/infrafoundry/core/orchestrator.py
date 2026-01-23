@@ -24,7 +24,7 @@ from infrafoundry.core.orchestrator_workflows import (
     StatusOrchestrator,
     ValidationOrchestrator,
 )
-from infrafoundry.core.policy import PolicyEngine
+from infrafoundry.core.policy import PolicyEngine, PolicyViolation
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_registry_service import ProviderRegistryService
@@ -349,7 +349,7 @@ class Orchestrator:
 
     def check_policies(
         self, env_name: str, resources: list[ResourceConfig], enforce: bool = False
-    ) -> tuple[bool, list]:
+    ) -> tuple[bool, list[PolicyViolation]]:
         """Check resources against policies.
 
         Delegates to PolicyChecker.

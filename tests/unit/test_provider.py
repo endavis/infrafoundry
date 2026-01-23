@@ -7,7 +7,7 @@ import pytest
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 
 
-class TestProviderImplementation(ProviderBase):
+class StubProviderImplementation(ProviderBase):
     """Test implementation of ProviderBase for testing."""
 
     def __init__(self, name: str, config_dir: Path, output_dir: Path) -> None:
@@ -39,7 +39,7 @@ class TestProviderBase:
         """Test ProviderBase initialization."""
         config_dir = temp_dir / "config"
         output_dir = temp_dir / "output"
-        provider = TestProviderImplementation("test", config_dir, output_dir)
+        provider = StubProviderImplementation("test", config_dir, output_dir)
         assert provider.name == "test"
         assert provider.terraform_dir == output_dir / "terraform" / "test"
         assert provider.ansible_dir == output_dir / "ansible" / "test"
@@ -48,7 +48,7 @@ class TestProviderBase:
         """Test ensure_directories creates output directories."""
         config_dir = temp_dir / "config"
         output_dir = temp_dir / "output"
-        provider = TestProviderImplementation("test", config_dir, output_dir)
+        provider = StubProviderImplementation("test", config_dir, output_dir)
         provider.ensure_directories()
 
         assert provider.terraform_dir.exists()
@@ -58,7 +58,7 @@ class TestProviderBase:
         """Test get_dependencies returns empty dict by default."""
         config_dir = temp_dir / "config"
         output_dir = temp_dir / "output"
-        provider = TestProviderImplementation("test", config_dir, output_dir)
+        provider = StubProviderImplementation("test", config_dir, output_dir)
         deps = provider.get_dependencies()
         assert deps == {}
 

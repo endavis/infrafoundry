@@ -63,7 +63,7 @@ class VaultwardenProvider(SecretProvider):
         except subprocess.CalledProcessError as e:
             stderr = e.stderr.lower()
             if "not found" in stderr:
-                raise SecretNotFoundError(f"Bitwarden item not found: {args}")
+                raise SecretNotFoundError(f"Bitwarden item not found: {args}") from e
             raise SecretError(f"Bitwarden CLI error: {e.stderr}") from e
 
     def _authenticate_if_needed(self) -> None:
