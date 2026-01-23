@@ -92,16 +92,18 @@ select = [
     "ASYNC", # flake8-async
 ]
 ignore = [
-    "ANN401",  # Dynamically typed expressions (Any) - allow for now, fix incrementally
-    "ANN001",  # Missing type annotation for function argument - fix incrementally
-    "ANN002",  # Missing type annotation for *args
-    "ANN003",  # Missing type annotation for **kwargs
-    "ANN201",  # Missing return type annotation for public function
-    "ANN202",  # Missing return type annotation for private function
+    "ANN401",  # Dynamically typed expressions (Any) - intentional in plugin interfaces
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "src/infrafoundry/cli/main.py" = ["E402"]  # CLI command imports after group setup
+"tests/**/*.py" = [
+    "ANN001",   # Missing type annotation for function argument
+    "ANN002",   # Missing type annotation for *args
+    "ANN003",   # Missing type annotation for **kwargs
+    "ANN201",   # Missing return type annotation for public function
+    "ANN202",   # Missing return type annotation for private function
+]
 
 [tool.ruff.format]
 quote-style = "double"
