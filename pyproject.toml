@@ -98,7 +98,6 @@ ignore = [
     "ANN003",  # Missing type annotation for **kwargs
     "ANN201",  # Missing return type annotation for public function
     "ANN202",  # Missing return type annotation for private function
-    "B024",    # Abstract base class without abstract methods - intentional in some cases
     "B904",    # raise-without-from - fix incrementally
     "RUF012",  # Mutable class default - fix incrementally
 ]

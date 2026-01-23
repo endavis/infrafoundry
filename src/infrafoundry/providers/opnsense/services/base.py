@@ -7,7 +7,7 @@ from typing import Self
 from ..api_client import OPNsenseClient
 
 
-class BaseService(ABC):
+class BaseService(ABC):  # noqa: B024
     """Base class for OPNsense service operations.
 
     Services provide low-level API operations for specific OPNsense components.
