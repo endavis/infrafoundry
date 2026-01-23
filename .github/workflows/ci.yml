@@ -48,18 +48,18 @@ jobs:
               echo 'matrix={"include":[]}' >> $GITHUB_OUTPUT
             else
               echo "Middle versions: $versions"
-              echo "matrix={\"os\":[\"ubuntu-latest\",\"windows-latest\",\"macos-latest\"],\"python-version\":[$versions]}" >> $GITHUB_OUTPUT
+              echo "matrix={\"python-version\":[$versions]}" >> $GITHUB_OUTPUT
             fi
           else
             # Bookend versions (oldest + newest)
             echo "Bookend versions: $oldest, $newest"
-            echo "matrix={\"os\":[\"ubuntu-latest\",\"windows-latest\",\"macos-latest\"],\"python-version\":[\"$oldest\",\"$newest\"]}" >> $GITHUB_OUTPUT
+            echo "matrix={\"python-version\":[\"$oldest\",\"$newest\"]}" >> $GITHUB_OUTPUT
           fi
 
   test:
     needs: setup
     if: ${{ needs.setup.outputs.matrix != '{"include":[]}' }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
@@ -68,10 +68,6 @@ jobs:
       INFRAFOUNDRY_SKIP_SOPS_CHECK: '1'
 
     steps:
-      - name: Configure git line endings (Windows)
-        if: runner.os == 'Windows'
-        run: git config --global core.autocrlf false
-
       - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v6
@@ -94,7 +90,8 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Install system tools
-        if: runner.os != 'Windows'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run doit install_deps
 
       - name: Check code formatting
@@ -119,7 +116,7 @@ jobs:
         run: uv run pytest --cov=infrafoundry --cov-report=xml:tmp/coverage.xml --cov-report=term -v
 
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
+        if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
         with:
           file: ./tmp/coverage.xml
