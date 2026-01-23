@@ -163,7 +163,7 @@ skips = []
 
 [tool.codespell]
 skip = "tmp,.venv,.git,*.lock,*.pyc,__pycache__"
-ignore-words-list = "crate,applyable"
+ignore-words-list = "applyable"
 
 [tool.coverage.run]
 branch = true
