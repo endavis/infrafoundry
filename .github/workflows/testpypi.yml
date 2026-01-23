@@ -13,7 +13,7 @@ permissions:
 jobs:
   test:
     name: Run CI checks
-    uses: ./.github/workflows/tests.yml
+    uses: ./.github/workflows/ci.yml
 
   build:
     needs: test
