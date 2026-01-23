@@ -2,7 +2,7 @@
 
 import copy
 from pathlib import Path
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 import yaml
 
@@ -26,7 +26,7 @@ class OCIProvider(
 ):
     """OCI provider for managing VCNs, subnets, and compute instances."""
 
-    _OCI_TFVARS_MAPPING = {
+    _OCI_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
         "tenancy_ocid": "oci_tenancy_ocid",
         "user_ocid": "oci_user_ocid",
         "fingerprint": "oci_fingerprint",

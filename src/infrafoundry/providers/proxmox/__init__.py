@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
@@ -24,7 +24,7 @@ class ProxmoxProvider(
 ):
     """Proxmox VE provider for managing VMs, templates, and networks."""
 
-    _PROXMOX_TFVARS_MAPPING = {
+    _PROXMOX_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
         "api_url": "proxmox_api_url",
         "api_token": "proxmox_api_token",  # nosec B105
         "node": "proxmox_node",

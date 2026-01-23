@@ -98,8 +98,6 @@ ignore = [
     "ANN003",  # Missing type annotation for **kwargs
     "ANN201",  # Missing return type annotation for public function
     "ANN202",  # Missing return type annotation for private function
-    "B904",    # raise-without-from - fix incrementally
-    "RUF012",  # Mutable class default - fix incrementally
 ]
 
 [tool.ruff.lint.per-file-ignores]
