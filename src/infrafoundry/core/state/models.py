@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SQLEnum
@@ -55,10 +56,12 @@ class Deployment(Base):
         Boolean, default=False, nullable=False
     )  # Whether this was a dry run
     error_message: Mapped[str | None] = mapped_column(Text)
-    extra_data: Mapped[dict | None] = mapped_column(
+    extra_data: Mapped[dict[str, Any] | None] = mapped_column(
         JSON
     )  # Renamed from metadata to avoid SQLAlchemy reserved word
-    rollback_data: Mapped[dict | None] = mapped_column(JSON)  # Configuration snapshot for rollback
+    rollback_data: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON
+    )  # Configuration snapshot for rollback
 
     # Relationships
     resources = relationship("Resource", back_populates="deployment")
@@ -79,7 +82,7 @@ class Resource(Base):
     resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     state: Mapped[ResourceState] = mapped_column(SQLEnum(ResourceState), nullable=False)
-    config: Mapped[dict | None] = mapped_column(JSON)  # Full resource configuration
+    config: Mapped[dict[str, Any] | None] = mapped_column(JSON)  # Full resource configuration
     terraform_id: Mapped[str | None] = mapped_column(String(500))  # Terraform resource ID
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(UTC)
@@ -91,7 +94,7 @@ class Resource(Base):
         onupdate=lambda: datetime.now(UTC),
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
-    extra_data: Mapped[dict | None] = mapped_column(JSON)  # Additional context
+    extra_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)  # Additional context
 
     # Relationships
     deployment = relationship("Deployment", back_populates="resources")
@@ -141,7 +144,7 @@ class DeploymentEvent(Base):
     timestamp: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(UTC)
     )
-    extra_data: Mapped[dict | None] = mapped_column(JSON)  # Additional context
+    extra_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)  # Additional context
 
     # Relationships
     deployment = relationship("Deployment", back_populates="events")

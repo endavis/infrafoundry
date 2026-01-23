@@ -1,5 +1,7 @@
 """Kea DHCP service for OPNsense operations."""
 
+from typing import Any
+
 import yaml
 
 from ..api_client import KeaClient, OPNsenseClient
@@ -23,7 +25,7 @@ class KeaDHCPService(BaseService):
         self.kea_client = KeaClient(client)
 
     # DHCPv4 Operations
-    def search_dhcpv4_reservations(self) -> list[dict]:
+    def search_dhcpv4_reservations(self) -> list[dict[str, Any]]:
         """Search for all DHCPv4 reservations.
 
         Returns:
@@ -54,7 +56,7 @@ class KeaDHCPService(BaseService):
                 count += 1
         return count
 
-    def search_dhcpv4_subnets(self) -> list[dict]:
+    def search_dhcpv4_subnets(self) -> list[dict[str, Any]]:
         """Search for all DHCPv4 subnets.
 
         Returns:
@@ -86,7 +88,7 @@ class KeaDHCPService(BaseService):
         return count
 
     # DHCPv6 Operations
-    def search_dhcpv6_reservations(self) -> list[dict]:
+    def search_dhcpv6_reservations(self) -> list[dict[str, Any]]:
         """Search for all DHCPv6 reservations.
 
         Returns:
@@ -116,7 +118,7 @@ class KeaDHCPService(BaseService):
                 count += 1
         return count
 
-    def search_dhcpv6_subnets(self) -> list[dict]:
+    def search_dhcpv6_subnets(self) -> list[dict[str, Any]]:
         """Search for all DHCPv6 subnets.
 
         Returns:

@@ -120,7 +120,7 @@ warn_unused_configs = true
 warn_unused_ignores = true
 # Additional strict checks
 check_untyped_defs = true
-disallow_any_generics = false  # Can enable later for even stricter checking
+disallow_any_generics = true
 disallow_incomplete_defs = true
 disallow_subclassing_any = true
 no_implicit_optional = true

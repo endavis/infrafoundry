@@ -164,7 +164,7 @@ class OCIProvider(
 
         return instance_copy
 
-    def _deep_merge(self, base: dict, overlay: dict) -> None:
+    def _deep_merge(self, base: dict[str, Any], overlay: dict[str, Any]) -> None:
         """Deep merge overlay dict into base dict (modifies base in-place)."""
         for key, value in overlay.items():
             if key in base:

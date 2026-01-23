@@ -5,7 +5,7 @@ import os
 import tempfile
 from pathlib import Path
 from types import TracebackType
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from infrafoundry.core.credential_loader.base_loader import (
     BaseCredentialLoader,
@@ -48,7 +48,7 @@ class CredentialLoader:
 
     # Legacy attribute for backward compatibility with tests
     @property
-    def provider_credentials(self) -> dict:
+    def provider_credentials(self) -> dict[str, Any]:
         """Return provider credentials in old format for backward compatibility."""
         result = {}
         for name, loader_class in self.PROVIDER_LOADERS.items():

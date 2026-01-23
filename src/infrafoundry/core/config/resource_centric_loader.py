@@ -4,6 +4,7 @@ Loads resources from envs/{env}/resources/*.yaml files.
 """
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -98,7 +99,7 @@ class ResourceCentricLoader:
 
         return resources
 
-    def _validate_resource_item(self, item: dict, config_file: Path) -> None:
+    def _validate_resource_item(self, item: dict[str, Any], config_file: Path) -> None:
         """Validate required fields in a resource item.
 
         Args:
