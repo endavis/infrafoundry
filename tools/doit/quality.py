@@ -12,6 +12,7 @@ def task_lint() -> dict[str, Any]:
     return {
         "actions": ["uv run ruff check src/ tests/"],
         "title": title_with_actions,
+        "verbosity": 0,
     }
 
 
@@ -31,6 +32,7 @@ def task_format_check() -> dict[str, Any]:
     return {
         "actions": ["uv run ruff format --check src/ tests/"],
         "title": title_with_actions,
+        "verbosity": 0,
     }
 
 
@@ -40,6 +42,7 @@ def task_type_check() -> dict[str, Any]:
     return {
         "actions": [cmd],
         "title": title_with_actions,
+        "verbosity": 0,
     }
 
 

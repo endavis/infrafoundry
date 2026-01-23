@@ -10,6 +10,7 @@ def task_test() -> dict[str, Any]:
     return {
         "actions": ["uv run pytest -v"],
         "title": title_with_actions,
+        "verbosity": 0,
     }
 
 

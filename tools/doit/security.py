@@ -24,6 +24,7 @@ def task_security() -> dict[str, Any]:
             "echo 'bandit not installed. Run: uv sync --extra security'"
         ],
         "title": title_with_actions,
+        "verbosity": 0,
     }
 
 

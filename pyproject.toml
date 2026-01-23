@@ -30,13 +30,16 @@ dev = [
     "mkdocs-material>=9.5",
     "mypy>=1.0.0",
     "pre-commit>=3.7.0",
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
     "pyproject-fmt>=2.0",
+    "pyright>=1.1",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "radon>=6.0",
     "ruff>=0.1.0",
     "types-PyYAML>=6.0.0",
-    "types-requests>=2.32.0",
     "types-boto3>=1.35.0",
+    "types-requests>=2.32.0",
+    "vulture>=2.0",
 ]
 security = [
     "pip-audit>=2.6",
@@ -129,7 +132,7 @@ warn_redundant_casts = true
 warn_unreachable = true
 
 [tool.pytest.ini_options]
-minversion = "7.0"
+minversion = "8.0"
 cache_dir = "tmp/.pytest_cache"
 addopts = "-v --tb=short --strict-config --strict-markers"
 testpaths = ["tests"]
@@ -158,7 +161,7 @@ bump_map = { "feat" = "MINOR", "fix" = "PATCH", "refactor" = "PATCH", "perf" = "
 change_type_order = ["BREAKING CHANGE", "feat", "fix", "refactor", "perf"]
 
 [tool.bandit]
-exclude_dirs = ["tests", "tmp", ".venv"]
+exclude_dirs = ["tests", "tmp", ".venv", "docs", ".git", ".github", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".claude"]
 skips = []
 
 [tool.codespell]
@@ -195,3 +198,21 @@ directory = "tmp/htmlcov"
 
 [tool.coverage.xml]
 output = "tmp/coverage.xml"
+
+[tool.vulture]
+min_confidence = 80
+paths = ["src", "tests"]
+exclude = ["*/tests/*", "*/__pycache__/*"]
+ignore_names = ["test_*", "fixture_*", "*_fixture"]
+ignore_decorators = ["@pytest.fixture", "@pytest.mark.*"]
+
+[tool.pyright]
+include = ["src", "tests", "*.py", "tools", ".github"]
+exclude = ["**/__pycache__", "**/.venv", "**/tmp", "**/.pytest_cache", "**/.mypy_cache", "**/.ruff_cache", "**/site", "**/.git"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+useLibraryCodeForTypes = true
+reportMissingImports = true
+reportMissingTypeStubs = false
