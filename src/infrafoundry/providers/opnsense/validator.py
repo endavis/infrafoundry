@@ -86,7 +86,7 @@ class OPNsenseValidator:
         env_map = {
             "api_url": "OPNSENSE_API_URL",
             "api_key": "OPNSENSE_API_KEY",
-            "api_secret": "OPNSENSE_API_SECRET",
+            "api_secret": "OPNSENSE_API_SECRET",  # nosec B105
         }
         credentials = self.api_validator.get_credentials(
             ["api_url", "api_key", "api_secret"],
@@ -151,7 +151,7 @@ class OPNsenseValidator:
         env_map = {
             "api_url": "OPNSENSE_API_URL",
             "api_key": "OPNSENSE_API_KEY",
-            "api_secret": "OPNSENSE_API_SECRET",
+            "api_secret": "OPNSENSE_API_SECRET",  # nosec B105
         }
         credentials = self.api_validator.get_credentials(
             ["api_url", "api_key", "api_secret"],

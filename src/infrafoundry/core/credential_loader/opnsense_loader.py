@@ -27,5 +27,5 @@ class OPNsenseCredentialLoader(BaseCredentialLoader):
         return {
             "opnsense_api_url": "OPNSENSE_API_URL",
             "opnsense_api_key": "OPNSENSE_API_KEY",
-            "opnsense_api_secret": "OPNSENSE_API_SECRET",
+            "opnsense_api_secret": "OPNSENSE_API_SECRET",  # nosec B105 - env var name, not a secret
         }

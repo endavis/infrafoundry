@@ -26,7 +26,7 @@ class ProxmoxProvider(
 
     _PROXMOX_TFVARS_MAPPING = {
         "api_url": "proxmox_api_url",
-        "api_token": "proxmox_api_token",
+        "api_token": "proxmox_api_token",  # nosec B105
         "node": "proxmox_node",
         "storage": "proxmox_storage",
     }
