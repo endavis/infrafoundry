@@ -130,7 +130,7 @@ warn_unreachable = true
 [tool.pytest.ini_options]
 minversion = "7.0"
 cache_dir = "tmp/.pytest_cache"
-addopts = "-v --tb=short --strict-config --strict-markers --disable-warnings"
+addopts = "-v --tb=short --strict-config --strict-markers"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]

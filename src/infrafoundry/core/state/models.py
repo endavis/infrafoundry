@@ -1,6 +1,6 @@
 """Database models for state management."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
@@ -45,7 +45,9 @@ class Deployment(Base):
     environment: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     command: Mapped[str] = mapped_column(String(50), nullable=False)  # plan, apply, destroy
     status: Mapped[DeploymentStatus] = mapped_column(SQLEnum(DeploymentStatus), nullable=False)
-    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+    )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     user: Mapped[str | None] = mapped_column(String(100))
     commit_sha: Mapped[str | None] = mapped_column(String(40))  # Git commit
@@ -79,9 +81,14 @@ class Resource(Base):
     state: Mapped[ResourceState] = mapped_column(SQLEnum(ResourceState), nullable=False)
     config: Mapped[dict | None] = mapped_column(JSON)  # Full resource configuration
     terraform_id: Mapped[str | None] = mapped_column(String(500))  # Terraform resource ID
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
     extra_data: Mapped[dict | None] = mapped_column(JSON)  # Additional context
@@ -131,7 +138,9 @@ class DeploymentEvent(Base):
     )  # resource_created, validation_failed, etc.
     resource_name: Mapped[str | None] = mapped_column(String(200))
     message: Mapped[str | None] = mapped_column(Text)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+    )
     extra_data: Mapped[dict | None] = mapped_column(JSON)  # Additional context
 
     # Relationships
