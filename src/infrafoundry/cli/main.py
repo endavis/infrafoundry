@@ -97,6 +97,18 @@ def _get_orchestrator(
         pass
 
     try:
+        from infrafoundry.providers.oci import OCIProvider
+
+        orchestrator.register_provider(
+            OCIProvider(
+                config_dir=config_manager.base_dir,
+                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+            )
+        )
+    except ImportError:
+        pass
+
+    try:
         from infrafoundry.providers.opnsense import OPNsenseProvider
 
         orchestrator.register_provider(
