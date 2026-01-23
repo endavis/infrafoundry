@@ -158,7 +158,7 @@ change_type_order = ["BREAKING CHANGE", "feat", "fix", "refactor", "perf"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "tmp", ".venv"]
-skips = ["B101"]  # Skip assert_used - asserts are fine in tests
+skips = []
 
 [tool.codespell]
 skip = "tmp,.venv,.git,*.lock,*.pyc,__pycache__"
