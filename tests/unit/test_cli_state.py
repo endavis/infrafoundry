@@ -39,18 +39,20 @@ def mock_orchestrator(tmp_path):
 def test_state_backup_basic(cli_runner, mock_orchestrator, tmp_path):
     """Test basic state backup without generated directory."""
     # Patch the _get_orchestrator function to return our mock orchestrator
-    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        with patch("shutil.copy2") as mock_copy2:
-            result = cli_runner.invoke(main, ["state", "backup", "-o", str(tmp_path)])
+    with (
+        patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
+        patch("shutil.copy2") as mock_copy2,
+    ):
+        result = cli_runner.invoke(main, ["state", "backup", "-o", str(tmp_path)])
 
-            assert result.exit_code == 0
-            assert "State database backed up to:" in result.output
-            mock_copy2.assert_called_once()
-            # Compare Path objects directly or their string representations
-            assert Path(mock_orchestrator.state_manager.engine.url.database) == Path(
-                mock_copy2.call_args[0][0]
-            )
-            assert tmp_path.joinpath("infrafoundry_state_").stem in str(mock_copy2.call_args[0][1])
+        assert result.exit_code == 0
+        assert "State database backed up to:" in result.output
+        mock_copy2.assert_called_once()
+        # Compare Path objects directly or their string representations
+        assert Path(mock_orchestrator.state_manager.engine.url.database) == Path(
+            mock_copy2.call_args[0][0]
+        )
+        assert tmp_path.joinpath("infrafoundry_state_").stem in str(mock_copy2.call_args[0][1])
 
 
 def test_state_backup_with_generated(cli_runner, mock_orchestrator, tmp_path):
@@ -61,21 +63,23 @@ def test_state_backup_with_generated(cli_runner, mock_orchestrator, tmp_path):
         (cwd / "generated").mkdir()
         (cwd / "generated" / "file.txt").touch()
 
-        with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-            with patch("shutil.copy2") as mock_copy2:
-                with patch("shutil.make_archive") as mock_make_archive:
-                    # Use tmp_path for output to keep it separate, or use cwd
-                    result = cli_runner.invoke(main, ["state", "backup", "-o", str(tmp_path), "-g"])
+        with (
+            patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
+            patch("shutil.copy2") as mock_copy2,
+            patch("shutil.make_archive") as mock_make_archive,
+        ):
+            # Use tmp_path for output to keep it separate, or use cwd
+            result = cli_runner.invoke(main, ["state", "backup", "-o", str(tmp_path), "-g"])
 
-                    assert result.exit_code == 0
-                    assert "State database backed up to:" in result.output
-                    assert "'generated/' directory archived to:" in result.output
-                    mock_copy2.assert_called_once()
-                    mock_make_archive.assert_called_once()
-                    # Check root_dir and base_dir arguments for make_archive
-                    # Path.cwd() inside the command will match cwd here
-                    assert str(cwd) == mock_make_archive.call_args[1]["root_dir"]
-                    assert "generated" == mock_make_archive.call_args[1]["base_dir"]
+            assert result.exit_code == 0
+            assert "State database backed up to:" in result.output
+            assert "'generated/' directory archived to:" in result.output
+            mock_copy2.assert_called_once()
+            mock_make_archive.assert_called_once()
+            # Check root_dir and base_dir arguments for make_archive
+            # Path.cwd() inside the command will match cwd here
+            assert str(cwd) == mock_make_archive.call_args[1]["root_dir"]
+            assert mock_make_archive.call_args[1]["base_dir"] == "generated"
 
 
 def test_state_backup_state_db_not_found(cli_runner, mock_orchestrator, tmp_path):
@@ -95,22 +99,26 @@ def test_state_backup_output_dir_creation(cli_runner, mock_orchestrator, tmp_pat
     non_existent_dir = tmp_path / "non_existent_backup_dir"
     assert not non_existent_dir.exists()
 
-    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        with patch("shutil.copy2"):
-            result = cli_runner.invoke(main, ["state", "backup", "-o", str(non_existent_dir)])
+    with (
+        patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
+        patch("shutil.copy2"),
+    ):
+        result = cli_runner.invoke(main, ["state", "backup", "-o", str(non_existent_dir)])
 
-            assert result.exit_code == 0
-            assert non_existent_dir.is_dir()  # Assert directory was created
+        assert result.exit_code == 0
+        assert non_existent_dir.is_dir()  # Assert directory was created
 
 
 def test_state_backup_failure(cli_runner, mock_orchestrator, tmp_path):
     """Test state backup handles copy failure gracefully."""
-    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        with patch("shutil.copy2", side_effect=OSError("Permission denied")):
-            result = cli_runner.invoke(main, ["state", "backup", "-o", str(tmp_path)])
+    with (
+        patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
+        patch("shutil.copy2", side_effect=OSError("Permission denied")),
+    ):
+        result = cli_runner.invoke(main, ["state", "backup", "-o", str(tmp_path)])
 
-            assert result.exit_code == 1  # Expect failure
-            assert "State backup failed: Permission denied" in result.output
+        assert result.exit_code == 1  # Expect failure
+        assert "State backup failed: Permission denied" in result.output
 
 
 def test_state_backup_non_sqlite(cli_runner, mock_orchestrator, tmp_path):

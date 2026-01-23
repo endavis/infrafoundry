@@ -91,19 +91,21 @@ def orchestrator(tmp_path, mock_config, mock_providers):
 
 def mock_apply_methods(orchestrator):
     """Helper to mock methods needed for apply workflow."""
-    with patch(
-        "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
-        return_value={"success": True},
-    ):
-        with patch(
+    with (
+        patch(
+            "infrafoundry.core.runners.terraform_runner.TerraformRunner.run",
+            return_value={"success": True},
+        ),
+        patch(
             "infrafoundry.core.runners.terraform_runner.TerraformRunner.get_resource_ids",
             return_value={},
-        ):
-            with patch(
-                "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
-                return_value={"success": True},
-            ):
-                yield
+        ),
+        patch(
+            "infrafoundry.core.runners.ansible_runner.AnsibleRunner.run",
+            return_value={"success": True},
+        ),
+    ):
+        yield
 
 
 class TestPlanOrchestrator:
@@ -398,20 +400,20 @@ class TestApplyOrchestrator:
 
     def test_apply_failure_updates_deployment_status(self, orchestrator):
         """Test that apply failure marks deployment as failed."""
-        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
-            with patch(
-                "infrafoundry.core.runners.terraform_runner.TerraformRunner.apply"
-            ) as mock_apply:
-                mock_plan.return_value = {"success": True}
-                mock_apply.side_effect = RuntimeError("Apply failed")
+        with (
+            patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan,
+            patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.apply") as mock_apply,
+        ):
+            mock_plan.return_value = {"success": True}
+            mock_apply.side_effect = RuntimeError("Apply failed")
 
-                with pytest.raises(RuntimeError):
-                    orchestrator.apply(env_name="dev", auto_approve=True)
+            with pytest.raises(RuntimeError):
+                orchestrator.apply(env_name="dev", auto_approve=True)
 
-                # Check deployment was marked as failed
-                deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
-                failed_deployments = [d for d in deployments if d.status == DeploymentStatus.FAILED]
-                assert failed_deployments
+            # Check deployment was marked as failed
+            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
+            failed_deployments = [d for d in deployments if d.status == DeploymentStatus.FAILED]
+            assert failed_deployments
 
     def test_apply_emits_failure_event(self, orchestrator):
         """Test that apply failure emits failure event."""

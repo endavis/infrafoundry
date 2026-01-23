@@ -43,15 +43,17 @@ class TestCLICommands:
 
     def test_envs_command(self, cli_runner, cli_environment):
         """Test listing environments."""
-        with patch(
-            "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
-        ):
-            with patch(
+        with (
+            patch(
                 "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
-            ):
-                result = cli_runner.invoke(cli, ["envs"], env=cli_environment)
-                # Command should run (may need config setup)
-                assert result.exit_code in [0, 1, 2]  # Success or expected error
+            ),
+            patch(
+                "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+            ),
+        ):
+            result = cli_runner.invoke(cli, ["envs"], env=cli_environment)
+            # Command should run (may need config setup)
+            assert result.exit_code in [0, 1, 2]  # Success or expected error
 
     def test_list_command_requires_env(self, cli_runner):
         """Test that list command requires --env flag."""

@@ -162,9 +162,7 @@ class TestProxmoxValidation:
 
             if "/nodes/pve01/status" in url:
                 mock_response.json.return_value = {"data": {"uptime": 12345}}
-            elif "/nodes/pve01/storage" in url:
-                mock_response.json.return_value = {"data": []}
-            elif "/nodes/pve01/network" in url:
+            elif "/nodes/pve01/storage" in url or "/nodes/pve01/network" in url:
                 mock_response.json.return_value = {"data": []}
             elif "/cluster/resources" in url:
                 # Only ubuntu template, missing centos
@@ -230,9 +228,7 @@ class TestProxmoxValidation:
 
             if "/nodes/pve01/status" in url:
                 mock_response.json.return_value = {"data": {"uptime": 12345}}
-            elif "/nodes/pve01/storage" in url:
-                mock_response.json.return_value = {"data": []}
-            elif "/nodes/pve01/network" in url:
+            elif "/nodes/pve01/storage" in url or "/nodes/pve01/network" in url:
                 mock_response.json.return_value = {"data": []}
             elif "/cluster/resources" in url:
                 mock_response.json.return_value = {
