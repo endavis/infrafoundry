@@ -34,6 +34,7 @@ def task_spell_check() -> dict[str, Any]:
     return {
         "actions": ["uv run codespell src/ tests/ docs/ README.md"],
         "title": title_with_actions,
+        "verbosity": 0,
     }
 
 
