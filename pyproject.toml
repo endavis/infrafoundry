@@ -101,8 +101,10 @@ ignore = [
     "B024",    # Abstract base class without abstract methods - intentional in some cases
     "B904",    # raise-without-from - fix incrementally
     "RUF012",  # Mutable class default - fix incrementally
-    "E402",    # Module level import not at top of file - needed for CLI command loading
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"src/infrafoundry/cli/main.py" = ["E402"]  # CLI command imports after group setup
 
 [tool.ruff.format]
 quote-style = "double"
