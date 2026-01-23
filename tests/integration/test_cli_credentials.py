@@ -80,110 +80,118 @@ class TestCLICredentialLoading:
             "PROXMOX_API_TOKEN_SECRET": "prod-secret",
         }
 
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
-        ) as mock_load:
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orchestrator.return_value = mock_orch
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+            ) as mock_load,
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
+        ):
+            mock_orch = MagicMock()
+            mock_orchestrator.return_value = mock_orch
 
-                _result = cli_runner.invoke(
-                    cli,
-                    [
-                        "--config-dir",
-                        str(mock_credentials_setup),
-                        "infra",
-                        "apply",
-                        "--env",
-                        "prod",
-                        "--auto-approve",
-                    ],
-                )
+            _result = cli_runner.invoke(
+                cli,
+                [
+                    "--config-dir",
+                    str(mock_credentials_setup),
+                    "infra",
+                    "apply",
+                    "--env",
+                    "prod",
+                    "--auto-approve",
+                ],
+            )
 
-                # Verify credential loading was called with prod environment
-                assert mock_load.call_count == 1
-                assert mock_load.call_args[0][0] == "prod"
+            # Verify credential loading was called with prod environment
+            assert mock_load.call_count == 1
+            assert mock_load.call_args[0][0] == "prod"
 
     def test_destroy_command_loads_credentials(self, cli_runner, mock_credentials_setup):
         """Test that destroy command loads credentials automatically."""
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
-        ) as mock_load:
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orchestrator.return_value = mock_orch
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+            ) as mock_load,
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
+        ):
+            mock_orch = MagicMock()
+            mock_orchestrator.return_value = mock_orch
 
-                _result = cli_runner.invoke(
-                    cli,
-                    [
-                        "--config-dir",
-                        str(mock_credentials_setup),
-                        "infra",
-                        "destroy",
-                        "--env",
-                        "staging",
-                        "--auto-approve",
-                    ],
-                )
+            _result = cli_runner.invoke(
+                cli,
+                [
+                    "--config-dir",
+                    str(mock_credentials_setup),
+                    "infra",
+                    "destroy",
+                    "--env",
+                    "staging",
+                    "--auto-approve",
+                ],
+            )
 
-                # Verify credential loading was called with staging
-                # Verify called with correct environment (path type may vary)
-                assert mock_load.call_count == 1
-                assert mock_load.call_args[0][0] == "staging"
+            # Verify credential loading was called with staging
+            # Verify called with correct environment (path type may vary)
+            assert mock_load.call_count == 1
+            assert mock_load.call_args[0][0] == "staging"
 
     def test_status_command_loads_credentials(self, cli_runner, mock_credentials_setup):
         """Test that status command loads credentials automatically."""
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
-        ) as mock_load:
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orchestrator.return_value = mock_orch
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+            ) as mock_load,
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
+        ):
+            mock_orch = MagicMock()
+            mock_orchestrator.return_value = mock_orch
 
-                _result = cli_runner.invoke(
-                    cli,
-                    [
-                        "--config-dir",
-                        str(mock_credentials_setup),
-                        "infra",
-                        "status",
-                        "--env",
-                        "dev",
-                    ],
-                )
+            _result = cli_runner.invoke(
+                cli,
+                [
+                    "--config-dir",
+                    str(mock_credentials_setup),
+                    "infra",
+                    "status",
+                    "--env",
+                    "dev",
+                ],
+            )
 
-                # Verify credential loading was called
-                # Verify called with correct environment (path type may vary)
-                assert mock_load.call_count == 1
-                assert mock_load.call_args[0][0] == "dev"
+            # Verify credential loading was called
+            # Verify called with correct environment (path type may vary)
+            assert mock_load.call_count == 1
+            assert mock_load.call_args[0][0] == "dev"
 
     def test_drift_command_loads_credentials(self, cli_runner, mock_credentials_setup):
         """Test that drift command loads credentials automatically."""
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
-        ) as mock_load:
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orch.detect_drift.return_value = {}
-                mock_orchestrator.return_value = mock_orch
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+            ) as mock_load,
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
+        ):
+            mock_orch = MagicMock()
+            mock_orch.detect_drift.return_value = {}
+            mock_orchestrator.return_value = mock_orch
 
-                _result = cli_runner.invoke(
-                    cli,
-                    [
-                        "--config-dir",
-                        str(mock_credentials_setup),
-                        "infra",
-                        "drift",
-                        "detect",
-                        "--env",
-                        "prod",
-                    ],
-                )
+            _result = cli_runner.invoke(
+                cli,
+                [
+                    "--config-dir",
+                    str(mock_credentials_setup),
+                    "infra",
+                    "drift",
+                    "detect",
+                    "--env",
+                    "prod",
+                ],
+            )
 
-                # Verify credential loading was called
-                # Verify called with correct environment (path type may vary)
-                assert mock_load.call_count == 1
-                assert mock_load.call_args[0][0] == "prod"
+            # Verify credential loading was called
+            # Verify called with correct environment (path type may vary)
+            assert mock_load.call_count == 1
+            assert mock_load.call_args[0][0] == "prod"
 
     def test_credentials_set_in_environment(self, cli_runner, mock_credentials_setup):
         """Test that loaded credentials are set in os.environ."""
@@ -202,29 +210,31 @@ class TestCLICredentialLoading:
             return mock_creds
 
         try:
-            with patch(
-                "infrafoundry.core.credential_loader.CredentialLoader",
-                side_effect=mock_load_creds,
+            with (
+                patch(
+                    "infrafoundry.core.credential_loader.CredentialLoader",
+                    side_effect=mock_load_creds,
+                ),
+                patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
             ):
-                with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                    mock_orch = MagicMock()
-                    mock_orchestrator.return_value = mock_orch
+                mock_orch = MagicMock()
+                mock_orchestrator.return_value = mock_orch
 
-                    _result = cli_runner.invoke(
-                        cli,
-                        [
-                            "--config-dir",
-                            str(mock_credentials_setup),
-                            "infra",
-                            "plan",
-                            "--env",
-                            "test",
-                        ],
-                    )
+                _result = cli_runner.invoke(
+                    cli,
+                    [
+                        "--config-dir",
+                        str(mock_credentials_setup),
+                        "infra",
+                        "plan",
+                        "--env",
+                        "test",
+                    ],
+                )
 
-                    # After invocation, credentials should have been set
-                    # (Note: Click's CliRunner isolates env vars, so we check the mock was called)
-                    assert mock_orch is not None
+                # After invocation, credentials should have been set
+                # (Note: Click's CliRunner isolates env vars, so we check the mock was called)
+                assert mock_orch is not None
 
         finally:
             # Restore original environment
@@ -234,22 +244,24 @@ class TestCLICredentialLoading:
     def test_credential_loading_failure_doesnt_crash(self, cli_runner, mock_credentials_setup):
         """Test that credential loading failures don't crash the CLI."""
         # Mock credential loading to raise an exception
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader",
-            side_effect=Exception("SOPS failed"),
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader",
+                side_effect=Exception("SOPS failed"),
+            ),
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
         ):
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orchestrator.return_value = mock_orch
+            mock_orch = MagicMock()
+            mock_orchestrator.return_value = mock_orch
 
-                result = cli_runner.invoke(
-                    cli,
-                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
-                )
+            result = cli_runner.invoke(
+                cli,
+                ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
+            )
 
-                # Command should still run (credentials may be in env vars)
-                # The _load_env_credentials wrapper handles exceptions gracefully
-                assert result.exit_code in [0, 1]  # Success or expected error, not crash
+            # Command should still run (credentials may be in env vars)
+            # The _load_env_credentials wrapper handles exceptions gracefully
+            assert result.exit_code in [0, 1]  # Success or expected error, not crash
 
     def test_multiple_commands_with_different_environments(
         self, cli_runner, mock_credentials_setup
@@ -276,32 +288,34 @@ class TestCLICredentialLoading:
                 return prod_creds
             return {}
 
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply",
-            side_effect=mock_load_env,
-        ) as mock_load:
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orchestrator.return_value = mock_orch
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply",
+                side_effect=mock_load_env,
+            ) as mock_load,
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
+        ):
+            mock_orch = MagicMock()
+            mock_orchestrator.return_value = mock_orch
 
-                # Run plan for dev
-                _result_dev = cli_runner.invoke(
-                    cli,
-                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
-                )
+            # Run plan for dev
+            _result_dev = cli_runner.invoke(
+                cli,
+                ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
+            )
 
-                # Run plan for prod
-                _result_prod = cli_runner.invoke(
-                    cli,
-                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "prod"],
-                )
+            # Run plan for prod
+            _result_prod = cli_runner.invoke(
+                cli,
+                ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "prod"],
+            )
 
-                # Verify both environments were loaded
-                assert mock_load.call_count == 2
-                calls = mock_load.call_args_list
-                # Check positional args
-                assert calls[0].args[0] == "dev"
-                assert calls[1].args[0] == "prod"
+            # Verify both environments were loaded
+            assert mock_load.call_count == 2
+            calls = mock_load.call_args_list
+            # Check positional args
+            assert calls[0].args[0] == "dev"
+            assert calls[1].args[0] == "prod"
 
     def test_config_dir_flag_passed_to_credential_loader(self, cli_runner, tmp_path):
         """Test that --config-dir flag is passed to credential loader."""
@@ -312,39 +326,43 @@ class TestCLICredentialLoading:
         secrets_dir.mkdir(parents=True)
         (secrets_dir / "proxmox.yaml").write_text("encrypted")
 
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
-        ) as mock_load:
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orchestrator.return_value = mock_orch
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+            ) as mock_load,
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
+        ):
+            mock_orch = MagicMock()
+            mock_orchestrator.return_value = mock_orch
 
-                _result = cli_runner.invoke(
-                    cli,
-                    ["--config-dir", str(custom_config_dir), "infra", "plan", "--env", "dev"],
-                )
+            _result = cli_runner.invoke(
+                cli,
+                ["--config-dir", str(custom_config_dir), "infra", "plan", "--env", "dev"],
+            )
 
-                # Verify the custom config dir was passed
-                # Verify called with correct environment (path type may vary)
-                assert mock_load.call_count == 1
-                assert mock_load.call_args[0][0] == "dev"
+            # Verify the custom config dir was passed
+            # Verify called with correct environment (path type may vary)
+            assert mock_load.call_count == 1
+            assert mock_load.call_args[0][0] == "dev"
 
     def test_no_config_dir_uses_default(self, cli_runner, mock_credentials_setup):
         """Test that not specifying --config-dir uses default behavior."""
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
-        ) as mock_load:
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orchestrator.return_value = mock_orch
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader.load_and_apply"
+            ) as mock_load,
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
+        ):
+            mock_orch = MagicMock()
+            mock_orchestrator.return_value = mock_orch
 
-                # Don't pass --config-dir
-                _result = cli_runner.invoke(cli, ["infra", "plan", "--env", "dev"])
+            # Don't pass --config-dir
+            _result = cli_runner.invoke(cli, ["infra", "plan", "--env", "dev"])
 
-                # Should still call credential loader (with None or default path)
-                mock_load.assert_called_once()
-                # First argument should be 'dev'
-                assert mock_load.call_args[0][0] == "dev"
+            # Should still call credential loader (with None or default path)
+            mock_load.assert_called_once()
+            # First argument should be 'dev'
+            assert mock_load.call_args[0][0] == "dev"
 
 
 @pytest.mark.integration
@@ -355,40 +373,44 @@ class TestCredentialLoadingDebugLogging:
         """Test that debug logging shows credential loading when enabled."""
         mock_creds = {"PROXMOX_API_URL": "https://proxmox.example.com:8006"}
 
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader",
-            return_value=mock_creds,
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader",
+                return_value=mock_creds,
+            ),
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
         ):
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orchestrator.return_value = mock_orch
+            mock_orch = MagicMock()
+            mock_orchestrator.return_value = mock_orch
 
-                # Enable debug logging
-                result = cli_runner.invoke(
-                    cli,
-                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
-                    env={"INFRAFOUNDRY_LOG_LEVEL": "DEBUG"},
-                )
+            # Enable debug logging
+            result = cli_runner.invoke(
+                cli,
+                ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
+                env={"INFRAFOUNDRY_LOG_LEVEL": "DEBUG"},
+            )
 
-                # Command should run
-                assert result.exit_code in [0, 1]
+            # Command should run
+            assert result.exit_code in [0, 1]
 
     def test_no_debug_logging_by_default(self, cli_runner, mock_credentials_setup):
         """Test that credential loading is silent by default."""
         mock_creds = {"PROXMOX_API_URL": "https://proxmox.example.com:8006"}
 
-        with patch(
-            "infrafoundry.core.credential_loader.CredentialLoader",
-            return_value=mock_creds,
+        with (
+            patch(
+                "infrafoundry.core.credential_loader.CredentialLoader",
+                return_value=mock_creds,
+            ),
+            patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator,
         ):
-            with patch("infrafoundry.cli.main._get_orchestrator") as mock_orchestrator:
-                mock_orch = MagicMock()
-                mock_orchestrator.return_value = mock_orch
+            mock_orch = MagicMock()
+            mock_orchestrator.return_value = mock_orch
 
-                result = cli_runner.invoke(
-                    cli,
-                    ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
-                )
+            result = cli_runner.invoke(
+                cli,
+                ["--config-dir", str(mock_credentials_setup), "infra", "plan", "--env", "dev"],
+            )
 
-                # Command should run without debug output
-                assert result.exit_code in [0, 1]
+            # Command should run without debug output
+            assert result.exit_code in [0, 1]

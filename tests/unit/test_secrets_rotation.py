@@ -376,9 +376,11 @@ class TestSecretsRotator:
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(stdout="age1newkey", returncode=0)
 
-            with patch.dict("os.environ", {"SOPS_AGE_KEY_FILE": "/tmp/old_key"}):
-                with pytest.raises(SecretError, match="Secrets rotation failed"):
-                    rotator.rotate(new_key_file=new_key_file, verify=False)
+            with (
+                patch.dict("os.environ", {"SOPS_AGE_KEY_FILE": "/tmp/old_key"}),
+                pytest.raises(SecretError, match="Secrets rotation failed"),
+            ):
+                rotator.rotate(new_key_file=new_key_file, verify=False)
 
         # Verify backup was created
         assert rotator.current_backup is not None

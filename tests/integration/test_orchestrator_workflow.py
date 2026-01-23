@@ -14,16 +14,14 @@ from infrafoundry.core.state import StateManager
 @pytest.fixture
 def mock_secret_manager(mock_secrets_dir):
     """Create a mock SecretManager."""
-    with patch(
-        "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
+    with (
+        patch("infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None),
+        patch("infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None),
     ):
-        with patch(
-            "infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None
-        ):
-            manager = SecretManager(env_name="dev", secrets_dir=mock_secrets_dir)
-            # Mock decrypt to return simple data
-            manager.decrypt_file = MagicMock(return_value={"api_token": "test-token"})
-            return manager
+        manager = SecretManager(env_name="dev", secrets_dir=mock_secrets_dir)
+        # Mock decrypt to return simple data
+        manager.decrypt_file = MagicMock(return_value={"api_token": "test-token"})
+        return manager
 
 
 @pytest.mark.integration

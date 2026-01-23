@@ -199,10 +199,12 @@ class TestBaseProviderValidator:
 
     def test_check_api_connectivity_no_requests_library(self, validator, report):
         """Test API connectivity when requests library is not installed."""
-        with patch.dict("sys.modules", {"requests": None}):
+        with (
+            patch.dict("sys.modules", {"requests": None}),
             # Import error will be raised when trying to import requests
-            with patch("builtins.__import__", side_effect=ImportError):
-                result = validator.check_api_connectivity(url="https://api.example.com/status")
+            patch("builtins.__import__", side_effect=ImportError),
+        ):
+            result = validator.check_api_connectivity(url="https://api.example.com/status")
 
         assert result is False
         call_args = report.add_check.call_args[1]

@@ -23,13 +23,15 @@ def test_secrets_init_basic(cli_runner, tmp_path):
     mock_result.returncode = 0
     mock_result.stderr = "# public key: age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
-    with patch("subprocess.run", return_value=mock_result):
-        with patch("infrafoundry.cli.commands.secrets.secrets.create_sops_config"):
-            result = cli_runner.invoke(main, ["secrets", "init", "--key-file", str(key_file)])
+    with (
+        patch("subprocess.run", return_value=mock_result),
+        patch("infrafoundry.cli.commands.secrets.secrets.create_sops_config"),
+    ):
+        result = cli_runner.invoke(main, ["secrets", "init", "--key-file", str(key_file)])
 
-            assert result.exit_code == 0
-            assert "Created age key:" in result.output
-            assert "Created .sops.yaml" in result.output
+        assert result.exit_code == 0
+        assert "Created age key:" in result.output
+        assert "Created .sops.yaml" in result.output
 
 
 def test_secrets_init_key_exists(cli_runner, tmp_path):
