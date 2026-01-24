@@ -3,7 +3,11 @@
 {% for instance in instances %}
 resource "oci_core_instance" "{{ instance.name | to_terraform_name }}" {
   compartment_id      = var.oci_compartment_ocid
-  availability_domain = "{{ instance.config.get('availability_domain', 'data.oci_identity_availability_domains.ads.availability_domains[0].name') }}"
+{% if instance.config.get('availability_domain') %}
+  availability_domain = "{{ instance.config.availability_domain }}"
+{% else %}
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+{% endif %}
   display_name        = "{{ instance.name }}"
   shape               = "{{ instance.config.shape }}"
 
@@ -16,7 +20,7 @@ resource "oci_core_instance" "{{ instance.name | to_terraform_name }}" {
 
   create_vnic_details {
     subnet_id        = oci_core_subnet.{{ instance.config.subnet | to_terraform_name }}.id
-    assign_public_ip = {{ instance.config.get('public_ip', true) | lower }}
+    assign_public_ip = {{ instance.config.get('assign_public_ip', true) | lower }}
     display_name     = "{{ instance.name }}-vnic"
   }
 
@@ -33,7 +37,7 @@ resource "oci_core_instance" "{{ instance.name | to_terraform_name }}" {
     ssh_authorized_keys = "{{ instance.config.ssh_authorized_keys | join('\\n') }}"
     {% endif %}
     {% if instance.config.get('cloud_init_merged') %}
-    user_data = base64encode(yamlencode({{ instance.config.cloud_init_merged | tojson }}))
+    user_data = base64encode(join("\n", ["#cloud-config", yamlencode({{ instance.config.cloud_init_merged | tojson }})]))
     {% elif instance.config.get('user_data') %}
     user_data = base64encode({{ instance.config.user_data | tojson }})
     {% endif %}
