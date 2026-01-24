@@ -435,11 +435,24 @@ class TestOutputsTemplate:
         assert "output" not in content
 
 
+class TestAnsibleCfgTemplate:
+    """Tests for ansible.cfg.j2 template."""
+
+    def test_renders_ansible_cfg_with_roles_path(self, provider):
+        """Test ansible.cfg includes roles_path and ssh settings."""
+        content = provider.render_template(
+            "oci/ansible.cfg.j2", {"roles_path": "/home/user/infra/roles"}
+        )
+        assert "roles_path = /home/user/infra/roles" in content
+        assert "host_key_checking = False" in content
+        assert "pipelining = True" in content
+
+
 class TestPlaybookTemplate:
     """Tests for playbook.yml.j2 template."""
 
     def test_renders_playbook_with_roles(self, provider):
-        """Test playbook includes ansible roles."""
+        """Test playbook creates per-role plays."""
         instances = [
             ResourceConfig(
                 name="app-server",
@@ -453,30 +466,28 @@ class TestPlaybookTemplate:
                 },
             )
         ]
-        content = provider.render_template("oci/playbook.yml.j2", {"instances": instances})
-        assert "docker" in content
-        assert "app" in content
-        assert "app-server" in content
+        role_groups = {"docker": instances, "app": instances}
+        content = provider.render_template("oci/playbook.yml.j2", {"role_groups": role_groups})
+        assert "Apply docker" in content
+        assert "docker_hosts" in content
+        assert "- docker" in content
+        assert "Apply app" in content
+        assert "app_hosts" in content
+        assert "- app" in content
 
     def test_renders_playbook_without_roles(self, provider):
-        """Test playbook renders without roles."""
-        instances = [
-            ResourceConfig(
-                name="plain-server",
-                type="instance",
-                provider="oci",
-                config={"shape": "VM.Standard.A1.Flex", "subnet": "s", "image": "img"},
-            )
-        ]
-        content = provider.render_template("oci/playbook.yml.j2", {"instances": instances})
-        assert "Configure OCI Instances" in content
+        """Test playbook renders empty when no roles defined."""
+        role_groups: dict[str, list] = {}
+        content = provider.render_template("oci/playbook.yml.j2", {"role_groups": role_groups})
+        assert "---" in content
+        assert "hosts:" not in content
 
 
 class TestInventoryTemplate:
     """Tests for inventory.yml.j2 template."""
 
     def test_renders_inventory_with_instances(self, provider):
-        """Test inventory lists instances with host info."""
+        """Test inventory lists instances in per-role groups."""
         instances = [
             ResourceConfig(
                 name="web-1",
@@ -487,16 +498,18 @@ class TestInventoryTemplate:
                     "subnet": "s",
                     "image": "img",
                     "ssh_user": "opc",
+                    "ansible_roles": ["nginx"],
                 },
             )
         ]
-        content = provider.render_template("oci/inventory.yml.j2", {"instances": instances})
+        role_groups = {"nginx": instances}
+        content = provider.render_template("oci/inventory.yml.j2", {"role_groups": role_groups})
         assert "web-1" in content
         assert "opc" in content
-        assert "oci_instances" in content
+        assert "nginx_hosts" in content
 
     def test_ansible_host_override(self, provider):
-        """Test ansible_host config override takes priority over Terraform output."""
+        """Test ansible_host config override is included in inventory."""
         custom_host = "custom-ansible-host-override"
         instances = [
             ResourceConfig(
@@ -508,15 +521,17 @@ class TestInventoryTemplate:
                     "subnet": "s",
                     "image": "img",
                     "ansible_host": custom_host,
+                    "ansible_roles": ["common"],
                 },
             )
         ]
-        content = provider.render_template("oci/inventory.yml.j2", {"instances": instances})
+        role_groups = {"common": instances}
+        content = provider.render_template("oci/inventory.yml.j2", {"role_groups": role_groups})
         assert custom_host in content
         assert "oci_core_instance" not in content
 
-    def test_ansible_host_default(self, provider):
-        """Test ansible_host falls back to Terraform output when not set."""
+    def test_ansible_host_omitted_when_not_set(self, provider):
+        """Test ansible_host line is omitted when not set in config."""
         instances = [
             ResourceConfig(
                 name="pub-host",
@@ -526,11 +541,13 @@ class TestInventoryTemplate:
                     "shape": "VM.Standard.A1.Flex",
                     "subnet": "s",
                     "image": "img",
+                    "ansible_roles": ["common"],
                 },
             )
         ]
-        content = provider.render_template("oci/inventory.yml.j2", {"instances": instances})
-        assert "oci_core_instance.pub_host.public_ip" in content
+        role_groups = {"common": instances}
+        content = provider.render_template("oci/inventory.yml.j2", {"role_groups": role_groups})
+        assert "ansible_host" not in content
 
     def test_default_ssh_user(self, provider):
         """Test inventory uses ubuntu as default ssh user."""
@@ -539,8 +556,14 @@ class TestInventoryTemplate:
                 name="default-user",
                 type="instance",
                 provider="oci",
-                config={"shape": "VM.Standard.A1.Flex", "subnet": "s", "image": "img"},
+                config={
+                    "shape": "VM.Standard.A1.Flex",
+                    "subnet": "s",
+                    "image": "img",
+                    "ansible_roles": ["common"],
+                },
             )
         ]
-        content = provider.render_template("oci/inventory.yml.j2", {"instances": instances})
+        role_groups = {"common": instances}
+        content = provider.render_template("oci/inventory.yml.j2", {"role_groups": role_groups})
         assert "ubuntu" in content
