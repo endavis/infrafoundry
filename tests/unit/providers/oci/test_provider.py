@@ -171,7 +171,7 @@ def test_generate_terraform_instance_with_shape_config(provider, tmp_dirs):
 
 
 def test_generate_ansible_creates_files(provider, tmp_dirs):
-    """Test that generate_ansible creates playbook and inventory."""
+    """Test that generate_ansible creates playbook, inventory, and ansible.cfg."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
 
@@ -192,12 +192,13 @@ def test_generate_ansible_creates_files(provider, tmp_dirs):
     provider.generate_ansible(resources)
 
     ansible_dir = output_dir / "test" / "ansible" / "oci"
+    assert (ansible_dir / "ansible.cfg").exists()
     assert (ansible_dir / "playbook.yml").exists()
     assert (ansible_dir / "inventory.yml").exists()
 
 
 def test_generate_ansible_playbook_content(provider, tmp_dirs):
-    """Test playbook includes ansible_roles."""
+    """Test playbook creates per-role plays with correct host groups."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
 
@@ -219,12 +220,13 @@ def test_generate_ansible_playbook_content(provider, tmp_dirs):
 
     ansible_dir = output_dir / "test" / "ansible" / "oci"
     content = (ansible_dir / "playbook.yml").read_text()
-    assert "nginx" in content
-    assert "web-server" in content
+    assert "Apply nginx" in content
+    assert "nginx_hosts" in content
+    assert "- nginx" in content
 
 
 def test_generate_ansible_inventory_content(provider, tmp_dirs):
-    """Test inventory contains instance entries."""
+    """Test inventory contains per-role groups with instance entries."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
 
@@ -238,6 +240,7 @@ def test_generate_ansible_inventory_content(provider, tmp_dirs):
                 "subnet": "public-subnet",
                 "image": "ocid1.image.oc1.iad.example",
                 "ssh_user": "opc",
+                "ansible_roles": ["common"],
             },
         ),
     ]
@@ -246,6 +249,7 @@ def test_generate_ansible_inventory_content(provider, tmp_dirs):
 
     ansible_dir = output_dir / "test" / "ansible" / "oci"
     content = (ansible_dir / "inventory.yml").read_text()
+    assert "common_hosts" in content
     assert "my-instance" in content
     assert "opc" in content
 
@@ -449,6 +453,7 @@ def test_generate_ansible_with_ansible_host_override(provider, tmp_dirs):
                 "subnet": "public-subnet",
                 "image": "ocid1.image.oc1.iad.example",
                 "ansible_host": custom_host,
+                "ansible_roles": ["common"],
             },
         ),
     ]
@@ -481,6 +486,7 @@ def test_generate_ansible_filters_non_instances(provider, tmp_dirs):
                 "shape": "VM.Standard.A1.Flex",
                 "subnet": "public-subnet",
                 "image": "ocid1.image.oc1.iad.example",
+                "ansible_roles": ["common"],
             },
         ),
     ]

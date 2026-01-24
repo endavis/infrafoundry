@@ -1,40 +1,12 @@
 ---
-# OCI Ansible Playbook - Post-instance configuration
-- name: Configure OCI Instances
-  hosts: oci_instances
+# OCI Ansible Playbook - Generated from resource configurations
+{% for role, instances in role_groups.items() %}
+
+- name: Apply {{ role }}
+  hosts: {{ role | to_terraform_name }}_hosts
   become: true
-  gather_facts: true
+  gather_facts: false
 
   roles:
-{% for instance in instances %}
-{% if instance.config.get('ansible_roles') %}
-{% for role in instance.config.ansible_roles %}
-    - role: {{ role }}
-      when: inventory_hostname == '{{ instance.name }}'
-{% endfor %}
-{% endif %}
-{% endfor %}
-
-  tasks:
-    - name: Wait for instances to be accessible
-      wait_for_connection:
-        timeout: 300
-
-    - name: Update package cache
-      apt:
-        update_cache: yes
-      when: ansible_os_family == "Debian"
-
-{% for instance in instances %}
-{% if instance.config.get('ansible_tasks') %}
-    # Custom tasks for {{ instance.name }}
-{% for task in instance.config.ansible_tasks %}
-    - name: {{ task.name }}
-      when: inventory_hostname == '{{ instance.name }}'
-      {{ task.module }}:
-{% for key, value in task.params.items() %}
-        {{ key }}: {{ value }}
-{% endfor %}
-{% endfor %}
-{% endif %}
+    - {{ role }}
 {% endfor %}
