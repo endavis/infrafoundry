@@ -106,7 +106,7 @@ class AnsibleRunner(BaseRunner):
 
         try:
             result = subprocess.run(  # nosec B603 - trusted command
-                [self.tool_path, "--syntax-check", str(playbook)],
+                [self.tool_path, "--syntax-check", playbook.name],
                 cwd=ansible_dir,
                 capture_output=True,
                 text=True,
@@ -143,8 +143,8 @@ class AnsibleRunner(BaseRunner):
             )
             return {"error": "ansible-playbook not found", "success": False}
 
-        # Build command using full path to ansible-playbook binary
-        cmd = [self.tool_path, "-i", str(inventory), str(playbook)]
+        # Build command using filenames only since cwd is ansible_dir
+        cmd = [self.tool_path, "-i", inventory.name, playbook.name]
         if check_mode:
             cmd.append("--check")
             self.console.print("[dim]Running Ansible in check mode (dry run)...[/dim]")
