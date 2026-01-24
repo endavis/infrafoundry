@@ -390,10 +390,13 @@ class TerraformGeneratorMixin:
         if not env_name:
             return None
 
-        # ConfigManager expects the parent envs directory, not the specific env directory
-        # config_dir points to envs/{env}, so we need to use its parent
-        envs_dir = self.config_dir.parent
-        config_manager = ConfigManager(envs_dir)
+        # config_dir may be the envs/ directory (CLI) or envs/{env} (tests)
+        # Try config_dir first, fall back to config_dir.parent
+        settings_path = self.config_dir / env_name / "settings.yaml"
+        if settings_path.exists():
+            config_manager = ConfigManager(self.config_dir)
+        else:
+            config_manager = ConfigManager(self.config_dir.parent)
         try:
             return config_manager.load_environment(env_name)
         except FileNotFoundError:
