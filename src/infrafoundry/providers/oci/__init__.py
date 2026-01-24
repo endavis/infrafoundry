@@ -182,13 +182,32 @@ class OCIProvider(
         """Generate Ansible playbooks for OCI post-configuration."""
         self.ensure_directories()
 
-        # Filter to only instances with ansible_roles
         instances = [r for r in resources if r.type == "instance"]
 
-        content = self.render_template("oci/playbook.yml.j2", {"instances": instances})
+        # Generate ansible.cfg with roles_path
+        # config_dir is {config_repo}/envs, parent is config repo root
+        roles_dir = self.config_dir.parent / "roles"
+        content = self.render_template(
+            "oci/ansible.cfg.j2",
+            {
+                "roles_path": str(roles_dir.resolve()),
+            },
+        )
+        self._write_ansible_file("ansible.cfg", content)
+
+        # Build role_groups: ordered dict of {role_name: [instances]}
+        role_groups: dict[str, list[ResourceConfig]] = {}
+        for inst in instances:
+            for role in inst.config.get("ansible_roles", []):
+                if role not in role_groups:
+                    role_groups[role] = []
+                role_groups[role].append(inst)
+
+        # Generate playbook and inventory with role grouping
+        content = self.render_template("oci/playbook.yml.j2", {"role_groups": role_groups})
         self._write_ansible_file("playbook.yml", content)
 
-        content = self.render_template("oci/inventory.yml.j2", {"instances": instances})
+        content = self.render_template("oci/inventory.yml.j2", {"role_groups": role_groups})
         self._write_ansible_file("inventory.yml", content)
 
     @override
