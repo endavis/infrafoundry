@@ -35,6 +35,7 @@ env/
 
 # User configuration (use example-config/ as template, or separate repo)
 envs/
+!example-config/envs/
 !src/infrafoundry/core/secrets/
 
 # Secrets and sensitive data

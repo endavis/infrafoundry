@@ -1,0 +1,93 @@
+---
+# K3s Agent (Worker Node) Installation
+#
+# This role installs K3s in agent mode, joining an existing cluster.
+# It fetches the join token from the control plane node automatically.
+#
+# Variables:
+#   k3s_version: Specific version to install (empty = latest, should match server)
+#   k3s_control_host: Inventory hostname of the control plane node
+#   k3s_agent_args: Additional agent arguments
+#
+# Requirements:
+#   - Control plane must be installed and running first
+#   - This role delegates to k3s_control_host to fetch the token
+
+- name: Wait for connectivity
+  wait_for_connection:
+    timeout: 300
+
+- name: Gather facts
+  setup:
+
+- name: Check for existing k3s-agent installation
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Stop existing k3s-agent (if present)
+  service:
+    name: k3s-agent
+    state: stopped
+  ignore_errors: true
+  when: k3s_binary.stat.exists
+
+- name: Uninstall existing k3s-agent (if present)
+  shell: /usr/local/bin/k3s-agent-uninstall.sh
+  ignore_errors: true
+  when: k3s_binary.stat.exists
+
+- name: Remove old k3s-agent state
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/rancher
+    - /var/lib/rancher
+    - /etc/systemd/system/k3s-agent.service
+    - /etc/systemd/system/k3s-agent.service.env
+
+- name: Get join token from control node
+  delegate_to: "{{ k3s_control_host }}"
+  shell: cat /var/lib/rancher/k3s/server/node-token
+  register: k3s_token_output
+  changed_when: false
+
+- name: Get control plane ansible_host
+  set_fact:
+    k3s_server_url: "https://{{ hostvars[k3s_control_host]['ansible_host'] }}:6443"
+
+- name: Display join information
+  debug:
+    msg: "Joining cluster at {{ k3s_server_url }}"
+
+- name: Install k3s agent
+  shell: |
+    curl -sfL https://get.k3s.io | sh -s - agent {{ k3s_agent_args }}
+    test -x /usr/local/bin/k3s
+  register: k3s_install
+  retries: 5
+  delay: 15
+  until: k3s_install.rc == 0
+  environment:
+    K3S_URL: "{{ k3s_server_url }}"
+    K3S_TOKEN: "{{ k3s_token_output.stdout }}"
+    INSTALL_K3S_VERSION: "{{ k3s_version | default(omit, true) }}"
+
+- name: Wait for k3s-agent service to be active
+  service:
+    name: k3s-agent
+    state: started
+  register: k3s_agent_service
+  retries: 5
+  delay: 10
+  until: k3s_agent_service is succeeded
+
+- name: Verify node joined cluster (from control plane)
+  delegate_to: "{{ k3s_control_host }}"
+  shell: kubectl get nodes | grep -q "{{ inventory_hostname }}"
+  register: node_joined
+  retries: 30
+  delay: 10
+  until: node_joined.rc == 0
+  changed_when: false

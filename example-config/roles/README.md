@@ -10,7 +10,8 @@ roles/
 ├── webserver/           # Nginx/Apache web server
 ├── database/            # Database servers (PostgreSQL, MySQL)
 ├── docker/              # Docker installation and configuration
-├── kubernetes/          # Kubernetes node configuration
+├── k3s-server/          # K3s control plane installation
+├── k3s-agent/           # K3s worker node installation
 ├── monitoring/          # Monitoring agents (Prometheus, etc.)
 ├── tailscale-exit-node/ # Tailscale VPN exit node (includes example)
 └── custom/              # Your custom roles
@@ -42,6 +43,43 @@ vms:
 ```
 
 See [tailscale-exit-node/README.md](tailscale-exit-node/README.md) for full documentation or [tailscale-exit-node/QUICKSTART.md](tailscale-exit-node/QUICKSTART.md) for quick deployment guide.
+
+### K3s Cluster (`k3s-server/` and `k3s-agent/`)
+
+Production-ready roles for deploying lightweight Kubernetes (K3s) clusters:
+
+**k3s-server** - Control plane installation:
+- ✅ Installs K3s in server mode
+- ✅ Configures TLS SANs for remote access (Tailscale)
+- ✅ Fetches kubeconfig to local machine
+- ✅ Supports custom cluster/service CIDRs
+
+**k3s-agent** - Worker node installation:
+- ✅ Automatically fetches join token from control plane
+- ✅ Joins existing K3s cluster
+- ✅ Supports node labels and taints
+
+**Quick Usage:**
+```yaml
+instance:
+  # Control plane
+  - name: k3s-control
+    ansible_roles:
+      - k3s-server
+    ansible_vars:
+      kubeconfig_local_path: "~/.kube/my-cluster.yaml"
+
+  # Workers
+  - name: k3s-worker-0
+    ansible_roles:
+      - k3s-agent
+    ansible_vars:
+      k3s_control_host: "k3s-control"
+```
+
+See [k3s-server/README.md](k3s-server/README.md) and [k3s-agent/README.md](k3s-agent/README.md) for full documentation.
+
+For a complete OCI deployment example with Tailscale, see [envs/oci-k3s/](../envs/oci-k3s/).
 
 ## Using Roles in Configuration
 

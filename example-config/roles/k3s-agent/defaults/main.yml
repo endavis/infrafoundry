@@ -1,0 +1,12 @@
+---
+# K3s version to install (empty = latest stable)
+# Should match the server version
+k3s_version: ""
+
+# Hostname of the k3s control plane node (from inventory)
+# This is used to fetch the join token and determine the server URL
+k3s_control_host: "k3s-control"
+
+# Additional k3s agent arguments
+# Example: "--node-label role=worker"
+k3s_agent_args: ""

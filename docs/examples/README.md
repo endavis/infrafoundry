@@ -11,6 +11,10 @@ Practical examples and reference configurations for InfraFoundry.
 - **[Environment Example](ENV_EXAMPLE.md)** - Annotated example of environment configuration
 - **[Envrc Local](ENVRC_LOCAL.md)** - Example usage of local environment variables
 
+## Infrastructure Examples
+
+- **[OCI K3s Cluster](oci-k3s-cluster.md)** - Complete K3s cluster on OCI free tier with Tailscale
+
 ## Integration Examples
 
 - **[GitLab CI Example](GITLAB_CI_EXAMPLE.md)** - Example GitLab CI workflow configuration
@@ -29,4 +33,4 @@ For more detailed documentation, see:
 
 ---
 
-**Last Updated:** 2025-12-29
+**Last Updated:** 2025-01-25
