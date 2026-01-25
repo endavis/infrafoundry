@@ -1,0 +1,59 @@
+# OCI K3s Network Configuration
+#
+# Architecture:
+#   - VCN with /16 CIDR for cluster networking
+#   - Internet Gateway for public subnet (control plane)
+#   - NAT Gateway for private subnet (workers) to pull images
+#   - Public subnet: Control plane with public IP for initial SSH/Tailscale setup
+#   - Private subnet: Worker nodes accessible only via Tailscale
+#
+# Security:
+#   - Minimal ingress: SSH only from internet
+#   - All intra-cluster traffic allowed within VCN
+#   - Workers have no public IPs - accessed via Tailscale overlay
+
+vcn:
+  - name: k3s-vcn
+    cidr_block: "10.0.0.0/16"
+    dns_label: k3svcn
+    internet_gateway: true
+    nat_gateway: true
+    security_list:
+      egress_rules:
+        # Allow all outbound (for package updates, image pulls, Tailscale)
+        - destination: "0.0.0.0/0"
+          protocol: "all"
+      ingress_rules:
+        # SSH from anywhere (for initial setup, then use Tailscale)
+        - source: "0.0.0.0/0"
+          protocol: "6"  # TCP
+          tcp_options:
+            min: 22
+            max: 22
+        # All traffic within VCN (K3s cluster communication)
+        - source: "10.0.0.0/16"
+          protocol: "all"
+        # Kubernetes API from VCN (for kubectl via Tailscale)
+        - source: "10.0.0.0/16"
+          protocol: "6"
+          tcp_options:
+            min: 6443
+            max: 6443
+
+subnet:
+  # Public subnet for control plane
+  # Uses Internet Gateway for routing
+  - name: k3s-control-subnet
+    vcn: k3s-vcn
+    cidr_block: "10.0.0.0/24"
+    dns_label: ctrl
+    public: true
+
+  # Private subnet for workers
+  # Uses NAT Gateway for outbound traffic (image pulls, updates)
+  # No public IPs - accessed via Tailscale
+  - name: k3s-worker-subnet
+    vcn: k3s-vcn
+    cidr_block: "10.0.1.0/24"
+    dns_label: work
+    public: false
