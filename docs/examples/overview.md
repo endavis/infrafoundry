@@ -13,6 +13,10 @@ The examples in this section demonstrate real-world usage patterns and provide t
 - **[Environment Example](ENV_EXAMPLE.md)** - Annotated example of a complete environment configuration file showing all available options
 - **[Envrc Local](ENVRC_LOCAL.md)** - Example usage of local environment variables with direnv for development
 
+### Infrastructure Examples
+
+- **[OCI K3s Cluster](oci-k3s-cluster.md)** - Complete example deploying a K3s Kubernetes cluster on OCI Always Free Tier with Tailscale for secure access. Includes Terraform for infrastructure and Ansible roles for K3s installation.
+
 ### Integration Examples
 
 - **[GitLab CI Example](GITLAB_CI_EXAMPLE.md)** - Complete GitLab CI workflow configuration for automated infrastructure deployment
@@ -44,7 +48,8 @@ If you're new to InfraFoundry, start with these examples in order:
 
 1. **[Environment Example](ENV_EXAMPLE.md)** - Understand the configuration structure
 2. **[Envrc Local](ENVRC_LOCAL.md)** - Set up your development environment
-3. **[Custom Runner Example](custom-runner-example.md)** - Learn how to extend InfraFoundry
+3. **[OCI K3s Cluster](oci-k3s-cluster.md)** - See a complete real-world deployment
+4. **[Custom Runner Example](custom-runner-example.md)** - Learn how to extend InfraFoundry
 
 ## See Also
 
@@ -54,4 +59,4 @@ If you're new to InfraFoundry, start with these examples in order:
 
 ---
 
-**Last Updated:** 2025-12-29
+**Last Updated:** 2025-01-25

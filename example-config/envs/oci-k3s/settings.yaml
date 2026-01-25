@@ -1,0 +1,38 @@
+# OCI K3s Cluster Environment Settings
+#
+# This example deploys a K3s cluster on Oracle Cloud Infrastructure (OCI)
+# using the Always Free Tier ARM instances with Tailscale for secure access.
+#
+# SECURITY NOTE: Encrypt with SOPS before committing:
+#   sops --encrypt --in-place envs/oci-k3s/settings.yaml
+
+name: oci-k3s
+description: OCI K3s cluster - ARM free tier with Tailscale overlay
+
+variables:
+  environment: oci-k3s
+  managed_by: infrafoundry
+  # Tailscale network name (used in ansible_host)
+  tailnet: your-tailnet.ts.net
+
+ssh:
+  user: ubuntu
+  key_path: ~/.ssh/id_rsa
+
+provider_settings:
+  oci:
+    # Get these from OCI Console -> Identity -> Users -> API Keys
+    tenancy_ocid: "ocid1.tenancy.oc1..aaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    user_ocid: "ocid1.user.oc1..aaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    fingerprint: "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+    private_key_path: "~/.oci/oci_api_key.pem"
+    region: "us-ashburn-1"
+    # Create a compartment or use root compartment OCID
+    compartment_ocid: "ocid1.compartment.oc1..aaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Secrets for cloud-init (referenced via ${SECRET_NAME} in snippets)
+secrets:
+  tailscale:
+    # Generate an auth key at https://login.tailscale.com/admin/settings/keys
+    # Use a reusable, ephemeral key for best security
+    auth_key: "tskey-auth-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"

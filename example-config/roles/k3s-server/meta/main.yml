@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: k3s-server
+  author: InfraFoundry
+  description: Install and configure k3s server (control plane)
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+dependencies: []

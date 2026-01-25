@@ -131,6 +131,7 @@ nav:
   - Examples:
     - Overview: examples/overview.md
     - Quick Start: examples/README.md
+    - OCI K3s Cluster: examples/oci-k3s-cluster.md
     - Environment Example: examples/ENV_EXAMPLE.md
     - Envrc Local: examples/ENVRC_LOCAL.md
     - GitLab CI: examples/GITLAB_CI_EXAMPLE.md

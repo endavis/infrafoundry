@@ -1,0 +1,109 @@
+---
+# K3s Server (Control Plane) Installation
+#
+# This role installs K3s in server mode, creating the control plane.
+# After installation, it fetches the kubeconfig to your local machine.
+#
+# Variables:
+#   k3s_version: Specific version to install (empty = latest)
+#   kubeconfig_local_path: Where to save kubeconfig locally
+#   k3s_server_args: Additional server arguments
+
+- name: Wait for connectivity
+  wait_for_connection:
+    timeout: 300
+
+- name: Gather facts
+  setup:
+
+- name: Check for existing k3s installation
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Uninstall existing k3s (if present)
+  shell: /usr/local/bin/k3s-uninstall.sh
+  ignore_errors: true
+  when: k3s_binary.stat.exists
+
+- name: Remove old k3s directories
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/rancher
+    - /var/lib/rancher
+    - /var/lib/kubelet
+    - /etc/systemd/system/k3s.service
+    - /etc/systemd/system/k3s.service.env
+
+- name: Create k3s config directory
+  file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write k3s config.yaml
+  copy:
+    dest: /etc/rancher/k3s/config.yaml
+    content: |
+      write-kubeconfig-mode: "0644"
+      tls-san:
+        - {{ ansible_host }}
+        - {{ inventory_hostname }}
+      {% if k3s_cluster_cidr %}
+      cluster-cidr: {{ k3s_cluster_cidr }}
+      {% endif %}
+      {% if k3s_service_cidr %}
+      service-cidr: {{ k3s_service_cidr }}
+      {% endif %}
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install k3s server
+  shell: |
+    curl -sfL https://get.k3s.io | sh -s - server {{ k3s_server_args }}
+    test -x /usr/local/bin/k3s
+  register: k3s_install
+  retries: 5
+  delay: 15
+  until: k3s_install.rc == 0
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version | default(omit, true) }}"
+
+- name: Wait for k3s to be ready
+  command: kubectl get nodes
+  register: k3s_ready
+  retries: 30
+  delay: 5
+  until: k3s_ready.rc == 0
+  changed_when: false
+
+- name: Wait for node to be Ready
+  shell: kubectl get nodes -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}'
+  register: node_ready
+  retries: 30
+  delay: 10
+  until: node_ready.stdout == "True"
+  changed_when: false
+
+- name: Fetch kubeconfig from control node
+  fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ kubeconfig_local_path }}"
+    flat: true
+
+- name: Update server endpoint in fetched kubeconfig
+  delegate_to: localhost
+  become: false
+  replace:
+    path: "{{ kubeconfig_local_path }}"
+    regexp: 'server: https://127.0.0.1:6443'
+    replace: 'server: https://{{ ansible_host }}:6443'
+
+- name: Display kubeconfig location
+  debug:
+    msg: "Kubeconfig saved to {{ kubeconfig_local_path }}. Use: export KUBECONFIG={{ kubeconfig_local_path }}"

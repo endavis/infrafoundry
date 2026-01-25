@@ -1,0 +1,18 @@
+---
+# K3s version to install (empty = latest stable)
+# Example: "v1.28.5+k3s1"
+k3s_version: ""
+
+# Local path to save kubeconfig after installation
+# The server endpoint will be updated to use ansible_host
+kubeconfig_local_path: "~/.kube/k3s-cluster.yaml"
+
+# Additional k3s server arguments
+# Example: "--disable traefik --disable servicelb"
+k3s_server_args: ""
+
+# Cluster CIDR for pods (default: 10.42.0.0/16)
+k3s_cluster_cidr: ""
+
+# Service CIDR (default: 10.43.0.0/16)
+k3s_service_cidr: ""
