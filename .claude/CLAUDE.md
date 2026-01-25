@@ -47,11 +47,13 @@ When creating new code (functions, modules, commands, features), Claude MUST use
 
 Before making ANY changes, Claude MUST:
 1. Read AGENTS.md and locate the "## Development Workflow" section
-2. Verify the workflow: Issue → Branch → Commit → PR → Merge
+2. Verify the workflow: Issue → Branch → Commit → PR → Merge → Close Issue
 3. **NEVER commit directly to main**
 4. Ensure a GitHub Issue exists for the task
 5. Create a branch linked to the issue
 6. Work on the branch, then create a PR
+7. After PR merge, manually close the issue with `gh issue close <number> --comment "Fixed in PR #<pr>"`
+   (GitHub auto-close is disabled in this repository)
 
 # COMMIT WORKFLOW (MANDATORY)
 
