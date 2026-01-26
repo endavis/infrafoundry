@@ -29,6 +29,8 @@ class TestProviderTemplate:
         assert 'provider "kubernetes"' in content
         assert "hashicorp/kubernetes" in content
         assert "~> 2.23" in content
+        # Verify pathexpand is used for kubeconfig
+        assert "pathexpand(var.kubeconfig_path)" in content
 
     def test_includes_helm_provider_when_releases_exist(self, provider):
         """Test provider template includes Helm when releases exist."""

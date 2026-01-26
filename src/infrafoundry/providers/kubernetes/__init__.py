@@ -1,7 +1,7 @@
 """Kubernetes provider for InfraFoundry."""
 
 from pathlib import Path
-from typing import Any, override
+from typing import Any, ClassVar, override
 
 import yaml
 
@@ -20,6 +20,11 @@ class KubernetesProvider(
     TerraformGeneratorMixin,
 ):
     """Kubernetes provider for managing deployments, services, secrets, RBAC, and Helm releases."""
+
+    # Mapping from settings.yaml keys to terraform variable names
+    _KUBERNETES_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
+        "kubeconfig_path": "kubeconfig_path",
+    }
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize Kubernetes provider."""
@@ -54,6 +59,12 @@ class KubernetesProvider(
             "kubernetes/variables.tf.j2",
             context={},
             output_name="variables.tf",
+        )
+
+        # Generate terraform.tfvars from settings.yaml
+        self.generate_provider_tfvars(
+            provider_name="kubernetes",
+            mapping=self._KUBERNETES_TFVARS_MAPPING,
         )
 
         # Generate resources by type - Core resources
