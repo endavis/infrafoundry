@@ -5,23 +5,40 @@
   gather_facts: false
 
   tasks:
+{% set deployments = resources | selectattr('type', 'equalto', 'deployments') | list %}
+{% if deployments %}
     - name: Wait for deployments to be ready
       command: >
         kubectl wait --for=condition=available --timeout=300s
-        deployment/{% raw %}{{ item.config.name }}{% endraw %}
+        deployment/{% raw %}{{ item.name }}{% endraw %}
         -n {% raw %}{{ item.config.namespace | default('default') }}{% endraw %}
-      loop: "{{ resources | selectattr('type', 'equalto', 'deployments') | list }}"
-      when: resources is defined
+      loop:
+{% for dep in deployments %}
+        - name: "{{ dep.name }}"
+          config:
+            namespace: "{{ dep.config.namespace | default('default') }}"
+{% endfor %}
+      loop_control:
+        label: "{% raw %}{{ item.name }}{% endraw %}"
 
     - name: Get deployment status
       command: >
         kubectl get deployments
         -n {% raw %}{{ item.config.namespace | default('default') }}{% endraw %}
         -o wide
-      loop: "{{ resources | selectattr('type', 'equalto', 'deployments') | list }}"
-      when: resources is defined
+      loop:
+{% for dep in deployments %}
+        - name: "{{ dep.name }}"
+          config:
+            namespace: "{{ dep.config.namespace | default('default') }}"
+{% endfor %}
+      loop_control:
+        label: "{% raw %}{{ item.name }}{% endraw %}"
       register: deployment_status
+{% endif %}
 
+{% if deployments %}
     - name: Display deployment status
       debug:
         var: deployment_status
+{% endif %}
