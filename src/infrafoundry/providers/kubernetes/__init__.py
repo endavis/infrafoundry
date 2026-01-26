@@ -103,9 +103,12 @@ class KubernetesProvider(
         if "helm_releases" in resources_by_type:
             self._generate_helm_releases_terraform(resources_by_type["helm_releases"])
 
-        # Custom manifests (CRDs, etc.)
+        # Custom manifests (CRDs, etc.) - pass helm_releases for depends_on
         if "manifests" in resources_by_type:
-            self._generate_manifests_terraform(resources_by_type["manifests"])
+            self._generate_manifests_terraform(
+                resources_by_type["manifests"],
+                resources_by_type.get("helm_releases", []),
+            )
 
         # Generate outputs
         self.render_outputs_terraform(resources_by_type)
@@ -221,11 +224,20 @@ class KubernetesProvider(
             output_name="helm_releases.tf",
         )
 
-    def _generate_manifests_terraform(self, manifests: list[ResourceConfig]) -> None:
-        """Generate Terraform for custom Kubernetes manifests (CRDs, etc.)."""
+    def _generate_manifests_terraform(
+        self,
+        manifests: list[ResourceConfig],
+        helm_releases: list[ResourceConfig],
+    ) -> None:
+        """Generate Terraform for custom Kubernetes manifests (CRDs, etc.).
+
+        Args:
+            manifests: List of manifest resources to generate
+            helm_releases: List of helm releases to add as dependencies (for CRDs)
+        """
         self.render_and_write_terraform(
             "kubernetes/manifests.tf.j2",
-            context={"manifests": manifests},
+            context={"manifests": manifests, "helm_releases": helm_releases},
             output_name="manifests.tf",
         )
 

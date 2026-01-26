@@ -31,11 +31,16 @@ resource "kubernetes_manifest" "{{ manifest.name | replace('-', '_') }}" {
     {% endif %}
   }
 
-  {% if manifest.config.depends_on is defined %}
+  {% if helm_releases or manifest.config.depends_on is defined %}
   depends_on = [
+    {% for release in helm_releases %}
+    helm_release.{{ release.name | replace('-', '_') }},
+    {% endfor %}
+    {% if manifest.config.depends_on is defined %}
     {% for dep in manifest.config.depends_on %}
     {{ dep }},
     {% endfor %}
+    {% endif %}
   ]
   {% endif %}
 }

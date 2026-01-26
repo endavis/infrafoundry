@@ -503,7 +503,9 @@ class TestManifestsTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/manifests.tf.j2", {"manifests": manifests})
+        content = provider.render_template(
+            "kubernetes/manifests.tf.j2", {"manifests": manifests, "helm_releases": []}
+        )
         assert 'resource "kubernetes_manifest" "my_custom_resource"' in content
         assert '"apiVersion" = "example.com/v1"' in content
         assert '"kind"       = "CustomResource"' in content
@@ -536,7 +538,9 @@ class TestManifestsTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/manifests.tf.j2", {"manifests": manifests})
+        content = provider.render_template(
+            "kubernetes/manifests.tf.j2", {"manifests": manifests, "helm_releases": []}
+        )
         assert 'resource "kubernetes_manifest" "oci_subnet_router"' in content
         assert '"apiVersion" = "tailscale.com/v1alpha1"' in content
         assert '"kind"       = "Connector"' in content
@@ -565,7 +569,9 @@ class TestManifestsTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/manifests.tf.j2", {"manifests": manifests})
+        content = provider.render_template(
+            "kubernetes/manifests.tf.j2", {"manifests": manifests, "helm_releases": []}
+        )
         assert '"app" = "myapp"' in content
         assert '"env" = "prod"' in content
         assert '"managed-by" = "infrafoundry"' in content
@@ -589,7 +595,44 @@ class TestManifestsTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/manifests.tf.j2", {"manifests": manifests})
+        content = provider.render_template(
+            "kubernetes/manifests.tf.j2", {"manifests": manifests, "helm_releases": []}
+        )
         assert '"name"      = "global-config"' in content
         # Should not have namespace line
         assert '"namespace"' not in content
+
+    def test_renders_manifest_with_helm_depends_on(self, provider):
+        """Test manifest with automatic depends_on for Helm releases."""
+        manifests = [
+            ResourceConfig(
+                name="my-crd",
+                type="manifests",
+                provider="kubernetes",
+                config={
+                    "manifest": {
+                        "apiVersion": "example.com/v1",
+                        "kind": "CustomResource",
+                        "metadata": {"name": "my-crd"},
+                        "spec": {},
+                    },
+                },
+            )
+        ]
+        helm_releases = [
+            ResourceConfig(
+                name="my-operator",
+                type="helm_releases",
+                provider="kubernetes",
+                config={
+                    "chart": "my-operator",
+                    "repository": "https://example.com/charts",
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/manifests.tf.j2",
+            {"manifests": manifests, "helm_releases": helm_releases},
+        )
+        assert "depends_on" in content
+        assert "helm_release.my_operator" in content
