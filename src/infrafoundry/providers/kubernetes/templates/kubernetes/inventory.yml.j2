@@ -4,6 +4,6 @@ all:
   hosts:
     localhost:
       ansible_connection: local
-      ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      ansible_python_interpreter: "{{ '{{' }} ansible_playbook_python {{ '}}' }}"
   vars:
-    kubeconfig: "{{ lookup('env', 'KUBECONFIG') | default('~/.kube/config', true) }}"
+    kubeconfig: "{{ kubeconfig_path | default('~/.kube/config') }}"

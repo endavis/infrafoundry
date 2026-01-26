@@ -4,9 +4,23 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.23"
     }
+{% if has_helm_releases %}
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12"
+    }
+{% endif %}
   }
 }
 
 provider "kubernetes" {
   config_path = var.kubeconfig_path
 }
+
+{% if has_helm_releases %}
+provider "helm" {
+  kubernetes {
+    config_path = var.kubeconfig_path
+  }
+}
+{% endif %}
