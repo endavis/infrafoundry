@@ -1,0 +1,110 @@
+{% for release in helm_releases %}
+resource "helm_release" "{{ release.name | replace('-', '_') }}" {
+  name       = "{{ release.name }}"
+  chart      = "{{ release.config.chart }}"
+  {% if release.config.repository is defined %}
+  repository = "{{ release.config.repository }}"
+  {% endif %}
+  {% if release.config.version is defined %}
+  version    = "{{ release.config.version }}"
+  {% endif %}
+  namespace  = "{{ release.config.namespace | default('default') }}"
+
+  {% if release.config.create_namespace is defined %}
+  create_namespace = {{ release.config.create_namespace | lower }}
+  {% endif %}
+
+  {% if release.config.atomic is defined %}
+  atomic = {{ release.config.atomic | lower }}
+  {% endif %}
+
+  {% if release.config.cleanup_on_fail is defined %}
+  cleanup_on_fail = {{ release.config.cleanup_on_fail | lower }}
+  {% endif %}
+
+  {% if release.config.dependency_update is defined %}
+  dependency_update = {{ release.config.dependency_update | lower }}
+  {% endif %}
+
+  {% if release.config.force_update is defined %}
+  force_update = {{ release.config.force_update | lower }}
+  {% endif %}
+
+  {% if release.config.lint is defined %}
+  lint = {{ release.config.lint | lower }}
+  {% endif %}
+
+  {% if release.config.recreate_pods is defined %}
+  recreate_pods = {{ release.config.recreate_pods | lower }}
+  {% endif %}
+
+  {% if release.config.replace is defined %}
+  replace = {{ release.config.replace | lower }}
+  {% endif %}
+
+  {% if release.config.reset_values is defined %}
+  reset_values = {{ release.config.reset_values | lower }}
+  {% endif %}
+
+  {% if release.config.reuse_values is defined %}
+  reuse_values = {{ release.config.reuse_values | lower }}
+  {% endif %}
+
+  {% if release.config.skip_crds is defined %}
+  skip_crds = {{ release.config.skip_crds | lower }}
+  {% endif %}
+
+  {% if release.config.timeout is defined %}
+  timeout = {{ release.config.timeout }}
+  {% endif %}
+
+  {% if release.config.wait is defined %}
+  wait = {{ release.config.wait | lower }}
+  {% endif %}
+
+  {% if release.config.wait_for_jobs is defined %}
+  wait_for_jobs = {{ release.config.wait_for_jobs | lower }}
+  {% endif %}
+
+  {% if release.config.max_history is defined %}
+  max_history = {{ release.config.max_history }}
+  {% endif %}
+
+  {% if release.config.get('values') is defined %}
+  values = [<<-EOT
+{{ release.config.get('values') | toyaml }}
+EOT
+  ]
+  {% endif %}
+
+  {% if release.config.set is defined %}
+  {% for s in release.config.set %}
+  set {
+    name  = "{{ s.name }}"
+    value = "{{ s.value }}"
+    {% if s.type is defined %}
+    type  = "{{ s.type }}"
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+
+  {% if release.config.set_sensitive is defined %}
+  {% for s in release.config.set_sensitive %}
+  set_sensitive {
+    name  = "{{ s.name }}"
+    value = "{{ s.value }}"
+  }
+  {% endfor %}
+  {% endif %}
+
+  {% if release.config.depends_on is defined %}
+  depends_on = [
+    {% for dep in release.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+  ]
+  {% endif %}
+}
+
+{% endfor %}
