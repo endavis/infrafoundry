@@ -24,6 +24,7 @@ class TestOrchestratorInit:
     def test_init_with_defaults(self, tmp_path):
         """Test initialization with default parameters."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
 
         orchestrator = Orchestrator(
             config_manager=config_manager,
@@ -40,6 +41,7 @@ class TestOrchestratorInit:
     def test_init_with_custom_output_dir(self, tmp_path):
         """Test initialization with custom output directory."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         output_dir = tmp_path / "custom_output"
 
         orchestrator = Orchestrator(
@@ -53,6 +55,7 @@ class TestOrchestratorInit:
     def test_init_with_custom_managers(self, tmp_path):
         """Test initialization with custom manager instances."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         state_manager = Mock(spec=StateManager)
         event_manager = Mock(spec=EventManager)
 
@@ -68,6 +71,7 @@ class TestOrchestratorInit:
     def test_init_creates_output_directory(self, tmp_path):
         """Test that initialization creates output directory if it doesn't exist."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         output_dir = tmp_path / "nested" / "output" / "dir"
 
         assert not output_dir.exists()
@@ -82,6 +86,7 @@ class TestOrchestratorInit:
     def test_init_sets_current_user(self, tmp_path):
         """Test that initialization captures current user from environment."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
 
         with patch.dict(os.environ, {"USER": "testuser"}):
             orchestrator = Orchestrator(
@@ -92,6 +97,7 @@ class TestOrchestratorInit:
     def test_init_fallback_user(self, tmp_path):
         """Test user fallback when USER env var not set."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
 
         # Clear USER and USERNAME
         env = os.environ.copy()
@@ -111,6 +117,7 @@ class TestOrchestratorNotifications:
     def test_setup_notifications_with_channels(self, tmp_path):
         """Test that notifications are set up when channels exist."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         event_manager = Mock(spec=EventManager)
 
         # Mock notification manager with channels
@@ -130,6 +137,7 @@ class TestOrchestratorNotifications:
     def test_setup_notifications_without_channels(self, tmp_path):
         """Test that notifications are skipped when no channels configured."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
 
         orchestrator = Orchestrator(
             config_manager=config_manager,
@@ -145,6 +153,7 @@ class TestOrchestratorProviderManagement:
     def test_register_provider(self, tmp_path):
         """Test registering a provider."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(config_manager)
 
         provider = Mock(spec=ProviderBase)
@@ -158,6 +167,7 @@ class TestOrchestratorProviderManagement:
     def test_register_multiple_providers(self, tmp_path):
         """Test registering multiple providers."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(config_manager)
 
         provider1 = Mock(spec=ProviderBase)
@@ -175,6 +185,7 @@ class TestOrchestratorProviderManagement:
     def test_register_provider_overwrites_existing(self, tmp_path):
         """Test that registering a provider with same name overwrites."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(config_manager)
 
         provider1 = Mock(spec=ProviderBase)
@@ -190,6 +201,7 @@ class TestOrchestratorProviderManagement:
     def test_register_provider_applies_strict_snippet_flag(self, tmp_path):
         """Provider inherits strict snippet config when registered."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(
             config_manager,
             strict_config=OrchestratorStrictConfig(fail_on_missing_snippets=True),
@@ -209,6 +221,7 @@ class TestOrchestratorValidateResources:
     def test_validate_resources_all_valid(self, tmp_path):
         """Test validation succeeds when all resources are valid."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(config_manager)
 
         # Register provider
@@ -234,6 +247,7 @@ class TestOrchestratorValidateResources:
     def test_validate_resources_provider_not_registered(self, tmp_path):
         """Test validation fails when provider not registered."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(config_manager)
 
         resource = Mock()
@@ -247,6 +261,7 @@ class TestOrchestratorValidateResources:
     def test_validate_resources_type_not_supported(self, tmp_path):
         """Test validation fails when resource type not supported."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(config_manager)
 
         provider = Mock(spec=ProviderBase)
@@ -268,6 +283,7 @@ class TestOrchestratorValidateResources:
     def test_validate_resources_empty_list(self, tmp_path):
         """Test validation succeeds with empty resource list."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(config_manager)
 
         # Should not raise
@@ -280,6 +296,7 @@ class TestOrchestratorBuildDependencyGraph:
     def test_build_dependency_graph_basic(self, tmp_path):
         """Test building a basic dependency graph."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(config_manager)
 
         # Register provider with dependencies
@@ -311,6 +328,7 @@ class TestOrchestratorBuildDependencyGraph:
     def test_build_dependency_graph_multi_provider(self, tmp_path):
         """Test building dependency graph with multiple providers."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         orchestrator = Orchestrator(config_manager)
 
         # Register multiple providers
@@ -352,6 +370,7 @@ class TestOrchestratorStatus:
     def test_status_no_resources(self, tmp_path, capsys):
         """Test status when no resources exist."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
         config_manager.get_all_resources_all_providers.return_value = []
 
         orchestrator = Orchestrator(config_manager)
@@ -364,6 +383,7 @@ class TestOrchestratorStatus:
     def test_status_with_resources(self, tmp_path):
         """Test status with resources."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
 
         # Mock resource
         vm = Mock()
@@ -388,6 +408,7 @@ class TestOrchestratorStatus:
     def test_status_with_unregistered_provider(self, tmp_path):
         """Test status with resource from unregistered provider."""
         config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
 
         # Mock resource from unregistered provider
         vm = Mock()
