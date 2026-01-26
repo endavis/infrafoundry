@@ -62,6 +62,9 @@ class EnvironmentConfig(BaseModel):
     provider_settings: dict[str, dict[str, Any]] = Field(default_factory=dict)
     # Override runner execution order: { "pyinfra": 40, "ansible": 60 }
     runner_priorities: dict[str, int] = Field(default_factory=dict)
+    # Override provider execution order: ["opnsense", "proxmox", "oci", "kubernetes"]
+    # Providers earlier in the list are applied first. Unlisted providers run last.
+    provider_order: list[str] = Field(default_factory=list)
     # Terraform backend configuration for state management and locking
     backend: BackendConfig | None = None
     # Drift remediation configuration for automated drift detection and remediation

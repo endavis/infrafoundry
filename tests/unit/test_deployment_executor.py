@@ -491,3 +491,141 @@ def test_apply_single_provider_handles_multiple_resources():
     assert state_manager.track_resource.call_count == 3
     assert state_manager.update_resource_state.call_count == 3
     assert results["terraform"]["success"] is True
+
+
+def test_get_sorted_providers_uses_default_order():
+    """Provider sorting uses default order when not configured."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    state_manager = MagicMock()
+    event_manager = MagicMock()
+    providers = {}
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+    )
+
+    # Verify default order is used
+    assert executor.provider_order == ["opnsense", "proxmox", "oci", "kubernetes"]
+
+    # Test sorting with default order
+    resources_by_provider = {
+        "kubernetes": [_resource("app", provider="kubernetes")],
+        "proxmox": [_resource("vm1", provider="proxmox")],
+        "opnsense": [_resource("fw1", provider="opnsense")],
+    }
+
+    sorted_providers = executor._get_sorted_providers(resources_by_provider)
+    assert sorted_providers == ["opnsense", "proxmox", "kubernetes"]
+
+
+def test_get_sorted_providers_uses_custom_order():
+    """Provider sorting respects custom order from config."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    state_manager = MagicMock()
+    event_manager = MagicMock()
+    providers = {}
+
+    # Custom order: proxmox first, then kubernetes, then opnsense
+    custom_order = ["proxmox", "kubernetes", "opnsense"]
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+        provider_order=custom_order,
+    )
+
+    resources_by_provider = {
+        "kubernetes": [_resource("app", provider="kubernetes")],
+        "proxmox": [_resource("vm1", provider="proxmox")],
+        "opnsense": [_resource("fw1", provider="opnsense")],
+    }
+
+    sorted_providers = executor._get_sorted_providers(resources_by_provider)
+    assert sorted_providers == ["proxmox", "kubernetes", "opnsense"]
+
+
+def test_get_sorted_providers_puts_unknown_providers_last():
+    """Providers not in order list are placed at the end."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    state_manager = MagicMock()
+    event_manager = MagicMock()
+    providers = {}
+
+    # Custom order that doesn't include "cloudflare"
+    custom_order = ["opnsense", "proxmox"]
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+        provider_order=custom_order,
+    )
+
+    resources_by_provider = {
+        "cloudflare": [_resource("dns", provider="cloudflare")],
+        "proxmox": [_resource("vm1", provider="proxmox")],
+        "opnsense": [_resource("fw1", provider="opnsense")],
+    }
+
+    sorted_providers = executor._get_sorted_providers(resources_by_provider)
+    # cloudflare should be last since it's not in the order list
+    assert sorted_providers == ["opnsense", "proxmox", "cloudflare"]
+
+
+def test_apply_serial_uses_custom_provider_order():
+    """Serial apply honors custom provider order from config."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.apply = MagicMock(return_value={"success": True})
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={})
+    runner_registry.create_runner.return_value = tf_runner
+
+    state_manager = MagicMock()
+    state_manager.track_resource.side_effect = [
+        MagicMock(id=1, terraform_id=None),
+        MagicMock(id=2, terraform_id=None),
+    ]
+    event_manager = MagicMock()
+
+    providers = {
+        "opnsense": MagicMock(),
+        "proxmox": MagicMock(),
+    }
+
+    resources_by_provider = {
+        "opnsense": [_resource("fw", provider="opnsense")],
+        "proxmox": [_resource("vm1", provider="proxmox")],
+    }
+
+    # Custom order: proxmox first, then opnsense (reversed from default)
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+        provider_order=["proxmox", "opnsense"],
+    )
+
+    results = executor.apply_serial(
+        env_name="dev",
+        deployment_id=10,
+        resources_by_provider=resources_by_provider,
+        resource_filter=None,
+        auto_approve=True,
+    )
+
+    # Provider order should be proxmox first, then opnsense
+    assert list(results.keys()) == ["proxmox", "opnsense"]

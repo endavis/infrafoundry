@@ -1,6 +1,6 @@
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -18,6 +18,9 @@ from infrafoundry.core.types import ResourceEventData
 class DeploymentExecutor:
     """Executes infrastructure deployments across providers."""
 
+    # Default provider execution order when not configured
+    DEFAULT_PROVIDER_ORDER: ClassVar[list[str]] = ["opnsense", "proxmox", "oci", "kubernetes"]
+
     def __init__(
         self,
         runner_registry: RunnerRegistry,
@@ -26,6 +29,7 @@ class DeploymentExecutor:
         providers: dict[str, ProviderBase],
         console: Console | None = None,
         runner_priorities: dict[str, int] | None = None,
+        provider_order: list[str] | None = None,
     ) -> None:
         """Initialize deployment executor.
 
@@ -36,6 +40,7 @@ class DeploymentExecutor:
             providers: Dict of registered provider instances
             console: Rich console for output (creates default if None)
             runner_priorities: Optional dict mapping runner names to priorities
+            provider_order: Optional list defining provider execution order
         """
         self.runner_registry = runner_registry
         self.state_manager = state_manager
@@ -43,6 +48,7 @@ class DeploymentExecutor:
         self.providers = providers
         self.console = console or Console()
         self.runner_priorities = runner_priorities or {}
+        self.provider_order = provider_order or self.DEFAULT_PROVIDER_ORDER
 
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
@@ -73,6 +79,29 @@ class DeploymentExecutor:
 
         return sorted(self.runners.items(), key=get_priority)
 
+    def _get_sorted_providers(
+        self, resources_by_provider: dict[str, list[ResourceConfig]]
+    ) -> list[str]:
+        """Get providers sorted by configured execution order.
+
+        Providers are sorted by their position in provider_order.
+        Providers not in the order list are placed at the end.
+
+        Args:
+            resources_by_provider: Dict mapping provider names to resources
+
+        Returns:
+            List of provider names sorted by execution order.
+        """
+        order = self.provider_order
+
+        def get_order(provider: str) -> int:
+            if provider in order:
+                return order.index(provider)
+            return len(order)
+
+        return sorted(resources_by_provider.keys(), key=get_order)
+
     def apply_serial(
         self,
         env_name: str,
@@ -95,16 +124,8 @@ class DeploymentExecutor:
         """
         results = {}
 
-        # Define provider execution order
-        # Providers earlier in the list are applied first
-        # Infrastructure providers (network, compute) run before application providers (kubernetes)
-        provider_order = ["opnsense", "proxmox", "oci", "kubernetes"]
-
-        # Sort providers by defined order, putting undefined ones at the end
-        sorted_providers = sorted(
-            resources_by_provider.keys(),
-            key=lambda p: provider_order.index(p) if p in provider_order else len(provider_order),
-        )
+        # Sort providers by configured execution order
+        sorted_providers = self._get_sorted_providers(resources_by_provider)
 
         for provider_name in sorted_providers:
             if provider_name not in self.providers:
