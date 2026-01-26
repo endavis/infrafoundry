@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from infrafoundry.core.config.backend_config import BackendConfig
+from infrafoundry.core.hooks.models import HooksConfig
 
 
 class DriftRemediationConfig(BaseModel):
@@ -65,6 +66,8 @@ class EnvironmentConfig(BaseModel):
     backend: BackendConfig | None = None
     # Drift remediation configuration for automated drift detection and remediation
     drift_remediation: DriftRemediationConfig | None = None
+    # Lifecycle hooks for environment-level script execution
+    hooks: HooksConfig | None = None
 
     def get_ssh_config(self, provider_name: str) -> SSHConfig | None:
         """Get SSH config for a specific provider.

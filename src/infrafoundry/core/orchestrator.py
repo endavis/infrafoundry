@@ -13,6 +13,7 @@ from infrafoundry.core.dependencies import DependencyGraph
 from infrafoundry.core.deployment_executor import DeploymentExecutor
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import Event, EventManager, EventType
+from infrafoundry.core.hooks import HookManager
 from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.orchestrator_workflows import (
     ApplyOrchestrator,
@@ -93,6 +94,12 @@ class Orchestrator:
         self._providers = self.provider_registry.providers
         self.runner_registry = self.provider_registry.runner_registry
 
+        # Hook manager for lifecycle hooks
+        self.hook_manager = HookManager(
+            config_base_dir=self.config_manager.base_dir,
+            secret_manager_factory=self._create_secret_manager,
+        )
+
         # Initialize helper classes for orchestration tasks
         self.policy_checker = PolicyChecker(self.policy_engine, self.event_manager, self.console)
         self.drift_detector = DriftDetector(
@@ -131,6 +138,8 @@ class Orchestrator:
             get_current_user=self._get_current_user,
             fail_on_missing_secrets=self.strict_config.fail_on_missing_secrets,
             get_runner_priorities=self.provider_registry.get_runner_priorities,
+            hook_manager=self.hook_manager,
+            load_environment=self.config_manager.load_environment,
         )
         self.apply_orchestrator = ApplyOrchestrator(
             console=self.console,
@@ -140,6 +149,8 @@ class Orchestrator:
             apply_serial=self._apply_providers_serial,
             apply_parallel=self._apply_providers_parallel,
             get_current_user=self._get_current_user,
+            hook_manager=self.hook_manager,
+            load_environment=self.config_manager.load_environment,
         )
         self.destroy_orchestrator = DestroyOrchestrator(
             console=self.console,
@@ -150,6 +161,8 @@ class Orchestrator:
             load_resources=self._load_resources,
             iter_provider_batches=self._iter_provider_batches,
             get_current_user=self._get_current_user,
+            hook_manager=self.hook_manager,
+            load_environment=self.config_manager.load_environment,
         )
         self.rollback_orchestrator = RollbackOrchestrator(
             console=self.console,

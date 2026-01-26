@@ -36,3 +36,23 @@ secrets:
     # Generate an auth key at https://login.tailscale.com/admin/settings/keys
     # Use a reusable, ephemeral key for best security
     auth_key: "tskey-auth-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    # API key for device management (Settings -> Keys -> API access tokens)
+    api_key: "tskey-api-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+# Lifecycle hooks for custom automation
+# See: https://infrafoundry.dev/docs/configuration/lifecycle-hooks/
+hooks:
+  # Run before destroying any resources in this environment
+  before_destroy:
+    - script: scripts/cleanup-tailscale-devices.sh
+      description: "Remove all Tailscale devices for this environment"
+      env:
+        TAILSCALE_API_KEY: "{{ secrets.tailscale.api_key }}"
+      timeout: 60
+
+  # Run after successful apply
+  after_apply:
+    - script: scripts/verify-cluster.sh
+      description: "Verify K3s cluster is healthy"
+      continue_on_error: true  # Don't fail if verification fails
+      timeout: 120

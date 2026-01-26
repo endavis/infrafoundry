@@ -55,6 +55,15 @@ instance:
     ansible_vars:
       kubeconfig_local_path: "~/.kube/oci-k3s.yaml"
     ssh_user: ubuntu
+    # Resource-level lifecycle hooks
+    # These run only for this specific instance
+    hooks:
+      before_destroy:
+        - script: scripts/cleanup-tailscale-device.sh
+          description: "Remove k3s-control from Tailscale"
+          env:
+            TAILSCALE_API_KEY: "{{ secrets.tailscale.api_key }}"
+            # INFRAFOUNDRY_RESOURCE is automatically set to "k3s-control"
 
   # K3s Worker Node 0
   # - Private subnet (no public IP)

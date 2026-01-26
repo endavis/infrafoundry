@@ -52,6 +52,7 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     # Create a mock environment config object
     env_config_mock = Mock()
     env_config_mock.runner_priorities = {}
+    env_config_mock.hooks = None  # No lifecycle hooks configured
     env_config_mock.model_dump.return_value = mock_config["environment"]
 
     config_manager.load_environment = Mock(return_value=env_config_mock)
@@ -585,6 +586,7 @@ class TestMultiProviderWorkflow:
         k8s_resource.type = "deployment"
         k8s_resource.name = "app-01"
         k8s_resource.config = {}
+        k8s_resource.hooks = None  # No lifecycle hooks configured
         mock_config["resources"].append(k8s_resource)
 
         with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
@@ -618,6 +620,7 @@ class TestMultiProviderWorkflow:
         k8s_resource.type = "deployment"
         k8s_resource.name = "app-01"
         k8s_resource.config = {}
+        k8s_resource.hooks = None  # No lifecycle hooks configured
         mock_config["resources"].append(k8s_resource)
 
         with (
@@ -664,6 +667,7 @@ class TestMultiProviderWorkflow:
         opn_resource.type = "firewall_rule"
         opn_resource.name = "rule-01"
         opn_resource.config = {}
+        opn_resource.hooks = None  # No lifecycle hooks configured
         mock_config["resources"].append(opn_resource)
 
         with patch(
