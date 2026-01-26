@@ -1,0 +1,203 @@
+{% for cronjob in cronjobs %}
+resource "kubernetes_cron_job_v1" "{{ cronjob.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ cronjob.name }}"
+    namespace = "{{ cronjob.namespace | default('default') }}"
+
+    {% if cronjob.config.labels is defined %}
+    labels = {
+      {% for key, value in cronjob.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if cronjob.config.annotations is defined %}
+    annotations = {
+      {% for key, value in cronjob.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  spec {
+    schedule = "{{ cronjob.config.schedule }}"
+
+    {% if cronjob.config.timezone is defined %}
+    time_zone = "{{ cronjob.config.timezone }}"
+    {% endif %}
+
+    {% if cronjob.config.concurrency_policy is defined %}
+    concurrency_policy = "{{ cronjob.config.concurrency_policy }}"
+    {% endif %}
+
+    {% if cronjob.config.suspend is defined %}
+    suspend = {{ cronjob.config.suspend | lower }}
+    {% endif %}
+
+    {% if cronjob.config.starting_deadline_seconds is defined %}
+    starting_deadline_seconds = {{ cronjob.config.starting_deadline_seconds }}
+    {% endif %}
+
+    {% if cronjob.config.successful_jobs_history_limit is defined %}
+    successful_jobs_history_limit = {{ cronjob.config.successful_jobs_history_limit }}
+    {% endif %}
+
+    {% if cronjob.config.failed_jobs_history_limit is defined %}
+    failed_jobs_history_limit = {{ cronjob.config.failed_jobs_history_limit }}
+    {% endif %}
+
+    job_template {
+      metadata {
+        labels = {
+          cronjob = "{{ cronjob.name }}"
+          {% if cronjob.config.labels is defined %}
+          {% for key, value in cronjob.config.labels.items() %}
+          "{{ key }}" = "{{ value }}"
+          {% endfor %}
+          {% endif %}
+        }
+      }
+
+      spec {
+        {% if cronjob.config.backoff_limit is defined %}
+        backoff_limit = {{ cronjob.config.backoff_limit }}
+        {% endif %}
+
+        {% if cronjob.config.ttl_seconds_after_finished is defined %}
+        ttl_seconds_after_finished = {{ cronjob.config.ttl_seconds_after_finished }}
+        {% endif %}
+
+        template {
+          metadata {
+            labels = {
+              cronjob = "{{ cronjob.name }}"
+              {% if cronjob.config.labels is defined %}
+              {% for key, value in cronjob.config.labels.items() %}
+              "{{ key }}" = "{{ value }}"
+              {% endfor %}
+              {% endif %}
+            }
+          }
+
+          spec {
+            restart_policy = "{{ cronjob.config.restart_policy | default('OnFailure') }}"
+
+            {% if cronjob.config.service_account_name is defined %}
+            service_account_name = "{{ cronjob.config.service_account_name }}"
+            {% endif %}
+
+            {% for container in cronjob.config.containers %}
+            container {
+              name  = "{{ container.name }}"
+              image = "{{ container.image }}"
+
+              {% if container.command is defined %}
+              command = [{% for c in container.command %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+              {% endif %}
+
+              {% if container.args is defined %}
+              args = [{% for a in container.args %}"{{ a }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+              {% endif %}
+
+              {% if container.env is defined %}
+              {% for env in container.env %}
+              env {
+                name  = "{{ env.name }}"
+                {% if env.value is defined %}
+                value = "{{ env.value }}"
+                {% endif %}
+                {% if env.value_from is defined %}
+                value_from {
+                  {% if env.value_from.secret_key_ref is defined %}
+                  secret_key_ref {
+                    name = "{{ env.value_from.secret_key_ref.name }}"
+                    key  = "{{ env.value_from.secret_key_ref.key }}"
+                  }
+                  {% endif %}
+                  {% if env.value_from.config_map_key_ref is defined %}
+                  config_map_key_ref {
+                    name = "{{ env.value_from.config_map_key_ref.name }}"
+                    key  = "{{ env.value_from.config_map_key_ref.key }}"
+                  }
+                  {% endif %}
+                }
+                {% endif %}
+              }
+              {% endfor %}
+              {% endif %}
+
+              {% if container.resources is defined %}
+              resources {
+                {% if container.resources.limits is defined %}
+                limits = {
+                  {% for key, value in container.resources.limits.items() %}
+                  "{{ key }}" = "{{ value }}"
+                  {% endfor %}
+                }
+                {% endif %}
+                {% if container.resources.requests is defined %}
+                requests = {
+                  {% for key, value in container.resources.requests.items() %}
+                  "{{ key }}" = "{{ value }}"
+                  {% endfor %}
+                }
+                {% endif %}
+              }
+              {% endif %}
+
+              {% if container.volume_mounts is defined %}
+              {% for vm in container.volume_mounts %}
+              volume_mount {
+                name       = "{{ vm.name }}"
+                mount_path = "{{ vm.mount_path }}"
+                {% if vm.sub_path is defined %}
+                sub_path = "{{ vm.sub_path }}"
+                {% endif %}
+                {% if vm.read_only is defined %}
+                read_only = {{ vm.read_only | lower }}
+                {% endif %}
+              }
+              {% endfor %}
+              {% endif %}
+            }
+            {% endfor %}
+
+            {% if cronjob.config.volumes is defined %}
+            {% for volume in cronjob.config.volumes %}
+            volume {
+              name = "{{ volume.name }}"
+
+              {% if volume.config_map is defined %}
+              config_map {
+                name = "{{ volume.config_map.name }}"
+              }
+              {% endif %}
+
+              {% if volume.secret is defined %}
+              secret {
+                secret_name = "{{ volume.secret.secret_name }}"
+              }
+              {% endif %}
+
+              {% if volume.persistent_volume_claim is defined %}
+              persistent_volume_claim {
+                claim_name = "{{ volume.persistent_volume_claim.claim_name }}"
+              }
+              {% endif %}
+
+              {% if volume.empty_dir is defined %}
+              empty_dir {}
+              {% endif %}
+            }
+            {% endfor %}
+            {% endif %}
+          }
+        }
+      }
+    }
+  }
+}
+
+{% endfor %}

@@ -1,0 +1,80 @@
+{% for pvc in pvcs %}
+resource "kubernetes_persistent_volume_claim" "{{ pvc.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ pvc.name }}"
+    namespace = "{{ pvc.config.namespace | default('default') }}"
+
+    {% if pvc.config.labels is defined %}
+    labels = {
+      {% for key, value in pvc.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if pvc.config.annotations is defined %}
+    annotations = {
+      {% for key, value in pvc.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  spec {
+    access_modes = [
+      {% for mode in pvc.config.access_modes | default(['ReadWriteOnce']) %}
+      "{{ mode }}",
+      {% endfor %}
+    ]
+
+    resources {
+      requests = {
+        storage = "{{ pvc.config.storage | default('1Gi') }}"
+      }
+      {% if pvc.config.limits is defined %}
+      limits = {
+        storage = "{{ pvc.config.limits.storage }}"
+      }
+      {% endif %}
+    }
+
+    {% if pvc.config.storage_class_name is defined %}
+    storage_class_name = "{{ pvc.config.storage_class_name }}"
+    {% endif %}
+
+    {% if pvc.config.volume_name is defined %}
+    volume_name = "{{ pvc.config.volume_name }}"
+    {% endif %}
+
+    {% if pvc.config.selector is defined %}
+    selector {
+      {% if pvc.config.selector.match_labels is defined %}
+      match_labels = {
+        {% for key, value in pvc.config.selector.match_labels.items() %}
+        "{{ key }}" = "{{ value }}"
+        {% endfor %}
+      }
+      {% endif %}
+
+      {% if pvc.config.selector.match_expressions is defined %}
+      {% for expr in pvc.config.selector.match_expressions %}
+      match_expressions {
+        key      = "{{ expr.key }}"
+        operator = "{{ expr.operator }}"
+        {% if expr.values is defined %}
+        values   = [{% for v in expr.values %}"{{ v }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+        {% endif %}
+      }
+      {% endfor %}
+      {% endif %}
+    }
+    {% endif %}
+  }
+
+  {% if pvc.config.wait_until_bound is defined %}
+  wait_until_bound = {{ pvc.config.wait_until_bound | lower }}
+  {% endif %}
+}
+
+{% endfor %}

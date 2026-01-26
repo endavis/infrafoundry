@@ -1,0 +1,221 @@
+{# Service Accounts #}
+{% for sa in serviceaccounts %}
+resource "kubernetes_service_account" "{{ sa.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ sa.name }}"
+    namespace = "{{ sa.config.namespace | default('default') }}"
+
+    {% if sa.config.labels is defined %}
+    labels = {
+      {% for key, value in sa.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if sa.config.annotations is defined %}
+    annotations = {
+      {% for key, value in sa.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  {% if sa.config.image_pull_secrets is defined %}
+  {% for secret in sa.config.image_pull_secrets %}
+  image_pull_secret {
+    name = "{{ secret.name }}"
+  }
+  {% endfor %}
+  {% endif %}
+
+  {% if sa.config.automount_service_account_token is defined %}
+  automount_service_account_token = {{ sa.config.automount_service_account_token | lower }}
+  {% endif %}
+}
+
+{% endfor %}
+
+{# Roles #}
+{% for role in roles %}
+resource "kubernetes_role" "{{ role.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ role.name }}"
+    namespace = "{{ role.config.namespace | default('default') }}"
+
+    {% if role.config.labels is defined %}
+    labels = {
+      {% for key, value in role.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if role.config.annotations is defined %}
+    annotations = {
+      {% for key, value in role.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  {% for rule in role.config.rules %}
+  rule {
+    api_groups = [{% for g in rule.api_groups %}"{{ g }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    resources  = [{% for r in rule.resources %}"{{ r }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    verbs      = [{% for v in rule.verbs %}"{{ v }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    {% if rule.resource_names is defined %}
+    resource_names = [{% for n in rule.resource_names %}"{{ n }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    {% endif %}
+  }
+  {% endfor %}
+}
+
+{% endfor %}
+
+{# Role Bindings #}
+{% for rb in rolebindings %}
+resource "kubernetes_role_binding" "{{ rb.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ rb.name }}"
+    namespace = "{{ rb.config.namespace | default('default') }}"
+
+    {% if rb.config.labels is defined %}
+    labels = {
+      {% for key, value in rb.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if rb.config.annotations is defined %}
+    annotations = {
+      {% for key, value in rb.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "{{ rb.config.role_ref.kind | default('Role') }}"
+    name      = "{{ rb.config.role_ref.name }}"
+  }
+
+  {% for subject in rb.config.subjects %}
+  subject {
+    kind      = "{{ subject.kind }}"
+    name      = "{{ subject.name }}"
+    {% if subject.namespace is defined %}
+    namespace = "{{ subject.namespace }}"
+    {% endif %}
+    {% if subject.api_group is defined %}
+    api_group = "{{ subject.api_group }}"
+    {% endif %}
+  }
+  {% endfor %}
+}
+
+{% endfor %}
+
+{# Cluster Roles #}
+{% for cr in clusterroles %}
+resource "kubernetes_cluster_role" "{{ cr.name | replace('-', '_') }}" {
+  metadata {
+    name = "{{ cr.name }}"
+
+    {% if cr.config.labels is defined %}
+    labels = {
+      {% for key, value in cr.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if cr.config.annotations is defined %}
+    annotations = {
+      {% for key, value in cr.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  {% for rule in cr.config.rules %}
+  rule {
+    api_groups = [{% for g in rule.api_groups %}"{{ g }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    resources  = [{% for r in rule.resources %}"{{ r }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    verbs      = [{% for v in rule.verbs %}"{{ v }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    {% if rule.resource_names is defined %}
+    resource_names = [{% for n in rule.resource_names %}"{{ n }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    {% endif %}
+    {% if rule.non_resource_urls is defined %}
+    non_resource_urls = [{% for u in rule.non_resource_urls %}"{{ u }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    {% endif %}
+  }
+  {% endfor %}
+
+  {% if cr.config.aggregation_rule is defined %}
+  aggregation_rule {
+    {% for selector in cr.config.aggregation_rule.cluster_role_selectors %}
+    cluster_role_selectors {
+      match_labels = {
+        {% for key, value in selector.match_labels.items() %}
+        "{{ key }}" = "{{ value }}"
+        {% endfor %}
+      }
+    }
+    {% endfor %}
+  }
+  {% endif %}
+}
+
+{% endfor %}
+
+{# Cluster Role Bindings #}
+{% for crb in clusterrolebindings %}
+resource "kubernetes_cluster_role_binding" "{{ crb.name | replace('-', '_') }}" {
+  metadata {
+    name = "{{ crb.name }}"
+
+    {% if crb.config.labels is defined %}
+    labels = {
+      {% for key, value in crb.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if crb.config.annotations is defined %}
+    annotations = {
+      {% for key, value in crb.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = "{{ crb.config.role_ref.name }}"
+  }
+
+  {% for subject in crb.config.subjects %}
+  subject {
+    kind      = "{{ subject.kind }}"
+    name      = "{{ subject.name }}"
+    {% if subject.namespace is defined %}
+    namespace = "{{ subject.namespace }}"
+    {% endif %}
+    {% if subject.api_group is defined %}
+    api_group = "{{ subject.api_group }}"
+    {% endif %}
+  }
+  {% endfor %}
+}
+
+{% endfor %}
