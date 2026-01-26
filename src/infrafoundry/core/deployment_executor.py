@@ -97,8 +97,8 @@ class DeploymentExecutor:
 
         # Define provider execution order
         # Providers earlier in the list are applied first
-        # This ensures network/DHCP config is ready before VMs
-        provider_order = ["opnsense", "proxmox", "kubernetes"]
+        # Infrastructure providers (network, compute) run before application providers (kubernetes)
+        provider_order = ["opnsense", "proxmox", "oci", "kubernetes"]
 
         # Sort providers by defined order, putting undefined ones at the end
         sorted_providers = sorted(
