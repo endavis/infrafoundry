@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from infrafoundry.core.hooks.models import HooksConfig
 from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 
@@ -17,6 +18,7 @@ class ResourceConfig(BaseModel):
     type: str
     provider: str
     config: dict[str, Any]
+    hooks: HooksConfig | None = None
 
 
 class ProviderBase(ABC):
