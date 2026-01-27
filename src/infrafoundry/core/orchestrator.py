@@ -108,7 +108,6 @@ class Orchestrator:
             self.runner_registry,
             self.event_manager,
             self.providers,
-            self.console,
         )
         self.deployment_executor = DeploymentExecutor(
             self.runner_registry,

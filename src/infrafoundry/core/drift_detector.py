@@ -1,10 +1,8 @@
 """Drift detection for infrastructure resources."""
 
-import traceback
-from typing import Any
+from typing import Any, override
 
-from rich.console import Console
-
+from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import (
@@ -17,7 +15,7 @@ from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import RunnerRegistry
 
 
-class DriftDetector:
+class DriftDetector(BaseManager):
     """Detects infrastructure drift from declared configuration."""
 
     def __init__(
@@ -26,7 +24,6 @@ class DriftDetector:
         runner_registry: RunnerRegistry,
         event_manager: EventManager,
         providers: dict[str, ProviderBase],
-        console: Console | None = None,
     ) -> None:
         """Initialize drift detector.
 
@@ -35,13 +32,12 @@ class DriftDetector:
             runner_registry: Registry for creating tool runners
             event_manager: Event manager for notifications
             providers: Dict of registered provider instances
-            console: Rich console for output (creates default if None)
         """
+        super().__init__()
         self.config_manager = config_manager
         self.runner_registry = runner_registry
         self.event_manager = event_manager
         self.providers = providers
-        self.console = console or Console()
 
     def detect(self, env_name: str) -> dict[str, Any]:
         """Detect infrastructure drift from declared configuration.
@@ -73,13 +69,13 @@ class DriftDetector:
             {"environment": env_name},
         )
 
-        self.console.print(f"\n[bold cyan]Checking for drift in: {env_name}[/bold cyan]")
+        self._log_info(f"Checking for drift in: {env_name}")
 
         results = {}
         drift_detected = False
 
         # Dynamically create the runner
-        terraform_runner = self.runner_registry.create_runner("terraform", console=self.console)
+        terraform_runner = self.runner_registry.create_runner("terraform")
         if not terraform_runner:
             raise InfraFoundryError("Could not create terraform runner")
 
@@ -100,20 +96,18 @@ class DriftDetector:
 
                 provider = self.providers[provider_name]
 
-                self.console.print(f"\n[bold]Checking {provider_name}...[/bold]")
+                self._log_info(f"Checking {provider_name}...")
 
                 # Check if runner supports plan and drift detection
                 if not isinstance(terraform_runner, Plannable):
-                    self.console.print(
-                        f"  [yellow]⚠ Runner {terraform_runner.tool_name} "
-                        "does not support plan operation[/yellow]"
+                    self._log_warning(
+                        f"Runner {terraform_runner.tool_name} does not support plan operation"
                     )
                     continue
 
                 if not isinstance(terraform_runner, DriftDetectable):
-                    self.console.print(
-                        f"  [yellow]⚠ Runner {terraform_runner.tool_name} "
-                        "does not support drift detection[/yellow]"
+                    self._log_warning(
+                        f"Runner {terraform_runner.tool_name} does not support drift detection"
                     )
                     continue
 
@@ -126,9 +120,7 @@ class DriftDetector:
 
                 if drift_info["has_changes"]:
                     drift_detected = True
-                    self.console.print(
-                        f"  [yellow]⚠ Drift detected: {drift_info['summary']}[/yellow]"
-                    )
+                    self._log_warning(f"Drift detected: {drift_info['summary']}")
 
                     # Emit drift detected event
                     self.event_manager.emit_event(
@@ -140,7 +132,7 @@ class DriftDetector:
                         },
                     )
                 else:
-                    self.console.print("  [green]✓ No drift detected[/green]")
+                    self._log_info(f"No drift detected for {provider_name}")
 
                 results[provider_name] = drift_info
 
@@ -155,19 +147,24 @@ class DriftDetector:
             )
 
             if not drift_detected:
-                self.console.print(
-                    "\n[bold green]✓ All infrastructure matches declared configuration[/bold green]"
-                )
+                self._log_info("All infrastructure matches declared configuration")
 
         except (ConfigurationError, TerraformError) as e:
-            self.console.print(f"\n[bold red]Error detecting drift:[/bold red] {e}")
+            self._log_error(f"Error detecting drift: {e}", e)
             raise
         except InfraFoundryError as e:
-            self.console.print(f"\n[bold red]InfraFoundry error detecting drift:[/bold red] {e}")
+            self._log_error(f"InfraFoundry error detecting drift: {e}", e)
             raise
         except Exception as e:
-            self.console.print(f"\n[bold red]Unexpected error detecting drift:[/bold red] {e}")
-            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
+            self._log_error(f"Unexpected error detecting drift: {e}", e)
             raise
 
         return results
+
+    @override
+    def cleanup(self) -> None:
+        """Clean up resources (required by BaseManager).
+
+        DriftDetector has no persistent resources to clean up.
+        """
+        self._log_debug("DriftDetector cleanup complete")
