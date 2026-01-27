@@ -1,9 +1,14 @@
 """Event context and result models."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from infrafoundry.core.events.types import EventType
+from infrafoundry.core.types import DeploymentEventData, ResourceEventData
+
+# Backward compatibility type aliases from legacy EventManager
+type EventPayload = ResourceEventData | DeploymentEventData | dict[str, Any]
 
 
 @dataclass
@@ -139,3 +144,7 @@ class Event:
 
     def __repr__(self) -> str:
         return f"Event({self.event_type}, env={self.environment}, data={self.data})"
+
+
+# EventHandler type alias (must be after Event class definition)
+type EventHandler = Callable[[Event], None]
