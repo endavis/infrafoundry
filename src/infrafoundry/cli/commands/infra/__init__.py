@@ -11,6 +11,7 @@ from .reset import reset
 from .rollback import rollback
 from .security import security
 from .status import status
+from .test import test
 
 
 @click.group()
@@ -28,6 +29,7 @@ infra.add_command(rollback)
 infra.add_command(reset)
 infra.add_command(security)
 infra.add_command(status)
+infra.add_command(test)
 infra.add_command(history)
 
 
