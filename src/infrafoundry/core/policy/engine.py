@@ -2,10 +2,11 @@
 
 import traceback
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import yaml
 
+from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.exceptions import PolicyError
 
 from .evaluators import (
@@ -18,7 +19,7 @@ from .evaluators import (
 from .models import Policy, PolicyLevel, PolicyType, PolicyViolation
 
 
-class PolicyEngine:
+class PolicyEngine(BaseManager):
     """Evaluates policies against infrastructure configurations.
 
     This engine loads policies from YAML files and evaluates resources
@@ -31,6 +32,7 @@ class PolicyEngine:
         Args:
             policy_dir: Directory containing policy files (defaults to ./policies)
         """
+        super().__init__()
         self.policy_dir = policy_dir or Path("policies")
         self.policies: list[Policy] = []
 
@@ -66,14 +68,14 @@ class PolicyEngine:
                         )
                         self.policies.append(policy)
             except yaml.YAMLError as e:
-                print(f"Warning: Invalid YAML in policy file {policy_file}: {e}")
+                self._log_warning(f"Invalid YAML in policy file {policy_file}: {e}")
             except (KeyError, ValueError) as e:
-                print(f"Warning: Invalid policy structure in {policy_file}: {e}")
+                self._log_warning(f"Invalid policy structure in {policy_file}: {e}")
             except PolicyError as e:
-                print(f"Warning: Policy error in {policy_file}: {e}")
+                self._log_warning(f"Policy error in {policy_file}: {e}")
             except Exception as e:
-                print(f"Warning: Unexpected error loading policy file {policy_file}: {e}")
-                print(traceback.format_exc())  # Log full traceback
+                self._log_warning(f"Unexpected error loading policy file {policy_file}: {e}")
+                self._log_debug(traceback.format_exc())
 
     def register_evaluator(self, policy_type: PolicyType, evaluator: PolicyEvaluator) -> None:
         """Register a custom evaluator for a policy type.
@@ -109,7 +111,7 @@ class PolicyEngine:
             if evaluator:
                 violations.extend(evaluator.evaluate(policy, resources))
             else:
-                print(f"Warning: No evaluator registered for policy type {policy.type}")
+                self._log_warning(f"No evaluator registered for policy type {policy.type}")
 
         return violations
 
@@ -141,3 +143,11 @@ class PolicyEngine:
             for p in self.policies
             if p.enabled and (p.environments is None or environment in p.environments)
         ]
+
+    @override
+    def cleanup(self) -> None:
+        """Clean up resources (required by BaseManager).
+
+        PolicyEngine has no persistent resources to clean up.
+        """
+        self._log_debug("PolicyEngine cleanup complete")
