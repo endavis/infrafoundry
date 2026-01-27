@@ -26,6 +26,7 @@ def mock_providers(tmp_path):
     proxmox.generate_ansible = Mock()
     proxmox.validate_config = Mock()
     proxmox.get_resource_types = Mock(return_value=["vm", "network", "template"])
+    proxmox.get_dependencies = Mock(return_value={})  # No dependencies defined
 
     return {"proxmox": proxmox}
 
@@ -52,6 +53,8 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     # Create a mock environment config object
     env_config_mock = Mock()
     env_config_mock.runner_priorities = {}
+    env_config_mock.hooks = None  # No lifecycle hooks configured
+    env_config_mock.provider_order = []  # Use default provider order
     env_config_mock.model_dump.return_value = mock_config["environment"]
 
     config_manager.load_environment = Mock(return_value=env_config_mock)
@@ -576,6 +579,7 @@ class TestMultiProviderWorkflow:
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
         kubernetes.get_resource_types = Mock(return_value=["deployment", "service"])
+        kubernetes.get_dependencies = Mock(return_value={})
         mock_providers["kubernetes"] = kubernetes
         orchestrator.providers = mock_providers
 
@@ -585,6 +589,7 @@ class TestMultiProviderWorkflow:
         k8s_resource.type = "deployment"
         k8s_resource.name = "app-01"
         k8s_resource.config = {}
+        k8s_resource.hooks = None  # No lifecycle hooks configured
         mock_config["resources"].append(k8s_resource)
 
         with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
@@ -609,6 +614,7 @@ class TestMultiProviderWorkflow:
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
         kubernetes.get_resource_types = Mock(return_value=["deployment", "service"])
+        kubernetes.get_dependencies = Mock(return_value={})
         mock_providers["kubernetes"] = kubernetes
         orchestrator.providers = mock_providers
 
@@ -618,6 +624,7 @@ class TestMultiProviderWorkflow:
         k8s_resource.type = "deployment"
         k8s_resource.name = "app-01"
         k8s_resource.config = {}
+        k8s_resource.hooks = None  # No lifecycle hooks configured
         mock_config["resources"].append(k8s_resource)
 
         with (
@@ -655,6 +662,8 @@ class TestMultiProviderWorkflow:
         opnsense.ensure_directories = Mock()
         opnsense.generate_terraform = Mock()
         opnsense.generate_ansible = Mock()
+        opnsense.get_resource_types = Mock(return_value=["rule", "alias"])
+        opnsense.get_dependencies = Mock(return_value={})
         mock_providers["opnsense"] = opnsense
         orchestrator.providers = mock_providers
 
@@ -664,6 +673,7 @@ class TestMultiProviderWorkflow:
         opn_resource.type = "firewall_rule"
         opn_resource.name = "rule-01"
         opn_resource.config = {}
+        opn_resource.hooks = None  # No lifecycle hooks configured
         mock_config["resources"].append(opn_resource)
 
         with patch(

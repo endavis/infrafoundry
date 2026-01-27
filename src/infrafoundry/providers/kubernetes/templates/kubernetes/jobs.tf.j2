@@ -1,0 +1,186 @@
+{% for job in jobs %}
+resource "kubernetes_job" "{{ job.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ job.name }}"
+    namespace = "{{ job.namespace | default('default') }}"
+
+    {% if job.config.labels is defined %}
+    labels = {
+      {% for key, value in job.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if job.config.annotations is defined %}
+    annotations = {
+      {% for key, value in job.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  spec {
+    {% if job.config.backoff_limit is defined %}
+    backoff_limit = {{ job.config.backoff_limit }}
+    {% endif %}
+
+    {% if job.config.completions is defined %}
+    completions = {{ job.config.completions }}
+    {% endif %}
+
+    {% if job.config.parallelism is defined %}
+    parallelism = {{ job.config.parallelism }}
+    {% endif %}
+
+    {% if job.config.active_deadline_seconds is defined %}
+    active_deadline_seconds = {{ job.config.active_deadline_seconds }}
+    {% endif %}
+
+    {% if job.config.ttl_seconds_after_finished is defined %}
+    ttl_seconds_after_finished = {{ job.config.ttl_seconds_after_finished }}
+    {% endif %}
+
+    template {
+      metadata {
+        labels = {
+          job = "{{ job.name }}"
+          {% if job.config.labels is defined %}
+          {% for key, value in job.config.labels.items() %}
+          "{{ key }}" = "{{ value }}"
+          {% endfor %}
+          {% endif %}
+        }
+      }
+
+      spec {
+        restart_policy = "{{ job.config.restart_policy | default('Never') }}"
+
+        {% if job.config.service_account_name is defined %}
+        service_account_name = "{{ job.config.service_account_name }}"
+        {% endif %}
+
+        {% for container in job.config.containers %}
+        container {
+          name  = "{{ container.name }}"
+          image = "{{ container.image }}"
+
+          {% if container.command is defined %}
+          command = [{% for c in container.command %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+          {% endif %}
+
+          {% if container.args is defined %}
+          args = [{% for a in container.args %}"{{ a }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+          {% endif %}
+
+          {% if container.env is defined %}
+          {% for env in container.env %}
+          env {
+            name  = "{{ env.name }}"
+            {% if env.value is defined %}
+            value = "{{ env.value }}"
+            {% endif %}
+            {% if env.value_from is defined %}
+            value_from {
+              {% if env.value_from.secret_key_ref is defined %}
+              secret_key_ref {
+                name = "{{ env.value_from.secret_key_ref.name }}"
+                key  = "{{ env.value_from.secret_key_ref.key }}"
+              }
+              {% endif %}
+              {% if env.value_from.config_map_key_ref is defined %}
+              config_map_key_ref {
+                name = "{{ env.value_from.config_map_key_ref.name }}"
+                key  = "{{ env.value_from.config_map_key_ref.key }}"
+              }
+              {% endif %}
+            }
+            {% endif %}
+          }
+          {% endfor %}
+          {% endif %}
+
+          {% if container.resources is defined %}
+          resources {
+            {% if container.resources.limits is defined %}
+            limits = {
+              {% for key, value in container.resources.limits.items() %}
+              "{{ key }}" = "{{ value }}"
+              {% endfor %}
+            }
+            {% endif %}
+            {% if container.resources.requests is defined %}
+            requests = {
+              {% for key, value in container.resources.requests.items() %}
+              "{{ key }}" = "{{ value }}"
+              {% endfor %}
+            }
+            {% endif %}
+          }
+          {% endif %}
+
+          {% if container.volume_mounts is defined %}
+          {% for vm in container.volume_mounts %}
+          volume_mount {
+            name       = "{{ vm.name }}"
+            mount_path = "{{ vm.mount_path }}"
+            {% if vm.sub_path is defined %}
+            sub_path = "{{ vm.sub_path }}"
+            {% endif %}
+            {% if vm.read_only is defined %}
+            read_only = {{ vm.read_only | lower }}
+            {% endif %}
+          }
+          {% endfor %}
+          {% endif %}
+        }
+        {% endfor %}
+
+        {% if job.config.volumes is defined %}
+        {% for volume in job.config.volumes %}
+        volume {
+          name = "{{ volume.name }}"
+
+          {% if volume.config_map is defined %}
+          config_map {
+            name = "{{ volume.config_map.name }}"
+            {% if volume.config_map.items is defined %}
+            {% for item in volume.config_map.items %}
+            items {
+              key  = "{{ item.key }}"
+              path = "{{ item.path }}"
+            }
+            {% endfor %}
+            {% endif %}
+          }
+          {% endif %}
+
+          {% if volume.secret is defined %}
+          secret {
+            secret_name = "{{ volume.secret.secret_name }}"
+          }
+          {% endif %}
+
+          {% if volume.persistent_volume_claim is defined %}
+          persistent_volume_claim {
+            claim_name = "{{ volume.persistent_volume_claim.claim_name }}"
+          }
+          {% endif %}
+
+          {% if volume.empty_dir is defined %}
+          empty_dir {}
+          {% endif %}
+        }
+        {% endfor %}
+        {% endif %}
+      }
+    }
+  }
+
+  {% if job.config.wait_for_completion is defined %}
+  wait_for_completion = {{ job.config.wait_for_completion | lower }}
+  {% endif %}
+}
+
+{% endfor %}

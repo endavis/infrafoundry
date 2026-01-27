@@ -10,6 +10,7 @@ This example demonstrates:
 - **Network Isolation**: Workers in private subnet with NAT gateway for image pulls
 - **Secure Access**: Tailscale overlay network for SSH and kubectl access
 - **Full Automation**: Terraform for infrastructure, Ansible for K3s installation
+- **OCI Firewall Fix**: Automated iptables configuration for K3s networking
 
 ## Architecture
 
@@ -35,13 +36,13 @@ This example demonstrates:
    └────────┘       │  │                 │    │ └─────────────────┘ │    │
                     │  └─────────────────┘    └─────────────────────┘    │
                     └─────────────────────────────────────────────────────┘
-                                            │
-                                            │ Tailscale Overlay
-                                            ▼
-                                    ┌───────────────┐
-                                    │  Your Device  │
-                                    │  (Tailscale)  │
-                                    └───────────────┘
+                                           │
+                                           │ Tailscale Overlay
+                                           ▼
+                                   ┌───────────────┐
+                                   │  Your Device  │
+                                   │  (Tailscale)  │
+                                   └───────────────┘
 ```
 
 ## Prerequisites
@@ -59,93 +60,55 @@ The example is located in `example-config/envs/oci-k3s/`:
 example-config/
 ├── envs/oci-k3s/
 │   ├── settings.yaml                    # OCI credentials, Tailscale auth key
-│   ├── README.md                        # Detailed setup instructions
+│   ├── README.md                        # Quick start guide
+│   ├── DECISIONS.md                     # Design decisions and reasoning
 │   ├── oci/
 │   │   ├── network.yaml                 # VCN, subnets, gateways
 │   │   └── instances.yaml               # Control plane + workers
-│   └── files/cloud-init-snippets/
-│       └── tailscale.yaml               # Tailscale installation script
+│   ├── files/cloud-init-snippets/
+│   │   └── tailscale.yaml               # Bootstrap: DNS, Tailscale
+│   └── scripts/
+│       └── cleanup-tailscale.sh         # Pre-destroy Tailscale cleanup
 └── roles/
-    ├── k3s-server/                      # Control plane installation
+    ├── k3s-server/                      # Control plane + iptables
     │   ├── tasks/main.yml
     │   ├── defaults/main.yml
     │   └── README.md
-    └── k3s-agent/                       # Worker node installation
+    └── k3s-agent/                       # Worker nodes + iptables
         ├── tasks/main.yml
         ├── defaults/main.yml
         └── README.md
 ```
 
-## Key Configuration
+## Key Design Decisions
 
-### Network (`oci/network.yaml`)
+For detailed explanations of all design decisions, see [DECISIONS.md](../../example-config/envs/oci-k3s/DECISIONS.md).
 
-```yaml
-vcn:
-  - name: k3s-vcn
-    cidr_block: "10.0.0.0/16"
-    internet_gateway: true
-    nat_gateway: true        # Enables outbound for private subnet
-    security_list:
-      ingress_rules:
-        - source: "0.0.0.0/0"
-          protocol: "6"
-          tcp_options:
-            min: 22
-            max: 22
+### OCI Firewall Fix (Critical)
 
-subnet:
-  - name: k3s-control-subnet
-    cidr_block: "10.0.0.0/24"
-    public: true             # Control plane gets public IP
+OCI Ubuntu instances have restrictive default iptables rules that block K3s networking. The fix is applied via Ansible AFTER K3s installation.
 
-  - name: k3s-worker-subnet
-    cidr_block: "10.0.1.0/24"
-    public: false            # Workers are private
-```
+**Why Ansible instead of cloud-init?**
+- Cloud-init runs BEFORE K3s installation
+- K3s/flannel removes UDP 8472 rules during initialization
+- Rules applied via cloud-init disappear from live iptables
+- Ansible applies rules AFTER K3s, ensuring they persist
 
-### Instances (`oci/instances.yaml`)
+**Required iptables rules:**
 
-```yaml
-instance:
-  - name: k3s-control
-    shape: VM.Standard.A1.Flex
-    shape_config:
-      ocpus: 2
-      memory_in_gbs: 8
-    subnet: k3s-control-subnet
-    assign_public_ip: true
-    cloud_init_snippets:
-      - tailscale
-    ansible_host: "k3s-control.${variables.tailnet}"
-    ansible_roles:
-      - k3s-server
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 8472 | UDP | Flannel VXLAN (pod networking) |
+| 10250 | TCP | Kubelet API (kubectl logs/exec) |
+| 6443 | TCP | Kubernetes API server |
 
-  - name: k3s-worker-0
-    subnet: k3s-worker-subnet
-    assign_public_ip: false
-    ansible_roles:
-      - k3s-agent
-    ansible_vars:
-      k3s_control_host: "k3s-control"
-```
+### Tailscale for Management
 
-### Cloud-Init Tailscale (`files/cloud-init-snippets/tailscale.yaml`)
-
-The cloud-init snippet installs Tailscale on first boot with retry logic for unreliable networks:
-
-```yaml
-#cloud-config
-runcmd:
-  - |
-    # Download and install Tailscale with retries
-    for i in $(seq 1 30); do
-      curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/pool/tailscale_*.deb -o /tmp/tailscale.deb && break
-      sleep 10
-    done
-    dpkg -i /tmp/tailscale.deb
-  - tailscale up --auth-key=${TS_AUTH_KEY} --hostname=${HOSTNAME} --ssh
-```
+All management access goes through Tailscale:
+- No SSH or Kubernetes API exposed to internet
+- Works across NAT and firewalls
+- Built-in SSH via `--ssh` flag
+- MagicDNS for easy node addressing
 
 ## Deployment Steps
 
@@ -155,7 +118,7 @@ runcmd:
 oci compute image list \
   --compartment-id <your-compartment-ocid> \
   --operating-system "Canonical Ubuntu" \
-  --operating-system-version "22.04" \
+  --operating-system-version "24.04" \
   --shape "VM.Standard.A1.Flex" \
   --sort-by TIMECREATED --sort-order DESC \
   --query 'data[0].id' --raw-output
@@ -194,20 +157,11 @@ sops --encrypt --in-place envs/oci-k3s/settings.yaml
 # Generate and review Terraform
 infra plan --env oci-k3s
 
-# Create infrastructure
+# Create infrastructure and install K3s
 infra apply --env oci-k3s
 ```
 
-### 5. Install K3s
-
-After Terraform completes and nodes join Tailscale:
-
-```bash
-# Run Ansible to install K3s
-infra apply --env oci-k3s --ansible-only
-```
-
-### 6. Access Your Cluster
+### 5. Access Your Cluster
 
 ```bash
 # Use the fetched kubeconfig
@@ -218,6 +172,24 @@ kubectl get nodes
 kubectl get pods -A
 ```
 
+## Destroy Workflow
+
+**Important:** Clean up Tailscale devices before destroying infrastructure to avoid orphaned entries.
+
+```bash
+# 1. Clean up Tailscale devices
+TAILSCALE_API_KEY=tskey-api-xxx ./scripts/cleanup-tailscale.sh
+
+# 2. Destroy infrastructure
+infra destroy --env oci-k3s
+
+# 3. (Optional) Recreate
+infra apply --env oci-k3s
+```
+
+Get your API key from: https://login.tailscale.com/admin/settings/keys
+Required scopes: `devices:read`, `devices:write`
+
 ## Ansible Roles
 
 ### k3s-server
@@ -226,11 +198,14 @@ Installs K3s control plane:
 - Configures TLS SANs for Tailscale hostname
 - Fetches kubeconfig to local machine
 - Updates server endpoint for remote access
+- **Applies OCI iptables fix after K3s installation**
 
 Variables:
 - `kubeconfig_local_path`: Where to save kubeconfig (default: `~/.kube/k3s-cluster.yaml`)
 - `k3s_version`: Specific version (default: latest)
 - `k3s_server_args`: Additional server arguments
+- `k3s_vcn_cidr`: VCN CIDR for iptables rules (default: `10.0.0.0/16`)
+- `k3s_oci_firewall_fix`: Enable OCI firewall fix (default: `true`)
 
 ### k3s-agent
 
@@ -238,11 +213,14 @@ Installs K3s worker nodes:
 - Fetches join token from control plane
 - Joins existing cluster
 - Verifies successful registration
+- **Applies OCI iptables fix after K3s installation**
 
 Variables:
 - `k3s_control_host`: Inventory name of control plane (required)
 - `k3s_version`: Should match server version
 - `k3s_agent_args`: Additional agent arguments
+- `k3s_vcn_cidr`: VCN CIDR for iptables rules (default: `10.0.0.0/16`)
+- `k3s_oci_firewall_fix`: Enable OCI firewall fix (default: `true`)
 
 ## Resource Usage
 
@@ -277,7 +255,44 @@ ansible_vars:
   k3s_agent_args: "--node-label zone=private"
 ```
 
+### Disable OCI Firewall Fix
+
+If running on a non-OCI cloud or with different firewall configuration:
+```yaml
+ansible_vars:
+  k3s_oci_firewall_fix: false
+```
+
 ## Troubleshooting
+
+### DNS Resolution Failures from Worker Pods
+
+**Symptom:** `nslookup kubernetes.default.svc` times out from worker pods
+
+**Cause:** UDP 8472 (VXLAN) blocked by iptables
+
+**Diagnosis:**
+```bash
+# Check if VXLAN rule exists
+ssh ubuntu@<node> 'sudo iptables -L INPUT -n | grep 8472'
+# Should show: ACCEPT udp -- 10.0.0.0/16 0.0.0.0/0 udp dpt:8472
+```
+
+**Fix:** Re-run Ansible to apply iptables rules:
+```bash
+infra apply --env oci-k3s --ansible-only
+```
+
+### kubectl logs/exec Returns 502 Bad Gateway
+
+**Symptom:** `kubectl logs <pod>` or `kubectl exec` fails with 502
+
+**Cause:** TCP 10250 (kubelet API) blocked by iptables
+
+**Diagnosis:**
+```bash
+ssh ubuntu@<node> 'sudo iptables -L INPUT -n | grep 10250'
+```
 
 ### Tailscale Not Connecting
 
@@ -297,8 +312,16 @@ Verify NAT gateway is configured and private subnet routes through it.
 
 OCI free tier ARM instances are popular. Try different availability domains or off-peak hours.
 
+### Orphaned Tailscale Devices
+
+After destroy, devices may remain in Tailscale admin console. Run cleanup script:
+```bash
+TAILSCALE_API_KEY=tskey-api-xxx ./scripts/cleanup-tailscale.sh
+```
+
 ## See Also
 
+- [Design Decisions Document](../../example-config/envs/oci-k3s/DECISIONS.md)
 - [OCI Provider Documentation](../providers/oci.md)
 - [Ansible Runner Documentation](../runners/ansible.md)
 - [Separate Config Repository Guide](../configuration/separate-config-repo.md)
@@ -306,4 +329,4 @@ OCI free tier ARM instances are popular. Try different availability domains or o
 
 ---
 
-**Last Updated:** 2025-01-25
+**Last Updated:** 2026-01-26

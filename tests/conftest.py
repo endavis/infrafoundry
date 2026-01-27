@@ -2,9 +2,12 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 import yaml
+
+from infrafoundry.core.config import ConfigManager
 
 
 @pytest.fixture
@@ -12,6 +15,15 @@ def temp_dir():
     """Create a temporary directory for test files."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
+
+
+@pytest.fixture
+def mock_config_manager(temp_dir):
+    """Create a mock ConfigManager with required attributes for Orchestrator tests."""
+    config_manager = Mock(spec=ConfigManager)
+    config_manager.base_dir = temp_dir
+    config_manager.load_environment.return_value = None
+    return config_manager
 
 
 @pytest.fixture
@@ -161,6 +173,7 @@ def mock_config():
         resource.type = "vm"
         resource.name = f"web-0{i + 1}"
         resource.config = {"cores": 2, "memory": 4096}
+        resource.hooks = None  # No lifecycle hooks configured
         resources.append(resource)
 
     return {"environment": environment, "resources": resources}

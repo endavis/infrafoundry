@@ -107,3 +107,69 @@
 - name: Display kubeconfig location
   debug:
     msg: "Kubeconfig saved to {{ kubeconfig_local_path }}. Use: export KUBECONFIG={{ kubeconfig_local_path }}"
+
+# =============================================================================
+# OCI FIREWALL FIX
+# =============================================================================
+# OCI Ubuntu instances have restrictive default iptables rules that block K3s
+# networking traffic (VXLAN, kubelet API). These rules MUST be applied AFTER
+# K3s installation because K3s modifies iptables during startup.
+#
+# Why not cloud-init?
+# - Cloud-init runs BEFORE K3s installation
+# - K3s/flannel removes UDP 8472 rules during initialization
+# - Rules applied via cloud-init disappear from live iptables
+# - Only TCP rules survive; UDP 8472 (VXLAN) is consistently removed
+#
+# By applying rules AFTER K3s installation, we ensure they persist.
+# =============================================================================
+
+- name: Add iptables rule for flannel VXLAN (UDP 8472)
+  iptables:
+    chain: INPUT
+    protocol: udp
+    source: "{{ k3s_vcn_cidr | default('10.0.0.0/16') }}"
+    destination_port: 8472
+    jump: ACCEPT
+    comment: "flannel VXLAN"
+    action: insert
+    rule_num: 1
+  when: k3s_oci_firewall_fix | default(true)
+
+- name: Add iptables rule for kubelet API (TCP 10250)
+  iptables:
+    chain: INPUT
+    protocol: tcp
+    source: "{{ k3s_vcn_cidr | default('10.0.0.0/16') }}"
+    destination_port: 10250
+    jump: ACCEPT
+    comment: "kubelet API"
+    action: insert
+    rule_num: 1
+  when: k3s_oci_firewall_fix | default(true)
+
+- name: Add iptables rule for Kubernetes API (TCP 6443)
+  iptables:
+    chain: INPUT
+    protocol: tcp
+    source: "{{ k3s_vcn_cidr | default('10.0.0.0/16') }}"
+    destination_port: 6443
+    jump: ACCEPT
+    comment: "kubernetes API"
+    action: insert
+    rule_num: 1
+  when: k3s_oci_firewall_fix | default(true)
+
+- name: Remove REJECT rule from FORWARD chain (OCI default)
+  iptables:
+    chain: FORWARD
+    jump: REJECT
+    reject_with: icmp-host-prohibited
+    state: absent
+  ignore_errors: true
+  when: k3s_oci_firewall_fix | default(true)
+
+- name: Persist iptables rules
+  command: netfilter-persistent save
+  changed_when: true
+  when: k3s_oci_firewall_fix | default(true)

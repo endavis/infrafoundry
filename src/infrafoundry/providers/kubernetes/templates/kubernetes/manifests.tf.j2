@@ -1,0 +1,48 @@
+{% for manifest in manifests %}
+resource "kubernetes_manifest" "{{ manifest.name | replace('-', '_') }}" {
+  manifest = {
+    "apiVersion" = "{{ manifest.config.manifest.apiVersion }}"
+    "kind"       = "{{ manifest.config.manifest.kind }}"
+    "metadata" = {
+      "name"      = "{{ manifest.config.manifest.metadata.name }}"
+      {% if manifest.config.manifest.metadata.namespace is defined %}
+      "namespace" = "{{ manifest.config.manifest.metadata.namespace }}"
+      {% endif %}
+      {% if manifest.config.manifest.metadata.labels is defined %}
+      "labels" = {
+        {% for key, value in manifest.config.manifest.metadata.labels.items() %}
+        "{{ key }}" = "{{ value }}"
+        {% endfor %}
+      }
+      {% endif %}
+      {% if manifest.config.manifest.metadata.annotations is defined %}
+      "annotations" = {
+        {% for key, value in manifest.config.manifest.metadata.annotations.items() %}
+        "{{ key }}" = "{{ value }}"
+        {% endfor %}
+      }
+      {% endif %}
+    }
+    {% if manifest.config.manifest.spec is defined %}
+    "spec" = yamldecode(<<-EOT
+{{ manifest.config.manifest.spec | toyaml | indent(6, first=True) }}
+    EOT
+    )
+    {% endif %}
+  }
+
+  {% if helm_releases or manifest.config.depends_on is defined %}
+  depends_on = [
+    {% for release in helm_releases %}
+    helm_release.{{ release.name | replace('-', '_') }},
+    {% endfor %}
+    {% if manifest.config.depends_on is defined %}
+    {% for dep in manifest.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
+}
+
+{% endfor %}

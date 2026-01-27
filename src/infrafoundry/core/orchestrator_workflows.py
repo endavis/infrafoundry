@@ -12,8 +12,10 @@ from rich.console import Console
 from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.hooks import HookExecutionError, HookManager
 from infrafoundry.core.protocols import Destroyable, Plannable
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
@@ -111,7 +113,8 @@ class ValidationOrchestrator:
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
         ],
         iter_provider_batches: Callable[
-            [dict[str, list[ResourceConfig]], list[str] | None], list[ProviderResourceBatch]
+            [dict[str, list[ResourceConfig]], list[str] | None, bool, str | None],
+            list[ProviderResourceBatch],
         ],
     ) -> None:
         self.config_manager = config_manager
@@ -147,7 +150,10 @@ class ValidationOrchestrator:
         results: dict[str, Any] = {}
 
         providers = self._get_providers()
-        for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
+        # Use forward order for validation (same as apply)
+        for batch in self._iter_provider_batches(
+            resources_by_provider, resource_filter, False, env_name
+        ):
             provider_name = batch.name
             resources = batch.resources
             provider = providers.get(provider_name)
@@ -266,7 +272,8 @@ class PlanOrchestrator:
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
         ],
         iter_provider_batches: Callable[
-            [dict[str, list[ResourceConfig]], list[str] | None], list[ProviderResourceBatch]
+            [dict[str, list[ResourceConfig]], list[str] | None, bool, str | None],
+            list[ProviderResourceBatch],
         ],
         validate_resources: Callable[[list[ResourceConfig]], None],
         has_policies: Callable[[], bool],
@@ -275,6 +282,8 @@ class PlanOrchestrator:
         get_current_user: Callable[[], str],
         fail_on_missing_secrets: bool,
         get_runner_priorities: Callable[[str], dict[str, int]],
+        hook_manager: HookManager | None = None,
+        load_environment: Callable[[str], EnvironmentConfig | None] | None = None,
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -290,6 +299,8 @@ class PlanOrchestrator:
         self._get_current_user = get_current_user
         self._fail_on_missing_secrets = fail_on_missing_secrets
         self._get_runner_priorities = get_runner_priorities
+        self._hook_manager = hook_manager
+        self._load_environment = load_environment
 
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
@@ -332,6 +343,9 @@ class PlanOrchestrator:
         results: dict[str, Any] = {}
         runner_priorities = self._get_runner_priorities(env_name)
 
+        # Load environment config for hooks
+        env_config = self._load_environment(env_name) if self._load_environment else None
+
         try:
             self._print_header("Planning", env_name, resource_filter, style="bold cyan")
             all_resources, resources_by_provider = self._load_resources(env_name)
@@ -339,8 +353,14 @@ class PlanOrchestrator:
             if self._has_policies():
                 self._check_policies(env_name, all_resources, enforce_policies)
 
+            # Execute environment-level before_plan hooks
+            self._execute_env_hooks(env_name, "before_plan", env_config)
+
             providers = self._get_providers()
-            for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
+            # Use forward order for plan (same as apply)
+            for batch in self._iter_provider_batches(
+                resources_by_provider, resource_filter, False, env_name
+            ):
                 provider_name = batch.name
                 provider_resources = batch.resources
                 provider = providers.get(provider_name)
@@ -359,6 +379,10 @@ class PlanOrchestrator:
                 )
 
                 provider_results: dict[str, Any] = {"resources": len(provider_resources)}
+
+                # Execute resource-level before_plan hooks
+                for resource in provider_resources:
+                    self._execute_resource_hooks(env_name, "before_plan", resource, provider_name)
 
                 if dry_run:
                     self.console.print("  [dim]Would generate configurations and run plans[/dim]")
@@ -390,7 +414,14 @@ class PlanOrchestrator:
                                 f"no generate_{tool_name} method[/dim]"
                             )
 
+                # Execute resource-level after_plan hooks
+                for resource in provider_resources:
+                    self._execute_resource_hooks(env_name, "after_plan", resource, provider_name)
+
                 results[provider_name] = provider_results
+
+            # Execute environment-level after_plan hooks
+            self._execute_env_hooks(env_name, "after_plan", env_config)
 
             self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
             self.event_manager.emit_event(
@@ -483,6 +514,49 @@ class PlanOrchestrator:
             if self._fail_on_missing_secrets:
                 raise
             self.console.print(f"[dim]Skipping secrets export: {exc}[/dim]")
+
+    def _execute_env_hooks(
+        self,
+        env_name: str,
+        stage: str,
+        env_config: EnvironmentConfig | None,
+    ) -> None:
+        """Execute environment-level hooks for a lifecycle stage."""
+        if not self._hook_manager or not env_config or not env_config.hooks:
+            return
+
+        try:
+            self._hook_manager.execute_environment_hooks(
+                env_name=env_name,
+                stage=stage,
+                hooks_config=env_config.hooks,
+            )
+        except HookExecutionError as e:
+            self.console.print(f"[red]Hook failed: {e}[/red]")
+            raise
+
+    def _execute_resource_hooks(
+        self,
+        env_name: str,
+        stage: str,
+        resource: ResourceConfig,
+        provider_name: str,
+    ) -> None:
+        """Execute resource-level hooks for a lifecycle stage."""
+        if not self._hook_manager or not resource.hooks:
+            return
+
+        try:
+            self._hook_manager.execute_resource_hooks(
+                env_name=env_name,
+                stage=stage,
+                resource_name=resource.name,
+                provider_name=provider_name,
+                hooks_config=resource.hooks,
+            )
+        except HookExecutionError as e:
+            self.console.print(f"[red]Hook failed for {resource.name}: {e}[/red]")
+            raise
 
 
 class RollbackOrchestrator:
@@ -607,6 +681,8 @@ class ApplyOrchestrator:
             dict[str, Any],
         ],
         get_current_user: Callable[[], str],
+        hook_manager: HookManager | None = None,
+        load_environment: Callable[[str], EnvironmentConfig | None] | None = None,
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -615,6 +691,8 @@ class ApplyOrchestrator:
         self._apply_serial = apply_serial
         self._apply_parallel = apply_parallel
         self._get_current_user = get_current_user
+        self._hook_manager = hook_manager
+        self._load_environment = load_environment
 
     def apply(
         self,
@@ -644,10 +722,24 @@ class ApplyOrchestrator:
 
         results: dict[str, Any] = {}
 
+        # Load environment config for hooks
+        env_config = self._load_environment(env_name) if self._load_environment else None
+
         try:
             self._print_header("Applying", env_name, resource_filter, "bold green")
             all_resources, resources_by_provider = self._load_resources(env_name)
             self._store_rollback_snapshot(deployment_id, env_name, all_resources)
+
+            # Execute environment-level before_apply hooks
+            self._execute_env_hooks(env_name, "before_apply", env_config)
+
+            # Execute resource-level before_apply hooks
+            for resources in resources_by_provider.values():
+                for resource in resources:
+                    if not resource_filter or resource.name in resource_filter:
+                        self._execute_resource_hooks(
+                            env_name, "before_apply", resource, resource.provider
+                        )
 
             if parallel and len(resources_by_provider) > 1:
                 results = self._apply_parallel(
@@ -666,6 +758,17 @@ class ApplyOrchestrator:
                     resource_filter,
                     auto_approve,
                 )
+
+            # Execute resource-level after_apply hooks
+            for resources in resources_by_provider.values():
+                for resource in resources:
+                    if not resource_filter or resource.name in resource_filter:
+                        self._execute_resource_hooks(
+                            env_name, "after_apply", resource, resource.provider
+                        )
+
+            # Execute environment-level after_apply hooks
+            self._execute_env_hooks(env_name, "after_apply", env_config)
 
             self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
             self.event_manager.emit_event(
@@ -716,6 +819,49 @@ class ApplyOrchestrator:
         else:
             self.console.print(f"\n[{style}]{label} infrastructure for: {env_name}[/{style}]")
 
+    def _execute_env_hooks(
+        self,
+        env_name: str,
+        stage: str,
+        env_config: EnvironmentConfig | None,
+    ) -> None:
+        """Execute environment-level hooks for a lifecycle stage."""
+        if not self._hook_manager or not env_config or not env_config.hooks:
+            return
+
+        try:
+            self._hook_manager.execute_environment_hooks(
+                env_name=env_name,
+                stage=stage,
+                hooks_config=env_config.hooks,
+            )
+        except HookExecutionError as e:
+            self.console.print(f"[red]Hook failed: {e}[/red]")
+            raise
+
+    def _execute_resource_hooks(
+        self,
+        env_name: str,
+        stage: str,
+        resource: ResourceConfig,
+        provider_name: str,
+    ) -> None:
+        """Execute resource-level hooks for a lifecycle stage."""
+        if not self._hook_manager or not resource.hooks:
+            return
+
+        try:
+            self._hook_manager.execute_resource_hooks(
+                env_name=env_name,
+                stage=stage,
+                resource_name=resource.name,
+                provider_name=provider_name,
+                hooks_config=resource.hooks,
+            )
+        except HookExecutionError as e:
+            self.console.print(f"[red]Hook failed for {resource.name}: {e}[/red]")
+            raise
+
 
 class DestroyOrchestrator:
     """Handle destroy operations with consistent tracking."""
@@ -731,9 +877,12 @@ class DestroyOrchestrator:
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
         ],
         iter_provider_batches: Callable[
-            [dict[str, list[ResourceConfig]], list[str] | None], list[ProviderResourceBatch]
+            [dict[str, list[ResourceConfig]], list[str] | None, bool, str | None],
+            list[ProviderResourceBatch],
         ],
         get_current_user: Callable[[], str],
+        hook_manager: HookManager | None = None,
+        load_environment: Callable[[str], EnvironmentConfig | None] | None = None,
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -743,6 +892,8 @@ class DestroyOrchestrator:
         self._load_resources = load_resources
         self._iter_provider_batches = iter_provider_batches
         self._get_current_user = get_current_user
+        self._hook_manager = hook_manager
+        self._load_environment = load_environment
 
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
@@ -778,6 +929,9 @@ class DestroyOrchestrator:
 
         results: dict[str, Any] = {}
 
+        # Load environment config for hooks
+        env_config = self._load_environment(env_name) if self._load_environment else None
+
         try:
             self._print_header("Destroying", env_name, resource_filter, "bold red")
 
@@ -807,7 +961,14 @@ class DestroyOrchestrator:
             _, resources_by_provider = self._load_resources(env_name)
             providers = self._get_providers()
 
-            for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
+            # Execute environment-level before_destroy hooks
+            self._execute_env_hooks(env_name, "before_destroy", env_config)
+
+            # Use REVERSE order for destroy - application providers (kubernetes) before
+            # infrastructure providers (proxmox, opnsense)
+            for batch in self._iter_provider_batches(
+                resources_by_provider, resource_filter, True, env_name
+            ):
                 provider_name = batch.name
                 resources = batch.resources
                 provider = providers.get(provider_name)
@@ -816,6 +977,13 @@ class DestroyOrchestrator:
 
                 self.console.print(f"\n[bold]Destroying {provider_name}...[/bold]")
                 provider.set_environment(env_name)
+
+                # Execute resource-level before_destroy hooks
+                for resource in resources:
+                    self._execute_resource_hooks(
+                        env_name, "before_destroy", resource, provider_name
+                    )
+
                 resource_ids = self._track_destroying_resources(
                     deployment_id, env_name, provider_name, resources
                 )
@@ -833,7 +1001,15 @@ class DestroyOrchestrator:
                     provider_results[tool_name] = runner_result
 
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)
+
+                # Execute resource-level after_destroy hooks
+                for resource in resources:
+                    self._execute_resource_hooks(env_name, "after_destroy", resource, provider_name)
+
                 results[provider_name] = provider_results
+
+            # Execute environment-level after_destroy hooks
+            self._execute_env_hooks(env_name, "after_destroy", env_config)
 
             self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
             self.event_manager.emit_event(
@@ -913,3 +1089,46 @@ class DestroyOrchestrator:
             )
         else:
             self.console.print(f"\n[{style}]{label} infrastructure for: {env_name}[/{style}]")
+
+    def _execute_env_hooks(
+        self,
+        env_name: str,
+        stage: str,
+        env_config: EnvironmentConfig | None,
+    ) -> None:
+        """Execute environment-level hooks for a lifecycle stage."""
+        if not self._hook_manager or not env_config or not env_config.hooks:
+            return
+
+        try:
+            self._hook_manager.execute_environment_hooks(
+                env_name=env_name,
+                stage=stage,
+                hooks_config=env_config.hooks,
+            )
+        except HookExecutionError as e:
+            self.console.print(f"[red]Hook failed: {e}[/red]")
+            raise
+
+    def _execute_resource_hooks(
+        self,
+        env_name: str,
+        stage: str,
+        resource: ResourceConfig,
+        provider_name: str,
+    ) -> None:
+        """Execute resource-level hooks for a lifecycle stage."""
+        if not self._hook_manager or not resource.hooks:
+            return
+
+        try:
+            self._hook_manager.execute_resource_hooks(
+                env_name=env_name,
+                stage=stage,
+                resource_name=resource.name,
+                provider_name=provider_name,
+                hooks_config=resource.hooks,
+            )
+        except HookExecutionError as e:
+            self.console.print(f"[red]Hook failed for {resource.name}: {e}[/red]")
+            raise

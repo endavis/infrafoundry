@@ -1,0 +1,95 @@
+{% for ingress in ingresses %}
+resource "kubernetes_ingress_v1" "{{ ingress.name | replace('-', '_') }}" {
+  metadata {
+    name      = "{{ ingress.name }}"
+    namespace = "{{ ingress.config.namespace | default('default') }}"
+
+    {% if ingress.config.labels is defined %}
+    labels = {
+      {% for key, value in ingress.config.labels.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+
+    {% if ingress.config.annotations is defined %}
+    annotations = {
+      {% for key, value in ingress.config.annotations.items() %}
+      "{{ key }}" = "{{ value }}"
+      {% endfor %}
+    }
+    {% endif %}
+  }
+
+  spec {
+    {% if ingress.config.ingress_class_name is defined %}
+    ingress_class_name = "{{ ingress.config.ingress_class_name }}"
+    {% endif %}
+
+    {% if ingress.config.default_backend is defined %}
+    default_backend {
+      service {
+        name = "{{ ingress.config.default_backend.service.name }}"
+        port {
+          {% if ingress.config.default_backend.service.port.number is defined %}
+          number = {{ ingress.config.default_backend.service.port.number }}
+          {% elif ingress.config.default_backend.service.port.name is defined %}
+          name = "{{ ingress.config.default_backend.service.port.name }}"
+          {% endif %}
+        }
+      }
+    }
+    {% endif %}
+
+    {% if ingress.config.tls is defined %}
+    {% for tls in ingress.config.tls %}
+    tls {
+      {% if tls.hosts is defined %}
+      hosts = [
+        {% for host in tls.hosts %}
+        "{{ host }}",
+        {% endfor %}
+      ]
+      {% endif %}
+      {% if tls.secret_name is defined %}
+      secret_name = "{{ tls.secret_name }}"
+      {% endif %}
+    }
+    {% endfor %}
+    {% endif %}
+
+    {% if ingress.config.rules is defined %}
+    {% for rule in ingress.config.rules %}
+    rule {
+      {% if rule.host is defined %}
+      host = "{{ rule.host }}"
+      {% endif %}
+
+      http {
+        {% for path in rule.paths %}
+        path {
+          path      = "{{ path.path }}"
+          path_type = "{{ path.path_type | default('Prefix') }}"
+
+          backend {
+            service {
+              name = "{{ path.backend.service.name }}"
+              port {
+                {% if path.backend.service.port.number is defined %}
+                number = {{ path.backend.service.port.number }}
+                {% elif path.backend.service.port.name is defined %}
+                name = "{{ path.backend.service.port.name }}"
+                {% endif %}
+              }
+            }
+          }
+        }
+        {% endfor %}
+      }
+    }
+    {% endfor %}
+    {% endif %}
+  }
+}
+
+{% endfor %}
