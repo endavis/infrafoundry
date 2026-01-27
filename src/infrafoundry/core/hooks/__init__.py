@@ -5,11 +5,13 @@ during plan, apply, and destroy operations.
 """
 
 from infrafoundry.core.hooks.manager import HookExecutionError, HookManager
+from infrafoundry.core.hooks.mixin import HookExecutionMixin
 from infrafoundry.core.hooks.models import HookConfig, HookResult, HooksConfig
 
 __all__ = [
     "HookConfig",
     "HookExecutionError",
+    "HookExecutionMixin",
     "HookManager",
     "HookResult",
     "HooksConfig",
