@@ -49,6 +49,23 @@ class SSHConfig(BaseModel):
     port: int = 22
 
 
+class NotificationChannelConfig(BaseModel):
+    """Configuration for a single notification channel."""
+
+    name: str
+    type: str  # webhook, slack, email
+    enabled: bool = True
+    config: dict[str, Any] = Field(default_factory=dict)
+    events: list[str] | None = None  # None = all events
+    levels: list[str] | None = None  # None = all levels
+
+
+class NotificationsConfig(BaseModel):
+    """Configuration for notifications in an environment."""
+
+    channels: list[NotificationChannelConfig] = Field(default_factory=list)
+
+
 class EnvironmentConfig(BaseModel):
     """Environment-specific configuration."""
 
@@ -72,6 +89,8 @@ class EnvironmentConfig(BaseModel):
     drift_remediation: DriftRemediationConfig | None = None
     # Lifecycle hooks for environment-level script execution
     hooks: HooksConfig | None = None
+    # Notification channels for this environment
+    notifications: NotificationsConfig | None = None
 
     def get_ssh_config(self, provider_name: str) -> SSHConfig | None:
         """Get SSH config for a specific provider.

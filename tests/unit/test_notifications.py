@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from infrafoundry.core.config.models import NotificationChannelConfig, NotificationsConfig
 from infrafoundry.core.notifications import (
     NotificationChannel,
     NotificationManager,
@@ -532,3 +533,99 @@ class TestNotificationManager:
         notifier = SlackNotifier(config)
         result = notifier.send("APPLY_COMPLETED", "dev", {"resource": "vm-01"})
         assert result is False
+
+    def test_init_no_params(self):
+        """Test initialization with no parameters."""
+        manager = NotificationManager()
+        assert len(manager.channels) == 0
+        assert len(manager.notifiers) == 0
+
+    @patch("requests.post")
+    def test_load_from_notifications_config(self, mock_post):
+        """Test loading from NotificationsConfig."""
+        mock_post.return_value.status_code = 200
+
+        notifications_config = NotificationsConfig(
+            channels=[
+                NotificationChannelConfig(
+                    name="test-webhook",
+                    type="webhook",
+                    enabled=True,
+                    config={"url": "https://webhook.example.com"},
+                    events=["AFTER_APPLY"],
+                ),
+                NotificationChannelConfig(
+                    name="test-slack",
+                    type="slack",
+                    enabled=True,
+                    config={"webhook_url": "https://hooks.slack.com/test"},
+                ),
+            ]
+        )
+
+        manager = NotificationManager(notifications_config=notifications_config)
+        assert len(manager.channels) == 2
+        assert "test-webhook" in manager.notifiers
+        assert "test-slack" in manager.notifiers
+
+        # Verify notifications work
+        manager.notify("AFTER_APPLY", "dev", {"resource": "vm-01"})
+        # Both channels should receive (slack has no event filter)
+        assert mock_post.call_count == 2
+
+    def test_notifications_config_takes_precedence_over_file(self, temp_dir):
+        """Test that notifications_config takes precedence over config_file."""
+        import yaml
+
+        # Create a file config with different channel
+        file_config = {
+            "channels": [
+                {
+                    "name": "file-webhook",
+                    "type": "webhook",
+                    "enabled": True,
+                    "config": {"url": "https://file.example.com"},
+                }
+            ]
+        }
+        config_file = temp_dir / "notifications.yaml"
+        with open(config_file, "w") as f:
+            yaml.dump(file_config, f)
+
+        # Create notifications_config with different channel
+        notifications_config = NotificationsConfig(
+            channels=[
+                NotificationChannelConfig(
+                    name="config-webhook",
+                    type="webhook",
+                    enabled=True,
+                    config={"url": "https://config.example.com"},
+                )
+            ]
+        )
+
+        # Both provided - notifications_config should win
+        manager = NotificationManager(
+            config_file=config_file, notifications_config=notifications_config
+        )
+
+        assert len(manager.channels) == 1
+        assert manager.channels[0].name == "config-webhook"
+        assert "file-webhook" not in manager.notifiers
+
+    def test_disabled_channel_in_notifications_config(self):
+        """Test that disabled channels in NotificationsConfig don't create notifiers."""
+        notifications_config = NotificationsConfig(
+            channels=[
+                NotificationChannelConfig(
+                    name="disabled-webhook",
+                    type="webhook",
+                    enabled=False,
+                    config={"url": "https://webhook.example.com"},
+                )
+            ]
+        )
+
+        manager = NotificationManager(notifications_config=notifications_config)
+        assert len(manager.channels) == 1
+        assert len(manager.notifiers) == 0
