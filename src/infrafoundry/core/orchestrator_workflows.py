@@ -15,7 +15,7 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
-from infrafoundry.core.hooks import HookExecutionError, HookManager
+from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.protocols import Destroyable, Plannable
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
@@ -258,7 +258,7 @@ class ValidationOrchestrator:
             self.console.print("[yellow]  Fix errors before deploying[/yellow]")
 
 
-class PlanOrchestrator:
+class PlanOrchestrator(HookExecutionMixin):
     """Handle plan execution for each provider."""
 
     def __init__(
@@ -515,49 +515,6 @@ class PlanOrchestrator:
                 raise
             self.console.print(f"[dim]Skipping secrets export: {exc}[/dim]")
 
-    def _execute_env_hooks(
-        self,
-        env_name: str,
-        stage: str,
-        env_config: EnvironmentConfig | None,
-    ) -> None:
-        """Execute environment-level hooks for a lifecycle stage."""
-        if not self._hook_manager or not env_config or not env_config.hooks:
-            return
-
-        try:
-            self._hook_manager.execute_environment_hooks(
-                env_name=env_name,
-                stage=stage,
-                hooks_config=env_config.hooks,
-            )
-        except HookExecutionError as e:
-            self.console.print(f"[red]Hook failed: {e}[/red]")
-            raise
-
-    def _execute_resource_hooks(
-        self,
-        env_name: str,
-        stage: str,
-        resource: ResourceConfig,
-        provider_name: str,
-    ) -> None:
-        """Execute resource-level hooks for a lifecycle stage."""
-        if not self._hook_manager or not resource.hooks:
-            return
-
-        try:
-            self._hook_manager.execute_resource_hooks(
-                env_name=env_name,
-                stage=stage,
-                resource_name=resource.name,
-                provider_name=provider_name,
-                hooks_config=resource.hooks,
-            )
-        except HookExecutionError as e:
-            self.console.print(f"[red]Hook failed for {resource.name}: {e}[/red]")
-            raise
-
 
 class RollbackOrchestrator:
     """Handle rollbacks by orchestrating confirmation and apply execution."""
@@ -662,7 +619,7 @@ class RollbackOrchestrator:
         )
 
 
-class ApplyOrchestrator:
+class ApplyOrchestrator(HookExecutionMixin):
     """Coordinate apply deployments after planning."""
 
     def __init__(
@@ -819,51 +776,8 @@ class ApplyOrchestrator:
         else:
             self.console.print(f"\n[{style}]{label} infrastructure for: {env_name}[/{style}]")
 
-    def _execute_env_hooks(
-        self,
-        env_name: str,
-        stage: str,
-        env_config: EnvironmentConfig | None,
-    ) -> None:
-        """Execute environment-level hooks for a lifecycle stage."""
-        if not self._hook_manager or not env_config or not env_config.hooks:
-            return
 
-        try:
-            self._hook_manager.execute_environment_hooks(
-                env_name=env_name,
-                stage=stage,
-                hooks_config=env_config.hooks,
-            )
-        except HookExecutionError as e:
-            self.console.print(f"[red]Hook failed: {e}[/red]")
-            raise
-
-    def _execute_resource_hooks(
-        self,
-        env_name: str,
-        stage: str,
-        resource: ResourceConfig,
-        provider_name: str,
-    ) -> None:
-        """Execute resource-level hooks for a lifecycle stage."""
-        if not self._hook_manager or not resource.hooks:
-            return
-
-        try:
-            self._hook_manager.execute_resource_hooks(
-                env_name=env_name,
-                stage=stage,
-                resource_name=resource.name,
-                provider_name=provider_name,
-                hooks_config=resource.hooks,
-            )
-        except HookExecutionError as e:
-            self.console.print(f"[red]Hook failed for {resource.name}: {e}[/red]")
-            raise
-
-
-class DestroyOrchestrator:
+class DestroyOrchestrator(HookExecutionMixin):
     """Handle destroy operations with consistent tracking."""
 
     def __init__(
@@ -1089,46 +1003,3 @@ class DestroyOrchestrator:
             )
         else:
             self.console.print(f"\n[{style}]{label} infrastructure for: {env_name}[/{style}]")
-
-    def _execute_env_hooks(
-        self,
-        env_name: str,
-        stage: str,
-        env_config: EnvironmentConfig | None,
-    ) -> None:
-        """Execute environment-level hooks for a lifecycle stage."""
-        if not self._hook_manager or not env_config or not env_config.hooks:
-            return
-
-        try:
-            self._hook_manager.execute_environment_hooks(
-                env_name=env_name,
-                stage=stage,
-                hooks_config=env_config.hooks,
-            )
-        except HookExecutionError as e:
-            self.console.print(f"[red]Hook failed: {e}[/red]")
-            raise
-
-    def _execute_resource_hooks(
-        self,
-        env_name: str,
-        stage: str,
-        resource: ResourceConfig,
-        provider_name: str,
-    ) -> None:
-        """Execute resource-level hooks for a lifecycle stage."""
-        if not self._hook_manager or not resource.hooks:
-            return
-
-        try:
-            self._hook_manager.execute_resource_hooks(
-                env_name=env_name,
-                stage=stage,
-                resource_name=resource.name,
-                provider_name=provider_name,
-                hooks_config=resource.hooks,
-            )
-        except HookExecutionError as e:
-            self.console.print(f"[red]Hook failed for {resource.name}: {e}[/red]")
-            raise
