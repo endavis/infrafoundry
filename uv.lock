@@ -1690,7 +1690,7 @@ wheels = [
 
 [[package]]
 name = "pyinfra"
-version = "3.5.1"
+version = "3.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -1699,12 +1699,13 @@ dependencies = [
     { name = "jinja2" },
     { name = "packaging" },
     { name = "paramiko" },
+    { name = "pydantic" },
     { name = "python-dateutil" },
     { name = "typeguard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/d3/55b8387c7e9cddc0b1619962bfcdcce397d87c5671f77af49a73be702178/pyinfra-3.5.1.tar.gz", hash = "sha256:9d8e928ae7fe43cd7d6d07a09654266ec1e4e15c3d0fd8411ae85d055eff6a0b", size = 455977, upload-time = "2025-10-01T15:26:22.232Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6e/f1/9113db11d625d7d20f78304a8fe1680d1a8782ce0ef2510707beb875e8db/pyinfra-3.6.tar.gz", hash = "sha256:4ce84ec94c8d8915eaad108f183aa4eabf58687679f14f78aad44414bc79a4cd", size = 493500, upload-time = "2026-01-05T09:58:11.829Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/84/072c355a429578b5e5f0fd7fdced21a228f7868027ff16fd1e471d58d4d1/pyinfra-3.5.1-py3-none-any.whl", hash = "sha256:212225129701a7f0fbff81fdad0f5943237106c21e798ddf5e062a37878548b9", size = 257750, upload-time = "2025-10-01T15:26:20.577Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/b0/979bea9fb10d3f717266eef90786499b212eac896f26fa7b8fbbbed864e7/pyinfra-3.6-py3-none-any.whl", hash = "sha256:b17ad60de2eeb37e61e34c6d77aafe5f66d90f7439d5299ac89121333fb5b54b", size = 262629, upload-time = "2026-01-05T09:58:13.097Z" },
 ]
 
 [[package]]
