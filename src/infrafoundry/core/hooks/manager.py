@@ -1,15 +1,21 @@
 """Hook manager for executing lifecycle hooks."""
 
+from __future__ import annotations
+
 import os
 import re
 import subprocess  # nosec B404 - required for running user scripts
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.hooks.models import HookConfig, HookResult, HooksConfig
 from infrafoundry.core.secrets.secret_manager import SecretManager
+
+if TYPE_CHECKING:
+    from infrafoundry.core.events import EventManager
 
 
 class HookExecutionError(Exception):
@@ -45,16 +51,19 @@ class HookManager(PathBasedManager):
         self,
         config_base_dir: Path,
         secret_manager_factory: Callable[[str], SecretManager],
+        event_manager: EventManager | None = None,
     ) -> None:
         """Initialize hook manager.
 
         Args:
             config_base_dir: Base directory for configuration (contains envs/)
             secret_manager_factory: Factory function to create SecretManager for an environment
+            event_manager: Optional event manager for emitting hook lifecycle events
         """
         super().__init__()
         self.config_base_dir = config_base_dir
         self._secret_manager_factory = secret_manager_factory
+        self._event_manager = event_manager
 
     def execute_environment_hooks(
         self,
@@ -241,6 +250,17 @@ class HookManager(PathBasedManager):
             provider_name=provider_name,
         )
 
+        # Build event data for hook lifecycle events
+        hook_event_data: dict[str, Any] = {
+            "script": hook.script,
+            "stage": stage,
+            "description": hook.description,
+        }
+        if resource_name:
+            hook_event_data["resource_name"] = resource_name
+        if provider_name:
+            hook_event_data["provider_name"] = provider_name
+
         # Log execution
         desc = hook.description or hook.script
         if resource_name:
@@ -248,8 +268,12 @@ class HookManager(PathBasedManager):
         else:
             self._log_info(f"Running hook: {desc}")
 
+        # Emit HOOK_STARTED event
+        self._emit_hook_event("HOOK_STARTED", env_name, hook_event_data)
+
         # Execute script
         start_time = time.monotonic()
+        hook_result: HookResult
         try:
             result = subprocess.run(  # nosec B603 - user-controlled scripts
                 [str(script_path)],
@@ -261,7 +285,7 @@ class HookManager(PathBasedManager):
             )
             duration = time.monotonic() - start_time
 
-            return HookResult(
+            hook_result = HookResult(
                 script=hook.script,
                 success=result.returncode == 0,
                 exit_code=result.returncode,
@@ -274,7 +298,7 @@ class HookManager(PathBasedManager):
 
         except subprocess.TimeoutExpired as e:
             duration = time.monotonic() - start_time
-            return HookResult(
+            hook_result = HookResult(
                 script=hook.script,
                 success=False,
                 exit_code=-1,
@@ -287,7 +311,7 @@ class HookManager(PathBasedManager):
 
         except PermissionError:
             duration = time.monotonic() - start_time
-            return HookResult(
+            hook_result = HookResult(
                 script=hook.script,
                 success=False,
                 exit_code=-1,
@@ -300,7 +324,7 @@ class HookManager(PathBasedManager):
 
         except OSError as e:
             duration = time.monotonic() - start_time
-            return HookResult(
+            hook_result = HookResult(
                 script=hook.script,
                 success=False,
                 exit_code=-1,
@@ -310,6 +334,22 @@ class HookManager(PathBasedManager):
                 timed_out=False,
                 error_message=f"OS error: {e}",
             )
+
+        # Emit HOOK_COMPLETED or HOOK_FAILED event
+        result_event_data = {
+            **hook_event_data,
+            "success": hook_result.success,
+            "exit_code": hook_result.exit_code,
+            "duration_seconds": hook_result.duration_seconds,
+            "timed_out": hook_result.timed_out,
+        }
+        if hook_result.error_message:
+            result_event_data["error_message"] = hook_result.error_message
+
+        event_type = "HOOK_COMPLETED" if hook_result.success else "HOOK_FAILED"
+        self._emit_hook_event(event_type, env_name, result_event_data)
+
+        return hook_result
 
     def _prepare_environment(
         self,
@@ -394,3 +434,26 @@ class HookManager(PathBasedManager):
     def cleanup(self) -> None:
         """Clean up resources (required by BaseManager)."""
         self._log_debug("HookManager cleanup complete")
+
+    def _emit_hook_event(
+        self,
+        event_type_name: str,
+        env_name: str,
+        data: dict[str, Any],
+    ) -> None:
+        """Emit a hook lifecycle event if event_manager is configured.
+
+        Args:
+            event_type_name: Name of the event type (e.g., "HOOK_STARTED")
+            env_name: Environment name
+            data: Event data payload
+        """
+        if not self._event_manager:
+            return
+
+        # Import here to avoid circular imports at module level
+        from infrafoundry.core.events import EventType
+
+        event_type = getattr(EventType, event_type_name, None)
+        if event_type:
+            self._event_manager.emit_event(event_type, env_name, data)
