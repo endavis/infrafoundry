@@ -3,6 +3,7 @@
 import pytest
 import yaml
 
+from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.policy import PolicyEngine, PolicyLevel, PolicyType, PolicyViolation
 from infrafoundry.core.provider import ResourceConfig
 
@@ -581,3 +582,36 @@ class TestPolicyEngine:
         )
         violations = engine.evaluate_resources([resource], "dev")
         assert len(violations) > 0
+
+    def test_inherits_from_base_manager(self, temp_dir):
+        """Test that PolicyEngine inherits from BaseManager."""
+        policy_dir = temp_dir / "policies"
+        policy_dir.mkdir()
+
+        engine = PolicyEngine(policy_dir)
+        assert isinstance(engine, BaseManager)
+        # Should have BaseManager methods
+        assert hasattr(engine, "_log_info")
+        assert hasattr(engine, "_log_warning")
+        assert hasattr(engine, "_log_error")
+        assert hasattr(engine, "_log_debug")
+        assert hasattr(engine, "cleanup")
+
+    def test_cleanup_method(self, temp_dir):
+        """Test that cleanup method works."""
+        policy_dir = temp_dir / "policies"
+        policy_dir.mkdir()
+
+        engine = PolicyEngine(policy_dir)
+        # cleanup() should not raise any exceptions
+        engine.cleanup()
+
+    def test_context_manager(self, temp_dir):
+        """Test that PolicyEngine can be used as context manager."""
+        policy_dir = temp_dir / "policies"
+        policy_dir.mkdir()
+
+        with PolicyEngine(policy_dir) as engine:
+            assert isinstance(engine, PolicyEngine)
+            assert len(engine.policies) == 0
+        # Exiting context should call cleanup without error
