@@ -113,7 +113,8 @@ class ValidationOrchestrator:
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
         ],
         iter_provider_batches: Callable[
-            [dict[str, list[ResourceConfig]], list[str] | None], list[ProviderResourceBatch]
+            [dict[str, list[ResourceConfig]], list[str] | None, bool, str | None],
+            list[ProviderResourceBatch],
         ],
     ) -> None:
         self.config_manager = config_manager
@@ -149,7 +150,10 @@ class ValidationOrchestrator:
         results: dict[str, Any] = {}
 
         providers = self._get_providers()
-        for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
+        # Use forward order for validation (same as apply)
+        for batch in self._iter_provider_batches(
+            resources_by_provider, resource_filter, False, env_name
+        ):
             provider_name = batch.name
             resources = batch.resources
             provider = providers.get(provider_name)
@@ -268,7 +272,8 @@ class PlanOrchestrator:
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
         ],
         iter_provider_batches: Callable[
-            [dict[str, list[ResourceConfig]], list[str] | None], list[ProviderResourceBatch]
+            [dict[str, list[ResourceConfig]], list[str] | None, bool, str | None],
+            list[ProviderResourceBatch],
         ],
         validate_resources: Callable[[list[ResourceConfig]], None],
         has_policies: Callable[[], bool],
@@ -352,7 +357,10 @@ class PlanOrchestrator:
             self._execute_env_hooks(env_name, "before_plan", env_config)
 
             providers = self._get_providers()
-            for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
+            # Use forward order for plan (same as apply)
+            for batch in self._iter_provider_batches(
+                resources_by_provider, resource_filter, False, env_name
+            ):
                 provider_name = batch.name
                 provider_resources = batch.resources
                 provider = providers.get(provider_name)
@@ -869,7 +877,8 @@ class DestroyOrchestrator:
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
         ],
         iter_provider_batches: Callable[
-            [dict[str, list[ResourceConfig]], list[str] | None], list[ProviderResourceBatch]
+            [dict[str, list[ResourceConfig]], list[str] | None, bool, str | None],
+            list[ProviderResourceBatch],
         ],
         get_current_user: Callable[[], str],
         hook_manager: HookManager | None = None,
@@ -955,7 +964,11 @@ class DestroyOrchestrator:
             # Execute environment-level before_destroy hooks
             self._execute_env_hooks(env_name, "before_destroy", env_config)
 
-            for batch in self._iter_provider_batches(resources_by_provider, resource_filter):
+            # Use REVERSE order for destroy - application providers (kubernetes) before
+            # infrastructure providers (proxmox, opnsense)
+            for batch in self._iter_provider_batches(
+                resources_by_provider, resource_filter, True, env_name
+            ):
                 provider_name = batch.name
                 resources = batch.resources
                 provider = providers.get(provider_name)

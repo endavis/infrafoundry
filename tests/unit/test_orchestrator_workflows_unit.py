@@ -53,7 +53,7 @@ def test_plan_orchestrator_dry_run_skips_generation(console):
         runner_registry,
         get_providers=lambda: providers,
         load_resources=load_resources,
-        iter_provider_batches=lambda resources_by_provider, filt: [
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
             ProviderResourceBatch("proxmox", resources_by_provider["proxmox"], 1)
         ],
         validate_resources=MagicMock(),
@@ -120,7 +120,7 @@ def test_plan_orchestrator_runs_runners_in_priority_order(console):
         runner_registry,
         get_providers=lambda: providers,
         load_resources=load_resources,
-        iter_provider_batches=lambda resources_by_provider, filt: [
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
             ProviderResourceBatch("proxmox", resources_by_provider["proxmox"], 1)
         ],
         validate_resources=MagicMock(),
@@ -196,7 +196,7 @@ def test_destroy_orchestrator_requires_confirmation(console):
         runner_registry,
         get_providers=lambda: providers,
         load_resources=lambda env: ([], {"proxmox": []}),
-        iter_provider_batches=lambda resources_by_provider, filt: [
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
             ProviderResourceBatch("proxmox", [], 0)
         ],
         get_current_user=lambda: "tester",
@@ -227,7 +227,7 @@ def test_validation_orchestrator_warns_on_missing_provider(console):
         console,
         get_providers=lambda: {},  # Missing provider
         load_resources=lambda env: (env_resources, {"proxmox": env_resources}),
-        iter_provider_batches=lambda resources_by_provider, filt: [
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
             ProviderResourceBatch("proxmox", env_resources, 1)
         ],
     )
