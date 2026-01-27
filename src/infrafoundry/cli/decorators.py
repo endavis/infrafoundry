@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import inspect
+import os
 import sys
-import traceback
 from collections.abc import Callable
 from functools import wraps
 from typing import Any
@@ -21,6 +21,44 @@ from infrafoundry.core.exceptions import (
 from .utils import raise_cli_error
 
 console = Console()
+
+
+def _is_debug_mode() -> bool:
+    """Check if debug mode is enabled."""
+    return os.getenv("INFRAFOUNDRY_LOG_LEVEL") == "DEBUG"
+
+
+def _get_error_hint(exc: Exception) -> str | None:
+    """Get a helpful hint for common errors.
+
+    Args:
+        exc: The exception to analyze
+
+    Returns:
+        A hint string, or None if no hint is available
+    """
+    exc_str = str(exc).lower()
+
+    if isinstance(exc, FileNotFoundError):
+        if "generated" in exc_str or "terraform" in exc_str:
+            return "Make sure you're running from the project root directory."
+        if "kubeconfig" in exc_str or ".kube" in exc_str:
+            return "Check that your kubeconfig file exists and is readable."
+        return "Check that the file path is correct and the file exists."
+
+    if isinstance(exc, PermissionError):
+        return "Check file permissions or try running with appropriate access."
+
+    if isinstance(exc, ConnectionError | OSError) and "connection" in exc_str:
+        return "Check your network connection and that the service is reachable."
+
+    if "timeout" in exc_str:
+        return "The operation timed out. Try again or increase the timeout."
+
+    if "authentication" in exc_str or "unauthorized" in exc_str:
+        return "Check your credentials and authentication settings."
+
+    return None
 
 
 def with_orchestrator(
@@ -83,8 +121,21 @@ def with_orchestrator(
                 # Other InfraFoundry errors - show with context
                 raise_cli_error(action, exc)
             except Exception as exc:
-                console.print(f"[bold red]ERROR:[/bold red] {action} - {exc}")
-                console.print(traceback.format_exc(), style="dim red")  # Log full traceback
+                # Show user-friendly error message
+                console.print(f"[bold red]Error:[/bold red] {action}")
+                console.print(f"  {exc}")
+
+                # Show hint if available
+                if hint := _get_error_hint(exc):
+                    console.print(f"\n[yellow]Hint:[/yellow] {hint}")
+
+                # Show traceback only in debug mode
+                if _is_debug_mode():
+                    console.print("\n[dim]Debug traceback:[/dim]")
+                    console.print_exception(show_locals=False)
+                else:
+                    console.print("\n[dim]Use --debug for full error details.[/dim]")
+
                 sys.exit(1)
 
         return wrapper

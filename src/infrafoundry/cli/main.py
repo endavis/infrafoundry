@@ -161,6 +161,12 @@ def _load_env_credentials(env_name: str, config_dir: Path | None = None) -> None
 @click.group()
 @click.version_option(version="0.1.0", prog_name="foundry")
 @click.option(
+    "--debug",
+    is_flag=True,
+    default=False,
+    help="Enable debug mode (show full tracebacks on errors)",
+)
+@click.option(
     "--config-dir",
     "-c",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
@@ -184,6 +190,7 @@ def _load_env_credentials(env_name: str, config_dir: Path | None = None) -> None
 @click.pass_context
 def foundry(
     ctx: click.Context,
+    debug: bool,
     config_dir: Path | None,
     strict_mode: bool | None,
     fail_on_missing_secrets: bool | None,
@@ -191,6 +198,12 @@ def foundry(
 ) -> None:
     """InfraFoundry - Infrastructure automation framework."""
     ctx.ensure_object(dict)
+
+    # Enable debug mode if requested
+    if debug:
+        os.environ["INFRAFOUNDRY_LOG_LEVEL"] = "DEBUG"
+    ctx.obj["debug"] = debug
+
     # Use --config-dir flag if provided, otherwise check environment variable
     if config_dir:
         ctx.obj["config_dir"] = config_dir
