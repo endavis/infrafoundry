@@ -7,6 +7,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.execution_planner import ExecutionPlanner
 from infrafoundry.core.protocols import Applyable, StateAware
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
@@ -26,6 +27,7 @@ class DeploymentExecutor:
         providers: dict[str, ProviderBase],
         console: Console | None = None,
         runner_priorities: dict[str, int] | None = None,
+        provider_order: list[str] | None = None,
     ) -> None:
         """Initialize deployment executor.
 
@@ -36,6 +38,8 @@ class DeploymentExecutor:
             providers: Dict of registered provider instances
             console: Rich console for output (creates default if None)
             runner_priorities: Optional dict mapping runner names to priorities
+            provider_order: Optional list defining provider execution order.
+                           Providers earlier in the list are executed first.
         """
         self.runner_registry = runner_registry
         self.state_manager = state_manager
@@ -43,6 +47,10 @@ class DeploymentExecutor:
         self.providers = providers
         self.console = console or Console()
         self.runner_priorities = runner_priorities or {}
+        self.provider_order = provider_order
+
+        # Create execution planner with configured provider order
+        self.execution_planner = ExecutionPlanner(provider_order=provider_order)
 
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
@@ -95,15 +103,9 @@ class DeploymentExecutor:
         """
         results = {}
 
-        # Define provider execution order
-        # Providers earlier in the list are applied first
-        # Infrastructure providers (network, compute) run before application providers (kubernetes)
-        provider_order = ["opnsense", "proxmox", "oci", "kubernetes"]
-
-        # Sort providers by defined order, putting undefined ones at the end
-        sorted_providers = sorted(
-            resources_by_provider.keys(),
-            key=lambda p: provider_order.index(p) if p in provider_order else len(provider_order),
+        # Sort providers using execution planner (forward order for apply)
+        sorted_providers = self.execution_planner.sort_providers(
+            list(resources_by_provider.keys()), reverse=False
         )
 
         for provider_name in sorted_providers:
@@ -147,7 +149,11 @@ class DeploymentExecutor:
         auto_approve: bool,
         max_workers: int,
     ) -> dict[str, Any]:
-        """Apply providers in parallel.
+        """Apply providers in parallel, respecting provider execution order.
+
+        Providers are processed in batches based on their execution order.
+        Providers within the same batch can run in parallel, but batches
+        are processed sequentially to respect provider dependencies.
 
         Args:
             env_name: Environment name
@@ -160,67 +166,90 @@ class DeploymentExecutor:
         Returns:
             Dict with apply results per provider
         """
-        results = {}
+        results: dict[str, Any] = {}
+
+        # Get execution batches from planner (forward order for apply)
+        batches = self.execution_planner.plan_apply(resources_by_provider)
+
+        total_providers = sum(len(batch.providers) for batch in batches)
         self.console.print(
-            f"\n[bold cyan]Applying {len(resources_by_provider)} providers in parallel "
-            f"(max {max_workers} workers)...[/bold cyan]"
+            f"\n[bold cyan]Applying {total_providers} providers in {len(batches)} batch(es) "
+            f"(max {max_workers} workers per batch)...[/bold cyan]"
         )
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all provider apply tasks
-            future_to_provider = {}
-            for provider_name, resources in resources_by_provider.items():
+        # Process each batch sequentially
+        for batch_idx, batch in enumerate(batches, 1):
+            batch_providers = []
+
+            # Filter to providers we have registered and have matching resources
+            for provider_name in batch.providers:
                 if provider_name not in self.providers:
                     continue
 
-                provider = self.providers[provider_name]
+                resources = batch.resources_by_provider.get(provider_name, [])
 
-                # Set environment for provider to ensure correct output directory
-                provider.set_environment(env_name)
-
-                # Check if any resources match filter for this provider
+                # Apply resource filter
                 if resource_filter:
                     resources = [r for r in resources if r.name in resource_filter]
                     if not resources:
-                        continue  # Skip provider if no matching resources
+                        continue
 
-                future = executor.submit(
-                    self.apply_single_provider,
-                    env_name=env_name,
-                    deployment_id=deployment_id,
-                    provider_name=provider_name,
-                    provider=provider,
-                    resources=resources,
-                    auto_approve=auto_approve,
-                )
-                future_to_provider[future] = provider_name
+                batch_providers.append((provider_name, resources))
 
-            # Collect results as they complete
-            with Progress(
-                SpinnerColumn(), TextColumn("[progress.description]{task.description}")
-            ) as progress:
-                task = progress.add_task(
-                    "[cyan]Applying providers...", total=len(future_to_provider)
+            if not batch_providers:
+                continue
+
+            if len(batches) > 1:
+                self.console.print(
+                    f"\n[dim]Batch {batch_idx}/{len(batches)}: "
+                    f"{', '.join(p[0] for p in batch_providers)}[/dim]"
                 )
 
-                for future in as_completed(future_to_provider):
-                    provider_name = future_to_provider[future]
-                    try:
-                        result = future.result()
-                        results[provider_name] = result
-                        self.console.print(f"[green]✓ {provider_name} completed[/green]")
-                    except InfraFoundryError as e:
-                        self.console.print(f"[red]✗ {provider_name} failed: {e.message}[/red]")
-                        if e.context:
-                            self.console.print(f"  Context: {e.context}", style="dim red")
-                        results[provider_name] = {"error": str(e)}
-                    except Exception as e:
-                        self.console.print(f"[red]✗ {provider_name} failed (unexpected): {e}[/red]")
-                        self.console.print(
-                            traceback.format_exc(), style="dim red"
-                        )  # Log full traceback
-                        results[provider_name] = {"error": str(e)}
-                    progress.update(task, advance=1)
+            # Run providers in this batch in parallel
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_provider: dict[Any, str] = {}
+
+                for provider_name, resources in batch_providers:
+                    provider = self.providers[provider_name]
+                    provider.set_environment(env_name)
+
+                    future = executor.submit(
+                        self.apply_single_provider,
+                        env_name=env_name,
+                        deployment_id=deployment_id,
+                        provider_name=provider_name,
+                        provider=provider,
+                        resources=resources,
+                        auto_approve=auto_approve,
+                    )
+                    future_to_provider[future] = provider_name
+
+                # Collect results as they complete
+                with Progress(
+                    SpinnerColumn(), TextColumn("[progress.description]{task.description}")
+                ) as progress:
+                    task = progress.add_task(
+                        "[cyan]Applying providers...", total=len(future_to_provider)
+                    )
+
+                    for future in as_completed(future_to_provider):
+                        provider_name = future_to_provider[future]
+                        try:
+                            result = future.result()
+                            results[provider_name] = result
+                            self.console.print(f"[green]✓ {provider_name} completed[/green]")
+                        except InfraFoundryError as e:
+                            self.console.print(f"[red]✗ {provider_name} failed: {e.message}[/red]")
+                            if e.context:
+                                self.console.print(f"  Context: {e.context}", style="dim red")
+                            results[provider_name] = {"error": str(e)}
+                        except Exception as e:
+                            self.console.print(
+                                f"[red]✗ {provider_name} failed (unexpected): {e}[/red]"
+                            )
+                            self.console.print(traceback.format_exc(), style="dim red")
+                            results[provider_name] = {"error": str(e)}
+                        progress.update(task, advance=1)
 
         return results
 

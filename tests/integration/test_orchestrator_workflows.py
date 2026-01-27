@@ -26,6 +26,7 @@ def mock_providers(tmp_path):
     proxmox.generate_ansible = Mock()
     proxmox.validate_config = Mock()
     proxmox.get_resource_types = Mock(return_value=["vm", "network", "template"])
+    proxmox.get_dependencies = Mock(return_value={})  # No dependencies defined
 
     return {"proxmox": proxmox}
 
@@ -53,6 +54,7 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     env_config_mock = Mock()
     env_config_mock.runner_priorities = {}
     env_config_mock.hooks = None  # No lifecycle hooks configured
+    env_config_mock.provider_order = []  # Use default provider order
     env_config_mock.model_dump.return_value = mock_config["environment"]
 
     config_manager.load_environment = Mock(return_value=env_config_mock)
@@ -577,6 +579,7 @@ class TestMultiProviderWorkflow:
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
         kubernetes.get_resource_types = Mock(return_value=["deployment", "service"])
+        kubernetes.get_dependencies = Mock(return_value={})
         mock_providers["kubernetes"] = kubernetes
         orchestrator.providers = mock_providers
 
@@ -611,6 +614,7 @@ class TestMultiProviderWorkflow:
         kubernetes.generate_terraform = Mock()
         kubernetes.generate_ansible = Mock()
         kubernetes.get_resource_types = Mock(return_value=["deployment", "service"])
+        kubernetes.get_dependencies = Mock(return_value={})
         mock_providers["kubernetes"] = kubernetes
         orchestrator.providers = mock_providers
 
@@ -658,6 +662,8 @@ class TestMultiProviderWorkflow:
         opnsense.ensure_directories = Mock()
         opnsense.generate_terraform = Mock()
         opnsense.generate_ansible = Mock()
+        opnsense.get_resource_types = Mock(return_value=["rule", "alias"])
+        opnsense.get_dependencies = Mock(return_value={})
         mock_providers["opnsense"] = opnsense
         orchestrator.providers = mock_providers
 
