@@ -13,6 +13,7 @@ from infrafoundry.core.dependencies import DependencyGraph
 from infrafoundry.core.deployment_executor import DeploymentExecutor
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import Event, EventManager, EventType
+from infrafoundry.core.execution_planner import ExecutionPlanner
 from infrafoundry.core.hooks import HookManager
 from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.orchestrator_workflows import (
@@ -255,14 +256,57 @@ class Orchestrator:
             resources_by_provider.setdefault(resource.provider, []).append(resource)
         return all_resources, resources_by_provider
 
+    def _create_execution_planner(self, env_name: str) -> ExecutionPlanner:
+        """Create an execution planner for an environment.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            ExecutionPlanner configured with environment's provider order
+        """
+        env_config = self.config_manager.load_environment(env_name)
+        provider_order = None
+        if env_config and env_config.provider_order:
+            provider_order = env_config.provider_order
+
+        # Optionally include dependency graph for cross-provider deps
+        dependency_graph = self.build_dependency_graph(env_name)
+
+        return ExecutionPlanner(
+            provider_order=provider_order,
+            dependency_graph=dependency_graph,
+        )
+
     def _iter_provider_batches(
         self,
         resources_by_provider: dict[str, list[ResourceConfig]],
         resource_filter: list[str] | None,
+        reverse: bool = False,
+        env_name: str | None = None,
     ) -> list[ProviderResourceBatch]:
-        """Yield provider batches applying an optional resource name filter."""
+        """Yield provider batches applying an optional resource name filter.
+
+        Args:
+            resources_by_provider: Dict mapping provider names to resources
+            resource_filter: Optional list of resource names to filter by
+            reverse: If True, return batches in reverse order (for destroy)
+            env_name: Optional environment name for loading provider order config
+
+        Returns:
+            List of ProviderResourceBatch in execution order
+        """
+        # Create execution planner with environment config
+        planner = self._create_execution_planner(env_name) if env_name else ExecutionPlanner()
+
+        # Get sorted provider order
+        sorted_providers = planner.sort_providers(
+            list(resources_by_provider.keys()), reverse=reverse
+        )
+
         batches: list[ProviderResourceBatch] = []
-        for provider_name, resources in resources_by_provider.items():
+        for provider_name in sorted_providers:
+            resources = resources_by_provider.get(provider_name, [])
             original_count = len(resources)
             filtered_resources = resources
             if resource_filter:
@@ -483,10 +527,15 @@ class Orchestrator:
         auto_approve: bool,
     ) -> dict[str, Any]:
         """Apply providers sequentially."""
-        # Load runner priorities from environment config
+        # Load runner priorities and provider order from environment config
         env_config = self.config_manager.load_environment(env_name)
         if env_config:
             self.deployment_executor.runner_priorities = env_config.runner_priorities
+            # Update execution planner with environment-specific provider order
+            self.deployment_executor.provider_order = env_config.provider_order or None
+            self.deployment_executor.execution_planner = ExecutionPlanner(
+                provider_order=env_config.provider_order or None
+            )
 
         return self.deployment_executor.apply_serial(
             env_name, deployment_id, resources_by_provider, resource_filter, auto_approve
@@ -502,10 +551,15 @@ class Orchestrator:
         max_workers: int,
     ) -> dict[str, Any]:
         """Apply providers in parallel."""
-        # Load runner priorities from environment config
+        # Load runner priorities and provider order from environment config
         env_config = self.config_manager.load_environment(env_name)
         if env_config:
             self.deployment_executor.runner_priorities = env_config.runner_priorities
+            # Update execution planner with environment-specific provider order
+            self.deployment_executor.provider_order = env_config.provider_order or None
+            self.deployment_executor.execution_planner = ExecutionPlanner(
+                provider_order=env_config.provider_order or None
+            )
 
         return self.deployment_executor.apply_parallel(
             env_name,
