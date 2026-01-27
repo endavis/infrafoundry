@@ -14,6 +14,7 @@ class EventType(str, Enum):
     - Validation events: Config validation
     - Drift events: Drift detection
     - Policy events: Policy enforcement
+    - Hook events: Lifecycle hook execution
     """
 
     # Planning phase
@@ -66,6 +67,11 @@ class EventType(str, Enum):
     POLICY_VIOLATION = "policy_violation"
     POLICY_CHECK_PASSED = "policy_check_passed"
     POLICY_CHECK_FAILED = "policy_check_failed"
+
+    # Hook lifecycle
+    HOOK_STARTED = "hook_started"
+    HOOK_COMPLETED = "hook_completed"
+    HOOK_FAILED = "hook_failed"
 
 
 class HandlerType(str, Enum):

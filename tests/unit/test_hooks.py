@@ -556,3 +556,141 @@ class TestHookExecutionError:
         error = HookExecutionError("Hook failed", result)
         assert error.result == result
         assert "Hook failed" in str(error)
+
+
+@pytest.mark.unit
+class TestHookEventsIntegration:
+    """Tests for hook events integration."""
+
+    def test_hook_emits_events_on_success(
+        self, temp_config_dir, executable_script, mock_secret_manager_factory
+    ):
+        """Test that successful hook emits HOOK_STARTED and HOOK_COMPLETED events."""
+        from unittest.mock import MagicMock
+
+        from infrafoundry.core.events import EventManager, EventType
+
+        mock_event_manager = MagicMock(spec=EventManager)
+
+        manager = HookManager(
+            config_base_dir=temp_config_dir,
+            secret_manager_factory=mock_secret_manager_factory,
+            event_manager=mock_event_manager,
+        )
+        hook = HookConfig(script="scripts/test-hook.sh", description="Test hook")
+        hooks_config = HooksConfig(before_plan=[hook])
+
+        manager.execute_environment_hooks(
+            env_name="test-env",
+            stage="before_plan",
+            hooks_config=hooks_config,
+        )
+
+        # Should have emitted HOOK_STARTED and HOOK_COMPLETED
+        calls = mock_event_manager.emit_event.call_args_list
+        assert len(calls) == 2
+
+        # First call: HOOK_STARTED
+        assert calls[0][0][0] == EventType.HOOK_STARTED
+        assert calls[0][0][1] == "test-env"
+        assert calls[0][0][2]["script"] == "scripts/test-hook.sh"
+        assert calls[0][0][2]["stage"] == "before_plan"
+
+        # Second call: HOOK_COMPLETED
+        assert calls[1][0][0] == EventType.HOOK_COMPLETED
+        assert calls[1][0][1] == "test-env"
+        assert calls[1][0][2]["success"] is True
+
+    def test_hook_emits_events_on_failure(
+        self, temp_config_dir, failing_script, mock_secret_manager_factory
+    ):
+        """Test that failing hook emits HOOK_STARTED and HOOK_FAILED events."""
+        from unittest.mock import MagicMock
+
+        from infrafoundry.core.events import EventManager, EventType
+
+        mock_event_manager = MagicMock(spec=EventManager)
+
+        manager = HookManager(
+            config_base_dir=temp_config_dir,
+            secret_manager_factory=mock_secret_manager_factory,
+            event_manager=mock_event_manager,
+        )
+        hook = HookConfig(script="scripts/failing-hook.sh", continue_on_error=True)
+        hooks_config = HooksConfig(before_plan=[hook])
+
+        manager.execute_environment_hooks(
+            env_name="test-env",
+            stage="before_plan",
+            hooks_config=hooks_config,
+        )
+
+        # Should have emitted HOOK_STARTED and HOOK_FAILED
+        calls = mock_event_manager.emit_event.call_args_list
+        assert len(calls) == 2
+
+        # First call: HOOK_STARTED
+        assert calls[0][0][0] == EventType.HOOK_STARTED
+
+        # Second call: HOOK_FAILED
+        assert calls[1][0][0] == EventType.HOOK_FAILED
+        assert calls[1][0][2]["success"] is False
+        assert "error_message" in calls[1][0][2]
+
+    def test_hook_no_events_without_event_manager(
+        self, temp_config_dir, executable_script, mock_secret_manager_factory
+    ):
+        """Test that hooks work without event manager (no events emitted)."""
+        manager = HookManager(
+            config_base_dir=temp_config_dir,
+            secret_manager_factory=mock_secret_manager_factory,
+            event_manager=None,  # No event manager
+        )
+        hook = HookConfig(script="scripts/test-hook.sh")
+        hooks_config = HooksConfig(before_plan=[hook])
+
+        # Should not raise any errors
+        results = manager.execute_environment_hooks(
+            env_name="test-env",
+            stage="before_plan",
+            hooks_config=hooks_config,
+        )
+
+        assert len(results) == 1
+        assert results[0].success is True
+
+    def test_hook_events_include_resource_info(
+        self, temp_config_dir, executable_script, mock_secret_manager_factory
+    ):
+        """Test that resource hooks include resource info in events."""
+        from unittest.mock import MagicMock
+
+        from infrafoundry.core.events import EventManager
+
+        mock_event_manager = MagicMock(spec=EventManager)
+
+        manager = HookManager(
+            config_base_dir=temp_config_dir,
+            secret_manager_factory=mock_secret_manager_factory,
+            event_manager=mock_event_manager,
+        )
+        hook = HookConfig(script="scripts/test-hook.sh")
+        hooks_config = HooksConfig(before_plan=[hook])
+
+        manager.execute_resource_hooks(
+            env_name="test-env",
+            stage="before_plan",
+            resource_name="my-vm",
+            provider_name="proxmox",
+            hooks_config=hooks_config,
+        )
+
+        # Check that resource info is in event data
+        calls = mock_event_manager.emit_event.call_args_list
+        assert len(calls) == 2
+
+        # Both events should include resource info
+        for call in calls:
+            data = call[0][2]
+            assert data["resource_name"] == "my-vm"
+            assert data["provider_name"] == "proxmox"
