@@ -40,6 +40,12 @@ class OPNsenseProviderSettings(TypedDict, total=False):
     api_secret: str
 
 
+class KubernetesProviderSettings(TypedDict, total=False):
+    """Provider settings expected by the Kubernetes provider."""
+
+    kubeconfig_path: str
+
+
 class OPNsenseEnvironmentConfig(TypedDict, total=False):
     """Subset of the environment configuration consumed by OPNsense."""
 
@@ -146,6 +152,7 @@ __all__ = [
     "DeploymentMetadata",
     "DestroyDeploymentMetadata",
     "EnvironmentData",
+    "KubernetesProviderSettings",
     "OCIProviderSettings",
     "OPNsenseEnvironmentConfig",
     "OPNsenseProviderSettings",

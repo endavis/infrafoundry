@@ -1,8 +1,14 @@
 """Validation framework for pre-flight checks before infrastructure changes."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from infrafoundry.core.provider import ResourceConfig
+    from infrafoundry.core.types import EnvironmentData
 
 
 class ValidationLevel(Enum):
@@ -115,3 +121,64 @@ class ValidationReport:
             lines.append(f"  {result}")
 
         return "\n".join(lines)
+
+
+@runtime_checkable
+class ProviderValidator(Protocol):
+    """Protocol defining the standard interface for provider validators.
+
+    All provider validators should implement this protocol to ensure
+    consistent validation behavior across providers.
+
+    Attributes:
+        env_config: Environment configuration including provider_settings
+        report: ValidationReport to add results to
+
+    Example:
+        class MyProviderValidator:
+            def __init__(
+                self,
+                env_config: EnvironmentData,
+                report: ValidationReport,
+            ) -> None:
+                self.env_config = env_config
+                self.report = report
+
+            def validate_connectivity(self) -> None:
+                # Check API connectivity
+                ...
+
+            def validate_references(self, resources: list[ResourceConfig]) -> None:
+                # Validate resource references
+                ...
+    """
+
+    env_config: EnvironmentData
+    report: ValidationReport
+
+    def validate_connectivity(self) -> None:
+        """Validate connectivity to the provider's API.
+
+        Should check:
+        - Required credentials are present
+        - API endpoint is reachable
+        - Authentication is valid
+
+        Results should be added to self.report.
+        """
+        ...
+
+    def validate_references(self, resources: list[ResourceConfig]) -> None:
+        """Validate resource references against live state or config.
+
+        Should check:
+        - Referenced resources exist (in config or live API)
+        - No duplicate identifiers
+        - Cross-resource references are valid
+
+        Args:
+            resources: List of resources to validate
+
+        Results should be added to self.report.
+        """
+        ...
