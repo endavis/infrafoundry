@@ -28,6 +28,10 @@ bootcmd:
   - systemctl restart systemd-resolved
   # Force IPv4 for apt (IPv6 can timeout on some networks)
   - printf 'Acquire::ForceIPv4 "true";\n' > /etc/apt/apt.conf.d/99force-ipv4
+  # NOTE: K3s iptables rules (VXLAN, kubelet API) are applied by Ansible
+  # AFTER K3s installation. See roles/k3s-server/ and roles/k3s-agent/.
+  # Applying them here in cloud-init doesn't work because K3s removes the
+  # UDP 8472 rule during initialization.
 
 runcmd:
   # Install Tailscale with retry logic
