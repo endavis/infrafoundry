@@ -1,5 +1,7 @@
 """List resources in an environment command."""
 
+from typing import Any
+
 import click
 
 from infrafoundry.core.config import ConfigManager
@@ -9,6 +11,7 @@ from infrafoundry.core.exceptions import (
     InfraFoundryError,
 )
 
+from ...output import BULLET, output_data
 from ...utils import console, raise_cli_error
 
 
@@ -16,8 +19,21 @@ from ...utils import console, raise_cli_error
 @click.option("--env", "-e", required=True, help="Environment name")
 @click.option("--provider", "-p", help="Filter by provider (e.g., proxmox, opnsense)")
 @click.option("--type", "-t", help="Filter by resource type (e.g., vms, firewall_rules)")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format (default: text)",
+)
 @click.pass_context
-def list_resources(ctx: click.Context, env: str, provider: str | None, type: str | None) -> None:
+def list_resources(
+    ctx: click.Context,
+    env: str,
+    provider: str | None,
+    type: str | None,
+    output_format: str,
+) -> None:
     """List all resources in an environment."""
     try:
         config_repo = ctx.obj.get("config_dir")
@@ -36,6 +52,10 @@ def list_resources(ctx: click.Context, env: str, provider: str | None, type: str
             all_resources = [r for r in all_resources if r.type == type]
 
         if not all_resources:
+            if output_format == "json":
+                output_data({"environment": env, "resources": [], "total": 0}, output_format)
+                return
+
             if type and provider:
                 console.warning(f"No resources found with provider '{provider}' and type '{type}'")
             elif type:
@@ -46,16 +66,31 @@ def list_resources(ctx: click.Context, env: str, provider: str | None, type: str
                 console.warning("No resources found")
             return
 
-        console.header(f"Resources in {env}:")
-
         # Sort all resources by name
         all_resources.sort(key=lambda r: r.name)
 
-        # Display each resource on a single line
-        for resource in all_resources:
-            console.info(f"  • {resource.name:<40} {resource.provider:<12} ({resource.type})")
+        # Build data structure
+        resource_data: list[dict[str, Any]] = [
+            {
+                "name": r.name,
+                "provider": r.provider,
+                "type": r.type,
+            }
+            for r in all_resources
+        ]
 
-        console.info(f"Total: {len(all_resources)} resources")
+        if output_format == "json":
+            output_data(
+                {"environment": env, "resources": resource_data, "total": len(resource_data)},
+                output_format,
+            )
+        else:
+            console.header(f"Resources in {env}:")
+            for resource in all_resources:
+                console.info(
+                    f"  {BULLET} {resource.name:<40} {resource.provider:<12} ({resource.type})"
+                )
+            console.info(f"Total: {len(all_resources)} resources")
 
     except click.ClickException:
         raise

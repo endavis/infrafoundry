@@ -4,10 +4,13 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
 from rich.table import Table
+
+from ..output import output_data
 
 console = Console()
 
@@ -163,22 +166,30 @@ def _check_sops_keys() -> CheckResult:
 
 
 @click.command()
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format (default: text)",
+)
 @click.pass_context
-def doctor(ctx: click.Context) -> None:
+def doctor(ctx: click.Context, output_format: str) -> None:
     """Check InfraFoundry setup and dependencies.
 
     Validates that all required tools are installed and properly configured.
     """
     config_dir = ctx.obj.get("config_dir")
 
-    console.print()
-    console.print("[bold cyan]InfraFoundry Doctor[/bold cyan]")
-    console.print()
-
     results: list[CheckResult] = []
 
     # Check dependencies
-    console.print("[bold]Checking dependencies...[/bold]")
+    if output_format == "text":
+        console.print()
+        console.print("[bold cyan]InfraFoundry Doctor[/bold cyan]")
+        console.print()
+        console.print("[bold]Checking dependencies...[/bold]")
+
     results.append(
         _check_dependency(
             "Terraform",
@@ -209,52 +220,76 @@ def doctor(ctx: click.Context) -> None:
     )
 
     # Check configuration
-    console.print("[bold]Checking configuration...[/bold]")
+    if output_format == "text":
+        console.print("[bold]Checking configuration...[/bold]")
+
     results.append(_check_config_repo(config_dir))
     results.append(_check_environments(config_dir))
     results.append(_check_state_backend())
     results.append(_check_sops_keys())
 
-    # Display results
-    console.print()
-    table = Table(title="Health Check Results", show_header=True)
-    table.add_column("Check", style="cyan")
-    table.add_column("Status")
-    table.add_column("Details")
+    # Count errors and warnings
+    errors = sum(1 for r in results if r.status == "error")
+    warnings = sum(1 for r in results if r.status == "warning")
 
-    status_icons = {
-        "ok": "[green]OK[/green]",
-        "warning": "[yellow]WARN[/yellow]",
-        "error": "[red]FAIL[/red]",
-    }
+    if output_format == "json":
+        # Build JSON output
+        check_data: list[dict[str, Any]] = []
+        for result in results:
+            check_dict: dict[str, Any] = {
+                "name": result.name,
+                "status": result.status,
+                "message": result.message,
+            }
+            if result.suggestion:
+                check_dict["suggestion"] = result.suggestion
+            check_data.append(check_dict)
 
-    errors = 0
-    warnings = 0
-
-    for result in results:
-        status_display = status_icons.get(result.status, result.status)
-        details = result.message
-        if result.suggestion:
-            details += f"\n[dim]{result.suggestion}[/dim]"
-        table.add_row(result.name, status_display, details)
-
-        if result.status == "error":
-            errors += 1
-        elif result.status == "warning":
-            warnings += 1
-
-    console.print(table)
-    console.print()
-
-    # Summary
-    if errors > 0:
-        console.print(f"[red]Found {errors} error(s) and {warnings} warning(s)[/red]")
-        console.print("[dim]Fix errors before using InfraFoundry[/dim]")
-    elif warnings > 0:
-        console.print(f"[yellow]Found {warnings} warning(s)[/yellow]")
-        console.print("[dim]InfraFoundry should work but some features may be limited[/dim]")
+        output_data(
+            {
+                "checks": check_data,
+                "summary": {
+                    "total": len(results),
+                    "errors": errors,
+                    "warnings": warnings,
+                    "ok": len(results) - errors - warnings,
+                },
+            },
+            output_format,
+        )
     else:
-        console.print("[green]All checks passed![/green]")
-        console.print("[dim]InfraFoundry is ready to use[/dim]")
+        # Display results as table
+        console.print()
+        table = Table(title="Health Check Results", show_header=True)
+        table.add_column("Check", style="cyan")
+        table.add_column("Status")
+        table.add_column("Details")
 
-    console.print()
+        status_icons = {
+            "ok": "[green]OK[/green]",
+            "warning": "[yellow]WARN[/yellow]",
+            "error": "[red]FAIL[/red]",
+        }
+
+        for result in results:
+            status_display = status_icons.get(result.status, result.status)
+            details = result.message
+            if result.suggestion:
+                details += f"\n[dim]{result.suggestion}[/dim]"
+            table.add_row(result.name, status_display, details)
+
+        console.print(table)
+        console.print()
+
+        # Summary
+        if errors > 0:
+            console.print(f"[red]Found {errors} error(s) and {warnings} warning(s)[/red]")
+            console.print("[dim]Fix errors before using InfraFoundry[/dim]")
+        elif warnings > 0:
+            console.print(f"[yellow]Found {warnings} warning(s)[/yellow]")
+            console.print("[dim]InfraFoundry should work but some features may be limited[/dim]")
+        else:
+            console.print("[green]All checks passed![/green]")
+            console.print("[dim]InfraFoundry is ready to use[/dim]")
+
+        console.print()

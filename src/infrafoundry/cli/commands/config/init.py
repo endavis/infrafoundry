@@ -11,6 +11,7 @@ import yaml
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.exceptions import EnvironmentNotFoundError
 
+from ...output import BULLET
 from ...utils import console
 
 
@@ -180,7 +181,7 @@ def init(
             try:
                 config_manager = ConfigManager(base_dir=envs_dir)
                 for env in config_manager.list_environments():
-                    console.info(f"  - {env}")
+                    console.info(f"  {BULLET} {env}")
             except Exception:
                 console.info("  (unable to list environments)")
             raise click.Abort() from None

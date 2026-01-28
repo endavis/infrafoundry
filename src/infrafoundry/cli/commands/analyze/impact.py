@@ -5,6 +5,7 @@ import click
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
+from ...output import BULLET
 from ...utils import console
 
 
@@ -29,7 +30,7 @@ def impact(_ctx: click.Context, orchestrator: Orchestrator, env: str, resource: 
         console.warning(f"Resource '{resource}' not found in environment '{env}'")
         console.info("\nAvailable resources:")
         for node_name in graph.nodes:
-            console.info(f"  - {node_name}")
+            console.info(f"  {BULLET} {node_name}")
         return
 
     # Display results
