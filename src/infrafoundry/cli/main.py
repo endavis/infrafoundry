@@ -174,14 +174,14 @@ def _show_welcome(ctx: click.Context) -> None:
         try:
             config_manager = ConfigManager(base_dir=config_dir / "envs")
             env_count = len(config_manager.list_environments())
-        except Exception:
+        except Exception:  # nosec B110 - intentional silent fail for welcome message
             pass
     elif config_repo := os.getenv("INFRAFOUNDRY_CONFIG_REPO"):
         config_status = config_repo
         try:
             config_manager = ConfigManager(base_dir=Path(config_repo) / "envs")
             env_count = len(config_manager.list_environments())
-        except Exception:
+        except Exception:  # nosec B110 - intentional silent fail for welcome message
             pass
 
     # Display status
