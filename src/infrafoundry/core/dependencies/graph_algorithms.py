@@ -39,18 +39,19 @@ class GraphAlgorithms:
         rec_stack = set()
         cycles = []
 
-        def dfs(node: str, path: list[str]) -> None:
+        def dfs(node: str, path: list[str], path_index: dict[str, int]) -> None:
             """Depth-first search to find cycles."""
             visited.add(node)
             rec_stack.add(node)
+            path_index[node] = len(path)
             path.append(node)
 
             for neighbor in adjacency.get(node, set()):
                 if neighbor not in visited:
-                    dfs(neighbor, path.copy())
+                    dfs(neighbor, path.copy(), path_index.copy())
                 elif neighbor in rec_stack:
-                    # Found a cycle
-                    cycle_start = path.index(neighbor)
+                    # Found a cycle - use dict for O(1) index lookup
+                    cycle_start = path_index[neighbor]
                     cycles.append([*path[cycle_start:], neighbor])
 
             rec_stack.remove(node)
@@ -62,7 +63,7 @@ class GraphAlgorithms:
 
         for node in all_nodes:
             if node not in visited:
-                dfs(node, [])
+                dfs(node, [], {})
 
         return cycles
 

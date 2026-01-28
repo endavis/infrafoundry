@@ -139,12 +139,16 @@ class ValidationOrchestrator:
 
         env_data = cast(EnvironmentData, env_config.model_dump())
         all_resources, resources_by_provider = self._load_resources(env_name)
+
+        # Convert to set for O(1) lookups
+        filter_set = set(resource_filter) if resource_filter else None
+
         filtered_resources = all_resources
-        if resource_filter:
-            filtered_resources = [r for r in all_resources if r.name in resource_filter]
+        if filter_set:
+            filtered_resources = [r for r in all_resources if r.name in filter_set]
             self.console.print(
                 f"[yellow]Validating {len(filtered_resources)} resources: "
-                f"{', '.join(resource_filter)}[/yellow]\n"
+                f"{', '.join(filter_set)}[/yellow]\n"
             )
 
         results: dict[str, Any] = {}
@@ -687,13 +691,16 @@ class ApplyOrchestrator(HookExecutionMixin):
             all_resources, resources_by_provider = self._load_resources(env_name)
             self._store_rollback_snapshot(deployment_id, env_name, all_resources)
 
+            # Convert to set for O(1) lookups
+            filter_set = set(resource_filter) if resource_filter else None
+
             # Execute environment-level before_apply hooks
             self._execute_env_hooks(env_name, "before_apply", env_config)
 
             # Execute resource-level before_apply hooks
             for resources in resources_by_provider.values():
                 for resource in resources:
-                    if not resource_filter or resource.name in resource_filter:
+                    if not filter_set or resource.name in filter_set:
                         self._execute_resource_hooks(
                             env_name, "before_apply", resource, resource.provider
                         )
@@ -719,7 +726,7 @@ class ApplyOrchestrator(HookExecutionMixin):
             # Execute resource-level after_apply hooks
             for resources in resources_by_provider.values():
                 for resource in resources:
-                    if not resource_filter or resource.name in resource_filter:
+                    if not filter_set or resource.name in filter_set:
                         self._execute_resource_hooks(
                             env_name, "after_apply", resource, resource.provider
                         )
