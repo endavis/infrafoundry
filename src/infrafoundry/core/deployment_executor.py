@@ -103,6 +103,9 @@ class DeploymentExecutor:
         """
         results = {}
 
+        # Convert to set for O(1) lookups
+        filter_set = set(resource_filter) if resource_filter else None
+
         # Sort providers using execution planner (forward order for apply)
         sorted_providers = self.execution_planner.sort_providers(
             list(resources_by_provider.keys()), reverse=False
@@ -118,8 +121,8 @@ class DeploymentExecutor:
             resources = resources_by_provider[provider_name]
 
             # Check if any resources match filter for this provider
-            if resource_filter:
-                resources = [r for r in resources if r.name in resource_filter]
+            if filter_set:
+                resources = [r for r in resources if r.name in filter_set]
                 if not resources:
                     continue  # Skip provider if no matching resources
 
@@ -168,6 +171,9 @@ class DeploymentExecutor:
         """
         results: dict[str, Any] = {}
 
+        # Convert to set for O(1) lookups
+        filter_set = set(resource_filter) if resource_filter else None
+
         # Get execution batches from planner (forward order for apply)
         batches = self.execution_planner.plan_apply(resources_by_provider)
 
@@ -189,8 +195,8 @@ class DeploymentExecutor:
                 resources = batch.resources_by_provider.get(provider_name, [])
 
                 # Apply resource filter
-                if resource_filter:
-                    resources = [r for r in resources if r.name in resource_filter]
+                if filter_set:
+                    resources = [r for r in resources if r.name in filter_set]
                     if not resources:
                         continue
 

@@ -305,6 +305,9 @@ class Orchestrator:
         # Create execution planner with environment config
         planner = self._create_execution_planner(env_name) if env_name else ExecutionPlanner()
 
+        # Convert to set for O(1) lookups
+        filter_set = set(resource_filter) if resource_filter else None
+
         # Get sorted provider order
         sorted_providers = planner.sort_providers(
             list(resources_by_provider.keys()), reverse=reverse
@@ -315,8 +318,8 @@ class Orchestrator:
             resources = resources_by_provider.get(provider_name, [])
             original_count = len(resources)
             filtered_resources = resources
-            if resource_filter:
-                filtered_resources = [r for r in resources if r.name in resource_filter]
+            if filter_set:
+                filtered_resources = [r for r in resources if r.name in filter_set]
                 if not filtered_resources:
                     continue
             batches.append(
