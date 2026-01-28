@@ -11,6 +11,7 @@ from rich.console import Console as RichConsole
 from infrafoundry.core.exceptions import InfraFoundryError
 
 from .errors import format_error, get_error_code, get_error_info
+from .output import BULLET
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -41,6 +42,15 @@ class InfraFoundryConsole:
     def info(self, message: str) -> None:
         """Print an info message."""
         self._console.print(message)
+
+    def list_item(self, message: str, indent: int = 2) -> None:
+        """Print a list item with standard bullet.
+
+        Args:
+            message: Item text
+            indent: Number of spaces before bullet (default: 2)
+        """
+        self._console.print(f"{' ' * indent}{BULLET} {message}")
 
     def status(self, message: str) -> None:
         """Print a status update."""
