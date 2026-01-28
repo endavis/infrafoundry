@@ -57,6 +57,7 @@ class TestOrchestratorInit:
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
         state_manager = Mock(spec=StateManager)
+        state_manager.SessionLocal = Mock()  # Required for AuditLogger initialization
         event_manager = Mock(spec=EventManager)
 
         orchestrator = Orchestrator(
