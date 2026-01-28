@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Config Init Command**: Added `foundry config init <env>` to create new environments, with `--from <existing>` flag to scaffold from existing environments.
+- **Config Show Command**: Added `foundry config show --env <env>` to display resolved configuration with filtering by provider, resource type, and output format (table/yaml/json).
 - **Error Code Catalog**: Added structured error codes (IF-CATEGORY-NNN) with actionable suggestions for all error types. Errors now display helpful resolution steps. See `docs/reference/errors.md` for full documentation.
 - **External Vault Integration**: Added support for Vaultwarden/Bitwarden, AWS Secrets Manager, and Azure Key Vault as secret providers.
 - **Dependency Analysis**: New command (`infra dependencies`?) to visualize and analyze resource dependencies.
