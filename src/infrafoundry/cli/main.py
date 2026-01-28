@@ -158,7 +158,58 @@ def _load_env_credentials(env_name: str, config_dir: Path | None = None) -> None
             console.print(f"[dim]Could not load env-specific credentials: {exc}[/dim]")
 
 
-@click.group()
+def _show_welcome(ctx: click.Context) -> None:
+    """Display welcome message with getting-started guidance."""
+    console.print()
+    console.print("[bold cyan]InfraFoundry[/bold cyan] - Infrastructure automation framework")
+    console.print()
+
+    # Check configuration status
+    config_dir = ctx.obj.get("config_dir")
+    config_status = "not configured"
+    env_count = 0
+
+    if config_dir:
+        config_status = str(config_dir)
+        try:
+            config_manager = ConfigManager(base_dir=config_dir / "envs")
+            env_count = len(config_manager.list_environments())
+        except Exception:
+            pass
+    elif config_repo := os.getenv("INFRAFOUNDRY_CONFIG_REPO"):
+        config_status = config_repo
+        try:
+            config_manager = ConfigManager(base_dir=Path(config_repo) / "envs")
+            env_count = len(config_manager.list_environments())
+        except Exception:
+            pass
+
+    # Display status
+    console.print("[bold]Status:[/bold]")
+    if config_dir or os.getenv("INFRAFOUNDRY_CONFIG_REPO"):
+        console.print(f"  Config repo: {config_status}")
+        console.print(f"  Environments: {env_count} available")
+    else:
+        console.print("  [yellow]Config repo: not set[/yellow]")
+        console.print("  [dim]Set INFRAFOUNDRY_CONFIG_REPO or use --config-dir[/dim]")
+
+    console.print()
+    console.print("[bold]Quick Start:[/bold]")
+    console.print("  foundry doctor          Check setup and dependencies")
+    console.print("  foundry config envs     List available environments")
+    console.print("  foundry infra plan      Generate infrastructure configs")
+    console.print("  foundry infra apply     Apply infrastructure changes")
+    console.print()
+    console.print("[bold]Environment Variables:[/bold]")
+    console.print("  INFRAFOUNDRY_CONFIG_REPO    Path to configuration repository")
+    console.print("  INFRAFOUNDRY_OUTPUT_DIR     Output directory (default: generated)")
+    console.print("  INFRAFOUNDRY_STRICT_MODE    Fail on missing secrets/snippets")
+    console.print()
+    console.print("Run [cyan]foundry --help[/cyan] for all commands")
+    console.print()
+
+
+@click.group(invoke_without_command=True)
 @click.version_option(version="0.1.0", prog_name="foundry")
 @click.option(
     "--debug",
@@ -219,17 +270,23 @@ def foundry(
     )
     ctx.obj["strict_config"] = strict_config
 
+    # Show welcome message when no subcommand is invoked
+    if ctx.invoked_subcommand is None:
+        _show_welcome(ctx)
+
 
 # Import and register command groups
 from infrafoundry.cli.commands.analyze import analyze
 from infrafoundry.cli.commands.audit import audit
 from infrafoundry.cli.commands.config import config
+from infrafoundry.cli.commands.doctor import doctor
 from infrafoundry.cli.commands.infra import infra
 from infrafoundry.cli.commands.policy import policy
 from infrafoundry.cli.commands.proxmox import proxmox
 from infrafoundry.cli.commands.secrets import secrets
 from infrafoundry.cli.commands.state import state
 
+foundry.add_command(doctor)
 foundry.add_command(infra)
 foundry.add_command(config)
 foundry.add_command(state)
