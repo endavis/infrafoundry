@@ -278,6 +278,7 @@ def foundry(
 # Import and register command groups
 from infrafoundry.cli.commands.analyze import analyze
 from infrafoundry.cli.commands.audit import audit
+from infrafoundry.cli.commands.completion import completion
 from infrafoundry.cli.commands.config import config
 from infrafoundry.cli.commands.doctor import doctor
 from infrafoundry.cli.commands.infra import infra
@@ -286,6 +287,7 @@ from infrafoundry.cli.commands.proxmox import proxmox
 from infrafoundry.cli.commands.secrets import secrets
 from infrafoundry.cli.commands.state import state
 
+foundry.add_command(completion)
 foundry.add_command(doctor)
 foundry.add_command(infra)
 foundry.add_command(config)
