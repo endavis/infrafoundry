@@ -8,6 +8,7 @@ from typing import Any
 
 from rich.console import Console
 
+from infrafoundry.core.audit import AuditLogger
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.dependencies import DependencyGraph
 from infrafoundry.core.deployment_executor import DeploymentExecutor
@@ -85,6 +86,13 @@ class Orchestrator:
         self.event_manager = event_manager or EventManager()
         self.policy_engine = PolicyEngine(policy_dir)
         self.notification_manager = NotificationManager(notifications_config)
+
+        # Initialize audit logger with event bus subscription
+        self.audit_logger = AuditLogger(
+            session_factory=self.state_manager.SessionLocal,
+            event_bus=self.event_manager,
+            get_current_user=self._get_current_user,
+        )
 
         # Provider and runner management
         self.provider_registry = ProviderRegistryService(

@@ -222,6 +222,7 @@ def foundry(
 
 # Import and register command groups
 from infrafoundry.cli.commands.analyze import analyze
+from infrafoundry.cli.commands.audit import audit
 from infrafoundry.cli.commands.config import config
 from infrafoundry.cli.commands.infra import infra
 from infrafoundry.cli.commands.policy import policy
@@ -234,6 +235,7 @@ foundry.add_command(config)
 foundry.add_command(state)
 foundry.add_command(secrets)
 foundry.add_command(analyze)
+foundry.add_command(audit)
 foundry.add_command(policy)
 foundry.add_command(proxmox)
 
