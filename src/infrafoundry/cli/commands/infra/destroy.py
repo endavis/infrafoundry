@@ -5,6 +5,7 @@ import click
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
+from ...progress import OperationTimer
 from ...utils import console
 
 
@@ -30,10 +31,11 @@ def destroy(
     def confirm_callback() -> bool:
         return click.confirm("Are you sure you want to destroy?")
 
-    orchestrator.destroy(
-        env,
-        auto_approve=auto_approve,
-        resource_filter=list(resource) if resource else None,
-        confirm_callback=confirm_callback,
-    )
-    console.success("Destroy complete!")
+    with OperationTimer() as timer:
+        orchestrator.destroy(
+            env,
+            auto_approve=auto_approve,
+            resource_filter=list(resource) if resource else None,
+            confirm_callback=confirm_callback,
+        )
+    console.success(f"Destroy complete! ({timer.elapsed_str})")

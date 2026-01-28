@@ -5,6 +5,7 @@ import click
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
+from ...progress import OperationTimer
 from ...utils import console
 
 
@@ -32,15 +33,16 @@ def plan(
     enforce_policies: bool,
 ) -> None:
     """Plan infrastructure changes."""
-    orchestrator.plan(
-        env,
-        dry_run=dry_run,
-        resource_filter=list(resource) if resource else None,
-        enforce_policies=enforce_policies,
-    )
+    with OperationTimer() as timer:
+        orchestrator.plan(
+            env,
+            dry_run=dry_run,
+            resource_filter=list(resource) if resource else None,
+            enforce_policies=enforce_policies,
+        )
 
     if dry_run:
-        console.info("Dry run complete. No files generated.")
+        console.info(f"Dry run complete. No files generated. ({timer.elapsed_str})")
     else:
-        console.success("Plan generated successfully!")
+        console.success(f"Plan generated successfully! ({timer.elapsed_str})")
         console.info("Generated files are in: generated/")
