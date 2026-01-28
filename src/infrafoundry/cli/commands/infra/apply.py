@@ -5,6 +5,7 @@ import click
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
+from ...progress import OperationTimer
 from ...utils import console
 
 
@@ -52,11 +53,12 @@ def apply(
         # User confirmed, so pass auto_approve=True to Terraform
         auto_approve = True
 
-    orchestrator.apply(
-        env,
-        auto_approve=auto_approve,
-        resource_filter=list(resource) if resource else None,
-        parallel=parallel,
-        max_workers=max_workers,
-    )
-    console.success("Apply complete!")
+    with OperationTimer() as timer:
+        orchestrator.apply(
+            env,
+            auto_approve=auto_approve,
+            resource_filter=list(resource) if resource else None,
+            parallel=parallel,
+            max_workers=max_workers,
+        )
+    console.success(f"Apply complete! ({timer.elapsed_str})")
