@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Error Code Catalog**: Added structured error codes (IF-CATEGORY-NNN) with actionable suggestions for all error types. Errors now display helpful resolution steps. See `docs/reference/errors.md` for full documentation.
 - **External Vault Integration**: Added support for Vaultwarden/Bitwarden, AWS Secrets Manager, and Azure Key Vault as secret providers.
 - **Dependency Analysis**: New command (`infra dependencies`?) to visualize and analyze resource dependencies.
 - **Proxmox Config Exporter**: Tool to extract existing Proxmox cluster configurations into InfraFoundry YAML.
@@ -18,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Schema Validation**: Added rigorous schema validation for resource configurations using Pydantic/Validator schemas.
 
 ### Changed
+- **CLI Error Handling**: Refactored error handling to use centralized error catalog. Removed `console` object and internal functions from `cli/decorators.py` (replaced by error catalog in `cli/errors.py`).
+
+### Removed
+- **`cli.decorators.console`**: Module-level `Console` object removed from `cli/decorators.py`. Use `cli.utils.console` instead if needed.
 - **Provider Registry Service**: Extracted provider and runner registration logic into a dedicated `ProviderRegistryService` to decouple it from the Orchestrator.
 - **Runner Interface**: Refactored runners to use Protocol-based interfaces (`Plannable`, `Applyable`, `Destroyable`) for better type safety and flexibility.
 - **Task Runner**: Migrated development task runner from `just` to `doit` for better Python integration and cross-platform compatibility.
