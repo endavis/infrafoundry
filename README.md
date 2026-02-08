@@ -7,7 +7,7 @@ A pluggable infrastructure code generator and orchestration framework that turns
 ## Audience and Prerequisites
 
 - **Audience:** Platform/infrastructure engineers and contributors building or operating InfraFoundry.
-- **Prereqs:** Python 3.12+, `uv`, Terraform ≥1.6, Ansible ≥2.15, SOPS + age, direnv (optional), and access to a config repo (`INFRAFOUNDRY_CONFIG_REPO` or `--config-dir`).
+- **Prereqs:** Python 3.12+, `uv`, Terraform ≥1.6 or OpenTofu ≥1.6, Ansible ≥2.15, SOPS + age, direnv (optional), and access to a config repo (`INFRAFOUNDRY_CONFIG_REPO` or `--config-dir`).
 
 ## When to Use This
 

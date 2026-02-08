@@ -193,6 +193,71 @@ def _install_terraform() -> None:
     print(f"Terraform {latest_version} installed to {install_dir}")
 
 
+def _install_opentofu() -> None:
+    """Install OpenTofu."""
+    url = "https://api.github.com/repos/opentofu/opentofu/releases/latest"
+    try:
+        request = urllib.request.Request(url)
+        github_token = os.environ.get("GITHUB_TOKEN")
+        if github_token:
+            request.add_header("Authorization", f"token {github_token}")
+        with urllib.request.urlopen(request) as response:
+            data = json.loads(response.read().decode())
+            latest_version = data["tag_name"].lstrip("v")
+    except Exception as e:
+        print(f"Failed to fetch latest OpenTofu version: {e}")
+        return
+
+    if shutil.which("tofu"):
+        current_json = subprocess.getoutput("tofu version -json")
+        try:
+            current_version = json.loads(current_json)["terraform_version"]
+            if current_version == latest_version:
+                print(f"OpenTofu already up to date: {latest_version}")
+                return
+            print(f"Current version: {current_version}, upgrading to: {latest_version}")
+        except Exception:
+            print("Could not parse current OpenTofu version, reinstalling...")
+
+    print(f"Installing OpenTofu {latest_version}...")
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+
+    if machine == "x86_64":
+        arch = "amd64"
+    elif machine in ("aarch64", "arm64"):
+        arch = "arm64"
+    else:
+        arch = "amd64"
+
+    if system == "linux":
+        os_name = "linux"
+    elif system == "darwin":
+        os_name = "darwin"
+    else:
+        print(f"Unsupported OS: {system}")
+        sys.exit(1)
+
+    zip_name = f"tofu_{latest_version}_{os_name}_{arch}.zip"
+    download_url = (
+        f"https://github.com/opentofu/opentofu/releases/download/"
+        f"v{latest_version}/{zip_name}"
+    )
+    zip_path = "/tmp/opentofu.zip"
+
+    print(f"Downloading {download_url}...")
+    urllib.request.urlretrieve(download_url, zip_path)
+
+    install_dir = os.path.expanduser("~/.local/bin")
+    os.makedirs(install_dir, exist_ok=True)
+
+    print(f"Unzipping to {install_dir}...")
+    _run_cmd(f"unzip -o {zip_path} tofu -d {install_dir}")
+    _run_cmd(f"chmod +x {install_dir}/tofu")
+    os.remove(zip_path)
+    print(f"OpenTofu {latest_version} installed to {install_dir}")
+
+
 def _install_ansible() -> None:
     """Install Ansible via uv."""
     in_venv = (
@@ -242,6 +307,14 @@ def task_install_terraform() -> dict[str, Any]:
     }
 
 
+def task_install_opentofu() -> dict[str, Any]:
+    """Install OpenTofu."""
+    return {
+        "actions": [_install_opentofu],
+        "title": title_with_actions,
+    }
+
+
 def task_install_ansible() -> dict[str, Any]:
     """Install Ansible via uv."""
     return {
@@ -259,6 +332,7 @@ def task_install_deps() -> dict[str, Any]:
             "install_age",
             "install_sops",
             "install_terraform",
+            "install_opentofu",
             "install_ansible",
         ],
         "title": title_with_actions,

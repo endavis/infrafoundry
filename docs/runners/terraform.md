@@ -63,6 +63,7 @@ infra apply --env dev
 
 ## Related Documentation
 
+- [OpenTofu Runner](opentofu.md) - Open-source alternative using the same `.tf` format
 - [Runner Execution Overview](overview.md)
 - [Configuration Guide](../configuration/overview.md)
 - [State Management](../architecture/state-management.md)

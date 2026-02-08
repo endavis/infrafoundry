@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from infrafoundry.core.config import ConfigManager
-from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
@@ -31,6 +31,9 @@ from infrafoundry.core.types import (
     RollbackDeploymentMetadata,
 )
 from infrafoundry.core.validation import ValidationReport
+
+# Registry keys for mutually exclusive IaC runners
+_IAC_TOOL_KEYS = {tool.value for tool in IaCTool}
 
 
 @dataclass(slots=True)
@@ -313,14 +316,28 @@ class PlanOrchestrator(HookExecutionMixin):
             if runner:
                 self.runners[tool_name] = runner
 
-    def _get_sorted_runners(self, priorities: dict[str, int]) -> list[tuple[str, BaseRunner]]:
-        """Get runners sorted by priority."""
+    def _get_sorted_runners(
+        self,
+        priorities: dict[str, int],
+        iac_tool: IaCTool = IaCTool.TERRAFORM,
+    ) -> list[tuple[str, BaseRunner]]:
+        """Get runners sorted by priority, filtering by configured IaC tool.
+
+        Only the IaC runner matching *iac_tool* is included; the other
+        IaC runner is skipped.  Non-IaC runners are always included.
+        """
 
         def get_priority(item: tuple[str, BaseRunner]) -> int:
             name, runner = item
             return priorities.get(name, runner.priority)
 
-        return sorted(self.runners.items(), key=get_priority)
+        active_iac = iac_tool.value
+        filtered = {
+            name: runner
+            for name, runner in self.runners.items()
+            if name not in _IAC_TOOL_KEYS or name == active_iac
+        }
+        return sorted(filtered.items(), key=get_priority)
 
     def plan(
         self,
@@ -396,7 +413,8 @@ class PlanOrchestrator(HookExecutionMixin):
                     provider.ensure_directories()
                     self._export_secrets(provider_name, env_name, provider)
 
-                    for tool_name, runner in self._get_sorted_runners(runner_priorities):
+                    iac_tool = env_config.iac_tool if env_config else IaCTool.TERRAFORM
+                    for tool_name, runner in self._get_sorted_runners(runner_priorities, iac_tool):
                         generate_method = getattr(provider, f"generate_{tool_name}", None)
                         if generate_method and callable(generate_method):
                             if not isinstance(runner, Plannable):
@@ -910,7 +928,11 @@ class DestroyOrchestrator(HookExecutionMixin):
                 )
 
                 provider_results: dict[str, Any] = {}
+                active_iac = env_config.iac_tool.value if env_config else IaCTool.TERRAFORM.value
                 for tool_name, runner in self.runners.items():
+                    # Skip IaC runners that don't match the configured tool
+                    if tool_name in _IAC_TOOL_KEYS and tool_name != active_iac:
+                        continue
                     if not isinstance(runner, Destroyable):
                         self.console.print(
                             f"  [dim]Skipping {tool_name}: does not support destroy[/dim]"
