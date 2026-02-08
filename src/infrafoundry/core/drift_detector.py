@@ -4,6 +4,7 @@ from typing import Any, override
 
 from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.config.models import IaCTool
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import (
     ConfigurationError,
@@ -74,10 +75,18 @@ class DriftDetector(BaseManager):
         results = {}
         drift_detected = False
 
-        # Dynamically create the runner
-        terraform_runner = self.runner_registry.create_runner("terraform")
+        # Resolve IaC tool from environment config
+        iac_tool = IaCTool.TERRAFORM
+        try:
+            env_config = self.config_manager.load_environment(env_name)
+            iac_tool = env_config.iac_tool
+        except FileNotFoundError:
+            pass  # Use default (terraform) when no env config exists
+
+        # Dynamically create the runner for the configured IaC tool
+        terraform_runner = self.runner_registry.create_runner(iac_tool.value)
         if not terraform_runner:
-            raise InfraFoundryError("Could not create terraform runner")
+            raise InfraFoundryError(f"Could not create {iac_tool.value} runner")
 
         try:
             # Get all resources and discover providers dynamically

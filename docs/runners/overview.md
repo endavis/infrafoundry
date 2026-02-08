@@ -2,7 +2,7 @@
 
 ## Overview
 
-InfraFoundry executes runners (Terraform, Ansible, PyInfra) in priority order to provision, configure, and deploy. Defaults reflect provisioning → system config → app deployment.
+InfraFoundry executes runners (Terraform/OpenTofu, Ansible, PyInfra) in priority order to provision, configure, and deploy. Defaults reflect provisioning → system config → app deployment.
 
 ## Audience and Prerequisites
 
@@ -17,7 +17,12 @@ InfraFoundry executes runners (Terraform, Ansible, PyInfra) in priority order to
 
 ## Quick Start
 
-Default order: Terraform (0) → Ansible (50) → PyInfra (50; after Ansible by registration).
+Default order: Terraform/OpenTofu (0) → Ansible (50) → PyInfra (50; after Ansible by registration).
+
+Select the IaC tool per environment in `envs/{env}/settings.yaml`:
+```yaml
+iac_tool: opentofu  # or "terraform" (default)
+```
 
 Customize priorities in `envs/{env}/settings.yaml`:
 ```yaml
@@ -58,6 +63,7 @@ runner_priorities:
 - [Pluggable Runner System](../architecture/pluggable-runners.md)
 - [Configuration Guide](../configuration/overview.md)
 - [Terraform Runner](terraform.md)
+- [OpenTofu Runner](opentofu.md)
 - [Ansible Runner](ansible.md)
 - [PyInfra Runner](pyinfra.md)
 

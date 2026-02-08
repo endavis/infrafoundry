@@ -199,6 +199,13 @@ def doctor(ctx: click.Context, output_format: str) -> None:
     )
     results.append(
         _check_dependency(
+            "OpenTofu",
+            "tofu",
+            "Install from https://opentofu.org/docs/intro/install/",
+        )
+    )
+    results.append(
+        _check_dependency(
             "Ansible",
             "ansible",
             "Install with: pip install ansible",

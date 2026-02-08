@@ -11,7 +11,7 @@ from infrafoundry.core.config.backend_config import (
     TerraformCloudBackendConfig,
 )
 from infrafoundry.core.config.config_manager import ConfigManager
-from infrafoundry.core.config.models import EnvironmentConfig, SSHConfig
+from infrafoundry.core.config.models import EnvironmentConfig, IaCTool, SSHConfig
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
 
@@ -22,6 +22,7 @@ __all__ = [
     "ConfigManager",
     "EnvironmentConfig",
     "GCSBackendConfig",
+    "IaCTool",
     "LocalBackendConfig",
     "PostgresBackendConfig",
     "ProviderCentricLoader",

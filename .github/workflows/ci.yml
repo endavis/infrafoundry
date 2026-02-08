@@ -94,6 +94,11 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_wrapper: false
+
       - name: Install system tools (age, sops)
         run: |
           mkdir -p ~/.local/bin

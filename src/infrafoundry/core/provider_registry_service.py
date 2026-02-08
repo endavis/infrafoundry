@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import (
     AnsibleRunner,
+    OpenTofuRunner,
     PulumiRunner,
     PyInfraRunner,
     RunnerRegistry,
@@ -52,8 +53,15 @@ class ProviderRegistryService:
         return env_config.runner_priorities if env_config else {}
 
     def _register_default_runners(self) -> None:
-        """Register built-in runners."""
+        """Register built-in runners.
+
+        Both Terraform and OpenTofu runners are registered. The active IaC
+        runner is selected at execution time based on the environment's
+        ``iac_tool`` configuration, allowing different environments to use
+        different tools.
+        """
         self.runner_registry.register(TerraformRunner)
+        self.runner_registry.register(OpenTofuRunner)
         self.runner_registry.register(AnsibleRunner)
         self.runner_registry.register(PyInfraRunner)
         # Register experimental runners if enabled

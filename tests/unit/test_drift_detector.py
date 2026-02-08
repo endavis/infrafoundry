@@ -135,3 +135,52 @@ class TestDriftDetector:
         results = detector.detect("test-env")
 
         assert results == {}
+
+    def test_detect_uses_configured_iac_tool(
+        self, mock_config_manager, mock_runner_registry, mock_event_manager, mock_providers
+    ):
+        """Test that detect resolves the IaC tool from environment config."""
+        from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
+
+        # Configure environment with opentofu
+        env_config = EnvironmentConfig(name="test-env", iac_tool=IaCTool.OPENTOFU)
+        mock_config_manager.load_environment.return_value = env_config
+
+        mock_runner = MagicMock()
+        mock_runner_registry.create_runner.return_value = mock_runner
+        mock_config_manager.get_all_resources_all_providers.return_value = []
+
+        detector = DriftDetector(
+            config_manager=mock_config_manager,
+            runner_registry=mock_runner_registry,
+            event_manager=mock_event_manager,
+            providers=mock_providers,
+        )
+
+        detector.detect("test-env")
+
+        # Should create runner with "opentofu", not "terraform"
+        mock_runner_registry.create_runner.assert_called_once_with("opentofu")
+
+    def test_detect_defaults_to_terraform_when_no_env_config(
+        self, mock_runner_registry, mock_event_manager, mock_providers
+    ):
+        """Test that detect falls back to terraform when env config is missing."""
+        mock_config_manager = MagicMock()
+        mock_config_manager.load_environment.side_effect = FileNotFoundError("no config")
+        mock_config_manager.get_all_resources_all_providers.return_value = []
+
+        mock_runner = MagicMock()
+        mock_runner_registry.create_runner.return_value = mock_runner
+
+        detector = DriftDetector(
+            config_manager=mock_config_manager,
+            runner_registry=mock_runner_registry,
+            event_manager=mock_event_manager,
+            providers=mock_providers,
+        )
+
+        detector.detect("test-env")
+
+        # Should fall back to "terraform"
+        mock_runner_registry.create_runner.assert_called_once_with("terraform")
