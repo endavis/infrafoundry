@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+from infrafoundry.core.config.models import IaCTool
 from infrafoundry.core.deployment_executor import DeploymentExecutor
 from infrafoundry.core.events import EventType
 from infrafoundry.core.state import ResourceState
@@ -524,6 +525,7 @@ def test_apply_single_provider_tracks_state_for_opentofu_runner():
         event_manager=event_manager,
         providers=providers,
     )
+    executor.iac_tool = IaCTool.OPENTOFU
 
     results = executor.apply_single_provider(
         env_name="dev",
@@ -538,3 +540,53 @@ def test_apply_single_provider_tracks_state_for_opentofu_runner():
     assert "opentofu" in results
     assert results["opentofu"]["success"] is True
     state_manager.update_resource.assert_called_with(resource_id=1, terraform_id="proxmox_vm.vm1")
+
+
+def test_get_sorted_runners_filters_inactive_iac_tool():
+    """Only the configured IaC runner is included; the other is skipped."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform", "opentofu", "ansible"]
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+
+    tofu_runner = MagicMock()
+    tofu_runner.priority = 0
+
+    ansible_runner = MagicMock()
+    ansible_runner.priority = 50
+
+    def create_runner(name, console=None):
+        if name == "terraform":
+            return tf_runner
+        elif name == "opentofu":
+            return tofu_runner
+        else:
+            return ansible_runner
+
+    runner_registry.create_runner.side_effect = create_runner
+
+    state_manager = MagicMock()
+    event_manager = MagicMock()
+    providers = {}
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+    )
+
+    # Default: terraform
+    executor.iac_tool = IaCTool.TERRAFORM
+    names = [name for name, _ in executor._get_sorted_runners()]
+    assert "terraform" in names
+    assert "opentofu" not in names
+    assert "ansible" in names
+
+    # Switch to opentofu
+    executor.iac_tool = IaCTool.OPENTOFU
+    names = [name for name, _ in executor._get_sorted_runners()]
+    assert "opentofu" in names
+    assert "terraform" not in names
+    assert "ansible" in names

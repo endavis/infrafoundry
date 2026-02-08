@@ -51,10 +51,13 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     config_manager.base_dir = config_dir
 
     # Create a mock environment config object
+    from infrafoundry.core.config.models import IaCTool
+
     env_config_mock = Mock()
     env_config_mock.runner_priorities = {}
     env_config_mock.hooks = None  # No lifecycle hooks configured
     env_config_mock.provider_order = []  # Use default provider order
+    env_config_mock.iac_tool = IaCTool.TERRAFORM
     env_config_mock.model_dump.return_value = mock_config["environment"]
 
     config_manager.load_environment = Mock(return_value=env_config_mock)

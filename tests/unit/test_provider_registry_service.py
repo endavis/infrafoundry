@@ -101,9 +101,9 @@ class TestProviderRegistryService:
             )
 
         # Verify registration calls
-        # We expect register to be called for TerraformRunner (default),
+        # We expect register to be called for TerraformRunner, OpenTofuRunner,
         # AnsibleRunner, PyInfraRunner
-        assert mock_registry.register.call_count == 3
+        assert mock_registry.register.call_count == 4
 
     def test_register_experimental_runners(self, tmp_path):
         """Test that experimental runners are registered when enabled."""
@@ -118,30 +118,26 @@ class TestProviderRegistryService:
                 runner_registry_factory=factory,
             )
 
-        # We expect register to be called for TerraformRunner (default),
+        # We expect register to be called for TerraformRunner, OpenTofuRunner,
         # AnsibleRunner, PyInfraRunner, PulumiRunner
-        assert mock_registry.register.call_count == 4
+        assert mock_registry.register.call_count == 5
 
-    def test_register_opentofu_runner_via_env_var(self, tmp_path):
-        """Test that OpenTofuRunner is registered when INFRAFOUNDRY_IAC_TOOL=opentofu."""
-        from infrafoundry.core.runners import OpenTofuRunner
+    def test_both_iac_runners_registered(self, tmp_path):
+        """Test that both TerraformRunner and OpenTofuRunner are registered."""
+        from infrafoundry.core.runners import OpenTofuRunner, TerraformRunner
 
         config_manager = Mock(spec=ConfigManager)
         mock_registry = Mock(spec=RunnerRegistry)
         factory = Mock(return_value=mock_registry)
 
-        with patch.dict("os.environ", {"INFRAFOUNDRY_IAC_TOOL": "opentofu"}, clear=True):
+        with patch.dict("os.environ", {}, clear=True):
             ProviderRegistryService(
                 base_output_dir=tmp_path,
                 config_manager=config_manager,
                 runner_registry_factory=factory,
             )
 
-        # Should register OpenTofuRunner instead of TerraformRunner
+        # Both IaC runners should be registered
         register_calls = [call[0][0] for call in mock_registry.register.call_args_list]
+        assert TerraformRunner in register_calls
         assert OpenTofuRunner in register_calls
-        from infrafoundry.core.runners import TerraformRunner
-
-        assert TerraformRunner not in register_calls
-        # Total: OpenTofuRunner, AnsibleRunner, PyInfraRunner
-        assert mock_registry.register.call_count == 3

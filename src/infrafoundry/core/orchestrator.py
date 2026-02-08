@@ -536,10 +536,11 @@ class Orchestrator:
         auto_approve: bool,
     ) -> dict[str, Any]:
         """Apply providers sequentially."""
-        # Load runner priorities and provider order from environment config
+        # Load runner priorities, IaC tool, and provider order from environment config
         env_config = self.config_manager.load_environment(env_name)
         if env_config:
             self.deployment_executor.runner_priorities = env_config.runner_priorities
+            self.deployment_executor.iac_tool = env_config.iac_tool
             # Update execution planner with environment-specific provider order
             self.deployment_executor.provider_order = env_config.provider_order or None
             self.deployment_executor.execution_planner = ExecutionPlanner(
@@ -560,10 +561,11 @@ class Orchestrator:
         max_workers: int,
     ) -> dict[str, Any]:
         """Apply providers in parallel."""
-        # Load runner priorities and provider order from environment config
+        # Load runner priorities, IaC tool, and provider order from environment config
         env_config = self.config_manager.load_environment(env_name)
         if env_config:
             self.deployment_executor.runner_priorities = env_config.runner_priorities
+            self.deployment_executor.iac_tool = env_config.iac_tool
             # Update execution planner with environment-specific provider order
             self.deployment_executor.provider_order = env_config.provider_order or None
             self.deployment_executor.execution_planner = ExecutionPlanner(

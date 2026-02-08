@@ -7,7 +7,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from infrafoundry.core.config.models import IaCTool
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import (
     AnsibleRunner,
@@ -56,17 +55,13 @@ class ProviderRegistryService:
     def _register_default_runners(self) -> None:
         """Register built-in runners.
 
-        Only one IaC runner (Terraform or OpenTofu) is registered based on
-        the INFRAFOUNDRY_IAC_TOOL environment variable. This is evaluated
-        at init time since the runner registry is shared across environments.
-        Per-environment iac_tool config in settings.yaml overrides are applied
-        during config loading.
+        Both Terraform and OpenTofu runners are registered. The active IaC
+        runner is selected at execution time based on the environment's
+        ``iac_tool`` configuration, allowing different environments to use
+        different tools.
         """
-        iac_tool = os.getenv("INFRAFOUNDRY_IAC_TOOL", IaCTool.TERRAFORM.value)
-        if iac_tool == IaCTool.OPENTOFU.value:
-            self.runner_registry.register(OpenTofuRunner)
-        else:
-            self.runner_registry.register(TerraformRunner)
+        self.runner_registry.register(TerraformRunner)
+        self.runner_registry.register(OpenTofuRunner)
         self.runner_registry.register(AnsibleRunner)
         self.runner_registry.register(PyInfraRunner)
         # Register experimental runners if enabled

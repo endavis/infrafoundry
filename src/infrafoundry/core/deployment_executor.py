@@ -5,6 +5,7 @@ from typing import Any, cast
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from infrafoundry.core.config.models import IaCTool
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.execution_planner import ExecutionPlanner
@@ -14,6 +15,9 @@ from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.state import ResourceState, StateManager
 from infrafoundry.core.types import ResourceEventData
+
+# Registry keys for mutually exclusive IaC runners
+_IAC_TOOL_KEYS = {tool.value for tool in IaCTool}
 
 
 class DeploymentExecutor:
@@ -48,6 +52,7 @@ class DeploymentExecutor:
         self.console = console or Console()
         self.runner_priorities = runner_priorities or {}
         self.provider_order = provider_order
+        self.iac_tool: IaCTool = IaCTool.TERRAFORM
 
         # Create execution planner with configured provider order
         self.execution_planner = ExecutionPlanner(provider_order=provider_order)
@@ -60,7 +65,11 @@ class DeploymentExecutor:
                 self.runners[tool_name] = runner
 
     def _get_sorted_runners(self) -> list[tuple[str, BaseRunner]]:
-        """Get runners sorted by priority.
+        """Get runners sorted by priority, filtering by configured IaC tool.
+
+        Only the IaC runner matching ``self.iac_tool`` is included; the other
+        IaC runner is skipped.  Non-IaC runners (Ansible, PyInfra, etc.) are
+        always included.
 
         Priority is determined by:
         1. Environment config override (if present)
@@ -70,6 +79,7 @@ class DeploymentExecutor:
         Returns:
             List of (tool_name, runner) tuples sorted by priority.
         """
+        active_iac = self.iac_tool.value
 
         def get_priority(item: tuple[str, BaseRunner]) -> int:
             name, runner = item
@@ -79,7 +89,12 @@ class DeploymentExecutor:
             # Fallback to default
             return runner.priority
 
-        return sorted(self.runners.items(), key=get_priority)
+        filtered = {
+            name: runner
+            for name, runner in self.runners.items()
+            if name not in _IAC_TOOL_KEYS or name == active_iac
+        }
+        return sorted(filtered.items(), key=get_priority)
 
     def apply_serial(
         self,
