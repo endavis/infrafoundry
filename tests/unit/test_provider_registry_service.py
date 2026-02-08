@@ -101,7 +101,8 @@ class TestProviderRegistryService:
             )
 
         # Verify registration calls
-        # We expect register to be called for TerraformRunner, AnsibleRunner, PyInfraRunner
+        # We expect register to be called for TerraformRunner (default),
+        # AnsibleRunner, PyInfraRunner
         assert mock_registry.register.call_count == 3
 
     def test_register_experimental_runners(self, tmp_path):
@@ -117,6 +118,30 @@ class TestProviderRegistryService:
                 runner_registry_factory=factory,
             )
 
-        # We expect register to be called for TerraformRunner, AnsibleRunner,
-        # PyInfraRunner, PulumiRunner
+        # We expect register to be called for TerraformRunner (default),
+        # AnsibleRunner, PyInfraRunner, PulumiRunner
         assert mock_registry.register.call_count == 4
+
+    def test_register_opentofu_runner_via_env_var(self, tmp_path):
+        """Test that OpenTofuRunner is registered when INFRAFOUNDRY_IAC_TOOL=opentofu."""
+        from infrafoundry.core.runners import OpenTofuRunner
+
+        config_manager = Mock(spec=ConfigManager)
+        mock_registry = Mock(spec=RunnerRegistry)
+        factory = Mock(return_value=mock_registry)
+
+        with patch.dict("os.environ", {"INFRAFOUNDRY_IAC_TOOL": "opentofu"}, clear=True):
+            ProviderRegistryService(
+                base_output_dir=tmp_path,
+                config_manager=config_manager,
+                runner_registry_factory=factory,
+            )
+
+        # Should register OpenTofuRunner instead of TerraformRunner
+        register_calls = [call[0][0] for call in mock_registry.register.call_args_list]
+        assert OpenTofuRunner in register_calls
+        from infrafoundry.core.runners import TerraformRunner
+
+        assert TerraformRunner not in register_calls
+        # Total: OpenTofuRunner, AnsibleRunner, PyInfraRunner
+        assert mock_registry.register.call_count == 3

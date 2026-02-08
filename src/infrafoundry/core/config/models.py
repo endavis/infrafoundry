@@ -1,11 +1,19 @@
 """Configuration models for InfraFoundry."""
 
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from infrafoundry.core.config.backend_config import BackendConfig
 from infrafoundry.core.hooks.models import HooksConfig
+
+
+class IaCTool(str, Enum):
+    """Supported Infrastructure as Code tools."""
+
+    TERRAFORM = "terraform"
+    OPENTOFU = "opentofu"
 
 
 class DriftRemediationConfig(BaseModel):
@@ -91,6 +99,8 @@ class EnvironmentConfig(BaseModel):
     hooks: HooksConfig | None = None
     # Notification channels for this environment
     notifications: NotificationsConfig | None = None
+    # Infrastructure as Code tool selection (terraform or opentofu)
+    iac_tool: IaCTool = IaCTool.TERRAFORM
 
     def get_ssh_config(self, provider_name: str) -> SSHConfig | None:
         """Get SSH config for a specific provider.

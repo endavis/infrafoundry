@@ -92,6 +92,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
       - **Azure:** `resource_group_name` (required), `storage_account_name` (required), `container_name` (required), `key`, `access_key`, `sas_token`, `use_azuread_auth`
       - **Postgres:** `conn_str` (required), `schema_name`, `skip_schema_creation`
       - **Terraform Cloud:** `organization` (required), `workspaces` (required), `hostname`, `token`
+  - `iac_tool` (optional, `"terraform"` | `"opentofu"`, default: `"terraform"`): Select the IaC provisioning tool. Can also be set via the `INFRAFOUNDRY_IAC_TOOL` environment variable (env var takes precedence). See [OpenTofu Runner](../runners/opentofu.md) for details.
   - `runner_priorities` (optional, dict[str, int]): Override default runner execution priorities. See [Runner Execution Overview](../runners/overview.md) for details.
   - `ssh.user`/`key_path`/`port` (optional, defaults to current user and port 22).
   - `provider_ssh.<provider>` overrides global SSH.

@@ -1,11 +1,12 @@
 """Refactored configuration manager - coordinates between loaders."""
 
+import os
 from pathlib import Path
 
 import yaml
 
 from infrafoundry.core.base_manager import PathBasedManager
-from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
 from infrafoundry.core.exceptions import InvalidConfigurationError
@@ -82,6 +83,15 @@ class ConfigManager(PathBasedManager):
         if not data:
             # Ensure we return an empty but valid EnvironmentConfig if file is empty
             data = {}
+
+        # Environment variable override for IaC tool selection
+        iac_tool_env = os.getenv("INFRAFOUNDRY_IAC_TOOL")
+        if iac_tool_env:
+            try:
+                IaCTool(iac_tool_env)  # Validate the value
+                data["iac_tool"] = iac_tool_env
+            except ValueError:
+                self._log_warning(f"Invalid INFRAFOUNDRY_IAC_TOOL value '{iac_tool_env}', ignoring")
 
         self._log_debug(f"Loaded environment config: {env_name}")
         return EnvironmentConfig(**data)

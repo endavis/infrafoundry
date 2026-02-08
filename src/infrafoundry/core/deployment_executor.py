@@ -320,12 +320,8 @@ class DeploymentExecutor:
             run_result = runner.apply(provider, auto_approve=auto_approve)
             runner_results[tool_name] = run_result
 
-            # Update state with Terraform resource IDs if available
-            if (
-                tool_name == "terraform"
-                and run_result["success"]
-                and isinstance(runner, StateAware)
-            ):
+            # Update state with resource IDs if the runner supports state tracking
+            if run_result["success"] and isinstance(runner, StateAware):
                 state_runner = cast(StateAware, runner)
                 terraform_ids = state_runner.get_resource_ids(provider)
                 # Update tracked resources with Terraform IDs

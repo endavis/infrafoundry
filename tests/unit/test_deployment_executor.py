@@ -491,3 +491,50 @@ def test_apply_single_provider_handles_multiple_resources():
     assert state_manager.track_resource.call_count == 3
     assert state_manager.update_resource_state.call_count == 3
     assert results["terraform"]["success"] is True
+
+
+def test_apply_single_provider_tracks_state_for_opentofu_runner():
+    """StateAware check works for opentofu runner (not just terraform)."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["opentofu"]
+
+    tofu_runner = MagicMock()
+    tofu_runner.priority = 0
+
+    # Set protocol methods with return values
+    tofu_runner.apply = MagicMock(return_value={"success": True})
+    tofu_runner.plan = MagicMock()
+    tofu_runner.destroy = MagicMock()
+    tofu_runner.get_resource_ids = MagicMock(return_value={"vm1": "proxmox_vm.vm1"})
+
+    runner_registry.create_runner.return_value = tofu_runner
+
+    state_manager = MagicMock()
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    provider = MagicMock()
+    providers = {"proxmox": provider}
+
+    resources = [_resource("vm1")]
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+    )
+
+    results = executor.apply_single_provider(
+        env_name="dev",
+        deployment_id=1,
+        provider_name="proxmox",
+        provider=provider,
+        resources=resources,
+        auto_approve=True,
+    )
+
+    # OpenTofu runner should also trigger state tracking via StateAware
+    assert "opentofu" in results
+    assert results["opentofu"]["success"] is True
+    state_manager.update_resource.assert_called_with(resource_id=1, terraform_id="proxmox_vm.vm1")
