@@ -40,10 +40,11 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Run benchmarks
-        run: >
-          uv run pytest tests/benchmarks/
-          --benchmark-enable --benchmark-only
-          --benchmark-json=tmp/benchmark-results.json -v
+        run: |
+          mkdir -p tmp
+          uv run pytest tests/benchmarks/ \
+            --benchmark-enable --benchmark-only \
+            --benchmark-json=tmp/benchmark-results.json -v
 
       - name: Check for benchmark data branch
         id: check-bench-branch
