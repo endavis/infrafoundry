@@ -49,10 +49,10 @@ def validate_merge_commits(console: "ConsoleType") -> bool:
         console.print("[green]✓ No merge commits to validate.[/green]")
         return True
 
-    # Pattern: <type>: <subject> (merges PR #XX, closes #YY) or (merges PR #XX)
+    # Pattern: <type>: <subject> (merges PR #XX, addresses #YY) or (merges PR #XX)
     merge_pattern = re.compile(
         r"^[a-f0-9]+\s+(feat|fix|refactor|docs|test|chore|ci|perf):\s.+\s"
-        r"\(merges PR #\d+(?:, closes #\d+)?\)$"
+        r"\(merges PR #\d+(?:, addresses #\d+(?:, #\d+)*)?\)$"
     )
 
     invalid_commits = []
@@ -65,7 +65,7 @@ def validate_merge_commits(console: "ConsoleType") -> bool:
         for commit in invalid_commits:
             console.print(f"  [red]{commit}[/red]")
         console.print("\n[yellow]Expected format:[/yellow]")
-        console.print("  <type>: <subject> (merges PR #XX, closes #YY)")
+        console.print("  <type>: <subject> (merges PR #XX, addresses #YY)")
         console.print("  <type>: <subject> (merges PR #XX)")
         return False
 
@@ -326,7 +326,7 @@ def task_release(increment: str = "") -> dict[str, Any]:
         if not validate_merge_commits(console):
             console.print("\n[bold red]❌ Merge commit validation failed![/bold red]")
             console.print("[yellow]Please ensure all merge commits follow the format:[/yellow]")
-            console.print("[yellow]  <type>: <subject> (merges PR #XX, closes #YY)[/yellow]")
+            console.print("[yellow]  <type>: <subject> (merges PR #XX, addresses #YY)[/yellow]")
             sys.exit(1)
 
         # Validate issue links (warning only)
@@ -493,7 +493,7 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
         if not validate_merge_commits(console):
             console.print("\n[bold red]❌ Merge commit validation failed![/bold red]")
             console.print("[yellow]Please ensure all merge commits follow the format:[/yellow]")
-            console.print("[yellow]  <type>: <subject> (merges PR #XX, closes #YY)[/yellow]")
+            console.print("[yellow]  <type>: <subject> (merges PR #XX, addresses #YY)[/yellow]")
             sys.exit(1)
 
         # Validate issue links (warning only)

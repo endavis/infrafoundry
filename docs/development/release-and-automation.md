@@ -290,14 +290,14 @@ InfraFoundry enforces governance rules to ensure code quality and traceability.
 
 **Required Format**:
 ```
-<type>: <subject> (merges PR #XX, closes #YY)
+<type>: <subject> (merges PR #XX, addresses #YY)
 <type>: <subject> (merges PR #XX)
 ```
 
 **Examples**:
 ```
-✅ feat: add CloudFlare provider (merges PR #102, closes #99)
-✅ fix: resolve state parsing issue (merges PR #103, closes #100)
+✅ feat: add CloudFlare provider (merges PR #102, addresses #99)
+✅ fix: resolve state parsing issue (merges PR #103, addresses #100)
 ✅ docs: update installation guide (merges PR #104)
 
 ❌ Add new feature                    # Missing type
@@ -318,7 +318,7 @@ InfraFoundry enforces governance rules to ensure code quality and traceability.
 **Examples**:
 ```
 ✅ feat: add new provider (#99)
-✅ fix: resolve bug closes #100
+✅ fix: resolve bug addresses #100
 ✅ docs: update README                # Docs exempt
 
 ⚠️ feat: add new feature             # Warning only
@@ -548,8 +548,8 @@ uv run doit release
 
 **Solution**: Update the merge commit message:
 ```bash
-# When merging PR #102 that closes issue #99
-git merge --no-ff feat/99-feature -m "feat: add new feature (merges PR #102, closes #99)"
+# When merging PR #102 that addresses issue #99
+git merge --no-ff feat/99-feature -m "feat: add new feature (merges PR #102, addresses #99)"
 ```
 
 ### Security Task Fails: "pip-audit not installed"

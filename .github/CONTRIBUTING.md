@@ -72,6 +72,7 @@ doit lint          # Run linting
 doit format        # Format code
 doit type_check    # Run type checking
 doit check         # Run all checks
+doit benchmark     # Run performance benchmarks
 doit cleanup       # Clean build artifacts
 ```
 
@@ -776,7 +777,7 @@ doit pr --draft
 ```
 
 Features:
-- Auto-detects issue number from branch name (e.g., `feat/42-description` → `Closes #42`)
+- Auto-detects issue number from branch name (e.g., `feat/42-description` → `Addresses #42`)
 - Pre-fills the PR template with detected issue
 - Validates required fields before creating
 
@@ -787,27 +788,27 @@ Features:
 
 **PR Description Requirements (enforced by CI):**
 - Minimum 50 characters
-- Reference related issue: "Closes #42" or "Part of #42"
+- Reference related issue: "Addresses #42"
 - Describe what changed and why
 - Include testing information
 
 #### 5. **Merge:** Format Must Include PR and Issue Numbers
 
-**When PR completes the issue:**
+**Merge commit format:**
 ```
-<type>: <subject> (merges PR #XX, closes #YY)
+<type>: <subject> (merges PR #XX, addresses #YY)
 ```
 
-**When PR is part of multi-PR issue:**
+**When PR is docs-only or doesn't complete the issue:**
 ```
-<type>: <subject> (merges PR #XX, part of #YY)
+<type>: <subject> (merges PR #XX)
 ```
 
 **Examples - Correct:**
 ```
-feat: add user authentication (merges PR #18, closes #42)
-fix: handle None values (merges PR #23, closes #19)
-docs: update installation guide (merges PR #29, closes #25)
+feat: add user authentication (merges PR #18, addresses #42)
+fix: handle None values (merges PR #23, addresses #19)
+docs: update installation guide (merges PR #29, addresses #25)
 ```
 
 **Examples - Incorrect:**

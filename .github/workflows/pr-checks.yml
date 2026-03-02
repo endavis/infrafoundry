@@ -78,7 +78,7 @@ jobs:
 
             // Check for issue reference in PR body or title
             const issuePatterns = [
-              /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#\d+/i,
+              /addresses\s+#\d+/i,
               /#\d+/
             ];
 
@@ -90,10 +90,8 @@ jobs:
               core.setFailed(
                 '❌ PR must reference an issue number\n\n' +
                 'Code changes require a linked GitHub issue.\n' +
-                'Add one of the following to your PR description:\n' +
-                '  - "Closes #123"\n' +
-                '  - "Fixes #123"\n' +
-                '  - "Resolves #123"\n\n' +
+                'Add the following to your PR description:\n' +
+                '  - "Addresses #123"\n\n' +
                 '📝 Documentation-only PRs are exempt from this requirement.\n\n' +
                 'Why? Issue-driven development ensures:\n' +
                 '  • Clear tracking of why changes were made\n' +

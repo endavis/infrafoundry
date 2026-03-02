@@ -40,7 +40,7 @@ from settings import (  # noqa: E402
     get_template_commits_since,
     get_template_latest_commit,
 )
-from utils import Colors, Logger, prompt, validate_package_name  # noqa: E402
+from utils import Colors, Logger, prompt, prompt_confirm, validate_package_name  # noqa: E402
 
 # Import cleanup utilities (optional - may not exist if already cleaned)
 try:
@@ -281,26 +281,52 @@ def edit_settings(manager: SettingsManager) -> None:
     manager.save()
 
 
-def run_action(action: int, manager: SettingsManager, dry_run: bool) -> int:
+def run_action(
+    action: int,
+    manager: SettingsManager,
+    dry_run: bool,
+    *,
+    yes: bool = False,
+    cleanup_mode: str | None = None,
+) -> int:
     """Run the selected action."""
     if action == 1:
-        return action_create_project(manager, dry_run)
+        return action_create_project(manager, dry_run, yes=yes)
     elif action == 2:
-        return action_configure(manager, dry_run)
+        return action_configure(manager, dry_run, yes=yes)
     elif action == 3:
         return action_check_updates(manager, dry_run)
     elif action == 4:
         return action_repo_settings(manager, dry_run)
     elif action == 5:
-        return action_mark_synced(manager, dry_run)
+        return action_mark_synced(manager, dry_run, yes=yes)
     elif action == 6:
-        return action_template_cleanup(manager, dry_run)
+        return action_template_cleanup(manager, dry_run, yes=yes, cleanup_mode=cleanup_mode)
     else:
         Logger.error(f"Unknown action: {action}")
         return 1
 
 
-def action_create_project(manager: SettingsManager, dry_run: bool) -> int:
+def _copy_template_adrs(template_dir: Path, project_dir: Path) -> int:
+    """Copy template ADR files (9*.md) into the project's decisions directory.
+
+    Args:
+        template_dir: Path to docs/template/decisions/ in the cloned project.
+        project_dir: Path to docs/decisions/ in the cloned project.
+
+    Returns:
+        Number of files copied.
+    """
+    import shutil
+
+    copied = 0
+    for adr_file in sorted(template_dir.glob("9*.md")):
+        shutil.copy2(adr_file, project_dir / adr_file.name)
+        copied += 1
+    return copied
+
+
+def action_create_project(manager: SettingsManager, dry_run: bool, *, yes: bool = False) -> int:
     """Create a new project from the template."""
     Logger.header("Creating New Project from Template")
 
@@ -352,6 +378,24 @@ def action_create_project(manager: SettingsManager, dry_run: bool) -> int:
 
         # Clone and configure locally BEFORE branch protection
         setup.clone_repository()
+
+        # Offer to copy template ADRs into project decisions
+        template_adrs_dir = Path.cwd() / "docs" / "template" / "decisions"
+        project_adrs_dir = Path.cwd() / "docs" / "decisions"
+        # When yes=True, skip prompt and default to False (don't copy ADRs)
+        should_copy_adrs = (
+            not yes
+            and template_adrs_dir.exists()
+            and project_adrs_dir.exists()
+            and prompt_confirm(
+                "Include template ADRs in project decisions directory?",
+                default=False,
+            )
+        )
+        if should_copy_adrs:
+            count = _copy_template_adrs(template_adrs_dir, project_adrs_dir)
+            Logger.info(f"Copied {count} template ADR(s) to docs/decisions/")
+
         setup.configure_placeholders()
         setup.setup_development_environment()
 
@@ -439,7 +483,7 @@ def action_check_updates(manager: SettingsManager, dry_run: bool) -> int:
     return int(result)
 
 
-def action_configure(manager: SettingsManager, dry_run: bool) -> int:
+def action_configure(manager: SettingsManager, dry_run: bool, *, yes: bool = False) -> int:
     """Re-run configuration."""
     Logger.header("Running Configuration")
 
@@ -462,8 +506,8 @@ def action_configure(manager: SettingsManager, dry_run: bool) -> int:
 
     return int(
         run_configure(
-            auto=False,
-            yes=False,
+            auto=yes,
+            yes=yes,
             dry_run=dry_run,
             defaults=defaults,
         )
@@ -506,7 +550,7 @@ def action_repo_settings(manager: SettingsManager, dry_run: bool) -> int:
         return 1
 
 
-def action_mark_synced(manager: SettingsManager, dry_run: bool) -> int:
+def action_mark_synced(manager: SettingsManager, dry_run: bool, *, yes: bool = False) -> int:
     """Mark project as synced to reviewed template commit."""
     import shutil
     import subprocess  # nosec B404 - subprocess is required for git operations
@@ -547,11 +591,12 @@ def action_mark_synced(manager: SettingsManager, dry_run: bool) -> int:
         Logger.info(f"Dry run: Would mark as synced to {new_commit}")
         return 0
 
-    # Confirm with user
-    confirm = prompt(f"Mark as synced to {new_commit}?", "Y")
-    if confirm.lower() not in ("y", "yes", ""):
-        Logger.warning("Cancelled")
-        return 0
+    # Confirm with user (skip when yes=True to auto-confirm)
+    if not yes:
+        confirm = prompt(f"Mark as synced to {new_commit}?", "Y")
+        if confirm.lower() not in ("y", "yes", ""):
+            Logger.warning("Cancelled")
+            return 0
 
     # Update template state
     manager.update_template_state(new_commit, new_date)
@@ -611,7 +656,13 @@ def action_mark_synced(manager: SettingsManager, dry_run: bool) -> int:
     return 0
 
 
-def action_template_cleanup(manager: SettingsManager, dry_run: bool) -> int:
+def action_template_cleanup(
+    manager: SettingsManager,
+    dry_run: bool,
+    *,
+    yes: bool = False,
+    cleanup_mode: str | None = None,
+) -> int:
     """Clean up template-specific files."""
     Logger.header("Template File Cleanup")
 
@@ -623,11 +674,27 @@ def action_template_cleanup(manager: SettingsManager, dry_run: bool) -> int:
         Logger.info("Dry run: Would prompt for cleanup mode and show files to delete")
         return 0
 
-    # Prompt user for cleanup mode
-    mode = prompt_cleanup()
-    if mode is None:
-        Logger.info("Keeping all template files")
+    mode = None
+
+    if cleanup_mode:
+        # CLI-specified mode (cleanup module is guaranteed available after guard above)
+        from cleanup import CleanupMode as CleanupModeEnum
+
+        mode_map = {"setup": CleanupModeEnum.SETUP_ONLY, "all": CleanupModeEnum.ALL}
+        mode = mode_map.get(cleanup_mode)
+        if mode is None:
+            Logger.error(f"Invalid cleanup mode: {cleanup_mode}. Use 'setup' or 'all'.")
+            return 1
+    elif yes:
+        # Non-interactive without explicit mode: skip cleanup (safer default)
+        Logger.info("Non-interactive mode: skipping cleanup (use --cleanup-mode to specify)")
         return 0
+    else:
+        # Interactive prompt
+        mode = prompt_cleanup()
+        if mode is None:
+            Logger.info("Keeping all template files")
+            return 0
 
     # Perform cleanup
     result = cleanup_template_files(mode, dry_run=False)
@@ -640,13 +707,16 @@ def action_template_cleanup(manager: SettingsManager, dry_run: bool) -> int:
     return 0
 
 
-def offer_cleanup_prompt() -> None:
+def offer_cleanup_prompt(*, yes: bool = False) -> None:
     """Offer to clean up template files after successful setup.
 
     This is called after "Create new project" or "Configure project" completes.
     """
     if prompt_cleanup is None or cleanup_template_files is None:
         return  # Cleanup module not available
+
+    if yes:
+        return  # Non-interactive mode: skip cleanup
 
     print()
     response = prompt("Would you like to clean up template-specific files? (y/N)", "n")
@@ -703,7 +773,7 @@ def prompt_initial_settings(manager: SettingsManager) -> None:
     print()
 
 
-def interactive_menu(manager: SettingsManager, dry_run: bool = False) -> int:
+def interactive_menu(manager: SettingsManager, dry_run: bool = False, *, yes: bool = False) -> int:
     """Run the interactive menu loop."""
     # Prompt for initial settings if not configured
     prompt_initial_settings(manager)
@@ -748,12 +818,12 @@ def interactive_menu(manager: SettingsManager, dry_run: bool = False) -> int:
             Logger.info(f"Dry run mode: {'enabled' if dry_run else 'disabled'}")
         elif choice in ("1", "2", "3", "4", "5", "6"):
             action = int(choice)
-            result = run_action(action, manager, dry_run)
+            result = run_action(action, manager, dry_run, yes=yes)
             if result == 0:
                 Logger.success("Action completed successfully")
                 # Offer cleanup after successful create/configure (but not for cleanup itself)
                 if action in (1, 2) and not dry_run:
-                    offer_cleanup_prompt()
+                    offer_cleanup_prompt(yes=yes)
             else:
                 Logger.error("Action failed")
             input("\nPress enter to return to menu...")
@@ -778,6 +848,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     subparsers.add_parser("check", help="Check for template updates")
     subparsers.add_parser("repo", help="Update repository settings")
     subparsers.add_parser("sync", help="Mark as synced to latest template")
+    cleanup_parser = subparsers.add_parser("cleanup", help="Clean up template-specific files")
+    cleanup_parser.add_argument(
+        "--cleanup-mode",
+        choices=["setup", "all"],
+        help="Cleanup mode: 'setup' removes setup files only, 'all' removes all template files",
+    )
 
     # Global options
     parser.add_argument(
@@ -815,10 +891,14 @@ def main(argv: list[str] | None = None) -> int:
             "check": 3,
             "repo": 4,
             "sync": 5,
+            "cleanup": 6,
         }
         action = command_map.get(args.command)
         if action:
-            return run_action(action, manager, args.dry_run)
+            cleanup_mode = getattr(args, "cleanup_mode", None)
+            return run_action(
+                action, manager, args.dry_run, yes=args.yes, cleanup_mode=cleanup_mode
+            )
         return 1
 
     # Handle --update-only (CI mode)
@@ -840,7 +920,7 @@ def main(argv: list[str] | None = None) -> int:
             manager.context, manager.settings, manager.template_state, latest_commit
         )
         if recommended:
-            return run_action(recommended, manager, args.dry_run)
+            return run_action(recommended, manager, args.dry_run, yes=True)
         Logger.success("Project is up to date, no action needed.")
         return 0
 

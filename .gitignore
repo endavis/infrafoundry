@@ -22,9 +22,12 @@ wheels/
 MANIFEST
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+.tox/
+.hypothesis/
 
 # Virtual environments
 venv/
@@ -90,9 +93,14 @@ _version.py
 
 # Temporary files
 tmp/
+!tmp/.gitkeep
 .venv
 .cache/
+.uv-cache/
 .infrafoundry/
 coverage.xml
 .nfs*
 .doit.db.db
+
+# AI agent settings originals
+.gemini/settings.json.orig

@@ -1,0 +1,51 @@
+name: Mutation Testing
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"  # Sunday midnight UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutate:
+    runs-on: ubuntu-latest
+    env:
+      UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Run mutation testing
+        run: |
+          uv run mutmut run || true
+          uv run mutmut results
+          uv run mutmut html --html-dir tmp/mutmut
+
+      - name: Upload mutation results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: mutation-results
+          path: tmp/mutmut/
+          retention-days: 90

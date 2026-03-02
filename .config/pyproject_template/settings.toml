@@ -9,5 +9,5 @@ github_user = "endavis"
 github_repo = "infrafoundry"
 
 [template]
-commit = "2c1171b97183a76fe8415d408432bf344081507c"
-commit_date = "2026-01-23"
+commit = "5486031f1f8914323ffb920ef6c979143144e6c9"
+commit_date = "2026-03-02"

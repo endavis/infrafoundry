@@ -486,25 +486,34 @@ def _extract_linked_issues(body: str) -> dict[str, list[str]]:
     """Extract linked issue numbers from PR body with relationship type.
 
     Looks for patterns like:
-    - Closes #123, Fixes #456, Resolves #789 → "closes"
+    - Addresses #123 → "addresses"
+    - Closes #123, Fixes #456, Resolves #789 → "addresses" (legacy compat)
     - Part of #101 → "part_of"
 
     Args:
         body: PR body text
 
     Returns:
-        Dict with "closes" and "part_of" keys, each containing list of issue numbers
+        Dict with "addresses" and "part_of" keys, each containing list of issue numbers
     """
-    result: dict[str, list[str]] = {"closes": [], "part_of": []}
+    result: dict[str, list[str]] = {"addresses": [], "part_of": []}
     seen: set[str] = set()
 
-    # Pattern for closes/fixes/resolves
+    # Pattern for addresses (preferred)
+    addresses_pattern = r"address(?:es|ed)?\s+#(\d+)"
+    for match in re.finditer(addresses_pattern, body, re.IGNORECASE):
+        issue = match.group(1)
+        if issue not in seen:
+            seen.add(issue)
+            result["addresses"].append(issue)
+
+    # Pattern for closes/fixes/resolves (legacy compat, treated as addresses)
     closes_pattern = r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)"
     for match in re.finditer(closes_pattern, body, re.IGNORECASE):
         issue = match.group(1)
         if issue not in seen:
             seen.add(issue)
-            result["closes"].append(issue)
+            result["addresses"].append(issue)
 
     # Pattern for part of
     part_of_pattern = r"part\s+of\s+#(\d+)"
@@ -523,21 +532,21 @@ def _format_merge_subject(title: str, pr_number: int, issues: dict[str, list[str
     Args:
         title: PR title (should be in conventional commit format)
         pr_number: PR number
-        issues: Dict with "closes" and "part_of" keys containing issue numbers
+        issues: Dict with "addresses" and "part_of" keys containing issue numbers
 
     Returns:
-        Formatted subject: "<type>: <subject> (merges PR #XX, closes #YY)"
-        or: "<type>: <subject> (merges PR #XX, part of #YY)"
+        Formatted subject: "<type>: <subject> (merges PR #XX, addresses #YY)"
+        or: "<type>: <subject> (merges PR #XX)"
     """
-    closes = issues.get("closes", [])
+    addresses = issues.get("addresses", [])
     part_of = issues.get("part_of", [])
 
     # Build the suffix parts
     parts = [f"merges PR #{pr_number}"]
 
-    if closes:
-        issue_refs = ", ".join(f"#{i}" for i in closes)
-        parts.append(f"closes {issue_refs}")
+    if addresses:
+        issue_refs = ", ".join(f"#{i}" for i in addresses)
+        parts.append(f"addresses {issue_refs}")
 
     if part_of:
         issue_refs = ", ".join(f"#{i}" for i in part_of)
@@ -551,7 +560,7 @@ def task_pr_merge() -> dict[str, Any]:
     """Merge a PR with properly formatted commit message.
 
     This task enforces the merge commit format:
-        <type>: <subject> (merges PR #XX, closes #YY)
+        <type>: <subject> (merges PR #XX, addresses #YY)
 
     Uses squash merge with a custom subject line to ensure consistent
     commit history that matches the documented format.

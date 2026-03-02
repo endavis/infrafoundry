@@ -23,7 +23,7 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 - **Questions != Instructions:** If the user asks "What...", "How...", or "Can we...", answer with a **PLAN** or **EXPLANATION**.
 - **NEVER implement based on a question.** Wait for explicit "Do it" or "Proceed".
 - **Stop & Verify:** If the user says "Stop", "Wait", "Hold on", "Cancel", "Wrong", or "No", immediately halt and ask for clarification.
-- **Summary Before Commit:** At the end of any implementation, summarize what was changed and wait for the user's explicit instruction to commit.
+- **Summary Before Commit:** At the end of any implementation (docs, fix, feature, chore, etc.), summarize what was changed for the user before committing and wait for the user's explicit instruction to commit the changes.
 
 ### 2. Task Planning Protocol
 - **Plan First:** Before writing code, present a checklist: Implementation Plan, Test Plan, Validation Plan (`doit check`).
@@ -33,20 +33,62 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 ### 3. Error Recovery Protocol
 - **Stop on Error:** If an action fails or you realize a mistake, **STOP**. Do not attempt to "fix it quickly" or revert silently.
 - **Report & Wait:** Report the error/mistake to the user, explain the state, propose a fix, and **WAIT** for confirmation.
+- **No Auto-Reverts:** Do not revert changes unless explicitly instructed or if the change caused a critical system failure blocking further interaction.
 
 ### 4. When Blocked Protocol
 - **Blocked != Broken:** If a command is blocked, it is blocked FOR A REASON.
 - **Investigate First:** Ask "WHY is this blocked?" before anything else.
-- **NEVER Bypass:** Do not use `--admin`, `--force`, `--no-verify`, or similar flags.
+- **NEVER Bypass:** Do not use `--admin`, `--force`, `--no-verify`, or similar flags to override blocks.
 - **Report & Wait:** Explain what's blocked and ask the user how to proceed.
 
-### 5. Decision Framework
+> **Note:** Dangerous commands are also blocked at the tool level by hooks in `tools/hooks/ai/`. See the [AI Command Blocking](docs/development/ai/command-blocking.md) documentation.
+
+### 5. Pre-Action Checks (Dynamic Context)
+**Do not rely on pre-loaded context.** You MUST read these files *immediately before* acting:
+
+| Intent / Action | **MUST READ** Rule Source | Purpose |
+| :--- | :--- | :--- |
+| **New Feature** (Check for duplicates) | `.github/ISSUE_TEMPLATE/feature_request.yml` | Required fields & structure. |
+| **Refactoring** | `.github/ISSUE_TEMPLATE/refactor.yml` | Success criteria requirements. |
+| **Bug Fix** (Check for duplicates) | `.github/ISSUE_TEMPLATE/bug_report.yml` | Reproduction steps format. |
+| **PR Template** | `.github/pull_request_template.md` | Required structure & checklist items. |
+| **Committing** | `.github/CONTRIBUTING.md` (Commit Guidelines) | `<type>: <subject>` format. |
+| **New Dependency** | `.github/CONTRIBUTING.md` (Dependencies) | "Ask First" policy. |
+| **Creating Code** | `.claude/CLAUDE.md` (TodoWrite) | Plan -> Test -> Code loop. |
+| **Architectural Decision** | `docs/decisions/README.md` | Check for related ADRs to update. |
+
+### 6. Decision Framework
 
 | Status | Trigger | Action |
 | :--- | :--- | :--- |
 | **ALWAYS** | Obvious fixes, docs, tests, refactoring (same behavior) | **Proceed Autonomously** |
 | **ASK FIRST** | Scope expansion, new deps, architecture, ambiguous requests | **Propose & Wait** |
-| **NEVER** | Commit to `main`, skip hooks, release, commit secrets, bypass blocks | **Refuse & Explain** |
+| **NEVER** | Commit to `main`, skip hooks, release, commit secrets, bypass blocks (`--admin`, `--force`) | **Refuse & Explain** |
+
+### Examples: Prohibited vs. Correct Reasoning
+
+**Understanding what constitutes an "assumption" or "judgment call":**
+
+**Prohibited - These are assumption-based judgment calls:**
+- "This change is small/trivial, so I don't need to follow the full workflow"
+- "This is just a typo fix, so I can commit directly to main"
+- "GitHub will automatically close the issue, so I don't need to verify"
+- "The user probably wants me to proceed without asking"
+- "This seems obvious, so I'll skip the issue creation step"
+- "It's just documentation, so tests aren't needed"
+- "I'll commit now and create the issue afterward"
+- "The merge is blocked, so I'll use --admin to force it through"
+
+**Correct - These follow documented rules:**
+- "The workflow says Issue -> Branch -> Commit -> PR -> Merge, so I will follow every step regardless of change size"
+- "I'm not sure if I should close the issue manually, so I will ask the user"
+- "The documentation says 'NEVER commit to main' with no exceptions, so I will create a branch"
+- "AGENTS.md says to create tests when writing new code, so I will create them even though this is simple"
+- "I don't see explicit documentation about this case, so I will ask the user before proceeding"
+- "The rule says 'NO EXCEPTIONS' so I will not evaluate if this qualifies as an exception"
+- "The merge is blocked, so I will investigate why and ask the user before attempting to bypass"
+
+**Key principle:** If you find yourself thinking "but this case is different because..." or "this is simple enough to...", you are making a judgment call. STOP and follow the documented process or ASK the user.
 
 ## Sources of Truth
 
@@ -202,27 +244,143 @@ def generate_terraform(self, resources: list[dict[str, Any]]) -> Path:
 
 ## Tooling & Environment
 
-- **GitHub CLI (`gh`):** Primary tool for issue management, PR creation
-- **uv:** Package management and environment control
-- **doit:** Task automation and project checks
+### Principle: Use the Highest-Level Tool Available
+
+This project wraps common operations in `doit` tasks that enforce conventions, validate inputs, and reduce errors. **Always check if a `doit` task exists before running a raw command.**
+
+The tool hierarchy (prefer higher over lower):
+
+1. **`doit`** — Project tasks that enforce conventions (issues, PRs, checks, releases)
+2. **`uv`** — Package management and Python execution
+3. **`gh`** — GitHub API queries and operations not covered by `doit`
+4. **`git`** — Version control operations
+5. **Raw commands** — Only when nothing above covers the need
+
+### Tool Reference
+
+| Task | Preferred Tool | Do NOT Use |
+| :--- | :--- | :--- |
+| Run all checks (test, lint, type) | `doit check` | `pytest`, `ruff`, `mypy` separately |
+| Run tests only | `doit test` | `pytest` directly |
+| Run tests with coverage | `doit coverage` | `pytest --cov` directly |
+| Lint code | `doit lint` | `ruff check` directly |
+| Format code | `doit format` | `ruff format` directly |
+| Type-check | `doit type_check` | `mypy` directly |
+| Security audit | `doit audit` | `pip-audit` directly |
+| Create issues | `doit issue --type=<type>` | `gh issue create` |
+| Create PRs | `doit pr` | `gh pr create` |
+| Merge PRs | `doit pr_merge` | `gh pr merge` |
+| Create ADRs | `doit adr` | Manual file creation |
+| Commit (interactive) | `doit commit` | `git commit` without format |
+| Install/add packages | `uv add <pkg>` | `pip install` |
+| Sync dependencies | `uv sync` | `pip install -r` |
+| Run Python scripts | `uv run <script>` | `python` directly |
+| Run a specific test file | `uv run pytest tests/test_foo.py` | `pytest` directly |
+| Read issues/PRs/comments | `gh issue view`, `gh pr view`, `gh api` | `WebFetch` on GitHub URLs |
+| GitHub API queries | `gh api` | `curl` to GitHub API |
+| Build docs | `doit docs_build` | `mkdocs build` directly |
+| Serve docs locally | `doit docs_serve` | `mkdocs serve` directly |
+| Release (production) | `doit release` | Manual tag + push |
+| Release (pre-release) | `doit release_dev` | Manual tag + push |
+| Mutation testing | `doit mutate` | `mutmut` directly |
+| Generate SBOM | `doit sbom` | `cyclonedx-py` directly |
+
+### Discovering Available Tasks
+
+List all available `doit` tasks before assuming one doesn't exist:
+
+```bash
+doit list          # Show all tasks with descriptions
+doit help <task>   # Show detailed help for a specific task
+```
+
+### When Raw Commands Are Appropriate
+
+Raw `git` and `gh` commands are fine for **read-only queries** that `doit` doesn't wrap:
+
+```bash
+# Git — read-only is always fine
+git status
+git log --oneline -10
+git diff
+git branch -a
+
+# gh — read-only queries
+gh issue view 42
+gh pr view 123
+gh pr checks
+gh api repos/{owner}/{repo}/pulls/123/comments
+gh issue list --label "bug"
+gh pr list --state open
+```
+
+**Write operations** should go through `doit` when a task exists. Use raw `git`/`gh` for write operations only when no `doit` task covers the need (e.g., `git checkout -b`, `git add`, `gh issue close`).
+
+### Dependabot PRs
+
+When merging dependabot PRs that are behind `main`, **never** use the GitHub API `update-branch` endpoint or local rebase to update the branch. This strips the verified commit signatures from dependabot commits, which are required by branch protection rules.
+
+Instead, use dependabot's own rebase command:
+
+```bash
+gh pr comment <number> --body "@dependabot rebase"
+```
+
+Dependabot will rebase the branch and re-sign the commits, preserving verified signatures.
+
+#### Dependabot PR merge workflow
+
+1. **Request rebase** via dependabot's own action (preserves signed commits):
+   ```bash
+   gh pr comment <number> --body "@dependabot rebase"
+   ```
+
+2. **Wait for force-push** — poll until the PR's commit parent matches current `main` HEAD:
+   ```bash
+   main_sha=$(gh api repos/{owner}/{repo}/git/ref/heads/main --jq '.object.sha[0:7]')
+   gh api repos/{owner}/{repo}/pulls/<number>/commits --jq '.[0].parents[0].sha[0:7]'
+   ```
+   This takes 1–3 minutes. **Do not** request a second rebase until the first one lands.
+
+3. **Wait for CI** to pass (`gh pr checks <number> --watch`).
+
+4. **Merge** with `doit pr_merge --pr=<number>`.
+
+### AI Agent File Operations
+
+AI agents with native file tools (Read, Grep, Glob, Edit, Write) **must** prefer those over shell equivalents:
+
+| Operation | Use This | Not This |
+| :--- | :--- | :--- |
+| Read a file | `Read` tool | `cat`, `head`, `tail` |
+| Search file contents | `Grep` tool | `grep`, `rg` |
+| Find files by pattern | `Glob` tool | `find`, `ls` |
+| Edit a file | `Edit` tool | `sed`, `awk` |
+| Create a file | `Write` tool | `echo >`, `cat <<EOF` |
+
+Native tools provide better visibility, review capabilities, and error handling for the user.
 
 ## Token Efficiency
-
-- **Be Concise:** Minimal text output
-- **Use Local Tools:** Prefer `read_file`, `grep` over sub-agents
-- **No Speculation:** Don't read files you don't need
+- **Be Concise:** Minimal text output.
+- **Use Local Tools:** Prefer native file tools over sub-agents (see [AI Agent File Operations](#ai-agent-file-operations)).
+- **No Speculation:** Don't read files you don't need.
 
 ## Critical Reminders
-
-- **Flow:** Issue (`doit issue`) → Branch → Commit → PR (`doit pr`) → Merge (`doit pr_merge`) → Close Issue
-- **Scope:** Never mix refactoring, features, and docs in one PR
-- **Verify:** Check file paths and branch before assuming they exist
-- **Tooling:** Prefer `doit` tasks over manual commands
-- **Local State:** Protect user config (e.g., `.envrc.local`). Do not revert/delete without backup
-- **Version:** Source of truth is Git tags. Never edit `pyproject.toml` version
-- **Tests:** Creating code = Creating tests. No exceptions
-- **Releases:** Never run `doit release` without explicit command
-- **ADRs:** Update related ADRs when implementing architectural decisions
+- **Flow:** Issue (`doit issue`) -> Branch -> Commit -> PR (`doit pr`) -> Merge (`doit pr_merge`). NEVER commit to main.
+- **Scope:** Never mix refactoring, features, and docs in one PR. Create separate branches.
+- **Verify:** Check file paths (`ls`) and branch (`git status`) before assuming they exist.
+- **Security:** NEVER bypass security checks (e.g., `--no-verify`, ignoring secrets).
+- **Tooling:** Prefer `doit` tasks over manual commands.
+- **Integrity:** Respect architectural patterns (modularity) over "quick fixes".
+- **Local State:** Protect user config (e.g., `.envrc.local`, settings). Do not revert/delete without backup.
+- **Version:** Source of truth is Git tags. Never edit `pyproject.toml` version.
+- **Tests:** Creating code = Creating tests. No exceptions.
+- **Commits:** One logical change per commit. Use conventional commits.
+- **Releases:** Never run `doit release` without explicit command.
+- **PRs:** Use `doit pr` to create PRs and `doit pr_merge` to merge with proper commit format. Issues are not automatically closed. Ask the user if they would like the related issue closed.
+- **The Merge Gate action:** is a manual action for the user to add to a PR. It requires the ready-to-merge label and should never be added by automation.
+- **Issues:** Use `doit issue --type=<type>` to create issues (types: feature, bug, refactor, doc, chore). Labels are auto-applied. Manually close after PR merge with comment "Addressed in PR #XXX". Issues are not closed automatically when PRs are merged.
+- **ADRs:** When implementing architectural decisions (typically `feat` or `refactor`, rarely `fix`), update related ADRs in `docs/decisions/` to add the issue link. Create new ADRs for significant decisions using `doit adr`. Every ADR must link to the documentation in `docs/` that describes the implementation. Doc and chore issues do not need ADRs. Issues with the `needs-adr` label require an ADR before the PR can be merged.
 
 ## Development Workflow
 
@@ -246,11 +404,11 @@ def generate_terraform(self, resources: list[dict[str, Any]]) -> Path:
 
 4. **Pull Request:** Submit a PR from your branch to `main`
    - Use `doit pr` to create PRs with proper formatting
-   - Reference the issue in PR description (e.g., "Closes #42")
+   - Reference the issue in PR description (e.g., "Addresses #42")
    - PR title must follow conventional commit format
 
 5. **PR Merge:** Use `doit pr_merge` for proper commit format
-   - Format: `<type>: <subject> (merges PR #XX, closes #YY)`
+   - Format: `<type>: <subject> (merges PR #XX, addresses #YY)`
 
 6. **Close Issue:** Manually close the linked issue after merging.
    ```bash
@@ -287,7 +445,7 @@ doit issue --type=chore --title="chore: update dependencies" \
 
 #### PR Creation
 ```bash
-doit pr --title="feat: add caching" --body="## Summary\nAdded caching support\n\nCloses #123"
+doit pr --title="feat: add caching" --body="## Summary\nAdded caching support\n\nAddresses #123"
 doit pr --title="fix: handle null" --body-file=pr.md
 ```
 
@@ -393,7 +551,7 @@ The PR title becomes the merge commit message, so make it clear and descriptive.
 
 **When PR completes the issue:**
 ```
-<type>: <subject> (merges PR #XX, closes #YY)
+<type>: <subject> (merges PR #XX, addresses #YY)
 ```
 
 **When PR is part of multi-PR issue or docs-only:**
@@ -403,8 +561,8 @@ The PR title becomes the merge commit message, so make it clear and descriptive.
 
 **Examples - Correct:**
 ```
-feat: add PyInfra runner support (merges PR #18, closes #42)
-fix: handle None values in OPNsense provider (merges PR #23, closes #19)
+feat: add PyInfra runner support (merges PR #18, addresses #42)
+fix: handle None values in OPNsense provider (merges PR #23, addresses #19)
 docs: update provider implementation guide (merges PR #29)
 ```
 
@@ -470,6 +628,20 @@ doit coverage
 - **Check CI**: Ensure all CI checks pass before considering work complete
 - **Link issues**: Always reference related issue numbers
 - **Close issues**: Manually close issues after PR merge
+
+## PR Checklist (for AI agents)
+
+Before creating a PR, verify:
+
+- [ ] `doit check` passes (tests, lint, type-check, security)
+- [ ] Branch name follows convention: `<type>/<issue>-<description>`
+- [ ] Commits follow conventional format: `<type>: <subject>`
+- [ ] PR title follows conventional format: `<type>: <subject>`
+- [ ] PR description references the issue: "Addresses #XX"
+- [ ] If issue has `needs-adr` label: ADR created and included in PR
+- [ ] If implementing architectural decision: Related ADR updated with issue link
+- [ ] If ADR created/updated: Links to documentation in `docs/` included
+- [ ] Documentation updated if behavior changed
 
 ## Testing Expectations
 
