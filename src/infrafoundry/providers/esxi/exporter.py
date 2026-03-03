@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import subprocess
+import subprocess  # nosec B404 - required for SSH commands to ESXi hosts
 from typing import Any
 
 import yaml

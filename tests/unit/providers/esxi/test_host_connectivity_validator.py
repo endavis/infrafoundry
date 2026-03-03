@@ -26,35 +26,35 @@ def test_validate_host_reachable(validator, report):
     """Test validation of reachable host."""
     mock_conn = MagicMock()
     with patch("socket.create_connection", return_value=mock_conn):
-        validator.validate("esxi-01.example.com")
+        validator.validate("esxi-host-01")
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is True
     assert "reachable" in call_args["message"]
-    assert "esxi-01.example.com" in call_args["message"]
+    assert "esxi-host-01" in call_args["message"]
     mock_conn.close.assert_called_once()
 
 
 def test_validate_host_unreachable(validator, report):
     """Test validation of unreachable host."""
     with patch("socket.create_connection", side_effect=OSError("Connection refused")):
-        validator.validate("esxi-01.example.com")
+        validator.validate("esxi-host-01")
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is False
     assert "not reachable" in call_args["message"]
-    assert "esxi-01.example.com" in call_args["message"]
+    assert "esxi-host-01" in call_args["message"]
 
 
 def test_validate_custom_port(validator, report):
     """Test validation with custom port."""
     mock_conn = MagicMock()
     with patch("socket.create_connection", return_value=mock_conn) as mock_create:
-        validator.validate("esxi-01.example.com", port=443)
+        validator.validate("esxi-host-01", port=443)
 
-    mock_create.assert_called_once_with(("esxi-01.example.com", 443), timeout=1.0)
+    mock_create.assert_called_once_with(("esxi-host-01", 443), timeout=1.0)
     call_args = report.add_check.call_args[1]
     assert "port 443" in call_args["message"]
 
@@ -62,7 +62,7 @@ def test_validate_custom_port(validator, report):
 def test_validate_timeout_error(validator, report):
     """Test validation when connection times out."""
     with patch("socket.create_connection", side_effect=OSError("Connection timed out")):
-        validator.validate("esxi-01.example.com")
+        validator.validate("esxi-host-01")
 
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is False
