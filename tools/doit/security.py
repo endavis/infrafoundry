@@ -37,3 +37,17 @@ def task_licenses() -> dict[str, Any]:
         ],
         "title": title_with_actions,
     }
+
+
+def task_sbom() -> dict[str, Any]:
+    """Generate SBOM in CycloneDX format (requires security extras)."""
+    return {
+        "actions": [
+            "mkdir -p tmp",
+            "uv run cyclonedx-py environment --of JSON -o tmp/sbom.json && "
+            "uv run cyclonedx-py environment --of XML -o tmp/sbom.xml || "
+            "echo 'cyclonedx-py not installed. Run: uv sync --extra security'",
+        ],
+        "title": title_with_actions,
+        "verbosity": 2,
+    }

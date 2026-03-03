@@ -32,7 +32,11 @@ def task_changelog() -> dict[str, Any]:
 def task_pre_commit_install() -> dict[str, Any]:
     """Install pre-commit hooks."""
     return {
-        "actions": ["uv run pre-commit install"],
+        "actions": [
+            "uv run pre-commit install",
+            "uv run pre-commit install --hook-type post-merge",
+            "uv run pre-commit install --hook-type post-checkout",
+        ],
         "title": title_with_actions,
     }
 

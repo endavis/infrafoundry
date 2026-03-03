@@ -4,12 +4,19 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        stages: [pre-commit]
       - id: end-of-file-fixer
+        stages: [pre-commit]
       - id: check-yaml
+        stages: [pre-commit]
       - id: check-added-large-files
+        stages: [pre-commit]
       - id: check-toml
+        stages: [pre-commit]
       - id: check-merge-conflict
+        stages: [pre-commit]
       - id: detect-private-key
+        stages: [pre-commit]
 
   # Conventional commits enforcement
   - repo: https://github.com/compilerla/conventional-pre-commit
@@ -29,12 +36,14 @@ repos:
         entry: uv run ruff check --fix
         language: system
         types: [python]
+        stages: [pre-commit]
 
       - id: ruff-format
         name: ruff-format
         entry: uv run ruff format
         language: system
         types: [python]
+        stages: [pre-commit]
 
       # Type checking (uses project's mypy version)
       # Only checks src/ to match doit type_check behavior
@@ -44,6 +53,7 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+        stages: [pre-commit]
 
       # Security scanning (uses project's bandit version)
       # Skips if bandit not installed (optional security extra)
@@ -52,6 +62,7 @@ repos:
         entry: bash -c 'command -v bandit &>/dev/null || uv run python -c "import bandit" 2>/dev/null || exit 0; uv run bandit -c pyproject.toml "$@"' --
         language: system
         types: [python]
+        stages: [pre-commit]
 
       # Spell checking (uses project's codespell version)
       - id: codespell
@@ -60,6 +71,7 @@ repos:
         language: system
         types: [text]
         exclude: ^(\.git/|\.venv/|uv\.lock)
+        stages: [pre-commit]
 
       # Branch naming enforcement
       - id: check-branch-name
@@ -87,6 +99,7 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+        stages: [pre-commit]
 
       # Generate documentation TOC from frontmatter
       - id: generate-doc-toc
@@ -95,6 +108,7 @@ repos:
         language: system
         pass_filenames: false
         files: ^docs/.*\.md$
+        stages: [pre-commit]
 
       # Prevent direct commits to main branch
       - id: no-commit-to-main
@@ -120,6 +134,7 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+        stages: [pre-commit]
 
       # Prevent committing local config files
       - id: no-local-config
@@ -143,6 +158,7 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+        stages: [pre-commit]
 
       # Protect dynamic version configuration
       - id: protect-dynamic-version
@@ -161,5 +177,24 @@ repos:
             fi
           fi'
         language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      # Auto-sync dependencies when uv.lock changes after git pull
+      - id: uv-sync-on-pull
+        name: Auto uv sync after pull (lock changed)
+        entry: bash -c 'git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD | grep -q "^uv\.lock$" && echo "uv.lock changed — running uv sync..." && uv sync --all-extras --dev || true'
+        language: system
+        stages: [post-merge]
+        pass_filenames: false
+        always_run: true
+
+      # Auto-sync dependencies when uv.lock changes after branch switch
+      - id: uv-sync-on-checkout
+        name: Auto uv sync after branch switch (lock changed)
+        entry: bash -c 'if [ "$3" = "1" ]; then git diff --name-only "$1" "$2" | grep -q "^uv\.lock$" && echo "uv.lock changed — running uv sync..." && uv sync --all-extras --dev || true; fi'
+        language: system
+        stages: [post-checkout]
         pass_filenames: false
         always_run: true
