@@ -4,6 +4,7 @@ from infrafoundry.providers.proxmox.validators.network_validator import NetworkV
 from infrafoundry.providers.proxmox.validators.node_validator import NodeValidator
 from infrafoundry.providers.proxmox.validators.storage_validator import StorageValidator
 from infrafoundry.providers.proxmox.validators.template_validator import TemplateValidator
+from infrafoundry.providers.proxmox.validators.vm_config_validator import VMConfigValidator
 from infrafoundry.providers.proxmox.validators.vmid_validator import VMIDValidator
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "NodeValidator",
     "StorageValidator",
     "TemplateValidator",
+    "VMConfigValidator",
     "VMIDValidator",
 ]
