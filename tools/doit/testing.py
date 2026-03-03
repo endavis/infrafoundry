@@ -32,3 +32,24 @@ def task_test_integration() -> dict[str, Any]:
         "actions": ["uv run pytest -v -m integration tests/integration/"],
         "title": title_with_actions,
     }
+
+
+def task_mutate() -> dict[str, Any]:
+    """Run mutation testing with mutmut."""
+    return {
+        "actions": [
+            "uv run mutmut run",
+            "uv run mutmut results",
+        ],
+        "title": title_with_actions,
+        "verbosity": 2,
+    }
+
+
+def task_mutate_html() -> dict[str, Any]:
+    """Generate HTML report from mutmut results."""
+    return {
+        "actions": ["uv run mutmut html --html-dir tmp/mutmut"],
+        "title": title_with_actions,
+        "verbosity": 2,
+    }

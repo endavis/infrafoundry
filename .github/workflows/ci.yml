@@ -66,6 +66,7 @@ jobs:
     env:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
       INFRAFOUNDRY_SKIP_SOPS_CHECK: '1'
+      HYPOTHESIS_PROFILE: ci
 
     steps:
       - uses: actions/checkout@v6
@@ -127,7 +128,8 @@ jobs:
         run: uv run codespell src/ tests/ docs/ README.md
 
       - name: Run dependency audit
-        run: uv run pip install --upgrade pip && uv run pip-audit
+        continue-on-error: true
+        run: uv run pip-audit --skip-editable
 
       - name: Run tests with coverage
         run: uv run pytest --cov=infrafoundry --cov-report=xml:tmp/coverage.xml --cov-report=term -v

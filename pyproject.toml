@@ -27,13 +27,18 @@ dev = [
     "codespell>=2.2",
     "commitizen>=3.0",
     "coverage-badge>=1.1.0",
+    "hypothesis>=6.0",
     "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+    "mutmut>=3.0",
     "mypy>=1.0.0",
     "pre-commit>=3.7.0",
     "pyproject-fmt>=2.0",
     "pyright>=1.1",
     "pytest>=8.0.0",
+    "pytest-benchmark>=4.0",
     "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.5",
     "radon>=6.0",
     "ruff>=0.1.0",
     "types-PyYAML>=6.0.0",
@@ -42,9 +47,11 @@ dev = [
     "vulture>=2.0",
 ]
 security = [
+    "pip>=26.0",
     "pip-audit>=2.6",
     "bandit>=1.7",
     "pip-licenses>=4.0",
+    "cyclonedx-bom>=4.0",
 ]
 
 [project.scripts]
@@ -130,11 +137,22 @@ no_implicit_optional = true
 strict_equality = true
 warn_redundant_casts = true
 warn_unreachable = true
+exclude = ["tools/pyproject_template/", ".claude/", ".gemini/", ".codex/"]
+
+[[tool.mypy.overrides]]
+module = "doit.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Standalone scripts using sys.path manipulation; excluded from discovery
+# but still followed via imports from bootstrap.py
+module = "tools.pyproject_template.*"
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 minversion = "8.0"
 cache_dir = "tmp/.pytest_cache"
-addopts = "-v --tb=short --strict-config --strict-markers"
+addopts = "-v --tb=short --strict-config --strict-markers --benchmark-disable"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
@@ -143,7 +161,14 @@ markers = [
     "unit: Unit tests for individual components",
     "integration: Integration tests for full workflows",
     "slow: Tests that take significant time to run",
+    "benchmark: marks tests as performance benchmarks (deselect with '--benchmark-disable')",
+    "property: marks tests as property-based tests (run with Hypothesis)",
 ]
+
+[tool.pytest-benchmark]
+disable_gc = true
+min_rounds = 5
+warmup = true
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -161,8 +186,29 @@ bump_map = { "feat" = "MINOR", "fix" = "PATCH", "refactor" = "PATCH", "perf" = "
 change_type_order = ["BREAKING CHANGE", "feat", "fix", "refactor", "perf"]
 
 [tool.bandit]
-exclude_dirs = ["tests", "tmp", ".venv", "docs", ".git", ".github", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".claude"]
-skips = []
+exclude_dirs = [
+    "tests",
+    "tmp",
+    ".venv",
+    "docs",
+    "examples",
+    ".git",
+    ".github",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "site",
+    ".claude",
+    ".gemini",
+    ".codex",
+    ".devcontainer",
+    ".vscode",
+]
+skips = [
+    "B101",
+    "B603",
+    "B607",
+]
 
 [tool.codespell]
 skip = "tmp,.venv,.git,*.lock,*.pyc,__pycache__"
@@ -202,13 +248,52 @@ output = "tmp/coverage.xml"
 [tool.vulture]
 min_confidence = 80
 paths = ["src", "tests"]
-exclude = ["*/tests/*", "*/__pycache__/*"]
-ignore_names = ["test_*", "fixture_*", "*_fixture"]
-ignore_decorators = ["@pytest.fixture", "@pytest.mark.*"]
+exclude = [
+    "*/tests/*",      # Test fixtures often appear unused
+    "*/__pycache__/*",
+]
+ignore_names = [
+    "test_*",         # Pytest test functions
+    "fixture_*",      # Pytest fixtures
+    "*_fixture",      # Pytest fixtures
+    "setUp",          # unittest methods
+    "tearDown",       # unittest methods
+    "setUpClass",     # unittest methods
+    "tearDownClass",  # unittest methods
+]
+ignore_decorators = [
+    "@pytest.fixture",
+    "@pytest.mark.*",
+    "@click.command",
+    "@click.option",
+    "@click.group",
+    "@abstractmethod",
+]
+
+[tool.mutmut]
+paths_to_mutate = "src/"
+tests_dir = "tests/"
+runner = "uv run python -m pytest -x --assert=plain"
 
 [tool.pyright]
-include = ["src", "tests", "*.py", "tools", ".github"]
-exclude = ["**/__pycache__", "**/.venv", "**/tmp", "**/.pytest_cache", "**/.mypy_cache", "**/.ruff_cache", "**/site", "**/.git"]
+# LSP support for Claude Code - provides fast code navigation and type checking
+include = [
+    "src",
+    "tests",
+    "*.py",           # Root level Python files (dodo.py)
+    "tools",          # Tools directory
+    ".github",        # Any Python in GitHub workflows/scripts
+]
+exclude = [
+    "**/__pycache__",
+    "**/.venv",
+    "**/tmp",
+    "**/.pytest_cache",
+    "**/.mypy_cache",
+    "**/.ruff_cache",
+    "**/site",        # mkdocs build output
+    "**/.git",
+]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"

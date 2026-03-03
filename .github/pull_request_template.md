@@ -4,10 +4,8 @@
 
 ## Related Issue
 
-<!-- Link to the issue this PR addresses. Use one of: -->
-<!-- - "Closes #XX" when this PR fully completes the issue -->
-<!-- - "Part of #XX" when this PR is one of multiple PRs for the issue -->
-Closes #(issue)
+<!-- Link to the issue this PR addresses -->
+Addresses #(issue)
 
 ## Type of Change
 

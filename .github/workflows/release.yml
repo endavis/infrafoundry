@@ -41,6 +41,15 @@ jobs:
       - name: Build artifacts
         run: uv build
 
+      - name: Install security extras for SBOM generation
+        run: uv sync --extra security
+
+      - name: Generate SBOM (JSON)
+        run: uv run cyclonedx-py environment --of JSON -o dist/sbom.json
+
+      - name: Generate SBOM (XML)
+        run: uv run cyclonedx-py environment --of XML -o dist/sbom.xml
+
       - uses: actions/upload-artifact@v6
         with:
           name: dist
@@ -87,3 +96,33 @@ jobs:
         with:
           packages-dir: dist
           skip-existing: true
+
+  github-release:
+    name: Create GitHub Release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create GitHub release with auto-generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release create "$tag" --generate-notes --title "$tag"
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist
+
+      - name: Upload SBOM assets to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release upload "$tag" dist/sbom.json dist/sbom.xml --clobber
