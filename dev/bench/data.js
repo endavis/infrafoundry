@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772537860377,
+  "lastUpdate": 1772551441889,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -31,6 +31,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000892940579448594",
             "extra": "mean: 142.5078904982138 usec\nrounds: 2347"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e20acaf17f14c5c93859d08a06ddf8d1dc26138a",
+          "message": "feat: add multi-NIC, CPU type, machine type, BIOS, and ISO boot support to Proxmox provider (merges PR #286, addresses #281)",
+          "timestamp": "2026-03-03T15:23:27Z",
+          "tree_id": "cd4c994fb26aa74290a02759b0fb30cb264bfd61",
+          "url": "https://github.com/endavis/infrafoundry/commit/e20acaf17f14c5c93859d08a06ddf8d1dc26138a"
+        },
+        "date": 1772551441267,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6997.656278890577,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009056500914681771",
+            "extra": "mean: 142.90498992021685 usec\nrounds: 2381"
           }
         ]
       }
