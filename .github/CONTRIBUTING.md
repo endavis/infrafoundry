@@ -370,7 +370,7 @@ The label and approval are independent checks - both must pass. The label serves
 
 - Delete your branch
 - Update your fork with the latest changes
-- Close any related issues with comment "Fixed in PR #XXX"
+- Close any related issues with comment "Addressed in PR #XXX"
 
 ## Release Process
 

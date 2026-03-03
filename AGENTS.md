@@ -72,12 +72,13 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 **Prohibited - These are assumption-based judgment calls:**
 - "This change is small/trivial, so I don't need to follow the full workflow"
 - "This is just a typo fix, so I can commit directly to main"
-- "GitHub will automatically close the issue, so I don't need to verify"
+- "GitHub will automatically close the issue with 'Addresses #XX' syntax, so I don't need to verify"
 - "The user probably wants me to proceed without asking"
 - "This seems obvious, so I'll skip the issue creation step"
 - "It's just documentation, so tests aren't needed"
 - "I'll commit now and create the issue afterward"
 - "The merge is blocked, so I'll use --admin to force it through"
+- "CI hasn't finished but I'll bypass with --admin"
 
 **Correct - These follow documented rules:**
 - "The workflow says Issue -> Branch -> Commit -> PR -> Merge, so I will follow every step regardless of change size"

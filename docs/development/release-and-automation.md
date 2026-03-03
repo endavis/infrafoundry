@@ -5,7 +5,9 @@ This guide covers the automated versioning, release management, governance valid
 ## Table of Contents
 - [Automated Versioning](#automated-versioning)
 - [Release Management](#release-management)
-- [Security & Quality Tasks](#security-quality-tasks)
+- [Release Notes](#release-notes)
+- [Security & Quality Tasks](#security--quality-tasks)
+- [SBOM Generation](#sbom-generation)
 - [Governance Validation](#governance-validation)
 - [Environment Configuration](#environment-configuration)
 
@@ -156,6 +158,32 @@ uv run doit release
 # --> Creates v0.2.0, updates CHANGELOG, publishes to PyPI
 ```
 
+## Release Notes
+
+Release notes are automatically generated from merged pull requests when a GitHub release is created. The release workflow creates a GitHub release with auto-generated notes after publishing to PyPI.
+
+### How It Works
+
+1. When a version tag (e.g., `v1.0.0`) is pushed, the release workflow runs
+2. After the package is published to PyPI, the `github-release` job creates a GitHub release
+3. GitHub generates release notes by categorizing merged PRs since the last release
+4. SBOM files are attached to the release as downloadable assets
+
+### Category Configuration
+
+PR labels and conventional commit prefixes are mapped to release note sections in `.github/release.yml`:
+
+| Section | Labels |
+|---------|--------|
+| **Breaking Changes** | `breaking` |
+| **New Features** | `enhancement`, `feat` |
+| **Bug Fixes** | `bug`, `fix` |
+| **Documentation** | `documentation`, `docs` |
+| **Performance** | `performance`, `perf` |
+| **Other Changes** | Everything else |
+
+PRs with the `dependencies` or `needs-triage` labels are excluded from release notes.
+
 ## Security & Quality Tasks
 
 InfraFoundry includes comprehensive security scanning and code quality tools.
@@ -251,6 +279,63 @@ uv run doit fmt_pyproject
   | click        | 8.1.7   | BSD-3-Clause|
   | pydantic     | 2.5.0   | MIT         |
   ```
+
+#### `doit sbom`
+- **Tool**: cyclonedx-py
+- **Purpose**: Generates a Software Bill of Materials (SBOM) in CycloneDX format
+- **Output**: `tmp/sbom.json` (JSON) and `tmp/sbom.xml` (XML)
+- **Example**:
+  ```bash
+  $ uv run doit sbom
+  # Generates tmp/sbom.json and tmp/sbom.xml
+  ```
+
+### SBOM Generation
+
+A **Software Bill of Materials (SBOM)** is a machine-readable inventory of all software components and dependencies in a project. SBOMs are increasingly required for regulatory compliance and are essential for security auditing and supply chain transparency.
+
+#### Why SBOM Matters
+
+- **Compliance**: Many organizations and government agencies require SBOMs for software procurement
+- **Security Auditing**: Enables automated vulnerability scanning across all dependencies
+- **Supply Chain Transparency**: Provides a complete picture of third-party components
+- **Incident Response**: Quickly determine if a newly discovered vulnerability affects your software
+
+#### Local Usage
+
+```bash
+# Install security extras (if not already installed)
+uv sync --extra security
+
+# Generate SBOM files
+doit sbom
+```
+
+This produces two files in the `tmp/` directory:
+
+- `tmp/sbom.json` -- CycloneDX JSON format
+- `tmp/sbom.xml` -- CycloneDX XML format
+
+#### Release Integration
+
+SBOMs are automatically generated and attached to every GitHub release:
+
+1. During the **build** job, `cyclonedx-py` generates both JSON and XML SBOMs
+2. The SBOM files are included in the `dist/` artifact alongside wheel and sdist packages
+3. After publishing to PyPI, the **github-release** job creates a GitHub release with auto-generated notes and attaches the SBOMs as release assets
+
+#### Using SBOMs for Vulnerability Scanning
+
+```bash
+# Using grype (https://github.com/anchore/grype)
+grype sbom:tmp/sbom.json
+
+# Using trivy (https://github.com/aquasecurity/trivy)
+trivy sbom tmp/sbom.json
+
+# Using osv-scanner (https://github.com/google/osv-scanner)
+osv-scanner --sbom=tmp/sbom.json
+```
 
 ### Integrating into CI
 

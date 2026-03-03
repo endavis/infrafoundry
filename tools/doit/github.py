@@ -607,9 +607,9 @@ def task_pr_merge() -> dict[str, Any]:
 
         # Extract linked issues
         issues = _extract_linked_issues(pr_body)
-        has_issues = issues["closes"] or issues["part_of"]
+        has_issues = issues["addresses"] or issues["part_of"]
         if has_issues:
-            all_issues = issues["closes"] + issues["part_of"]
+            all_issues = issues["addresses"] + issues["part_of"]
             console.print(f"[dim]Linked issues: {', '.join(f'#{i}' for i in all_issues)}[/dim]")
         else:
             console.print("[yellow]Warning: No linked issues found in PR body.[/yellow]")
