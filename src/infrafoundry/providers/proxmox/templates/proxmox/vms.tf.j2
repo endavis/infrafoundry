@@ -130,11 +130,15 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   cpu {
     cores   = {{ vm.config.cores | default(2) }}
     sockets = {{ vm.config.sockets | default(1) }}
+    type    = "{{ vm.config.cpu_type | default('kvm64') }}"
   }
 
   # Memory Configuration
   memory {
     dedicated = {{ vm.config.memory | default(2048) }}
+    {% if vm.config.balloon is defined %}
+    floating  = {{ vm.config.balloon }}
+    {% endif %}
   }
 
   {% if vm.config.agent is defined %}
@@ -149,7 +153,7 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   disk {
     datastore_id = "{{ vm.config.disk.storage | default('local-lvm') }}"
     size         = {{ vm.config.disk.size | default('32') | replace('G', '') }}
-    interface    = "{{ 'scsi0' if vm.config.disk.type == 'scsi' else 'virtio0' }}"
+    interface    = "{{ 'scsi0' if vm.config.disk.type == 'scsi' else ('sata0' if vm.config.disk.type == 'sata' else 'virtio0') }}"
   }
   {% endif %}
 
@@ -165,18 +169,30 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
 
   {% if vm.config.network is defined %}
   # Network Configuration
+  {% for nic in vm.config.network %}
   network_device {
-    bridge      = "{{ vm.config.network.bridge | default('vmbr0') }}"
-    {% if vm.config.network.macaddr is defined %}
-    mac_address = "{{ vm.config.network.macaddr }}"
+    bridge      = "{{ nic.bridge | default('vmbr0') }}"
+    {% if nic.model is defined %}
+    model       = "{{ nic.model }}"
     {% endif %}
-    {% if vm.config.network.tag is defined %}
-    vlan_id     = {{ vm.config.network.tag }}
+    {% if nic.macaddr is defined %}
+    mac_address = "{{ nic.macaddr }}"
     {% endif %}
+    {% if nic.tag is defined %}
+    vlan_id     = {{ nic.tag }}
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+
+  {% if vm.config.iso is defined %}
+  # CD-ROM / ISO boot
+  cdrom {
+    file_id = "{{ vm.config.iso }}"
   }
   {% endif %}
 
-  {% if vm.config.ipconfig is defined or vm.config.ssh_user is defined or vm.config.ssh_keys is defined or vm.config.cloud_init_users is defined %}
+  {% if vm.config.iso is not defined and (vm.config.ipconfig is defined or vm.config.ssh_user is defined or vm.config.ssh_keys is defined or vm.config.cloud_init_users is defined) %}
   # Cloud-init Configuration
   initialization {
     datastore_id = "{{ vm.config.cloud_init_datastore | default((vm.config.disk.storage if vm.config.disk is defined else 'local-lvm')) }}"

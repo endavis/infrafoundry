@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypedDict, cast
+from typing import Any, TypedDict, cast
 
 import urllib3
 
@@ -232,14 +232,16 @@ class ProxmoxValidator:
             if (storage := config.get("storage")) and target_node:
                 storage_pools.add((target_node, storage))
 
-            # Collect network bridges
-            if (
-                (network_config := config.get("network"))
-                and isinstance(network_config, dict)
-                and (bridge := network_config.get("bridge"))
-                and target_node
-            ):
-                bridges.add((target_node, bridge))
+            # Collect network bridges (network can be a dict or list of dicts)
+            network_config = config.get("network")
+            nic_list: list[dict[str, Any]] = []
+            if isinstance(network_config, dict):
+                nic_list = [network_config]
+            elif isinstance(network_config, list):
+                nic_list = [n for n in network_config if isinstance(n, dict)]
+            for nic in nic_list:
+                if (bridge := nic.get("bridge")) and target_node:
+                    bridges.add((target_node, bridge))
 
             # Collect template references (for VMs that clone)
             if resource.type == "vm" and (clone_ref := config.get("clone")):
@@ -260,24 +262,21 @@ class ProxmoxValidator:
                     )
                 vmids[vmid] = resource_name
 
-            # Collect MAC addresses and check for conflicts
-            if (
-                (network_config := config.get("network"))
-                and isinstance(network_config, dict)
-                and (mac := network_config.get("macaddr"))
-            ):
-                mac_upper = mac.upper()
-                if mac_upper in mac_addresses:
-                    self.report.add_check(
-                        check_name=f"proxmox_mac_{mac}_duplicate",
-                        passed=False,
-                        message=(
-                            f"MAC address {mac} used by multiple resources: "
-                            f"{mac_addresses[mac_upper]} and {resource_name}"
-                        ),
-                        level=ValidationLevel.ERROR,
-                    )
-                mac_addresses[mac_upper] = resource_name
+            # Collect MAC addresses and check for conflicts (uses nic_list from above)
+            for nic in nic_list:
+                if mac := nic.get("macaddr"):
+                    mac_upper = mac.upper()
+                    if mac_upper in mac_addresses:
+                        self.report.add_check(
+                            check_name=f"proxmox_mac_{mac}_duplicate",
+                            passed=False,
+                            message=(
+                                f"MAC address {mac} used by multiple resources: "
+                                f"{mac_addresses[mac_upper]} and {resource_name}"
+                            ),
+                            level=ValidationLevel.ERROR,
+                        )
+                    mac_addresses[mac_upper] = resource_name
 
         return ProxmoxResourceReferences(
             nodes=nodes,
