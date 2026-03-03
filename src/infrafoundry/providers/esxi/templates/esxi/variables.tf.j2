@@ -1,0 +1,19 @@
+{% for host in hosts %}
+variable "esxi_hostname_{{ host.alias }}" {
+  description = "ESXi hostname or IP for {{ host.name }}"
+  type        = string
+}
+
+variable "esxi_username_{{ host.alias }}" {
+  description = "ESXi username for {{ host.name }}"
+  type        = string
+  default     = "root"
+}
+
+variable "esxi_password_{{ host.alias }}" {
+  description = "ESXi password for {{ host.name }}"
+  type        = string
+  sensitive   = true
+}
+
+{% endfor %}
