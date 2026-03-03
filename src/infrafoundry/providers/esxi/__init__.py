@@ -163,10 +163,11 @@ class EsxiProvider(
         )
 
     def _generate_multi_host_tfvars(self, hosts: list[dict[str, str]]) -> None:
-        """Generate terraform.tfvars with per-host credentials.
+        """Generate terraform.tfvars with per-host non-sensitive settings.
 
-        Loads host credentials from environment configuration settings and
-        writes a tfvars file with variables for each host.
+        Writes hostname and username to tfvars. Passwords are NOT written to
+        disk — they must be provided via TF_VAR_esxi_password_<alias>
+        environment variables.
 
         Args:
             hosts: List of host dicts with 'name' and 'alias' keys
@@ -188,11 +189,10 @@ class EsxiProvider(
 
             hostname = host_settings.get("hostname", host["name"])
             username = host_settings.get("username", "root")
-            password = host_settings.get("password", "")
 
             lines.append(self._format_tfvar_line(f"esxi_hostname_{alias}", hostname))
             lines.append(self._format_tfvar_line(f"esxi_username_{alias}", username))
-            lines.append(self._format_tfvar_line(f"esxi_password_{alias}", password))
+            # Password is sensitive — provide via TF_VAR_esxi_password_<alias>
 
         self._write_tfvars_lines(lines)
 

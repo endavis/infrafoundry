@@ -28,7 +28,7 @@ The provider uses `josenk/esxi ~> 1.10`. It is installed automatically by `terra
 
 ### Provider Settings
 
-Add ESXi host credentials to your environment's `settings.yaml`:
+Add ESXi host settings to your environment's `settings.yaml`:
 
 ```yaml
 name: prod
@@ -40,20 +40,23 @@ provider_settings:
       esxi-01:
         hostname: "192.168.1.10"
         username: "root"
-        password: "secret"
       esxi-02:
         hostname: "192.168.1.11"
         username: "root"
-        password: "secret"
 ```
 
 Each key under `hosts` is a logical host name used in resource configs. The `hostname` field is the actual SSH hostname or IP address.
 
-!!! warning "Encrypt with SOPS"
-    In production, encrypt your settings file:
-    ```bash
-    sops --encrypt --in-place envs/prod/settings.yaml
-    ```
+### Providing Passwords
+
+Passwords are **never written to disk**. Provide them via Terraform environment variables:
+
+```bash
+export TF_VAR_esxi_password_esxi_01="secret"
+export TF_VAR_esxi_password_esxi_02="secret"
+```
+
+The variable name follows the pattern `TF_VAR_esxi_password_<alias>`, where `<alias>` is the host name with hyphens and dots replaced by underscores (e.g., `esxi-01` becomes `esxi_01`).
 
 ### Resource Files
 
