@@ -1,0 +1,18 @@
+terraform {
+  required_providers {
+    esxi = {
+      source  = "josenk/esxi"
+      version = "~> 1.10"
+    }
+  }
+}
+
+{% for host in hosts %}
+provider "esxi" {
+  alias     = "{{ host.alias }}"
+  esxi_hostname = var.esxi_hostname_{{ host.alias }}
+  esxi_username = var.esxi_username_{{ host.alias }}
+  esxi_password = var.esxi_password_{{ host.alias }}
+}
+
+{% endfor %}

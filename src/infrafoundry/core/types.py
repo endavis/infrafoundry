@@ -40,6 +40,21 @@ class OPNsenseProviderSettings(TypedDict, total=False):
     api_secret: str
 
 
+class EsxiHostSettings(TypedDict, total=False):
+    """Settings for a single ESXi host."""
+
+    hostname: str
+    username: str
+    password: str
+
+
+class EsxiProviderSettings(TypedDict, total=False):
+    """Provider settings expected by the ESXi provider."""
+
+    hosts: dict[str, EsxiHostSettings]
+    timeout: int
+
+
 class KubernetesProviderSettings(TypedDict, total=False):
     """Provider settings expected by the Kubernetes provider."""
 
@@ -152,6 +167,8 @@ __all__ = [
     "DeploymentMetadata",
     "DestroyDeploymentMetadata",
     "EnvironmentData",
+    "EsxiHostSettings",
+    "EsxiProviderSettings",
     "KubernetesProviderSettings",
     "OCIProviderSettings",
     "OPNsenseEnvironmentConfig",

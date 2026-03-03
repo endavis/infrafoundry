@@ -132,6 +132,18 @@ def _get_orchestrator(
     except ImportError:
         pass
 
+    try:
+        from infrafoundry.providers.esxi import EsxiProvider
+
+        orchestrator.register_provider(
+            EsxiProvider(
+                config_dir=config_manager.base_dir,
+                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+            )
+        )
+    except ImportError:
+        pass
+
     return orchestrator
 
 

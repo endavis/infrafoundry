@@ -1,0 +1,20 @@
+{% for portgroup in portgroups %}
+resource "esxi_portgroup" "{{ portgroup.name | to_terraform_name }}" {
+  provider = esxi.{{ host_alias(portgroup.config.host) }}
+  name     = "{{ portgroup.name }}"
+  vswitch  = "{{ portgroup.config.vswitch }}"
+  {% if portgroup.config.vlan is defined %}
+  vlan     = {{ portgroup.config.vlan }}
+  {% endif %}
+  {% if portgroup.config.promiscuous_mode is defined %}
+  promiscuous_mode = {{ portgroup.config.promiscuous_mode | lower }}
+  {% endif %}
+  {% if portgroup.config.mac_changes is defined %}
+  mac_changes = {{ portgroup.config.mac_changes | lower }}
+  {% endif %}
+  {% if portgroup.config.forged_transmits is defined %}
+  forged_transmits = {{ portgroup.config.forged_transmits | lower }}
+  {% endif %}
+}
+
+{% endfor %}
