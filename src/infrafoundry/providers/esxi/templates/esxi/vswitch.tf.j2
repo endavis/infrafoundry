@@ -1,0 +1,20 @@
+{% for vswitch in vswitches %}
+resource "esxi_vswitch" "{{ vswitch.name | to_terraform_name }}" {
+  provider = esxi.{{ host_alias(vswitch.config.host) }}
+  name     = "{{ vswitch.name }}"
+  {% if vswitch.config.uplink is defined %}
+  {% for uplink in vswitch.config.uplink %}
+  uplink {
+    name = "{{ uplink }}"
+  }
+  {% endfor %}
+  {% endif %}
+  {% if vswitch.config.mtu is defined %}
+  mtu = {{ vswitch.config.mtu }}
+  {% endif %}
+  {% if vswitch.config.ports is defined %}
+  ports = {{ vswitch.config.ports }}
+  {% endif %}
+}
+
+{% endfor %}

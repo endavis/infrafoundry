@@ -98,6 +98,7 @@ nav:
       - ADR-0004 Protocol Runners: architecture/decisions/0004-protocol-based-runner-interfaces.md
 
   - Providers:
+    - ESXi: providers/esxi.md
     - OCI: providers/oci.md
 
   - Guides:

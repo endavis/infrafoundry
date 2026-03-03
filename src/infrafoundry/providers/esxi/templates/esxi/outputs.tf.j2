@@ -1,0 +1,37 @@
+# Outputs for ESXi resources
+
+{% if resources_by_type.get('vm') %}
+output "vm_info" {
+  description = "ESXi guest VM information"
+  value = {
+    {% for vm in resources_by_type['vm'] %}
+    "{{ vm.name }}" = {
+      id         = esxi_guest.{{ vm.name | to_terraform_name }}.id
+      ip_address = esxi_guest.{{ vm.name | to_terraform_name }}.ip_address
+    }
+    {% endfor %}
+  }
+}
+{% endif %}
+
+{% if resources_by_type.get('vswitch') %}
+output "vswitches" {
+  description = "Created ESXi vswitches"
+  value = [
+    {% for vswitch in resources_by_type['vswitch'] %}
+    "{{ vswitch.name }}",
+    {% endfor %}
+  ]
+}
+{% endif %}
+
+{% if resources_by_type.get('portgroup') %}
+output "portgroups" {
+  description = "Created ESXi portgroups"
+  value = [
+    {% for portgroup in resources_by_type['portgroup'] %}
+    "{{ portgroup.name }}",
+    {% endfor %}
+  ]
+}
+{% endif %}

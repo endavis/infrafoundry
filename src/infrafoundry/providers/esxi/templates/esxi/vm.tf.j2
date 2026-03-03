@@ -1,0 +1,54 @@
+{% for vm in vms %}
+resource "esxi_guest" "{{ vm.name | to_terraform_name }}" {
+  provider     = esxi.{{ host_alias(vm.config.host) }}
+  guest_name   = "{{ vm.config.name | default(vm.name) }}"
+  {% if vm.config.ovf_source is defined %}
+  ovf_source   = "{{ vm.config.ovf_source }}"
+  {% endif %}
+  {% if vm.config.disk_store is defined %}
+  disk_store   = "{{ vm.config.disk_store }}"
+  {% endif %}
+  {% if vm.config.numvcpus is defined %}
+  numvcpus     = {{ vm.config.numvcpus }}
+  {% endif %}
+  {% if vm.config.memsize is defined %}
+  memsize      = {{ vm.config.memsize }}
+  {% endif %}
+  {% if vm.config.power is defined %}
+  power        = "{{ vm.config.power }}"
+  {% endif %}
+  {% if vm.config.notes is defined %}
+  notes        = "{{ vm.config.notes }}"
+  {% endif %}
+  {% if vm.config.guest_startup_timeout is defined %}
+  guest_startup_timeout = {{ vm.config.guest_startup_timeout }}
+  {% endif %}
+  {% if vm.config.guest_shutdown_timeout is defined %}
+  guest_shutdown_timeout = {{ vm.config.guest_shutdown_timeout }}
+  {% endif %}
+
+  {% if vm.config.network is defined %}
+  {% for nic in vm.config.network %}
+  network_interfaces {
+    virtual_network = "{{ nic.portgroup | default(nic.virtual_network | default('VM Network')) }}"
+    {% if nic.nic_type is defined %}
+    nic_type        = "{{ nic.nic_type }}"
+    {% endif %}
+    {% if nic.mac_address is defined %}
+    mac_address     = "{{ nic.mac_address }}"
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+
+  {% if vm.config.virtual_disks is defined %}
+  {% for disk in vm.config.virtual_disks %}
+  virtual_disks {
+    virtual_disk_id = "{{ disk.virtual_disk_id }}"
+    slot            = "{{ disk.slot | default('0:1') }}"
+  }
+  {% endfor %}
+  {% endif %}
+}
+
+{% endfor %}
