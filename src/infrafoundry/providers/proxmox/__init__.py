@@ -94,10 +94,11 @@ class ProxmoxProvider(
 
     def _generate_vms_terraform(self, vms: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox VMs."""
-        # Process VMs to merge cloud-init snippets
+        # Process VMs to merge cloud-init snippets and normalize config
         processed_vms = []
         for vm in vms:
             processed_vm = self._process_cloud_init_snippets(vm)
+            processed_vm = self._normalize_vm_config(processed_vm)
             processed_vms.append(processed_vm)
 
         self.render_and_write_terraform(
@@ -105,6 +106,31 @@ class ProxmoxProvider(
             context={"vms": processed_vms},
             output_name="vms.tf",
         )
+
+    def _normalize_vm_config(self, vm: ResourceConfig) -> ResourceConfig:
+        """Normalize VM config for template consumption.
+
+        Ensures the network field is always a list of dicts, even when the user
+        provides a single dict. This allows the Jinja2 template to use a simple
+        ``{% for nic in vm.config.network %}`` loop without dual dict/list handling.
+
+        Args:
+            vm: The VM resource config to normalize.
+
+        Returns:
+            The VM resource config with normalized network field.
+        """
+        import copy
+
+        vm_copy = copy.deepcopy(vm)
+        config = vm_copy.config
+
+        # Normalize network: wrap single dict in a list
+        network = config.get("network")
+        if isinstance(network, dict):
+            config["network"] = [network]
+
+        return vm_copy
 
     def _process_cloud_init_snippets(self, vm: ResourceConfig) -> ResourceConfig:
         """Process cloud-init snippets and merge them into VM config."""
