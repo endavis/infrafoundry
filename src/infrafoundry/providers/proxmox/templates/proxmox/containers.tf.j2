@@ -1,0 +1,262 @@
+{% for container in containers %}
+resource "proxmox_virtual_environment_container" "{{ container.config.name | replace('-', '_') }}" {
+  node_name   = "{{ container.config.target_node }}"
+  {% if container.config.ctid is defined %}
+  vm_id       = {{ container.config.ctid }}
+  {% endif %}
+  {% if container.config.description is defined %}
+  description = "{{ container.config.description }}"
+  {% endif %}
+  {% if container.config.unprivileged is defined %}
+  unprivileged = {{ container.config.unprivileged | lower }}
+  {% endif %}
+  {% if container.config.start is defined %}
+  started     = {{ container.config.start | lower }}
+  {% endif %}
+  {% if container.config.onboot is defined %}
+  start_on_boot = {{ container.config.onboot | lower }}
+  {% endif %}
+  {% if container.config.tags is defined %}
+  tags        = {{ container.config.tags | tojson }}
+  {% endif %}
+  {% if container.config.template is defined %}
+  template    = {{ container.config.template | lower }}
+  {% endif %}
+  {% if container.config.protection is defined %}
+  protection  = {{ container.config.protection | lower }}
+  {% endif %}
+  {% if container.config.pool_id is defined %}
+  pool_id     = "{{ container.config.pool_id }}"
+  {% endif %}
+
+  {% if container.config.clone is defined %}
+  # Clone from existing container
+  clone {
+    vm_id = {{ container.config.clone.vm_id }}
+    {% if container.config.clone.node_name is defined %}
+    node_name    = "{{ container.config.clone.node_name }}"
+    {% endif %}
+    {% if container.config.clone.datastore_id is defined %}
+    datastore_id = "{{ container.config.clone.datastore_id }}"
+    {% endif %}
+  }
+  {% endif %}
+
+  {% if container.config.ostemplate is defined %}
+  # Operating System Template
+  operating_system {
+    template_file_id = "{{ container.config.ostemplate }}"
+    {% if container.config.ostype is defined %}
+    type             = "{{ container.config.ostype }}"
+    {% endif %}
+  }
+  {% endif %}
+
+  # CPU Configuration
+  cpu {
+    cores        = {{ container.config.cores | default(1) }}
+    {% if container.config.arch is defined %}
+    architecture = "{{ container.config.arch }}"
+    {% endif %}
+  }
+
+  # Memory Configuration
+  memory {
+    dedicated = {{ container.config.memory | default(512) }}
+    {% if container.config.swap is defined %}
+    swap      = {{ container.config.swap }}
+    {% endif %}
+  }
+
+  {% if container.config.rootfs is defined %}
+  # Root Filesystem
+  disk {
+    datastore_id = "{{ container.config.rootfs.storage | default('local-lvm') }}"
+    size         = {{ container.config.rootfs.size | default(8) }}
+  }
+  {% endif %}
+
+  {% if container.config.network is defined %}
+  # Network Interfaces
+  {% for nic in container.config.network %}
+  network_interface {
+    name     = "{{ nic.name }}"
+    {% if nic.bridge is defined %}
+    bridge   = "{{ nic.bridge }}"
+    {% endif %}
+    {% if nic.enabled is defined %}
+    enabled  = {{ nic.enabled | lower }}
+    {% endif %}
+    {% if nic.firewall is defined %}
+    firewall = {{ nic.firewall | lower }}
+    {% endif %}
+    {% if nic.macaddr is defined %}
+    mac_address = "{{ nic.macaddr }}"
+    {% endif %}
+    {% if nic.mtu is defined %}
+    mtu      = {{ nic.mtu }}
+    {% endif %}
+    {% if nic.rate_limit is defined %}
+    rate_limit = {{ nic.rate_limit }}
+    {% endif %}
+    {% if nic.tag is defined %}
+    vlan_id  = {{ nic.tag }}
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+
+  {% if container.config.mount_point is defined %}
+  # Mount Points
+  {% for mp in container.config.mount_point %}
+  mount_point {
+    volume = "{{ mp.volume }}"
+    path   = "{{ mp.path }}"
+    {% if mp.size is defined %}
+    size   = "{{ mp.size }}G"
+    {% endif %}
+    {% if mp.acl is defined %}
+    acl    = {{ mp.acl | lower }}
+    {% endif %}
+    {% if mp.backup is defined %}
+    backup = {{ mp.backup | lower }}
+    {% endif %}
+    {% if mp.mount_options is defined %}
+    mount_options = {{ mp.mount_options | tojson }}
+    {% endif %}
+    {% if mp.quota is defined %}
+    quota  = {{ mp.quota | lower }}
+    {% endif %}
+    {% if mp.read_only is defined %}
+    read_only = {{ mp.read_only | lower }}
+    {% endif %}
+    {% if mp.replicate is defined %}
+    replicate = {{ mp.replicate | lower }}
+    {% endif %}
+    {% if mp.shared is defined %}
+    shared = {{ mp.shared | lower }}
+    {% endif %}
+  }
+  {% endfor %}
+  {% endif %}
+
+  {% if container.config.hostname is defined or container.config.dns is defined or container.config.network is defined or container.config.ssh_keys is defined or container.config.password is defined %}
+  # Initialization
+  initialization {
+    {% if container.config.hostname is defined %}
+    hostname {
+      name = "{{ container.config.hostname }}"
+    }
+    {% endif %}
+
+    {% if container.config.dns is defined %}
+    dns {
+      {% if container.config.dns.domain is defined %}
+      domain  = "{{ container.config.dns.domain }}"
+      {% endif %}
+      {% if container.config.dns.servers is defined %}
+      servers = {{ container.config.dns.servers | tojson }}
+      {% endif %}
+    }
+    {% endif %}
+
+    {% if container.config.network is defined %}
+    {% for nic in container.config.network %}
+    {% if nic.ip is defined or nic.ip6 is defined %}
+    ip_config {
+      {% if nic.ip is defined %}
+      ipv4 {
+        {% if nic.ip == 'dhcp' %}
+        address = "dhcp"
+        {% else %}
+        address = "{{ nic.ip }}"
+        {% if nic.gw is defined %}
+        gateway = "{{ nic.gw }}"
+        {% endif %}
+        {% endif %}
+      }
+      {% endif %}
+      {% if nic.ip6 is defined %}
+      ipv6 {
+        {% if nic.ip6 == 'dhcp' %}
+        address = "dhcp"
+        {% else %}
+        address = "{{ nic.ip6 }}"
+        {% if nic.gw6 is defined %}
+        gateway = "{{ nic.gw6 }}"
+        {% endif %}
+        {% endif %}
+      }
+      {% endif %}
+    }
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    {% if container.config.ssh_keys is defined or container.config.password is defined %}
+    user_account {
+      {% if container.config.ssh_keys is defined %}
+      keys = [
+        {% for key in container.config.ssh_keys %}
+        "{{ key }}",
+        {% endfor %}
+      ]
+      {% endif %}
+      {% if container.config.password is defined %}
+      password = "{{ container.config.password }}"
+      {% endif %}
+    }
+    {% endif %}
+  }
+  {% endif %}
+
+  {% if container.config.features is defined %}
+  # Features
+  features {
+    {% if container.config.features.nesting is defined %}
+    nesting = {{ container.config.features.nesting | lower }}
+    {% endif %}
+    {% if container.config.features.fuse is defined %}
+    fuse    = {{ container.config.features.fuse | lower }}
+    {% endif %}
+    {% if container.config.features.keyctl is defined %}
+    keyctl  = {{ container.config.features.keyctl | lower }}
+    {% endif %}
+    {% if container.config.features.mount is defined %}
+    mount   = {{ container.config.features.mount | tojson }}
+    {% endif %}
+  }
+  {% endif %}
+
+  {% if container.config.startup is defined %}
+  # Startup Configuration
+  startup {
+    {% if container.config.startup.order is defined %}
+    order      = {{ container.config.startup.order }}
+    {% endif %}
+    {% if container.config.startup.up_delay is defined %}
+    up_delay   = {{ container.config.startup.up_delay }}
+    {% endif %}
+    {% if container.config.startup.down_delay is defined %}
+    down_delay = {{ container.config.startup.down_delay }}
+    {% endif %}
+  }
+  {% endif %}
+
+  {% if container.config.console is defined %}
+  # Console Configuration
+  console {
+    {% if container.config.console.enabled is defined %}
+    enabled   = {{ container.config.console.enabled | lower }}
+    {% endif %}
+    {% if container.config.console.type is defined %}
+    type      = "{{ container.config.console.type }}"
+    {% endif %}
+    {% if container.config.console.tty_count is defined %}
+    tty_count = {{ container.config.console.tty_count }}
+    {% endif %}
+  }
+  {% endif %}
+}
+
+{% endfor %}
