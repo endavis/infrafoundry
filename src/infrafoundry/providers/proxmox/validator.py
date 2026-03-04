@@ -221,11 +221,18 @@ class ProxmoxValidator:
             if target_node:
                 nodes.add(target_node)
 
-            # Collect storage pools
+            # Collect storage pools (VM disk, container rootfs, or top-level storage)
             if (
                 (disk_config := config.get("disk"))
                 and isinstance(disk_config, dict)
                 and (storage := disk_config.get("storage"))
+                and target_node
+            ):
+                storage_pools.add((target_node, storage))
+            if (
+                (rootfs_config := config.get("rootfs"))
+                and isinstance(rootfs_config, dict)
+                and (storage := rootfs_config.get("storage"))
                 and target_node
             ):
                 storage_pools.add((target_node, storage))
@@ -248,8 +255,10 @@ class ProxmoxValidator:
                 key = str(clone_ref)
                 template_refs.setdefault(key, []).append(resource_name)
 
-            # Collect VMIDs and check for duplicates
-            if vmid := config.get("vmid"):
+            # Collect VMIDs/CTIDs and check for duplicates
+            # Containers use 'ctid' but share the same Proxmox ID space as VMs
+            vmid = config.get("vmid") or config.get("ctid")
+            if vmid:
                 if vmid in vmids:
                     self.report.add_check(
                         check_name=f"proxmox_vmid_{vmid}_duplicate",

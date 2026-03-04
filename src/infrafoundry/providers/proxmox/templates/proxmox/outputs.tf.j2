@@ -11,6 +11,17 @@ output "vm_ips" {
 }
 {% endif %}
 
+{% if resources_by_type.get('container') %}
+output "container_ids" {
+  description = "IDs of created LXC containers"
+  value = {
+    {% for ct in resources_by_type['container'] %}
+    "{{ ct.config.name }}" = proxmox_virtual_environment_container.{{ ct.config.name | replace('-', '_') }}.id
+    {% endfor %}
+  }
+}
+{% endif %}
+
 {% if resources_by_type.get('templates') %}
 output "templates" {
   description = "Created templates"

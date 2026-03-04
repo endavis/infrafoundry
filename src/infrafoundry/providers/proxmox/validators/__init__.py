@@ -1,5 +1,8 @@
 """Specialized validators for Proxmox resources."""
 
+from infrafoundry.providers.proxmox.validators.container_config_validator import (
+    ContainerConfigValidator,
+)
 from infrafoundry.providers.proxmox.validators.network_validator import NetworkValidator
 from infrafoundry.providers.proxmox.validators.node_validator import NodeValidator
 from infrafoundry.providers.proxmox.validators.storage_validator import StorageValidator
@@ -8,6 +11,7 @@ from infrafoundry.providers.proxmox.validators.vm_config_validator import VMConf
 from infrafoundry.providers.proxmox.validators.vmid_validator import VMIDValidator
 
 __all__ = [
+    "ContainerConfigValidator",
     "NetworkValidator",
     "NodeValidator",
     "StorageValidator",
