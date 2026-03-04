@@ -15,6 +15,7 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.exceptions import SecretNotFoundError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.protocols import Destroyable, Plannable
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
@@ -527,7 +528,7 @@ class PlanOrchestrator(HookExecutionMixin):
             secrets_file = f"{provider_name}.yaml"
             tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
             secret_manager.export_for_terraform(secrets_file, tf_vars)
-        except FileNotFoundError as exc:
+        except (FileNotFoundError, SecretNotFoundError) as exc:
             message = f"No secrets file for {provider_name}"
             if self._fail_on_missing_secrets:
                 raise FileNotFoundError(message) from exc
