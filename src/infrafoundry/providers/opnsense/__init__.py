@@ -181,6 +181,13 @@ class OPNsenseProvider(
         )
         kea = KeaClient(client)
 
+        # Ensure DHCPv6 service is enabled with required interfaces
+        required_interfaces: list[str] = sorted(
+            {s.config["interface"] for s in subnets if s.config.get("interface")}
+        )
+        if required_interfaces:
+            kea.ensure_dhcp6_enabled(required_interfaces)
+
         # Search existing resources ONCE
         existing_subnets = kea.search_dhcp6_subnets() if subnets else []
         existing_reservations = kea.search_dhcp6_reservations() if reservations else []
@@ -200,29 +207,31 @@ class OPNsenseProvider(
             # Look up existing subnet
             existing_uuid = existing_subnets_map.get(subnet_address)
 
-            # Prepare subnet data
-            subnet_data = {
+            # Prepare subnet data — field names match OPNsense Kea DHCPv6 API
+            subnet_data: dict[str, Any] = {
                 "subnet": subnet_address,
                 "interface": config.get("interface"),
-                "option_data_autocollect": str(int(config.get("auto_collect", True))),
             }
 
-            # Add pools
+            # Pools is a newline-separated string of ranges
             if "pools" in config:
-                pools_list: list[dict[str, Any]] = []
-                for pool in config["pools"]:
-                    pools_list.append({"pool": pool["range"]})
-                subnet_data["pools"] = pools_list
+                pool_strings = [pool["range"] for pool in config["pools"]]
+                subnet_data["pools"] = "\n".join(pool_strings)
 
-            # Add optional fields
+            # Optional fields
             if "valid_lifetime" in config:
                 subnet_data["valid_lifetime"] = str(config["valid_lifetime"])
-            if "dns_servers" in config:
-                subnet_data["dns_servers"] = ",".join(config["dns_servers"])
-            if "dns_search_list" in config:
-                subnet_data["dns_search_list"] = ",".join(config["dns_search_list"])
             if "description" in config:
                 subnet_data["description"] = config["description"]
+
+            # DNS settings go under option_data
+            option_data: dict[str, str] = {}
+            if "dns_servers" in config:
+                option_data["dns_servers"] = ",".join(config["dns_servers"])
+            if "dns_search_list" in config:
+                option_data["domain_search"] = ",".join(config["dns_search_list"])
+            if option_data:
+                subnet_data["option_data"] = option_data
 
             # Create or update subnet
             if existing_uuid:
@@ -230,8 +239,16 @@ class OPNsenseProvider(
                 kea.update_dhcp6_subnet(existing_uuid, subnet_data)
             else:
                 print(f"Creating DHCPv6 subnet {subnet_name}")
-                response = kea.add_dhcp6_subnet(subnet_data)
-                created_uuid = response.get("uuid")
+                result = kea.add_dhcp6_subnet(subnet_data)
+                if result.get("result") == "failed":
+                    raise ValueError(f"Failed to create DHCPv6 subnet {subnet_name}: {result}")
+                # The add response doesn't include the UUID, so search for the
+                # newly created subnet to retrieve it
+                created_uuid = None
+                for s in kea.search_dhcp6_subnets():
+                    if s.get("subnet") == subnet_address:
+                        created_uuid = s.get("uuid")
+                        break
                 print(f"Created with UUID: {created_uuid}")
                 # Update map for use in reservations
                 existing_subnets_map[subnet_address] = created_uuid
@@ -255,11 +272,11 @@ class OPNsenseProvider(
             duid = config.get("duid")
             existing_uuid = existing_reservations_map.get((duid, subnet_id))
 
-            # Prepare reservation data
+            # Prepare reservation data — field names match OPNsense Kea DHCPv6 API
             reservation_data = {
-                "subnet_id": subnet_id,
+                "subnet": subnet_id,
+                "ip_address": config.get("ip_address"),
                 "duid": duid,
-                "ip_addresses": config.get("ip_address"),
                 "hostname": config.get("hostname", ""),
                 "description": config.get("description", ""),
             }
@@ -270,8 +287,13 @@ class OPNsenseProvider(
                 kea.update_dhcp6_reservation(existing_uuid, reservation_data)
             else:
                 print(f"Creating DHCPv6 reservation {reservation_name}")
-                response = kea.add_dhcp6_reservation(reservation_data)
-                print(f"Created with UUID: {response.get('uuid')}")
+                result = kea.add_dhcp6_reservation(reservation_data)
+                if result.get("result") == "failed":
+                    validations = result.get("validations", {})
+                    raise ValueError(
+                        f"Failed to create DHCPv6 reservation {reservation_name}: {validations}"
+                    )
+                print(f"Created reservation {reservation_name}")
 
         # Reconfigure service ONCE to apply all changes
         print("Reconfiguring Kea service...")
