@@ -145,7 +145,7 @@ class KeaClient:
             data: Resource configuration
 
         Returns:
-            Response with 'result' and 'uuid' fields
+            Response with 'result' field (uuid is NOT included in add responses)
         """
         endpoint = f"kea/dhcpv6/add{resource_type}"
         request_data = {resource_key: data}
@@ -219,7 +219,7 @@ class KeaClient:
         Returns:
             Response with 'result' and 'uuid' fields
         """
-        return self._crud_add("Subnet", "subnet", subnet_data)
+        return self._crud_add("Subnet", "subnet6", subnet_data)
 
     def update_dhcp6_subnet(self, uuid: str, subnet_data: dict[str, Any]) -> dict[str, Any]:
         """Update an existing DHCPv6 subnet.
@@ -231,7 +231,7 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        return self._crud_update("Subnet", uuid, "subnet", subnet_data)
+        return self._crud_update("Subnet", uuid, "subnet6", subnet_data)
 
     def delete_dhcp6_subnet(self, uuid: str) -> dict[str, Any]:
         """Delete a DHCPv6 subnet.
@@ -305,6 +305,93 @@ class KeaClient:
             Response with 'result' field
         """
         return self._crud_delete("Reservation", uuid)
+
+    # DHCPv6 General Settings operations
+
+    def get_dhcp6_general(self) -> dict[str, Any]:
+        """Get Kea DHCPv6 general settings.
+
+        Returns:
+            General settings dictionary with 'dhcpv6' key containing
+            'enabled', 'interfaces', and other configuration.
+        """
+        return self.client.request("GET", "kea/dhcpv6/get")
+
+    def set_dhcp6_general(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Update Kea DHCPv6 general settings.
+
+        Args:
+            settings: General settings to update, wrapped in 'dhcpv6' key.
+                Example: {"dhcpv6": {"enabled": "1", "interfaces": "opt1,opt2"}}
+
+        Returns:
+            Response with 'result' field
+        """
+        return self.client.request("POST", "kea/dhcpv6/set", data=settings)
+
+    def ensure_dhcp6_enabled(self, interfaces: list[str]) -> None:
+        """Ensure Kea DHCPv6 is enabled with the specified interfaces selected.
+
+        Reads current settings, enables the service if needed, and adds any
+        missing interfaces to the selection. Only makes API calls if changes
+        are required.
+
+        Args:
+            interfaces: List of interface names that must be enabled (e.g., ["opt1", "opt2"])
+        """
+        general = self.get_dhcp6_general()
+        # API returns: {"dhcpv6": {"general": {"enabled": "0", "interfaces": {...}}}}
+        general_settings = general.get("dhcpv6", {}).get("general", {})
+
+        # Determine current state
+        currently_enabled = general_settings.get("enabled", "0") == "1"
+
+        # Parse current interfaces — the API returns a dict of interface options
+        # with "selected" field indicating which are active
+        current_interfaces_raw = general_settings.get("interfaces", {})
+        selected_interfaces: set[str] = set()
+
+        if isinstance(current_interfaces_raw, dict):
+            for iface_name, iface_data in current_interfaces_raw.items():
+                if isinstance(iface_data, dict) and iface_data.get("selected", 0):
+                    selected_interfaces.add(iface_name)
+        elif isinstance(current_interfaces_raw, str) and current_interfaces_raw:
+            selected_interfaces = set(current_interfaces_raw.split(","))
+
+        # Determine required changes
+        required = set(interfaces)
+        missing_interfaces = required - selected_interfaces
+        needs_enable = not currently_enabled
+        needs_interface_update = bool(missing_interfaces)
+
+        if not needs_enable and not needs_interface_update:
+            logger.info("Kea DHCPv6 already enabled with required interfaces")
+            return
+
+        # Build update payload — must nest under dhcpv6.general to match API structure
+        new_interfaces = selected_interfaces | required
+        update_data: dict[str, Any] = {
+            "dhcpv6": {
+                "general": {
+                    "enabled": "1",
+                    "interfaces": ",".join(sorted(new_interfaces)),
+                }
+            }
+        }
+
+        if needs_enable:
+            print("Enabling Kea DHCPv6 service...")
+        if needs_interface_update:
+            print(f"Adding interfaces to DHCPv6: {', '.join(sorted(missing_interfaces))}")
+
+        result = self.set_dhcp6_general(update_data)
+        if result.get("result") == "failed":
+            validations = result.get("validations", {})
+            raise ValueError(f"Failed to update DHCPv6 general settings: {validations}")
+
+        # Reconfigure to apply the general settings change
+        self.reconfigure_service()
+        print("Kea DHCPv6 service configured and running")
 
     # Service operations
 
