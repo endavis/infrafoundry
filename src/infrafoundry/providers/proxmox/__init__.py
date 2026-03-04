@@ -79,7 +79,10 @@ class ProxmoxProvider(
             ssh_prefix="proxmox",
         )
 
-        # Generate resources by type
+        # Generate resources by type (storage before VMs/containers so they can reference it)
+        if "storage" in resources_by_type:
+            self._generate_storage_terraform(resources_by_type["storage"])
+
         if "vm" in resources_by_type:
             self._generate_vms_terraform(resources_by_type["vm"])
 
@@ -306,6 +309,14 @@ class ProxmoxProvider(
             output_name="networks.tf",
         )
 
+    def _generate_storage_terraform(self, storages: list[ResourceConfig]) -> None:
+        """Generate Terraform for Proxmox storage backends."""
+        self.render_and_write_terraform(
+            "proxmox/storage.tf.j2",
+            context={"storages": storages},
+            output_name="storage.tf",
+        )
+
     def _copy_tfvars_if_exists(self) -> None:
         """Copy environment-specific terraform.tfvars if it exists."""
         import shutil
@@ -389,14 +400,15 @@ class ProxmoxProvider(
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["vm", "container", "template", "network"]
+        return ["vm", "container", "template", "network", "storage"]
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
-            "vm": ["template", "network"],
-            "container": ["network"],
+            "vm": ["template", "network", "storage"],
+            "container": ["network", "storage"],
             "template": [],
             "network": [],
+            "storage": [],
         }
