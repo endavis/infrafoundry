@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772615668061,
+  "lastUpdate": 1772633763356,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -124,6 +124,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009513382098962517",
             "extra": "mean: 143.77228900250293 usec\nrounds: 2346"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6298d04354739d75408037898b29effc85aba402",
+          "message": "feat: add LXC container support to Proxmox provider (merges PR #291, addresses #290)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-04T14:15:32Z",
+          "tree_id": "85a9bf61228502b5e0e7562274f1c8b8fdd9d82e",
+          "url": "https://github.com/endavis/infrafoundry/commit/6298d04354739d75408037898b29effc85aba402"
+        },
+        "date": 1772633762853,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6686.28642524553,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000026976163299129543",
+            "extra": "mean: 149.55985077520495 usec\nrounds: 2580"
           }
         ]
       }
