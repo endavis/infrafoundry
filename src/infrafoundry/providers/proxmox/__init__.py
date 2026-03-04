@@ -22,7 +22,7 @@ class ProxmoxProvider(
     ResourceGrouperMixin,
     TerraformGeneratorMixin,
 ):
-    """Proxmox VE provider for managing VMs, templates, and networks."""
+    """Proxmox VE provider for managing VMs, containers, templates, and networks."""
 
     _PROXMOX_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
         "api_url": "proxmox_api_url",
@@ -83,6 +83,9 @@ class ProxmoxProvider(
         if "vm" in resources_by_type:
             self._generate_vms_terraform(resources_by_type["vm"])
 
+        if "container" in resources_by_type:
+            self._generate_containers_terraform(resources_by_type["container"])
+
         if "template" in resources_by_type:
             self._generate_templates_terraform(resources_by_type["template"])
 
@@ -106,6 +109,47 @@ class ProxmoxProvider(
             context={"vms": processed_vms},
             output_name="vms.tf",
         )
+
+    def _generate_containers_terraform(self, containers: list[ResourceConfig]) -> None:
+        """Generate Terraform for Proxmox LXC containers."""
+        processed_containers = []
+        for container in containers:
+            processed_containers.append(self._normalize_container_config(container))
+
+        self.render_and_write_terraform(
+            "proxmox/containers.tf.j2",
+            context={"containers": processed_containers},
+            output_name="containers.tf",
+        )
+
+    def _normalize_container_config(self, container: ResourceConfig) -> ResourceConfig:
+        """Normalize container config for template consumption.
+
+        Ensures the network and mount_point fields are always lists of dicts,
+        even when the user provides a single dict.
+
+        Args:
+            container: The container resource config to normalize.
+
+        Returns:
+            The container resource config with normalized fields.
+        """
+        import copy
+
+        ct_copy = copy.deepcopy(container)
+        config = ct_copy.config
+
+        # Normalize network: wrap single dict in a list
+        network = config.get("network")
+        if isinstance(network, dict):
+            config["network"] = [network]
+
+        # Normalize mount_point: wrap single dict in a list
+        mount_point = config.get("mount_point")
+        if isinstance(mount_point, dict):
+            config["mount_point"] = [mount_point]
+
+        return ct_copy
 
     def _normalize_vm_config(self, vm: ResourceConfig) -> ResourceConfig:
         """Normalize VM config for template consumption.
@@ -345,13 +389,14 @@ class ProxmoxProvider(
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["vm", "template", "network"]
+        return ["vm", "container", "template", "network"]
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
             "vm": ["template", "network"],
+            "container": ["network"],
             "template": [],
             "network": [],
         }
