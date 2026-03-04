@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772640458362,
+  "lastUpdate": 1772644170476,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -186,6 +186,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000020133523945523156",
             "extra": "mean: 111.35364127361434 usec\nrounds: 2796"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a56c53d6f1bf72f66a732c67f3ba30d8b8e665db",
+          "message": "feat: add Proxmox storage resource type for NFS, CIFS, and directory backends (merges PR #295, addresses #294)\n\nAddresses #294\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-04T17:08:58Z",
+          "tree_id": "b53bb54aea4578c0878c9dd55dbad6b1a78991a5",
+          "url": "https://github.com/endavis/infrafoundry/commit/a56c53d6f1bf72f66a732c67f3ba30d8b8e665db"
+        },
+        "date": 1772644169643,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9229.66070757115,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014400808942408301",
+            "extra": "mean: 108.3463446472841 usec\nrounds: 2681"
           }
         ]
       }
