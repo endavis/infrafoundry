@@ -1,0 +1,68 @@
+{% for storage in storages %}
+{% if storage.config.backend == 'nfs' %}
+resource "proxmox_virtual_environment_storage_nfs" "{{ storage.config.name | replace('-', '_') }}" {
+  id     = "{{ storage.config.name }}"
+  server = "{{ storage.config.server }}"
+  export = "{{ storage.config.export }}"
+  {% if storage.config.content_types is defined %}
+  content = {{ storage.config.content_types | tojson }}
+  {% endif %}
+  {% if storage.config.nodes is defined %}
+  nodes  = {{ storage.config.nodes | tojson }}
+  {% endif %}
+  {% if storage.config.disable is defined %}
+  disable = {{ storage.config.disable | lower }}
+  {% endif %}
+  {% if storage.config.preallocation is defined %}
+  preallocation = "{{ storage.config.preallocation }}"
+  {% endif %}
+}
+
+{% elif storage.config.backend == 'cifs' %}
+resource "proxmox_virtual_environment_storage_cifs" "{{ storage.config.name | replace('-', '_') }}" {
+  id     = "{{ storage.config.name }}"
+  server = "{{ storage.config.server }}"
+  share  = "{{ storage.config.share }}"
+  {% if storage.config.username is defined %}
+  username = "{{ storage.config.username }}"
+  {% endif %}
+  {% if storage.config.password is defined %}
+  password = "{{ storage.config.password }}"
+  {% endif %}
+  {% if storage.config.domain is defined %}
+  domain = "{{ storage.config.domain }}"
+  {% endif %}
+  {% if storage.config.subdirectory is defined %}
+  subdir = "{{ storage.config.subdirectory }}"
+  {% endif %}
+  {% if storage.config.content_types is defined %}
+  content = {{ storage.config.content_types | tojson }}
+  {% endif %}
+  {% if storage.config.nodes is defined %}
+  nodes  = {{ storage.config.nodes | tojson }}
+  {% endif %}
+  {% if storage.config.disable is defined %}
+  disable = {{ storage.config.disable | lower }}
+  {% endif %}
+}
+
+{% elif storage.config.backend == 'dir' %}
+resource "proxmox_virtual_environment_storage_dir" "{{ storage.config.name | replace('-', '_') }}" {
+  id     = "{{ storage.config.name }}"
+  path   = "{{ storage.config.path }}"
+  {% if storage.config.content_types is defined %}
+  content = {{ storage.config.content_types | tojson }}
+  {% endif %}
+  {% if storage.config.nodes is defined %}
+  nodes  = {{ storage.config.nodes | tojson }}
+  {% endif %}
+  {% if storage.config.shared is defined %}
+  shared = {{ storage.config.shared | lower }}
+  {% endif %}
+  {% if storage.config.disable is defined %}
+  disable = {{ storage.config.disable | lower }}
+  {% endif %}
+}
+
+{% endif %}
+{% endfor %}

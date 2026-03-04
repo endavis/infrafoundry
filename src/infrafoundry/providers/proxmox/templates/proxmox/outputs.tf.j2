@@ -32,3 +32,20 @@ output "templates" {
   ]
 }
 {% endif %}
+
+{% if resources_by_type.get('storage') %}
+output "storage_ids" {
+  description = "IDs of created storage backends"
+  value = {
+    {% for storage in resources_by_type['storage'] %}
+    {% if storage.config.backend == 'nfs' %}
+    "{{ storage.config.name }}" = proxmox_virtual_environment_storage_nfs.{{ storage.config.name | replace('-', '_') }}.id
+    {% elif storage.config.backend == 'cifs' %}
+    "{{ storage.config.name }}" = proxmox_virtual_environment_storage_cifs.{{ storage.config.name | replace('-', '_') }}.id
+    {% elif storage.config.backend == 'dir' %}
+    "{{ storage.config.name }}" = proxmox_virtual_environment_storage_dir.{{ storage.config.name | replace('-', '_') }}.id
+    {% endif %}
+    {% endfor %}
+  }
+}
+{% endif %}
