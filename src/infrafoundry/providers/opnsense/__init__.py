@@ -195,7 +195,7 @@ class OPNsenseProvider(
         # Create lookup maps for efficient searching
         existing_subnets_map = {s.get("subnet"): s.get("uuid") for s in existing_subnets}
         existing_reservations_map = {
-            (r.get("duid"), r.get("subnet_id")): r.get("uuid") for r in existing_reservations
+            (r.get("duid"), r.get("subnet")): r.get("uuid") for r in existing_reservations
         }
 
         # Process all subnets
