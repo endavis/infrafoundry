@@ -166,13 +166,16 @@ class TerraformRunner(BaseRunner):
 
         Args:
             provider: Provider instance
-            **kwargs: Options including auto_approve
+            **kwargs: Options including auto_approve, target_resources
 
         Returns:
             Dict with destroy results
         """
         auto_approve = kwargs.get("auto_approve", False)
-        return self._run_terraform(provider, "destroy", auto_approve=auto_approve)
+        target_resources = kwargs.get("target_resources")
+        return self._run_terraform(
+            provider, "destroy", auto_approve=auto_approve, target_resources=target_resources
+        )
 
     @override
     def get_version(self) -> str | None:

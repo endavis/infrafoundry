@@ -953,7 +953,11 @@ class DestroyOrchestrator(HookExecutionMixin):
                         continue
 
                     self.console.print(f"  [dim]Running {tool_name} destroy...[/dim]")
-                    runner_result = runner.destroy(provider, auto_approve=auto_approve)
+                    runner_result = runner.destroy(
+                        provider,
+                        auto_approve=auto_approve,
+                        target_resources=resource_filter if resource_filter else None,
+                    )
                     provider_results[tool_name] = runner_result
 
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)
