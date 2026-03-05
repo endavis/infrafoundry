@@ -153,6 +153,7 @@ class DeploymentExecutor:
                 provider=provider,
                 resources=resources,
                 auto_approve=auto_approve,
+                resource_filter=resource_filter,
             )
             results[provider_name] = result
 
@@ -242,6 +243,7 @@ class DeploymentExecutor:
                         provider=provider,
                         resources=resources,
                         auto_approve=auto_approve,
+                        resource_filter=resource_filter,
                     )
                     future_to_provider[future] = provider_name
 
@@ -282,6 +284,7 @@ class DeploymentExecutor:
         provider: ProviderBase,
         resources: list[ResourceConfig],
         auto_approve: bool,
+        resource_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Apply a single provider's resources.
 
@@ -292,6 +295,7 @@ class DeploymentExecutor:
             provider: Provider instance
             resources: List of resources to apply
             auto_approve: If True, skip confirmation prompts
+            resource_filter: Optional list of resource names to target with -target
 
         Returns:
             Dict with apply results including terraform and ansible outcomes
@@ -332,7 +336,11 @@ class DeploymentExecutor:
 
             # Ansible interprets auto_approve=False as check mode (dry-run)
             # Other runners use it to skip confirmation prompts
-            run_result = runner.apply(provider, auto_approve=auto_approve)
+            run_result = runner.apply(
+                provider,
+                auto_approve=auto_approve,
+                target_resources=resource_filter if resource_filter else None,
+            )
             runner_results[tool_name] = run_result
 
             # Update state with resource IDs if the runner supports state tracking

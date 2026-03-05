@@ -120,7 +120,7 @@ def test_apply_parallel_uses_executor_and_handles_runner_errors():
         "opnsense": [_resource("fw1", provider="opnsense")],
     }
 
-    def runner_apply(provider, auto_approve=True):
+    def runner_apply(provider, auto_approve=True, **kwargs):
         if provider is provider_err:
             raise RuntimeError("boom")
         return {"success": True}
@@ -260,7 +260,7 @@ def test_apply_single_provider_runs_runners_in_priority_order():
     tf_runner.priority = 0
 
     # Set protocol methods with side effects for execution tracking
-    def tf_apply(provider, auto_approve=True):
+    def tf_apply(provider, auto_approve=True, **kwargs):
         execution_order.append("terraform")
         return {"success": True}
 
@@ -272,7 +272,7 @@ def test_apply_single_provider_runs_runners_in_priority_order():
     ansible_runner = MagicMock()
     ansible_runner.priority = 50
 
-    def ansible_apply(provider, auto_approve=True):
+    def ansible_apply(provider, auto_approve=True, **kwargs):
         execution_order.append("ansible")
         return {"success": True}
 

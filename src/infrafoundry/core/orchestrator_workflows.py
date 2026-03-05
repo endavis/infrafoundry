@@ -414,6 +414,14 @@ class PlanOrchestrator(HookExecutionMixin):
                     provider.ensure_directories()
                     self._export_secrets(provider_name, env_name, provider)
 
+                    # Always generate with ALL resources to avoid terraform
+                    # seeing filtered-out resources as deleted. The resource
+                    # filter is applied via terraform -target instead.
+                    all_provider_resources = resources_by_provider.get(provider_name, [])
+                    generate_resources = (
+                        all_provider_resources if resource_filter else provider_resources
+                    )
+
                     iac_tool = env_config.iac_tool if env_config else IaCTool.TERRAFORM
                     for tool_name, runner in self._get_sorted_runners(runner_priorities, iac_tool):
                         generate_method = getattr(provider, f"generate_{tool_name}", None)
@@ -427,9 +435,13 @@ class PlanOrchestrator(HookExecutionMixin):
                             self.console.print(
                                 f"  [dim]Generating {tool_name} configuration...[/dim]"
                             )
-                            generate_method(provider_resources)
+                            generate_method(generate_resources)
                             self.console.print(f"  [dim]Running {tool_name} plan...[/dim]")
-                            runner_result = runner.plan(provider)
+                            # Pass resource filter as target names for terraform
+                            runner_result = runner.plan(
+                                provider,
+                                target_resources=resource_filter if resource_filter else None,
+                            )
                             provider_results[f"{tool_name}_plan"] = runner_result
                         else:
                             self.console.print(
