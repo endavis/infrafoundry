@@ -286,8 +286,7 @@ class TestContainerInitialization:
         containers = [_make_ct(ostemplate="s:vztmpl/t.tar.xz", hostname="web-01")]
         content = _render_containers(provider, containers)
         assert "initialization {" in content
-        assert "hostname {" in content
-        assert 'name = "web-01"' in content
+        assert 'hostname = "web-01"' in content
 
     def test_dns(self, provider):
         """DNS should render in initialization block."""

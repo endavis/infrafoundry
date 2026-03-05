@@ -144,9 +144,7 @@ resource "proxmox_virtual_environment_container" "{{ container.config.name | rep
   # Initialization
   initialization {
     {% if container.config.hostname is defined %}
-    hostname {
-      name = "{{ container.config.hostname }}"
-    }
+    hostname = "{{ container.config.hostname }}"
     {% endif %}
 
     {% if container.config.dns is defined %}
