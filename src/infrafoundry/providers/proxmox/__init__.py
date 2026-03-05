@@ -235,31 +235,11 @@ class ProxmoxProvider(
                     # Merge snippet into merged_cloud_init
                     self._deep_merge(merged_cloud_init, snippet_data)
 
-        # Convert merged cloud-init to the format expected by the template
+        # Store full merged cloud-init as YAML string for direct passthrough
         if merged_cloud_init:
-            # Handle hostname
-            if "hostname" in merged_cloud_init:
-                config["cloud_init_hostname"] = merged_cloud_init["hostname"]
-            if "fqdn" in merged_cloud_init:
-                config["cloud_init_fqdn"] = merged_cloud_init.get(
-                    "fqdn", merged_cloud_init.get("hostname")
-                )
-
-            # Handle users
-            if "users" in merged_cloud_init:
-                config["cloud_init_users"] = merged_cloud_init["users"]
-
-            # Handle packages
-            if "packages" in merged_cloud_init:
-                config["cloud_init_packages"] = merged_cloud_init["packages"]
-
-            # Handle runcmd
-            if "runcmd" in merged_cloud_init:
-                config["cloud_init_runcmd"] = merged_cloud_init["runcmd"]
-
-            # Handle network config - store as raw YAML for template
-            if "network" in merged_cloud_init:
-                config["cloud_init_network"] = merged_cloud_init["network"]
+            config["cloud_init_user_data"] = yaml.dump(
+                merged_cloud_init, default_flow_style=False, sort_keys=False
+            )
 
         return vm_copy
 
