@@ -75,8 +75,9 @@ resource "null_resource" "configure_vm_{{ template.config.name | replace('-', '_
         # Import disk
         qm importdisk {{ template.config.vmid }} /var/lib/vz/template/iso/{{ image_file }} {{ template.config.disk.storage | default('local-lvm') }}
 
-        # Attach disk
-        qm set {{ template.config.vmid }} --scsi0 {{ template.config.disk.storage | default('local-lvm') }}:vm-{{ template.config.vmid }}-disk-0
+        # Attach disk (parse unused0 from config to handle both LVM and NFS path formats)
+        DISK_PATH=\$(qm config {{ template.config.vmid }} | grep '^unused0:' | sed 's/^unused0: //')
+        qm set {{ template.config.vmid }} --scsi0 \$DISK_PATH
 
         {% if template.config.efi_disk is defined %}
         # Add EFI disk for UEFI boot
