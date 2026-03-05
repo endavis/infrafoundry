@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772716696018,
+  "lastUpdate": 1772723044370,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -310,6 +310,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000031124594371373404",
             "extra": "mean: 158.94869253256365 usec\nrounds: 2049"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "265d5cff4f2f5b3d35046ec156c06431960cf4da",
+          "message": "fix: pass through all cloud-init directives in snippet processor (merges PR #303, addresses #302)\n\n* fix: pass through all cloud-init directives in snippet processor\n\nInstead of extracting a hardcoded list of cloud-init fields (hostname,\nusers, packages, runcmd, network), store the full merged cloud-init\nas a YAML string and output it directly in the template. This preserves\nall directives including mounts, write_files, bootcmd, swap, etc.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* fix: remove domain-like string from test to avoid CodeQL false positive\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-05T15:03:02Z",
+          "tree_id": "13d02f2550b4cdccb6c12a11345306a9dd1cc5dc",
+          "url": "https://github.com/endavis/infrafoundry/commit/265d5cff4f2f5b3d35046ec156c06431960cf4da"
+        },
+        "date": 1772723043725,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6972.1953863528715,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000012949917132856148",
+            "extra": "mean: 143.42684686624884 usec\nrounds: 1835"
           }
         ]
       }
