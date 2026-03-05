@@ -136,25 +136,30 @@ class TerraformRunner(BaseRunner):
 
         Args:
             provider: Provider instance
-            **kwargs: Additional terraform plan options
+            **kwargs: Additional terraform plan options:
+                - target_resources: List of resource names to target with -target
 
         Returns:
             Dict with plan results
         """
-        return self._run_terraform(provider, "plan", **kwargs)
+        target_resources = kwargs.get("target_resources")
+        return self._run_terraform(provider, "plan", target_resources=target_resources)
 
     def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Apply Terraform configuration.
 
         Args:
             provider: Provider instance
-            **kwargs: Options including auto_approve
+            **kwargs: Options including auto_approve, target_resources
 
         Returns:
             Dict with apply results
         """
         auto_approve = kwargs.get("auto_approve", False)
-        return self._run_terraform(provider, "apply", auto_approve=auto_approve)
+        target_resources = kwargs.get("target_resources")
+        return self._run_terraform(
+            provider, "apply", auto_approve=auto_approve, target_resources=target_resources
+        )
 
     def destroy(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
         """Destroy Terraform-managed infrastructure.
@@ -213,7 +218,11 @@ class TerraformRunner(BaseRunner):
             return {"valid": False, "error": str(e)}
 
     def _run_terraform(
-        self, provider: ProviderBase, command: str, auto_approve: bool = False
+        self,
+        provider: ProviderBase,
+        command: str,
+        auto_approve: bool = False,
+        target_resources: list[str] | None = None,
     ) -> dict[str, Any]:
         """Run Terraform command for a provider.
 
@@ -221,6 +230,7 @@ class TerraformRunner(BaseRunner):
             provider: Provider instance
             command: Terraform command (plan, apply, destroy)
             auto_approve: If True, add -auto-approve flag
+            target_resources: Optional list of resource names to target with -target
 
         Returns:
             Dict with command results
@@ -239,6 +249,12 @@ class TerraformRunner(BaseRunner):
         cmd = [self.tool_path, command]
         if auto_approve and command in {"apply", "destroy"}:
             cmd.append("-auto-approve")
+
+        # Add -target flags for resource filtering
+        if target_resources:
+            targets = self._resolve_terraform_targets(tf_dir, target_resources)
+            for target in targets:
+                cmd.extend(["-target", target])
 
         # Run command with environment variables; capture output for plan so drift parsing works
         capture = command == "plan"
@@ -259,6 +275,39 @@ class TerraformRunner(BaseRunner):
             response["error"] = result.stderr or ""
 
         return response
+
+    def _resolve_terraform_targets(self, tf_dir: Path, resource_names: list[str]) -> list[str]:
+        """Resolve resource names to terraform resource addresses.
+
+        Scans generated .tf files for resource blocks matching the given names
+        (with dashes converted to underscores).
+
+        Args:
+            tf_dir: Terraform working directory
+            resource_names: List of resource names (e.g., ["infra-web", "esx-01"])
+
+        Returns:
+            List of terraform resource addresses (e.g.,
+            ["proxmox_virtual_environment_vm.infra_web"])
+        """
+        # Convert resource names to terraform-style names (dashes to underscores)
+        tf_names = {name.replace("-", "_") for name in resource_names}
+
+        targets: list[str] = []
+        # Pattern matches: resource "type" "name" {
+        resource_pattern = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
+
+        for tf_file in tf_dir.glob("*.tf"):
+            with open(tf_file) as f:
+                for line in f:
+                    match = resource_pattern.match(line)
+                    if match:
+                        resource_type = match.group(1)
+                        resource_name = match.group(2)
+                        if resource_name in tf_names:
+                            targets.append(f"{resource_type}.{resource_name}")
+
+        return targets
 
     def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
         """Extract Terraform resource IDs from state.
