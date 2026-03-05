@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772716212960,
+  "lastUpdate": 1772716696018,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -279,6 +279,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002103098559196757",
             "extra": "mean: 147.9649569177818 usec\nrounds: 2414"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bbe6ef6bc49bc8aa3924a4479f9df384ce556edf",
+          "message": "fix: correct Proxmox container hostname and provider config rendering (merges PR #301, addresses #300)\n\n- Fix container hostname from nested block to flat attribute\n- Update provider.tf.j2 to use Terraform variables for API credentials\n- Update test to match corrected hostname rendering\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-05T13:17:42Z",
+          "tree_id": "a68dc24e87719fb2a32e14b18bd47ad2a0128930",
+          "url": "https://github.com/endavis/infrafoundry/commit/bbe6ef6bc49bc8aa3924a4479f9df384ce556edf"
+        },
+        "date": 1772716695157,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6291.338318464815,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000031124594371373404",
+            "extra": "mean: 158.94869253256365 usec\nrounds: 2049"
           }
         ]
       }
