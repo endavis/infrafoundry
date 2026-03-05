@@ -105,12 +105,13 @@ class TestSnippetPassthrough:
         _write_snippet(
             snippet_dir,
             "system/hostname",
-            "hostname: myhost\nfqdn: myhost.example.com\n",
+            "hostname: web-01\nfqdn: web-01\n",
         )
         vm = _make_vm(cloud_init_snippets=["system/hostname"])
         result = provider._process_cloud_init_snippets(vm)
-        assert "hostname: myhost" in result.config["cloud_init_user_data"]
-        assert "myhost.example.com" in result.config["cloud_init_user_data"]
+        user_data = result.config["cloud_init_user_data"]
+        assert "hostname: web-01" in user_data
+        assert "fqdn: web-01" in user_data
 
     def test_users_preserved(self, provider, snippet_dir):
         """users directive should be included in user-data."""
