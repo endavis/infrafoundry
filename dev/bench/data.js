@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772723044370,
+  "lastUpdate": 1772734096794,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -341,6 +341,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000012949917132856148",
             "extra": "mean: 143.42684686624884 usec\nrounds: 1835"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "17b89a6e57643b6561e378fa854b9edfafe38e01",
+          "message": "fix: use terraform -target for resource filter instead of regenerating config (merges PR #305, addresses #304)\n\n* fix: use terraform -target for resource filter instead of regenerating config\n\nThe -r resource filter previously regenerated .tf files with only the\nfiltered resources, causing terraform to see missing resources as deleted\nand destroy them. Now all resources are always generated, and the filter\nis applied via terraform's -target flag.\n\n- orchestrator_workflows: generate all resources, pass filter to runner\n- terraform_runner: add _resolve_terraform_targets() and -target support\n- deployment_executor: pass resource_filter through to runners\n- test_deployment_executor: update mock signatures for new kwargs\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* chore: trigger CI re-run\n\n---------\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-05T18:05:35Z",
+          "tree_id": "a3458b33dae2065f87d96b38dd93828bcbac4344",
+          "url": "https://github.com/endavis/infrafoundry/commit/17b89a6e57643b6561e378fa854b9edfafe38e01"
+        },
+        "date": 1772734095853,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6759.482672638948,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002015098184681069",
+            "extra": "mean: 147.94031561731828 usec\nrounds: 2446"
           }
         ]
       }
