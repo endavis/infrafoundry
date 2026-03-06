@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772815009526,
+  "lastUpdate": 1772816686354,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -465,6 +465,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014667268797314524",
             "extra": "mean: 146.21922951517877 usec\nrounds: 2331"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "16756161b4c0dc4cafa376b67f18b659c3ba8b58",
+          "message": "fix: URL-encode ESXi password in OVF deployment vi:// URL (merges PR #313, addresses #312)\n\nfix: URL-encode ESXi password and use self references in OVF deployment\n\nThe ovf_deployment template had two issues:\n1. Passwords with URL-special characters (e.g., #, @, ?) broke the\n   vi:// URL passed to ovftool. Now URL-encoded via python3 urllib.\n2. Destroy provisioner referenced var.* which Terraform forbids in\n   destroy-time provisioners. Now stores connection details in\n   triggers_replace and uses self.triggers_replace.* throughout.\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-06T17:04:17Z",
+          "tree_id": "e0fb25fafbc064072289628451875d3808e4090f",
+          "url": "https://github.com/endavis/infrafoundry/commit/16756161b4c0dc4cafa376b67f18b659c3ba8b58"
+        },
+        "date": 1772816686048,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6842.586743726931,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000019306886155300812",
+            "extra": "mean: 146.14356199675052 usec\nrounds: 2484"
           }
         ]
       }
