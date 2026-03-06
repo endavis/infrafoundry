@@ -58,16 +58,20 @@ class TestOvfDeploymentTemplate:
         assert '--net:"hostonly"="PG-Cluster-esx-01"' in content
         assert '--net:"nat"="PG-Management-esx-01"' in content
 
-    def test_host_alias_in_variables(self, provider):
-        """Host alias should be used in variable references."""
+    def test_host_alias_in_triggers(self, provider):
+        """Host alias should be used in triggers_replace variable references."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
             "esxi/ovf_deployment.tf.j2",
             {"ovf_deployments": deployments, "host_alias": EsxiProvider._host_alias},
         )
+        # Connection details stored in triggers_replace via var references
         assert "var.esxi_hostname_esxi_01" in content
         assert "var.esxi_username_esxi_01" in content
         assert "var.esxi_password_esxi_01" in content
+        # Create provisioner uses self references
+        assert "self.triggers_replace.esxi_username" in content
+        assert "self.triggers_replace.esxi_hostname" in content
 
     def test_multiple_deployments(self, provider):
         """Multiple deployments should render multiple resources."""
@@ -147,7 +151,7 @@ class TestOvfDeploymentTemplate:
         assert "--annotation" not in content
 
     def test_destroy_provisioner(self, provider):
-        """Destroy provisioner should include SSH command with VM name."""
+        """Destroy provisioner should use self references for SSH commands."""
         deployments = [_make_ovf_deployment(vm_name="ontap-node-01")]
         content = provider.render_template(
             "esxi/ovf_deployment.tf.j2",
@@ -156,29 +160,37 @@ class TestOvfDeploymentTemplate:
         assert "when    = destroy" in content
         assert "vim-cmd vmsvc/power.off" in content
         assert "vim-cmd vmsvc/destroy" in content
-        assert "ontap-node-01" in content
+        assert "self.triggers_replace.vm_name" in content
+        assert "self.triggers_replace.esxi_hostname" in content
+        assert "self.triggers_replace.esxi_password" in content
         assert "sshpass" in content
 
     def test_vm_name_defaults_to_resource_name(self, provider):
-        """When vm_name is not set, resource name should be used."""
+        """When vm_name is not set, resource name should be used in triggers."""
         deployment = _make_ovf_deployment("my-vm")
         del deployment.config["vm_name"]
         content = provider.render_template(
             "esxi/ovf_deployment.tf.j2",
             {"ovf_deployments": [deployment], "host_alias": EsxiProvider._host_alias},
         )
-        assert '--name="my-vm"' in content
+        assert "vm_name" in content
+        assert '"my-vm"' in content
 
     def test_triggers_replace_block(self, provider):
-        """Triggers replace block should contain vm_name, ovf_source, host."""
+        """Triggers replace block should contain config and connection details."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
             "esxi/ovf_deployment.tf.j2",
             {"ovf_deployments": deployments, "host_alias": EsxiProvider._host_alias},
         )
-        assert 'vm_name    = "ontap-node-01"' in content
-        assert 'ovf_source = "/path/to/vsim.ovf"' in content
-        assert 'host       = "esxi-01"' in content
+        assert "vm_name" in content
+        assert '"ontap-node-01"' in content
+        assert "ovf_source" in content
+        assert '"/path/to/vsim.ovf"' in content
+        assert '"esxi-01"' in content
+        assert "esxi_hostname = var.esxi_hostname_esxi_01" in content
+        assert "esxi_username = var.esxi_username_esxi_01" in content
+        assert "esxi_password = var.esxi_password_esxi_01" in content
 
     def test_overwrite_flag(self, provider):
         """Overwrite=true should render --overwrite flag."""
@@ -197,3 +209,13 @@ class TestOvfDeploymentTemplate:
             {"ovf_deployments": deployments, "host_alias": EsxiProvider._host_alias},
         )
         assert "--overwrite" not in content
+
+    def test_password_url_encoded_in_vi_url(self, provider):
+        """Password should be URL-encoded in the vi:// URL to handle special chars."""
+        deployments = [_make_ovf_deployment()]
+        content = provider.render_template(
+            "esxi/ovf_deployment.tf.j2",
+            {"ovf_deployments": deployments, "host_alias": EsxiProvider._host_alias},
+        )
+        assert "urllib.parse.quote" in content
+        assert "self.triggers_replace.esxi_password" in content
