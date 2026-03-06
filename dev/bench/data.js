@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772793331840,
+  "lastUpdate": 1772801750259,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -403,6 +403,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007970859749700178",
             "extra": "mean: 141.51144668962579 usec\nrounds: 2326"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cdbac1eb56457f88b36c33324972592da384db89",
+          "message": "feat: add boot_order support for Proxmox VMs (merges PR #309, addresses #308)\n\nAdds a boot_order config option that maps to the terraform provider's\nboot_order list attribute. This is needed for ISO-based installs (e.g.,\nESXi) where disk must boot before CD after installation to prevent\ninfinite reinstall loops.\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-06T12:55:04Z",
+          "tree_id": "ae858f5cdef453e1320940da60dacde6d488b78d",
+          "url": "https://github.com/endavis/infrafoundry/commit/cdbac1eb56457f88b36c33324972592da384db89"
+        },
+        "date": 1772801749360,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6907.787009003514,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001257302231792096",
+            "extra": "mean: 144.76416234267413 usec\nrounds: 2544"
           }
         ]
       }
