@@ -35,3 +35,14 @@ output "portgroups" {
   ]
 }
 {% endif %}
+
+{% if resources_by_type.get('ovf_deployment') %}
+output "ovf_deployments" {
+  description = "Deployed OVF virtual machines"
+  value = [
+    {% for deployment in resources_by_type['ovf_deployment'] %}
+    "{{ deployment.config.vm_name | default(deployment.name) }}",
+    {% endfor %}
+  ]
+}
+{% endif %}

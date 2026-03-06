@@ -9,6 +9,7 @@ The ESXi provider manages resources inside one or more VMware ESXi hosts using t
 | `vswitch` | Virtual switch with optional uplinks and MTU configuration |
 | `portgroup` | Port group on a vswitch with VLAN and security settings |
 | `vm` | Guest VM with OVF deployment, disk, and multi-NIC support |
+| `ovf_deployment` | Deploy an OVA/OVF appliance via `ovftool` with network mapping |
 
 ## Prerequisites
 
@@ -173,6 +174,47 @@ The `network` field accepts either a single dict or a list of dicts. A single di
 | `virtual_disk_id` | Yes | Path to the VMDK file |
 | `slot` | No | SCSI slot (default: `0:1`) |
 
+### ovf_deployment
+
+Use `ovf_deployment` when you need to deploy a pre-built OVA/OVF appliance (e.g., a vendor virtual appliance) using VMware `ovftool`. Unlike the `vm` resource, which creates VMs via the ESXi provider API, `ovf_deployment` invokes `ovftool` as a local-exec provisioner and supports explicit OVF network-to-portgroup mapping.
+
+```yaml
+ovf_deployment:
+  - name: vcsa
+    host: esxi-01
+    ovf_source: "/path/to/vcsa.ova"
+    disk_store: datastore1
+    disk_mode: thin
+    power: "on"
+    overwrite: false
+    notes: "vCenter Server Appliance"
+    network_map:
+      "Network 1": prod-network
+      "Management Network": mgmt-network
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Deployment name (used as the VM name unless `vm_name` is set) |
+| `host` | Yes | Logical host name from `provider_settings.esxi.hosts` |
+| `ovf_source` | Yes | Local path to the OVA/OVF file |
+| `disk_store` | Yes | Target datastore on the ESXi host |
+| `network_map` | Yes | Dict mapping OVF network names to ESXi portgroup names |
+| `vm_name` | No | Override the VM display name (defaults to `name`) |
+| `disk_mode` | No | Disk provisioning mode: `thin`, `thick`, `eagerzeroedthick` (default: `thin`) |
+| `power` | No | Power state after deployment: `on` or `off` (default: `on`) |
+| `overwrite` | No | Overwrite an existing VM with the same name (default: `false`) |
+| `notes` | No | Annotation/notes for the VM |
+
+**Prerequisites:**
+
+- `ovftool` must be installed and available on the system PATH
+- The OVA/OVF file must be accessible from the machine running Terraform
+
+**Destroy behavior:**
+
+On `terraform destroy`, the provisioner connects to the ESXi host via SSH and powers off then destroys the VM by name.
+
 ## Multi-Host Support
 
 The ESXi provider supports managing resources across multiple ESXi hosts simultaneously. Each host gets its own Terraform provider alias, and resources are routed to the correct host based on the `host` field.
@@ -201,6 +243,7 @@ The ESXi provider validates:
 - **Connectivity**: SSH access to each configured host on port 22
 - **Vswitch references**: Portgroups reference vswitches that exist on the same host
 - **Portgroup references**: VMs reference portgroups that exist on the same host
+- **OVF deployments**: Required fields (`host`, `ovf_source`, `disk_store`, `network_map`) and non-empty network mappings
 
 ```bash
 infra validate --env prod
@@ -247,6 +290,7 @@ generated/prod/terraform/esxi/
 ├── vswitch.tf           # Virtual switch resources
 ├── portgroup.tf         # Port group resources
 ├── vm.tf                # Guest VM resources
+├── ovf_deployment.tf    # OVF/OVA appliance deployments (if configured)
 └── outputs.tf           # VM IPs, vswitch names, portgroup names
 ```
 
@@ -256,6 +300,7 @@ Resources are created in dependency order:
 
 ```
 vswitch → portgroup → vm
+                    → ovf_deployment
 ```
 
-Portgroups depend on vswitches, and VMs depend on both vswitches and portgroups.
+Portgroups depend on vswitches. Both VMs and OVF deployments depend on vswitches and portgroups.

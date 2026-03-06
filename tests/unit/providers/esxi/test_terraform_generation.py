@@ -307,6 +307,50 @@ class TestOutputsTemplate:
         assert "pg-mgmt" in content
         assert "pg-storage" in content
 
+    def test_outputs_with_ovf_deployments(self, provider):
+        """Outputs should include OVF deployment VM names."""
+        resources_by_type = {
+            "ovf_deployment": [
+                ResourceConfig(
+                    name="node-01",
+                    type="ovf_deployment",
+                    provider="esxi",
+                    config={"vm_name": "ontap-01", "host": "esxi-01"},
+                ),
+                ResourceConfig(
+                    name="node-02",
+                    type="ovf_deployment",
+                    provider="esxi",
+                    config={"vm_name": "ontap-02", "host": "esxi-01"},
+                ),
+            ],
+        }
+        content = provider.render_template(
+            "esxi/outputs.tf.j2",
+            {"resources_by_type": resources_by_type},
+        )
+        assert "ovf_deployments" in content
+        assert "ontap-01" in content
+        assert "ontap-02" in content
+
+    def test_outputs_ovf_deployment_defaults_to_name(self, provider):
+        """OVF deployment output should fall back to resource name when vm_name missing."""
+        resources_by_type = {
+            "ovf_deployment": [
+                ResourceConfig(
+                    name="my-ovf-vm",
+                    type="ovf_deployment",
+                    provider="esxi",
+                    config={"host": "esxi-01"},
+                ),
+            ],
+        }
+        content = provider.render_template(
+            "esxi/outputs.tf.j2",
+            {"resources_by_type": resources_by_type},
+        )
+        assert "my-ovf-vm" in content
+
     def test_outputs_empty_resources(self, provider):
         """Outputs with no resources should not render output blocks."""
         content = provider.render_template(

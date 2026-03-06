@@ -1,0 +1,42 @@
+{% for deployment in ovf_deployments %}
+resource "terraform_data" "ovf_{{ deployment.name | to_terraform_name }}" {
+  triggers_replace = {
+    vm_name    = "{{ deployment.config.vm_name | default(deployment.name) }}"
+    ovf_source = "{{ deployment.config.ovf_source }}"
+    host       = "{{ deployment.config.host }}"
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      ovftool --acceptAllEulas --noSSLVerify \
+        {% for ovf_net, target_pg in deployment.config.network_map.items() %}
+        --net:"{{ ovf_net }}"="{{ target_pg }}" \
+        {% endfor %}
+        --name="{{ deployment.config.vm_name | default(deployment.name) }}" \
+        -dm={{ deployment.config.disk_mode | default("thin") }} -ds="{{ deployment.config.disk_store }}" \
+        {% if deployment.config.power | default("on") == "on" %}
+        --powerOn \
+        {% endif %}
+        {% if deployment.config.overwrite | default(false) %}
+        --overwrite \
+        {% endif %}
+        {% if deployment.config.notes is defined %}
+        --annotation="{{ deployment.config.notes }}" \
+        {% endif %}
+        "{{ deployment.config.ovf_source }}" \
+        "vi://${var.esxi_username_{{ host_alias(deployment.config.host) }}}:${var.esxi_password_{{ host_alias(deployment.config.host) }}}@${var.esxi_hostname_{{ host_alias(deployment.config.host) }}}"
+    EOT
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      CMD='VMID=$(vim-cmd vmsvc/getallvms | grep "{{ deployment.config.vm_name | default(deployment.name) }}" | awk "{print \$1}"); vim-cmd vmsvc/power.off $VMID 2>/dev/null; vim-cmd vmsvc/destroy $VMID'
+      SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
+      ssh $SSH_OPTS -o BatchMode=yes ${var.esxi_username_{{ host_alias(deployment.config.host) }}}@${var.esxi_hostname_{{ host_alias(deployment.config.host) }}} "$CMD" 2>/dev/null \
+        || sshpass -p "${var.esxi_password_{{ host_alias(deployment.config.host) }}}" ssh $SSH_OPTS ${var.esxi_username_{{ host_alias(deployment.config.host) }}}@${var.esxi_hostname_{{ host_alias(deployment.config.host) }}} "$CMD"
+    EOT
+  }
+}
+
+{% endfor %}
