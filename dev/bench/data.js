@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772734096794,
+  "lastUpdate": 1772793331840,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -372,6 +372,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002015098184681069",
             "extra": "mean: 147.94031561731828 usec\nrounds: 2446"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9eaf536c131941cedda3ba91eede21262ab064c7",
+          "message": "fix: pass resource filter as -target to terraform destroy (merges PR #307, addresses #306)\n\nThe destroy path was missed in PR #305 which fixed plan and apply.\nWithout this, `foundry infra destroy -r <name>` destroyed ALL resources\ninstead of only the targeted ones.\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-06T10:35:01Z",
+          "tree_id": "c008c9c036e1be8b7b2b71b4aa5d599c7c6bf263",
+          "url": "https://github.com/endavis/infrafoundry/commit/9eaf536c131941cedda3ba91eede21262ab064c7"
+        },
+        "date": 1772793331355,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7066.566156964532,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007970859749700178",
+            "extra": "mean: 141.51144668962579 usec\nrounds: 2326"
           }
         ]
       }
