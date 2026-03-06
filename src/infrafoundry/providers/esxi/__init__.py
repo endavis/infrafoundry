@@ -115,6 +115,9 @@ class EsxiProvider(
             processed_vms = [self._normalize_vm_config(vm) for vm in resources_by_type["vm"]]
             self._generate_vms_terraform(processed_vms)
 
+        if "ovf_deployment" in resources_by_type:
+            self._generate_ovf_deployments_terraform(resources_by_type["ovf_deployment"])
+
         # Generate outputs
         self.render_outputs_terraform(resources_by_type)
 
@@ -131,13 +134,14 @@ class EsxiProvider(
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["vswitch", "portgroup", "vm"]
+        return ["vswitch", "portgroup", "vm", "ovf_deployment"]
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
             "vm": ["vswitch", "portgroup"],
+            "ovf_deployment": ["vswitch", "portgroup"],
             "portgroup": ["vswitch"],
             "vswitch": [],
         }
@@ -238,4 +242,12 @@ class EsxiProvider(
             "esxi/vm.tf.j2",
             context={"vms": vms, "host_alias": self._host_alias},
             output_name="vm.tf",
+        )
+
+    def _generate_ovf_deployments_terraform(self, ovf_deployments: list[ResourceConfig]) -> None:
+        """Generate Terraform for ESXi OVF deployments."""
+        self.render_and_write_terraform(
+            "esxi/ovf_deployment.tf.j2",
+            context={"ovf_deployments": ovf_deployments, "host_alias": self._host_alias},
+            output_name="ovf_deployment.tf",
         )

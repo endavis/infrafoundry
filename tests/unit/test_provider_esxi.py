@@ -35,6 +35,7 @@ class TestEsxiProvider:
         assert "vswitch" in types
         assert "portgroup" in types
         assert "vm" in types
+        assert "ovf_deployment" in types
 
     def test_get_dependencies(self, temp_dir):
         """Test dependency resolution."""
@@ -49,6 +50,9 @@ class TestEsxiProvider:
         assert "vm" in deps
         assert "vswitch" in deps["vm"]
         assert "portgroup" in deps["vm"]
+        assert "ovf_deployment" in deps
+        assert "vswitch" in deps["ovf_deployment"]
+        assert "portgroup" in deps["ovf_deployment"]
         assert "vswitch" in deps["portgroup"]
         assert deps["vswitch"] == []
 
