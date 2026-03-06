@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772801750259,
+  "lastUpdate": 1772815009526,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -434,6 +434,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001257302231792096",
             "extra": "mean: 144.76416234267413 usec\nrounds: 2544"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c27aee948057f013239eb595d35cedf964395bbc",
+          "message": "feat: add OVF deployment support with network mapping (merges PR #311, addresses #310)\n\nfeat: add OVF deployment resource type to ESXi provider\n\nAdd ovf_deployment resource type that uses ovftool directly with --net:\nflags for per-network OVF-to-portgroup mapping. This enables deploying\nOVF appliances (e.g., ONTAP Simulator) that define multiple logical\nnetworks requiring different target port groups.\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-06T16:36:17Z",
+          "tree_id": "09e59c536de607482e491b9a424a1f0fe91769b0",
+          "url": "https://github.com/endavis/infrafoundry/commit/c27aee948057f013239eb595d35cedf964395bbc"
+        },
+        "date": 1772815008898,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6839.0457487412195,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014667268797314524",
+            "extra": "mean: 146.21922951517877 usec\nrounds: 2331"
           }
         ]
       }
