@@ -202,6 +202,31 @@ class TestAllNewFields:
         assert "efi_disk {" in content
 
 
+class TestBootOrder:
+    """Tests for boot_order rendering."""
+
+    def test_vm_with_boot_order(self, provider):
+        """Boot order should render as a list."""
+        vms = [_make_vm(boot_order=["sata0", "ide3"])]
+        content = _render_vms(provider, vms)
+        assert "boot_order" in content
+        assert '"sata0"' in content
+        assert '"ide3"' in content
+
+    def test_vm_without_boot_order(self, provider):
+        """No boot_order config should not render the attribute."""
+        vms = [_make_vm(clone="100")]
+        content = _render_vms(provider, vms)
+        assert "boot_order" not in content
+
+    def test_vm_single_boot_device(self, provider):
+        """Single device boot order should render correctly."""
+        vms = [_make_vm(boot_order=["scsi0"])]
+        content = _render_vms(provider, vms)
+        assert "boot_order" in content
+        assert '"scsi0"' in content
+
+
 class TestDefaultsUnchanged:
     """Verify that minimal configs still produce the same output."""
 
