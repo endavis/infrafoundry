@@ -8,6 +8,7 @@ from infrafoundry.core.validation import ValidationReport
 
 from .validators import (
     HostConnectivityValidator,
+    OvfDeploymentValidator,
     PortgroupReferenceValidator,
     VswitchReferenceValidator,
 )
@@ -35,6 +36,7 @@ class EsxiValidator:
         self.host_connectivity_validator = HostConnectivityValidator(report)
         self.vswitch_reference_validator = VswitchReferenceValidator(report)
         self.portgroup_reference_validator = PortgroupReferenceValidator(report)
+        self.ovf_deployment_validator = OvfDeploymentValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate SSH connectivity to ESXi hosts.
@@ -68,3 +70,4 @@ class EsxiValidator:
         """
         self.vswitch_reference_validator.validate(resources)
         self.portgroup_reference_validator.validate(resources)
+        self.ovf_deployment_validator.validate(resources)
