@@ -177,6 +177,9 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   {% endif %}
 
   # Boot and startup
+  {% if vm.config.boot_order is defined %}
+  boot_order = {{ vm.config.boot_order | tojson }}
+  {% endif %}
   {% if vm.config.onboot is defined %}
   on_boot = {{ vm.config.onboot | lower }}
   {% endif %}
