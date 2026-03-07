@@ -18,6 +18,7 @@ from infrafoundry.providers.opnsense.validators import (
     DHCPValidator,
     FirewallValidator,
     ResourceNameValidator,
+    UnboundValidator,
     VLANValidator,
 )
 
@@ -73,6 +74,7 @@ class OPNsenseValidator:
         self.firewall_validator = FirewallValidator(report)
         self.dhcp_validator = DHCPValidator(report)
         self.vlan_validator = VLANValidator(report)
+        self.unbound_validator = UnboundValidator(report)
         self.resource_name_validator = ResourceNameValidator(report)
 
     def validate_connectivity(self) -> None:
@@ -143,6 +145,7 @@ class OPNsenseValidator:
         - Aliases referenced in firewall rules exist
         - VLANs referenced in DHCP maps exist
         - Interfaces are valid
+        - Unbound host override fields are valid
         - No duplicate resource names
 
         Args:
@@ -190,6 +193,7 @@ class OPNsenseValidator:
                 resource_refs["vlans"],
                 existing_interfaces,
             )
+            self.unbound_validator.validate(resource_refs["unbound_host_overrides"])
             self.resource_name_validator.validate(resources)
 
         except Exception as exc:
@@ -215,6 +219,7 @@ class OPNsenseValidator:
         vlans = [r for r in resources if r.type == "vlans"]
         firewall_rules = [r for r in resources if r.type == "firewall_rules"]
         dhcp_maps = [r for r in resources if r.type == "dhcp_static_maps"]
+        unbound_host_overrides = [r for r in resources if r.type == "unbound_host_override"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}
@@ -226,6 +231,7 @@ class OPNsenseValidator:
             "vlan_names": vlan_names,
             "firewall_rules": firewall_rules,
             "dhcp_maps": dhcp_maps,
+            "unbound_host_overrides": unbound_host_overrides,
         }
 
     def _get_existing_aliases(
