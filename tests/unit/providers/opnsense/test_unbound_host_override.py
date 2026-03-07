@@ -147,7 +147,7 @@ class TestUnboundHostOverrideTemplates:
 
         content = outputs_tf.read_text()
         assert "unbound_host_overrides" in content
-        assert "web.example.com" in content
+        assert content.find("web.example.com") != -1
 
 
 class TestUnboundHostOverrideProvider:
