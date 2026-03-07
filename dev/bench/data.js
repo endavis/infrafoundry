@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772816686354,
+  "lastUpdate": 1772874824962,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -496,6 +496,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000019306886155300812",
             "extra": "mean: 146.14356199675052 usec\nrounds: 2484"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f7e708f9cbbb48e2e96fa734ae130b817107430b",
+          "message": "feat: add mac_map support to ovf_deployment for deterministic MAC addresses (merges PR #315, addresses #314)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-07T09:13:17Z",
+          "tree_id": "37c53bfc024046b803bd412ccc4bd87ee0eb375d",
+          "url": "https://github.com/endavis/infrafoundry/commit/f7e708f9cbbb48e2e96fa734ae130b817107430b"
+        },
+        "date": 1772874824628,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6605.016253728227,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000027365805467078235",
+            "extra": "mean: 151.40008163273575 usec\nrounds: 2450"
           }
         ]
       }
