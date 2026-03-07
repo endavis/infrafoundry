@@ -193,6 +193,32 @@ ovf_deployment:
       "Management Network": mgmt-network
 ```
 
+**With static MAC addresses:**
+
+```yaml
+ovf_deployment:
+  - name: ontap-node-01
+    host: esxi-01
+    ovf_source: "/path/to/vsim.ovf"
+    disk_store: datastore1
+    vm_name: ontap-node-01
+    network_map:
+      hostonly: PG-Cluster-esx-01
+      nat: PG-Management-esx-01
+    mac_map:
+      nat: "BC:24:11:0A:01:01"
+    disk_mode: thin
+    power: "on"
+```
+
+When `mac_map` is present, the deployment workflow changes:
+
+1. The OVF is deployed with power **off** (regardless of the `power` setting)
+2. The provisioner SSHes to the ESXi host and modifies the VMX file to set static MAC addresses
+3. If `power` is `on`, a final provisioner powers on the VM
+
+This enables pre-configuring DHCP reservations for deterministic MAC addresses before the VM boots.
+
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | Yes | Deployment name (used as the VM name unless `vm_name` is set) |
@@ -205,6 +231,7 @@ ovf_deployment:
 | `power` | No | Power state after deployment: `on` or `off` (default: `on`) |
 | `overwrite` | No | Overwrite an existing VM with the same name (default: `false`) |
 | `notes` | No | Annotation/notes for the VM |
+| `mac_map` | No | Dict mapping OVF network names to static MAC addresses. Keys must exist in `network_map`. MAC format: `XX:XX:XX:XX:XX:XX` (6 colon-separated hex pairs) |
 
 **Prerequisites:**
 
@@ -243,7 +270,7 @@ The ESXi provider validates:
 - **Connectivity**: SSH access to each configured host on port 22
 - **Vswitch references**: Portgroups reference vswitches that exist on the same host
 - **Portgroup references**: VMs reference portgroups that exist on the same host
-- **OVF deployments**: Required fields (`host`, `ovf_source`, `disk_store`, `network_map`) and non-empty network mappings
+- **OVF deployments**: Required fields (`host`, `ovf_source`, `disk_store`, `network_map`), non-empty network mappings, and `mac_map` key/format validation
 
 ```bash
 infra validate --env prod

@@ -219,3 +219,104 @@ class TestOvfDeploymentTemplate:
         )
         assert "urllib.parse.quote" in content
         assert "self.triggers_replace.esxi_password" in content
+
+
+class TestOvfDeploymentMacMap:
+    """Tests for mac_map support in ovf_deployment template."""
+
+    def _render_with_mac_map(self, provider, **config_overrides):
+        """Helper to render template with mac_map config."""
+        deployments = [_make_ovf_deployment(**config_overrides)]
+        return provider.render_template(
+            "esxi/ovf_deployment.tf.j2",
+            {"ovf_deployments": deployments, "host_alias": EsxiProvider._host_alias},
+        )
+
+    def test_mac_map_suppresses_power_on(self, provider):
+        """When mac_map is set, --powerOn should not appear in ovftool command."""
+        content = self._render_with_mac_map(
+            provider,
+            mac_map={"nat": "BC:24:11:0A:01:01"},
+        )
+        # The ovftool command should NOT have --powerOn
+        # Split by provisioner blocks to check only the ovftool provisioner
+        assert "--powerOn" not in content
+
+    def test_mac_map_set_mac_provisioner(self, provider):
+        """mac_map should generate a provisioner that modifies VMX via SSH."""
+        content = self._render_with_mac_map(
+            provider,
+            mac_map={"nat": "BC:24:11:0A:01:01"},
+        )
+        assert "vim-cmd vmsvc/getallvms" in content
+        assert "BC:24:11:0A:01:01" in content
+        assert "PG-Management-esx-01" in content
+        assert "addressType" in content
+        assert "static" in content
+        assert "generatedAddress" in content
+        assert "FULL_PATH" in content
+
+    def test_mac_map_power_on_provisioner(self, provider):
+        """When mac_map is set and power=on, a power-on provisioner should exist."""
+        content = self._render_with_mac_map(
+            provider,
+            mac_map={"nat": "BC:24:11:0A:01:01"},
+            power="on",
+        )
+        assert "vim-cmd vmsvc/power.on" in content
+
+    def test_mac_map_power_off_no_power_on(self, provider):
+        """When mac_map is set and power=off, no power-on provisioner should exist."""
+        content = self._render_with_mac_map(
+            provider,
+            mac_map={"nat": "BC:24:11:0A:01:01"},
+            power="off",
+        )
+        assert "vim-cmd vmsvc/power.on" not in content
+        # MAC provisioner should still exist
+        assert "addressType" in content
+
+    def test_mac_map_in_triggers_replace(self, provider):
+        """MAC values should appear in triggers_replace for change detection."""
+        content = self._render_with_mac_map(
+            provider,
+            mac_map={"nat": "BC:24:11:0A:01:01"},
+        )
+        assert "mac_nat" in content
+        assert '"BC:24:11:0A:01:01"' in content
+
+    def test_no_mac_map_unchanged(self, provider):
+        """Without mac_map, template output should be unchanged (no MAC provisioners)."""
+        content = self._render_with_mac_map(provider)
+        # Should have normal --powerOn
+        assert "--powerOn" in content
+        # Should NOT have MAC-related provisioner content
+        assert "addressType" not in content
+        assert "FULL_PATH" not in content
+        assert "vim-cmd vmsvc/power.on" not in content
+        assert "mac_" not in content
+
+    def test_mac_map_multiple_entries(self, provider):
+        """Multiple mac_map entries should generate commands for each."""
+        content = self._render_with_mac_map(
+            provider,
+            mac_map={
+                "nat": "BC:24:11:0A:01:01",
+                "hostonly": "BC:24:11:0A:01:02",
+            },
+        )
+        assert "BC:24:11:0A:01:01" in content
+        assert "BC:24:11:0A:01:02" in content
+        assert "PG-Management-esx-01" in content
+        assert "PG-Cluster-esx-01" in content
+        assert "mac_nat" in content
+        assert "mac_hostonly" in content
+
+    def test_mac_map_ssh_auth_pattern(self, provider):
+        """MAC provisioner should use the same SSH auth pattern (key then password)."""
+        content = self._render_with_mac_map(
+            provider,
+            mac_map={"nat": "BC:24:11:0A:01:01"},
+        )
+        assert "BatchMode=yes" in content
+        assert "sshpass" in content

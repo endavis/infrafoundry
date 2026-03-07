@@ -185,3 +185,85 @@ class TestOvfDeploymentValidatorEdgeCases:
         ]
         assert len(node01_checks) > 0
         assert len(node02_checks) > 0
+
+
+class TestOvfDeploymentValidatorMacMap:
+    """Tests for mac_map validation."""
+
+    def test_mac_map_valid(self, validator, report):
+        """Valid mac_map with keys in network_map and correct format should pass."""
+        validator.validate([_make_ovf_deployment(mac_map={"nat": "BC:24:11:0A:01:01"})])
+
+        calls = [c[1] for c in report.add_check.call_args_list]
+        mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
+        assert len(mac_checks) == 1
+        assert mac_checks[0]["passed"] is True
+        assert mac_checks[0]["level"] == ValidationLevel.INFO
+
+    def test_mac_map_keys_not_in_network_map(self, validator, report):
+        """mac_map keys not in network_map should produce an error."""
+        validator.validate([_make_ovf_deployment(mac_map={"unknown_net": "BC:24:11:0A:01:01"})])
+
+        calls = [c[1] for c in report.add_check.call_args_list]
+        key_checks = [c for c in calls if "mac_map_keys" in c["check_name"]]
+        assert len(key_checks) == 1
+        assert key_checks[0]["passed"] is False
+        assert key_checks[0]["level"] == ValidationLevel.ERROR
+        assert "unknown_net" in key_checks[0]["message"]
+
+    def test_mac_map_invalid_format(self, validator, report):
+        """Invalid MAC address format should produce an error."""
+        validator.validate([_make_ovf_deployment(mac_map={"nat": "not-a-mac"})])
+
+        calls = [c[1] for c in report.add_check.call_args_list]
+        format_checks = [c for c in calls if "mac_map_format" in c["check_name"]]
+        assert len(format_checks) == 1
+        assert format_checks[0]["passed"] is False
+        assert format_checks[0]["level"] == ValidationLevel.ERROR
+        assert "not-a-mac" in format_checks[0]["message"]
+
+    def test_mac_map_empty_dict(self, validator, report):
+        """Empty mac_map dict should be treated as no mac_map (no validation)."""
+        validator.validate([_make_ovf_deployment(mac_map={})])
+
+        calls = [c[1] for c in report.add_check.call_args_list]
+        mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
+        assert len(mac_checks) == 0
+
+    def test_no_mac_map(self, validator, report):
+        """Omitting mac_map should pass without mac_map validation."""
+        validator.validate([_make_ovf_deployment()])
+
+        calls = [c[1] for c in report.add_check.call_args_list]
+        mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
+        assert len(mac_checks) == 0
+
+    def test_mac_map_multiple_valid_entries(self, validator, report):
+        """Multiple valid mac_map entries should all pass."""
+        validator.validate(
+            [
+                _make_ovf_deployment(
+                    mac_map={
+                        "nat": "BC:24:11:0A:01:01",
+                        "hostonly": "BC:24:11:0A:01:02",
+                    }
+                )
+            ]
+        )
+
+        calls = [c[1] for c in report.add_check.call_args_list]
+        mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
+        assert len(mac_checks) == 1
+        assert mac_checks[0]["passed"] is True
+        assert "2 mapping(s)" in mac_checks[0]["message"]
+
+    def test_mac_map_lowercase_mac_valid(self, validator, report):
+        """Lowercase MAC addresses should be accepted."""
+        validator.validate([_make_ovf_deployment(mac_map={"nat": "bc:24:11:0a:01:01"})])
+
+        calls = [c[1] for c in report.add_check.call_args_list]
+        format_checks = [c for c in calls if "mac_map_format" in c["check_name"]]
+        assert len(format_checks) == 0
+        mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
+        assert len(mac_checks) == 1
+        assert mac_checks[0]["passed"] is True

@@ -1,9 +1,12 @@
 """OVF deployment validation for ESXi provider."""
 
+import re
 from pathlib import Path
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+
+MAC_ADDRESS_PATTERN = re.compile(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
 
 
 class OvfDeploymentValidator:
@@ -126,3 +129,62 @@ class OvfDeploymentValidator:
                     ),
                     level=ValidationLevel.INFO,
                 )
+
+        # Validate optional: mac_map
+        mac_map = config.get("mac_map")
+        if mac_map and isinstance(mac_map, dict):
+            self._validate_mac_map(resource, mac_map, network_map)
+
+    def _validate_mac_map(
+        self,
+        resource: ResourceConfig,
+        mac_map: dict[str, str],
+        network_map: dict[str, str] | None,
+    ) -> None:
+        """Validate mac_map entries against network_map and MAC address format.
+
+        Args:
+            resource: The OVF deployment resource being validated
+            mac_map: Dict mapping OVF network names to MAC addresses
+            network_map: Dict mapping OVF network names to portgroup names
+        """
+        # Validate keys are a subset of network_map keys
+        network_map_keys = (
+            set(network_map.keys()) if network_map and isinstance(network_map, dict) else set()
+        )
+        invalid_keys = [k for k in mac_map if k not in network_map_keys]
+        if invalid_keys:
+            self.report.add_check(
+                check_name=f"esxi_ovf_deployment_mac_map_keys_{resource.name}",
+                passed=False,
+                message=(
+                    f"OVF deployment '{resource.name}' mac_map has keys not in "
+                    f"network_map: {', '.join(invalid_keys)}"
+                ),
+                level=ValidationLevel.ERROR,
+            )
+
+        # Validate MAC address format
+        invalid_macs = {k: v for k, v in mac_map.items() if not MAC_ADDRESS_PATTERN.match(v)}
+        if invalid_macs:
+            details = ", ".join(f"{k}={v}" for k, v in invalid_macs.items())
+            self.report.add_check(
+                check_name=f"esxi_ovf_deployment_mac_map_format_{resource.name}",
+                passed=False,
+                message=(
+                    f"OVF deployment '{resource.name}' mac_map has invalid MAC "
+                    f"address format (expected XX:XX:XX:XX:XX:XX): {details}"
+                ),
+                level=ValidationLevel.ERROR,
+            )
+
+        if not invalid_keys and not invalid_macs:
+            self.report.add_check(
+                check_name=f"esxi_ovf_deployment_mac_map_{resource.name}",
+                passed=True,
+                message=(
+                    f"OVF deployment '{resource.name}' has valid mac_map "
+                    f"with {len(mac_map)} mapping(s)"
+                ),
+                level=ValidationLevel.INFO,
+            )
