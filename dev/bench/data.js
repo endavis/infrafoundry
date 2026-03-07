@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772874824962,
+  "lastUpdate": 1772876876551,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -527,6 +527,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000027365805467078235",
             "extra": "mean: 151.40008163273575 usec\nrounds: 2450"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0351cb88281e67a054865d552724542f24cc00dd",
+          "message": "fix: change mac_map keys from network names to ethernet adapter names (merges PR #316, addresses #314)\n\nOVFs can have multiple NICs on the same network (e.g., ONTAP has\nethernet0 and ethernet1 both on \"hostonly\"). Using network names as\nmac_map keys couldn't distinguish between them. Now keys are ethernet\nadapter names (ethernet0, ethernet1, etc.) which map directly to VMX\nentries, simplifying the SSH script and supporting all NICs.\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-07T09:47:28Z",
+          "tree_id": "1115f4ff6f219d7bafff8082c6b61bf4c02f54d8",
+          "url": "https://github.com/endavis/infrafoundry/commit/0351cb88281e67a054865d552724542f24cc00dd"
+        },
+        "date": 1772876876129,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7022.714658843161,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008868752417531363",
+            "extra": "mean: 142.39507776964533 usec\nrounds: 2726"
           }
         ]
       }
