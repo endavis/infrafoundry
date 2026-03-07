@@ -50,15 +50,13 @@ resource "terraform_data" "ovf_{{ deployment.name | to_terraform_name }}" {
       DATASTORE=$(echo "$VMX_INFO" | grep "${self.triggers_replace.vm_name}" | sed 's/.*\[\(.*\)\].*/\1/')
       FULL_PATH="/vmfs/volumes/$DATASTORE/$VMX_PATH"
 
-      {% for ovf_net, mac in deployment.config.mac_map.items() %}
-      {% set pg = deployment.config.network_map[ovf_net] %}
-      # Set MAC for {{ ovf_net }} (portgroup: {{ pg }})
-      CMD="IDX=\$(grep -n '{{ pg }}' \"$FULL_PATH\" | head -1 | sed 's/.*ethernet\([0-9]*\).*/\1/'); \
-        sed -i \"s/ethernet\${IDX}.addressType = .*/ethernet\${IDX}.addressType = \\\"static\\\"/\" \"$FULL_PATH\"; \
-        sed -i \"/ethernet\${IDX}.generatedAddress/d\" \"$FULL_PATH\"; \
-        grep -q \"ethernet\${IDX}.address \" \"$FULL_PATH\" && \
-          sed -i \"s/ethernet\${IDX}.address = .*/ethernet\${IDX}.address = \\\"{{ mac }}\\\"/\" \"$FULL_PATH\" || \
-          echo 'ethernet'\"$IDX\"'.address = \"{{ mac }}\"' >> \"$FULL_PATH\""
+      {% for eth_name, mac in deployment.config.mac_map.items() %}
+      # Set MAC for {{ eth_name }}
+      CMD="sed -i 's/{{ eth_name }}.addressType = .*/{{ eth_name }}.addressType = \"static\"/' \"$FULL_PATH\"; \
+        sed -i '/{{ eth_name }}.generatedAddress/d' \"$FULL_PATH\"; \
+        grep -q '{{ eth_name }}.address ' \"$FULL_PATH\" && \
+          sed -i 's/{{ eth_name }}.address = .*/{{ eth_name }}.address = \"{{ mac }}\"/' \"$FULL_PATH\" || \
+          echo '{{ eth_name }}.address = \"{{ mac }}\"' >> \"$FULL_PATH\""
       $SSH_CMD "$CMD" 2>/dev/null || $SSH_CMD_PW "$CMD"
       {% endfor %}
     EOT
