@@ -1,4 +1,5 @@
 {% for deployment in ovf_deployments %}
+{% set has_mac_map = deployment.config.mac_map is defined and deployment.config.mac_map %}
 resource "terraform_data" "ovf_{{ deployment.name | to_terraform_name }}" {
   triggers_replace = {
     vm_name       = "{{ deployment.config.vm_name | default(deployment.name) }}"
@@ -7,6 +8,11 @@ resource "terraform_data" "ovf_{{ deployment.name | to_terraform_name }}" {
     esxi_hostname = var.esxi_hostname_{{ host_alias(deployment.config.host) }}
     esxi_username = var.esxi_username_{{ host_alias(deployment.config.host) }}
     esxi_password = var.esxi_password_{{ host_alias(deployment.config.host) }}
+    {% if has_mac_map %}
+    {% for ovf_net, mac in deployment.config.mac_map.items() %}
+    mac_{{ ovf_net }} = "{{ mac }}"
+    {% endfor %}
+    {% endif %}
   }
 
   provisioner "local-exec" {
@@ -17,7 +23,7 @@ resource "terraform_data" "ovf_{{ deployment.name | to_terraform_name }}" {
         {% endfor %}
         --name="${self.triggers_replace.vm_name}" \
         -dm={{ deployment.config.disk_mode | default("thin") }} -ds="{{ deployment.config.disk_store }}" \
-        {% if deployment.config.power | default("on") == "on" %}
+        {% if not has_mac_map and deployment.config.power | default("on") == "on" %}
         --powerOn \
         {% endif %}
         {% if deployment.config.overwrite | default(false) %}
@@ -30,6 +36,45 @@ resource "terraform_data" "ovf_{{ deployment.name | to_terraform_name }}" {
         "vi://${self.triggers_replace.esxi_username}:$(python3 -c "import urllib.parse; print(urllib.parse.quote('${self.triggers_replace.esxi_password}', safe=''))")@${self.triggers_replace.esxi_hostname}"
     EOT
   }
+
+  {% if has_mac_map %}
+  provisioner "local-exec" {
+    command = <<-EOT
+      SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
+      SSH_CMD="ssh $SSH_OPTS -o BatchMode=yes ${self.triggers_replace.esxi_username}@${self.triggers_replace.esxi_hostname}"
+      SSH_CMD_PW="sshpass -p '${self.triggers_replace.esxi_password}' ssh $SSH_OPTS ${self.triggers_replace.esxi_username}@${self.triggers_replace.esxi_hostname}"
+
+      # Find VMX path from vm inventory
+      VMX_INFO=$($SSH_CMD "vim-cmd vmsvc/getallvms" 2>/dev/null || $SSH_CMD_PW "vim-cmd vmsvc/getallvms")
+      VMX_PATH=$(echo "$VMX_INFO" | grep "${self.triggers_replace.vm_name}" | awk '{print $NF}')
+      DATASTORE=$(echo "$VMX_INFO" | grep "${self.triggers_replace.vm_name}" | sed 's/.*\[\(.*\)\].*/\1/')
+      FULL_PATH="/vmfs/volumes/$DATASTORE/$VMX_PATH"
+
+      {% for ovf_net, mac in deployment.config.mac_map.items() %}
+      {% set pg = deployment.config.network_map[ovf_net] %}
+      # Set MAC for {{ ovf_net }} (portgroup: {{ pg }})
+      CMD="IDX=\$(grep -n '{{ pg }}' \"$FULL_PATH\" | head -1 | sed 's/.*ethernet\([0-9]*\).*/\1/'); \
+        sed -i \"s/ethernet\${IDX}.addressType = .*/ethernet\${IDX}.addressType = \\\"static\\\"/\" \"$FULL_PATH\"; \
+        sed -i \"/ethernet\${IDX}.generatedAddress/d\" \"$FULL_PATH\"; \
+        grep -q \"ethernet\${IDX}.address \" \"$FULL_PATH\" && \
+          sed -i \"s/ethernet\${IDX}.address = .*/ethernet\${IDX}.address = \\\"{{ mac }}\\\"/\" \"$FULL_PATH\" || \
+          echo 'ethernet'\"$IDX\"'.address = \"{{ mac }}\"' >> \"$FULL_PATH\""
+      $SSH_CMD "$CMD" 2>/dev/null || $SSH_CMD_PW "$CMD"
+      {% endfor %}
+    EOT
+  }
+
+  {% if deployment.config.power | default("on") == "on" %}
+  provisioner "local-exec" {
+    command = <<-EOT
+      SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
+      CMD='VMID=$(vim-cmd vmsvc/getallvms | grep "${self.triggers_replace.vm_name}" | awk "{print \$1}"); vim-cmd vmsvc/power.on $VMID'
+      ssh $SSH_OPTS -o BatchMode=yes ${self.triggers_replace.esxi_username}@${self.triggers_replace.esxi_hostname} "$CMD" 2>/dev/null \
+        || sshpass -p "${self.triggers_replace.esxi_password}" ssh $SSH_OPTS ${self.triggers_replace.esxi_username}@${self.triggers_replace.esxi_hostname} "$CMD"
+    EOT
+  }
+  {% endif %}
+  {% endif %}
 
   provisioner "local-exec" {
     when    = destroy
