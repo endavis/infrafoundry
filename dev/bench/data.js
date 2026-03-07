@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772876876551,
+  "lastUpdate": 1772883522014,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -558,6 +558,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008868752417531363",
             "extra": "mean: 142.39507776964533 usec\nrounds: 2726"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "91495383faa47f488e1db75d345564ec01da13f0",
+          "message": "feat: add Unbound DNS host override support to OPNsense provider (merges PR #318, addresses #317)\n\n* feat: add Unbound DNS host override support to OPNsense provider\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* fix: avoid CodeQL false positive for URL substring check in test\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-07T11:38:16Z",
+          "tree_id": "21e101aaddfc55f75a7e2a9866e4c1f8dc714c8e",
+          "url": "https://github.com/endavis/infrafoundry/commit/91495383faa47f488e1db75d345564ec01da13f0"
+        },
+        "date": 1772883521624,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9612.239946393955,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005515654405864584",
+            "extra": "mean: 104.03402386715818 usec\nrounds: 2891"
           }
         ]
       }
