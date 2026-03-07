@@ -32,3 +32,14 @@ output "aliases" {
   ]
 }
 {% endif %}
+
+{% if resources_by_type.get('unbound_host_override') %}
+output "unbound_host_overrides" {
+  description = "Created Unbound DNS host overrides"
+  value = [
+    {% for override in resources_by_type['unbound_host_override'] %}
+    "{{ override.config.hostname }}.{{ override.config.domain }}",
+    {% endfor %}
+  ]
+}
+{% endif %}
