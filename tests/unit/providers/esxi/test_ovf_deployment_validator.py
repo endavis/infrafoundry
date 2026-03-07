@@ -191,8 +191,8 @@ class TestOvfDeploymentValidatorMacMap:
     """Tests for mac_map validation."""
 
     def test_mac_map_valid(self, validator, report):
-        """Valid mac_map with keys in network_map and correct format should pass."""
-        validator.validate([_make_ovf_deployment(mac_map={"nat": "BC:24:11:0A:01:01"})])
+        """Valid mac_map with ethernet names and correct format should pass."""
+        validator.validate([_make_ovf_deployment(mac_map={"ethernet0": "BC:24:11:0A:01:01"})])
 
         calls = [c[1] for c in report.add_check.call_args_list]
         mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
@@ -200,20 +200,20 @@ class TestOvfDeploymentValidatorMacMap:
         assert mac_checks[0]["passed"] is True
         assert mac_checks[0]["level"] == ValidationLevel.INFO
 
-    def test_mac_map_keys_not_in_network_map(self, validator, report):
-        """mac_map keys not in network_map should produce an error."""
-        validator.validate([_make_ovf_deployment(mac_map={"unknown_net": "BC:24:11:0A:01:01"})])
+    def test_mac_map_invalid_ethernet_name(self, validator, report):
+        """mac_map keys not matching ethernetN format should produce an error."""
+        validator.validate([_make_ovf_deployment(mac_map={"not_ethernet": "BC:24:11:0A:01:01"})])
 
         calls = [c[1] for c in report.add_check.call_args_list]
         key_checks = [c for c in calls if "mac_map_keys" in c["check_name"]]
         assert len(key_checks) == 1
         assert key_checks[0]["passed"] is False
         assert key_checks[0]["level"] == ValidationLevel.ERROR
-        assert "unknown_net" in key_checks[0]["message"]
+        assert "not_ethernet" in key_checks[0]["message"]
 
     def test_mac_map_invalid_format(self, validator, report):
         """Invalid MAC address format should produce an error."""
-        validator.validate([_make_ovf_deployment(mac_map={"nat": "not-a-mac"})])
+        validator.validate([_make_ovf_deployment(mac_map={"ethernet0": "not-a-mac"})])
 
         calls = [c[1] for c in report.add_check.call_args_list]
         format_checks = [c for c in calls if "mac_map_format" in c["check_name"]]
@@ -244,8 +244,10 @@ class TestOvfDeploymentValidatorMacMap:
             [
                 _make_ovf_deployment(
                     mac_map={
-                        "nat": "BC:24:11:0A:01:01",
-                        "hostonly": "BC:24:11:0A:01:02",
+                        "ethernet0": "BC:24:11:0A:01:01",
+                        "ethernet1": "BC:24:11:0A:01:02",
+                        "ethernet2": "BC:24:11:0A:01:03",
+                        "ethernet3": "BC:24:11:0A:01:04",
                     }
                 )
             ]
@@ -255,11 +257,11 @@ class TestOvfDeploymentValidatorMacMap:
         mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
         assert len(mac_checks) == 1
         assert mac_checks[0]["passed"] is True
-        assert "2 mapping(s)" in mac_checks[0]["message"]
+        assert "4 mapping(s)" in mac_checks[0]["message"]
 
     def test_mac_map_lowercase_mac_valid(self, validator, report):
         """Lowercase MAC addresses should be accepted."""
-        validator.validate([_make_ovf_deployment(mac_map={"nat": "bc:24:11:0a:01:01"})])
+        validator.validate([_make_ovf_deployment(mac_map={"ethernet0": "bc:24:11:0a:01:01"})])
 
         calls = [c[1] for c in report.add_check.call_args_list]
         format_checks = [c for c in calls if "mac_map_format" in c["check_name"]]
