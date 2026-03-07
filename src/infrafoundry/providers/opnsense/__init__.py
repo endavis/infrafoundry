@@ -80,6 +80,11 @@ class OPNsenseProvider(
         if "kea_reservation" in resources_by_type:
             self._generate_kea_reservation_terraform(resources_by_type["kea_reservation"])
 
+        if "unbound_host_override" in resources_by_type:
+            self._generate_unbound_host_override_terraform(
+                resources_by_type["unbound_host_override"]
+            )
+
         # Batch DHCPv6 subnets and reservations together for optimal performance
         kea_dhcp6_subnets = resources_by_type.get("kea_dhcp6_subnet", [])
         kea_dhcp6_reservations = resources_by_type.get("kea_dhcp6_reservation", [])
@@ -135,6 +140,14 @@ class OPNsenseProvider(
             "opnsense/kea_reservation.tf.j2",
             context={"reservations": reservations},
             output_name="kea_reservation.tf",
+        )
+
+    def _generate_unbound_host_override_terraform(self, overrides: list[ResourceConfig]) -> None:
+        """Generate Terraform for Unbound DNS host overrides."""
+        self.render_and_write_terraform(
+            "opnsense/unbound_host_override.tf.j2",
+            context={"overrides": overrides},
+            output_name="unbound_host_override.tf",
         )
 
     def _generate_kea_dhcp6_resources(
@@ -349,6 +362,7 @@ class OPNsenseProvider(
             "kea_reservation",
             "kea_dhcp6_subnet",
             "kea_dhcp6_reservation",
+            "unbound_host_override",
         ]
 
     @override
@@ -363,6 +377,7 @@ class OPNsenseProvider(
             "kea_reservation": ["kea_subnet"],
             "kea_dhcp6_subnet": ["vlans"],
             "kea_dhcp6_reservation": ["kea_dhcp6_subnet"],
+            "unbound_host_override": [],
         }
 
     @override

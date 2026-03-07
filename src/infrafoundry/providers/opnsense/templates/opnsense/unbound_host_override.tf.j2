@@ -1,0 +1,20 @@
+# Unbound DNS Host Overrides
+{% for override in overrides %}
+
+resource "opnsense_unbound_host_override" "{{ override.name | replace('-', '_') }}" {
+  hostname = "{{ override.config.hostname }}"
+  domain   = "{{ override.config.domain }}"
+
+  {% if override.config.get('server') %}
+  server = "{{ override.config.server }}"
+  {% endif %}
+
+  {% if override.config.get('description') %}
+  description = "{{ override.config.description }}"
+  {% endif %}
+
+  {% if override.config.get('enabled') is not none %}
+  enabled = {{ override.config.enabled | lower }}
+  {% endif %}
+}
+{% endfor %}
