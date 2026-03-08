@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772985413989,
+  "lastUpdate": 1772989895740,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -744,6 +744,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002451619108721127",
             "extra": "mean: 153.5158797654051 usec\nrounds: 2229"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "baa87c938340d7eb13f2f3c6cdb689d07466d1d3",
+          "message": "fix: always grep for unused0 in OVA disk import loop (merges PR #331, addresses #330)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-08T17:11:04Z",
+          "tree_id": "7c587349759747f2b9b0c57e1e848159f84d7341",
+          "url": "https://github.com/endavis/infrafoundry/commit/baa87c938340d7eb13f2f3c6cdb689d07466d1d3"
+        },
+        "date": 1772989894834,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6973.594934336527,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009929914312959382",
+            "extra": "mean: 143.39806217826168 usec\nrounds: 2525"
           }
         ]
       }
