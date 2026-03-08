@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772883522014,
+  "lastUpdate": 1772966547700,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -589,6 +589,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005515654405864584",
             "extra": "mean: 104.03402386715818 usec\nrounds: 2891"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4004341fd28859790c5f062d427133e7f4ce12ef",
+          "message": "fix: resource filter fails for prefixed terraform names (merges PR #319, addresses #304)\n\nfix: resource filter fails for prefixed terraform names and runs unfiltered on no match\n\n- Add suffix matching in _resolve_terraform_targets so prefixed resources\n  (e.g., ovf_ontap_node_01) match filter names (e.g., ontap-node-01)\n- Skip terraform execution when no targets match instead of running\n  unfiltered against all resources\n- Add tests for exact match, prefix/suffix match, no match, and skip behavior\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-08T10:41:58Z",
+          "tree_id": "824047a9cd3d8439c146902f03f2fccfa17ed92d",
+          "url": "https://github.com/endavis/infrafoundry/commit/4004341fd28859790c5f062d427133e7f4ce12ef"
+        },
+        "date": 1772966547252,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6968.359114364535,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008021726086519898",
+            "extra": "mean: 143.5058072622299 usec\nrounds: 2506"
           }
         ]
       }
