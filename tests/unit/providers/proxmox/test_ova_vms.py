@@ -103,6 +103,20 @@ class TestOVADiskImport:
         content = _render_ova_vms(provider, vms)
         assert "${self.triggers_replace.disk_bus}" in content
 
+    def test_unused_disk_always_greps_index_zero(self, provider):
+        """Grep for unused disk should always use unused0, not an incrementing index.
+
+        Proxmox renumbers unused disks when one is attached (unused1 becomes
+        unused0, etc.), so the grep must always look for unused0.
+        """
+        vms = [_make_ova_vm()]
+        content = _render_ova_vms(provider, vms)
+        assert 'grep \\"^unused0:\\"' in content
+        # Ensure no incrementing unused index pattern exists
+        assert "unused${DISK_INDEX}" not in content
+        assert "unused\\${DISK_INDEX}" not in content
+        assert "unused\\$${DISK_INDEX}" not in content
+
 
 class TestOVADiskStorage:
     """Tests for disk storage pool rendering."""
