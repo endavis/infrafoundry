@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772966547700,
+  "lastUpdate": 1772971845554,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -620,6 +620,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008021726086519898",
             "extra": "mean: 143.5058072622299 usec\nrounds: 2506"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "47b078bcddd0f14cc53ea513bce66295ef7793cb",
+          "message": "feat: add OVA-based VM creation support to Proxmox provider (merges PR #323, addresses #322)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-08T12:10:11Z",
+          "tree_id": "93bb48b4a4d3de6aa56ad4cbbfcfe95459c2bbbe",
+          "url": "https://github.com/endavis/infrafoundry/commit/47b078bcddd0f14cc53ea513bce66295ef7793cb"
+        },
+        "date": 1772971844731,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6362.711765703945,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000293952472826778",
+            "extra": "mean: 157.16569236880463 usec\nrounds: 2529"
           }
         ]
       }
