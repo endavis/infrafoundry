@@ -1,0 +1,91 @@
+{% for vm in ova_vms %}
+{% set vm_tf_name = vm.config.name | replace('-', '_') %}
+{% set ssh_target = ssh_hostname if ssh_hostname else vm.config.target_node %}
+# OVA VM: {{ vm.config.name }}
+resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
+  triggers_replace = {
+    vmid       = "{{ vm.config.vmid }}"
+    ova_source = "{{ vm.config.ova_source }}"
+    disk_bus   = "{{ vm.config.disk_bus | default('ide') }}"
+    name       = "{{ vm.config.name }}"
+  }
+
+  # Phase 1: Extract OVA to temp directory on Proxmox host
+  provisioner "local-exec" {
+    command = <<-EOT
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} \
+        "mkdir -p /tmp/ova-${self.triggers_replace.name} && \
+         tar -xf ${self.triggers_replace.ova_source} -C /tmp/ova-${self.triggers_replace.name}"
+    EOT
+  }
+
+  # Phase 2: Create VM shell via qm create
+  provisioner "local-exec" {
+    command = <<-EOT
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} \
+        "qm create ${self.triggers_replace.vmid} \
+          --name ${self.triggers_replace.name} \
+          --memory {{ vm.config.memory | default(2048) }} \
+          --cores {{ vm.config.cores | default(2) }} \
+          --cpu {{ vm.config.cpu_type | default('kvm64') }} \
+          --scsihw virtio-scsi-pci \
+          {% if vm.config.network is defined %}
+          {% for nic in vm.config.network %}
+          --net{{ loop.index0 }} {{ nic.model | default('virtio') }},bridge={{ nic.bridge | default('vmbr0') }}{% if nic.tag is defined %},tag={{ nic.tag }}{% endif %}{% if nic.macaddr is defined %},macaddr={{ nic.macaddr }}{% endif %} \
+          {% endfor %}
+          {% endif %}
+          {% if vm.config.serial | default(false) %}
+          --serial0 socket \
+          {% endif %}
+          --description 'OVA VM managed by InfraFoundry'"
+    EOT
+  }
+
+  # Phase 3: Import and attach disks from extracted OVA
+  provisioner "local-exec" {
+    command = <<-EOT
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} "
+        cd /tmp/ova-${self.triggers_replace.name}
+        DISK_INDEX=0
+        for VMDK in \$(ls -1 *.vmdk 2>/dev/null | sort); do
+          qm disk import ${self.triggers_replace.vmid} \$VMDK {{ vm.config.disk_storage | default('local-lvm') }} --format qcow2
+          DISK_PATH=\$(qm config ${self.triggers_replace.vmid} | grep \"^unused\${DISK_INDEX}:\" | sed 's/^unused[0-9]*: //')
+          qm set ${self.triggers_replace.vmid} --${self.triggers_replace.disk_bus}\${DISK_INDEX} \$DISK_PATH
+          DISK_INDEX=\$((DISK_INDEX + 1))
+        done
+      "
+    EOT
+  }
+
+  # Phase 4: Configure boot order and cleanup temp files
+  provisioner "local-exec" {
+    command = <<-EOT
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} "
+        {% if vm.config.boot_order is defined %}
+        qm set ${self.triggers_replace.vmid} --boot order={{ vm.config.boot_order | join(';') }}
+        {% else %}
+        qm set ${self.triggers_replace.vmid} --boot order=${self.triggers_replace.disk_bus}0
+        {% endif %}
+        {% if vm.config.onboot | default(false) %}
+        qm set ${self.triggers_replace.vmid} --onboot 1
+        {% endif %}
+        {% if vm.config.tags is defined %}
+        qm set ${self.triggers_replace.vmid} --tags {{ vm.config.tags | join(',') }}
+        {% endif %}
+        rm -rf /tmp/ova-${self.triggers_replace.name}
+      "
+    EOT
+  }
+
+  # Destroy provisioner: stop and purge the VM
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} \
+        "qm stop ${self.triggers_replace.vmid} 2>/dev/null; \
+         qm destroy ${self.triggers_replace.vmid} --purge"
+    EOT
+  }
+}
+
+{% endfor %}
