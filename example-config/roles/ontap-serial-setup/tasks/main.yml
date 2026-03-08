@@ -1,0 +1,70 @@
+---
+# ONTAP Serial Setup — Tasks
+#
+# Assigns a unique serial number and system ID to an ONTAP Simulator
+# node at the LOADER prompt via Proxmox `qm terminal`.
+#
+# This role runs on a Proxmox host and uses `ansible.builtin.expect`
+# to interact with the VM serial console.
+#
+# Requirements:
+#   - pexpect Python library on the Proxmox host
+#   - VM must be at the LOADER> prompt (first boot or halted)
+#
+# Variables:
+#   ontap_vmid: VM ID on the Proxmox host
+#   ontap_serial_number: Unique serial number to assign
+#   ontap_sysid: Unique system ID to assign
+
+- name: Start VM if not running
+  ansible.builtin.command:
+    cmd: "qm start {{ ontap_vmid }}"
+  register: vm_start
+  failed_when: vm_start.rc != 0 and 'already running' not in vm_start.stderr
+  changed_when: vm_start.rc == 0
+
+- name: Wait for VM to reach LOADER prompt
+  ansible.builtin.expect:
+    command: "qm terminal {{ ontap_vmid }}"
+    responses:
+      "LOADER-.*>":
+        - ""
+    timeout: "{{ ontap_loader_timeout }}"
+  register: loader_wait
+
+- name: Set serial number at LOADER prompt
+  ansible.builtin.expect:
+    command: "qm terminal {{ ontap_vmid }}"
+    responses:
+      "LOADER-.*>":
+        - "setenv SYS_SERIAL_NUM {{ ontap_serial_number }}"
+    timeout: 30
+  register: serial_set
+
+- name: Set system ID at LOADER prompt
+  ansible.builtin.expect:
+    command: "qm terminal {{ ontap_vmid }}"
+    responses:
+      "LOADER-.*>":
+        - "setenv bootarg.nvram.sysid {{ ontap_sysid }}"
+    timeout: 30
+  register: sysid_set
+
+- name: Boot the node from LOADER prompt
+  ansible.builtin.expect:
+    command: "qm terminal {{ ontap_vmid }}"
+    responses:
+      "LOADER-.*>":
+        - "boot_ontap"
+    timeout: 30
+  register: boot_cmd
+
+- name: Wait for ONTAP boot to complete
+  ansible.builtin.expect:
+    command: "qm terminal {{ ontap_vmid }}"
+    responses:
+      "Press Ctrl-C for Boot Menu":
+        - ""
+    timeout: "{{ ontap_boot_timeout }}"
+  register: boot_wait
+  ignore_errors: true

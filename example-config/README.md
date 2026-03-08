@@ -20,6 +20,10 @@ This repository contains your infrastructure configurations, environment definit
 │   │   ├── age.key          # Age encryption key (DO NOT COMMIT)
 │   │   ├── settings.yaml    # Environment definition + provider credentials (SOPS encrypted)
 │   │   ├── proxmox/         # Proxmox resources (YAML, not encrypted)
+│   │   │   ├── vms.yaml           # Standard VMs (clone, ISO boot)
+│   │   │   ├── ova_vms.yaml       # OVA-based VMs (ONTAP Simulator)
+│   │   │   ├── ontap-lab-playbook.yml   # ONTAP post-deploy automation
+│   │   │   └── ontap-lab-inventory.yml  # ONTAP lab Ansible inventory
 │   │   ├── opnsense/        # OPNsense resources (YAML, not encrypted)
 │   │   └── kubernetes/      # Kubernetes resources (YAML, not encrypted)
 │   ├── staging/             # Staging environment
@@ -28,6 +32,13 @@ This repository contains your infrastructure configurations, environment definit
 │   └── prod/                # Production environment
 │       ├── age.key          # Production encryption key (DO NOT COMMIT)
 │       └── settings.yaml    # Production environment + credentials (SOPS encrypted)
+├── roles/                   # Ansible roles for post-deploy automation
+│   ├── ontap-serial-setup/  # Assign unique serial/sysid to ONTAP nodes
+│   ├── ontap-cluster-setup/ # Create/join ONTAP cluster via serial console
+│   ├── ontap-post-cluster/  # Configure ONTAP via REST API (netapp.ontap)
+│   ├── k3s-server/          # Install k3s control plane
+│   ├── k3s-agent/           # Install k3s worker node
+│   └── tailscale-exit-node/ # Configure Tailscale exit node
 ├── .sops.yaml               # SOPS configuration (in config repo root)
 ├── .gitignore               # Ignore age.key files and generated files
 ├── .envrc.local.example     # Example environment variables
