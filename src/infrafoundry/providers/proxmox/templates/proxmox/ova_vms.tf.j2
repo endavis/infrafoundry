@@ -52,8 +52,8 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
         DISK_INDEX=0
         for VMDK in \$(ls -1 *.vmdk 2>/dev/null | sort); do
           qm disk import ${self.triggers_replace.vmid} \$VMDK {{ vm.config.disk_storage | default('local-lvm') }} --format qcow2
-          DISK_PATH=\$(qm config ${self.triggers_replace.vmid} | grep \"^unused\${DISK_INDEX}:\" | sed 's/^unused[0-9]*: //')
-          qm set ${self.triggers_replace.vmid} --${self.triggers_replace.disk_bus}\${DISK_INDEX} \$DISK_PATH
+          DISK_PATH=\$(qm config ${self.triggers_replace.vmid} | grep \"^unused\$${DISK_INDEX}:\" | sed 's/^unused[0-9]*: //')
+          qm set ${self.triggers_replace.vmid} --${self.triggers_replace.disk_bus}\$${DISK_INDEX} \$DISK_PATH
           DISK_INDEX=\$((DISK_INDEX + 1))
         done
       "
