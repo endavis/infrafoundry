@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772989895740,
+  "lastUpdate": 1772992868242,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -775,6 +775,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009929914312959382",
             "extra": "mean: 143.39806217826168 usec\nrounds: 2525"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e73ef52ac35dfce4af73bf801b2a934f1139ca08",
+          "message": "fix: use per-VM target_node as SSH target for OVA VMs (merges PR #333, addresses #332)\n\nfix: use per-VM target_node as SSH target instead of global ssh_hostname\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-08T18:00:38Z",
+          "tree_id": "275811b50408b9d2d6794144a3f92b6b82543979",
+          "url": "https://github.com/endavis/infrafoundry/commit/e73ef52ac35dfce4af73bf801b2a934f1139ca08"
+        },
+        "date": 1772992867778,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6923.583395798379,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009955849689672389",
+            "extra": "mean: 144.433878070546 usec\nrounds: 2239"
           }
         ]
       }
