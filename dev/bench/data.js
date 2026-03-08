@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772971845554,
+  "lastUpdate": 1772982958030,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -651,6 +651,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000293952472826778",
             "extra": "mean: 157.16569236880463 usec\nrounds: 2529"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fa803a6e71689e20c6ba60cd2cb943b8ebcb946a",
+          "message": "feat: add example config and Ansible roles for Proxmox ONTAP Simulator cluster (merges PR #324, addresses #283)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-08T15:15:29Z",
+          "tree_id": "8129e4f182bd4f8a4f2b9955874214a11507476b",
+          "url": "https://github.com/endavis/infrafoundry/commit/fa803a6e71689e20c6ba60cd2cb943b8ebcb946a"
+        },
+        "date": 1772982957568,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7033.456116353524,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009225457585909492",
+            "extra": "mean: 142.17761274928483 usec\nrounds: 2306"
           }
         ]
       }
