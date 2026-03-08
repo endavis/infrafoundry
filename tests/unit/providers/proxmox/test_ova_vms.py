@@ -348,3 +348,23 @@ class TestOVATriggers:
         vms = [_make_ova_vm(name="my-vm")]
         content = _render_ova_vms(provider, vms)
         assert 'name       = "my-vm"' in content
+
+    def test_triggers_include_ssh_fields(self, provider):
+        """Triggers should include ssh_cmd, ssh_user, and ssh_target for destroy provisioner."""
+        vms = [_make_ova_vm()]
+        content = _render_ova_vms(provider, vms)
+        assert "ssh_cmd    = local.ssh_cmd" in content
+        assert "ssh_user   = var.proxmox_ssh_user" in content
+        assert 'ssh_target = "10.0.0.1"' in content
+
+    def test_destroy_uses_self_ssh_references(self, provider):
+        """Destroy provisioner must use self.triggers_replace for SSH, not local/var."""
+        vms = [_make_ova_vm()]
+        content = _render_ova_vms(provider, vms)
+        # Find the destroy provisioner section
+        destroy_idx = content.find("when    = destroy")
+        assert destroy_idx != -1
+        destroy_section = content[destroy_idx:]
+        assert "${self.triggers_replace.ssh_cmd}" in destroy_section
+        assert "${self.triggers_replace.ssh_user}" in destroy_section
+        assert "${self.triggers_replace.ssh_target}" in destroy_section
