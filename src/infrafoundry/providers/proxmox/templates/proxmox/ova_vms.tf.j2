@@ -8,6 +8,9 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
     ova_source = "{{ vm.config.ova_source }}"
     disk_bus   = "{{ vm.config.disk_bus | default('ide') }}"
     name       = "{{ vm.config.name }}"
+    ssh_cmd    = local.ssh_cmd
+    ssh_user   = var.proxmox_ssh_user
+    ssh_target = "{{ ssh_target }}"
   }
 
   # Phase 1: Extract OVA to temp directory on Proxmox host
@@ -81,7 +84,7 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
   provisioner "local-exec" {
     when    = destroy
     command = <<-EOT
-      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} \
+      ${self.triggers_replace.ssh_cmd} ${self.triggers_replace.ssh_user}@${self.triggers_replace.ssh_target} \
         "qm stop ${self.triggers_replace.vmid} 2>/dev/null; \
          qm destroy ${self.triggers_replace.vmid} --purge"
     EOT
