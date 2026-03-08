@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772982958030,
+  "lastUpdate": 1772985101038,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -682,6 +682,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009225457585909492",
             "extra": "mean: 142.17761274928483 usec\nrounds: 2306"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bea8c4d7b2051ac223dff0aad55080c865578f46",
+          "message": "fix: use self references in OVA VM destroy provisioner (merges PR #326, addresses #325)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-08T15:51:16Z",
+          "tree_id": "a452763771bbdbfb7c008e565f73920a4f543ca1",
+          "url": "https://github.com/endavis/infrafoundry/commit/bea8c4d7b2051ac223dff0aad55080c865578f46"
+        },
+        "date": 1772985100636,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8729.074976578215,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000024409311632981335",
+            "extra": "mean: 114.55967587438441 usec\nrounds: 2715"
           }
         ]
       }
