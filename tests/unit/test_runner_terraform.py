@@ -126,3 +126,62 @@ def test_parse_plan_for_drift_detects_changes(runner: TerraformRunner) -> None:
     assert result["to_change"] == 2
     assert result["to_destroy"] == 0
     assert "add" in result["summary"]
+
+
+class TestResolveTargets:
+    """Tests for _resolve_terraform_targets."""
+
+    def test_exact_match(self, runner: TerraformRunner, tmp_path: Path) -> None:
+        """Exact resource name matches."""
+        tf_file = tmp_path / "main.tf"
+        tf_file.write_text('resource "esxi_guest" "my_vm" {\n}\n')
+        targets = runner._resolve_terraform_targets(tmp_path, ["my-vm"])
+        assert targets == ["esxi_guest.my_vm"]
+
+    def test_prefix_suffix_match(self, runner: TerraformRunner, tmp_path: Path) -> None:
+        """Resource with prefix matches via suffix (e.g., ovf_ontap_node_01)."""
+        tf_file = tmp_path / "ovf.tf"
+        tf_file.write_text('resource "terraform_data" "ovf_ontap_node_01" {\n}\n')
+        targets = runner._resolve_terraform_targets(tmp_path, ["ontap-node-01"])
+        assert targets == ["terraform_data.ovf_ontap_node_01"]
+
+    def test_no_match_returns_empty(self, runner: TerraformRunner, tmp_path: Path) -> None:
+        """Unmatched filter returns empty list."""
+        tf_file = tmp_path / "main.tf"
+        tf_file.write_text('resource "esxi_guest" "other_vm" {\n}\n')
+        targets = runner._resolve_terraform_targets(tmp_path, ["my-vm"])
+        assert targets == []
+
+    def test_no_false_suffix_match(self, runner: TerraformRunner, tmp_path: Path) -> None:
+        """Suffix match requires underscore separator (no partial matches)."""
+        tf_file = tmp_path / "main.tf"
+        tf_file.write_text('resource "esxi_guest" "bigontap_node_01" {\n}\n')
+        targets = runner._resolve_terraform_targets(tmp_path, ["node-01"])
+        assert targets == ["esxi_guest.bigontap_node_01"]
+
+    def test_multiple_resources_matched(self, runner: TerraformRunner, tmp_path: Path) -> None:
+        """Multiple resources can match from different files."""
+        (tmp_path / "a.tf").write_text('resource "terraform_data" "ovf_node_01" {\n}\n')
+        (tmp_path / "b.tf").write_text('resource "terraform_data" "ovf_node_02" {\n}\n')
+        targets = runner._resolve_terraform_targets(tmp_path, ["node-01", "node-02"])
+        assert sorted(targets) == [
+            "terraform_data.ovf_node_01",
+            "terraform_data.ovf_node_02",
+        ]
+
+    def test_unmatched_filter_skips_terraform(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        """When no targets match, terraform is skipped instead of running unfiltered."""
+        (provider.terraform_dir / "main.tf").write_text('resource "esxi_guest" "other_vm" {\n}\n')
+        (provider.terraform_dir / ".terraform").mkdir()
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+            result = runner.apply(provider, auto_approve=True, target_resources=["no-match"])
+
+        assert result["success"]
+        # subprocess.run should NOT have been called (no init, no apply)
+        mock_run.assert_not_called()
