@@ -256,6 +256,12 @@ class TerraformRunner(BaseRunner):
         # Add -target flags for resource filtering
         if target_resources:
             targets = self._resolve_terraform_targets(tf_dir, target_resources)
+            if not targets:
+                self.console.print(
+                    f"[yellow]Warning: No terraform resources matched filter: "
+                    f"{target_resources} — skipping[/yellow]"
+                )
+                return {"exit_code": 0, "success": True, "output": "", "error": ""}
             for target in targets:
                 cmd.extend(["-target", target])
 
@@ -307,7 +313,11 @@ class TerraformRunner(BaseRunner):
                     if match:
                         resource_type = match.group(1)
                         resource_name = match.group(2)
-                        if resource_name in tf_names:
+                        # Exact match or suffix match for prefixed resources
+                        # (e.g., "ovf_ontap_node_01" matches "ontap_node_01")
+                        if resource_name in tf_names or any(
+                            resource_name.endswith(f"_{tf_name}") for tf_name in tf_names
+                        ):
                             targets.append(f"{resource_type}.{resource_name}")
 
         return targets
