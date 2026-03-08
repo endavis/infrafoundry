@@ -48,9 +48,7 @@ def _make_regular_vm(name: str = "regular-vm", **config_overrides) -> ResourceCo
 def _render_ova_vms(provider: ProxmoxProvider, vms: list[ResourceConfig]) -> str:
     """Normalize OVA VM configs and render through the ova_vms template."""
     processed = [provider._normalize_vm_config(vm) for vm in vms]
-    return provider.render_template(
-        "proxmox/ova_vms.tf.j2", {"ova_vms": processed, "ssh_hostname": "10.0.0.1"}
-    )
+    return provider.render_template("proxmox/ova_vms.tf.j2", {"ova_vms": processed})
 
 
 class TestOVAExtraction:
@@ -291,11 +289,25 @@ class TestOVADefaults:
         content = _render_ova_vms(provider, vms)
         assert "order=sata0;ide2" in content
 
-    def test_ssh_hostname_renders(self, provider):
-        """SSH hostname should render in SSH commands."""
-        vms = [_make_ova_vm()]
+    def test_target_node_used_as_ssh_target(self, provider):
+        """Each VM's target_node should be used as SSH target, not a global ssh_hostname."""
+        vms = [_make_ova_vm(target_node="pve02")]
         content = _render_ova_vms(provider, vms)
-        assert "10.0.0.1" in content
+        assert "pve02" in content
+
+    def test_multiple_vms_use_own_target_nodes(self, provider):
+        """Each VM should SSH to its own target_node, not a shared host."""
+        vms = [
+            _make_ova_vm(name="vm-a", vmid=900, target_node="pve01"),
+            _make_ova_vm(name="vm-b", vmid=901, target_node="pve02"),
+        ]
+        content = _render_ova_vms(provider, vms)
+        # Split by resource blocks to check each VM targets its own node
+        blocks = content.split("# OVA VM:")
+        vm_a_block = next(b for b in blocks if "vm-a" in b)
+        vm_b_block = next(b for b in blocks if "vm-b" in b)
+        assert 'ssh_target = "pve01"' in vm_a_block
+        assert 'ssh_target = "pve02"' in vm_b_block
 
 
 class TestOVAVMRouting:
@@ -369,7 +381,7 @@ class TestOVATriggers:
         content = _render_ova_vms(provider, vms)
         assert "ssh_cmd    = local.ssh_cmd" in content
         assert "ssh_user   = var.proxmox_ssh_user" in content
-        assert 'ssh_target = "10.0.0.1"' in content
+        assert 'ssh_target = "pve01"' in content
 
     def test_destroy_uses_self_ssh_references(self, provider):
         """Destroy provisioner must use self.triggers_replace for SSH, not local/var."""

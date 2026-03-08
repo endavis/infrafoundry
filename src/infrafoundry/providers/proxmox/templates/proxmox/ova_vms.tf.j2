@@ -1,6 +1,6 @@
 {% for vm in ova_vms %}
 {% set vm_tf_name = vm.config.name | replace('-', '_') %}
-{% set ssh_target = ssh_hostname if ssh_hostname else vm.config.target_node %}
+{% set ssh_target = vm.config.target_node %}
 # OVA VM: {{ vm.config.name }}
 resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
   triggers_replace = {

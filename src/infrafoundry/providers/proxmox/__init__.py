@@ -130,30 +130,15 @@ class ProxmoxProvider(
 
         Uses terraform_data resources with SSH-based local-exec provisioners to
         extract OVA files, import VMDK disks, and configure VMs via qm commands.
+        Each VM's target_node is used as the SSH target since qm commands must
+        run on the node where the VM will be created.
 
         Args:
             ova_vms: List of OVA VM resource configs (must have ova_source).
         """
-        from urllib.parse import urlparse
-
-        from infrafoundry.core.config import ConfigManager
-
-        # Extract SSH hostname from API URL (same pattern as _generate_templates_terraform)
-        ssh_hostname = None
-        if self._current_environment:
-            config_manager = ConfigManager(self.config_dir)
-            try:
-                env_config = config_manager.load_environment(self._current_environment)
-                provider_settings = env_config.get_provider_settings("proxmox")
-                if provider_settings and "api_url" in provider_settings:
-                    parsed = urlparse(provider_settings["api_url"])
-                    ssh_hostname = parsed.hostname
-            except FileNotFoundError:
-                pass
-
         self.render_and_write_terraform(
             "proxmox/ova_vms.tf.j2",
-            context={"ova_vms": ova_vms, "ssh_hostname": ssh_hostname},
+            context={"ova_vms": ova_vms},
             output_name="ova_vms.tf",
         )
 
