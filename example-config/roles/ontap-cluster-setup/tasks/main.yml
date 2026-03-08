@@ -1,0 +1,138 @@
+---
+# ONTAP Cluster Setup — Tasks
+#
+# Creates a new ONTAP cluster on the first node or joins an existing
+# cluster on subsequent nodes via Proxmox `qm terminal`.
+#
+# This role runs on Proxmox hosts and uses `ansible.builtin.expect`
+# to interact with the ONTAP cluster setup wizard through the VM
+# serial console.
+#
+# Requirements:
+#   - pexpect Python library on the Proxmox host
+#   - ONTAP node must be booted and at the cluster setup wizard
+#
+# Variables:
+#   ontap_vmid: VM ID on the Proxmox host
+#   ontap_cluster_create: true to create cluster, false to join
+#   ontap_cluster_name: Name for the new cluster
+#   ontap_cluster_mgmt_ip: Cluster management IP
+#   ontap_password: Admin password
+
+- name: Create new cluster (first node)
+  when: ontap_cluster_create | bool
+  block:
+    - name: Wait for cluster setup wizard prompt
+      ansible.builtin.expect:
+        command: "qm terminal {{ ontap_vmid }}"
+        responses:
+          "Type yes to confirm and continue":
+            - "yes"
+        timeout: "{{ ontap_setup_timeout }}"
+
+    - name: Enter admin password
+      ansible.builtin.expect:
+        command: "qm terminal {{ ontap_vmid }}"
+        responses:
+          "Enter the password for.*admin":
+            - "{{ ontap_password }}"
+          "Retype the password":
+            - "{{ ontap_password }}"
+        timeout: 60
+
+    - name: Configure cluster — create new cluster
+      ansible.builtin.expect:
+        command: "qm terminal {{ ontap_vmid }}"
+        responses:
+          "Do you want to create a new cluster or join an existing":
+            - "create"
+          "Do you intend for this node to be used as a single node cluster":
+            - "no"
+          "Enter the cluster name":
+            - "{{ ontap_cluster_name }}"
+          "Enter the cluster management interface port":
+            - "e0a"
+          "Enter the cluster management interface IP address":
+            - "{{ ontap_cluster_mgmt_ip }}"
+          "Enter the cluster management interface netmask":
+            - "{{ ontap_cluster_mgmt_mask }}"
+          "Enter the cluster management interface default gateway":
+            - "{{ ontap_cluster_mgmt_gateway }}"
+          "Enter the DNS domain name":
+            - "lab.local"
+          "Enter the name server IP address":
+            - "{{ ontap_cluster_mgmt_gateway }}"
+          "Enter the node management interface port.*e0a":
+            - "e0a"
+          "Enter the node management interface IP address":
+            - "{{ ontap_node_mgmt_ip }}"
+          "Enter the node management interface netmask":
+            - "{{ ontap_node_mgmt_mask }}"
+          "Enter the node management interface default gateway":
+            - "{{ ontap_node_mgmt_gateway }}"
+          "Where is the controller located":
+            - ""
+        timeout: "{{ ontap_setup_timeout }}"
+
+    - name: Wait for cluster setup to complete
+      ansible.builtin.expect:
+        command: "qm terminal {{ ontap_vmid }}"
+        responses:
+          "Cluster setup is complete":
+            - ""
+          "login:":
+            - ""
+        timeout: "{{ ontap_setup_timeout }}"
+      register: cluster_complete
+
+- name: Join existing cluster (additional nodes)
+  when: not (ontap_cluster_create | bool)
+  block:
+    - name: Wait for cluster setup wizard prompt
+      ansible.builtin.expect:
+        command: "qm terminal {{ ontap_vmid }}"
+        responses:
+          "Type yes to confirm and continue":
+            - "yes"
+        timeout: "{{ ontap_setup_timeout }}"
+
+    - name: Enter admin password
+      ansible.builtin.expect:
+        command: "qm terminal {{ ontap_vmid }}"
+        responses:
+          "Enter the password for.*admin":
+            - "{{ ontap_password }}"
+          "Retype the password":
+            - "{{ ontap_password }}"
+        timeout: 60
+
+    - name: Configure node — join existing cluster
+      ansible.builtin.expect:
+        command: "qm terminal {{ ontap_vmid }}"
+        responses:
+          "Do you want to create a new cluster or join an existing":
+            - "join"
+          "Enter the IP address of the cluster you want to join":
+            - "{{ ontap_cluster_join_ip }}"
+          "Enter the node management interface port.*e0a":
+            - "e0a"
+          "Enter the node management interface IP address":
+            - "{{ ontap_node_mgmt_ip }}"
+          "Enter the node management interface netmask":
+            - "{{ ontap_node_mgmt_mask }}"
+          "Enter the node management interface default gateway":
+            - "{{ ontap_node_mgmt_gateway }}"
+          "Where is the controller located":
+            - ""
+        timeout: "{{ ontap_join_timeout }}"
+
+    - name: Wait for cluster join to complete
+      ansible.builtin.expect:
+        command: "qm terminal {{ ontap_vmid }}"
+        responses:
+          "Cluster setup is complete":
+            - ""
+          "login:":
+            - ""
+        timeout: "{{ ontap_join_timeout }}"
+      register: join_complete

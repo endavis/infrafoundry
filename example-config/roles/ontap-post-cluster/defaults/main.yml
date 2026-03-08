@@ -1,0 +1,78 @@
+---
+# ONTAP Post-Cluster Setup — Default Variables
+#
+# These variables configure the ONTAP cluster after it has been
+# created and all nodes have joined. Uses netapp.ontap modules
+# via the ONTAP REST API.
+
+# Cluster management endpoint
+ontap_cluster_mgmt_ip: "192.168.1.220"
+ontap_admin_user: "admin"
+ontap_admin_password: "changeme123"
+
+# Set to true to validate SSL certificates
+ontap_validate_certs: false
+
+# ONTAP feature licenses (comma-separated license keys)
+# Leave empty to skip license installation
+ontap_licenses: []
+# Example:
+# ontap_licenses:
+#   - "AAAAAAAAAAAAAAAA"
+#   - "BBBBBBBBBBBBBBBB"
+
+# Disk assignment — assign all unowned disks
+ontap_assign_disks: true
+
+# Aggregate configuration
+ontap_aggregates:
+  - name: aggr1_node01
+    node: "ontap-node-01"
+    disk_count: 5
+    raid_type: raid_dp
+  - name: aggr1_node02
+    node: "ontap-node-02"
+    disk_count: 5
+    raid_type: raid_dp
+
+# Storage Virtual Machine (SVM) configuration
+ontap_svms:
+  - name: svm_data
+    root_volume: svm_data_root
+    root_volume_aggregate: aggr1_node01
+    allowed_protocols:
+      - nfs
+      - cifs
+      - iscsi
+
+# Data LIF configuration
+ontap_lifs:
+  - name: svm_data_lif1
+    vserver: svm_data
+    role: data
+    protocol: nfs
+    home_node: "ontap-node-01"
+    home_port: e0d
+    address: "192.168.1.230"
+    netmask: "255.255.255.0"
+
+  - name: svm_data_lif2
+    vserver: svm_data
+    role: data
+    protocol: nfs
+    home_node: "ontap-node-02"
+    home_port: e0d
+    address: "192.168.1.231"
+    netmask: "255.255.255.0"
+
+# DNS configuration for the SVM
+ontap_dns:
+  - vserver: svm_data
+    domains:
+      - lab.local
+    nameservers:
+      - "192.168.1.1"
+
+# NTP server configuration
+ontap_ntp_servers:
+  - "192.168.1.1"

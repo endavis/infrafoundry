@@ -1,0 +1,24 @@
+---
+# ONTAP Serial Setup — Default Variables
+#
+# These variables control the serial number and system ID assignment
+# for ONTAP Simulator nodes via the LOADER prompt.
+
+# Proxmox VM ID of the ONTAP node to configure
+ontap_vmid: 221
+
+# Unique serial number to assign to the node
+# Each node in a cluster must have a distinct serial number.
+# Format: 8-digit numeric string
+ontap_serial_number: "4082368-50-7"
+
+# Unique system ID to assign to the node
+# Each node in a cluster must have a distinct sysid.
+# Format: numeric string
+ontap_sysid: "4082368507"
+
+# Timeout (seconds) to wait for the LOADER prompt
+ontap_loader_timeout: 120
+
+# Timeout (seconds) to wait for boot completion
+ontap_boot_timeout: 600

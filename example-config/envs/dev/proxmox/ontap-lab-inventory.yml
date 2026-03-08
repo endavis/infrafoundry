@@ -1,0 +1,31 @@
+---
+# ONTAP Simulator Lab — Ansible Inventory
+#
+# Defines Proxmox hosts for serial console automation and the
+# ONTAP cluster management endpoint for API-based configuration.
+#
+# Replace placeholder IPs with your actual Proxmox host addresses
+# and desired ONTAP cluster management IP.
+
+all:
+  children:
+    # Proxmox hosts running the ONTAP Simulator VMs
+    # Used by ontap-serial-setup and ontap-cluster-setup roles
+    proxmox_hosts:
+      hosts:
+        pve1:
+          ansible_host: "192.168.1.10"
+          ansible_user: root
+          ontap_vmid: 220
+        pve2:
+          ansible_host: "192.168.1.11"
+          ansible_user: root
+          ontap_vmid: 221
+
+    # ONTAP cluster management endpoint
+    # Used by ontap-post-cluster role (connects via REST API, not SSH)
+    ontap_cluster:
+      hosts:
+        ontap-cluster:
+          ansible_host: "192.168.1.220"
+          ansible_connection: local
