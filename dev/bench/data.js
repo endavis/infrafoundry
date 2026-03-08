@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772985101038,
+  "lastUpdate": 1772985413989,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -713,6 +713,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000024409311632981335",
             "extra": "mean: 114.55967587438441 usec\nrounds: 2715"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "542af1873f57e92f4ee2083774f64b8c3f78c0ec",
+          "message": "fix: escape shell variables in OVA VM disk import loop for Terraform (merges PR #328, addresses #327)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-08T15:56:26Z",
+          "tree_id": "cce9f930d9afe2e7f7af1bd4953c28d862e8552e",
+          "url": "https://github.com/endavis/infrafoundry/commit/542af1873f57e92f4ee2083774f64b8c3f78c0ec"
+        },
+        "date": 1772985413703,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6513.984100720704,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002451619108721127",
+            "extra": "mean: 153.5158797654051 usec\nrounds: 2229"
           }
         ]
       }
