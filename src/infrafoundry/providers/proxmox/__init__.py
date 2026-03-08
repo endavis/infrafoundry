@@ -99,18 +99,62 @@ class ProxmoxProvider(
         self.render_outputs_terraform(resources_by_type)
 
     def _generate_vms_terraform(self, vms: list[ResourceConfig]) -> None:
-        """Generate Terraform for Proxmox VMs."""
-        # Process VMs to merge cloud-init snippets and normalize config
-        processed_vms = []
+        """Generate Terraform for Proxmox VMs.
+
+        Partitions VMs into regular VMs (using bpg/proxmox provider) and OVA VMs
+        (using terraform_data with SSH-based qm commands). Regular VMs get cloud-init
+        processing; OVA VMs get network normalization only.
+        """
+        regular_vms = []
+        ova_vms = []
         for vm in vms:
-            processed_vm = self._process_cloud_init_snippets(vm)
-            processed_vm = self._normalize_vm_config(processed_vm)
-            processed_vms.append(processed_vm)
+            if "ova_source" in vm.config:
+                ova_vms.append(self._normalize_vm_config(vm))
+            else:
+                processed = self._process_cloud_init_snippets(vm)
+                processed = self._normalize_vm_config(processed)
+                regular_vms.append(processed)
+
+        if regular_vms:
+            self.render_and_write_terraform(
+                "proxmox/vms.tf.j2",
+                context={"vms": regular_vms},
+                output_name="vms.tf",
+            )
+
+        if ova_vms:
+            self._generate_ova_vms_terraform(ova_vms)
+
+    def _generate_ova_vms_terraform(self, ova_vms: list[ResourceConfig]) -> None:
+        """Generate Terraform for OVA-based Proxmox VMs.
+
+        Uses terraform_data resources with SSH-based local-exec provisioners to
+        extract OVA files, import VMDK disks, and configure VMs via qm commands.
+
+        Args:
+            ova_vms: List of OVA VM resource configs (must have ova_source).
+        """
+        from urllib.parse import urlparse
+
+        from infrafoundry.core.config import ConfigManager
+
+        # Extract SSH hostname from API URL (same pattern as _generate_templates_terraform)
+        ssh_hostname = None
+        if self._current_environment:
+            config_manager = ConfigManager(self.config_dir)
+            try:
+                env_config = config_manager.load_environment(self._current_environment)
+                provider_settings = env_config.get_provider_settings("proxmox")
+                if provider_settings and "api_url" in provider_settings:
+                    parsed = urlparse(provider_settings["api_url"])
+                    ssh_hostname = parsed.hostname
+            except FileNotFoundError:
+                pass
 
         self.render_and_write_terraform(
-            "proxmox/vms.tf.j2",
-            context={"vms": processed_vms},
-            output_name="vms.tf",
+            "proxmox/ova_vms.tf.j2",
+            context={"ova_vms": ova_vms, "ssh_hostname": ssh_hostname},
+            output_name="ova_vms.tf",
         )
 
     def _generate_containers_terraform(self, containers: list[ResourceConfig]) -> None:
