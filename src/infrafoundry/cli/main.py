@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.events import EventManager
 from infrafoundry.core.orchestrator import Orchestrator, OrchestratorStrictConfig
 
 # Load environment variables
@@ -76,9 +77,13 @@ def _get_orchestrator(
     else:
         config_manager = ConfigManager()
 
+    # Create event manager with config repo path for script handler resolution
+    event_manager = EventManager(config_base_dir=config_repo.resolve()) if config_repo else None
+
     # Create orchestrator (SecretManager is created per-operation now)
     orchestrator = Orchestrator(
         config_manager,
+        event_manager=event_manager,
         strict_config=strict_config,
         policy_dir=config_repo / "policies" if config_repo else None,
     )
