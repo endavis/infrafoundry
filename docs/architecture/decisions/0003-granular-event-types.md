@@ -26,6 +26,10 @@ We will define **19 granular event types** in the `EventType` enum, covering eve
 - **Noise:** Subscribing to "all" events generates a lot of data.
 - **Maintenance:** Adding a new workflow step requires adding new event types to maintain consistency.
 
+## Related Issues
+
+- [#336](https://github.com/endavis/infrafoundry/issues/336) — Wire events config in settings.yaml to UnifiedEventBus
+
 ## Alternatives Considered
 - **Generic Events (`LOG_INFO`, `LOG_ERROR`):** Rejected because it makes programmatic reaction (e.g., "trigger webhook on failure") difficult to parse.
 - **Only Workflow-Level Events:** Rejected because we need resource-level granularity for audit trails.

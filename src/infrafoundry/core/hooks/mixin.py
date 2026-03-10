@@ -13,6 +13,7 @@ from infrafoundry.core.hooks.manager import HookExecutionError, HookManager
 
 if TYPE_CHECKING:
     from infrafoundry.core.config.models import EnvironmentConfig
+    from infrafoundry.core.events.bus import UnifiedEventBus
     from infrafoundry.core.provider import ResourceConfig
 
 
@@ -46,6 +47,7 @@ class HookExecutionMixin:
     # Type hints for mixin - these are provided by the class using this mixin
     _hook_manager: HookManager | None
     console: Console
+    event_manager: "UnifiedEventBus"
 
     def _execute_env_hooks(
         self,
@@ -72,6 +74,21 @@ class HookExecutionMixin:
         except HookExecutionError as e:
             self.console.print(f"[red]Hook failed: {e}[/red]")
             raise
+
+    def _load_event_config(self, env_config: "EnvironmentConfig | None") -> None:
+        """Register event handlers from environment configuration.
+
+        Clears existing config-based handlers before loading to prevent
+        duplicate registrations across repeated workflow calls.
+
+        Args:
+            env_config: Environment configuration containing event handler definitions
+        """
+        if not env_config or not env_config.events:
+            return
+
+        self.event_manager.clear_handlers()
+        self.event_manager.load_config(env_config.events)
 
     def _execute_resource_hooks(
         self,

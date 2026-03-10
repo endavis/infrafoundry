@@ -45,6 +45,23 @@ Runner events are emitted in all three workflows (plan, apply, destroy) around e
 
 The `EventContext` includes `provider` and `runner` fields, and the `data` dict carries a `RunnerEventData` payload with `provider`, `runner`, and optionally `success` or `error`.
 
+### Configuring Event Handlers in settings.yaml
+
+Event handlers are configured in your environment's `settings.yaml` under the `events:` key. The key is the event type name and the value is a list of handler configurations. Handlers are loaded at the start of each workflow (plan, apply, destroy).
+
+```yaml
+# envs/<env>/settings.yaml
+events:
+  RUNNER_COMPLETED:
+    - type: script
+      name: "ontap-setup"
+      script: scripts/ontap-post-terraform.sh
+      timeout: 600
+  DRIFT_DETECTED:
+    - type: webhook
+      url: "https://hooks.slack.com/..."
+```
+
 **ScriptHandler** exposes the runner name as `INFRAFOUNDRY_RUNNER` environment variable, allowing scripts to filter by runner type:
 
 | Variable | Set When |
