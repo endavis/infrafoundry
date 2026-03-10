@@ -321,11 +321,16 @@ def test_plan_emits_runner_starting_and_completed(console):
 
     assert len(starting_calls) == 1
     assert len(completed_calls) == 1
-    assert starting_calls[0][0][2] == {"provider": "proxmox", "runner": "terraform"}
+    assert starting_calls[0][0][2] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "phase": "plan",
+    }
     assert starting_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
     assert completed_calls[0][0][2] == {
         "provider": "proxmox",
         "runner": "terraform",
+        "phase": "plan",
         "success": True,
     }
 
@@ -388,11 +393,16 @@ def test_destroy_emits_runner_starting_and_completed(console):
 
     assert len(starting_calls) == 1
     assert len(completed_calls) == 1
-    assert starting_calls[0][0][2] == {"provider": "proxmox", "runner": "terraform"}
+    assert starting_calls[0][0][2] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "phase": "destroy",
+    }
     assert starting_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
     assert completed_calls[0][0][2] == {
         "provider": "proxmox",
         "runner": "terraform",
+        "phase": "destroy",
         "success": True,
     }
 

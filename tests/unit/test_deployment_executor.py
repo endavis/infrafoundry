@@ -646,12 +646,17 @@ def test_apply_emits_runner_starting_and_completed():
     assert len(completed_calls) == 1
 
     # Verify data and kwargs
-    assert starting_calls[0][0][2] == {"provider": "proxmox", "runner": "terraform"}
+    assert starting_calls[0][0][2] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "phase": "apply",
+    }
     assert starting_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
 
     assert completed_calls[0][0][2] == {
         "provider": "proxmox",
         "runner": "terraform",
+        "phase": "apply",
         "success": True,
     }
     assert completed_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
@@ -722,6 +727,7 @@ def test_apply_emits_runner_failed_on_exception():
     assert failed_calls[0][0][2] == {
         "provider": "proxmox",
         "runner": "terraform",
+        "phase": "apply",
         "error": "terraform crashed",
     }
     assert failed_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}

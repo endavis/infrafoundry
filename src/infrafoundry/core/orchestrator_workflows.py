@@ -443,6 +443,7 @@ class PlanOrchestrator(HookExecutionMixin):
                             starting_event: RunnerEventData = {
                                 "provider": provider_name,
                                 "runner": tool_name,
+                                "phase": "plan",
                             }
                             self.event_manager.emit_event(
                                 EventType.RUNNER_STARTING,
@@ -463,6 +464,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                 completed_event: RunnerEventData = {
                                     "provider": provider_name,
                                     "runner": tool_name,
+                                    "phase": "plan",
                                     "success": True,
                                 }
                                 self.event_manager.emit_event(
@@ -476,6 +478,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                 failed_event: RunnerEventData = {
                                     "provider": provider_name,
                                     "runner": tool_name,
+                                    "phase": "plan",
                                     "error": str(exc),
                                 }
                                 self.event_manager.emit_event(
@@ -1002,6 +1005,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                     starting_event: RunnerEventData = {
                         "provider": provider_name,
                         "runner": tool_name,
+                        "phase": "destroy",
                     }
                     self.event_manager.emit_event(
                         EventType.RUNNER_STARTING,
@@ -1022,6 +1026,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                         completed_event: RunnerEventData = {
                             "provider": provider_name,
                             "runner": tool_name,
+                            "phase": "destroy",
                             "success": True,
                         }
                         self.event_manager.emit_event(
@@ -1035,6 +1040,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                         failed_event: RunnerEventData = {
                             "provider": provider_name,
                             "runner": tool_name,
+                            "phase": "destroy",
                             "error": str(exc),
                         }
                         self.event_manager.emit_event(

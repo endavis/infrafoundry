@@ -71,6 +71,7 @@ events:
 | `INFRAFOUNDRY_PROVIDER` | `context.provider` is set |
 | `INFRAFOUNDRY_RESOURCE` | `context.resource` is set |
 | `INFRAFOUNDRY_RUNNER` | `context.runner` is set |
+| `INFRAFOUNDRY_PHASE` | `data.phase` is set (`plan`, `apply`, or `destroy`) |
 | `INFRAFOUNDRY_CONFIG_DIR` | Always |
 | `INFRAFOUNDRY_DEPLOYMENT_ID` | `context.deployment_id` is set |
 
@@ -87,7 +88,7 @@ events:
 ```bash
 #!/bin/bash
 # scripts/post-terraform.sh
-if [ "$INFRAFOUNDRY_RUNNER" = "terraform" ] && [ "$INFRAFOUNDRY_PROVIDER" = "proxmox" ]; then
+if [ "$INFRAFOUNDRY_RUNNER" = "terraform" ] && [ "$INFRAFOUNDRY_PROVIDER" = "proxmox" ] && [ "${INFRAFOUNDRY_PHASE:-}" = "apply" ]; then
     ansible-playbook -i inventory.yml site.yml
 fi
 ```
