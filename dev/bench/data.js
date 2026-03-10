@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772992868242,
+  "lastUpdate": 1773159644299,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -806,6 +806,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009955849689672389",
             "extra": "mean: 144.433878070546 usec\nrounds: 2239"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f80a7dd220a951c65ea003a86c143ffd7bdb131d",
+          "message": "feat: emit runner lifecycle events in deployment executor (merges PR #335, addresses #334)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-10T16:19:51Z",
+          "tree_id": "735229e00db38ae1512c74a09a8f137cc71fb785",
+          "url": "https://github.com/endavis/infrafoundry/commit/f80a7dd220a951c65ea003a86c143ffd7bdb131d"
+        },
+        "date": 1773159643210,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7032.703596678645,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008183851706549252",
+            "extra": "mean: 142.1928261660669 usec\nrounds: 2744"
           }
         ]
       }
