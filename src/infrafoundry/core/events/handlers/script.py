@@ -26,6 +26,7 @@ class ScriptHandler(BaseHandler):
         INFRAFOUNDRY_EVENT: Event type
         INFRAFOUNDRY_PROVIDER: Provider name (if applicable)
         INFRAFOUNDRY_RESOURCE: Resource name (if applicable)
+        INFRAFOUNDRY_RUNNER: Runner name (if applicable, e.g., "terraform")
         INFRAFOUNDRY_CONFIG_DIR: Path to environment config directory
 
     Example config:
@@ -182,6 +183,9 @@ class ScriptHandler(BaseHandler):
 
         if context.resource:
             env["INFRAFOUNDRY_RESOURCE"] = context.resource
+
+        if context.runner:
+            env["INFRAFOUNDRY_RUNNER"] = context.runner
 
         if context.deployment_id:
             env["INFRAFOUNDRY_DEPLOYMENT_ID"] = str(context.deployment_id)

@@ -264,6 +264,138 @@ def test_status_orchestrator_marks_unregistered_provider(console):
     assert "Not registered" in rows[0][2]
 
 
+def test_plan_emits_runner_starting_and_completed(console):
+    """Runner events are emitted around each runner.plan() call."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 10
+    event_manager = MagicMock()
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.plan = MagicMock(return_value={"success": True})
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    runner_registry.create_runner.return_value = tf_runner
+
+    provider = MagicMock()
+    provider.generate_terraform = MagicMock()
+    providers = {"proxmox": provider}
+
+    def load_resources(env: str):
+        res = [_resource("vm1")]
+        return res, {"proxmox": res}
+
+    orchestrator = PlanOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
+            ProviderResourceBatch("proxmox", resources_by_provider["proxmox"], 1)
+        ],
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+    )
+
+    orchestrator.plan(env_name="dev", dry_run=False, resource_filter=None, enforce_policies=False)
+
+    starting_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_STARTING
+    ]
+    completed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_COMPLETED
+    ]
+
+    assert len(starting_calls) == 1
+    assert len(completed_calls) == 1
+    assert starting_calls[0][0][2] == {"provider": "proxmox", "runner": "terraform"}
+    assert starting_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+    assert completed_calls[0][0][2] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "success": True,
+    }
+
+
+def test_destroy_emits_runner_starting_and_completed(console):
+    """Runner events are emitted around each runner.destroy() call."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 20
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.destroy = MagicMock(return_value={"success": True})
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    runners = {"terraform": tf_runner}
+
+    provider = MagicMock()
+    providers = {"proxmox": provider}
+
+    def load_resources(env: str):
+        res = [_resource("vm1")]
+        return res, {"proxmox": res}
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
+            ProviderResourceBatch("proxmox", resources_by_provider["proxmox"], 1)
+        ],
+        get_current_user=lambda: "tester",
+    )
+    # Inject runners directly for the destroy loop
+    orchestrator.runners = runners
+
+    orchestrator.destroy(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        confirm_callback=lambda: True,
+    )
+
+    starting_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_STARTING
+    ]
+    completed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_COMPLETED
+    ]
+
+    assert len(starting_calls) == 1
+    assert len(completed_calls) == 1
+    assert starting_calls[0][0][2] == {"provider": "proxmox", "runner": "terraform"}
+    assert starting_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+    assert completed_calls[0][0][2] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "success": True,
+    }
+
+
 def test_drift_orchestrator_sets_providers():
     """DriftOrchestrator injects providers before detection."""
     drift_detector = MagicMock()

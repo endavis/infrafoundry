@@ -144,6 +144,15 @@ class DeploymentEventData(TypedDict, total=False):
     error: str | None
 
 
+class RunnerEventData(TypedDict, total=False):
+    """Event payload for runner lifecycle events."""
+
+    provider: str
+    runner: str
+    success: bool
+    error: str | None
+
+
 class RollbackResourceSnapshot(TypedDict):
     """Snapshot of a single resource for rollback purposes."""
 
@@ -181,5 +190,6 @@ __all__ = [
     "RollbackData",
     "RollbackDeploymentMetadata",
     "RollbackResourceSnapshot",
+    "RunnerEventData",
     "SSHConfigData",
 ]
