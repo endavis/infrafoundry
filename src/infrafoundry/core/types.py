@@ -149,6 +149,7 @@ class RunnerEventData(TypedDict, total=False):
 
     provider: str
     runner: str
+    phase: str
     success: bool
     error: str | None
 

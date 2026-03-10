@@ -27,6 +27,7 @@ class ScriptHandler(BaseHandler):
         INFRAFOUNDRY_PROVIDER: Provider name (if applicable)
         INFRAFOUNDRY_RESOURCE: Resource name (if applicable)
         INFRAFOUNDRY_RUNNER: Runner name (if applicable, e.g., "terraform")
+        INFRAFOUNDRY_PHASE: Workflow phase (if applicable, e.g., "plan", "apply", "destroy")
         INFRAFOUNDRY_CONFIG_DIR: Path to environment config directory
 
     Example config:
@@ -186,6 +187,9 @@ class ScriptHandler(BaseHandler):
 
         if context.runner:
             env["INFRAFOUNDRY_RUNNER"] = context.runner
+
+        if phase := context.data.get("phase"):
+            env["INFRAFOUNDRY_PHASE"] = str(phase)
 
         if context.deployment_id:
             env["INFRAFOUNDRY_DEPLOYMENT_ID"] = str(context.deployment_id)
