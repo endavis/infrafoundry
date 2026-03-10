@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773159644299,
+  "lastUpdate": 1773163821995,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -837,6 +837,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008183851706549252",
             "extra": "mean: 142.1928261660669 usec\nrounds: 2744"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4f956fe16c4298ae32be984dd7099c2d3b339eb2",
+          "message": "feat: wire events config to UnifiedEventBus (merges PR #337, addresses #336)\n\nfeat: wire events config in settings.yaml to UnifiedEventBus\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-10T17:29:50Z",
+          "tree_id": "34ccfaf55a2da33e0f6ec4d9d4b152202042a4fe",
+          "url": "https://github.com/endavis/infrafoundry/commit/4f956fe16c4298ae32be984dd7099c2d3b339eb2"
+        },
+        "date": 1773163821421,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6997.442438820977,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007798303163798977",
+            "extra": "mean: 142.90935706053386 usec\nrounds: 2599"
           }
         ]
       }
