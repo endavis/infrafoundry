@@ -337,6 +337,7 @@ class DeploymentExecutor:
             starting_event: RunnerEventData = {
                 "provider": provider_name,
                 "runner": tool_name,
+                "phase": "apply",
             }
             self.event_manager.emit_event(
                 EventType.RUNNER_STARTING,
@@ -359,6 +360,7 @@ class DeploymentExecutor:
                 completed_event: RunnerEventData = {
                     "provider": provider_name,
                     "runner": tool_name,
+                    "phase": "apply",
                     "success": run_result.get("success", True),
                 }
                 self.event_manager.emit_event(
@@ -372,6 +374,7 @@ class DeploymentExecutor:
                 failed_event: RunnerEventData = {
                     "provider": provider_name,
                     "runner": tool_name,
+                    "phase": "apply",
                     "error": str(exc),
                 }
                 self.event_manager.emit_event(
