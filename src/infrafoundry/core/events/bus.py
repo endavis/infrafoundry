@@ -9,6 +9,8 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+from rich.console import Console
+
 from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.events.context import Event, EventContext, EventResult
 from infrafoundry.core.events.handlers.base import BaseHandler
@@ -89,16 +91,19 @@ class UnifiedEventBus(BaseManager):
         self,
         config_base_dir: Path | None = None,
         secret_resolver: Callable[[str, str], str] | None = None,
+        console: Console | None = None,
     ) -> None:
         """Initialize the event bus.
 
         Args:
             config_base_dir: Base directory for config (for script handlers)
             secret_resolver: Function to resolve secrets (env_name, secret_path) -> value
+            console: Rich console for user-facing output
         """
         super().__init__()
         self.config_base_dir = config_base_dir or Path.cwd()
         self.secret_resolver = secret_resolver
+        self.console = console or Console()
 
         # Handlers by event type
         self._handlers: dict[EventType, list[BaseHandler]] = defaultdict(list)
@@ -226,6 +231,7 @@ class UnifiedEventBus(BaseManager):
         for handler in self._handlers[event_type]:
             result = self._execute_handler(handler, context, results)
             results.append(result)
+            self._print_handler_result(handler, result)
 
             # Check for abort
             if result.abort and abort_on_failure and event_type in ABORTABLE_EVENTS:
@@ -303,6 +309,34 @@ class UnifiedEventBus(BaseManager):
                 reason=f"Handler error: {e}",
                 handler_name=handler.name,
             )
+
+    def _print_handler_result(
+        self,
+        handler: BaseHandler,
+        result: EventResult,
+    ) -> None:
+        """Print handler execution result to console.
+
+        Args:
+            handler: The handler that was executed
+            result: The result from the handler
+        """
+        name = handler.name
+        if result.success:
+            self.console.print(f"  [green]✓[/green] Event handler [bold]{name}[/bold] completed")
+            if result.stdout:
+                for line in result.stdout.strip().splitlines():
+                    self.console.print(f"    {line}")
+        else:
+            self.console.print(
+                f"  [red]✗[/red] Event handler [bold]{name}[/bold] failed: {result.reason}"
+            )
+            if result.stderr:
+                for line in result.stderr.strip().splitlines():
+                    self.console.print(f"    [red]{line}[/red]")
+            if result.stdout:
+                for line in result.stdout.strip().splitlines():
+                    self.console.print(f"    {line}")
 
     def _invoke_callback(
         self,
