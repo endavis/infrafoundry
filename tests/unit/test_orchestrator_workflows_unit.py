@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from rich.console import Console
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.events import EventType
 from infrafoundry.core.orchestrator_workflows import (
     ApplyOrchestrator,
@@ -407,3 +408,176 @@ def test_drift_orchestrator_sets_providers():
 
     assert result == {"drift": False}
     assert drift_detector.providers == providers
+
+
+def _make_env_config_with_events(events: dict | None = None) -> EnvironmentConfig:
+    """Create an EnvironmentConfig with optional events dict."""
+    return EnvironmentConfig(
+        name="dev",
+        events=events or {},
+    )
+
+
+def test_plan_loads_event_config(console):
+    """PlanOrchestrator calls load_config when events are present."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 100
+    event_manager = MagicMock()
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    providers = {"proxmox": MagicMock()}
+
+    events_cfg = {"RUNNER_COMPLETED": [{"type": "script", "name": "post", "script": "s.sh"}]}
+    env_config = _make_env_config_with_events(events_cfg)
+
+    orchestrator = PlanOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: ([_resource("vm1")], {"proxmox": [_resource("vm1")]}),
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+        load_environment=lambda _: env_config,
+    )
+
+    orchestrator.plan(env_name="dev", dry_run=True, resource_filter=None, enforce_policies=False)
+
+    event_manager.clear_handlers.assert_called_once()
+    event_manager.load_config.assert_called_once_with(events_cfg)
+
+
+def test_plan_skips_event_config_when_empty(console):
+    """PlanOrchestrator does not call load_config when events is empty."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 101
+    event_manager = MagicMock()
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    providers = {"proxmox": MagicMock()}
+
+    env_config = _make_env_config_with_events({})
+
+    orchestrator = PlanOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: ([_resource("vm1")], {"proxmox": [_resource("vm1")]}),
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+        load_environment=lambda _: env_config,
+    )
+
+    orchestrator.plan(env_name="dev", dry_run=True, resource_filter=None, enforce_policies=False)
+
+    event_manager.clear_handlers.assert_not_called()
+    event_manager.load_config.assert_not_called()
+
+
+def test_apply_loads_event_config(console):
+    """ApplyOrchestrator calls load_config when events are present."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 102
+    event_manager = MagicMock()
+
+    events_cfg = {"RUNNER_COMPLETED": [{"type": "script", "name": "post", "script": "s.sh"}]}
+    env_config = _make_env_config_with_events(events_cfg)
+
+    apply_serial = MagicMock(return_value={"proxmox": {"success": True}})
+
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        lambda env: ([_resource("vm1")], {"proxmox": [_resource("vm1")]}),
+        apply_serial=apply_serial,
+        apply_parallel=MagicMock(),
+        get_current_user=lambda: "tester",
+        load_environment=lambda _: env_config,
+    )
+
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+    )
+
+    event_manager.clear_handlers.assert_called_once()
+    event_manager.load_config.assert_called_once_with(events_cfg)
+
+
+def test_destroy_loads_event_config(console):
+    """DestroyOrchestrator calls load_config when events are present."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 103
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    providers = {"proxmox": MagicMock()}
+
+    events_cfg = {"RUNNER_COMPLETED": [{"type": "script", "name": "post", "script": "s.sh"}]}
+    env_config = _make_env_config_with_events(events_cfg)
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: ([], {"proxmox": []}),
+        iter_provider_batches=lambda rbp, filt, rev, env: [ProviderResourceBatch("proxmox", [], 0)],
+        get_current_user=lambda: "tester",
+        load_environment=lambda _: env_config,
+    )
+
+    orchestrator.destroy(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        confirm_callback=lambda: True,
+    )
+
+    event_manager.clear_handlers.assert_called_once()
+    event_manager.load_config.assert_called_once_with(events_cfg)
+
+
+def test_environment_config_parses_events():
+    """EnvironmentConfig accepts events dict from settings data."""
+    config = EnvironmentConfig(
+        name="test",
+        events={
+            "RUNNER_COMPLETED": [
+                {"type": "script", "name": "ontap-setup", "script": "scripts/post.sh"}
+            ]
+        },
+    )
+    assert "RUNNER_COMPLETED" in config.events
+    assert config.events["RUNNER_COMPLETED"][0]["type"] == "script"
+
+
+def test_environment_config_default_empty_events():
+    """EnvironmentConfig defaults to empty dict for events."""
+    config = EnvironmentConfig(name="test")
+    assert config.events == {}

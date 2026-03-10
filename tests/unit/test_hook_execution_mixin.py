@@ -16,10 +16,14 @@ class MockOrchestrator(HookExecutionMixin):
     """Mock orchestrator class for testing the mixin."""
 
     def __init__(
-        self, console: Console | None = None, hook_manager: HookManager | None = None
+        self,
+        console: Console | None = None,
+        hook_manager: HookManager | None = None,
+        event_manager: MagicMock | None = None,
     ) -> None:
         self.console = console or MagicMock(spec=Console)
         self._hook_manager = hook_manager
+        self.event_manager = event_manager or MagicMock()
 
 
 @pytest.fixture
@@ -188,3 +192,45 @@ class TestOrchestratorIntegration:
         assert hasattr(DestroyOrchestrator, "_execute_env_hooks")
         assert hasattr(DestroyOrchestrator, "_execute_resource_hooks")
         assert issubclass(DestroyOrchestrator, HookExecutionMixin)
+
+
+@pytest.mark.unit
+class TestLoadEventConfig:
+    """Tests for _load_event_config in HookExecutionMixin."""
+
+    def test_load_event_config_with_events(self, mock_console):
+        """Test _load_event_config calls clear_handlers and load_config."""
+        event_manager = MagicMock()
+        orchestrator = MockOrchestrator(console=mock_console, event_manager=event_manager)
+        events = {
+            "RUNNER_COMPLETED": [{"type": "script", "name": "post-tf", "script": "scripts/post.sh"}]
+        }
+        env_config = MagicMock(spec=EnvironmentConfig)
+        env_config.events = events
+
+        orchestrator._load_event_config(env_config)
+
+        event_manager.clear_handlers.assert_called_once()
+        event_manager.load_config.assert_called_once_with(events)
+
+    def test_load_event_config_empty_events(self, mock_console):
+        """Test _load_event_config skips when events dict is empty."""
+        event_manager = MagicMock()
+        orchestrator = MockOrchestrator(console=mock_console, event_manager=event_manager)
+        env_config = MagicMock(spec=EnvironmentConfig)
+        env_config.events = {}
+
+        orchestrator._load_event_config(env_config)
+
+        event_manager.clear_handlers.assert_not_called()
+        event_manager.load_config.assert_not_called()
+
+    def test_load_event_config_none_env_config(self, mock_console):
+        """Test _load_event_config skips when env_config is None."""
+        event_manager = MagicMock()
+        orchestrator = MockOrchestrator(console=mock_console, event_manager=event_manager)
+
+        orchestrator._load_event_config(None)
+
+        event_manager.clear_handlers.assert_not_called()
+        event_manager.load_config.assert_not_called()

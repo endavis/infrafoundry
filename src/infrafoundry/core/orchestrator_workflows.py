@@ -366,8 +366,9 @@ class PlanOrchestrator(HookExecutionMixin):
         results: dict[str, Any] = {}
         runner_priorities = self._get_runner_priorities(env_name)
 
-        # Load environment config for hooks
+        # Load environment config for hooks and event handlers
         env_config = self._load_environment(env_name) if self._load_environment else None
+        self._load_event_config(env_config)
 
         try:
             self._print_header("Planning", env_name, resource_filter, style="bold cyan")
@@ -756,8 +757,9 @@ class ApplyOrchestrator(HookExecutionMixin):
 
         results: dict[str, Any] = {}
 
-        # Load environment config for hooks
+        # Load environment config for hooks and event handlers
         env_config = self._load_environment(env_name) if self._load_environment else None
+        self._load_event_config(env_config)
 
         try:
             self._print_header("Applying", env_name, resource_filter, "bold green")
@@ -923,8 +925,9 @@ class DestroyOrchestrator(HookExecutionMixin):
 
         results: dict[str, Any] = {}
 
-        # Load environment config for hooks
+        # Load environment config for hooks and event handlers
         env_config = self._load_environment(env_name) if self._load_environment else None
+        self._load_event_config(env_config)
 
         try:
             self._print_header("Destroying", env_name, resource_filter, "bold red")
