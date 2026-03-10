@@ -355,6 +355,16 @@ class UnifiedEventBus(BaseManager):
                 except ValueError as e:
                     self._log_error(f"Failed to register handler: {e}")
 
+    def clear_handlers(self) -> None:
+        """Remove all registered handlers (not legacy callbacks).
+
+        Use this before re-loading config-based handlers to prevent
+        duplicate registrations across repeated workflow calls.
+        """
+        handler_count = sum(len(h) for h in self._handlers.values())
+        self._handlers.clear()
+        self._log_debug(f"Cleared {handler_count} config handlers")
+
     def clear(self) -> None:
         """Clear all handlers and callbacks."""
         handler_count = self.handler_count()

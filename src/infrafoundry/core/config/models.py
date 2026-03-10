@@ -97,6 +97,8 @@ class EnvironmentConfig(BaseModel):
     drift_remediation: DriftRemediationConfig | None = None
     # Lifecycle hooks for environment-level script execution
     hooks: HooksConfig | None = None
+    # Event handlers registered from settings.yaml (event_type -> handler configs)
+    events: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
     # Notification channels for this environment
     notifications: NotificationsConfig | None = None
     # Infrastructure as Code tool selection (terraform or opentofu)
