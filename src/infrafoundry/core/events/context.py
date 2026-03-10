@@ -5,10 +5,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from infrafoundry.core.events.types import EventType
-from infrafoundry.core.types import DeploymentEventData, ResourceEventData
+from infrafoundry.core.types import DeploymentEventData, ResourceEventData, RunnerEventData
 
 # Backward compatibility type aliases from legacy EventManager
-type EventPayload = ResourceEventData | DeploymentEventData | dict[str, Any]
+type EventPayload = ResourceEventData | DeploymentEventData | RunnerEventData | dict[str, Any]
 
 
 @dataclass

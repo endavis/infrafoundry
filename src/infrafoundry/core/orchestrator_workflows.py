@@ -30,6 +30,7 @@ from infrafoundry.core.types import (
     PlanDeploymentMetadata,
     RollbackData,
     RollbackDeploymentMetadata,
+    RunnerEventData,
 )
 from infrafoundry.core.validation import ValidationReport
 
@@ -437,12 +438,53 @@ class PlanOrchestrator(HookExecutionMixin):
                             )
                             generate_method(generate_resources)
                             self.console.print(f"  [dim]Running {tool_name} plan...[/dim]")
-                            # Pass resource filter as target names for terraform
-                            runner_result = runner.plan(
-                                provider,
-                                target_resources=resource_filter if resource_filter else None,
+
+                            starting_event: RunnerEventData = {
+                                "provider": provider_name,
+                                "runner": tool_name,
+                            }
+                            self.event_manager.emit_event(
+                                EventType.RUNNER_STARTING,
+                                env_name,
+                                starting_event,
+                                provider=provider_name,
+                                runner=tool_name,
                             )
-                            provider_results[f"{tool_name}_plan"] = runner_result
+
+                            try:
+                                # Pass resource filter as target names for terraform
+                                runner_result = runner.plan(
+                                    provider,
+                                    target_resources=resource_filter if resource_filter else None,
+                                )
+                                provider_results[f"{tool_name}_plan"] = runner_result
+
+                                completed_event: RunnerEventData = {
+                                    "provider": provider_name,
+                                    "runner": tool_name,
+                                    "success": True,
+                                }
+                                self.event_manager.emit_event(
+                                    EventType.RUNNER_COMPLETED,
+                                    env_name,
+                                    completed_event,
+                                    provider=provider_name,
+                                    runner=tool_name,
+                                )
+                            except Exception as exc:
+                                failed_event: RunnerEventData = {
+                                    "provider": provider_name,
+                                    "runner": tool_name,
+                                    "error": str(exc),
+                                }
+                                self.event_manager.emit_event(
+                                    EventType.RUNNER_FAILED,
+                                    env_name,
+                                    failed_event,
+                                    provider=provider_name,
+                                    runner=tool_name,
+                                )
+                                raise
                         else:
                             self.console.print(
                                 f"  [dim]Skipping {tool_name} for {provider_name}: "
@@ -953,12 +995,53 @@ class DestroyOrchestrator(HookExecutionMixin):
                         continue
 
                     self.console.print(f"  [dim]Running {tool_name} destroy...[/dim]")
-                    runner_result = runner.destroy(
-                        provider,
-                        auto_approve=auto_approve,
-                        target_resources=resource_filter if resource_filter else None,
+
+                    starting_event: RunnerEventData = {
+                        "provider": provider_name,
+                        "runner": tool_name,
+                    }
+                    self.event_manager.emit_event(
+                        EventType.RUNNER_STARTING,
+                        env_name,
+                        starting_event,
+                        provider=provider_name,
+                        runner=tool_name,
                     )
-                    provider_results[tool_name] = runner_result
+
+                    try:
+                        runner_result = runner.destroy(
+                            provider,
+                            auto_approve=auto_approve,
+                            target_resources=resource_filter if resource_filter else None,
+                        )
+                        provider_results[tool_name] = runner_result
+
+                        completed_event: RunnerEventData = {
+                            "provider": provider_name,
+                            "runner": tool_name,
+                            "success": True,
+                        }
+                        self.event_manager.emit_event(
+                            EventType.RUNNER_COMPLETED,
+                            env_name,
+                            completed_event,
+                            provider=provider_name,
+                            runner=tool_name,
+                        )
+                    except Exception as exc:
+                        failed_event: RunnerEventData = {
+                            "provider": provider_name,
+                            "runner": tool_name,
+                            "error": str(exc),
+                        }
+                        self.event_manager.emit_event(
+                            EventType.RUNNER_FAILED,
+                            env_name,
+                            failed_event,
+                            provider=provider_name,
+                            runner=tool_name,
+                        )
+                        raise
 
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)
 
