@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773163821995,
+  "lastUpdate": 1773170182245,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -868,6 +868,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007798303163798977",
             "extra": "mean: 142.90935706053386 usec\nrounds: 2599"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e7d6fbb3a92d388087423249eb3150e261d4d91d",
+          "message": "fix: show event handler output and resolve scripts from config repo (merges PR #339, addresses #338)\n\n- Pass config_base_dir to EventManager in CLI so ScriptHandler resolves\n  scripts relative to the config repo, not the framework CWD\n- Add _print_handler_result() to UnifiedEventBus that prints handler\n  results (success/failure with stdout/stderr) to the Rich console\n- Add console parameter to UnifiedEventBus.__init__()\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-10T19:15:51Z",
+          "tree_id": "84932fcaa5c8a1aee55440c2edd2165adc941583",
+          "url": "https://github.com/endavis/infrafoundry/commit/e7d6fbb3a92d388087423249eb3150e261d4d91d"
+        },
+        "date": 1773170181732,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6917.279365575925,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001036360000748939",
+            "extra": "mean: 144.5655072103252 usec\nrounds: 2011"
           }
         ]
       }
