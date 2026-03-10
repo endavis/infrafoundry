@@ -590,3 +590,146 @@ def test_get_sorted_runners_filters_inactive_iac_tool():
     assert "opentofu" in names
     assert "terraform" not in names
     assert "ansible" in names
+
+
+def test_apply_emits_runner_starting_and_completed():
+    """Runner events are emitted around each runner.apply() call."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.apply = MagicMock(return_value={"success": True})
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={})
+
+    runner_registry.create_runner.return_value = tf_runner
+
+    state_manager = MagicMock()
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    provider = MagicMock()
+    providers = {"proxmox": provider}
+    resources = [_resource("vm1")]
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+    )
+
+    executor.apply_single_provider(
+        env_name="dev",
+        deployment_id=1,
+        provider_name="proxmox",
+        provider=provider,
+        resources=resources,
+        auto_approve=True,
+    )
+
+    # Extract runner event calls
+    starting_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_STARTING
+    ]
+    completed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_COMPLETED
+    ]
+
+    assert len(starting_calls) == 1
+    assert len(completed_calls) == 1
+
+    # Verify data and kwargs
+    assert starting_calls[0][0][2] == {"provider": "proxmox", "runner": "terraform"}
+    assert starting_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+
+    assert completed_calls[0][0][2] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "success": True,
+    }
+    assert completed_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+
+    # Verify ordering: STARTING before apply, COMPLETED after
+    all_call_types = [call[0][0] for call in event_manager.emit_event.call_args_list]
+    starting_idx = all_call_types.index(EventType.RUNNER_STARTING)
+    completed_idx = all_call_types.index(EventType.RUNNER_COMPLETED)
+    assert starting_idx < completed_idx
+
+
+def test_apply_emits_runner_failed_on_exception():
+    """RUNNER_FAILED is emitted when runner.apply() raises, and exception propagates."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.apply = MagicMock(side_effect=RuntimeError("terraform crashed"))
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={})
+
+    runner_registry.create_runner.return_value = tf_runner
+
+    state_manager = MagicMock()
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    provider = MagicMock()
+    providers = {"proxmox": provider}
+    resources = [_resource("vm1")]
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+    )
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="terraform crashed"):
+        executor.apply_single_provider(
+            env_name="dev",
+            deployment_id=1,
+            provider_name="proxmox",
+            provider=provider,
+            resources=resources,
+            auto_approve=True,
+        )
+
+    # RUNNER_STARTING should have been emitted
+    starting_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_STARTING
+    ]
+    assert len(starting_calls) == 1
+
+    # RUNNER_FAILED should have been emitted with error details
+    failed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_FAILED
+    ]
+    assert len(failed_calls) == 1
+    assert failed_calls[0][0][2] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "error": "terraform crashed",
+    }
+    assert failed_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+
+    # RUNNER_COMPLETED should NOT have been emitted
+    completed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_COMPLETED
+    ]
+    assert len(completed_calls) == 0

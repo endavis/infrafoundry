@@ -30,10 +30,50 @@ event_manager.emit_event(EventType.RESOURCE_CREATED, environment="prod", data={"
 
 ## Architecture Details
 
-- **Event types:** Lifecycle (`BEFORE/AFTER/FAILED` for PLAN/APPLY/DESTROY), resource lifecycle (`RESOURCE_*`), drift (`DRIFT_*`), policy (`POLICY_*`), validation.
+- **Event types:** Lifecycle (`BEFORE/AFTER/FAILED` for PLAN/APPLY/DESTROY), runner lifecycle (`RUNNER_STARTING/COMPLETED/FAILED`), resource lifecycle (`RESOURCE_*`), drift (`DRIFT_*`), policy (`POLICY_*`), validation.
 - **Event object:** `event_type`, `environment`, `data` (context), `timestamp`.
 - **Managers:** `EventManager` supports `subscribe`, `subscribe_all`, and `emit_event`.
 - **Integration:** `NotificationManager` listens to events and forwards to configured channels.
+
+### Runner Lifecycle Events
+
+Runner events are emitted in all three workflows (plan, apply, destroy) around each runner invocation:
+
+- `RUNNER_STARTING` - Before `runner.plan()`, `runner.apply()`, or `runner.destroy()`
+- `RUNNER_COMPLETED` - After a runner finishes successfully
+- `RUNNER_FAILED` - When a runner raises an exception (the exception is re-raised)
+
+The `EventContext` includes `provider` and `runner` fields, and the `data` dict carries a `RunnerEventData` payload with `provider`, `runner`, and optionally `success` or `error`.
+
+**ScriptHandler** exposes the runner name as `INFRAFOUNDRY_RUNNER` environment variable, allowing scripts to filter by runner type:
+
+| Variable | Set When |
+| :--- | :--- |
+| `INFRAFOUNDRY_ENV` | Always |
+| `INFRAFOUNDRY_EVENT` | Always |
+| `INFRAFOUNDRY_PROVIDER` | `context.provider` is set |
+| `INFRAFOUNDRY_RESOURCE` | `context.resource` is set |
+| `INFRAFOUNDRY_RUNNER` | `context.runner` is set |
+| `INFRAFOUNDRY_CONFIG_DIR` | Always |
+| `INFRAFOUNDRY_DEPLOYMENT_ID` | `context.deployment_id` is set |
+
+**Example:** Run an Ansible playbook after Terraform finishes for a specific provider:
+
+```yaml
+events:
+  - type: script
+    on: runner_completed
+    script: scripts/post-terraform.sh
+    description: "Run post-Terraform Ansible setup"
+```
+
+```bash
+#!/bin/bash
+# scripts/post-terraform.sh
+if [ "$INFRAFOUNDRY_RUNNER" = "terraform" ] && [ "$INFRAFOUNDRY_PROVIDER" = "proxmox" ]; then
+    ansible-playbook -i inventory.yml site.yml
+fi
+```
 
 ## Validation and Checks
 

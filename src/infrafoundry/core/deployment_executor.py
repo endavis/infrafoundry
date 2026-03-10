@@ -14,7 +14,7 @@ from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.state import ResourceState, StateManager
-from infrafoundry.core.types import ResourceEventData
+from infrafoundry.core.types import ResourceEventData, RunnerEventData
 
 # Registry keys for mutually exclusive IaC runners
 _IAC_TOOL_KEYS = {tool.value for tool in IaCTool}
@@ -334,14 +334,54 @@ class DeploymentExecutor:
 
             self.console.print(f"  [dim]Running {tool_name} apply...[/dim]")
 
-            # Ansible interprets auto_approve=False as check mode (dry-run)
-            # Other runners use it to skip confirmation prompts
-            run_result = runner.apply(
-                provider,
-                auto_approve=auto_approve,
-                target_resources=resource_filter if resource_filter else None,
+            starting_event: RunnerEventData = {
+                "provider": provider_name,
+                "runner": tool_name,
+            }
+            self.event_manager.emit_event(
+                EventType.RUNNER_STARTING,
+                env_name,
+                starting_event,
+                provider=provider_name,
+                runner=tool_name,
             )
-            runner_results[tool_name] = run_result
+
+            try:
+                # Ansible interprets auto_approve=False as check mode (dry-run)
+                # Other runners use it to skip confirmation prompts
+                run_result = runner.apply(
+                    provider,
+                    auto_approve=auto_approve,
+                    target_resources=resource_filter if resource_filter else None,
+                )
+                runner_results[tool_name] = run_result
+
+                completed_event: RunnerEventData = {
+                    "provider": provider_name,
+                    "runner": tool_name,
+                    "success": run_result.get("success", True),
+                }
+                self.event_manager.emit_event(
+                    EventType.RUNNER_COMPLETED,
+                    env_name,
+                    completed_event,
+                    provider=provider_name,
+                    runner=tool_name,
+                )
+            except Exception as exc:
+                failed_event: RunnerEventData = {
+                    "provider": provider_name,
+                    "runner": tool_name,
+                    "error": str(exc),
+                }
+                self.event_manager.emit_event(
+                    EventType.RUNNER_FAILED,
+                    env_name,
+                    failed_event,
+                    provider=provider_name,
+                    runner=tool_name,
+                )
+                raise
 
             # Update state with resource IDs if the runner supports state tracking
             if run_result["success"] and isinstance(runner, StateAware):

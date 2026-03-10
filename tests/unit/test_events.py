@@ -1,8 +1,12 @@
-"""Unit tests for EventManager."""
+"""Unit tests for EventManager and event handlers."""
+
+from pathlib import Path
 
 import pytest
 
 from infrafoundry.core.events import Event, EventHandlerError, EventManager, EventType
+from infrafoundry.core.events.context import EventContext
+from infrafoundry.core.events.handlers.script import ScriptHandler
 
 
 @pytest.mark.unit
@@ -194,3 +198,30 @@ class TestEventManager:
 
         # Should not raise exception when unsubscribing non-existent handler
         manager.unsubscribe(EventType.BEFORE_PLAN, handler)
+
+
+@pytest.mark.unit
+class TestScriptHandlerEnvironment:
+    """Tests for ScriptHandler._prepare_environment."""
+
+    def test_runner_env_var_injected_when_present(self, tmp_path: Path):
+        """INFRAFOUNDRY_RUNNER is set when context.runner is provided."""
+        handler = ScriptHandler({"script": "test.sh"}, config_base_dir=tmp_path)
+        context = EventContext(
+            event_type=EventType.RUNNER_COMPLETED,
+            environment="dev",
+            runner="terraform",
+            provider="proxmox",
+        )
+        env = handler._prepare_environment(context, tmp_path)
+        assert env["INFRAFOUNDRY_RUNNER"] == "terraform"
+
+    def test_runner_env_var_omitted_when_none(self, tmp_path: Path):
+        """INFRAFOUNDRY_RUNNER is not set when context.runner is None."""
+        handler = ScriptHandler({"script": "test.sh"}, config_base_dir=tmp_path)
+        context = EventContext(
+            event_type=EventType.BEFORE_PLAN,
+            environment="dev",
+        )
+        env = handler._prepare_environment(context, tmp_path)
+        assert "INFRAFOUNDRY_RUNNER" not in env

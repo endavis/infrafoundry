@@ -90,18 +90,23 @@ Categorized event types for different lifecycle phases and operations.
    - `RESOURCE_DELETED`
    - `RESOURCE_FAILED`
 
-3. **Drift Events** - Configuration drift detection
+3. **Runner Events** - Runner lifecycle within a workflow
+   - `RUNNER_STARTING` - Emitted before a runner executes (plan, apply, destroy)
+   - `RUNNER_COMPLETED` - Emitted after a runner finishes successfully
+   - `RUNNER_FAILED` - Emitted when a runner raises an exception
+
+5. **Drift Events** - Configuration drift detection
    - `DRIFT_DETECTED`
    - `DRIFT_REMEDIATION_STARTED`
    - `DRIFT_REMEDIATION_COMPLETED`
    - `DRIFT_REMEDIATION_FAILED`
 
-4. **Policy Events** - Governance validation
+6. **Policy Events** - Governance validation
    - `POLICY_CHECK_STARTED`
    - `POLICY_VIOLATION`
    - `POLICY_CHECK_PASSED`
 
-5. **Validation Events** - Configuration validation
+7. **Validation Events** - Configuration validation
    - `VALIDATION_STARTED`
    - `VALIDATION_COMPLETED`
    - `VALIDATION_FAILED`
@@ -178,6 +183,24 @@ Each event type includes specific data fields:
     "resource_name": "web-01",
     "resource_id": "vm-101",
     "provider": "proxmox"
+}
+```
+
+### Runner Events
+
+```python
+# RUNNER_STARTING / RUNNER_COMPLETED
+{
+    "provider": "proxmox",
+    "runner": "terraform",
+    "success": True          # RUNNER_COMPLETED only
+}
+
+# RUNNER_FAILED
+{
+    "provider": "proxmox",
+    "runner": "terraform",
+    "error": "Command exited with code 1"
 }
 ```
 
