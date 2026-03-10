@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773170182245,
+  "lastUpdate": 1773172547165,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -899,6 +899,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001036360000748939",
             "extra": "mean: 144.5655072103252 usec\nrounds: 2011"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "38452d20efdd651e2874045da6b82b158295b766",
+          "message": "feat: add INFRAFOUNDRY_PHASE env var to runner events (merges PR #341, addresses #340)\n\nAdd phase field (plan/apply/destroy) to RunnerEventData so event handler\nscripts can distinguish which workflow phase triggered the event. Inject\nas INFRAFOUNDRY_PHASE in ScriptHandler environment variables.\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-10T19:55:17Z",
+          "tree_id": "b166555a36a2f8eba22ce5f85057ba190bb90f7a",
+          "url": "https://github.com/endavis/infrafoundry/commit/38452d20efdd651e2874045da6b82b158295b766"
+        },
+        "date": 1773172546797,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6851.00780316521,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001670401155690002",
+            "extra": "mean: 145.96392658288806 usec\nrounds: 2479"
           }
         ]
       }
