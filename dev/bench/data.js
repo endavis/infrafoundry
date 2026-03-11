@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773240541123,
+  "lastUpdate": 1773251711294,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -992,6 +992,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008364801347473809",
             "extra": "mean: 142.255090011743 usec\nrounds: 2533"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f0b14089f1de4bec9616c056ee29889847ee49a5",
+          "message": "fix: always clear event handlers before loading to prevent duplicates (merges PR #351, addresses #350)\n\n_load_event_config() returned early without calling clear_handlers() when\nenv_config.events was empty. When package events moved from settings.yaml\nto infrafoundry.yml manifests, settings.yaml had no events, so handlers\nwere never cleared between plan and apply phases. Package events\naccumulated, causing event handlers to fire multiple times.\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-11T17:54:39Z",
+          "tree_id": "b7716193b8a95d543f0cf4f8fc1573294c0fbd51",
+          "url": "https://github.com/endavis/infrafoundry/commit/f0b14089f1de4bec9616c056ee29889847ee49a5"
+        },
+        "date": 1773251710953,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6942.85297219135,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009258486272362607",
+            "extra": "mean: 144.03300833322606 usec\nrounds: 2280"
           }
         ]
       }
