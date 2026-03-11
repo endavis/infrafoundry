@@ -485,3 +485,79 @@ class TestPrintHandlerResultStreaming:
 
         calls = [str(c) for c in console.print.call_args_list]
         assert any("buffered output" in c for c in calls)
+
+
+@pytest.mark.unit
+class TestPackageEventsIntegration:
+    """Tests for package events wiring through orchestrator."""
+
+    def test_package_events_registered_after_resource_load(self, tmp_path: Path):
+        """Verify orchestrator registers package events after resource loading."""
+        from unittest.mock import Mock, patch
+
+        from infrafoundry.core.config import ConfigManager
+        from infrafoundry.core.events import EventManager
+
+        # Create env structure with a package that has events
+        envs_dir = tmp_path / "envs"
+        dev_dir = envs_dir / "dev"
+        dev_dir.mkdir(parents=True)
+        (dev_dir / "settings.yaml").write_text("name: dev\ndescription: Test\n")
+
+        proxmox_dir = dev_dir / "proxmox"
+        proxmox_dir.mkdir()
+
+        pkg_dir = proxmox_dir / "my-pkg"
+        pkg_dir.mkdir()
+        import yaml
+
+        manifest = {
+            "name": "my-pkg",
+            "events": {"AFTER_APPLY": [{"type": "webhook", "url": "https://example.com/hook"}]},
+        }
+        with open(pkg_dir / "infrafoundry.yml", "w") as f:
+            yaml.dump(manifest, f)
+
+        config_manager = ConfigManager(envs_dir)
+        event_manager = EventManager()
+
+        # Spy on load_config
+        original_load_config = event_manager.load_config
+        load_config_calls: list[dict] = []
+
+        def spy_load_config(config: dict) -> None:
+            load_config_calls.append(config)
+            original_load_config(config)
+
+        event_manager.load_config = spy_load_config  # type: ignore[assignment]
+
+        # Patch Orchestrator to avoid full initialization
+        with (
+            patch("infrafoundry.core.orchestrator.StateManager"),
+            patch("infrafoundry.core.orchestrator.PolicyEngine"),
+            patch("infrafoundry.core.orchestrator.NotificationManager"),
+            patch("infrafoundry.core.orchestrator.AuditLogger"),
+            patch("infrafoundry.core.orchestrator.ProviderRegistryService") as mock_prs,
+        ):
+            mock_prs.return_value.providers = {}
+            mock_runner_registry = Mock()
+            mock_runner_registry.list_runners.return_value = []
+            mock_prs.return_value.runner_registry = mock_runner_registry
+
+            from infrafoundry.core.orchestrator import Orchestrator
+
+            orch = Orchestrator(
+                config_manager=config_manager,
+                output_dir=tmp_path / "generated",
+                event_manager=event_manager,
+            )
+
+            # Call _load_resources which should trigger package event registration
+            orch._load_resources("dev")
+
+            # Verify load_config was called with package events
+            assert len(load_config_calls) > 0
+            # Find the call that has AFTER_APPLY
+            pkg_event_calls = [c for c in load_config_calls if "AFTER_APPLY" in c]
+            assert len(pkg_event_calls) == 1
+            assert pkg_event_calls[0]["AFTER_APPLY"][0]["type"] == "webhook"
