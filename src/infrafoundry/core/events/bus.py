@@ -158,6 +158,7 @@ class UnifiedEventBus(BaseManager):
                 config,
                 config_base_dir=self.config_base_dir,
                 secret_resolver=self.secret_resolver,
+                console=self.console,
             )
 
         elif handler_type == HandlerType.WEBHOOK.value:
@@ -317,26 +318,32 @@ class UnifiedEventBus(BaseManager):
     ) -> None:
         """Print handler execution result to console.
 
+        For ScriptHandlers with a console, output was already streamed in
+        real-time, so only the summary line is printed (not stdout/stderr).
+
         Args:
             handler: The handler that was executed
             result: The result from the handler
         """
         name = handler.name
+        already_streamed = isinstance(handler, ScriptHandler) and handler.console is not None
+
         if result.success:
             self.console.print(f"  [green]✓[/green] Event handler [bold]{name}[/bold] completed")
-            if result.stdout:
+            if result.stdout and not already_streamed:
                 for line in result.stdout.strip().splitlines():
                     self.console.print(f"    {line}")
         else:
             self.console.print(
                 f"  [red]✗[/red] Event handler [bold]{name}[/bold] failed: {result.reason}"
             )
-            if result.stderr:
-                for line in result.stderr.strip().splitlines():
-                    self.console.print(f"    [red]{line}[/red]")
-            if result.stdout:
-                for line in result.stdout.strip().splitlines():
-                    self.console.print(f"    {line}")
+            if not already_streamed:
+                if result.stderr:
+                    for line in result.stderr.strip().splitlines():
+                        self.console.print(f"    [red]{line}[/red]")
+                if result.stdout:
+                    for line in result.stdout.strip().splitlines():
+                        self.console.print(f"    {line}")
 
     def _invoke_callback(
         self,
