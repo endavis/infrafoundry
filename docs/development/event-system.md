@@ -93,6 +93,16 @@ if [ "$INFRAFOUNDRY_RUNNER" = "terraform" ] && [ "$INFRAFOUNDRY_PROVIDER" = "pro
 fi
 ```
 
+### Real-Time Output Streaming
+
+Script handlers stream stdout and stderr to the console in real-time, line by line, instead of buffering all output until the script completes. This is essential for long-running handlers (e.g., Ansible playbooks) where the user needs to see progress.
+
+- **stdout** lines are printed with 4-space indent
+- **stderr** lines are printed with 4-space indent and `[red]` Rich styling
+- Output is still captured in `EventResult.stdout` and `EventResult.stderr` for programmatic use
+- The summary line (success/failure) is printed after the script finishes, but the output is not re-printed since it was already streamed
+- When no console is available (e.g., programmatic usage), output is captured silently as before
+
 ## Validation and Checks
 
 - Use consistent event types to ensure subscribers receive expected notifications.
