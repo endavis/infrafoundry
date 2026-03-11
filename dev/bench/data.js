@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773172547165,
+  "lastUpdate": 1773228713272,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -930,6 +930,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001670401155690002",
             "extra": "mean: 145.96392658288806 usec\nrounds: 2479"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7b2a1141c6c7fe81032826c8a5fbb270f3b05eb7",
+          "message": "feat: stream event handler output in real-time (merges PR #343, addresses #342)\n\nReplace subprocess.run with subprocess.Popen and threaded stream\nreaders in ScriptHandler so stdout/stderr are printed to the Rich\nconsole line-by-line as the script runs, instead of being buffered\nuntil completion.\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-11T11:31:23Z",
+          "tree_id": "95aec8195735f7d9c300aabaf9bb5e6cbb0affb7",
+          "url": "https://github.com/endavis/infrafoundry/commit/7b2a1141c6c7fe81032826c8a5fbb270f3b05eb7"
+        },
+        "date": 1773228712838,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7059.086507131006,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008436563937999455",
+            "extra": "mean: 141.6613890465589 usec\nrounds: 3524"
           }
         ]
       }
