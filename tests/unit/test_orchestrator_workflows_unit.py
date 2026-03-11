@@ -467,7 +467,7 @@ def test_plan_loads_event_config(console):
 
 
 def test_plan_skips_event_config_when_empty(console):
-    """PlanOrchestrator does not call load_config when events is empty."""
+    """PlanOrchestrator clears handlers but does not call load_config when events is empty."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 101
     event_manager = MagicMock()
@@ -499,7 +499,7 @@ def test_plan_skips_event_config_when_empty(console):
 
     orchestrator.plan(env_name="dev", dry_run=True, resource_filter=None, enforce_policies=False)
 
-    event_manager.clear_handlers.assert_not_called()
+    event_manager.clear_handlers.assert_called_once()
     event_manager.load_config.assert_not_called()
 
 
