@@ -118,3 +118,17 @@ class EnvironmentConfig(BaseModel):
     def get_provider_settings(self, provider_name: str) -> dict[str, Any] | None:
         """Return provider-specific settings dict if present."""
         return self.provider_settings.get(provider_name)
+
+
+class PackageManifest(BaseModel):
+    """Infrastructure package manifest (infrafoundry.yml).
+
+    Defines a self-contained infrastructure package with variables,
+    resource templates, and event handlers.
+    """
+
+    name: str
+    description: str | None = None
+    variables: dict[str, Any] = Field(default_factory=dict)
+    resources: list[str] = Field(default_factory=list)
+    events: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)

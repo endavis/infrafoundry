@@ -4,9 +4,11 @@ Loads resources from envs/{env}/{provider}/*.yaml files.
 """
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
+from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -20,6 +22,8 @@ class ProviderCentricLoader:
             base_dir: Base directory for environment configs (e.g., ./envs)
         """
         self.base_dir = base_dir
+        self._package_loader = PackageLoader(base_dir)
+        self._pending_package_events: dict[str, list[dict[str, Any]]] = {}
 
     def load_resources(
         self, env_name: str, provider: str, resource_file: str
@@ -107,7 +111,29 @@ class ProviderCentricLoader:
             resources = self.load_resources(env_name, provider, resource_file)
             all_resources.extend(resources)
 
+        # Discover and load packages in provider subdirectories
+        for package_dir in self._package_loader.discover_packages(env_name, provider):
+            pkg_resources, pkg_events = self._package_loader.load_package(
+                package_dir, provider, env_name
+            )
+            all_resources.extend(pkg_resources)
+            for event_type, handlers in pkg_events.items():
+                self._pending_package_events.setdefault(event_type, []).extend(handlers)
+
         return all_resources
+
+    def get_package_events(self) -> dict[str, list[dict[str, Any]]]:
+        """Return accumulated package events and clear the buffer.
+
+        Events are accumulated during get_all_resources() calls and
+        returned once via this method, then cleared.
+
+        Returns:
+            Dict mapping event type names to handler configs
+        """
+        events = self._pending_package_events
+        self._pending_package_events = {}
+        return events
 
     def discover_providers(self, env_name: str) -> set[str]:
         """Discover available providers in an environment.

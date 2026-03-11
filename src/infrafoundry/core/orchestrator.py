@@ -260,6 +260,12 @@ class Orchestrator:
         resources_by_provider: dict[str, list[ResourceConfig]] = {}
         for resource in all_resources:
             resources_by_provider.setdefault(resource.provider, []).append(resource)
+
+        # Register package events discovered during resource loading
+        package_events = self.config_manager.get_package_events()
+        if isinstance(package_events, dict) and package_events and self.event_manager:
+            self.event_manager.load_config(package_events)
+
         return all_resources, resources_by_provider
 
     def _create_execution_planner(self, env_name: str) -> ExecutionPlanner:

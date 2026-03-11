@@ -124,8 +124,34 @@ Script handlers stream stdout and stderr to the console in real-time, line by li
   )
   ```
 
+## Package Events
+
+Infrastructure packages can declare event handlers in their `infrafoundry.yml` manifest.
+These events use the same format as environment-level events in `settings.yaml`, but
+script paths are automatically rewritten to be relative to the environment directory.
+
+Package events are discovered during resource loading and registered with the event bus
+after all resources have been loaded. This happens in `Orchestrator._load_resources()`.
+
+```yaml
+# envs/dev/proxmox/ontap-cluster/infrafoundry.yml
+events:
+  AFTER_APPLY:
+    - type: script
+      script: scripts/cluster-setup.sh
+      timeout: 300
+```
+
+The script path `scripts/cluster-setup.sh` is rewritten to
+`proxmox/ontap-cluster/scripts/cluster-setup.sh` so that ScriptHandler resolves it
+correctly from the environment directory.
+
+See the [Infrastructure Packages guide](../configuration/infrastructure-packages.md)
+for full details on package structure and configuration.
+
 ## Related Documentation
 
+- [Infrastructure Packages](../configuration/infrastructure-packages.md)
 - [Notifications Guide](../configuration/notifications.md)
 - [Orchestrator Architecture](../architecture/orchestrator-architecture.md)
 - [Policy Configuration Guide](../configuration/policy-configuration.md)
