@@ -78,16 +78,18 @@ class HookExecutionMixin:
     def _load_event_config(self, env_config: "EnvironmentConfig | None") -> None:
         """Register event handlers from environment configuration.
 
-        Clears existing config-based handlers before loading to prevent
-        duplicate registrations across repeated workflow calls.
+        Always clears existing config-based handlers before loading to prevent
+        duplicate registrations across repeated workflow calls (e.g., plan then
+        apply). Package events are registered separately by _load_resources().
 
         Args:
             env_config: Environment configuration containing event handler definitions
         """
+        self.event_manager.clear_handlers()
+
         if not env_config or not env_config.events:
             return
 
-        self.event_manager.clear_handlers()
         self.event_manager.load_config(env_config.events)
 
     def _execute_resource_hooks(

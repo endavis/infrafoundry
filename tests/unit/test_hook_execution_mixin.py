@@ -214,7 +214,7 @@ class TestLoadEventConfig:
         event_manager.load_config.assert_called_once_with(events)
 
     def test_load_event_config_empty_events(self, mock_console):
-        """Test _load_event_config skips when events dict is empty."""
+        """Test _load_event_config clears handlers but skips load when events empty."""
         event_manager = MagicMock()
         orchestrator = MockOrchestrator(console=mock_console, event_manager=event_manager)
         env_config = MagicMock(spec=EnvironmentConfig)
@@ -222,15 +222,15 @@ class TestLoadEventConfig:
 
         orchestrator._load_event_config(env_config)
 
-        event_manager.clear_handlers.assert_not_called()
+        event_manager.clear_handlers.assert_called_once()
         event_manager.load_config.assert_not_called()
 
     def test_load_event_config_none_env_config(self, mock_console):
-        """Test _load_event_config skips when env_config is None."""
+        """Test _load_event_config clears handlers but skips load when env_config is None."""
         event_manager = MagicMock()
         orchestrator = MockOrchestrator(console=mock_console, event_manager=event_manager)
 
         orchestrator._load_event_config(None)
 
-        event_manager.clear_handlers.assert_not_called()
+        event_manager.clear_handlers.assert_called_once()
         event_manager.load_config.assert_not_called()
