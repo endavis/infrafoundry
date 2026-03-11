@@ -188,7 +188,7 @@ class PackageLoader:
 
         # Render Jinja2 template with StrictUndefined
         try:
-            env = jinja2.Environment(undefined=jinja2.StrictUndefined)
+            env = jinja2.Environment(undefined=jinja2.StrictUndefined)  # nosec B701 - rendering YAML, not HTML
             template = env.from_string(content)
             rendered = template.render(**variables)
         except jinja2.UndefinedError as e:
