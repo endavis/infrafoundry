@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773228713272,
+  "lastUpdate": 1773240541123,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -961,6 +961,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008436563937999455",
             "extra": "mean: 141.6613890465589 usec\nrounds: 3524"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f4d08017cef9da381bc05f82049fdd558d62574d",
+          "message": "feat: add infrastructure packages with infrafoundry.yml manifest (merges PR #345, addresses #344)\n\n* feat: add infrastructure packages with infrafoundry.yml manifest\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* fix: suppress bandit B701 false positive for YAML Jinja2 rendering\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-11T14:48:31Z",
+          "tree_id": "62235c0657ebed9008d29678c487f05cc03d7c40",
+          "url": "https://github.com/endavis/infrafoundry/commit/f4d08017cef9da381bc05f82049fdd558d62574d"
+        },
+        "date": 1773240540619,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7029.625441996142,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008364801347473809",
+            "extra": "mean: 142.255090011743 usec\nrounds: 2533"
           }
         ]
       }
