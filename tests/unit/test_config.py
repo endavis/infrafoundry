@@ -4,6 +4,7 @@ import pytest
 import yaml
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.exceptions import InfraFoundryError
 
 
@@ -760,3 +761,86 @@ provider_settings:
         assert settings is not None
         assert settings["api_url"] == "https://pve01.example.com:8006"
         assert settings["node"] == "pve01"
+
+    def test_get_all_resources_includes_packages(self, temp_dir):
+        """Packages are loaded alongside regular resources."""
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True)
+
+        # Create settings.yaml
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
+        env_file.write_text("name: dev\ndescription: Test\n")
+
+        # Create regular resource file
+        vm_file = envs_dir / "vm.yaml"
+        vm_data = {"vm": [{"name": "regular-vm", "cores": 2}]}
+        with open(vm_file, "w") as f:
+            yaml.dump(vm_data, f)
+
+        # Create package with resource
+        pkg_dir = envs_dir / "my-pkg"
+        pkg_dir.mkdir()
+        manifest = {"name": "my-pkg", "variables": {"prefix": "pkg"}, "resources": ["vm.yaml"]}
+        with open(pkg_dir / "infrafoundry.yml", "w") as f:
+            yaml.dump(manifest, f)
+        (pkg_dir / "vm.yaml").write_text("vm:\n  - name: {{ prefix }}-vm\n    cores: 4\n")
+
+        config = ConfigManager(temp_dir / "envs")
+        resources = config.get_all_resources("dev", "proxmox")
+
+        names = [r.name for r in resources]
+        assert "regular-vm" in names
+        assert "pkg-vm" in names
+
+    def test_get_all_resources_package_duplicate_name(self, temp_dir):
+        """Duplicate resource name from package raises error."""
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True)
+
+        # Create settings.yaml
+        env_file = temp_dir / "envs" / "dev" / "settings.yaml"
+        env_file.write_text("name: dev\ndescription: Test\n")
+
+        # Create regular resource
+        vm_file = envs_dir / "vm.yaml"
+        vm_data = {"vm": [{"name": "dup-vm", "cores": 2}]}
+        with open(vm_file, "w") as f:
+            yaml.dump(vm_data, f)
+
+        # Create package with same resource name
+        pkg_dir = envs_dir / "my-pkg"
+        pkg_dir.mkdir()
+        manifest = {"name": "my-pkg", "resources": ["vm.yaml"]}
+        with open(pkg_dir / "infrafoundry.yml", "w") as f:
+            yaml.dump(manifest, f)
+        (pkg_dir / "vm.yaml").write_text("vm:\n  - name: dup-vm\n    cores: 4\n")
+
+        config = ConfigManager(temp_dir / "envs")
+        with pytest.raises(ValueError, match="Duplicate resource names"):
+            config.get_all_resources_all_providers("dev")
+
+    def test_get_package_events_returns_and_clears(self, temp_dir):
+        """Package events are returned and then cleared."""
+        envs_dir = temp_dir / "envs" / "dev" / "proxmox"
+        envs_dir.mkdir(parents=True)
+
+        # Create package with events
+        pkg_dir = envs_dir / "my-pkg"
+        pkg_dir.mkdir()
+        manifest = {
+            "name": "my-pkg",
+            "events": {"AFTER_APPLY": [{"type": "script", "script": "scripts/run.sh"}]},
+        }
+        with open(pkg_dir / "infrafoundry.yml", "w") as f:
+            yaml.dump(manifest, f)
+
+        loader = ProviderCentricLoader(temp_dir / "envs")
+        loader.get_all_resources("dev", "proxmox")
+
+        events = loader.get_package_events()
+        assert "AFTER_APPLY" in events
+        assert len(events["AFTER_APPLY"]) == 1
+
+        # Second call should return empty (cleared)
+        events2 = loader.get_package_events()
+        assert events2 == {}

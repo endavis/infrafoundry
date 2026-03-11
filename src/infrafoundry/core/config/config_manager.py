@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -191,6 +192,26 @@ class ConfigManager(PathBasedManager):
 
                 all_resources.extend(resources)
 
+        # Load from infrastructure packages in provider subdirectories
+        for provider_name in discovered_providers:
+            for package_dir in self.provider_centric._package_loader.discover_packages(
+                env_name, provider_name
+            ):
+                pkg_resources, pkg_events = self.provider_centric._package_loader.load_package(
+                    package_dir, provider_name, env_name
+                )
+                for resource in pkg_resources:
+                    key = f"{resource.provider}:{resource.name}"
+                    if key not in resource_locations:
+                        resource_locations[key] = []
+                    resource_locations[key].append(str(package_dir / "infrafoundry.yml"))
+
+                all_resources.extend(pkg_resources)
+                for event_type, handlers in pkg_events.items():
+                    self.provider_centric._pending_package_events.setdefault(event_type, []).extend(
+                        handlers
+                    )
+
         # Load from resource-centric files
         resources_dir = self.base_dir / env_name / "resources"
         if resources_dir.exists():
@@ -221,6 +242,17 @@ class ConfigManager(PathBasedManager):
             )
 
         return all_resources
+
+    def get_package_events(self) -> dict[str, list[dict[str, Any]]]:
+        """Return accumulated package events from last resource load.
+
+        Package events are discovered during resource loading and buffered
+        in the ProviderCentricLoader. This method retrieves and clears them.
+
+        Returns:
+            Dict mapping event type names to handler configs
+        """
+        return self.provider_centric.get_package_events()
 
     def list_environments(self) -> list[str]:
         """List all available environments.
