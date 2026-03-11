@@ -1,14 +1,20 @@
 """Shell script handler for events."""
 
+from __future__ import annotations
+
 import os
 import re
 import subprocess  # nosec B404 - required for running user scripts
+import threading
 import time
 from pathlib import Path
-from typing import Any, override
+from typing import IO, TYPE_CHECKING, Any, override
 
 from infrafoundry.core.events.context import EventContext, EventResult
 from infrafoundry.core.events.handlers.base import BaseHandler
+
+if TYPE_CHECKING:
+    from rich.console import Console
 
 
 class ScriptHandler(BaseHandler):
@@ -46,6 +52,7 @@ class ScriptHandler(BaseHandler):
         config: dict[str, Any],
         config_base_dir: Path | None = None,
         secret_resolver: Any | None = None,
+        console: Console | None = None,
     ) -> None:
         """Initialize script handler.
 
@@ -53,10 +60,12 @@ class ScriptHandler(BaseHandler):
             config: Handler configuration
             config_base_dir: Base directory for config (contains envs/)
             secret_resolver: Optional callable to resolve secrets
+            console: Rich console for real-time output streaming
         """
         super().__init__(config)
         self.config_base_dir = config_base_dir or Path.cwd()
         self.secret_resolver = secret_resolver
+        self.console = console
 
     @override
     def validate_config(self) -> list[str]:
@@ -105,38 +114,62 @@ class ScriptHandler(BaseHandler):
         # Prepare environment
         env = self._prepare_environment(context, env_dir)
 
-        # Execute script
+        # Execute script with real-time streaming
         start_time = time.monotonic()
         try:
-            result = subprocess.run(  # nosec B603 - user-controlled scripts
+            process = subprocess.Popen(  # nosec B603 - user-controlled scripts
                 [str(script_path)],
                 cwd=env_dir,
                 env=env,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=timeout,
             )
+
+            stdout_lines: list[str] = []
+            stderr_lines: list[str] = []
+
+            stdout_thread = threading.Thread(
+                target=self._read_stream,
+                args=(process.stdout, stdout_lines, ""),
+                daemon=True,
+            )
+            stderr_thread = threading.Thread(
+                target=self._read_stream,
+                args=(process.stderr, stderr_lines, "red"),
+                daemon=True,
+            )
+            stdout_thread.start()
+            stderr_thread.start()
+
+            try:
+                process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                stdout_thread.join(timeout=5)
+                stderr_thread.join(timeout=5)
+                duration = time.monotonic() - start_time
+                return EventResult(
+                    success=False,
+                    abort=not self.config.get("continue_on_error", False),
+                    reason=f"Timeout after {timeout} seconds",
+                    stdout="\n".join(stdout_lines),
+                    stderr="\n".join(stderr_lines),
+                    duration_seconds=duration,
+                    handler_name=self.name,
+                )
+
+            stdout_thread.join(timeout=5)
+            stderr_thread.join(timeout=5)
             duration = time.monotonic() - start_time
 
-            success = result.returncode == 0
+            success = process.returncode == 0
             return EventResult(
                 success=success,
                 abort=not success and not self.config.get("continue_on_error", False),
-                reason=None if success else f"Exit code: {result.returncode}",
-                stdout=result.stdout,
-                stderr=result.stderr,
-                duration_seconds=duration,
-                handler_name=self.name,
-            )
-
-        except subprocess.TimeoutExpired as e:
-            duration = time.monotonic() - start_time
-            return EventResult(
-                success=False,
-                abort=not self.config.get("continue_on_error", False),
-                reason=f"Timeout after {timeout} seconds",
-                stdout=e.stdout.decode() if e.stdout else "",
-                stderr=e.stderr.decode() if e.stderr else "",
+                reason=None if success else f"Exit code: {process.returncode}",
+                stdout="\n".join(stdout_lines),
+                stderr="\n".join(stderr_lines),
                 duration_seconds=duration,
                 handler_name=self.name,
             )
@@ -156,6 +189,30 @@ class ScriptHandler(BaseHandler):
                 handler_name=self.name,
                 duration_seconds=time.monotonic() - start_time,
             )
+
+    def _read_stream(
+        self,
+        stream: IO[str] | None,
+        collected: list[str],
+        style: str = "",
+    ) -> None:
+        """Read a stream line-by-line, optionally printing to console.
+
+        Args:
+            stream: The stdout or stderr pipe to read
+            collected: List to append lines to for later capture
+            style: Rich style name for console output (e.g. "red" for stderr)
+        """
+        if stream is None:
+            return
+        for line in stream:
+            stripped = line.rstrip("\n")
+            collected.append(stripped)
+            if self.console is not None:
+                if style:
+                    self.console.print(f"    [{style}]{stripped}[/{style}]")
+                else:
+                    self.console.print(f"    {stripped}")
 
     def _prepare_environment(
         self,

@@ -1,11 +1,14 @@
 """Unit tests for EventManager and event handlers."""
 
+import stat
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
 from infrafoundry.core.events import Event, EventHandlerError, EventManager, EventType
-from infrafoundry.core.events.context import EventContext
+from infrafoundry.core.events.bus import UnifiedEventBus
+from infrafoundry.core.events.context import EventContext, EventResult
 from infrafoundry.core.events.handlers.script import ScriptHandler
 
 
@@ -225,3 +228,260 @@ class TestScriptHandlerEnvironment:
         )
         env = handler._prepare_environment(context, tmp_path)
         assert "INFRAFOUNDRY_RUNNER" not in env
+
+
+def _make_script(tmp_path: Path, name: str, content: str) -> Path:
+    """Create an executable script in the expected directory structure.
+
+    Args:
+        tmp_path: Pytest temporary directory
+        name: Script filename
+        content: Script content
+
+    Returns:
+        Path to the script relative to envs/dev/
+    """
+    env_dir = tmp_path / "envs" / "dev"
+    env_dir.mkdir(parents=True, exist_ok=True)
+    script = env_dir / name
+    script.write_text(content)
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    return Path(name)
+
+
+@pytest.mark.unit
+class TestScriptHandlerStreaming:
+    """Tests for ScriptHandler real-time output streaming."""
+
+    def test_streaming_prints_stdout_to_console(self, tmp_path: Path):
+        """Stdout lines are printed to console in real-time."""
+        script_rel = _make_script(
+            tmp_path,
+            "echo.sh",
+            "#!/bin/bash\necho line1\necho line2\n",
+        )
+        console = MagicMock()
+        handler = ScriptHandler(
+            {"script": str(script_rel)},
+            config_base_dir=tmp_path,
+            console=console,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+
+        assert result.success
+        assert "line1" in result.stdout
+        assert "line2" in result.stdout
+        # Console should have been called with each line
+        print_calls = [str(c) for c in console.print.call_args_list]
+        assert any("line1" in c for c in print_calls)
+        assert any("line2" in c for c in print_calls)
+
+    def test_streaming_prints_stderr_with_red_style(self, tmp_path: Path):
+        """Stderr lines are printed to console with red styling."""
+        script_rel = _make_script(
+            tmp_path,
+            "stderr.sh",
+            "#!/bin/bash\necho err_msg >&2\n",
+        )
+        console = MagicMock()
+        handler = ScriptHandler(
+            {"script": str(script_rel)},
+            config_base_dir=tmp_path,
+            console=console,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+
+        assert "err_msg" in result.stderr
+        print_calls = [str(c) for c in console.print.call_args_list]
+        assert any("[red]" in c and "err_msg" in c for c in print_calls)
+
+    def test_stdout_and_stderr_captured_in_result(self, tmp_path: Path):
+        """EventResult still contains full stdout and stderr."""
+        script_rel = _make_script(
+            tmp_path,
+            "both.sh",
+            "#!/bin/bash\necho out_line\necho err_line >&2\n",
+        )
+        console = MagicMock()
+        handler = ScriptHandler(
+            {"script": str(script_rel)},
+            config_base_dir=tmp_path,
+            console=console,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+
+        assert result.success
+        assert "out_line" in result.stdout
+        assert "err_line" in result.stderr
+
+    def test_no_console_backward_compat(self, tmp_path: Path):
+        """ScriptHandler works without console (backward compatibility)."""
+        script_rel = _make_script(
+            tmp_path,
+            "compat.sh",
+            "#!/bin/bash\necho hello\n",
+        )
+        handler = ScriptHandler(
+            {"script": str(script_rel)},
+            config_base_dir=tmp_path,
+        )
+        assert handler.console is None
+
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+
+        assert result.success
+        assert "hello" in result.stdout
+
+    def test_timeout_kills_process_returns_partial(self, tmp_path: Path):
+        """Timeout kills the process and returns partial output."""
+        script_rel = _make_script(
+            tmp_path,
+            "slow.sh",
+            "#!/bin/bash\necho partial_out\nsleep 60\n",
+        )
+        console = MagicMock()
+        handler = ScriptHandler(
+            {"script": str(script_rel), "timeout": 1},
+            config_base_dir=tmp_path,
+            console=console,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+
+        assert not result.success
+        assert "Timeout" in (result.reason or "")
+        assert "partial_out" in result.stdout
+
+    def test_empty_output(self, tmp_path: Path):
+        """Empty output produces empty strings in result."""
+        script_rel = _make_script(
+            tmp_path,
+            "empty.sh",
+            "#!/bin/bash\n",
+        )
+        handler = ScriptHandler(
+            {"script": str(script_rel)},
+            config_base_dir=tmp_path,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+
+        assert result.success
+        assert result.stdout == ""
+        assert result.stderr == ""
+
+
+@pytest.mark.unit
+class TestPrintHandlerResultStreaming:
+    """Tests for _print_handler_result with streaming behavior."""
+
+    def test_skips_reprinting_for_streamed_script_handler(self):
+        """Output is not re-printed for ScriptHandler with console."""
+        console = MagicMock()
+        bus = UnifiedEventBus(console=console)
+
+        handler = ScriptHandler(
+            {"type": "script", "script": "test.sh"},
+            console=console,
+        )
+        result = EventResult(
+            success=True,
+            stdout="already streamed line",
+            handler_name="test",
+        )
+
+        console.reset_mock()
+        bus._print_handler_result(handler, result)
+
+        # Should print summary but NOT re-print stdout
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("completed" in c for c in calls)
+        assert not any("already streamed line" in c for c in calls)
+
+    def test_skips_reprinting_stderr_for_streamed_script_handler(self):
+        """Stderr is not re-printed for failed ScriptHandler with console."""
+        console = MagicMock()
+        bus = UnifiedEventBus(console=console)
+
+        handler = ScriptHandler(
+            {"type": "script", "script": "test.sh"},
+            console=console,
+        )
+        result = EventResult(
+            success=False,
+            reason="Exit code: 1",
+            stdout="some output",
+            stderr="some error",
+            handler_name="test",
+        )
+
+        console.reset_mock()
+        bus._print_handler_result(handler, result)
+
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("failed" in c for c in calls)
+        assert not any("some output" in c for c in calls)
+        assert not any("some error" in c for c in calls)
+
+    def test_prints_output_for_non_script_handler(self):
+        """Output is still printed for non-script handlers."""
+        from infrafoundry.core.events.handlers.python import PythonHandler
+
+        console = MagicMock()
+        bus = UnifiedEventBus(console=console)
+
+        handler = PythonHandler({"type": "python", "module": "test"})
+        result = EventResult(
+            success=True,
+            stdout="python handler output",
+            handler_name="test",
+        )
+
+        console.reset_mock()
+        bus._print_handler_result(handler, result)
+
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("python handler output" in c for c in calls)
+
+    def test_prints_output_for_script_handler_without_console(self):
+        """Output is printed for ScriptHandler without console (no streaming)."""
+        console = MagicMock()
+        bus = UnifiedEventBus(console=console)
+
+        handler = ScriptHandler(
+            {"type": "script", "script": "test.sh"},
+            console=None,
+        )
+        result = EventResult(
+            success=True,
+            stdout="buffered output",
+            handler_name="test",
+        )
+
+        console.reset_mock()
+        bus._print_handler_result(handler, result)
+
+        calls = [str(c) for c in console.print.call_args_list]
+        assert any("buffered output" in c for c in calls)
