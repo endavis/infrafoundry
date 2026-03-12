@@ -1,0 +1,101 @@
+---
+# ONTAP Simulator Lab — Cluster Setup Playbook
+#
+# Creates cluster on node 01, joins node 02, then configures via REST API.
+# Run AFTER serial setup (ontap-lab-serial-setup.yml).
+#
+# All variables are passed as extra-vars from infrafoundry.yml
+# by the ontap-post-terraform.sh event handler script.
+
+- name: Create ONTAP cluster on node 01
+  hosts: "{{ node01_target }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: ontap-cluster-setup
+      vars:
+        ontap_vmid: "{{ node01_vmid }}"
+        ontap_cluster_create: true
+        ontap_cluster_name: "{{ cluster_name }}"
+        ontap_cluster_mgmt_ip: "{{ cluster_mgmt_ip }}"
+        ontap_cluster_mgmt_mask: "{{ cluster_mgmt_mask }}"
+        ontap_cluster_mgmt_gateway: "{{ cluster_mgmt_gateway }}"
+        ontap_node_mgmt_ip: "{{ node01_mgmt_ip }}"
+        ontap_node_mgmt_mask: "{{ node_mgmt_mask }}"
+        ontap_node_mgmt_gateway: "{{ node_mgmt_gateway }}"
+        ontap_password: "{{ ontap_password }}"
+        ontap_dns_domain: "{{ dns_domain }}"
+
+- name: Discover cluster interconnect IP from node 01
+  hosts: ontap_cluster
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Query cluster network interfaces
+      ansible.builtin.uri:
+        url: "https://{{ cluster_mgmt_ip }}/api/network/ip/interfaces?ipspace.name=Cluster&fields=ip.address"
+        user: "admin"
+        password: "{{ ontap_password }}"
+        validate_certs: false
+        force_basic_auth: true
+      register: cluster_interfaces
+
+    - name: Set cluster interconnect IP fact
+      ansible.builtin.set_fact:
+        ontap_cluster_interconnect_ip: "{{ cluster_interfaces.json.records[0].ip.address }}"
+
+    - name: Display cluster interconnect IP
+      ansible.builtin.debug:
+        msg: "Cluster interconnect IP for join: {{ ontap_cluster_interconnect_ip }}"
+
+- name: Join ONTAP node 02 to cluster
+  hosts: "{{ node02_target }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: ontap-cluster-setup
+      vars:
+        ontap_vmid: "{{ node02_vmid }}"
+        ontap_cluster_create: false
+        ontap_cluster_join_ip: "{{ hostvars['ontap-cluster']['ontap_cluster_interconnect_ip'] }}"
+        ontap_node_mgmt_ip: "{{ node02_mgmt_ip }}"
+        ontap_node_mgmt_mask: "{{ node_mgmt_mask }}"
+        ontap_node_mgmt_gateway: "{{ node_mgmt_gateway }}"
+        ontap_password: "{{ ontap_password }}"
+
+- name: Configure ONTAP cluster (aggregates, SVMs, LIFs)
+  hosts: ontap_cluster
+  gather_facts: false
+  connection: local
+  roles:
+    - role: ontap-post-cluster
+      vars:
+        ontap_cluster_mgmt_ip: "{{ cluster_mgmt_ip }}"
+        ontap_admin_user: "admin"
+        ontap_admin_password: "{{ ontap_password }}"
+        ontap_validate_certs: false
+        ontap_dns:
+          - vserver: "{{ svm_name }}"
+            domains:
+              - "{{ dns_domain }}"
+            nameservers:
+              - "{{ dns_nameserver }}"
+        ontap_ntp_servers:
+          - "{{ ntp_server }}"
+        ontap_lifs:
+          - name: "{{ svm_name }}_lif1"
+            vserver: "{{ svm_name }}"
+            role: data
+            protocol: nfs
+            node_index: 0
+            home_port: e0d
+            address: "{{ data_lif1_ip }}"
+            netmask: "{{ data_lif_mask }}"
+          - name: "{{ svm_name }}_lif2"
+            vserver: "{{ svm_name }}"
+            role: data
+            protocol: nfs
+            node_index: 1
+            home_port: e0d
+            address: "{{ data_lif2_ip }}"
+            netmask: "{{ data_lif_mask }}"

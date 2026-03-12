@@ -1,0 +1,23 @@
+---
+# ONTAP Serial Setup — Default Variables
+#
+# Sets serial console as primary and optionally assigns unique
+# serial number and system ID via the VLOADER prompt.
+
+# Proxmox VM ID of the ONTAP node to configure
+ontap_vmid: 220
+
+# Unique serial number to assign to the node (optional).
+# Omit to keep OVA defaults. Only set on first boot — changing
+# after ONTAP initializes disks will corrupt the RDB.
+# ontap_serial_number: "4082368-50-7"
+
+# Unique system ID to assign to the node (optional).
+# Must be set together with ontap_serial_number.
+# ontap_sysid: "4082368507"
+
+# Timeout (seconds) to wait for the LOADER prompt
+ontap_loader_timeout: 120
+
+# Timeout (seconds) to wait for boot completion
+ontap_boot_timeout: 600
