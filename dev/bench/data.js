@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773330382680,
+  "lastUpdate": 1773330672291,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1271,6 +1271,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008635682245495203",
             "extra": "mean: 141.39108576949076 usec\nrounds: 3626"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dda2f03e303a1621c26833a3970cdeea496ca344",
+          "message": "chore(deps): bump pyproject-fmt from 2.12.1 to 2.16.1 (merges PR #273)\n\nBumps [pyproject-fmt](https://github.com/tox-dev/toml-fmt) from 2.12.1 to 2.16.1.\n- [Release notes](https://github.com/tox-dev/toml-fmt/releases)\n- [Commits](https://github.com/tox-dev/toml-fmt/compare/pyproject-fmt/2.12.1...pyproject-fmt/2.16.1)\n\n---\nupdated-dependencies:\n- dependency-name: pyproject-fmt\n  dependency-version: 2.16.1\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-12T15:50:39Z",
+          "tree_id": "334d929710d574d6158766857c31ff22f612a9ac",
+          "url": "https://github.com/endavis/infrafoundry/commit/dda2f03e303a1621c26833a3970cdeea496ca344"
+        },
+        "date": 1773330671711,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6898.647258470349,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007662165717918045",
+            "extra": "mean: 144.95595477391203 usec\nrounds: 2388"
           }
         ]
       }
