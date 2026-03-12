@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773330672291,
+  "lastUpdate": 1773330930467,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1302,6 +1302,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007662165717918045",
             "extra": "mean: 144.95595477391203 usec\nrounds: 2388"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1ab71f8057738b2233af8359b4ec75b01d31a369",
+          "message": "chore(deps): bump azure-identity from 1.25.1 to 1.25.2 (merges PR #270)\n\nBumps [azure-identity](https://github.com/Azure/azure-sdk-for-python) from 1.25.1 to 1.25.2.\n- [Release notes](https://github.com/Azure/azure-sdk-for-python/releases)\n- [Commits](https://github.com/Azure/azure-sdk-for-python/compare/azure-identity_1.25.1...azure-identity_1.25.2)\n\n---\nupdated-dependencies:\n- dependency-name: azure-identity\n  dependency-version: 1.25.2\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-12T15:54:52Z",
+          "tree_id": "464725a278c450186a4e43ac782a994dc579f7d6",
+          "url": "https://github.com/endavis/infrafoundry/commit/1ab71f8057738b2233af8359b4ec75b01d31a369"
+        },
+        "date": 1773330929468,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6847.752054564597,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016719079280524105",
+            "extra": "mean: 146.03332480962376 usec\nrounds: 2229"
           }
         ]
       }
