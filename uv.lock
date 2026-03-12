@@ -1758,16 +1758,16 @@ wheels = [
 
 [[package]]
 name = "opnsense-openapi"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/19/64/c17e443c3444d5a76671389388993fdd360391b602927035f85738d3518d/opnsense_openapi-0.1.0.tar.gz", hash = "sha256:551d30ac7a5ed25b8d4b929669f428764afd994e3068dac190291a579237d4d1", size = 1909950, upload-time = "2025-11-25T21:03:30.141Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/83/d22cdda8e290f07f3cfcc78245cc028b7649b0b0a8901a0291062c2e59bd/opnsense_openapi-0.2.0.tar.gz", hash = "sha256:1a7b08ddbf5912d964b9572d587f6ce8d9e1cbdabbc2eb03dc382096135cee8c", size = 2159533, upload-time = "2026-02-11T16:57:22.515Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/12/8704c82b74cc1d2a20e1435725bfe0480c0a9fc09177bce183e53bdfa1ec/opnsense_openapi-0.1.0-py3-none-any.whl", hash = "sha256:0755eeda0d0bc73efe177894d3a4f8685644ad46366a65ddd26a6260e390550b", size = 2001927, upload-time = "2025-11-25T21:03:28.106Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/d2/f84376dd5764e99faeef7ee8d16c9cb2e4dfd5fd971342b835d5cceb8c26/opnsense_openapi-0.2.0-py3-none-any.whl", hash = "sha256:512bbf76ba511497abd57e00ee460409327883f6331a41a6a2682c302dd3e3ef", size = 2275282, upload-time = "2026-02-11T16:57:20.095Z" },
 ]
 
 [[package]]
