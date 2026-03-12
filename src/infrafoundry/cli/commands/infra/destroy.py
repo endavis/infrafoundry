@@ -28,14 +28,22 @@ def destroy(
 ) -> None:
     """Destroy infrastructure."""
 
-    def confirm_callback() -> bool:
-        return click.confirm("Are you sure you want to destroy?")
+    if not auto_approve:
+        resource_desc = f" (resources: {', '.join(resource)})" if resource else ""
+        console.warning(f"About to DESTROY infrastructure for environment: {env}{resource_desc}")
+        console.warning("This will permanently remove resources from your infrastructure.")
+
+        if not click.confirm("Are you sure you want to destroy?", default=False):
+            console.warning("Destroy cancelled.")
+            return
+
+        # User confirmed, so pass auto_approve=True to Terraform
+        auto_approve = True
 
     with OperationTimer() as timer:
         orchestrator.destroy(
             env,
             auto_approve=auto_approve,
             resource_filter=list(resource) if resource else None,
-            confirm_callback=confirm_callback,
         )
     console.success(f"Destroy complete! ({timer.elapsed_str})")
