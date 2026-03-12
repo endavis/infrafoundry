@@ -2047,7 +2047,7 @@ wheels = [
 
 [[package]]
 name = "pyinfra"
-version = "3.6"
+version = "3.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -2060,9 +2060,9 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "typeguard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6e/f1/9113db11d625d7d20f78304a8fe1680d1a8782ce0ef2510707beb875e8db/pyinfra-3.6.tar.gz", hash = "sha256:4ce84ec94c8d8915eaad108f183aa4eabf58687679f14f78aad44414bc79a4cd", size = 493500, upload-time = "2026-01-05T09:58:11.829Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/2b/49eeb9000a66157f7cda8b5b4871e1e496f1fb42fd1b94290ee5efb9a3cb/pyinfra-3.7.tar.gz", hash = "sha256:2f8eeee84d4d90c5ee57300ae6673b58237117605cca6b0cffde29f0b2517d4b", size = 599054, upload-time = "2026-03-12T10:55:35.972Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/b0/979bea9fb10d3f717266eef90786499b212eac896f26fa7b8fbbbed864e7/pyinfra-3.6-py3-none-any.whl", hash = "sha256:b17ad60de2eeb37e61e34c6d77aafe5f66d90f7439d5299ac89121333fb5b54b", size = 262629, upload-time = "2026-01-05T09:58:13.097Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/6d/246168fe781009d32199fb7553a9a462e298d17f6e49accedf3b16c65346/pyinfra-3.7-py3-none-any.whl", hash = "sha256:9208de3f4479ad80509db51da874445017987818dba8a36c808f56ce1451b34c", size = 267074, upload-time = "2026-03-12T10:55:34.518Z" },
 ]
 
 [[package]]
