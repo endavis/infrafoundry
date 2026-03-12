@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773319375678,
+  "lastUpdate": 1773327688220,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1054,6 +1054,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007453946525544841",
             "extra": "mean: 142.9635762569486 usec\nrounds: 2367"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a5206c76a3f918b9cf4d04f62d96f6e6f44025f4",
+          "message": "feat: support resource-centric format in package loader (merges PR #355, addresses #354)\n\nAdd cross-provider resource support to PackageLoader. Resource files\ncan now use a `resources:` key where each item declares its own\nprovider and type, enabling packages to manage resources across\nmultiple providers (e.g., OPNsense DHCP reservations in a Proxmox\npackage).\n\nAddresses #354\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-12T15:00:56Z",
+          "tree_id": "c7533b260ffc258cebf6cf9b32f476047304e8bb",
+          "url": "https://github.com/endavis/infrafoundry/commit/a5206c76a3f918b9cf4d04f62d96f6e6f44025f4"
+        },
+        "date": 1773327687803,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6997.60405836922,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001164866674486126",
+            "extra": "mean: 142.9060563671058 usec\nrounds: 2395"
           }
         ]
       }
