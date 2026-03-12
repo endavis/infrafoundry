@@ -50,7 +50,7 @@ jobs:
       - name: Generate SBOM (XML)
         run: uv run cyclonedx-py environment --of XML -o dist/sbom.xml
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist
