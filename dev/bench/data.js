@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773330930467,
+  "lastUpdate": 1773331175324,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1333,6 +1333,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016719079280524105",
             "extra": "mean: 146.03332480962376 usec\nrounds: 2229"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f198f5f1ccf8fed1599640ea3e60ae8423ec75c5",
+          "message": "chore(deps): bump opnsense-openapi from 0.1.0 to 0.2.0 (merges PR #269)\n\nBumps [opnsense-openapi](https://github.com/endavis/opnsense-openapi) from 0.1.0 to 0.2.0.\n- [Commits](https://github.com/endavis/opnsense-openapi/compare/v0.1.0...v0.2.0)\n\n---\nupdated-dependencies:\n- dependency-name: opnsense-openapi\n  dependency-version: 0.2.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-12T15:59:01Z",
+          "tree_id": "b334bcc02d350c66ef29c392ea12dcf22f63c30b",
+          "url": "https://github.com/endavis/infrafoundry/commit/f198f5f1ccf8fed1599640ea3e60ae8423ec75c5"
+        },
+        "date": 1773331174295,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8451.524636598084,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000025653230571767144",
+            "extra": "mean: 118.32184641214288 usec\nrounds: 2676"
           }
         ]
       }
