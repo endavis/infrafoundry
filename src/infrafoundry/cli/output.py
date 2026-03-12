@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Sequence
-from enum import Enum
+from enum import StrEnum
 from functools import wraps
 from typing import Any, TypeVar
 
@@ -22,7 +22,7 @@ BULLET = "•"
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-class OutputFormat(str, Enum):
+class OutputFormat(StrEnum):
     """Output format options for CLI commands."""
 
     TEXT = "text"

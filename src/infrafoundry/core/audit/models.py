@@ -1,7 +1,7 @@
 """Database models for audit trail."""
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import JSON, DateTime, Index, Integer, String, Text
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from infrafoundry.core.state.models import Base
 
 
-class AuditStatus(str, Enum):
+class AuditStatus(StrEnum):
     """Status of an audited operation."""
 
     SUCCESS = "success"
