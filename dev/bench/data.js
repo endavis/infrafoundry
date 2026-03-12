@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773251711294,
+  "lastUpdate": 1773319375678,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1023,6 +1023,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009258486272362607",
             "extra": "mean: 144.03300833322606 usec\nrounds: 2280"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4bb97be75c763fa661d8ebcc4beb1acd0ac7589",
+          "message": "fix: clear stale package events buffer before reloading (merges PR #353, addresses #352)\n\nget_all_resources_all_providers() is called by both _load_resources()\n(which drains the event buffer) and build_dependency_graph() (which\ndoes not). When build_dependency_graph() runs first during the plan\nphase, stale events accumulate in _pending_package_events and persist\ninto the apply phase, causing event handlers to fire twice.\n\nClear _pending_package_events at the start of\nget_all_resources_all_providers() so each call starts fresh.\n\nAddresses #352",
+          "timestamp": "2026-03-12T12:42:25Z",
+          "tree_id": "f2b9a651d66375e0ff2816d52efbd27efd107040",
+          "url": "https://github.com/endavis/infrafoundry/commit/d4bb97be75c763fa661d8ebcc4beb1acd0ac7589"
+        },
+        "date": 1773319375208,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6994.7886460443515,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007453946525544841",
+            "extra": "mean: 142.9635762569486 usec\nrounds: 2367"
           }
         ]
       }
