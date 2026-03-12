@@ -215,14 +215,19 @@ class PackageLoader:
     ) -> list[ResourceConfig]:
         """Extract ResourceConfig objects from parsed YAML data.
 
-        Uses the same logic as ProviderCentricLoader.load_resources:
-        resource type is derived from the filename stem, and both
-        singular and plural key forms are checked.
+        Supports two formats:
+
+        1. **Resource-centric** (``resources:`` key): Each item declares its own
+           ``provider`` and ``type``. The parent provider is used as fallback.
+
+        2. **Provider-centric** (type-named key like ``ova_vms:``): Resource type
+           is derived from the filename stem. Individual items may override
+           ``provider`` via an optional ``provider`` field.
 
         Args:
             data: Parsed YAML data dictionary
             resource_file: Resource filename (e.g., 'vm.yaml')
-            provider: Provider name
+            provider: Default provider name (from parent directory)
 
         Returns:
             List of ResourceConfig objects
@@ -230,7 +235,11 @@ class PackageLoader:
         if not data:
             return []
 
-        # Extract resource type from filename (same logic as ProviderCentricLoader)
+        # Check for resource-centric format first
+        if "resources" in data and isinstance(data["resources"], list):
+            return self._parse_resource_centric(data["resources"], resource_file, provider)
+
+        # Provider-centric: extract resource type from filename
         stem = Path(resource_file).stem
         resource_type = stem.split("-")[0] if "-" in stem else stem
 
@@ -250,12 +259,44 @@ class PackageLoader:
             ResourceConfig(
                 name=item["name"],
                 type=resource_type,
-                provider=provider,
+                provider=item.get("provider", provider),
                 config=item,
             )
             for item in resource_list
             if isinstance(item, dict) and "name" in item
         ]
+
+    def _parse_resource_centric(
+        self, resources: list[Any], resource_file: str, default_provider: str
+    ) -> list[ResourceConfig]:
+        """Parse resource-centric format where each item has provider and type.
+
+        Args:
+            resources: List of resource dicts with provider, type, name, config
+            resource_file: Source filename (for error messages)
+            default_provider: Fallback provider if item lacks one
+
+        Returns:
+            List of ResourceConfig objects
+        """
+        result: list[ResourceConfig] = []
+        for item in resources:
+            if not isinstance(item, dict) or "name" not in item:
+                continue
+            if "type" not in item:
+                raise InvalidConfigurationError(
+                    f"Resource '{item.get('name', '?')}' in {resource_file} "
+                    f"uses resource-centric format but is missing 'type'"
+                )
+            result.append(
+                ResourceConfig(
+                    name=item["name"],
+                    type=item["type"],
+                    provider=item.get("provider", default_provider),
+                    config=item.get("config", item),
+                )
+            )
+        return result
 
     def _rewrite_event_scripts(
         self,
