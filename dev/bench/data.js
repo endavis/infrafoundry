@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773331727128,
+  "lastUpdate": 1773331970935,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1395,6 +1395,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003424866670103043",
             "extra": "mean: 161.303091811403 usec\nrounds: 1612"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "021f64369a7579b4acf52b24fb750f73ffca38b7",
+          "message": "chore(deps): bump pyinfra from 3.6 to 3.6.1 (merges PR #262)\n\nBumps [pyinfra](https://github.com/pyinfra-dev/pyinfra) from 3.6 to 3.6.1.\n- [Release notes](https://github.com/pyinfra-dev/pyinfra/releases)\n- [Changelog](https://github.com/pyinfra-dev/pyinfra/blob/3.x/CHANGELOG.md)\n- [Commits](https://github.com/pyinfra-dev/pyinfra/compare/v3.6...v3.6.1)\n\n---\nupdated-dependencies:\n- dependency-name: pyinfra\n  dependency-version: 3.6.1\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-12T16:12:17Z",
+          "tree_id": "8c6cc67330efe34213a69dae912915809492a8fb",
+          "url": "https://github.com/endavis/infrafoundry/commit/021f64369a7579b4acf52b24fb750f73ffca38b7"
+        },
+        "date": 1773331970260,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6922.846153760466,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011176493966238557",
+            "extra": "mean: 144.44925942154637 usec\nrounds: 2282"
           }
         ]
       }
