@@ -192,6 +192,10 @@ class ConfigManager(PathBasedManager):
 
                 all_resources.extend(resources)
 
+        # Clear any stale package events from previous calls (e.g., from
+        # build_dependency_graph) that did not drain the buffer.
+        self.provider_centric._pending_package_events = {}
+
         # Load from infrastructure packages in provider subdirectories
         for provider_name in discovered_providers:
             for package_dir in self.provider_centric._package_loader.discover_packages(
