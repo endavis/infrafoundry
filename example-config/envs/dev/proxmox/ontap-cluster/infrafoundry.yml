@@ -1,0 +1,91 @@
+# ONTAP Simulator 2-Node Cluster Lab
+#
+# Self-contained infrastructure package. Edit the variables below,
+# then run: infra apply --env dev -r ontap-node-01 -r ontap-node-02
+#
+# This file is the ONLY file you need to edit. All playbooks, roles,
+# and templates derive their configuration from these variables.
+
+name: ontap-cluster
+description: "NetApp ONTAP Simulator 2-node cluster lab"
+
+# All user-customizable values in one place.
+variables:
+  # --- VM Configuration ---
+  node01_name: ontap-node-01
+  node02_name: ontap-node-02
+  node01_vmid: 220
+  node02_vmid: 221
+  node01_target: pve1
+  node02_target: pve2
+  ova_source: "/path/to/vsim-netapp-DOT9.18.1-cm_nodar.ova"
+  disk_storage: local-lvm
+
+  # --- Proxmox Hosts ---
+  pve1_host: "192.168.1.10"
+  pve2_host: "192.168.1.11"
+
+  # --- Network ---
+  # All NICs use the same bridge; management and data ports are
+  # separated by VLAN tag. Set mgmt_vlan to empty string for flat networks.
+  bridge: vmbr0
+  mgmt_vlan: 10
+
+  # --- MAC Addresses (optional) ---
+  # Set these for DHCP reservations. Leave empty to let Proxmox assign.
+  node01_mgmt_mac: ""
+  node01_data_mac: ""
+  node02_mgmt_mac: ""
+  node02_data_mac: ""
+
+  # --- Node 02 Identity ---
+  # Each node in a 2-node cluster must have a unique serial number and
+  # system ID. Node 01 keeps OVA defaults; node 02 gets these values.
+  # Only applied on first boot — changing after ONTAP initializes disks
+  # will corrupt the replicated database.
+  node02_serial_number: "4082368-50-7"
+  node02_sysid: "4082368507"
+
+  # --- Cluster Configuration ---
+  cluster_name: ontap-lab
+  cluster_mgmt_ip: "192.168.1.220"
+  cluster_mgmt_mask: "255.255.255.0"
+  cluster_mgmt_gateway: "192.168.1.1"
+  node01_mgmt_ip: "192.168.1.221"
+  node02_mgmt_ip: "192.168.1.222"
+  node_mgmt_mask: "255.255.255.0"
+  node_mgmt_gateway: "192.168.1.1"
+  ontap_password: "changeme123"
+  dns_domain: "lab.local"
+
+  # --- DHCP Reservations (optional, for Kea integrated DNS) ---
+  # These create DNS entries via Kea DHCP. All IPs are statically assigned
+  # during ONTAP cluster setup, not via DHCP. Remove this section and
+  # dhcp.yaml from resources if you don't use Kea DHCP.
+  dhcp_subnet: my-subnet
+  cluster_mgmt_mac: "01:01:01:01:01:01"  # placeholder — never used for DHCP
+
+  # --- Post-Cluster: SVM & Data LIFs ---
+  svm_name: svm_data
+  data_lif1_ip: "192.168.1.230"
+  data_lif2_ip: "192.168.1.231"
+  data_lif_mask: "255.255.255.0"
+
+  # --- DNS & NTP ---
+  dns_nameserver: "192.168.1.1"
+  ntp_server: "192.168.1.1"
+
+# Resource files (rendered as Jinja2 templates with variables above)
+resources:
+  - vm.yaml
+  - dhcp.yaml
+
+# Event handlers
+events:
+  RUNNER_COMPLETED:
+    - type: script
+      name: ontap-cluster-setup
+      script: scripts/ontap-post-terraform.sh
+      description: "Run ONTAP lab Ansible playbook after Terraform apply"
+      timeout: 3600
+      continue_on_error: false

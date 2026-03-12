@@ -1,0 +1,20 @@
+---
+# ONTAP Simulator Lab — Full Orchestration Playbook
+#
+# Runs both serial setup and cluster setup in sequence.
+# For selective runs, use the individual playbooks:
+#   - ontap-lab-serial-setup.yml  (first boot only — sets sysid on node 02)
+#   - ontap-lab-cluster-setup.yml (cluster create, join, post-config)
+#
+# Usage (automated — all variables from infrafoundry.yml):
+#   Triggered by ontap-post-terraform.sh event handler
+#
+# Usage (manual):
+#   ansible-playbook -i .generated-inventory.yml ontap-lab-playbook.yml \
+#     -e @.generated-vars.json -v
+
+- name: Serial setup
+  ansible.builtin.import_playbook: ontap-lab-serial-setup.yml
+
+- name: Cluster setup
+  ansible.builtin.import_playbook: ontap-lab-cluster-setup.yml

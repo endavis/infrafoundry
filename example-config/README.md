@@ -21,9 +21,13 @@ This repository contains your infrastructure configurations, environment definit
 │   │   ├── settings.yaml    # Environment definition + provider credentials (SOPS encrypted)
 │   │   ├── proxmox/         # Proxmox resources (YAML, not encrypted)
 │   │   │   ├── vms.yaml           # Standard VMs (clone, ISO boot)
-│   │   │   ├── ova_vms.yaml       # OVA-based VMs (ONTAP Simulator)
-│   │   │   ├── ontap-lab-playbook.yml   # ONTAP post-deploy automation
-│   │   │   └── ontap-lab-inventory.yml  # ONTAP lab Ansible inventory
+│   │   │   └── ontap-cluster/     # ONTAP lab infrastructure package
+│   │   │       ├── infrafoundry.yml       # Package manifest (edit this!)
+│   │   │       ├── ova_vms.yaml           # VM definitions (Jinja2 template)
+│   │   │       ├── ontap-lab-playbook.yml # Ansible orchestration playbook
+│   │   │       ├── ontap-lab-inventory.yml# Ansible inventory
+│   │   │       ├── scripts/               # Event handler scripts
+│   │   │       └── roles/                 # ONTAP Ansible roles
 │   │   ├── opnsense/        # OPNsense resources (YAML, not encrypted)
 │   │   └── kubernetes/      # Kubernetes resources (YAML, not encrypted)
 │   ├── staging/             # Staging environment

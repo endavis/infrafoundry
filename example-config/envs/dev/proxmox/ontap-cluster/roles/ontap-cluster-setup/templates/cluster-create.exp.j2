@@ -1,0 +1,141 @@
+#!/usr/bin/expect -f
+# ONTAP Cluster Create — Expect Script (fresh boot, serial primary)
+# Handles both:
+#   A. Wizard auto-start: "Type yes to confirm" → node mgmt → create/join
+#   B. Login prompt: login as admin → cluster setup → wizard
+
+set timestamp [clock format [clock seconds] -format "%Y%m%d-%H%M%S"]
+log_file -noappend /tmp/ontap-cluster-create-{{ ontap_vmid }}-${timestamp}.log
+set timeout {{ ontap_setup_timeout }}
+log_user 1
+spawn socat STDIO,rawer UNIX-CONNECT:/var/run/qemu-server/{{ ontap_vmid }}.serial0
+
+# Nudge console
+send "\r"
+sleep 2
+send "\r"
+
+# Detect state: wizard, login prompt, or CLI
+set need_node_mgmt 1
+expect {
+  "Type yes to confirm and continue*" {
+    # Flow A: wizard auto-started
+    send "yes\r"
+  }
+  "login:" {
+    # Flow B: login as admin (no password on fresh install)
+    send "admin\r"
+    expect {
+      "Password:" {
+        send "\r"
+        expect {
+          "Type yes to confirm and continue*" {
+            send "yes\r"
+          }
+          "::>" {
+            send "cluster setup\r"
+            expect "Type yes to confirm and continue*"
+            send "yes\r"
+          }
+        }
+      }
+      "::>" {
+        send "cluster setup\r"
+        expect "Type yes to confirm and continue*"
+        send "yes\r"
+      }
+    }
+  }
+  "::>" {
+    send "cluster setup\r"
+    expect "Type yes to confirm and continue*"
+    send "yes\r"
+  }
+  timeout {
+    puts "ERROR: Timed out waiting for ONTAP prompt"
+    exit 1
+  }
+}
+
+# Node management (comes first in 9.18.1 wizard)
+expect "Enter the node management interface port*"
+send "e0c\r"
+expect "Enter the node management interface*address*"
+send "{{ ontap_node_mgmt_ip }}\r"
+expect "Enter the node management interface netmask*"
+send "{{ ontap_node_mgmt_mask }}\r"
+expect "Enter the node management interface default gateway*"
+send "{{ ontap_node_mgmt_gateway }}\r"
+
+# Intermediate "press Enter for CLI setup" prompt
+expect "*press Enter to complete cluster setup*"
+send "\r"
+
+# Create or join
+expect "*create*join*"
+send "create\r"
+
+# Single node
+expect "*single node cluster*"
+send "no\r"
+
+# Existing cluster interface configuration (may or may not appear)
+expect {
+  "Do you want to use this configuration*" {
+    send "yes\r"
+    expect "*admin*password*"
+    send "{{ ontap_password }}\r"
+  }
+  "*admin*password*" {
+    send "{{ ontap_password }}\r"
+  }
+}
+expect "Retype the password"
+send "{{ ontap_password }}\r"
+
+# Cluster name
+expect "Enter the cluster name*"
+send "{{ ontap_cluster_name }}\r"
+
+# License keys (skip by pressing Enter)
+expect "*license key*"
+send "\r"
+
+# Cluster management
+expect "Enter the cluster management interface port*"
+send "e0c\r"
+expect "Enter the cluster management interface*address*"
+send "{{ ontap_cluster_mgmt_ip }}\r"
+expect "Enter the cluster management interface netmask*"
+send "{{ ontap_cluster_mgmt_mask }}\r"
+expect "Enter the cluster management interface default gateway*"
+send "{{ ontap_cluster_mgmt_gateway }}\r"
+
+# DNS
+expect "Enter the DNS domain name*"
+send "{{ ontap_dns_domain | default('lab.local') }}\r"
+expect "Enter the name server IP address*"
+send "{{ ontap_cluster_mgmt_gateway }}\r"
+
+# Location (optional)
+expect "Where is the controller located*"
+send "\r"
+
+# Wait for completion
+set timeout {{ ontap_setup_timeout }}
+expect {
+  "Cluster setup is complete" {
+    puts "\nCluster created successfully"
+  }
+  "*::>" {
+    puts "\nCluster setup complete"
+  }
+  "login:" {
+    puts "\nCluster setup complete, at login prompt"
+  }
+  timeout {
+    puts "\nWARNING: Timed out waiting for cluster setup completion"
+  }
+}
+
+exit 0
