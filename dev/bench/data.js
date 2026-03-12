@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773329639387,
+  "lastUpdate": 1773330120528,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1209,6 +1209,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009109523579414205",
             "extra": "mean: 143.9980187032024 usec\nrounds: 2406"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2a25107b34151a3b554b4a32309cf27fd5e0285c",
+          "message": "chore(deps): bump commitizen from 4.13.0 to 4.13.8 (merges PR #275)\n\nBumps [commitizen](https://github.com/commitizen-tools/commitizen) from 4.13.0 to 4.13.8.\n- [Release notes](https://github.com/commitizen-tools/commitizen/releases)\n- [Changelog](https://github.com/commitizen-tools/commitizen/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/commitizen-tools/commitizen/compare/v4.13.0...v4.13.8)\n\n---\nupdated-dependencies:\n- dependency-name: commitizen\n  dependency-version: 4.13.8\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-12T15:41:27Z",
+          "tree_id": "eb2d72c2bbd043b097856f4fd725bfba8e9597d0",
+          "url": "https://github.com/endavis/infrafoundry/commit/2a25107b34151a3b554b4a32309cf27fd5e0285c"
+        },
+        "date": 1773330119082,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 5945.448475284521,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003750822532688722",
+            "extra": "mean: 168.19589037850415 usec\nrounds: 2536"
           }
         ]
       }
