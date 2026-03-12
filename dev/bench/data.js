@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773331175324,
+  "lastUpdate": 1773331727128,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1364,6 +1364,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000025653230571767144",
             "extra": "mean: 118.32184641214288 usec\nrounds: 2676"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d6e3f9710433dffac345f9a5531fc1e3b2b3051f",
+          "message": "chore(deps): bump doit from 0.36.0 to 0.37.0 (merges PR #265)\n\nBumps [doit](https://github.com/pydoit/doit) from 0.36.0 to 0.37.0.\n- [Changelog](https://github.com/pydoit/doit/blob/master/CHANGES)\n- [Commits](https://github.com/pydoit/doit/compare/0.36.0...0.37.0)\n\n---\nupdated-dependencies:\n- dependency-name: doit\n  dependency-version: 0.37.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-12T16:08:12Z",
+          "tree_id": "0243220ae3334ecd8f21f632b773280998b18e62",
+          "url": "https://github.com/endavis/infrafoundry/commit/d6e3f9710433dffac345f9a5531fc1e3b2b3051f"
+        },
+        "date": 1773331726626,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6199.509189626749,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003424866670103043",
+            "extra": "mean: 161.303091811403 usec\nrounds: 1612"
           }
         ]
       }
