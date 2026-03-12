@@ -479,3 +479,159 @@ class TestLoadPackage:
 
         with pytest.raises(InvalidConfigurationError, match="not found"):
             loader.load_package(pkg_dir, "proxmox", "dev")
+
+
+class TestMultiProviderResources:
+    """Tests for multi-provider resource support in packages."""
+
+    def test_resource_centric_format(self, temp_dir):
+        """Resource-centric format with explicit provider and type per item."""
+        loader = PackageLoader(temp_dir)
+        manifest = {
+            "name": "multi-provider",
+            "resources": ["resources.yaml"],
+        }
+        resource_content = """
+resources:
+  - provider: proxmox
+    type: ova_vm
+    name: ontap-node-01
+    config:
+      vmid: 220
+      target_node: pve1
+  - provider: opnsense
+    type: kea_reservation
+    name: ontap-node-01
+    config:
+      subnet_ref: opt1-infrastructure
+      ip_address: "192.168.10.201"
+"""
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "multi-provider",
+            manifest,
+            {"resources.yaml": resource_content},
+        )
+
+        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        assert len(resources) == 2
+        assert resources[0].provider == "proxmox"
+        assert resources[0].type == "ova_vm"
+        assert resources[0].name == "ontap-node-01"
+        assert resources[1].provider == "opnsense"
+        assert resources[1].type == "kea_reservation"
+
+    def test_resource_centric_default_provider(self, temp_dir):
+        """Resource-centric items without provider use parent provider."""
+        loader = PackageLoader(temp_dir)
+        manifest = {
+            "name": "default-provider",
+            "resources": ["resources.yaml"],
+        }
+        resource_content = """
+resources:
+  - type: vm
+    name: web-01
+    config:
+      vmid: 100
+"""
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "default-provider",
+            manifest,
+            {"resources.yaml": resource_content},
+        )
+
+        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        assert len(resources) == 1
+        assert resources[0].provider == "proxmox"
+        assert resources[0].type == "vm"
+
+    def test_resource_centric_missing_type(self, temp_dir):
+        """Resource-centric item without type raises error."""
+        loader = PackageLoader(temp_dir)
+        manifest = {
+            "name": "no-type",
+            "resources": ["resources.yaml"],
+        }
+        resource_content = """
+resources:
+  - provider: proxmox
+    name: bad-resource
+    config:
+      vmid: 100
+"""
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "no-type",
+            manifest,
+            {"resources.yaml": resource_content},
+        )
+
+        with pytest.raises(InvalidConfigurationError, match="missing 'type'"):
+            loader.load_package(pkg_dir, "proxmox", "dev")
+
+    def test_provider_centric_with_provider_override(self, temp_dir):
+        """Provider-centric format items can override provider."""
+        loader = PackageLoader(temp_dir)
+        manifest = {
+            "name": "override",
+            "resources": ["vms.yaml"],
+        }
+        resource_content = """
+vms:
+  - name: vm-01
+    vmid: 100
+  - name: vm-02
+    vmid: 101
+    provider: esxi
+"""
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "override",
+            manifest,
+            {"vms.yaml": resource_content},
+        )
+
+        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        assert len(resources) == 2
+        assert resources[0].provider == "proxmox"
+        assert resources[1].provider == "esxi"
+
+    def test_resource_centric_with_variables(self, temp_dir):
+        """Resource-centric format works with Jinja2 variable rendering."""
+        loader = PackageLoader(temp_dir)
+        manifest = {
+            "name": "templated",
+            "variables": {"node_name": "ontap-01", "vmid": 220},
+            "resources": ["resources.yaml"],
+        }
+        resource_content = """
+resources:
+  - provider: proxmox
+    type: ova_vm
+    name: "{{ node_name }}"
+    config:
+      vmid: {{ vmid }}
+"""
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "templated",
+            manifest,
+            {"resources.yaml": resource_content},
+        )
+
+        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        assert len(resources) == 1
+        assert resources[0].name == "ontap-01"
+        assert resources[0].config["vmid"] == 220
