@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773331970935,
+  "lastUpdate": 1773332379587,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1426,6 +1426,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011176493966238557",
             "extra": "mean: 144.44925942154637 usec\nrounds: 2282"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "10521ac089f9c58eb2e950c89199ed2bb5deaa2d",
+          "message": "chore(deps): bump hashicorp/setup-terraform from 3 to 4 (merges PR #278)\n\nBumps [hashicorp/setup-terraform](https://github.com/hashicorp/setup-terraform) from 3 to 4.\n- [Release notes](https://github.com/hashicorp/setup-terraform/releases)\n- [Changelog](https://github.com/hashicorp/setup-terraform/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/hashicorp/setup-terraform/compare/v3...v4)\n\n---\nupdated-dependencies:\n- dependency-name: hashicorp/setup-terraform\n  dependency-version: '4'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-12T16:19:08Z",
+          "tree_id": "8fcc7a36b161707bb2e77963e4b1d314dfff097d",
+          "url": "https://github.com/endavis/infrafoundry/commit/10521ac089f9c58eb2e950c89199ed2bb5deaa2d"
+        },
+        "date": 1773332379172,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6799.82993974558,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000020694936217681595",
+            "extra": "mean: 147.06250139505926 usec\nrounds: 2150"
           }
         ]
       }
