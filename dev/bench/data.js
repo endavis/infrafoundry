@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773327688220,
+  "lastUpdate": 1773328249052,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1085,6 +1085,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001164866674486126",
             "extra": "mean: 142.9060563671058 usec\nrounds: 2395"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c9809f1a8a488f4493eea7b15ae1d687e75d8ccc",
+          "message": "chore: migrate ONTAP lab example to infrastructure package (merges PR #356, addresses #346)\n\nMove the ONTAP Simulator lab from scattered files into a self-contained\ninfrastructure package at envs/dev/proxmox/ontap-cluster/. All variables\nare centralized in infrafoundry.yml — the only file users need to edit.\nUses expect-script approach for serial console automation, with dynamic\ninventory generation at runtime.\n\nAddresses #346\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-12T15:10:18Z",
+          "tree_id": "142bac1b245b8a5192d163432926d6f1eaf303e8",
+          "url": "https://github.com/endavis/infrafoundry/commit/c9809f1a8a488f4493eea7b15ae1d687e75d8ccc"
+        },
+        "date": 1773328248667,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6736.095893214641,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000019787870983002042",
+            "extra": "mean: 148.45394362739302 usec\nrounds: 2040"
           }
         ]
       }
