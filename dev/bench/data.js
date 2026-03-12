@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773328249052,
+  "lastUpdate": 1773329079652,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1116,6 +1116,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000019787870983002042",
             "extra": "mean: 148.45394362739302 usec\nrounds: 2040"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e1d8e00ccb16ae8e280702c47f01ffea1b0252d1",
+          "message": "fix: resolve destroy command double-prompting for confirmation (merges PR #358, addresses #349)\n\nMove confirmation from orchestrator callback to CLI level, matching\nthe apply command pattern. After user confirms, auto_approve is set\nto True so Terraform does not prompt again.\n\nAddresses #349\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-12T15:24:08Z",
+          "tree_id": "fe63da54605aeca9f5ca5a923bd08ecf040c80f4",
+          "url": "https://github.com/endavis/infrafoundry/commit/e1d8e00ccb16ae8e280702c47f01ffea1b0252d1"
+        },
+        "date": 1773329079172,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7007.593833841131,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009099844203029177",
+            "extra": "mean: 142.70233459747504 usec\nrounds: 2373"
           }
         ]
       }
