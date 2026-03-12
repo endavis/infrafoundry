@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773332379587,
+  "lastUpdate": 1773332594439,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1457,6 +1457,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000020694936217681595",
             "extra": "mean: 147.06250139505926 usec\nrounds: 2150"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2cb8707379502aedacb2755573bc1b589d0b5c53",
+          "message": "chore(deps): bump actions/download-artifact from 7 to 8 (merges PR #279)\n\nBumps [actions/download-artifact](https://github.com/actions/download-artifact) from 7 to 8.\n- [Release notes](https://github.com/actions/download-artifact/releases)\n- [Commits](https://github.com/actions/download-artifact/compare/v7...v8)\n\n---\nupdated-dependencies:\n- dependency-name: actions/download-artifact\n  dependency-version: '8'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-12T16:22:42Z",
+          "tree_id": "153dc7543a4d7a0f75a1d4a871c9e12ac674c4e1",
+          "url": "https://github.com/endavis/infrafoundry/commit/2cb8707379502aedacb2755573bc1b589d0b5c53"
+        },
+        "date": 1773332593908,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7088.672215911548,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007590403699868735",
+            "extra": "mean: 141.07014255157063 usec\nrounds: 2336"
           }
         ]
       }
