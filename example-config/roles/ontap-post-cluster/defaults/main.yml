@@ -25,13 +25,15 @@ ontap_licenses: []
 ontap_assign_disks: true
 
 # Aggregate configuration
+# Use node_index (0-based) instead of hardcoded node names.
+# Actual node names are discovered from the ONTAP REST API at runtime.
 ontap_aggregates:
   - name: aggr1_node01
-    node: "ontap-node-01"
+    node_index: 0
     disk_count: 5
     raid_type: raid_dp
   - name: aggr1_node02
-    node: "ontap-node-02"
+    node_index: 1
     disk_count: 5
     raid_type: raid_dp
 
@@ -46,12 +48,13 @@ ontap_svms:
       - iscsi
 
 # Data LIF configuration
+# Use node_index (0-based) instead of hardcoded node names.
 ontap_lifs:
   - name: svm_data_lif1
     vserver: svm_data
     role: data
     protocol: nfs
-    home_node: "ontap-node-01"
+    node_index: 0
     home_port: e0d
     address: "192.0.2.230"
     netmask: "255.255.255.0"
@@ -60,7 +63,7 @@ ontap_lifs:
     vserver: svm_data
     role: data
     protocol: nfs
-    home_node: "ontap-node-02"
+    node_index: 1
     home_port: e0d
     address: "192.0.2.231"
     netmask: "255.255.255.0"

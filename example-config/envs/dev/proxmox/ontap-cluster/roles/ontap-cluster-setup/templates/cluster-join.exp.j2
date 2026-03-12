@@ -1,0 +1,158 @@
+#!/usr/bin/expect -f
+# ONTAP Cluster Join — Expect Script (fresh boot, serial primary)
+# Handles both:
+#   A. Wizard auto-start: "Type yes to confirm" → node mgmt → create/join
+#   B. Login prompt: login as admin → cluster setup → wizard
+
+set timestamp [clock format [clock seconds] -format "%Y%m%d-%H%M%S"]
+log_file -noappend /tmp/ontap-cluster-join-{{ ontap_vmid }}-${timestamp}.log
+set timeout {{ ontap_join_timeout }}
+log_user 1
+spawn socat STDIO,rawer UNIX-CONNECT:/var/run/qemu-server/{{ ontap_vmid }}.serial0
+
+# Nudge console
+send "\r"
+sleep 2
+send "\r"
+
+# Detect state: wizard, login prompt, or CLI
+expect {
+  "Type yes to confirm and continue*" {
+    send "yes\r"
+  }
+  "login:" {
+    send "admin\r"
+    expect {
+      "Password:" {
+        send "\r"
+        expect {
+          "Type yes to confirm and continue*" {
+            send "yes\r"
+          }
+          "::>" {
+            send "cluster setup\r"
+            expect "Type yes to confirm and continue*"
+            send "yes\r"
+          }
+        }
+      }
+      "::>" {
+        send "cluster setup\r"
+        expect "Type yes to confirm and continue*"
+        send "yes\r"
+      }
+    }
+  }
+  "::>" {
+    send "cluster setup\r"
+    expect "Type yes to confirm and continue*"
+    send "yes\r"
+  }
+  timeout {
+    puts "ERROR: Timed out waiting for ONTAP prompt"
+    exit 1
+  }
+}
+
+# Node management (comes first in 9.18.1 wizard)
+expect "Enter the node management interface port*"
+send "e0c\r"
+expect "Enter the node management interface*address*"
+send "{{ ontap_node_mgmt_ip }}\r"
+expect "Enter the node management interface netmask*"
+send "{{ ontap_node_mgmt_mask }}\r"
+expect "Enter the node management interface default gateway*"
+send "{{ ontap_node_mgmt_gateway }}\r"
+
+# Intermediate "press Enter for CLI setup" prompt
+expect "*press Enter to complete cluster setup*"
+send "\r"
+
+# Join existing cluster
+expect "*create*join*"
+send "join\r"
+
+# Handle existing cluster interface configuration (ONTAP 9.18.1)
+# After choosing "join", ONTAP shows the current cluster network config
+# and asks to confirm before requesting the cluster IP to join.
+expect {
+  "Do you want to use this configuration*" {
+    send "yes\r"
+  }
+  "*IP address*" {
+    # No config prompt, go straight to cluster IP
+    send "{{ ontap_cluster_join_ip }}\r"
+    exp_continue
+  }
+}
+
+# Enter the IP address of an interface on the private cluster network
+# This must be a cluster interconnect IP (169.254.x.x), not the mgmt IP
+expect {
+  "*IP address*" {
+    send "{{ ontap_cluster_join_ip }}\r"
+  }
+  "Cluster setup is complete" {
+    puts "\nNode joined cluster successfully (auto-discovered)"
+    exit 0
+  }
+  "This node has been joined*" {
+    puts "\nNode joined cluster successfully (auto-discovered)"
+    exit 0
+  }
+}
+
+# Admin username for the cluster being joined
+expect {
+  "*username*" {
+    send "{{ ontap_admin_user | default('admin') }}\r"
+  }
+  "Cluster setup is complete" {
+    puts "\nNode joined cluster successfully"
+    exit 0
+  }
+}
+
+# Admin password for the cluster being joined
+expect {
+  "*password*" {
+    send "{{ ontap_password }}\r"
+  }
+  "Cluster setup is complete" {
+    puts "\nNode joined cluster successfully"
+    exit 0
+  }
+}
+
+# Location (optional)
+expect {
+  "Where is the controller located*" {
+    send "\r"
+  }
+  "Cluster setup is complete" {
+    puts "\nNode joined cluster successfully"
+    exit 0
+  }
+}
+
+# Wait for completion
+set timeout {{ ontap_join_timeout }}
+expect {
+  "Cluster setup is complete" {
+    puts "\nNode joined cluster successfully"
+  }
+  "This node has been joined*" {
+    puts "\nNode joined cluster successfully"
+  }
+  "*::>" {
+    puts "\nCluster join complete"
+  }
+  "login:" {
+    puts "\nCluster join complete, at login prompt"
+  }
+  timeout {
+    puts "\nWARNING: Timed out waiting for cluster join completion"
+  }
+}
+
+exit 0

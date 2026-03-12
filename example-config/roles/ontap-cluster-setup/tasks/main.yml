@@ -112,6 +112,8 @@
         responses:
           "Do you want to create a new cluster or join an existing":
             - "join"
+          "Do you want to use this configuration":
+            - "yes"
           "Enter the IP address of the cluster you want to join":
             - "{{ ontap_cluster_join_ip }}"
           "Enter the node management interface port.*e0a":

@@ -32,6 +32,30 @@
       validate_certs: "{{ ontap_validate_certs }}"
 
 # ---------------------------------------------------------------
+# Node discovery — query actual node names from the cluster
+# ---------------------------------------------------------------
+- name: Discover cluster nodes
+  ansible.builtin.uri:
+    url: "https://{{ ontap_cluster_mgmt_ip }}/api/cluster/nodes"
+    user: "{{ ontap_admin_user }}"
+    password: "{{ ontap_admin_password }}"
+    validate_certs: "{{ ontap_validate_certs }}"
+    force_basic_auth: true
+  register: cluster_nodes_response
+
+- name: Set discovered node names
+  ansible.builtin.set_fact:
+    ontap_discovered_nodes: >-
+      {{ cluster_nodes_response.json.records
+         | sort(attribute='name')
+         | map(attribute='name')
+         | list }}
+
+- name: Display discovered nodes
+  ansible.builtin.debug:
+    msg: "Discovered ONTAP nodes: {{ ontap_discovered_nodes }}"
+
+# ---------------------------------------------------------------
 # License installation
 # ---------------------------------------------------------------
 - name: Install ONTAP licenses
@@ -47,11 +71,15 @@
 - name: Assign all unowned disks
   netapp.ontap.na_ontap_disks:
     <<: *ontap_conn
-    node: "{{ item.node }}"
+    node: "{{ ontap_discovered_nodes[item.node_index] }}"
   loop: "{{ ontap_aggregates }}"
   loop_control:
-    label: "{{ item.node }}"
+    label: "{{ ontap_discovered_nodes[item.node_index] }}"
   when: ontap_assign_disks | bool
+  register: disk_assign
+  failed_when:
+    - disk_assign is failed
+    - "'No disk available' not in (disk_assign.msg | default(''))"
 
 # ---------------------------------------------------------------
 # Aggregate creation
@@ -62,7 +90,7 @@
     state: present
     name: "{{ item.name }}"
     nodes:
-      - "{{ item.node }}"
+      - "{{ ontap_discovered_nodes[item.node_index] }}"
     disk_count: "{{ item.disk_count }}"
     raid_type: "{{ item.raid_type }}"
   loop: "{{ ontap_aggregates }}"
@@ -77,8 +105,6 @@
     <<: *ontap_conn
     state: present
     name: "{{ item.name }}"
-    root_volume: "{{ item.root_volume }}"
-    root_volume_aggregate: "{{ item.root_volume_aggregate }}"
     allowed_protocols: "{{ item.allowed_protocols }}"
   loop: "{{ ontap_svms }}"
   loop_control:
@@ -95,7 +121,7 @@
     vserver: "{{ item.vserver }}"
     role: "{{ item.role }}"
     protocols: "{{ item.protocol }}"
-    home_node: "{{ item.home_node }}"
+    home_node: "{{ ontap_discovered_nodes[item.node_index] }}"
     home_port: "{{ item.home_port }}"
     address: "{{ item.address }}"
     netmask: "{{ item.netmask }}"

@@ -1,0 +1,7 @@
+---
+# Ansible collection dependencies for ONTAP lab automation
+#
+# Install: ansible-galaxy collection install -r requirements.yml
+collections:
+  - name: netapp.ontap
+    version: ">=22.0.0"
