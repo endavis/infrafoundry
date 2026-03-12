@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773332594439,
+  "lastUpdate": 1773332817723,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1488,6 +1488,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007590403699868735",
             "extra": "mean: 141.07014255157063 usec\nrounds: 2336"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4861fdce3b2d0aa29ac4e8a2cc015053950eb0eb",
+          "message": "chore(deps): bump actions/upload-artifact from 6 to 7 (merges PR #280)\n\nBumps [actions/upload-artifact](https://github.com/actions/upload-artifact) from 6 to 7.\n- [Release notes](https://github.com/actions/upload-artifact/releases)\n- [Commits](https://github.com/actions/upload-artifact/compare/v6...v7)\n\n---\nupdated-dependencies:\n- dependency-name: actions/upload-artifact\n  dependency-version: '7'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-12T16:26:27Z",
+          "tree_id": "22b3eae63b692ffa5c0496f04592dd236b828108",
+          "url": "https://github.com/endavis/infrafoundry/commit/4861fdce3b2d0aa29ac4e8a2cc015053950eb0eb"
+        },
+        "date": 1773332817362,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6946.925578122014,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007856448385659659",
+            "extra": "mean: 143.94856958728693 usec\nrounds: 2249"
           }
         ]
       }
