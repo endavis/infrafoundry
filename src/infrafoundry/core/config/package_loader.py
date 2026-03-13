@@ -288,12 +288,15 @@ class PackageLoader:
                     f"Resource '{item.get('name', '?')}' in {resource_file} "
                     f"uses resource-centric format but is missing 'type'"
                 )
+            config = item.get("config", item)
+            if "config" in item and "name" not in config:
+                config["name"] = item["name"]
             result.append(
                 ResourceConfig(
                     name=item["name"],
                     type=item["type"],
                     provider=item.get("provider", default_provider),
-                    config=item.get("config", item),
+                    config=config,
                 )
             )
         return result
