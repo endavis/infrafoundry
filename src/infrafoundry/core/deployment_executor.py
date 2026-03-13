@@ -322,6 +322,7 @@ class DeploymentExecutor:
                 EventType.RESOURCE_CREATING,
                 env_name,
                 creating_event,
+                target_resources=resource_filter,
             )
 
         runner_results: dict[str, Any] = {}
@@ -345,6 +346,7 @@ class DeploymentExecutor:
                 starting_event,
                 provider=provider_name,
                 runner=tool_name,
+                target_resources=resource_filter,
             )
 
             try:
@@ -369,6 +371,7 @@ class DeploymentExecutor:
                     completed_event,
                     provider=provider_name,
                     runner=tool_name,
+                    target_resources=resource_filter,
                 )
             except Exception as exc:
                 failed_event: RunnerEventData = {
@@ -383,6 +386,7 @@ class DeploymentExecutor:
                     failed_event,
                     provider=provider_name,
                     runner=tool_name,
+                    target_resources=resource_filter,
                 )
                 raise
 
@@ -416,6 +420,7 @@ class DeploymentExecutor:
                     EventType.RESOURCE_CREATED,
                     env_name,
                     created_event,
+                    target_resources=resource_filter,
                 )
 
         return runner_results

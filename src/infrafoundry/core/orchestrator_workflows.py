@@ -361,6 +361,7 @@ class PlanOrchestrator(HookExecutionMixin):
             EventType.BEFORE_PLAN,
             env_name,
             {"deployment_id": deployment_id, "dry_run": dry_run},
+            target_resources=resource_filter,
         )
 
         results: dict[str, Any] = {}
@@ -451,6 +452,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                 starting_event,
                                 provider=provider_name,
                                 runner=tool_name,
+                                target_resources=resource_filter,
                             )
 
                             try:
@@ -473,6 +475,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                     completed_event,
                                     provider=provider_name,
                                     runner=tool_name,
+                                    target_resources=resource_filter,
                                 )
                             except Exception as exc:
                                 failed_event: RunnerEventData = {
@@ -487,6 +490,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                     failed_event,
                                     provider=provider_name,
                                     runner=tool_name,
+                                    target_resources=resource_filter,
                                 )
                                 raise
                         else:
@@ -509,6 +513,7 @@ class PlanOrchestrator(HookExecutionMixin):
                 EventType.AFTER_PLAN,
                 env_name,
                 {"deployment_id": deployment_id, "results": results},
+                target_resources=resource_filter,
             )
         except Exception as exc:
             self.state_manager.update_deployment_status(
@@ -518,6 +523,7 @@ class PlanOrchestrator(HookExecutionMixin):
                 EventType.PLAN_FAILED,
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
+                target_resources=resource_filter,
             )
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
@@ -756,6 +762,7 @@ class ApplyOrchestrator(HookExecutionMixin):
             EventType.BEFORE_APPLY,
             env_name,
             {"deployment_id": deployment_id, "auto_approve": auto_approve},
+            target_resources=resource_filter,
         )
 
         results: dict[str, Any] = {}
@@ -817,6 +824,7 @@ class ApplyOrchestrator(HookExecutionMixin):
                 EventType.AFTER_APPLY,
                 env_name,
                 {"deployment_id": deployment_id, "results": results},
+                target_resources=resource_filter,
             )
         except Exception as exc:
             self.state_manager.update_deployment_status(
@@ -826,6 +834,7 @@ class ApplyOrchestrator(HookExecutionMixin):
                 EventType.APPLY_FAILED,
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
+                target_resources=resource_filter,
             )
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
@@ -924,6 +933,7 @@ class DestroyOrchestrator(HookExecutionMixin):
             EventType.BEFORE_DESTROY,
             env_name,
             {"deployment_id": deployment_id, "auto_approve": auto_approve},
+            target_resources=resource_filter,
         )
 
         results: dict[str, Any] = {}
@@ -1013,6 +1023,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                         starting_event,
                         provider=provider_name,
                         runner=tool_name,
+                        target_resources=resource_filter,
                     )
 
                     try:
@@ -1035,6 +1046,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                             completed_event,
                             provider=provider_name,
                             runner=tool_name,
+                            target_resources=resource_filter,
                         )
                     except Exception as exc:
                         failed_event: RunnerEventData = {
@@ -1049,6 +1061,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                             failed_event,
                             provider=provider_name,
                             runner=tool_name,
+                            target_resources=resource_filter,
                         )
                         raise
 
@@ -1068,6 +1081,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                 EventType.AFTER_DESTROY,
                 env_name,
                 {"deployment_id": deployment_id, "results": results},
+                target_resources=resource_filter,
             )
         except Exception as exc:
             self.state_manager.update_deployment_status(
@@ -1077,6 +1091,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                 EventType.DESTROY_FAILED,
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
+                target_resources=resource_filter,
             )
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise

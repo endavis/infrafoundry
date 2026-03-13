@@ -1,5 +1,6 @@
 """Tests for the unified event bus."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -315,3 +316,200 @@ class TestBackwardCompatibility:
         event = callback.call_args[0][0]
         assert event.context.provider == "proxmox"
         assert event.context.data["drift"] is True
+
+
+class TestBaseHandlerMatchesResources:
+    """Tests for BaseHandler.matches_resources()."""
+
+    def _make_handler(self, config: dict[str, Any]) -> Any:
+        """Create a concrete handler subclass for testing."""
+        from infrafoundry.core.events.handlers.base import BaseHandler
+
+        class StubHandler(BaseHandler):
+            def execute(self, context: EventContext) -> EventResult:
+                return EventResult(success=True, handler_name=self.name)
+
+            def validate_config(self) -> list[str]:
+                return []
+
+        return StubHandler(config)
+
+    def test_no_config_filter_returns_true(self) -> None:
+        """Handler without resources config fires for any target."""
+        handler = self._make_handler({"name": "no-filter"})
+        assert handler.matches_resources(["res-a", "res-b"]) is True
+
+    def test_no_target_resources_returns_true(self) -> None:
+        """Handler with resources config fires when target is None (no -r)."""
+        handler = self._make_handler({"name": "filtered", "resources": ["res-a"]})
+        assert handler.matches_resources(None) is True
+
+    def test_intersection_returns_true(self) -> None:
+        """Handler fires when target_resources overlaps handler resources."""
+        handler = self._make_handler({"name": "filtered", "resources": ["res-a", "res-b"]})
+        assert handler.matches_resources(["res-b", "res-c"]) is True
+
+    def test_no_intersection_returns_false(self) -> None:
+        """Handler skipped when no overlap between handler and target resources."""
+        handler = self._make_handler({"name": "filtered", "resources": ["res-a"]})
+        assert handler.matches_resources(["res-x", "res-y"]) is False
+
+    def test_empty_config_resources_returns_true(self) -> None:
+        """Empty resources list treated as no filter (fires for all)."""
+        handler = self._make_handler({"name": "empty-filter", "resources": []})
+        assert handler.matches_resources(["res-a"]) is True
+
+    def test_empty_target_resources_returns_true(self) -> None:
+        """Empty target list has no overlap, but empty handler list fires."""
+        handler = self._make_handler({"name": "no-filter"})
+        assert handler.matches_resources([]) is True
+
+
+class TestResourceFilteredEmit:
+    """Tests for resource-scoped filtering in emit()."""
+
+    def test_filtered_handler_skipped_unfiltered_fires(self) -> None:
+        """Only matching handlers execute when target_resources is set."""
+        bus = UnifiedEventBus()
+
+        with patch("importlib.import_module") as mock_import:
+            call_count: dict[str, int] = {"ontap": 0, "aiqum": 0}
+
+            def make_result(name: str) -> EventResult:
+                call_count[name] += 1
+                return EventResult(success=True, handler_name=name)
+
+            # Two separate modules for two handlers
+            ontap_module = MagicMock()
+            ontap_module.handle = MagicMock(side_effect=lambda ctx: make_result("ontap"))
+
+            aiqum_module = MagicMock()
+            aiqum_module.handle = MagicMock(side_effect=lambda ctx: make_result("aiqum"))
+
+            def import_side_effect(module_name: str) -> MagicMock:
+                if module_name == "hooks.ontap":
+                    return ontap_module
+                return aiqum_module
+
+            mock_import.side_effect = import_side_effect
+
+            # Handler scoped to ontap resources
+            bus.register_handler(
+                EventType.AFTER_APPLY,
+                {
+                    "type": "python",
+                    "module": "hooks.ontap",
+                    "name": "ontap-handler",
+                    "resources": ["ontapcl-01", "ontapcl-02"],
+                },
+            )
+
+            # Handler scoped to aiqum resources
+            bus.register_handler(
+                EventType.AFTER_APPLY,
+                {
+                    "type": "python",
+                    "module": "hooks.aiqum",
+                    "name": "aiqum-handler",
+                    "resources": ["aiqum-console"],
+                },
+            )
+
+            # Emit targeting only ontap resources
+            ctx = EventContext(
+                EventType.AFTER_APPLY,
+                "prod",
+                target_resources=["ontapcl-01", "ontapcl-02"],
+            )
+            results = bus.emit(ctx)
+
+            # Only ontap handler should have fired
+            assert len(results) == 1
+            assert results[0].handler_name == "ontap-handler"
+            assert call_count["ontap"] == 1
+            assert call_count["aiqum"] == 0
+
+    def test_handler_without_filter_fires_regardless(self) -> None:
+        """Handler with no resources config fires for any target_resources."""
+        bus = UnifiedEventBus()
+
+        with patch("importlib.import_module") as mock_import:
+            mock_module = MagicMock()
+            mock_module.handle = MagicMock(
+                return_value=EventResult(success=True, handler_name="global")
+            )
+            mock_import.return_value = mock_module
+
+            bus.register_handler(
+                EventType.AFTER_APPLY,
+                {"type": "python", "module": "hooks.global", "name": "global-handler"},
+            )
+
+            ctx = EventContext(
+                EventType.AFTER_APPLY,
+                "prod",
+                target_resources=["res-a"],
+            )
+            results = bus.emit(ctx)
+
+            assert len(results) == 1
+            assert results[0].handler_name == "global-handler"
+
+    def test_config_loading_preserves_resources_field(self) -> None:
+        """Resources field in handler config is preserved through load_config."""
+        bus = UnifiedEventBus()
+
+        with patch("importlib.import_module") as mock_import:
+            mock_module = MagicMock()
+            mock_module.handle = MagicMock(return_value=EventResult(success=True))
+            mock_import.return_value = mock_module
+
+            bus.load_config(
+                {
+                    "after_apply": [
+                        {
+                            "type": "python",
+                            "module": "hooks.scoped",
+                            "resources": ["res-a", "res-b"],
+                        },
+                    ],
+                }
+            )
+
+            handlers = bus._handlers[EventType.AFTER_APPLY]
+            assert len(handlers) == 1
+            assert handlers[0].config["resources"] == ["res-a", "res-b"]
+
+
+class TestEventContextTargetResources:
+    """Tests for target_resources field on EventContext."""
+
+    def test_default_is_none(self) -> None:
+        """target_resources defaults to None."""
+        ctx = EventContext(EventType.BEFORE_PLAN, "dev")
+        assert ctx.target_resources is None
+
+    def test_set_via_constructor(self) -> None:
+        """target_resources can be set via constructor."""
+        ctx = EventContext(
+            EventType.BEFORE_PLAN,
+            "dev",
+            target_resources=["res-a", "res-b"],
+        )
+        assert ctx.target_resources == ["res-a", "res-b"]
+
+    def test_emit_event_passes_target_resources(self) -> None:
+        """emit_event convenience method passes target_resources to context."""
+        bus = UnifiedEventBus()
+        callback = MagicMock()
+        bus.subscribe(EventType.BEFORE_APPLY, callback)
+
+        bus.emit_event(
+            EventType.BEFORE_APPLY,
+            "prod",
+            target_resources=["res-a"],
+        )
+
+        callback.assert_called_once()
+        event = callback.call_args[0][0]
+        assert event.context.target_resources == ["res-a"]

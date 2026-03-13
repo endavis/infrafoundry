@@ -84,6 +84,7 @@ def test_apply_serial_orders_providers_and_tracks_states():
             "name": "fw",
             "terraform_id": None,
         },
+        target_resources=None,
     )
     assert any(
         call_args[0][0] == EventType.RESOURCE_CREATED
@@ -651,7 +652,11 @@ def test_apply_emits_runner_starting_and_completed():
         "runner": "terraform",
         "phase": "apply",
     }
-    assert starting_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+    assert starting_calls[0][1] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "target_resources": None,
+    }
 
     assert completed_calls[0][0][2] == {
         "provider": "proxmox",
@@ -659,7 +664,11 @@ def test_apply_emits_runner_starting_and_completed():
         "phase": "apply",
         "success": True,
     }
-    assert completed_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+    assert completed_calls[0][1] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "target_resources": None,
+    }
 
     # Verify ordering: STARTING before apply, COMPLETED after
     all_call_types = [call[0][0] for call in event_manager.emit_event.call_args_list]
@@ -730,7 +739,11 @@ def test_apply_emits_runner_failed_on_exception():
         "phase": "apply",
         "error": "terraform crashed",
     }
-    assert failed_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+    assert failed_calls[0][1] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "target_resources": None,
+    }
 
     # RUNNER_COMPLETED should NOT have been emitted
     completed_calls = [
