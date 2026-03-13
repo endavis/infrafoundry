@@ -1,6 +1,6 @@
 """Configuration models for InfraFoundry."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -9,7 +9,7 @@ from infrafoundry.core.config.backend_config import BackendConfig
 from infrafoundry.core.hooks.models import HooksConfig
 
 
-class IaCTool(str, Enum):
+class IaCTool(StrEnum):
     """Supported Infrastructure as Code tools."""
 
     TERRAFORM = "terraform"

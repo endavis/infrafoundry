@@ -1,12 +1,12 @@
 """Backend configuration models for Terraform state management."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class BackendType(str, Enum):
+class BackendType(StrEnum):
     """Supported Terraform backend types."""
 
     LOCAL = "local"

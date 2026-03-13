@@ -120,13 +120,13 @@ class TemplateRendererMixin:
         self.jinja_env.filters["to_terraform_name"] = lambda s: str(s).replace("-", "_")
 
         # Convert to snake_case
-        self.jinja_env.filters["to_snake_case"] = (
-            lambda s: str(s).lower().replace("-", "_").replace(" ", "_")
+        self.jinja_env.filters["to_snake_case"] = lambda s: (
+            str(s).lower().replace("-", "_").replace(" ", "_")
         )
 
         # Convert to kebab-case
-        self.jinja_env.filters["to_kebab_case"] = (
-            lambda s: str(s).lower().replace("_", "-").replace(" ", "-")
+        self.jinja_env.filters["to_kebab_case"] = lambda s: (
+            str(s).lower().replace("_", "-").replace(" ", "-")
         )
 
         # Quote string for YAML/JSON
