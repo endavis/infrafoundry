@@ -101,19 +101,19 @@ class TestOVADiskImport:
         content = _render_ova_vms(provider, vms)
         assert "${self.triggers_replace.disk_bus}" in content
 
-    def test_unused_disk_always_greps_index_zero(self, provider):
-        """Grep for unused disk should always use unused0, not an incrementing index.
+    def test_disk_path_parsed_from_import_output(self, provider):
+        """Disk path should be parsed from qm disk import output, not qm config.
 
-        Proxmox renumbers unused disks when one is attached (unused1 becomes
-        unused0, etc.), so the grep must always look for unused0.
+        Parsing 'successfully imported' from stdout is reliable for multi-disk
+        imports, unlike grepping unused0 from qm config which breaks when
+        multiple disks are imported in sequence.
         """
         vms = [_make_ova_vm()]
         content = _render_ova_vms(provider, vms)
-        assert 'grep \\"^unused0:\\"' in content
-        # Ensure no incrementing unused index pattern exists
-        assert "unused${DISK_INDEX}" not in content
-        assert "unused\\${DISK_INDEX}" not in content
-        assert "unused\\$${DISK_INDEX}" not in content
+        assert "successfully imported" in content
+        assert "IMPORT_OUT" in content
+        # Ensure the old fragile unused0 pattern is not used
+        assert "unused0" not in content
 
 
 class TestOVADiskStorage:
