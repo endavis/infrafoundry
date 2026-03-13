@@ -162,7 +162,7 @@ class TestProxmoxTemplates:
     def test_generate_template_terraform(
         self, provider: ProxmoxProvider, template_resource: ResourceConfig
     ) -> None:
-        """Test template Terraform generation."""
+        """Test template Terraform generation for clone-based template."""
         provider.generate_terraform([template_resource])
 
         templates_tf = provider.terraform_dir / "templates.tf"
@@ -172,8 +172,120 @@ class TestProxmoxTemplates:
         # Template generates "template_<name>" not normalized name
         assert "template_ubuntu" in content or "ubuntu" in content
         assert "ubuntu-22.04-template" in content
-        # Template flag may be represented differently in the new templates
-        assert "template" in content
+        # Clone-based templates use proxmox_virtual_environment_vm with template = true
+        assert 'resource "proxmox_virtual_environment_vm"' in content
+        assert "template  = true" in content
+        # Should NOT contain download_file resources
+        assert "proxmox_virtual_environment_download_file" not in content
+
+    def test_generate_download_image_template_terraform(self, provider: ProxmoxProvider) -> None:
+        """Test template Terraform generation for download_image-based template."""
+        template = ResourceConfig(
+            provider="proxmox",
+            type="template",
+            name="rocky9-template",
+            config={
+                "name": "rocky9-template",
+                "target_node": "pve1",
+                "vmid": 901,
+                "cores": 2,
+                "sockets": 1,
+                "memory": 2048,
+                "agent": True,
+                "cloud_init": True,
+                "ciuser": "rocky",
+                "disk": {"storage": "local-lvm", "size": "32G"},
+                "network": {"bridge": "vmbr0", "tag": 100},
+                "download_image": {
+                    "url": "https://example.com/Rocky-9-GenericCloud.qcow2.xz",
+                    "filename": "rocky-9-genericcloud.qcow2",
+                    "decompression": "xz",
+                },
+                "tags": ["template", "rocky"],
+                "description": "Rocky 9 cloud template",
+            },
+        )
+
+        provider.generate_terraform([template])
+
+        templates_tf = provider.terraform_dir / "templates.tf"
+        assert templates_tf.exists()
+
+        content = templates_tf.read_text()
+
+        # Should use native download_file resource
+        assert (
+            'resource "proxmox_virtual_environment_download_file" '
+            '"cloud_image_rocky9_template"' in content
+        )
+        assert 'content_type = "import"' in content
+        assert 'url          = "https://example.com/Rocky-9-GenericCloud.qcow2.xz"' in content
+        assert 'file_name    = "rocky-9-genericcloud.qcow2"' in content
+        assert 'decompression_algorithm = "xz"' in content
+
+        # Should use native VM resource with template = true
+        assert 'resource "proxmox_virtual_environment_vm" "template_rocky9_template"' in content
+        assert "template  = true" in content
+        assert "started   = false" in content
+        assert "vm_id     = 901" in content
+
+        # Check import_from references the download_file resource
+        assert (
+            "import_from  = proxmox_virtual_environment_download_file"
+            ".cloud_image_rocky9_template.id" in content
+        )
+
+        # Check cloud-init initialization block
+        assert "initialization {" in content
+        assert 'username = "rocky"' in content
+        assert "dhcp" in content
+
+        # Check network with VLAN
+        assert 'bridge = "vmbr0"' in content
+        assert "vlan_id = 100" in content
+
+        # Check tags and description
+        assert "rocky" in content
+        assert "Rocky 9 cloud template" in content
+
+        # Should NOT contain null_resource blocks
+        assert "null_resource" not in content
+
+    def test_generate_download_image_template_minimal(self, provider: ProxmoxProvider) -> None:
+        """Test download_image template with minimal config (no optional fields)."""
+        template = ResourceConfig(
+            provider="proxmox",
+            type="template",
+            name="minimal-dl",
+            config={
+                "name": "minimal-dl",
+                "target_node": "pve1",
+                "vmid": 900,
+                "disk": {"storage": "local"},
+                "network": {},
+                "download_image": {
+                    "url": "https://example.com/image.qcow2",
+                    "filename": "image.qcow2",
+                },
+            },
+        )
+
+        provider.generate_terraform([template])
+
+        content = (provider.terraform_dir / "templates.tf").read_text()
+
+        # Should have download_file without decompression
+        assert 'resource "proxmox_virtual_environment_download_file"' in content
+        assert "decompression_algorithm" not in content
+
+        # Should have VM resource with defaults
+        assert "template  = true" in content
+        assert "cores   = 2" in content  # default
+        assert "dedicated = 2048" in content  # default memory
+
+        # Should NOT have cloud-init, tags, description, or agent blocks
+        assert "initialization" not in content
+        assert "null_resource" not in content
 
     def test_generate_network_terraform(
         self, provider: ProxmoxProvider, network_resource: ResourceConfig
