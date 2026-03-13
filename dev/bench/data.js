@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773397248089,
+  "lastUpdate": 1773428165989,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1581,6 +1581,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004399189790080742",
             "extra": "mean: 103.67164689035698 usec\nrounds: 2798"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "36c388a6c9f76467cec0ce6ba9a50ed0aa47020c",
+          "message": "feat: support resource-scoped event handlers in package manifests (merges PR #368, addresses #363)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-13T18:55:32Z",
+          "tree_id": "20b619e85b9872801cae27ff526feb5f911ef314",
+          "url": "https://github.com/endavis/infrafoundry/commit/36c388a6c9f76467cec0ce6ba9a50ed0aa47020c"
+        },
+        "date": 1773428165499,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8558.591692969814,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016398406129388543",
+            "extra": "mean: 116.84165291135673 usec\nrounds: 2181"
           }
         ]
       }
