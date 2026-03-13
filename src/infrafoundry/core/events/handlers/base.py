@@ -47,5 +47,26 @@ class BaseHandler(ABC):
         """
         ...
 
+    def matches_resources(self, target_resources: list[str] | None) -> bool:
+        """Check whether this handler should fire for the given target resources.
+
+        A handler fires if:
+        - It has no ``resources`` filter in its config (fires for all).
+        - ``target_resources`` is None (no -r flag, all resources targeted).
+        - There is an intersection between handler resources and target resources.
+
+        Args:
+            target_resources: Resource names from the -r CLI filter, or None.
+
+        Returns:
+            True if this handler should execute, False to skip.
+        """
+        handler_resources = self.config.get("resources")
+        if not handler_resources:
+            return True
+        if target_resources is None:
+            return True
+        return bool(set(handler_resources) & set(target_resources))
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"

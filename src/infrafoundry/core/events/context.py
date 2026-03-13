@@ -27,6 +27,7 @@ class EventContext:
         runner: Runner name if applicable (e.g., "terraform")
         deployment_id: Deployment ID if in a deployment context
         plan_output: Plan output data if available
+        target_resources: Resource names targeted by -r filter (None = all)
         previous_results: Results from previous handlers in chain
     """
 
@@ -38,6 +39,7 @@ class EventContext:
     runner: str | None = None
     deployment_id: int | None = None
     plan_output: dict[str, Any] | None = None
+    target_resources: list[str] | None = None
     previous_results: list["EventResult"] = field(default_factory=list)
 
     def __repr__(self) -> str:

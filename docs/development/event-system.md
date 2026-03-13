@@ -74,6 +74,7 @@ events:
 | `INFRAFOUNDRY_PHASE` | `data.phase` is set (`plan`, `apply`, or `destroy`) |
 | `INFRAFOUNDRY_CONFIG_DIR` | Always |
 | `INFRAFOUNDRY_DEPLOYMENT_ID` | `context.deployment_id` is set |
+| `INFRAFOUNDRY_TARGET_RESOURCES` | `-r` filter is active (comma-separated list) |
 
 **Example:** Run an Ansible playbook after Terraform finishes for a specific provider:
 
@@ -123,6 +124,29 @@ Script handlers stream stdout and stderr to the console in real-time, line by li
       data={"policy": "strict-naming", "resource": "vm-01"}
   )
   ```
+
+## Resource-Scoped Event Handlers
+
+Event handlers can be scoped to specific resources using the `resources` field.
+When the `-r` CLI filter is active, only handlers whose `resources` list overlaps
+with the targeted resources will fire. Handlers without a `resources` field always
+fire regardless of the `-r` filter.
+
+```yaml
+events:
+  AFTER_APPLY:
+    - type: script
+      script: scripts/cluster-setup.sh
+      resources:
+        - ontap-node1
+        - ontap-node2
+```
+
+In this example, the script only runs when `ontap-node1` or `ontap-node2` is among
+the resources targeted by `-r`. If no `-r` filter is used, all handlers fire.
+
+Scripts receive the targeted resource names as a comma-separated list in the
+`INFRAFOUNDRY_TARGET_RESOURCES` environment variable when the `-r` filter is active.
 
 ## Package Events
 
