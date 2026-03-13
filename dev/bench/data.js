@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773428165989,
+  "lastUpdate": 1773430339691,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1612,6 +1612,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016398406129388543",
             "extra": "mean: 116.84165291135673 usec\nrounds: 2181"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cd476bdabaad57ca9ff56d2e222fea8c63f5adc1",
+          "message": "refactor: replace null_resource template provisioners with native proxmox provider resources (merges PR #369, addresses #366)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-13T19:31:40Z",
+          "tree_id": "85a254d772a5fc0e17b8445a41db9ea86158fcfc",
+          "url": "https://github.com/endavis/infrafoundry/commit/cd476bdabaad57ca9ff56d2e222fea8c63f5adc1"
+        },
+        "date": 1773430338750,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6872.315979448821,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000018039316691679812",
+            "extra": "mean: 145.51135352193202 usec\nrounds: 2229"
           }
         ]
       }
