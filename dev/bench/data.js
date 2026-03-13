@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773395151366,
+  "lastUpdate": 1773397248089,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1550,6 +1550,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00020696013079272041",
             "extra": "mean: 153.02584911256312 usec\nrounds: 2366"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ac89864e830d75f99ac7aef1d75f40a690cb7d91",
+          "message": "fix: correct resource-centric name injection and clean stale .tf files (merges PR #365, addresses #364)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-13T10:20:15Z",
+          "tree_id": "456ebc17eaacd96627dab79e0e634ff4a6b24222",
+          "url": "https://github.com/endavis/infrafoundry/commit/ac89864e830d75f99ac7aef1d75f40a690cb7d91"
+        },
+        "date": 1773397247220,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9645.838857538347,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004399189790080742",
+            "extra": "mean: 103.67164689035698 usec\nrounds: 2798"
           }
         ]
       }
