@@ -251,6 +251,9 @@ class ScriptHandler(BaseHandler):
         if context.deployment_id:
             env["INFRAFOUNDRY_DEPLOYMENT_ID"] = str(context.deployment_id)
 
+        if context.target_resources:
+            env["INFRAFOUNDRY_TARGET_RESOURCES"] = ",".join(context.target_resources)
+
         # Add custom environment variables from config
         custom_env = self.config.get("env", {})
         for key, value in custom_env.items():

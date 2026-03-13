@@ -50,7 +50,15 @@ events:
     - type: script
       script: scripts/cluster-setup.sh
       timeout: 300
+      resources:
+        - lab-ontap-node1
+        - lab-ontap-node2
 ```
+
+Handlers with a `resources` list only fire when those resources are targeted by
+the `-r` CLI filter. Omit `resources` to fire on every invocation. See the
+[Resource-Scoped Event Handlers](../development/event-system.md#resource-scoped-event-handlers)
+section for details.
 
 ### Fields
 

@@ -77,10 +77,16 @@ def test_plan_orchestrator_dry_run_skips_generation(console):
     providers["proxmox"].ensure_directories.assert_not_called()
     state_manager.update_deployment_status.assert_called_with(1, DeploymentStatus.COMPLETED)
     event_manager.emit_event.assert_any_call(
-        EventType.BEFORE_PLAN, "dev", {"deployment_id": 1, "dry_run": True}
+        EventType.BEFORE_PLAN,
+        "dev",
+        {"deployment_id": 1, "dry_run": True},
+        target_resources=None,
     )
     event_manager.emit_event.assert_any_call(
-        EventType.AFTER_PLAN, "dev", {"deployment_id": 1, "results": result}
+        EventType.AFTER_PLAN,
+        "dev",
+        {"deployment_id": 1, "results": result},
+        target_resources=None,
     )
 
 
@@ -326,7 +332,11 @@ def test_plan_emits_runner_starting_and_completed(console):
         "runner": "terraform",
         "phase": "plan",
     }
-    assert starting_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+    assert starting_calls[0][1] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "target_resources": None,
+    }
     assert completed_calls[0][0][2] == {
         "provider": "proxmox",
         "runner": "terraform",
@@ -398,7 +408,11 @@ def test_destroy_emits_runner_starting_and_completed(console):
         "runner": "terraform",
         "phase": "destroy",
     }
-    assert starting_calls[0][1] == {"provider": "proxmox", "runner": "terraform"}
+    assert starting_calls[0][1] == {
+        "provider": "proxmox",
+        "runner": "terraform",
+        "target_resources": None,
+    }
     assert completed_calls[0][0][2] == {
         "provider": "proxmox",
         "runner": "terraform",
