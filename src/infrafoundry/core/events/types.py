@@ -1,9 +1,9 @@
 """Event types for the unified event system."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Types of events that can be emitted.
 
     Events are organized by category:
@@ -74,7 +74,7 @@ class EventType(str, Enum):
     HOOK_FAILED = "hook_failed"
 
 
-class HandlerType(str, Enum):
+class HandlerType(StrEnum):
     """Types of event handlers."""
 
     PYTHON = "python"

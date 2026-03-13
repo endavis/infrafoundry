@@ -6,14 +6,14 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any, override
 
 from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.provider import ResourceConfig
 
 
-class TestStatus(str, Enum):
+class TestStatus(StrEnum):
     """Status of a test execution."""
 
     PASSED = "passed"

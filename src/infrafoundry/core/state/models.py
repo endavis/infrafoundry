@@ -1,7 +1,7 @@
 """Database models for state management."""
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
@@ -15,7 +15,7 @@ class Base(DeclarativeBase):
     pass
 
 
-class DeploymentStatus(str, Enum):
+class DeploymentStatus(StrEnum):
     """Status of a deployment."""
 
     PLANNED = "planned"
@@ -25,7 +25,7 @@ class DeploymentStatus(str, Enum):
     ROLLED_BACK = "rolled_back"
 
 
-class ResourceState(str, Enum):
+class ResourceState(StrEnum):
     """State of a resource."""
 
     PLANNED = "planned"

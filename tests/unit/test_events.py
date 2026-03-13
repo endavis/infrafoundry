@@ -129,7 +129,7 @@ class TestEventManager:
         """Test Event string representation."""
         event = Event(EventType.BEFORE_PLAN, "dev", {"resource": "vm-01"})
         repr_str = repr(event)
-        assert "BEFORE_PLAN" in repr_str
+        assert "before_plan" in repr_str
         assert "dev" in repr_str
 
     def test_global_handler_error_handling(self):

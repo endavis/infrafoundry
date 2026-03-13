@@ -6,14 +6,14 @@ import json
 import shutil
 import subprocess  # nosec B404 - required for running checkov
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, override
 
 from infrafoundry.core.base_manager import BaseManager
 
 
-class ScanSeverity(str, Enum):
+class ScanSeverity(StrEnum):
     """Severity levels for security violations."""
 
     CRITICAL = "critical"
