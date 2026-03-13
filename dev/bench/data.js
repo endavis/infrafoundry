@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773332817723,
+  "lastUpdate": 1773395151366,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1519,6 +1519,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007856448385659659",
             "extra": "mean: 143.94856958728693 usec\nrounds: 2249"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "08f9ee24faf6f65fd6d94bedac6dac840a707da8",
+          "message": "chore: update all dependencies and migrate to StrEnum (merges PR #361, addresses #360)\n\nUpdate all dependencies via uv lock --upgrade. Notable updates:\nruff 0.14.14 → 0.15.5, ansible 13.3.0 → 13.4.0,\ncryptography 46.0.3 → 46.0.5, sqlalchemy 2.0.46 → 2.0.48.\n\nMigrate 11 (str, Enum) classes to StrEnum per ruff UP042 rule\nand apply ruff 0.15 formatting changes.\n\nAddresses #360\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-13T09:45:13Z",
+          "tree_id": "7110d84d0b87fc6041b2a98780bf150b91aa9617",
+          "url": "https://github.com/endavis/infrafoundry/commit/08f9ee24faf6f65fd6d94bedac6dac840a707da8"
+        },
+        "date": 1773395150493,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6534.8436607230815,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00020696013079272041",
+            "extra": "mean: 153.02584911256312 usec\nrounds: 2366"
           }
         ]
       }
