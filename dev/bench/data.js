@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773430339691,
+  "lastUpdate": 1773437313158,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1643,6 +1643,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000018039316691679812",
             "extra": "mean: 145.51135352193202 usec\nrounds: 2229"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "38393e3d2c73323c7e906d9083f8d3eeea5e6124",
+          "message": "fix: parse ova disk path from import output instead of fragile unused0 lookup (merges PR #371, addresses #370)\n\n* fix: parse ova disk path from import output instead of fragile unused0 lookup\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* test: update ova disk import test for new parsing approach\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-13T21:27:54Z",
+          "tree_id": "8ab9d4b4e11095b14b773e21ece09cb4a38d1ac9",
+          "url": "https://github.com/endavis/infrafoundry/commit/38393e3d2c73323c7e906d9083f8d3eeea5e6124"
+        },
+        "date": 1773437312123,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6834.338851237599,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000029672616249373274",
+            "extra": "mean: 146.31993258849238 usec\nrounds: 2685"
           }
         ]
       }
