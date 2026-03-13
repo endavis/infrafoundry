@@ -510,11 +510,45 @@ class TerraformGeneratorMixin:
         rendered = self.render_template(template_name, context or {})
         self._write_terraform_file(output_name, rendered)
 
+    # Files and directories preserved during stale .tf cleanup
+    _PRESERVED_TF_FILES: frozenset[str] = frozenset({"terraform.tfvars"})
+    _PRESERVED_TF_DIRS: frozenset[str] = frozenset({".terraform"})
+    _PRESERVED_TF_PATTERNS: frozenset[str] = frozenset({"terraform.tfstate"})
+
+    def _clean_stale_tf_files(self) -> list[Path]:
+        """Remove stale .tf files from the terraform directory before regenerating.
+
+        Preserves terraform.tfvars, .terraform/ directory, and state files.
+
+        Returns:
+            List of paths that were removed.
+        """
+        terraform_dir = Path(self.terraform_dir)
+        if not terraform_dir.exists():
+            return []
+
+        removed: list[Path] = []
+        for tf_file in terraform_dir.glob("*.tf"):
+            if tf_file.name in self._PRESERVED_TF_FILES:
+                continue
+            tf_file.unlink()
+            removed.append(tf_file)
+
+        if removed and hasattr(self, "_logger"):
+            self._logger.debug("Cleaned %d stale .tf file(s) from %s", len(removed), terraform_dir)
+
+        return removed
+
     def prepare_terraform_generation(
         self,
         resources: list[ResourceConfig],
     ) -> dict[str, list[ResourceConfig]]:
-        """Ensure directories exist and group resources for Terraform generation.
+        """Ensure directories exist, clean stale files, and group resources.
+
+        Removes previously generated ``.tf`` files before regenerating to prevent
+        stale resources from persisting when config entries are removed. Files
+        like ``terraform.tfvars``, the ``.terraform/`` directory, and state files
+        are preserved.
 
         Args:
             resources: Resources to generate Terraform for.
@@ -532,6 +566,9 @@ class TerraformGeneratorMixin:
 
         provider = cast("_TerraformProviderProtocol", self)
         provider.ensure_directories()
+
+        # Clean stale .tf files before regenerating
+        self._clean_stale_tf_files()
 
         group_resources = getattr(provider, "group_resources_by_type", None)
         if not group_resources:
