@@ -48,11 +48,17 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
   provisioner "local-exec" {
     command = <<-EOT
       ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} "
+        set -e
         cd /tmp/ova-${self.triggers_replace.name}
         DISK_INDEX=0
         for VMDK in \$(ls -1 *.vmdk 2>/dev/null | sort); do
-          qm disk import ${self.triggers_replace.vmid} \$VMDK {{ vm.config.disk_storage | default('local-lvm') }} --format qcow2
-          DISK_PATH=\$(qm config ${self.triggers_replace.vmid} | grep \"^unused0:\" | sed 's/^unused[0-9]*: //')
+          IMPORT_OUT=\$(qm disk import ${self.triggers_replace.vmid} \$VMDK {{ vm.config.disk_storage | default('local-lvm') }} --format qcow2 2>&1)
+          echo \"\$IMPORT_OUT\"
+          DISK_PATH=\$(echo \"\$IMPORT_OUT\" | grep 'successfully imported' | sed \"s/.*'\\(.*\\)'.*/\\1/\")
+          if [ -z \"\$DISK_PATH\" ]; then
+            echo \"ERROR: Failed to import disk \$VMDK\" >&2
+            exit 1
+          fi
           qm set ${self.triggers_replace.vmid} --${self.triggers_replace.disk_bus}\$${DISK_INDEX} \$DISK_PATH
           DISK_INDEX=\$((DISK_INDEX + 1))
         done
