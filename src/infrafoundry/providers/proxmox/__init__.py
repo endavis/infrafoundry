@@ -286,27 +286,16 @@ class ProxmoxProvider(
                 base[key] = value
 
     def _generate_templates_terraform(self, templates: list[ResourceConfig]) -> None:
-        """Generate Terraform for Proxmox templates."""
-        from urllib.parse import urlparse
+        """Generate Terraform for Proxmox templates.
 
-        from infrafoundry.core.config import ConfigManager
-
-        # Extract SSH hostname from API URL for templates that need it
-        ssh_hostname = None
-        if self._current_environment:
-            config_manager = ConfigManager(self.config_dir)
-            try:
-                env_config = config_manager.load_environment(self._current_environment)
-                provider_settings = env_config.get_provider_settings("proxmox")
-                if provider_settings and "api_url" in provider_settings:
-                    parsed = urlparse(provider_settings["api_url"])
-                    ssh_hostname = parsed.hostname
-            except FileNotFoundError:
-                pass
-
+        Uses native bpg/proxmox provider resources for download_image templates
+        (proxmox_virtual_environment_download_file + proxmox_virtual_environment_vm
+        with template=true). Clone-based templates use proxmox_virtual_environment_vm
+        with template=true directly.
+        """
         self.render_and_write_terraform(
             "proxmox/templates.tf.j2",
-            context={"templates": templates, "ssh_hostname": ssh_hostname},
+            context={"templates": templates},
             output_name="templates.tf",
         )
 
