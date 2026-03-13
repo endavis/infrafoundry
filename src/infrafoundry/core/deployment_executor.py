@@ -7,7 +7,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.config.models import IaCTool
 from infrafoundry.core.events import EventManager, EventType
-from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.exceptions import InfraFoundryError, ResourceFilterError
 from infrafoundry.core.execution_planner import ExecutionPlanner
 from infrafoundry.core.protocols import Applyable, StateAware
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
@@ -63,6 +63,40 @@ class DeploymentExecutor:
             runner = self.runner_registry.create_runner(tool_name, console=self.console)
             if runner:
                 self.runners[tool_name] = runner
+
+    def _validate_resource_filter(
+        self,
+        resources_by_provider: dict[str, list[ResourceConfig]],
+        filter_set: set[str],
+    ) -> None:
+        """Validate that resource filter matches at least one resource.
+
+        Args:
+            resources_by_provider: Dict mapping provider names to resources
+            filter_set: Set of resource names to filter by
+
+        Raises:
+            ResourceFilterError: If no resources match the filter
+        """
+        all_resource_names: set[str] = set()
+        matched_names: set[str] = set()
+        for resources in resources_by_provider.values():
+            for r in resources:
+                all_resource_names.add(r.name)
+                if r.name in filter_set:
+                    matched_names.add(r.name)
+
+        unmatched = filter_set - matched_names
+        if not matched_names:
+            raise ResourceFilterError(
+                f"No resources matched filter: {', '.join(sorted(filter_set))}. "
+                f"Available resources: {', '.join(sorted(all_resource_names))}"
+            )
+        elif unmatched:
+            self.console.print(
+                f"[yellow]Warning: Some resources not found: "
+                f"{', '.join(sorted(unmatched))}[/yellow]"
+            )
 
     def _get_sorted_runners(self) -> list[tuple[str, BaseRunner]]:
         """Get runners sorted by priority, filtering by configured IaC tool.
@@ -120,6 +154,10 @@ class DeploymentExecutor:
 
         # Convert to set for O(1) lookups
         filter_set = set(resource_filter) if resource_filter else None
+
+        # Validate resource filter before proceeding
+        if filter_set:
+            self._validate_resource_filter(resources_by_provider, filter_set)
 
         # Sort providers using execution planner (forward order for apply)
         sorted_providers = self.execution_planner.sort_providers(
@@ -189,6 +227,10 @@ class DeploymentExecutor:
 
         # Convert to set for O(1) lookups
         filter_set = set(resource_filter) if resource_filter else None
+
+        # Validate resource filter before proceeding
+        if filter_set:
+            self._validate_resource_filter(resources_by_provider, filter_set)
 
         # Get execution batches from planner (forward order for apply)
         batches = self.execution_planner.plan_apply(resources_by_provider)

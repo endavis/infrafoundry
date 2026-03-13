@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from infrafoundry.core.config.models import IaCTool
 from infrafoundry.core.deployment_executor import DeploymentExecutor
 from infrafoundry.core.events import EventType
+from infrafoundry.core.exceptions import ResourceFilterError
 from infrafoundry.core.state import ResourceState
 
 
@@ -706,8 +709,6 @@ def test_apply_emits_runner_failed_on_exception():
         providers=providers,
     )
 
-    import pytest
-
     with pytest.raises(RuntimeError, match="terraform crashed"):
         executor.apply_single_provider(
             env_name="dev",
@@ -752,3 +753,104 @@ def test_apply_emits_runner_failed_on_exception():
         if call[0][0] == EventType.RUNNER_COMPLETED
     ]
     assert len(completed_calls) == 0
+
+
+def _make_executor(providers=None):
+    """Create a minimal DeploymentExecutor for resource filter tests."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    state_manager = MagicMock()
+    event_manager = MagicMock()
+
+    return DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers or {},
+    )
+
+
+def test_validate_resource_filter_zero_matches_raises():
+    """Zero resource filter matches raises ResourceFilterError."""
+    executor = _make_executor()
+    resources_by_provider = {
+        "proxmox": [_resource("vm1"), _resource("vm2")],
+    }
+
+    with pytest.raises(ResourceFilterError, match="No resources matched filter"):
+        executor._validate_resource_filter(resources_by_provider, {"nonexistent"})
+
+
+def test_validate_resource_filter_error_includes_names():
+    """Error message includes unmatched filter names and available resource names."""
+    executor = _make_executor()
+    resources_by_provider = {
+        "proxmox": [_resource("vm1"), _resource("vm2")],
+    }
+
+    with pytest.raises(ResourceFilterError) as exc_info:
+        executor._validate_resource_filter(resources_by_provider, {"nonexistent"})
+
+    error_msg = str(exc_info.value)
+    assert "nonexistent" in error_msg
+    assert "vm1" in error_msg
+    assert "vm2" in error_msg
+
+
+def test_validate_resource_filter_partial_match_warns():
+    """Partial match warns but does not raise."""
+    executor = _make_executor()
+    resources_by_provider = {
+        "proxmox": [_resource("vm1"), _resource("vm2")],
+    }
+
+    # Should not raise
+    executor._validate_resource_filter(resources_by_provider, {"vm1", "nonexistent"})
+
+
+def test_validate_resource_filter_full_match_succeeds():
+    """Full match does not raise or warn."""
+    executor = _make_executor()
+    resources_by_provider = {
+        "proxmox": [_resource("vm1"), _resource("vm2")],
+    }
+
+    # Should not raise
+    executor._validate_resource_filter(resources_by_provider, {"vm1", "vm2"})
+
+
+def test_apply_serial_raises_on_zero_filter_matches():
+    """apply_serial raises ResourceFilterError when filter matches nothing."""
+    providers = {"proxmox": MagicMock()}
+    executor = _make_executor(providers=providers)
+    resources_by_provider = {
+        "proxmox": [_resource("vm1")],
+    }
+
+    with pytest.raises(ResourceFilterError, match="No resources matched filter"):
+        executor.apply_serial(
+            env_name="dev",
+            deployment_id=1,
+            resources_by_provider=resources_by_provider,
+            resource_filter=["nonexistent"],
+            auto_approve=True,
+        )
+
+
+def test_apply_parallel_raises_on_zero_filter_matches():
+    """apply_parallel raises ResourceFilterError when filter matches nothing."""
+    providers = {"proxmox": MagicMock()}
+    executor = _make_executor(providers=providers)
+    resources_by_provider = {
+        "proxmox": [_resource("vm1")],
+    }
+
+    with pytest.raises(ResourceFilterError, match="No resources matched filter"):
+        executor.apply_parallel(
+            env_name="dev",
+            deployment_id=1,
+            resources_by_provider=resources_by_provider,
+            resource_filter=["nonexistent"],
+            auto_approve=True,
+            max_workers=2,
+        )
