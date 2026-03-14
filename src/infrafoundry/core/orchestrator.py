@@ -14,6 +14,7 @@ from infrafoundry.core.dependencies import DependencyGraph
 from infrafoundry.core.deployment_executor import DeploymentExecutor
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import Event, EventManager, EventType
+from infrafoundry.core.exceptions import ResourceFilterError
 from infrafoundry.core.execution_planner import ExecutionPlanner
 from infrafoundry.core.hooks import HookManager
 from infrafoundry.core.notifications import NotificationManager
@@ -335,6 +336,25 @@ class Orchestrator:
                     original_count=original_count,
                 )
             )
+
+        # Validate resource filter results
+        if filter_set:
+            matched_names = {r.name for batch in batches for r in batch.resources}
+            unmatched = filter_set - matched_names
+            if not matched_names:
+                all_names = sorted(
+                    {r.name for resources in resources_by_provider.values() for r in resources}
+                )
+                raise ResourceFilterError(
+                    f"No resources matched filter: {', '.join(sorted(filter_set))}. "
+                    f"Available resources: {', '.join(all_names)}"
+                )
+            elif unmatched:
+                self.console.print(
+                    f"[yellow]Warning: Some resources not found: "
+                    f"{', '.join(sorted(unmatched))}[/yellow]"
+                )
+
         return batches
 
     def validate_resources(self, resources: list[ResourceConfig]) -> None:
