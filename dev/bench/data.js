@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773480618887,
+  "lastUpdate": 1773484782651,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1705,6 +1705,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001816994198145864",
             "extra": "mean: 110.36993381556037 usec\nrounds: 2765"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "90171fb142fafd9e321d53cd1371f6ce94da5830",
+          "message": "feat: add package model foundation with env-root discovery (merges PR #373, addresses #357)\n\nfeat: add env-root package discovery and loose resource deprecation\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T10:39:12Z",
+          "tree_id": "1fc586fa33c01a0722d1285b8b3ef48a90baef6c",
+          "url": "https://github.com/endavis/infrafoundry/commit/90171fb142fafd9e321d53cd1371f6ce94da5830"
+        },
+        "date": 1773484782291,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6784.577457158054,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000020715212299079996",
+            "extra": "mean: 147.39311420860145 usec\nrounds: 2224"
           }
         ]
       }
