@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773495448860,
+  "lastUpdate": 1773496070058,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1829,6 +1829,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004306533155032207",
             "extra": "mean: 103.52979374769723 usec\nrounds: 2783"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "distinct": true,
+          "id": "9ba889143488659a01d7310c8df6be8b9806c0ef",
+          "message": "fix: namespace provider files in per-package terraform directories\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T13:47:17Z",
+          "tree_id": "73f6ede762cdc29f136cb9fbaf868d02665c0a1d",
+          "url": "https://github.com/endavis/infrafoundry/commit/9ba889143488659a01d7310c8df6be8b9806c0ef"
+        },
+        "date": 1773496069563,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6882.051123614969,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001004679098196904",
+            "extra": "mean: 145.30551750314885 usec\nrounds: 2371"
           }
         ]
       }
