@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773506766129,
+  "lastUpdate": 1773509236600,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1984,6 +1984,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001313567637130104",
             "extra": "mean: 143.2258899587123 usec\nrounds: 2181"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "06d317e2e8284c15b12409a48935d042b7bff954",
+          "message": "fix: decrypt SOPS-encrypted settings.yaml before generating tfvars (merges PR #385, addresses #384)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T17:26:45Z",
+          "tree_id": "11f950e4c39d4d7f98720f25136b0ab8817bf25e",
+          "url": "https://github.com/endavis/infrafoundry/commit/06d317e2e8284c15b12409a48935d042b7bff954"
+        },
+        "date": 1773509236049,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7030.789865064862,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008740904729365387",
+            "extra": "mean: 142.23153005452178 usec\nrounds: 2379"
           }
         ]
       }
