@@ -150,7 +150,13 @@ class ProviderCentricLoader:
 
         providers = set()
         for item in env_dir.iterdir():
-            if item.is_dir() and item.name not in ("resources", "secrets"):
-                providers.add(item.name)
+            if not item.is_dir():
+                continue
+            if item.name in ("resources", "secrets"):
+                continue
+            # Skip directories that are env-root packages (contain infrafoundry.yml)
+            if (item / PackageLoader.MANIFEST_FILENAME).exists():
+                continue
+            providers.add(item.name)
 
         return providers

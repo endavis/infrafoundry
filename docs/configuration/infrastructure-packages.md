@@ -2,21 +2,28 @@
 
 ## Overview
 
-Infrastructure packages are self-contained directories within a provider that bundle
-resource templates, variables, and event handlers into a single deployable unit.
-Instead of scattering configuration across `settings.yaml`, provider resource files,
-and scripts directories, a package keeps everything together.
+Infrastructure packages are self-contained directories that bundle resource templates,
+variables, and event handlers into a single deployable unit. Instead of scattering
+configuration across `settings.yaml`, provider resource files, and scripts directories,
+a package keeps everything together.
+
+Packages can be placed in two locations:
+
+- **Provider-scoped:** Under a provider directory (`envs/{env}/{provider}/{package}/`)
+- **Env-root:** Directly under the environment directory (`envs/{env}/{package}/`)
 
 ## Directory Structure
 
-A package is a subdirectory of a provider directory containing an `infrafoundry.yml`
-manifest file:
+### Provider-scoped packages
+
+A provider-scoped package is a subdirectory of a provider directory containing an
+`infrafoundry.yml` manifest file. The provider is inferred from the parent directory:
 
 ```
 envs/dev/
   settings.yaml
   proxmox/
-    vm.yaml                    # Regular provider resources
+    vm.yaml                    # Regular provider resources (deprecated)
     ontap-cluster/             # Infrastructure package
       infrafoundry.yml         # Package manifest
       vm.yaml                  # Resource template (Jinja2)
@@ -26,6 +33,26 @@ envs/dev/
       roles/
         ontap-config/          # Ansible role (excluded from scanning)
 ```
+
+### Env-root packages
+
+An env-root package sits directly under the environment directory rather than under
+a provider. Because there is no parent provider directory to infer from, env-root
+packages **must** declare a `provider` field in their manifest:
+
+```
+envs/dev/
+  settings.yaml
+  ontap-cluster/               # Env-root package
+    infrafoundry.yml           # Must include provider field
+    vm.yaml
+    network.yaml
+  proxmox/                     # Provider directory (no infrafoundry.yml)
+    vm.yaml
+```
+
+Env-root packages are discovered during resource loading and are skipped by provider
+discovery so they are not mistaken for provider directories.
 
 ## Package Manifest (`infrafoundry.yml`)
 
@@ -66,6 +93,7 @@ section for details.
 |:------|:-----|:---------|:------------|
 | `name` | string | Yes | Package identifier |
 | `description` | string | No | Human-readable description |
+| `provider` | string | Env-root: Yes, Provider-scoped: No | Target provider name. Required for env-root packages; optional override for provider-scoped packages. |
 | `variables` | dict | No | Key-value pairs for template rendering |
 | `resources` | list[string] | No | Resource template files to render and load |
 | `events` | dict | No | Event handlers (same format as `settings.yaml` events) |
@@ -140,13 +168,31 @@ Non-script handlers (webhook, python) are passed through unchanged.
 
 ## Package Discovery
 
-Packages are discovered automatically during resource loading:
+Packages are discovered automatically during resource loading from two locations:
+
+### Provider-scoped discovery
 
 1. Only **direct subdirectories** of provider directories are scanned (no recursion)
 2. A subdirectory is a package if it contains `infrafoundry.yml`
 3. The following directory names are **excluded** from scanning:
    `roles`, `tasks`, `handlers`, `defaults`, `vars`, `meta`, `files`, `templates`, `scripts`
 4. Packages are loaded in alphabetical order by directory name
+
+### Env-root discovery
+
+1. Direct subdirectories of `envs/{env}/` are scanned for `infrafoundry.yml`
+2. Directories named `resources` or `secrets` are excluded, along with the standard
+   exclusion list above
+3. Directories containing `infrafoundry.yml` are **skipped** during provider discovery
+   so they are not mistaken for provider directories
+4. Env-root packages must declare a `provider` field in the manifest
+
+## Loose Resource Deprecation
+
+!!! warning "Deprecated"
+    Loose resource files (YAML files not inside a package directory) are deprecated.
+    They will continue to work but emit `DeprecationWarning` messages. Migrate them
+    to packages with an `infrafoundry.yml` manifest.
 
 ## Loading Order
 
@@ -155,9 +201,10 @@ are registered with the event bus after all resources (from all providers) have
 been loaded. This means:
 
 1. Regular resources from `*.yaml` files in provider directories
-2. Package resources from subdirectories with `infrafoundry.yml`
-3. Resource-centric resources from `resources/*.yaml`
-4. Package events registered with the event bus
+2. Provider-scoped package resources from subdirectories with `infrafoundry.yml`
+3. Env-root package resources from `envs/{env}/{package}/infrafoundry.yml`
+4. Resource-centric resources from `resources/*.yaml`
+5. Package events registered with the event bus
 
 ## Duplicate Detection
 

@@ -1,6 +1,8 @@
 """Refactored configuration manager - coordinates between loaders."""
 
 import os
+import subprocess  # nosec B404 - needed for SOPS decryption
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -8,9 +10,10 @@ import yaml
 
 from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
+from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
-from infrafoundry.core.exceptions import InvalidConfigurationError
+from infrafoundry.core.exceptions import InvalidConfigurationError, PackageNotFoundError
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -52,6 +55,7 @@ class ConfigManager(PathBasedManager):
         # Initialize loaders
         self.provider_centric = ProviderCentricLoader(base_dir)
         self.resource_centric = ResourceCentricLoader(base_dir)
+        self._package_loader = PackageLoader(base_dir)
 
     def load_environment(self, env_name: str) -> EnvironmentConfig:
         """Load environment configuration.
@@ -74,8 +78,7 @@ class ConfigManager(PathBasedManager):
 
         self._log_debug(f"Loading environment config: {env_name}")
         try:
-            with open(settings_file) as f:
-                data = yaml.safe_load(f)
+            data = self._load_yaml_with_sops(settings_file)
         except yaml.YAMLError as e:
             error_msg = f"Invalid YAML in {settings_file}: {e}"
             self._log_error(error_msg)
@@ -96,6 +99,34 @@ class ConfigManager(PathBasedManager):
 
         self._log_debug(f"Loaded environment config: {env_name}")
         return EnvironmentConfig(**data)
+
+    @staticmethod
+    def _load_yaml_with_sops(file_path: Path) -> dict[str, Any]:
+        """Load a YAML file, decrypting with SOPS if encrypted.
+
+        Detects SOPS encryption by checking for the ``sops`` metadata key
+        in the file content. If found, runs ``sops --decrypt`` to get
+        plaintext YAML before parsing.
+
+        Args:
+            file_path: Path to the YAML file.
+
+        Returns:
+            Parsed YAML data as a dictionary.
+        """
+        with open(file_path) as f:
+            raw = f.read()
+
+        if "sops:" in raw and "ENC[AES256_GCM," in raw:
+            result = subprocess.run(  # nosec B603 B607 - trusted sops command
+                ["sops", "--decrypt", str(file_path)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return yaml.safe_load(result.stdout) or {}
+
+        return yaml.safe_load(raw) or {}
 
     def load_resources(
         self, env_name: str, provider: str, resource_file: str
@@ -168,6 +199,7 @@ class ConfigManager(PathBasedManager):
         """
         all_resources = []
         resource_locations: dict[str, list[str]] = {}  # Track where each resource is defined
+        loose_resource_files: list[str] = []  # Track loose resource files for deprecation
 
         # Discover and load from provider-centric directories
         discovered_providers = self.provider_centric.discover_providers(env_name)
@@ -189,6 +221,9 @@ class ConfigManager(PathBasedManager):
                     if key not in resource_locations:
                         resource_locations[key] = []
                     resource_locations[key].append(str(config_file))
+
+                if resources:
+                    loose_resource_files.append(str(config_file))
 
                 all_resources.extend(resources)
 
@@ -216,6 +251,32 @@ class ConfigManager(PathBasedManager):
                         handlers
                     )
 
+        # Load env-root packages (directories at envs/{env}/ with infrafoundry.yml)
+        for package_dir in self._package_loader.discover_env_root_packages(env_name):
+            manifest = self._package_loader._parse_manifest(
+                package_dir / PackageLoader.MANIFEST_FILENAME
+            )
+            if not manifest.provider:
+                raise InvalidConfigurationError(
+                    f"Env-root package '{manifest.name}' at {package_dir} "
+                    f"must declare a 'provider' field in its manifest. "
+                    f"Provider cannot be inferred for packages outside provider directories."
+                )
+            pkg_resources, pkg_events = self._package_loader.load_package(
+                package_dir, manifest.provider, env_name
+            )
+            for resource in pkg_resources:
+                key = f"{resource.provider}:{resource.name}"
+                if key not in resource_locations:
+                    resource_locations[key] = []
+                resource_locations[key].append(str(package_dir / "infrafoundry.yml"))
+
+            all_resources.extend(pkg_resources)
+            for event_type, handlers in pkg_events.items():
+                self.provider_centric._pending_package_events.setdefault(event_type, []).extend(
+                    handlers
+                )
+
         # Load from resource-centric files
         resources_dir = self.base_dir / env_name / "resources"
         if resources_dir.exists():
@@ -229,7 +290,21 @@ class ConfigManager(PathBasedManager):
                         resource_locations[key] = []
                     resource_locations[key].append(str(config_file))
 
+                if resources:
+                    loose_resource_files.append(str(config_file))
+
                 all_resources.extend(resources)
+
+        # Emit deprecation warnings for loose resources (not in packages)
+        if loose_resource_files:
+            file_list = ", ".join(loose_resource_files)
+            warnings.warn(
+                f"Loose resources (not in packages) are deprecated and will be "
+                f"removed in a future release. Migrate these files to infrastructure "
+                f"packages with an infrafoundry.yml manifest: {file_list}",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         # Check for duplicate resource names
         duplicates = [
@@ -292,6 +367,54 @@ class ConfigManager(PathBasedManager):
             self._log_warning(f"Environment {env_name} missing settings.yaml")
 
         return is_valid
+
+    def resolve_package_filter(self, env_name: str, package_name: str) -> list[str]:
+        """Resolve a package name to a list of unique resource names.
+
+        Searches both provider-scoped and env-root packages for a package
+        whose manifest name matches *package_name*, then returns the names
+        of all resources declared by that package.
+
+        Args:
+            env_name: Environment name
+            package_name: Package name to resolve
+
+        Returns:
+            List of unique resource names belonging to the package
+
+        Raises:
+            PackageNotFoundError: If no package with the given name is found
+        """
+        # Check provider-scoped packages
+        discovered_providers = self.provider_centric.discover_providers(env_name)
+        for provider_name in discovered_providers:
+            for package_dir in self._package_loader.discover_packages(env_name, provider_name):
+                manifest = self._package_loader._parse_manifest(
+                    package_dir / PackageLoader.MANIFEST_FILENAME
+                )
+                if manifest.name == package_name:
+                    effective_provider = manifest.provider or provider_name
+                    pkg_resources, _ = self._package_loader.load_package(
+                        package_dir, effective_provider, env_name
+                    )
+                    return list(dict.fromkeys(r.name for r in pkg_resources))
+
+        # Check env-root packages
+        for package_dir in self._package_loader.discover_env_root_packages(env_name):
+            manifest = self._package_loader._parse_manifest(
+                package_dir / PackageLoader.MANIFEST_FILENAME
+            )
+            if manifest.name == package_name:
+                if not manifest.provider:
+                    continue
+                pkg_resources, _ = self._package_loader.load_package(
+                    package_dir, manifest.provider, env_name
+                )
+                return list(dict.fromkeys(r.name for r in pkg_resources))
+
+        raise PackageNotFoundError(
+            f"Package '{package_name}' not found in environment '{env_name}'"
+        )
 
     def cleanup(self) -> None:
         """Cleanup resources (required by BaseManager).

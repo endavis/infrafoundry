@@ -104,3 +104,4 @@ coverage.xml
 
 # AI agent settings originals
 .gemini/settings.json.orig
+endavis-infra
