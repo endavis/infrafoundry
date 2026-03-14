@@ -56,9 +56,9 @@ infra destroy --env dev --auto-approve
   - `infra history [--env <env>]` — view deployment history.
   - `infra diff --env-a <env1> --env-b <env2> [--provider ...] [--verbose]` — compare configurations between two environments.
 - **Plan/Apply/Destroy**
-  - `infra plan --env <env> [--resource ...] [--dry-run]`
-  - `infra apply --env <env> [--resource ...] [--auto-approve]`
-  - `infra destroy --env <env> [--resource ...] [--auto-approve]`
+  - `infra plan --env <env> [--resource ...] [--package <name>] [--dry-run]`
+  - `infra apply --env <env> [--resource ...] [--package <name>] [--auto-approve]`
+  - `infra destroy --env <env> [--resource ...] [--package <name>] [--auto-approve]`
   - `infra reset --env <env> --provider <provider> --component <component> [--auto-approve]` — completely remove component configuration from provider for clean reapply.
 - **Rollback and Recovery**
   - `infra rollback-points --env <env> [--limit <n>]` — list available rollback points for an environment.
@@ -95,6 +95,13 @@ infra destroy --env dev --auto-approve
   infra plan --env dev --resource vm-01 --resource vm-02
   infra apply --env dev --resource vm-01 --auto-approve
   ```
+- **Target an entire package:**
+  ```bash
+  infra plan --env dev --package ontap-cluster
+  infra apply --env dev -p ontap-cluster --auto-approve
+  infra destroy --env dev -p ontap-cluster
+  ```
+  Note: `--package` (`-p`) and `--resource` (`-r`) are mutually exclusive.
 - **Rollback to previous deployment:**
   ```bash
   # View deployment history to find deployment ID

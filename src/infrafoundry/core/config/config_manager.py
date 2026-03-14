@@ -12,7 +12,7 @@ from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
-from infrafoundry.core.exceptions import InvalidConfigurationError
+from infrafoundry.core.exceptions import InvalidConfigurationError, PackageNotFoundError
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -381,6 +381,54 @@ class ConfigManager(PathBasedManager):
                 resource_to_package[resource.name] = manifest.name
 
         return resource_to_package
+
+    def resolve_package_filter(self, env_name: str, package_name: str) -> list[str]:
+        """Resolve a package name to a list of resource names.
+
+        Searches both provider-scoped and env-root packages for a package
+        whose manifest name matches *package_name*, then returns the names
+        of all resources declared by that package.
+
+        Args:
+            env_name: Environment name
+            package_name: Package name to resolve
+
+        Returns:
+            List of resource names belonging to the package
+
+        Raises:
+            PackageNotFoundError: If no package with the given name is found
+        """
+        # Check provider-scoped packages
+        discovered_providers = self.provider_centric.discover_providers(env_name)
+        for provider_name in discovered_providers:
+            for package_dir in self._package_loader.discover_packages(env_name, provider_name):
+                manifest = self._package_loader._parse_manifest(
+                    package_dir / PackageLoader.MANIFEST_FILENAME
+                )
+                if manifest.name == package_name:
+                    effective_provider = manifest.provider or provider_name
+                    pkg_resources, _ = self._package_loader.load_package(
+                        package_dir, effective_provider, env_name
+                    )
+                    return [r.name for r in pkg_resources]
+
+        # Check env-root packages
+        for package_dir in self._package_loader.discover_env_root_packages(env_name):
+            manifest = self._package_loader._parse_manifest(
+                package_dir / PackageLoader.MANIFEST_FILENAME
+            )
+            if manifest.name == package_name:
+                if not manifest.provider:
+                    continue
+                pkg_resources, _ = self._package_loader.load_package(
+                    package_dir, manifest.provider, env_name
+                )
+                return [r.name for r in pkg_resources]
+
+        raise PackageNotFoundError(
+            f"Package '{package_name}' not found in environment '{env_name}'"
+        )
 
     def get_package_events(self) -> dict[str, list[dict[str, Any]]]:
         """Return accumulated package events from last resource load.
