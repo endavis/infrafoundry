@@ -486,6 +486,51 @@ class TerraformGeneratorMixin:
 
         self._write_tfvars_lines(lines)
 
+    def _split_provider_terraform_block(self, provider_name: str, rendered: str) -> None:
+        """Split rendered provider template into terraform and provider blocks.
+
+        In package context, the ``terraform { required_providers {} }`` block
+        must be shared across providers in a single file, while each provider's
+        ``provider "X" {}`` block goes in a namespaced file.
+
+        Args:
+            provider_name: Provider name for namespacing output files.
+            rendered: Full rendered provider template content.
+        """
+        import re
+
+        terraform_dir = Path(self.terraform_dir)
+
+        # Extract terraform { ... } block (required_providers)
+        tf_block_match = re.search(r"(terraform\s*\{.*?\n\})", rendered, re.DOTALL)
+        # Everything else is the provider block
+        provider_block = re.sub(r"terraform\s*\{.*?\n\}", "", rendered, flags=re.DOTALL).strip()
+
+        # Append required_providers to shared file
+        if tf_block_match:
+            req_providers_file = terraform_dir / "required_providers.tf"
+            # Extract just the inner required_providers content
+            tf_content = tf_block_match.group(1)
+            inner_match = re.search(r"required_providers\s*\{(.*?)\n  \}", tf_content, re.DOTALL)
+            if inner_match:
+                provider_entry = inner_match.group(1).strip()
+                # Build or append to required_providers.tf
+                if req_providers_file.exists():
+                    existing = req_providers_file.read_text()
+                    # Insert before closing braces
+                    existing = existing.rstrip().rstrip("}").rstrip().rstrip("}")
+                    new_content = f"{existing}\n    {provider_entry}\n  }}\n}}\n"
+                    req_providers_file.write_text(new_content)
+                else:
+                    req_providers_file.write_text(
+                        f"terraform {{\n  required_providers {{\n    {provider_entry}\n  }}\n}}\n"
+                    )
+
+        # Write provider block to namespaced file
+        if provider_block:
+            provider_file = terraform_dir / f"provider_{provider_name}.tf"
+            provider_file.write_text(provider_block + "\n")
+
     def render_and_write_terraform(
         self,
         template_name: str,
@@ -518,7 +563,7 @@ class TerraformGeneratorMixin:
         self._write_terraform_file(output_name, rendered)
 
     # Files and directories preserved during stale .tf cleanup
-    _PRESERVED_TF_FILES: frozenset[str] = frozenset({"terraform.tfvars"})
+    _PRESERVED_TF_FILES: frozenset[str] = frozenset({"terraform.tfvars", "required_providers.tf"})
     _PRESERVED_TF_DIRS: frozenset[str] = frozenset({".terraform"})
     _PRESERVED_TF_PATTERNS: frozenset[str] = frozenset({"terraform.tfstate"})
 
@@ -610,13 +655,21 @@ class TerraformGeneratorMixin:
         # When in package context, namespace provider/variables files to avoid
         # overwriting when multiple providers share the same package directory.
         pkg = getattr(provider, "_current_package", None)
-        provider_output = f"provider_{provider.name}.tf" if pkg else "provider.tf"
         variables_output = f"variables_{provider.name}.tf" if pkg else "variables.tf"
 
-        self.render_and_write_terraform(
-            provider_template or f"{provider.name}/provider.tf.j2",
-            output_name=provider_output,
-        )
+        if pkg:
+            # In package context, split rendered provider template into:
+            # 1. terraform { required_providers {} } → appended to shared required_providers.tf
+            # 2. provider "X" {} block → provider_{name}.tf
+            rendered = self.render_template(  # type: ignore[attr-defined]
+                provider_template or f"{provider.name}/provider.tf.j2", {}
+            )
+            self._split_provider_terraform_block(provider.name, rendered)
+        else:
+            self.render_and_write_terraform(
+                provider_template or f"{provider.name}/provider.tf.j2",
+                output_name="provider.tf",
+            )
 
         variables_template_name = variables_template or f"{provider.name}/variables.tf.j2"
         self.render_and_write_terraform(
