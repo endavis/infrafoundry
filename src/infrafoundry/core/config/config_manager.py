@@ -1,6 +1,7 @@
 """Refactored configuration manager - coordinates between loaders."""
 
 import os
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,7 @@ import yaml
 
 from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
+from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
 from infrafoundry.core.exceptions import InvalidConfigurationError
@@ -52,6 +54,7 @@ class ConfigManager(PathBasedManager):
         # Initialize loaders
         self.provider_centric = ProviderCentricLoader(base_dir)
         self.resource_centric = ResourceCentricLoader(base_dir)
+        self._package_loader = PackageLoader(base_dir)
 
     def load_environment(self, env_name: str) -> EnvironmentConfig:
         """Load environment configuration.
@@ -168,6 +171,7 @@ class ConfigManager(PathBasedManager):
         """
         all_resources = []
         resource_locations: dict[str, list[str]] = {}  # Track where each resource is defined
+        loose_resource_files: list[str] = []  # Track loose resource files for deprecation
 
         # Discover and load from provider-centric directories
         discovered_providers = self.provider_centric.discover_providers(env_name)
@@ -189,6 +193,9 @@ class ConfigManager(PathBasedManager):
                     if key not in resource_locations:
                         resource_locations[key] = []
                     resource_locations[key].append(str(config_file))
+
+                if resources:
+                    loose_resource_files.append(str(config_file))
 
                 all_resources.extend(resources)
 
@@ -216,6 +223,32 @@ class ConfigManager(PathBasedManager):
                         handlers
                     )
 
+        # Load env-root packages (directories at envs/{env}/ with infrafoundry.yml)
+        for package_dir in self._package_loader.discover_env_root_packages(env_name):
+            manifest = self._package_loader._parse_manifest(
+                package_dir / PackageLoader.MANIFEST_FILENAME
+            )
+            if not manifest.provider:
+                raise InvalidConfigurationError(
+                    f"Env-root package '{manifest.name}' at {package_dir} "
+                    f"must declare a 'provider' field in its manifest. "
+                    f"Provider cannot be inferred for packages outside provider directories."
+                )
+            pkg_resources, pkg_events = self._package_loader.load_package(
+                package_dir, manifest.provider, env_name
+            )
+            for resource in pkg_resources:
+                key = f"{resource.provider}:{resource.name}"
+                if key not in resource_locations:
+                    resource_locations[key] = []
+                resource_locations[key].append(str(package_dir / "infrafoundry.yml"))
+
+            all_resources.extend(pkg_resources)
+            for event_type, handlers in pkg_events.items():
+                self.provider_centric._pending_package_events.setdefault(event_type, []).extend(
+                    handlers
+                )
+
         # Load from resource-centric files
         resources_dir = self.base_dir / env_name / "resources"
         if resources_dir.exists():
@@ -229,7 +262,21 @@ class ConfigManager(PathBasedManager):
                         resource_locations[key] = []
                     resource_locations[key].append(str(config_file))
 
+                if resources:
+                    loose_resource_files.append(str(config_file))
+
                 all_resources.extend(resources)
+
+        # Emit deprecation warnings for loose resources (not in packages)
+        if loose_resource_files:
+            file_list = ", ".join(loose_resource_files)
+            warnings.warn(
+                f"Loose resources (not in packages) are deprecated and will be "
+                f"removed in a future release. Migrate these files to infrastructure "
+                f"packages with an infrafoundry.yml manifest: {file_list}",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         # Check for duplicate resource names
         duplicates = [
