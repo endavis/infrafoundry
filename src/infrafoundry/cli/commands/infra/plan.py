@@ -19,6 +19,12 @@ from ...utils import console
     help="Specific resource name(s) to target (can be used multiple times)",
 )
 @click.option(
+    "--package",
+    "-p",
+    "package_name",
+    help="Target a specific package by name (mutually exclusive with -r)",
+)
+@click.option(
     "--enforce-policies",
     is_flag=True,
     help="Enforce policy checks (block on violations)",
@@ -30,14 +36,24 @@ def plan(
     env: str,
     dry_run: bool,
     resource: tuple[str, ...],
+    package_name: str | None,
     enforce_policies: bool,
 ) -> None:
     """Plan infrastructure changes."""
+    if package_name and resource:
+        raise click.UsageError("--package and --resource are mutually exclusive")
+
+    resource_filter: list[str] | None = None
+    if package_name:
+        resource_filter = orchestrator.config_manager.resolve_package_filter(env, package_name)
+    elif resource:
+        resource_filter = list(resource)
+
     with OperationTimer() as timer:
         orchestrator.plan(
             env,
             dry_run=dry_run,
-            resource_filter=list(resource) if resource else None,
+            resource_filter=resource_filter,
             enforce_policies=enforce_policies,
         )
 
