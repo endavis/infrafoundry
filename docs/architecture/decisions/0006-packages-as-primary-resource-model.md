@@ -26,8 +26,11 @@ We will promote packages to the primary resource model in three phases:
 4. Emit deprecation warnings when loose resources (not in packages) are found.
 5. Add `PackageNotFoundError` exception for package resolution errors.
 
-### Phase 2 (future)
+### Phase 2 (this ADR, PR 2)
 - Per-package terraform state isolation: each package gets its own terraform working directory and state file.
+- `ProviderBase.set_package_context()` / `clear_package_context()` switch `terraform_dir` between `generated/{env}/terraform/{package}/` and the default `generated/{env}/terraform/{provider}/`.
+- Plan, apply, and destroy workflows group resources by package and process each group in its own terraform working directory.
+- Loose resources (not in any package) continue to use the per-provider directory.
 
 ### Phase 3 (future)
 - `--package` / `-p` CLI flag for `plan`/`apply`/`destroy` to target specific packages.

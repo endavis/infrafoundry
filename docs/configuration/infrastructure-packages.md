@@ -187,6 +187,42 @@ Packages are discovered automatically during resource loading from two locations
    so they are not mistaken for provider directories
 4. Env-root packages must declare a `provider` field in the manifest
 
+## Per-Package State Isolation
+
+Each package gets its own terraform working directory and state file. When a
+package context is active, generated terraform files are written to
+`generated/{env}/terraform/{package-name}/` instead of the default
+`generated/{env}/terraform/{provider}/`.
+
+This means:
+
+- **Independent state:** Applying or destroying one package cannot affect
+  another package's terraform state.
+- **Targeted operations:** `plan`, `apply`, and `destroy` process each package
+  separately, running `terraform init`, `plan`, and `apply` within the
+  package-scoped directory.
+- **Loose resources** (not inside a package) continue to use the per-provider
+  directory `generated/{env}/terraform/{provider}/`.
+
+### Directory layout example
+
+```
+generated/prod/
+  terraform/
+    ontap-cluster/           # Package-scoped state
+      main.tf
+      .terraform/
+        terraform.tfstate
+    k8s-cluster/             # Another package
+      main.tf
+      .terraform/
+        terraform.tfstate
+    proxmox/                 # Loose resources (per-provider)
+      main.tf
+      .terraform/
+        terraform.tfstate
+```
+
 ## Loose Resource Deprecation
 
 !!! warning "Deprecated"

@@ -57,12 +57,42 @@ class DeploymentExecutor:
         # Create execution planner with configured provider order
         self.execution_planner = ExecutionPlanner(provider_order=provider_order)
 
+        # Resource-to-package mapping for per-package state isolation.
+        # Set by the orchestrator before apply_serial/apply_parallel calls.
+        self.resource_package_map: dict[str, str] = {}
+
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
         for tool_name in self.runner_registry.list_runners():
             runner = self.runner_registry.create_runner(tool_name, console=self.console)
             if runner:
                 self.runners[tool_name] = runner
+
+    @staticmethod
+    def _group_by_package(
+        resources: list[ResourceConfig],
+        package_map: dict[str, str],
+    ) -> list[tuple[str | None, list[ResourceConfig]]]:
+        """Split resources into (package_name, resources) groups.
+
+        Args:
+            resources: Resources to split
+            package_map: Mapping of resource name to package name
+
+        Returns:
+            List of (package_name_or_None, resources) tuples
+        """
+        groups: dict[str | None, list[ResourceConfig]] = {}
+        for resource in resources:
+            pkg = package_map.get(resource.name)
+            groups.setdefault(pkg, []).append(resource)
+
+        result: list[tuple[str | None, list[ResourceConfig]]] = []
+        for pkg_name in sorted(k for k in groups if k is not None):
+            result.append((pkg_name, groups[pkg_name]))
+        if None in groups:
+            result.append((None, groups[None]))
+        return result
 
     def _validate_resource_filter(
         self,
@@ -184,16 +214,32 @@ class DeploymentExecutor:
             # Set environment for provider to ensure correct output directory
             provider.set_environment(env_name)
 
-            result = self.apply_single_provider(
-                env_name=env_name,
-                deployment_id=deployment_id,
-                provider_name=provider_name,
-                provider=provider,
-                resources=resources,
-                auto_approve=auto_approve,
-                resource_filter=resource_filter,
-            )
-            results[provider_name] = result
+            # Group by package for state isolation
+            package_groups = self._group_by_package(resources, self.resource_package_map)
+
+            for pkg_name, pkg_resources in package_groups:
+                if pkg_name is not None:
+                    provider.set_package_context(pkg_name)
+                    self.console.print(
+                        f"  [dim]Package: {pkg_name} ({len(pkg_resources)} resources)[/dim]"
+                    )
+                else:
+                    provider.clear_package_context()
+
+                result = self.apply_single_provider(
+                    env_name=env_name,
+                    deployment_id=deployment_id,
+                    provider_name=provider_name,
+                    provider=provider,
+                    resources=pkg_resources,
+                    auto_approve=auto_approve,
+                    resource_filter=resource_filter,
+                )
+                result_key = f"{provider_name}/{pkg_name}" if pkg_name else provider_name
+                results[result_key] = result
+
+            # Restore provider context
+            provider.clear_package_context()
 
         return results
 
@@ -243,9 +289,9 @@ class DeploymentExecutor:
 
         # Process each batch sequentially
         for batch_idx, batch in enumerate(batches, 1):
-            batch_providers = []
-
             # Filter to providers we have registered and have matching resources
+            # Each entry is (provider_name, pkg_name_or_None, resources)
+            batch_items: list[tuple[str, str | None, list[ResourceConfig]]] = []
             for provider_name in batch.providers:
                 if provider_name not in self.providers:
                     continue
@@ -258,24 +304,33 @@ class DeploymentExecutor:
                     if not resources:
                         continue
 
-                batch_providers.append((provider_name, resources))
+                # Sub-group by package for state isolation
+                package_groups = self._group_by_package(resources, self.resource_package_map)
+                for pkg_name, pkg_resources in package_groups:
+                    batch_items.append((provider_name, pkg_name, pkg_resources))
 
-            if not batch_providers:
+            if not batch_items:
                 continue
 
             if len(batches) > 1:
+                unique_providers = sorted({p for p, _, _ in batch_items})
                 self.console.print(
-                    f"\n[dim]Batch {batch_idx}/{len(batches)}: "
-                    f"{', '.join(p[0] for p in batch_providers)}[/dim]"
+                    f"\n[dim]Batch {batch_idx}/{len(batches)}: {', '.join(unique_providers)}[/dim]"
                 )
 
-            # Run providers in this batch in parallel
+            # Run providers/packages in this batch in parallel
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                future_to_provider: dict[Any, str] = {}
+                future_to_label: dict[Any, str] = {}
 
-                for provider_name, resources in batch_providers:
+                for provider_name, pkg_name, pkg_resources in batch_items:
                     provider = self.providers[provider_name]
                     provider.set_environment(env_name)
+                    if pkg_name is not None:
+                        provider.set_package_context(pkg_name)
+                    else:
+                        provider.clear_package_context()
+
+                    label = f"{provider_name}/{pkg_name}" if pkg_name else provider_name
 
                     future = executor.submit(
                         self.apply_single_provider,
@@ -283,37 +338,35 @@ class DeploymentExecutor:
                         deployment_id=deployment_id,
                         provider_name=provider_name,
                         provider=provider,
-                        resources=resources,
+                        resources=pkg_resources,
                         auto_approve=auto_approve,
                         resource_filter=resource_filter,
                     )
-                    future_to_provider[future] = provider_name
+                    future_to_label[future] = label
 
                 # Collect results as they complete
                 with Progress(
                     SpinnerColumn(), TextColumn("[progress.description]{task.description}")
                 ) as progress:
                     task = progress.add_task(
-                        "[cyan]Applying providers...", total=len(future_to_provider)
+                        "[cyan]Applying providers...", total=len(future_to_label)
                     )
 
-                    for future in as_completed(future_to_provider):
-                        provider_name = future_to_provider[future]
+                    for future in as_completed(future_to_label):
+                        label = future_to_label[future]
                         try:
                             result = future.result()
-                            results[provider_name] = result
-                            self.console.print(f"[green]✓ {provider_name} completed[/green]")
+                            results[label] = result
+                            self.console.print(f"[green]✓ {label} completed[/green]")
                         except InfraFoundryError as e:
-                            self.console.print(f"[red]✗ {provider_name} failed: {e.message}[/red]")
+                            self.console.print(f"[red]✗ {label} failed: {e.message}[/red]")
                             if e.context:
                                 self.console.print(f"  Context: {e.context}", style="dim red")
-                            results[provider_name] = {"error": str(e)}
+                            results[label] = {"error": str(e)}
                         except Exception as e:
-                            self.console.print(
-                                f"[red]✗ {provider_name} failed (unexpected): {e}[/red]"
-                            )
+                            self.console.print(f"[red]✗ {label} failed (unexpected): {e}[/red]")
                             self.console.print(traceback.format_exc(), style="dim red")
-                            results[provider_name] = {"error": str(e)}
+                            results[label] = {"error": str(e)}
                         progress.update(task, advance=1)
 
         return results

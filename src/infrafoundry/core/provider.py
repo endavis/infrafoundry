@@ -41,6 +41,7 @@ class ProviderBase(ABC):
         self.ansible_dir = output_dir / "ansible" / name
         self.pyinfra_dir = output_dir / "pyinfra" / name
         self._current_environment: str | None = None
+        self._current_package: str | None = None
 
     def set_environment(self, env_name: str) -> None:
         """Set the current environment and update output directories.
@@ -49,14 +50,53 @@ class ProviderBase(ABC):
         or generate_pyinfra() to ensure files are generated in the correct
         environment-specific directory.
 
+        Also clears any active package context so that subsequent calls
+        default to the per-provider directory layout.
+
         Args:
             env_name: Environment name (e.g., 'dev', 'staging', 'prod')
         """
         self._current_environment = env_name
+        self._current_package = None
         self.output_dir = self.base_output_dir / env_name
         self.terraform_dir = self.output_dir / "terraform" / self.name
         self.ansible_dir = self.output_dir / "ansible" / self.name
         self.pyinfra_dir = self.output_dir / "pyinfra" / self.name
+
+    def set_package_context(self, package_name: str) -> None:
+        """Set package context for isolated terraform state.
+
+        When a package context is active, ``terraform_dir`` points to a
+        package-scoped directory instead of the per-provider default.
+        This gives each package its own terraform working directory and
+        state file, so that applying or destroying one package cannot
+        affect another package's resources.
+
+        Must be called after ``set_environment()``.
+
+        Args:
+            package_name: Name of the infrastructure package
+
+        Raises:
+            RuntimeError: If called before set_environment()
+        """
+        if self._current_environment is None:
+            raise RuntimeError(
+                "set_package_context() requires set_environment() to be called first"
+            )
+        self._current_package = package_name
+        self.terraform_dir = self.output_dir / "terraform" / package_name
+
+    def clear_package_context(self) -> None:
+        """Clear the active package context and restore per-provider paths.
+
+        After this call, ``terraform_dir`` reverts to the standard
+        ``generated/{env}/terraform/{provider}/`` layout used for loose
+        resources.
+        """
+        self._current_package = None
+        if self._current_environment is not None:
+            self.terraform_dir = self.output_dir / "terraform" / self.name
 
     @abstractmethod
     def validate_config(self, config: dict[str, Any]) -> bool:
