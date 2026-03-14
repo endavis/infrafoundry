@@ -9,7 +9,7 @@ import pytest
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager
-from infrafoundry.core.exceptions import SecretNotFoundError
+from infrafoundry.core.exceptions import ResourceFilterError, SecretNotFoundError
 from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.orchestrator import Orchestrator, OrchestratorStrictConfig
 from infrafoundry.core.orchestrator_workflows import PlanOrchestrator
@@ -521,3 +521,95 @@ class TestPlanOrchestratorStrictMode:
         provider = SimpleNamespace(terraform_dir=tmp_path)
 
         workflow._export_secrets("proxmox", "dev", provider)
+
+
+class TestIterProviderBatchesResourceFilter:
+    """Tests for resource filter validation in _iter_provider_batches."""
+
+    def _make_orchestrator(self, tmp_path):
+        """Create a minimal Orchestrator for testing _iter_provider_batches."""
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        config_manager.load_environment.return_value = None
+        config_manager.get_all_resources_all_providers.return_value = []
+        return Orchestrator(config_manager)
+
+    def _resource(self, name, provider="proxmox", type_="vm"):
+        from infrafoundry.core.provider import ResourceConfig
+
+        return ResourceConfig(name=name, provider=provider, type=type_, config={"id": name})
+
+    def test_no_filter_returns_all_batches(self, tmp_path):
+        """No resource filter returns all provider batches."""
+        orchestrator = self._make_orchestrator(tmp_path)
+        resources_by_provider = {
+            "proxmox": [self._resource("vm1"), self._resource("vm2")],
+        }
+
+        batches = orchestrator._iter_provider_batches(resources_by_provider, None)
+
+        assert len(batches) == 1
+        assert len(batches[0].resources) == 2
+
+    def test_full_match_returns_filtered_batches(self, tmp_path):
+        """Filter matching all names returns those resources without error."""
+        orchestrator = self._make_orchestrator(tmp_path)
+        resources_by_provider = {
+            "proxmox": [self._resource("vm1"), self._resource("vm2")],
+        }
+
+        batches = orchestrator._iter_provider_batches(resources_by_provider, ["vm1", "vm2"])
+
+        assert len(batches) == 1
+        assert {r.name for r in batches[0].resources} == {"vm1", "vm2"}
+
+    def test_zero_matches_raises_resource_filter_error(self, tmp_path):
+        """Filter matching zero resources raises ResourceFilterError."""
+        orchestrator = self._make_orchestrator(tmp_path)
+        resources_by_provider = {
+            "proxmox": [self._resource("vm1"), self._resource("vm2")],
+        }
+
+        with pytest.raises(ResourceFilterError, match="No resources matched filter"):
+            orchestrator._iter_provider_batches(resources_by_provider, ["nonexistent"])
+
+    def test_zero_matches_error_includes_available_names(self, tmp_path):
+        """Error message includes unmatched and available resource names."""
+        orchestrator = self._make_orchestrator(tmp_path)
+        resources_by_provider = {
+            "proxmox": [self._resource("vm1"), self._resource("vm2")],
+        }
+
+        with pytest.raises(ResourceFilterError, match="nonexistent") as exc_info:
+            orchestrator._iter_provider_batches(resources_by_provider, ["nonexistent"])
+
+        error_msg = str(exc_info.value)
+        assert "nonexistent" in error_msg
+        assert "vm1" in error_msg
+        assert "vm2" in error_msg
+
+    def test_partial_match_warns_but_succeeds(self, tmp_path, capsys):
+        """Partial filter match warns about unmatched names but returns results."""
+        orchestrator = self._make_orchestrator(tmp_path)
+        resources_by_provider = {
+            "proxmox": [self._resource("vm1"), self._resource("vm2")],
+        }
+
+        batches = orchestrator._iter_provider_batches(resources_by_provider, ["vm1", "nonexistent"])
+
+        assert len(batches) == 1
+        assert batches[0].resources[0].name == "vm1"
+
+    def test_partial_match_across_providers(self, tmp_path):
+        """Partial match works across multiple providers."""
+        orchestrator = self._make_orchestrator(tmp_path)
+        resources_by_provider = {
+            "proxmox": [self._resource("vm1", provider="proxmox")],
+            "opnsense": [self._resource("fw1", provider="opnsense", type_="firewall")],
+        }
+
+        batches = orchestrator._iter_provider_batches(resources_by_provider, ["vm1", "fw1"])
+
+        assert len(batches) == 2
+        all_names = {r.name for b in batches for r in b.resources}
+        assert all_names == {"vm1", "fw1"}

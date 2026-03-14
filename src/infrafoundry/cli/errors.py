@@ -333,6 +333,16 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
             "Verify data types match expected schema",
         ],
     ),
+    "IF-VALIDATION-005": ErrorInfo(
+        code="IF-VALIDATION-005",
+        title="Resource Filter Matched Nothing",
+        description="The -r resource filter did not match any available resources.",
+        suggestions=[
+            "Check spelling of the resource names passed to -r",
+            "Run 'foundry infra list --env <env>' to see available resources",
+            "Verify the resources exist in your configuration",
+        ],
+    ),
     # Dependency errors (IF-DEPENDENCY-XXX)
     "IF-DEPENDENCY-001": ErrorInfo(
         code="IF-DEPENDENCY-001",
@@ -530,6 +540,7 @@ _EXCEPTION_TO_CODE: dict[str, str] = {
     "ConnectivityValidationError": "IF-VALIDATION-002",
     "ReferenceValidationError": "IF-VALIDATION-003",
     "SchemaValidationError": "IF-VALIDATION-004",
+    "ResourceFilterError": "IF-VALIDATION-005",
     # Dependency errors
     "CircularDependencyError": "IF-DEPENDENCY-001",
     "MissingDependencyError": "IF-DEPENDENCY-002",

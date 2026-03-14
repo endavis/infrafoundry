@@ -157,6 +157,13 @@ class StateInconsistencyError(StateError):
     """State database is inconsistent."""
 
 
+# Resource Filter Errors
+
+
+class ResourceFilterError(InfraFoundryError):
+    """Raised when resource filter matches no resources."""
+
+
 # Deployment and Orchestration Errors
 
 
@@ -312,6 +319,8 @@ __all__ = [
     "ProviderInitializationError",
     "ProviderNotFoundError",
     "ReferenceValidationError",
+    # Resource Filter
+    "ResourceFilterError",
     "ResourceNotFoundError",
     "RollbackError",
     "SchemaValidationError",
