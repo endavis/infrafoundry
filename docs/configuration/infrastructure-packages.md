@@ -223,6 +223,29 @@ generated/prod/
         terraform.tfstate
 ```
 
+## Targeting Packages from the CLI
+
+Use the `--package` / `-p` flag on `plan`, `apply`, and `destroy` to target all
+resources in a specific package:
+
+```bash
+# Plan only the ontap-cluster package
+infra plan --env prod --package ontap-cluster
+
+# Apply a package (short flag)
+infra apply --env prod -p ontap-cluster --auto-approve
+
+# Destroy a package
+infra destroy --env prod -p ontap-cluster
+```
+
+The `--package` flag resolves the package name to the list of resource names
+declared in its manifest and passes them as a resource filter to the orchestrator.
+
+!!! note
+    `--package` (`-p`) and `--resource` (`-r`) are mutually exclusive. Use one
+    or the other, not both.
+
 ## Loose Resource Deprecation
 
 !!! warning "Deprecated"

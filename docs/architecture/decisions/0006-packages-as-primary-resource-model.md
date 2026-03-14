@@ -32,9 +32,10 @@ We will promote packages to the primary resource model in three phases:
 - Plan, apply, and destroy workflows group resources by package and process each group in its own terraform working directory.
 - Loose resources (not in any package) continue to use the per-provider directory.
 
-### Phase 3 (future)
+### Phase 3 (this ADR, PR 3)
 - `--package` / `-p` CLI flag for `plan`/`apply`/`destroy` to target specific packages.
-- `resolve_package_filter()` for CLI integration.
+- `resolve_package_filter()` in `ConfigManager` resolves a package name to its resource names for CLI integration.
+- `--package` and `--resource` are mutually exclusive.
 
 ### Env-root packages
 
