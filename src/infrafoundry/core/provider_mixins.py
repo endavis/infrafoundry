@@ -445,11 +445,18 @@ class TerraformGeneratorMixin:
             lines.append(self._format_tfvar_line(f"{prefix}_ssh_port", ssh_config.port))
 
     def _write_tfvars_lines(self, lines: list[str]) -> None:
-        """Write tfvars lines to terraform.tfvars."""
+        """Write tfvars lines to terraform.tfvars.
+
+        When in package context, uses provider-namespaced filename to avoid
+        overwriting when multiple providers share the same package directory.
+        """
         if len(lines) <= 1:
             return
 
-        tfvars_path = Path(self.terraform_dir) / "terraform.tfvars"
+        pkg = getattr(self, "_current_package", None)
+        provider_name = getattr(self, "name", "unknown")
+        filename = f"terraform_{provider_name}.tfvars" if pkg else "terraform.tfvars"
+        tfvars_path = Path(self.terraform_dir) / filename
         tfvars_path.write_text("".join(lines))
 
     def generate_provider_tfvars(
@@ -567,8 +574,12 @@ class TerraformGeneratorMixin:
         provider = cast("_TerraformProviderProtocol", self)
         provider.ensure_directories()
 
-        # Clean stale .tf files before regenerating
-        self._clean_stale_tf_files()
+        # Clean stale .tf files before regenerating.
+        # Skip cleanup in package context — multiple providers share the directory
+        # and one provider's cleanup would remove another provider's resource files.
+        pkg = getattr(self, "_current_package", None)
+        if not pkg:
+            self._clean_stale_tf_files()
 
         group_resources = getattr(provider, "group_resources_by_type", None)
         if not group_resources:
@@ -596,16 +607,22 @@ class TerraformGeneratorMixin:
         """
         provider = cast("_TerraformProviderProtocol", self)
 
+        # When in package context, namespace provider/variables files to avoid
+        # overwriting when multiple providers share the same package directory.
+        pkg = getattr(provider, "_current_package", None)
+        provider_output = f"provider_{provider.name}.tf" if pkg else "provider.tf"
+        variables_output = f"variables_{provider.name}.tf" if pkg else "variables.tf"
+
         self.render_and_write_terraform(
             provider_template or f"{provider.name}/provider.tf.j2",
-            output_name="provider.tf",
+            output_name=provider_output,
         )
 
         variables_template_name = variables_template or f"{provider.name}/variables.tf.j2"
         self.render_and_write_terraform(
             variables_template_name,
             context=variables_context or {},
-            output_name="variables.tf",
+            output_name=variables_output,
         )
 
     def render_outputs_terraform(
@@ -622,10 +639,12 @@ class TerraformGeneratorMixin:
                 ``{self.name}/outputs.tf.j2``.
         """
         provider = cast("_TerraformProviderProtocol", self)
+        pkg = getattr(provider, "_current_package", None)
+        output_name = f"outputs_{provider.name}.tf" if pkg else "outputs.tf"
         self.render_and_write_terraform(
             template_name or f"{provider.name}/outputs.tf.j2",
             context={"resources_by_type": resources_by_type},
-            output_name="outputs.tf",
+            output_name=output_name,
         )
 
     def render_backend(self) -> bool:

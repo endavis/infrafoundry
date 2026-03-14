@@ -120,44 +120,60 @@ def check_dangerous_sequences(tokens: list[str]) -> tuple[bool, str]:
     return False, ""
 
 
-def check_force_push_to_protected(tokens: list[str]) -> tuple[bool, str]:
+def check_push_to_protected(tokens: list[str]) -> tuple[bool, str]:
     """
-    Check if command is a force push to a protected branch.
+    Check if command is a push (regular or force) while on a protected branch.
 
-    Allows force push to feature branches but blocks force push to main/master.
-    If no branch is specified, blocks by default (safer).
+    Blocks any git push when the current branch is a protected branch.
+    Force pushes to protected branches are also blocked even from feature branches.
     """
     tokens_lower = [t.lower() for t in tokens]
 
-    # Must be a git push command
+    # Must be a git push command (not git stash push, etc.)
     if "git" not in tokens_lower or "push" not in tokens_lower:
         return False, ""
 
-    # Check if any force flag is present
-    has_force_flag = any(flag in tokens for flag in FORCE_PUSH_FLAGS)
-    if not has_force_flag:
-        return False, ""
-
-    # Find the push index to look for branch/remote after it
     try:
+        git_idx = tokens_lower.index("git")
         push_idx = tokens_lower.index("push")
     except ValueError:
         return False, ""
 
-    # Look for protected branch name in tokens after 'push'
+    # Ensure "push" is the git subcommand, not part of another command like "git stash push"
+    subcommand_idx = git_idx + 1
+    if subcommand_idx >= len(tokens_lower) or tokens_lower[subcommand_idx] != "push":
+        return False, ""
+
+    # Check if any force flag is present
+    has_force_flag = any(flag in tokens for flag in FORCE_PUSH_FLAGS)
+
+    # Look for branch name in tokens after 'push'
     # Skip flags (tokens starting with -)
     after_push = [t for t in tokens[push_idx + 1 :] if not t.startswith("-")]
 
-    # Check if any token after push is a protected branch
+    # Check if explicitly pushing to a protected branch
     for token in after_push:
         # Handle origin/main format
         branch = token.split("/")[-1] if "/" in token else token
 
         if branch.lower() in PROTECTED_BRANCHES:
-            return True, f"Force push to protected branch '{branch}'"
+            action = "Force push" if has_force_flag else "Push"
+            return True, f"{action} to protected branch '{branch}'"
 
-    # If no branch specified, block by default (could push to current branch = main)
-    if not after_push or (len(after_push) == 1 and after_push[0] == "origin"):
+    # Check if currently on a protected branch (catches bare `git push`)
+    current_branch = get_current_branch()
+    if (
+        current_branch
+        and current_branch.lower() in PROTECTED_BRANCHES
+        and (not after_push or (len(after_push) == 1 and after_push[0] == "origin"))
+    ):
+        action = "Force push" if has_force_flag else "Push"
+        return True, (
+            f"{action} while on protected branch '{current_branch}'. Create a feature branch first"
+        )
+
+    # Force push without explicit branch from a feature branch — block as safety
+    if has_force_flag and (not after_push or (len(after_push) == 1 and after_push[0] == "origin")):
         return True, "Force push without explicit branch (could affect protected branch)"
 
     return False, ""
@@ -298,7 +314,7 @@ def check_command(command: str) -> tuple[bool, str]:
     Uses shlex to tokenize, then checks for:
     1. Dangerous flags as standalone tokens
     2. Dangerous token sequences
-    3. Force push to protected branches
+    3. Push to protected branches (regular or force)
     4. Deletion of protected branches
     5. Merge commits on protected branches
     6. Blocked workflow commands
@@ -319,8 +335,8 @@ def check_command(command: str) -> tuple[bool, str]:
     if is_dangerous:
         return True, reason
 
-    # Check for force push to protected branches
-    is_dangerous, reason = check_force_push_to_protected(tokens)
+    # Check for push to protected branches (regular or force)
+    is_dangerous, reason = check_push_to_protected(tokens)
     if is_dangerous:
         return True, reason
 
