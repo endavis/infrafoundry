@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773484782651,
+  "lastUpdate": 1773487343015,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1736,6 +1736,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000020715212299079996",
             "extra": "mean: 147.39311420860145 usec\nrounds: 2224"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1b23bd9d355234d1c2e727b0b86178635f9c796c",
+          "message": "feat: add per-package terraform state isolation (merges PR #374, addresses #357)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T11:21:52Z",
+          "tree_id": "7beb1375f13f3bfb3510717fa1d394b2eb8156f8",
+          "url": "https://github.com/endavis/infrafoundry/commit/1b23bd9d355234d1c2e727b0b86178635f9c796c"
+        },
+        "date": 1773487342690,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7070.782848335498,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010163228008783077",
+            "extra": "mean: 141.42705573759852 usec\nrounds: 2135"
           }
         ]
       }
