@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773496259950,
+  "lastUpdate": 1773500013869,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1891,6 +1891,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013967928368439583",
             "extra": "mean: 106.28090936109159 usec\nrounds: 2692"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c6a2b29fa43f5532ae387d1357d476a00a78a66f",
+          "message": "fix: namespace provider files in per-package terraform directories (merges PR #381, addresses #380)\n\n* fix: namespace provider files in per-package terraform directories\n\nIn package context, provider.tf, variables.tf, outputs.tf, terraform.tfvars,\nand secrets.auto.tfvars are now namespaced by provider name to prevent\noverwriting when multiple providers share a package directory. Stale file\ncleanup is skipped in package context to preserve other providers' files.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* fix: block all git push to protected branches, not just force push\n\nAlso fixes false positive where git stash push was matched as git push.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T14:52:55Z",
+          "tree_id": "ff9b5b6876f5647d8690ac07d0f6a06d99452ff6",
+          "url": "https://github.com/endavis/infrafoundry/commit/c6a2b29fa43f5532ae387d1357d476a00a78a66f"
+        },
+        "date": 1773500012940,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7089.465062945435,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008841772001876331",
+            "extra": "mean: 141.05436603767302 usec\nrounds: 2385"
           }
         ]
       }
