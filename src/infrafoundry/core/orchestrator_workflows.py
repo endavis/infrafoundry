@@ -476,7 +476,9 @@ class PlanOrchestrator(HookExecutionMixin):
                         if pkg_name is not None:
                             provider.set_package_context(pkg_name)
                             self.console.print(
-                                f"  [dim]Package: {pkg_name} ({len(pkg_resources)} resources)[/dim]"
+                                f"  [dim]Package: {pkg_name} "
+                                f"(provider: {provider_name}, "
+                                f"{len(pkg_resources)} resources)[/dim]"
                             )
                         else:
                             provider.clear_package_context()
@@ -661,7 +663,9 @@ class PlanOrchestrator(HookExecutionMixin):
         try:
             secret_manager = self._secret_manager_factory(env_name)
             secrets_file = f"{provider_name}.yaml"
-            tf_vars = provider.terraform_dir / "secrets.auto.tfvars"
+            pkg = getattr(provider, "_current_package", None)
+            secrets_name = f"secrets_{provider_name}.auto.tfvars" if pkg else "secrets.auto.tfvars"
+            tf_vars = provider.terraform_dir / secrets_name
             secret_manager.export_for_terraform(secrets_file, tf_vars)
         except (FileNotFoundError, SecretNotFoundError) as exc:
             message = f"No secrets file for {provider_name}"
@@ -1091,7 +1095,9 @@ class DestroyOrchestrator(HookExecutionMixin):
                     if pkg_name is not None:
                         provider.set_package_context(pkg_name)
                         self.console.print(
-                            f"  [dim]Package: {pkg_name} ({len(pkg_resources)} resources)[/dim]"
+                            f"  [dim]Package: {pkg_name} "
+                            f"(provider: {provider_name}, "
+                            f"{len(pkg_resources)} resources)[/dim]"
                         )
                     else:
                         provider.clear_package_context()

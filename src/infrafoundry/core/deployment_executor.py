@@ -229,7 +229,9 @@ class DeploymentExecutor:
                 if pkg_name is not None:
                     provider.set_package_context(pkg_name)
                     self.console.print(
-                        f"  [dim]Package: {pkg_name} ({len(pkg_resources)} resources)[/dim]"
+                        f"  [dim]Package: {pkg_name} "
+                        f"(provider: {provider_name}, "
+                        f"{len(pkg_resources)} resources)[/dim]"
                     )
                 else:
                     provider.clear_package_context()
