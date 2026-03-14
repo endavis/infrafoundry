@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773496070058,
+  "lastUpdate": 1773496259950,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1860,6 +1860,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001004679098196904",
             "extra": "mean: 145.30551750314885 usec\nrounds: 2371"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "aedc717dde481e17ab9876a957e032cd962a569d",
+          "message": "fix: skip non-matching packages and deduplicate resource filter (merges PR #379, addresses #376, #378)\n\nfix: skip non-matching packages during filtered plan/apply/destroy\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T13:36:56Z",
+          "tree_id": "3ffe8df8bd14ba87da9e89f58a5b0fdc27c46ade",
+          "url": "https://github.com/endavis/infrafoundry/commit/aedc717dde481e17ab9876a957e032cd962a569d"
+        },
+        "date": 1773496259019,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9409.027510316828,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013967928368439583",
+            "extra": "mean: 106.28090936109159 usec\nrounds: 2692"
           }
         ]
       }
