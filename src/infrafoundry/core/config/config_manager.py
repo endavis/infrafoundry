@@ -411,7 +411,7 @@ class ConfigManager(PathBasedManager):
                     pkg_resources, _ = self._package_loader.load_package(
                         package_dir, effective_provider, env_name
                     )
-                    return [r.name for r in pkg_resources]
+                    return list(dict.fromkeys(r.name for r in pkg_resources))
 
         # Check env-root packages
         for package_dir in self._package_loader.discover_env_root_packages(env_name):
@@ -424,7 +424,7 @@ class ConfigManager(PathBasedManager):
                 pkg_resources, _ = self._package_loader.load_package(
                     package_dir, manifest.provider, env_name
                 )
-                return [r.name for r in pkg_resources]
+                return list(dict.fromkeys(r.name for r in pkg_resources))
 
         raise PackageNotFoundError(
             f"Package '{package_name}' not found in environment '{env_name}'"
