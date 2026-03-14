@@ -1,6 +1,7 @@
 """Refactored configuration manager - coordinates between loaders."""
 
 import os
+import subprocess  # nosec B404 - needed for SOPS decryption
 import warnings
 from pathlib import Path
 from typing import Any
@@ -77,8 +78,7 @@ class ConfigManager(PathBasedManager):
 
         self._log_debug(f"Loading environment config: {env_name}")
         try:
-            with open(settings_file) as f:
-                data = yaml.safe_load(f)
+            data = self._load_yaml_with_sops(settings_file)
         except yaml.YAMLError as e:
             error_msg = f"Invalid YAML in {settings_file}: {e}"
             self._log_error(error_msg)
@@ -99,6 +99,34 @@ class ConfigManager(PathBasedManager):
 
         self._log_debug(f"Loaded environment config: {env_name}")
         return EnvironmentConfig(**data)
+
+    @staticmethod
+    def _load_yaml_with_sops(file_path: Path) -> dict[str, Any]:
+        """Load a YAML file, decrypting with SOPS if encrypted.
+
+        Detects SOPS encryption by checking for the ``sops`` metadata key
+        in the file content. If found, runs ``sops --decrypt`` to get
+        plaintext YAML before parsing.
+
+        Args:
+            file_path: Path to the YAML file.
+
+        Returns:
+            Parsed YAML data as a dictionary.
+        """
+        with open(file_path) as f:
+            raw = f.read()
+
+        if "sops:" in raw and "ENC[AES256_GCM," in raw:
+            result = subprocess.run(  # nosec B603 B607 - trusted sops command
+                ["sops", "--decrypt", str(file_path)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return yaml.safe_load(result.stdout) or {}
+
+        return yaml.safe_load(raw) or {}
 
     def load_resources(
         self, env_name: str, provider: str, resource_file: str
