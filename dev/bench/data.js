@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773501335736,
+  "lastUpdate": 1773506766129,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1953,6 +1953,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007972967865165166",
             "extra": "mean: 141.1349628741784 usec\nrounds: 2505"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "effb8326b5669a47625b0760d3c7a0164b92c98c",
+          "message": "fix: auto-load tfvars and upgrade lock file for multi-provider packages (merges PR #383, addresses #380)\n\n- Rename terraform_{name}.tfvars to {name}.auto.tfvars so terraform\n  auto-loads them (only terraform.tfvars and *.auto.tfvars are auto-loaded)\n- Detect missing providers in lock file and run terraform init -upgrade\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T16:45:33Z",
+          "tree_id": "65b001c3011c5259e56c7befaeed73f0c52c242c",
+          "url": "https://github.com/endavis/infrafoundry/commit/effb8326b5669a47625b0760d3c7a0164b92c98c"
+        },
+        "date": 1773506765641,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6981.977911174229,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001313567637130104",
+            "extra": "mean: 143.2258899587123 usec\nrounds: 2181"
           }
         ]
       }
