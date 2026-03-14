@@ -343,6 +343,17 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
             "Verify the resources exist in your configuration",
         ],
     ),
+    # Package errors (IF-PACKAGE-XXX)
+    "IF-PACKAGE-001": ErrorInfo(
+        code="IF-PACKAGE-001",
+        title="Package Not Found",
+        description="The specified infrastructure package was not found in the environment.",
+        suggestions=[
+            "Check the package name spelling",
+            "Run 'foundry infra list --env <env>' to see available packages",
+            "Verify the package directory contains an infrafoundry.yml manifest",
+        ],
+    ),
     # Dependency errors (IF-DEPENDENCY-XXX)
     "IF-DEPENDENCY-001": ErrorInfo(
         code="IF-DEPENDENCY-001",
@@ -541,6 +552,8 @@ _EXCEPTION_TO_CODE: dict[str, str] = {
     "ReferenceValidationError": "IF-VALIDATION-003",
     "SchemaValidationError": "IF-VALIDATION-004",
     "ResourceFilterError": "IF-VALIDATION-005",
+    # Package errors
+    "PackageNotFoundError": "IF-PACKAGE-001",
     # Dependency errors
     "CircularDependencyError": "IF-DEPENDENCY-001",
     "MissingDependencyError": "IF-DEPENDENCY-002",

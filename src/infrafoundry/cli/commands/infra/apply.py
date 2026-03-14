@@ -19,6 +19,12 @@ from ...utils import console
     help="Specific resource name(s) to target (can be used multiple times)",
 )
 @click.option(
+    "--package",
+    "-p",
+    "package_name",
+    help="Target a specific package by name (mutually exclusive with -r)",
+)
+@click.option(
     "--parallel",
     is_flag=True,
     help="Apply providers in parallel (experimental)",
@@ -36,13 +42,28 @@ def apply(
     env: str,
     auto_approve: bool,
     resource: tuple[str, ...],
+    package_name: str | None,
     parallel: bool,
     max_workers: int,
 ) -> None:
     """Apply infrastructure changes."""
+    if package_name and resource:
+        raise click.UsageError("--package and --resource are mutually exclusive")
+
+    resource_filter: list[str] | None = None
+    if package_name:
+        resource_filter = orchestrator.config_manager.resolve_package_filter(env, package_name)
+    elif resource:
+        resource_filter = list(resource)
+
     # If not auto-approve, ask for confirmation at InfraFoundry level
     if not auto_approve:
-        resource_desc = f" (resources: {', '.join(resource)})" if resource else ""
+        if package_name:
+            resource_desc = f" (package: {package_name})"
+        elif resource:
+            resource_desc = f" (resources: {', '.join(resource)})"
+        else:
+            resource_desc = ""
         console.warning(f"About to apply infrastructure for environment: {env}{resource_desc}")
         console.warning("This will make real changes to your infrastructure.")
 
@@ -57,7 +78,7 @@ def apply(
         orchestrator.apply(
             env,
             auto_approve=auto_approve,
-            resource_filter=list(resource) if resource else None,
+            resource_filter=resource_filter,
             parallel=parallel,
             max_workers=max_workers,
         )

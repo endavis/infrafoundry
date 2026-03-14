@@ -49,6 +49,12 @@ class PackageLoader:
             "scripts",
         }
     )
+    ENV_ROOT_EXCLUDED_DIRS: frozenset[str] = frozenset(
+        {
+            "resources",
+            "secrets",
+        }
+    )
 
     def __init__(self, base_dir: Path) -> None:
         """Initialize package loader.
@@ -87,6 +93,36 @@ class PackageLoader:
 
         return packages
 
+    def discover_env_root_packages(self, env_name: str) -> list[Path]:
+        """Find subdirectories of an environment directory that contain a manifest.
+
+        Scans direct subdirectories of ``envs/{env}/`` for ``infrafoundry.yml``,
+        skipping directories in EXCLUDED_DIRS and ENV_ROOT_EXCLUDED_DIRS.
+        These are "env-root packages" that are not nested under a provider.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            List of package directory paths, sorted by name
+        """
+        env_dir = self.base_dir / env_name
+        if not env_dir.exists():
+            return []
+
+        excluded = self.EXCLUDED_DIRS | self.ENV_ROOT_EXCLUDED_DIRS
+        packages: list[Path] = []
+        for item in sorted(env_dir.iterdir()):
+            if not item.is_dir():
+                continue
+            if item.name in excluded:
+                continue
+            manifest = item / self.MANIFEST_FILENAME
+            if manifest.exists():
+                packages.append(item)
+
+        return packages
+
     def load_package(
         self, package_dir: Path, provider: str, env_name: str
     ) -> tuple[list[ResourceConfig], dict[str, list[dict[str, Any]]]]:
@@ -109,11 +145,14 @@ class PackageLoader:
         manifest_path = package_dir / self.MANIFEST_FILENAME
         manifest = self._parse_manifest(manifest_path)
 
+        # Use manifest provider with fallback to directory-inferred provider
+        effective_provider = manifest.provider or provider
+
         logger.debug(
             "Loading package '%s' from %s (provider=%s, env=%s)",
             manifest.name,
             package_dir,
-            provider,
+            effective_provider,
             env_name,
         )
 
@@ -122,7 +161,7 @@ class PackageLoader:
         for resource_file in manifest.resources:
             resource_path = package_dir / resource_file
             data = self._render_resource_file(resource_path, manifest.variables)
-            parsed = self._parse_resources_from_data(data, resource_file, provider)
+            parsed = self._parse_resources_from_data(data, resource_file, effective_provider)
             resources.extend(parsed)
 
         # Rewrite event script paths

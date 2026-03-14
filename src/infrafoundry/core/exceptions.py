@@ -164,6 +164,13 @@ class ResourceFilterError(InfraFoundryError):
     """Raised when resource filter matches no resources."""
 
 
+# Package Errors
+
+
+class PackageNotFoundError(InfraFoundryError):
+    """Raised when a named package is not found in the environment."""
+
+
 # Deployment and Orchestration Errors
 
 
@@ -310,6 +317,8 @@ __all__ = [
     "MissingConfigurationError",
     "MissingCredentialError",
     "MissingDependencyError",
+    # Package
+    "PackageNotFoundError",
     # Policy
     "PolicyError",
     "PolicyNotFoundError",
