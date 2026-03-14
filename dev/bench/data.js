@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773500013869,
+  "lastUpdate": 1773501335736,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1922,6 +1922,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008841772001876331",
             "extra": "mean: 141.05436603767302 usec\nrounds: 2385"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e90690948f588650edde9f4cb0a31aadbacdfa60",
+          "message": "fix: merge required_providers into shared file for multi-provider packages (merges PR #382, addresses #380)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T15:14:58Z",
+          "tree_id": "f9ddf413ece9321e4c2b5620ebfad402ec7f52c6",
+          "url": "https://github.com/endavis/infrafoundry/commit/e90690948f588650edde9f4cb0a31aadbacdfa60"
+        },
+        "date": 1773501334844,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7085.416537725656,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007972967865165166",
+            "extra": "mean: 141.1349628741784 usec\nrounds: 2505"
           }
         ]
       }
