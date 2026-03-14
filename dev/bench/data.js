@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773487343015,
+  "lastUpdate": 1773488692545,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1767,6 +1767,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010163228008783077",
             "extra": "mean: 141.42705573759852 usec\nrounds: 2135"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "89edb1f729edeb5c4da57e0eb6b8a4326e4081da",
+          "message": "feat: add --package/-p CLI flag for plan, apply, and destroy (merges PR #375, addresses #357)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T11:44:22Z",
+          "tree_id": "04174403cdf8fc9a8799628e073aec6af252210d",
+          "url": "https://github.com/endavis/infrafoundry/commit/89edb1f729edeb5c4da57e0eb6b8a4326e4081da"
+        },
+        "date": 1773488692219,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6958.271241048682,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001129577926178701",
+            "extra": "mean: 143.71385727258456 usec\nrounds: 2207"
           }
         ]
       }
