@@ -460,6 +460,15 @@ class PlanOrchestrator(HookExecutionMixin):
                     package_map = self._get_resource_package_map()
                     package_groups = self._group_by_package(generate_resources, package_map)
 
+                    # When resource_filter is set, skip packages with no matching resources
+                    if resource_filter:
+                        filter_set = set(resource_filter)
+                        package_groups = [
+                            (pkg, res)
+                            for pkg, res in package_groups
+                            if any(r.name in filter_set for r in res)
+                        ]
+
                     iac_tool = env_config.iac_tool if env_config else IaCTool.TERRAFORM
 
                     for pkg_name, pkg_resources in package_groups:
@@ -1068,6 +1077,15 @@ class DestroyOrchestrator(HookExecutionMixin):
                 # Group resources by package for state isolation
                 package_map = self._get_resource_package_map()
                 package_groups = PlanOrchestrator._group_by_package(resources, package_map)
+
+                # When resource_filter is set, skip packages with no matching resources
+                if resource_filter:
+                    filter_set = set(resource_filter)
+                    package_groups = [
+                        (pkg, res)
+                        for pkg, res in package_groups
+                        if any(r.name in filter_set for r in res)
+                    ]
 
                 for pkg_name, pkg_resources in package_groups:
                     if pkg_name is not None:

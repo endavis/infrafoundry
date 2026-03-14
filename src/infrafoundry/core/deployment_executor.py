@@ -217,6 +217,14 @@ class DeploymentExecutor:
             # Group by package for state isolation
             package_groups = self._group_by_package(resources, self.resource_package_map)
 
+            # When resource_filter is set, skip packages with no matching resources
+            if filter_set:
+                package_groups = [
+                    (pkg, res)
+                    for pkg, res in package_groups
+                    if any(r.name in filter_set for r in res)
+                ]
+
             for pkg_name, pkg_resources in package_groups:
                 if pkg_name is not None:
                     provider.set_package_context(pkg_name)
