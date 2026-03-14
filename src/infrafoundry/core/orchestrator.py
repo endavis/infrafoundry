@@ -149,6 +149,7 @@ class Orchestrator:
             get_runner_priorities=self.provider_registry.get_runner_priorities,
             hook_manager=self.hook_manager,
             load_environment=self.config_manager.load_environment,
+            get_resource_package_map=self._get_resource_package_map,
         )
         self.apply_orchestrator = ApplyOrchestrator(
             console=self.console,
@@ -172,6 +173,7 @@ class Orchestrator:
             get_current_user=self._get_current_user,
             hook_manager=self.hook_manager,
             load_environment=self.config_manager.load_environment,
+            get_resource_package_map=self._get_resource_package_map,
         )
         self.rollback_orchestrator = RollbackOrchestrator(
             console=self.console,
@@ -267,7 +269,24 @@ class Orchestrator:
         if isinstance(package_events, dict) and package_events and self.event_manager:
             self.event_manager.load_config(package_events)
 
+        # Build and cache resource-to-package mapping for state isolation.
+        # Fallback to empty dict if the method returns a non-dict (e.g. when
+        # ConfigManager is mocked in tests).
+        pkg_map = self.config_manager.get_resource_package_map(env_name)
+        self._resource_package_map: dict[str, str] = pkg_map if isinstance(pkg_map, dict) else {}
+
         return all_resources, resources_by_provider
+
+    def _get_resource_package_map(self) -> dict[str, str]:
+        """Return the cached resource-to-package mapping.
+
+        Built during ``_load_resources()`` and maps resource names to their
+        owning package names. Loose resources are absent from the mapping.
+
+        Returns:
+            Dict mapping resource names to package names
+        """
+        return getattr(self, "_resource_package_map", {})
 
     def _create_execution_planner(self, env_name: str) -> ExecutionPlanner:
         """Create an execution planner for an environment.
@@ -573,6 +592,9 @@ class Orchestrator:
                 provider_order=env_config.provider_order or None
             )
 
+        # Pass cached resource-to-package map for state isolation
+        self.deployment_executor.resource_package_map = self._get_resource_package_map()
+
         return self.deployment_executor.apply_serial(
             env_name, deployment_id, resources_by_provider, resource_filter, auto_approve
         )
@@ -597,6 +619,9 @@ class Orchestrator:
             self.deployment_executor.execution_planner = ExecutionPlanner(
                 provider_order=env_config.provider_order or None
             )
+
+        # Pass cached resource-to-package map for state isolation
+        self.deployment_executor.resource_package_map = self._get_resource_package_map()
 
         return self.deployment_executor.apply_parallel(
             env_name,

@@ -294,6 +294,94 @@ class ConfigManager(PathBasedManager):
 
         return all_resources
 
+    def get_package_for_resource(self, env_name: str, resource_name: str) -> str | None:
+        """Return the package name that owns a resource, or None for loose resources.
+
+        Scans provider-scoped and env-root packages for a resource whose name
+        matches *resource_name*.
+
+        Args:
+            env_name: Environment name
+            resource_name: Resource name to look up
+
+        Returns:
+            Package name if the resource belongs to a package, None otherwise
+        """
+        # Check provider-scoped packages
+        discovered_providers = self.provider_centric.discover_providers(env_name)
+        for provider_name in discovered_providers:
+            for package_dir in self._package_loader.discover_packages(env_name, provider_name):
+                manifest = self._package_loader._parse_manifest(
+                    package_dir / PackageLoader.MANIFEST_FILENAME
+                )
+                effective_provider = manifest.provider or provider_name
+                pkg_resources, _ = self._package_loader.load_package(
+                    package_dir, effective_provider, env_name
+                )
+                for resource in pkg_resources:
+                    if resource.name == resource_name:
+                        return manifest.name
+
+        # Check env-root packages
+        for package_dir in self._package_loader.discover_env_root_packages(env_name):
+            manifest = self._package_loader._parse_manifest(
+                package_dir / PackageLoader.MANIFEST_FILENAME
+            )
+            if not manifest.provider:
+                continue
+            pkg_resources, _ = self._package_loader.load_package(
+                package_dir, manifest.provider, env_name
+            )
+            for resource in pkg_resources:
+                if resource.name == resource_name:
+                    return manifest.name
+
+        return None
+
+    def get_resource_package_map(self, env_name: str) -> dict[str, str]:
+        """Build a mapping of resource names to their owning package names.
+
+        This is more efficient than calling ``get_package_for_resource()``
+        in a loop because it loads each package only once.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            Dict mapping resource names to package names. Loose resources
+            (not in any package) are omitted from the result.
+        """
+        resource_to_package: dict[str, str] = {}
+
+        # Provider-scoped packages
+        discovered_providers = self.provider_centric.discover_providers(env_name)
+        for provider_name in discovered_providers:
+            for package_dir in self._package_loader.discover_packages(env_name, provider_name):
+                manifest = self._package_loader._parse_manifest(
+                    package_dir / PackageLoader.MANIFEST_FILENAME
+                )
+                effective_provider = manifest.provider or provider_name
+                pkg_resources, _ = self._package_loader.load_package(
+                    package_dir, effective_provider, env_name
+                )
+                for resource in pkg_resources:
+                    resource_to_package[resource.name] = manifest.name
+
+        # Env-root packages
+        for package_dir in self._package_loader.discover_env_root_packages(env_name):
+            manifest = self._package_loader._parse_manifest(
+                package_dir / PackageLoader.MANIFEST_FILENAME
+            )
+            if not manifest.provider:
+                continue
+            pkg_resources, _ = self._package_loader.load_package(
+                package_dir, manifest.provider, env_name
+            )
+            for resource in pkg_resources:
+                resource_to_package[resource.name] = manifest.name
+
+        return resource_to_package
+
     def get_package_events(self) -> dict[str, list[dict[str, Any]]]:
         """Return accumulated package events from last resource load.
 

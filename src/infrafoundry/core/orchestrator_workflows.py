@@ -293,6 +293,7 @@ class PlanOrchestrator(HookExecutionMixin):
         get_runner_priorities: Callable[[str], dict[str, int]],
         hook_manager: HookManager | None = None,
         load_environment: Callable[[str], EnvironmentConfig | None] | None = None,
+        get_resource_package_map: Callable[[], dict[str, str]] | None = None,
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -310,6 +311,7 @@ class PlanOrchestrator(HookExecutionMixin):
         self._get_runner_priorities = get_runner_priorities
         self._hook_manager = hook_manager
         self._load_environment = load_environment
+        self._get_resource_package_map = get_resource_package_map or (lambda: {})
 
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
@@ -317,6 +319,37 @@ class PlanOrchestrator(HookExecutionMixin):
             runner = self.runner_registry.create_runner(tool_name, console=self.console)
             if runner:
                 self.runners[tool_name] = runner
+
+    @staticmethod
+    def _group_by_package(
+        resources: list[ResourceConfig],
+        package_map: dict[str, str],
+    ) -> list[tuple[str | None, list[ResourceConfig]]]:
+        """Split resources into (package_name, resources) groups.
+
+        Resources belonging to a package are grouped under the package name.
+        Loose resources (not in any package) are grouped under ``None``.
+        Package groups are returned first, then the loose group (if any).
+
+        Args:
+            resources: Resources to split
+            package_map: Mapping of resource name to package name
+
+        Returns:
+            List of (package_name_or_None, resources) tuples
+        """
+        groups: dict[str | None, list[ResourceConfig]] = {}
+        for resource in resources:
+            pkg = package_map.get(resource.name)
+            groups.setdefault(pkg, []).append(resource)
+
+        # Packages first (sorted for deterministic order), then loose
+        result: list[tuple[str | None, list[ResourceConfig]]] = []
+        for pkg_name in sorted(k for k in groups if k is not None):
+            result.append((pkg_name, groups[pkg_name]))
+        if None in groups:
+            result.append((None, groups[None]))
+        return result
 
     def _get_sorted_runners(
         self,
@@ -414,8 +447,6 @@ class PlanOrchestrator(HookExecutionMixin):
                     provider_results["dry_run"] = True
                 else:
                     provider.set_environment(env_name)
-                    provider.ensure_directories()
-                    self._export_secrets(provider_name, env_name, provider)
 
                     # Always generate with ALL resources to avoid terraform
                     # seeing filtered-out resources as deleted. The resource
@@ -425,79 +456,110 @@ class PlanOrchestrator(HookExecutionMixin):
                         all_provider_resources if resource_filter else provider_resources
                     )
 
+                    # Split resources by package for state isolation
+                    package_map = self._get_resource_package_map()
+                    package_groups = self._group_by_package(generate_resources, package_map)
+
                     iac_tool = env_config.iac_tool if env_config else IaCTool.TERRAFORM
-                    for tool_name, runner in self._get_sorted_runners(runner_priorities, iac_tool):
-                        generate_method = getattr(provider, f"generate_{tool_name}", None)
-                        if generate_method and callable(generate_method):
-                            if not isinstance(runner, Plannable):
-                                self.console.print(
-                                    f"  [dim]Skipping {tool_name}: does not support plan[/dim]"
-                                )
-                                continue
 
+                    for pkg_name, pkg_resources in package_groups:
+                        # Set or clear package context on the provider
+                        if pkg_name is not None:
+                            provider.set_package_context(pkg_name)
                             self.console.print(
-                                f"  [dim]Generating {tool_name} configuration...[/dim]"
+                                f"  [dim]Package: {pkg_name} ({len(pkg_resources)} resources)[/dim]"
                             )
-                            generate_method(generate_resources)
-                            self.console.print(f"  [dim]Running {tool_name} plan...[/dim]")
-
-                            starting_event: RunnerEventData = {
-                                "provider": provider_name,
-                                "runner": tool_name,
-                                "phase": "plan",
-                            }
-                            self.event_manager.emit_event(
-                                EventType.RUNNER_STARTING,
-                                env_name,
-                                starting_event,
-                                provider=provider_name,
-                                runner=tool_name,
-                                target_resources=resource_filter,
-                            )
-
-                            try:
-                                # Pass resource filter as target names for terraform
-                                runner_result = runner.plan(
-                                    provider,
-                                    target_resources=resource_filter if resource_filter else None,
-                                )
-                                provider_results[f"{tool_name}_plan"] = runner_result
-
-                                completed_event: RunnerEventData = {
-                                    "provider": provider_name,
-                                    "runner": tool_name,
-                                    "phase": "plan",
-                                    "success": True,
-                                }
-                                self.event_manager.emit_event(
-                                    EventType.RUNNER_COMPLETED,
-                                    env_name,
-                                    completed_event,
-                                    provider=provider_name,
-                                    runner=tool_name,
-                                    target_resources=resource_filter,
-                                )
-                            except Exception as exc:
-                                failed_event: RunnerEventData = {
-                                    "provider": provider_name,
-                                    "runner": tool_name,
-                                    "phase": "plan",
-                                    "error": str(exc),
-                                }
-                                self.event_manager.emit_event(
-                                    EventType.RUNNER_FAILED,
-                                    env_name,
-                                    failed_event,
-                                    provider=provider_name,
-                                    runner=tool_name,
-                                    target_resources=resource_filter,
-                                )
-                                raise
                         else:
-                            self.console.print(
-                                f"  [dim]Skipping {tool_name} for {provider_name}: "
-                                f"no generate_{tool_name} method[/dim]"
-                            )
+                            provider.clear_package_context()
+
+                        provider.ensure_directories()
+                        self._export_secrets(provider_name, env_name, provider)
+
+                        for tool_name, runner in self._get_sorted_runners(
+                            runner_priorities, iac_tool
+                        ):
+                            generate_method = getattr(provider, f"generate_{tool_name}", None)
+                            if generate_method and callable(generate_method):
+                                if not isinstance(runner, Plannable):
+                                    self.console.print(
+                                        f"  [dim]Skipping {tool_name}: does not support plan[/dim]"
+                                    )
+                                    continue
+
+                                self.console.print(
+                                    f"  [dim]Generating {tool_name} configuration...[/dim]"
+                                )
+                                generate_method(pkg_resources)
+                                self.console.print(f"  [dim]Running {tool_name} plan...[/dim]")
+
+                                starting_event: RunnerEventData = {
+                                    "provider": provider_name,
+                                    "runner": tool_name,
+                                    "phase": "plan",
+                                }
+                                self.event_manager.emit_event(
+                                    EventType.RUNNER_STARTING,
+                                    env_name,
+                                    starting_event,
+                                    provider=provider_name,
+                                    runner=tool_name,
+                                    target_resources=resource_filter,
+                                )
+
+                                try:
+                                    # Pass resource filter as target names
+                                    runner_result = runner.plan(
+                                        provider,
+                                        target_resources=(
+                                            resource_filter if resource_filter else None
+                                        ),
+                                    )
+                                    # Use package-qualified key when multiple groups
+                                    result_key = (
+                                        f"{tool_name}_plan_{pkg_name}"
+                                        if pkg_name
+                                        else f"{tool_name}_plan"
+                                    )
+                                    provider_results[result_key] = runner_result
+
+                                    completed_event: RunnerEventData = {
+                                        "provider": provider_name,
+                                        "runner": tool_name,
+                                        "phase": "plan",
+                                        "success": True,
+                                    }
+                                    self.event_manager.emit_event(
+                                        EventType.RUNNER_COMPLETED,
+                                        env_name,
+                                        completed_event,
+                                        provider=provider_name,
+                                        runner=tool_name,
+                                        target_resources=resource_filter,
+                                    )
+                                except Exception as exc:
+                                    failed_event: RunnerEventData = {
+                                        "provider": provider_name,
+                                        "runner": tool_name,
+                                        "phase": "plan",
+                                        "error": str(exc),
+                                    }
+                                    self.event_manager.emit_event(
+                                        EventType.RUNNER_FAILED,
+                                        env_name,
+                                        failed_event,
+                                        provider=provider_name,
+                                        runner=tool_name,
+                                        target_resources=resource_filter,
+                                    )
+                                    raise
+                            else:
+                                self.console.print(
+                                    f"  [dim]Skipping {tool_name} for {provider_name}: "
+                                    f"no generate_{tool_name} method[/dim]"
+                                )
+
+                    # Restore provider-scoped terraform_dir after processing
+                    provider.clear_package_context()
 
                 # Execute resource-level after_plan hooks
                 for resource in provider_resources:
@@ -891,6 +953,7 @@ class DestroyOrchestrator(HookExecutionMixin):
         get_current_user: Callable[[], str],
         hook_manager: HookManager | None = None,
         load_environment: Callable[[str], EnvironmentConfig | None] | None = None,
+        get_resource_package_map: Callable[[], dict[str, str]] | None = None,
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -902,6 +965,7 @@ class DestroyOrchestrator(HookExecutionMixin):
         self._get_current_user = get_current_user
         self._hook_manager = hook_manager
         self._load_environment = load_environment
+        self._get_resource_package_map = get_resource_package_map or (lambda: {})
 
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
@@ -1000,70 +1064,98 @@ class DestroyOrchestrator(HookExecutionMixin):
 
                 provider_results: dict[str, Any] = {}
                 active_iac = env_config.iac_tool.value if env_config else IaCTool.TERRAFORM.value
-                for tool_name, runner in self.runners.items():
-                    # Skip IaC runners that don't match the configured tool
-                    if tool_name in _IAC_TOOL_KEYS and tool_name != active_iac:
-                        continue
-                    if not isinstance(runner, Destroyable):
+
+                # Group resources by package for state isolation
+                package_map = self._get_resource_package_map()
+                package_groups = PlanOrchestrator._group_by_package(resources, package_map)
+
+                for pkg_name, pkg_resources in package_groups:
+                    if pkg_name is not None:
+                        provider.set_package_context(pkg_name)
                         self.console.print(
-                            f"  [dim]Skipping {tool_name}: does not support destroy[/dim]"
+                            f"  [dim]Package: {pkg_name} ({len(pkg_resources)} resources)[/dim]"
                         )
-                        continue
+                    else:
+                        provider.clear_package_context()
 
-                    self.console.print(f"  [dim]Running {tool_name} destroy...[/dim]")
+                    # Build resource filter for this package sub-group
+                    pkg_resource_names = [r.name for r in pkg_resources]
 
-                    starting_event: RunnerEventData = {
-                        "provider": provider_name,
-                        "runner": tool_name,
-                        "phase": "destroy",
-                    }
-                    self.event_manager.emit_event(
-                        EventType.RUNNER_STARTING,
-                        env_name,
-                        starting_event,
-                        provider=provider_name,
-                        runner=tool_name,
-                        target_resources=resource_filter,
-                    )
+                    for tool_name, runner in self.runners.items():
+                        # Skip IaC runners that don't match the configured tool
+                        if tool_name in _IAC_TOOL_KEYS and tool_name != active_iac:
+                            continue
+                        if not isinstance(runner, Destroyable):
+                            self.console.print(
+                                f"  [dim]Skipping {tool_name}: does not support destroy[/dim]"
+                            )
+                            continue
 
-                    try:
-                        runner_result = runner.destroy(
-                            provider,
-                            auto_approve=auto_approve,
-                            target_resources=resource_filter if resource_filter else None,
-                        )
-                        provider_results[tool_name] = runner_result
+                        self.console.print(f"  [dim]Running {tool_name} destroy...[/dim]")
 
-                        completed_event: RunnerEventData = {
+                        starting_event: RunnerEventData = {
                             "provider": provider_name,
                             "runner": tool_name,
                             "phase": "destroy",
-                            "success": True,
                         }
                         self.event_manager.emit_event(
-                            EventType.RUNNER_COMPLETED,
+                            EventType.RUNNER_STARTING,
                             env_name,
-                            completed_event,
+                            starting_event,
                             provider=provider_name,
                             runner=tool_name,
                             target_resources=resource_filter,
                         )
-                    except Exception as exc:
-                        failed_event: RunnerEventData = {
-                            "provider": provider_name,
-                            "runner": tool_name,
-                            "phase": "destroy",
-                            "error": str(exc),
-                        }
-                        self.event_manager.emit_event(
-                            EventType.RUNNER_FAILED,
-                            env_name,
-                            failed_event,
-                            provider=provider_name,
-                            runner=tool_name,
-                            target_resources=resource_filter,
-                        )
-                        raise
+
+                        try:
+                            # Use package-scoped resource names or original
+                            # filter as target names for terraform
+                            destroy_targets = (
+                                (resource_filter if resource_filter else pkg_resource_names)
+                                if pkg_name is not None
+                                else (resource_filter if resource_filter else None)
+                            )
+                            runner_result = runner.destroy(
+                                provider,
+                                auto_approve=auto_approve,
+                                target_resources=destroy_targets,
+                            )
+                            result_key = f"{tool_name}_{pkg_name}" if pkg_name else tool_name
+                            provider_results[result_key] = runner_result
+
+                            completed_event: RunnerEventData = {
+                                "provider": provider_name,
+                                "runner": tool_name,
+                                "phase": "destroy",
+                                "success": True,
+                            }
+                            self.event_manager.emit_event(
+                                EventType.RUNNER_COMPLETED,
+                                env_name,
+                                completed_event,
+                                provider=provider_name,
+                                runner=tool_name,
+                                target_resources=resource_filter,
+                            )
+                        except Exception as exc:
+                            failed_event: RunnerEventData = {
+                                "provider": provider_name,
+                                "runner": tool_name,
+                                "phase": "destroy",
+                                "error": str(exc),
+                            }
+                            self.event_manager.emit_event(
+                                EventType.RUNNER_FAILED,
+                                env_name,
+                                failed_event,
+                                provider=provider_name,
+                                runner=tool_name,
+                                target_resources=resource_filter,
+                            )
+                            raise
+
+                # Restore provider context after processing all packages
+                provider.clear_package_context()
 
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)
 
