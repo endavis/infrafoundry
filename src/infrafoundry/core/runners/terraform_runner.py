@@ -100,7 +100,27 @@ class TerraformRunner(BaseRunner):
                 except (json.JSONDecodeError, FileNotFoundError):
                     pass
 
+            # Check if required_providers.tf has providers not in the lock file
             if not reconfigure:
+                lock_file = working_dir / ".terraform.lock.hcl"
+                req_providers_file = working_dir / "required_providers.tf"
+                if lock_file.exists() and req_providers_file.exists():
+                    lock_content = lock_file.read_text()
+                    req_content = req_providers_file.read_text()
+                    # Extract provider sources from required_providers.tf
+                    import re
+
+                    for source_match in re.finditer(r'source\s*=\s*"([^"]+)"', req_content):
+                        source = source_match.group(1)
+                        if source not in lock_content:
+                            upgrade = True
+                            self.console.print(
+                                f"[yellow]Provider {source} not in lock file, "
+                                f"running init -upgrade...[/yellow]"
+                            )
+                            break
+
+            if not (reconfigure or upgrade):
                 return {"success": True, "message": "Already initialized"}
 
         # Build init command using full path to terraform binary

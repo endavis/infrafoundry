@@ -455,7 +455,7 @@ class TerraformGeneratorMixin:
 
         pkg = getattr(self, "_current_package", None)
         provider_name = getattr(self, "name", "unknown")
-        filename = f"terraform_{provider_name}.tfvars" if pkg else "terraform.tfvars"
+        filename = f"{provider_name}.auto.tfvars" if pkg else "terraform.tfvars"
         tfvars_path = Path(self.terraform_dir) / filename
         tfvars_path.write_text("".join(lines))
 
