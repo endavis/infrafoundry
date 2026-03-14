@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773437313158,
+  "lastUpdate": 1773480618887,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1674,6 +1674,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000029672616249373274",
             "extra": "mean: 146.31993258849238 usec\nrounds: 2685"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "39059ca78695637bf8561e2b8fba51b9550478f7",
+          "message": "fix: raise error when -r resource filter matches no resources (merges PR #372, addresses #367)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-14T09:29:46Z",
+          "tree_id": "11db1c4105b3f6fe7f5c32d4a205bb45a0e43dbf",
+          "url": "https://github.com/endavis/infrafoundry/commit/39059ca78695637bf8561e2b8fba51b9550478f7"
+        },
+        "date": 1773480617951,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9060.438521881366,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001816994198145864",
+            "extra": "mean: 110.36993381556037 usec\nrounds: 2765"
           }
         ]
       }
