@@ -132,7 +132,9 @@ class TestPlanOrchestrator:
             # Verify provider methods were called
             mock_providers["proxmox"].ensure_directories.assert_called_once()
             mock_providers["proxmox"].generate_terraform.assert_called_once()
-            mock_providers["proxmox"].generate_ansible.assert_called_once()
+            # Ansible is a non-IaC runner, so generate_ansible is not called
+            # during plan (ansible runs only as event handlers)
+            mock_providers["proxmox"].generate_ansible.assert_not_called()
 
             # Verify terraform was run
             mock_plan.assert_called_once()

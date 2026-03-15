@@ -19,6 +19,7 @@ class ResourceConfig(BaseModel):
     provider: str
     config: dict[str, Any]
     hooks: HooksConfig | None = None
+    events: dict[str, list[dict[str, Any]]] | None = None
 
 
 class ProviderBase(ABC):

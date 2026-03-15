@@ -74,20 +74,28 @@ def test_plan_runs_terraform_with_capture(runner: TerraformRunner, provider: Mag
 
 def test_apply_adds_auto_approve(runner: TerraformRunner, provider: MagicMock) -> None:
     """Apply passes -auto-approve when requested."""
+    mock_process = MagicMock()
+    mock_process.stdout = iter([])
+    mock_process.stderr = MagicMock()
+    mock_process.stderr.__iter__ = MagicMock(return_value=iter([]))
+    mock_process.returncode = 0
+    mock_process.wait.return_value = 0
+
     with (
         patch("shutil.which", return_value="/usr/bin/terraform"),
         patch("subprocess.run") as mock_run,
+        patch("subprocess.Popen", return_value=mock_process) as mock_popen,
     ):
-        mock_run.side_effect = [
-            SimpleNamespace(returncode=0, stdout="", stderr=""),  # init
-            SimpleNamespace(returncode=0, stdout="", stderr=""),
-        ]
+        # subprocess.run is used for init
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
         runner.apply(provider, auto_approve=True)
 
-        _, kwargs = mock_run.call_args
-        args = mock_run.call_args[0][0]
+        # Popen is used for apply with -json
+        mock_popen.assert_called_once()
+        args = mock_popen.call_args[0][0]
         assert "-auto-approve" in args
-        assert kwargs["cwd"] == provider.terraform_dir
+        assert "-json" in args
+        assert mock_popen.call_args[1]["cwd"] == provider.terraform_dir
 
 
 def test_validate_config_success(runner: TerraformRunner, provider: MagicMock) -> None:

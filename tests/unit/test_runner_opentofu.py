@@ -85,17 +85,23 @@ class TestOpenTofuRunnerOperations:
 
     def test_apply_uses_tofu_binary(self, runner: OpenTofuRunner, provider: MagicMock) -> None:
         """Apply should use tofu binary with -auto-approve."""
+        mock_process = MagicMock()
+        mock_process.stdout = iter([])
+        mock_process.stderr = MagicMock()
+        mock_process.stderr.__iter__ = MagicMock(return_value=iter([]))
+        mock_process.returncode = 0
+        mock_process.wait.return_value = 0
+
         with (
             patch("shutil.which", return_value="/usr/bin/tofu"),
             patch("subprocess.run") as mock_run,
+            patch("subprocess.Popen", return_value=mock_process) as mock_popen,
         ):
-            mock_run.side_effect = [
-                SimpleNamespace(returncode=0, stdout="", stderr=""),  # init
-                SimpleNamespace(returncode=0, stdout="", stderr=""),
-            ]
+            # subprocess.run is used for init
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
             runner.apply(provider, auto_approve=True)
 
-        args = mock_run.call_args[0][0]
+        args = mock_popen.call_args[0][0]
         assert args[0] == "/usr/bin/tofu"
         assert "-auto-approve" in args
 

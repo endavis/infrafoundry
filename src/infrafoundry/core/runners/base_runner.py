@@ -41,6 +41,18 @@ class BaseRunner(ABC):
         return 50
 
     @property
+    def is_iac_runner(self) -> bool:
+        """Whether this runner is an Infrastructure as Code provisioner.
+
+        IaC runners (Terraform, OpenTofu) auto-run during plan/apply/destroy.
+        Non-IaC runners (Ansible, PyInfra) only run as event handlers.
+
+        Returns:
+            True for IaC provisioners, False for config management tools
+        """
+        return False
+
+    @property
     @abstractmethod
     def tool_name(self) -> str:
         """Return the name of the tool this runner executes.
