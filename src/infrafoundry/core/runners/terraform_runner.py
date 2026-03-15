@@ -350,6 +350,8 @@ class TerraformRunner(BaseRunner):
         # Parse resource outcomes from JSON output
         outcomes = self._parse_json_output(stdout_lines, tf_dir)
         response["resource_outcomes"] = outcomes
+        # Store JSON-safe version for audit logging
+        response["resource_outcomes_summary"] = [o.to_dict() for o in outcomes]
 
         return response
 

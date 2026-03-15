@@ -502,6 +502,13 @@ class DeploymentExecutor:
             env_name, provider_name, resources, all_outcomes, resource_filter
         )
 
+        # Replace ResourceOutcome objects with JSON-safe dicts for audit logging
+        for result in runner_results.values():
+            if isinstance(result, dict) and "resource_outcomes" in result:
+                result["resource_outcomes"] = [
+                    o.to_dict() if hasattr(o, "to_dict") else o for o in result["resource_outcomes"]
+                ]
+
         return runner_results
 
     def _fire_resource_lifecycle_events(
