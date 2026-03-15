@@ -1118,6 +1118,13 @@ class DestroyOrchestrator(HookExecutionMixin):
                 for resource in resources:
                     self._execute_resource_hooks(env_name, "after_destroy", resource, provider_name)
 
+                # Replace ResourceOutcome objects with JSON-safe dicts
+                for result in provider_results.values():
+                    if isinstance(result, dict) and "resource_outcomes" in result:
+                        result["resource_outcomes"] = [
+                            o.to_dict() if hasattr(o, "to_dict") else o
+                            for o in result["resource_outcomes"]
+                        ]
                 results[provider_name] = provider_results
 
             # Execute environment-level after_destroy hooks
