@@ -172,6 +172,10 @@ class ResourceOutcome:
     resource_name: str
     """Original resource name mapped back from the terraform address."""
 
+    def to_dict(self) -> dict[str, str]:
+        """Convert to JSON-serializable dict."""
+        return {"address": self.address, "action": self.action, "resource_name": self.resource_name}
+
 
 class RollbackResourceSnapshot(TypedDict):
     """Snapshot of a single resource for rollback purposes."""
