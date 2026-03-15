@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773512772607,
+  "lastUpdate": 1773598911294,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2077,6 +2077,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000428582939511193",
             "extra": "mean: 104.10557597478139 usec\nrounds: 2797"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "978ed9608cdc08c1d3f91c878e4359b4e63d0d37",
+          "message": "fix: replace runner-level event blocking with outcome-based resource lifecycle events (merges PR #392, addresses #390, #388)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-15T18:21:16Z",
+          "tree_id": "524d2ea7e87ad6d83f0a4f55e77efcb0a257b1d2",
+          "url": "https://github.com/endavis/infrafoundry/commit/978ed9608cdc08c1d3f91c878e4359b4e63d0d37"
+        },
+        "date": 1773598910859,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7058.007411233383,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008743462329382615",
+            "extra": "mean: 141.68304759901784 usec\nrounds: 2374"
           }
         ]
       }
