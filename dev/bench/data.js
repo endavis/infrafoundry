@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773600760303,
+  "lastUpdate": 1773608857088,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2139,6 +2139,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004359319010740227",
             "extra": "mean: 103.95020744491084 usec\nrounds: 2767"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "48912a13e8cadb9a787dd937e3aedecfb047bfcd",
+          "message": "fix: support on_create/on_destroy/on_update aliases and requires group events (merges PR #395, addresses #390)\n\n- Map lifecycle aliases (on_create → resource_created) in event bus config loader\n- Add requires field support to matches_resources() — all required resources\n  must be present (group event semantics)\n- Per-resource RESOURCE_CREATED events pass only the single resource name as\n  target_resources so group handlers with requires don't match individual events\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-15T21:07:01Z",
+          "tree_id": "258b6c7fc02f150685ae0db2affea75269f17ac2",
+          "url": "https://github.com/endavis/infrafoundry/commit/48912a13e8cadb9a787dd937e3aedecfb047bfcd"
+        },
+        "date": 1773608856107,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7024.486911008983,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008373511251836008",
+            "extra": "mean: 142.3591520161808 usec\nrounds: 2480"
           }
         ]
       }
