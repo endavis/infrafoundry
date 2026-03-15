@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773598911294,
+  "lastUpdate": 1773600760303,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2108,6 +2108,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008743462329382615",
             "extra": "mean: 141.68304759901784 usec\nrounds: 2374"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9b0ea9c917f98b61673be9c5b4a35eef8b7ece89",
+          "message": "fix: make ResourceOutcome JSON-serializable for audit logging (merges PR #393, addresses #390)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-15T18:52:08Z",
+          "tree_id": "8bb6b31bd2a3b9d3a3af4ebd62e9f45a14e6c5da",
+          "url": "https://github.com/endavis/infrafoundry/commit/9b0ea9c917f98b61673be9c5b4a35eef8b7ece89"
+        },
+        "date": 1773600759381,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9619.990422144729,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004359319010740227",
+            "extra": "mean: 103.95020744491084 usec\nrounds: 2767"
           }
         ]
       }
