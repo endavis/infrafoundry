@@ -35,7 +35,12 @@ event_manager.emit_event(EventType.RESOURCE_CREATED, environment="prod", data={"
 - **Managers:** `EventManager` supports `subscribe`, `subscribe_all`, and `emit_event`.
 - **Integration:** `NotificationManager` listens to events and forwards to configured channels.
 
-### Runner Lifecycle Events
+### Runner Lifecycle Events (Deprecated)
+
+!!! warning "Deprecated"
+    Runner lifecycle events are deprecated in favor of resource lifecycle events
+    (`on_create`, `on_update`, `on_destroy`). They continue to work but emit
+    `DeprecationWarning` messages. See [Resource Lifecycle Events](#resource-lifecycle-events).
 
 Runner events are emitted in all three workflows (plan, apply, destroy) around each runner invocation:
 
@@ -125,6 +130,93 @@ Script handlers stream stdout and stderr to the console in real-time, line by li
   )
   ```
 
+## Resource Lifecycle Events
+
+Resource lifecycle events fire based on the **actual outcome** of a terraform
+apply or destroy, rather than on runner completion. This replaces the
+`RUNNER_COMPLETED` pattern, which blocked subsequent providers.
+
+### Event keys
+
+| Event Key | Fires When | Maps to EventType |
+|:----------|:-----------|:------------------|
+| `on_create` | Terraform created the resource | `RESOURCE_CREATED` |
+| `on_update` | Terraform updated the resource in place | `RESOURCE_UPDATED` |
+| `on_destroy` | Terraform destroyed the resource | `RESOURCE_DELETED` |
+
+### How it works
+
+1. The IaC runner (Terraform/OpenTofu) runs with `-json` output
+2. Structured JSON output is parsed into `ResourceOutcome` objects
+3. After all IaC runners complete, outcomes are matched against each resource's
+   `events` configuration
+4. Matching handlers execute with resource context
+
+### Declaring resource events
+
+Events are declared directly on the resource definition:
+
+```yaml
+vm:
+  - name: ontapcl-01
+    cores: 4
+    memory: 16384
+    events:
+      on_create:
+        - type: script
+          name: serial-setup
+          script: scripts/ontap-serial-setup.sh
+          timeout: 600
+      on_destroy:
+        - type: script
+          name: cleanup
+          script: scripts/ontap-cleanup.sh
+```
+
+### Non-IaC runner handling
+
+Non-IaC runners (Ansible, PyInfra) are **skipped** during automatic
+plan/apply/destroy execution. They are intended to run as resource lifecycle
+event handlers instead. The `is_iac_runner` property on `BaseRunner` controls
+this behavior.
+
+### Ansible handler type
+
+A new `ansible` handler type runs Ansible playbooks as event handlers:
+
+```yaml
+events:
+  on_create:
+    - type: ansible
+      name: configure
+      playbook: playbooks/configure.yml
+      inventory: inventory/hosts.yml
+      extra_vars:
+        target_host: web-01
+      timeout: 300
+```
+
+See [Infrastructure Packages: Ansible handler configuration](../configuration/infrastructure-packages.md#ansible-handler-configuration) for full details.
+
+### Environment variables
+
+Scripts and playbooks receive resource context via environment variables:
+
+| Variable | Description |
+|:---------|:-----------|
+| `INFRAFOUNDRY_EVENT` | Event type (e.g., `RESOURCE_CREATED`) |
+| `INFRAFOUNDRY_RESOURCE` | Resource name that triggered the event |
+| `INFRAFOUNDRY_PROVIDER` | Provider name |
+| `INFRAFOUNDRY_PACKAGE` | Package name |
+| `INFRAFOUNDRY_ENV` | Environment name |
+| `INFRAFOUNDRY_CONFIG_DIR` | Path to environment config directory |
+
+### Deprecation notice
+
+The `RUNNER_STARTING` and `RUNNER_COMPLETED` events are deprecated. They
+continue to work but emit `DeprecationWarning` messages. Migrate to
+resource-level `on_create`, `on_update`, and `on_destroy` events.
+
 ## Resource-Scoped Event Handlers
 
 Event handlers can be scoped to specific resources using the `resources` field.
@@ -188,7 +280,7 @@ for full details on package structure and configuration.
 
 ---
 
-Last updated: 2025-12-23 14:27 GMT
+Last updated: 2026-03-15
 
 
 ---

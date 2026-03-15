@@ -206,6 +206,118 @@ been loaded. This means:
 4. Resource-centric resources from `resources/*.yaml`
 5. Package events registered with the event bus
 
+## Resource-Level Events
+
+Resources can declare lifecycle event handlers directly in their definition.
+Unlike package-level events (which fire on runner lifecycle), resource-level
+events fire based on **what actually happened** to the resource during apply:
+
+| Event Key | Fires When |
+|:----------|:-----------|
+| `on_create` | Resource was newly created (terraform `+ create`) |
+| `on_update` | Resource was modified in place (terraform `~ update`) |
+| `on_destroy` | Resource is being destroyed (terraform `- destroy`) |
+
+### Declaring events on a resource
+
+Add an `events` key to a resource definition inside a package resource template:
+
+```yaml
+vm:
+  - name: {{ cluster_name }}-node1
+    cores: 4
+    memory: 16384
+    events:
+      on_create:
+        - type: script
+          name: serial-setup
+          script: scripts/ontap-serial-setup.sh
+          timeout: 600
+      on_destroy:
+        - type: script
+          name: cleanup
+          script: scripts/ontap-cleanup.sh
+```
+
+Or in a resource-centric YAML file:
+
+```yaml
+resources:
+  - provider: proxmox
+    type: vm
+    name: ontapcl-01
+    config:
+      vmid: 220
+      target_node: pve1
+    events:
+      on_create:
+        - type: ansible
+          name: configure-node
+          playbook: playbooks/configure.yml
+          timeout: 300
+```
+
+### Handler types
+
+Resource-level events support the same handler types as package-level events,
+plus a new `ansible` handler type:
+
+| Type | Description |
+|:-----|:-----------|
+| `script` | Run a shell script |
+| `webhook` | Send an HTTP webhook |
+| `python` | Call a Python callable |
+| `ansible` | Run an Ansible playbook |
+
+### Ansible handler configuration
+
+The `ansible` handler runs an Ansible playbook as an event handler:
+
+```yaml
+events:
+  on_create:
+    - type: ansible
+      name: configure-node
+      playbook: playbooks/configure.yml
+      inventory: inventory/hosts.yml    # optional
+      extra_vars:                        # optional
+        target_host: "{{ resource_name }}"
+      timeout: 300
+      continue_on_error: false
+```
+
+| Field | Type | Required | Description |
+|:------|:-----|:---------|:-----------|
+| `playbook` | string | Yes | Path to playbook (relative to environment directory) |
+| `inventory` | string | No | Inventory file path (relative to environment directory) |
+| `extra_vars` | dict | No | Extra variables passed via `--extra-vars` |
+| `timeout` | int | No | Max execution time in seconds (default: 300, max: 3600) |
+| `continue_on_error` | bool | No | Don't abort on failure (default: false) |
+
+### Script path rewriting
+
+Script and playbook paths in resource-level events are rewritten the same way
+as package-level event paths. A path like `scripts/setup.sh` in a package at
+`envs/dev/proxmox/ontap-cluster/` becomes
+`proxmox/ontap-cluster/scripts/setup.sh`.
+
+### Why resource-level events?
+
+- **Idempotent:** Handlers only fire when the resource outcome matches (e.g.,
+  `on_create` only fires on first creation, not every apply)
+- **No blocking:** Eliminates the problem where `RUNNER_COMPLETED` handlers
+  block subsequent providers
+- **Self-contained:** The resource carries its config, provider, and lifecycle
+  events -- no cross-referencing by name
+- **Portable:** Move or rename a resource and its events move with it
+
+### Deprecation of runner lifecycle events
+
+The `RUNNER_STARTING` and `RUNNER_COMPLETED` events are deprecated in favor of
+resource-level events. They continue to work but emit `DeprecationWarning`
+messages. Migrate to resource-level `on_create`, `on_update`, and `on_destroy`
+events for new configurations.
+
 ## Duplicate Detection
 
 Resource names must be unique within a provider. If a package resource has the

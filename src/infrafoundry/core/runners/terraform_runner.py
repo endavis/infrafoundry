@@ -1,16 +1,21 @@
 """Terraform runner implementation."""
 
 import json
+import logging
 import os
 import re
 import subprocess  # nosec B404 - required for running terraform
+import threading
 from pathlib import Path
-from typing import Any, cast, override
+from typing import IO, Any, cast, override
 
 from rich.console import Console
 
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners.base_runner import BaseRunner
+from infrafoundry.core.types import ResourceOutcome
+
+logger = logging.getLogger(__name__)
 
 
 class TerraformRunner(BaseRunner):
@@ -35,6 +40,12 @@ class TerraformRunner(BaseRunner):
     def priority(self) -> int:
         """Terraform must run first to provision resources."""
         return 0
+
+    @property
+    @override
+    def is_iac_runner(self) -> bool:
+        """Terraform is an IaC provisioner."""
+        return True
 
     @override
     def is_available(self) -> bool:
@@ -229,6 +240,13 @@ class TerraformRunner(BaseRunner):
     ) -> dict[str, Any]:
         """Run Terraform command for a provider.
 
+        For apply and destroy commands, the ``-json`` flag is added so that
+        structured, line-delimited JSON is emitted on stdout.  This output
+        is captured and parsed into :class:`ResourceOutcome` objects that
+        describe what terraform did to each resource.  Human-readable
+        progress information is printed to the console from the JSON
+        ``message`` fields.
+
         Args:
             provider: Provider instance
             command: Terraform command (plan, apply, destroy)
@@ -236,7 +254,8 @@ class TerraformRunner(BaseRunner):
             target_resources: Optional list of resource names to target with -target
 
         Returns:
-            Dict with command results
+            Dict with command results.  For apply/destroy, includes a
+            ``resource_outcomes`` key with a list of :class:`ResourceOutcome`.
         """
         tf_dir = provider.terraform_dir
 
@@ -261,29 +280,201 @@ class TerraformRunner(BaseRunner):
                     f"[yellow]Warning: No terraform resources matched filter: "
                     f"{target_resources} — skipping[/yellow]"
                 )
-                return {"exit_code": 0, "success": True, "output": "", "error": ""}
+                return {
+                    "exit_code": 0,
+                    "success": True,
+                    "output": "",
+                    "error": "",
+                    "resource_outcomes": [],
+                }
             for target in targets:
                 cmd.extend(["-target", target])
 
-        # Run command with environment variables; capture output for plan so drift parsing works
-        capture = command == "plan"
-        result = subprocess.run(  # nosec B603
+        use_json = command in {"apply", "destroy"}
+        if use_json:
+            cmd.append("-json")
+
+        if command == "plan":
+            # Plan: capture stdout/stderr for drift parsing
+            result = subprocess.run(  # nosec B603
+                cmd,
+                cwd=tf_dir,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            return {
+                "exit_code": result.returncode,
+                "success": result.returncode == 0,
+                "output": result.stdout or "",
+                "error": result.stderr or "",
+            }
+
+        # Apply/Destroy: capture JSON stdout, stream progress to console
+        stdout_lines: list[str] = []
+        process = subprocess.Popen(  # nosec B603
             cmd,
             cwd=tf_dir,
-            capture_output=capture,
-            text=capture,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
             env=env,
         )
 
+        # Read stderr in background thread to prevent deadlock
+        stderr_lines: list[str] = []
+        stderr_thread = threading.Thread(
+            target=self._collect_stream,
+            args=(process.stderr, stderr_lines),
+            daemon=True,
+        )
+        stderr_thread.start()
+
+        # Read stdout (JSON lines) and display progress
+        if process.stdout:
+            for line in process.stdout:
+                stripped = line.rstrip("\n")
+                if not stripped:
+                    continue
+                stdout_lines.append(stripped)
+                self._print_json_progress(stripped)
+
+        process.wait()
+        stderr_thread.join(timeout=10)
+
         response: dict[str, Any] = {
-            "exit_code": result.returncode,
-            "success": result.returncode == 0,
+            "exit_code": process.returncode,
+            "success": process.returncode == 0,
         }
-        if capture:
-            response["output"] = result.stdout or ""
-            response["error"] = result.stderr or ""
+
+        # Parse resource outcomes from JSON output
+        outcomes = self._parse_json_output(stdout_lines, tf_dir)
+        response["resource_outcomes"] = outcomes
 
         return response
+
+    @staticmethod
+    def _collect_stream(stream: IO[str] | None, collected: list[str]) -> None:
+        """Read all lines from a stream into a list.
+
+        Args:
+            stream: The pipe to read
+            collected: List to append lines to
+        """
+        if stream is None:
+            return
+        for line in stream:
+            collected.append(line.rstrip("\n"))
+
+    def _print_json_progress(self, json_line: str) -> None:
+        """Extract and print a human-readable progress message from a JSON line.
+
+        Args:
+            json_line: A single line of terraform JSON output
+        """
+        try:
+            data = json.loads(json_line)
+        except json.JSONDecodeError:
+            return
+
+        msg_type = data.get("type", "")
+        message = data.get("@message", "")
+
+        if msg_type in {"apply_start", "apply_progress", "apply_complete"}:
+            if message:
+                self.console.print(f"  [dim]{message}[/dim]")
+        elif msg_type == "change_summary":
+            if message:
+                self.console.print(f"  {message}")
+        elif msg_type == "diagnostic" and data.get("@level") == "error":
+            detail = data.get("diagnostic", {}).get("summary", message)
+            if detail:
+                self.console.print(f"  [red]{detail}[/red]")
+
+    def _parse_json_output(self, stdout_lines: list[str], tf_dir: Path) -> list[ResourceOutcome]:
+        """Parse terraform JSON output lines into resource outcomes.
+
+        Looks for ``apply_complete`` messages which indicate a resource
+        action has finished.  Each such message contains the resource
+        address and the action performed.
+
+        Args:
+            stdout_lines: Lines of JSON output from terraform
+            tf_dir: Terraform working directory (for address-to-name mapping)
+
+        Returns:
+            List of ResourceOutcome objects
+        """
+        address_to_name = self._build_address_to_name_map(tf_dir)
+        outcomes: list[ResourceOutcome] = []
+
+        for line in stdout_lines:
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            if data.get("type") != "apply_complete":
+                continue
+
+            hook = data.get("hook", {})
+            resource = hook.get("resource", {})
+            address = resource.get("addr", "")
+            action = hook.get("action", "noop")
+
+            if not address:
+                continue
+
+            # Map terraform address back to resource name
+            resource_name = address_to_name.get(address, "")
+            if not resource_name:
+                # Fallback: extract the name part from the address and convert
+                # underscores back to dashes
+                parts = address.rsplit(".", 1)
+                resource_name = parts[-1].replace("_", "-") if parts else address
+
+            outcomes.append(
+                ResourceOutcome(
+                    address=address,
+                    action=action,
+                    resource_name=resource_name,
+                )
+            )
+
+        return outcomes
+
+    def _build_address_to_name_map(self, tf_dir: Path) -> dict[str, str]:
+        """Build a mapping from terraform resource addresses to resource names.
+
+        Scans ``.tf`` files for ``resource`` blocks and maps each
+        ``type.tf_name`` address back to the original resource name
+        (converting underscores to dashes).
+
+        Args:
+            tf_dir: Terraform working directory
+
+        Returns:
+            Dict mapping e.g. ``proxmox_vm.infra_web`` to ``infra-web``
+        """
+        address_map: dict[str, str] = {}
+        resource_pattern = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
+
+        for tf_file in tf_dir.glob("*.tf"):
+            try:
+                with open(tf_file) as f:
+                    for file_line in f:
+                        match = resource_pattern.match(file_line)
+                        if match:
+                            resource_type = match.group(1)
+                            tf_name = match.group(2)
+                            address = f"{resource_type}.{tf_name}"
+                            # Convert terraform name back to resource name
+                            resource_name = tf_name.replace("_", "-")
+                            address_map[address] = resource_name
+            except OSError:
+                continue
+
+        return address_map
 
     def _resolve_terraform_targets(self, tf_dir: Path, resource_names: list[str]) -> list[str]:
         """Resolve resource names to terraform resource addresses.
