@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, TypedDict
 
 
@@ -154,6 +155,24 @@ class RunnerEventData(TypedDict, total=False):
     error: str | None
 
 
+@dataclass(slots=True)
+class ResourceOutcome:
+    """Outcome of a terraform apply/destroy action on a single resource.
+
+    Parsed from terraform's ``-json`` output to determine what action
+    was taken on each resource (create, update, delete, or no-op).
+    """
+
+    address: str
+    """Terraform resource address (e.g., 'proxmox_virtual_environment_vm.infra_web')."""
+
+    action: str
+    """Action performed: 'create', 'update', 'delete', or 'noop'."""
+
+    resource_name: str
+    """Original resource name mapped back from the terraform address."""
+
+
 class RollbackResourceSnapshot(TypedDict):
     """Snapshot of a single resource for rollback purposes."""
 
@@ -187,6 +206,7 @@ __all__ = [
     "ProxmoxEnvironmentConfig",
     "ProxmoxProviderSettings",
     "ResourceEventData",
+    "ResourceOutcome",
     "ResourceTrackingMetadata",
     "RollbackData",
     "RollbackDeploymentMetadata",

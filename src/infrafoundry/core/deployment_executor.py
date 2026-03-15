@@ -1,4 +1,6 @@
+import logging
 import traceback
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, cast
 
@@ -14,7 +16,9 @@ from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.state import ResourceState, StateManager
-from infrafoundry.core.types import ResourceEventData, RunnerEventData
+from infrafoundry.core.types import ResourceEventData, ResourceOutcome, RunnerEventData
+
+logger = logging.getLogger(__name__)
 
 # Registry keys for mutually exclusive IaC runners
 _IAC_TOOL_KEYS = {tool.value for tool in IaCTool}
@@ -330,6 +334,15 @@ class DeploymentExecutor:
     ) -> dict[str, Any]:
         """Apply a single provider's resources.
 
+        Only IaC runners (Terraform, OpenTofu) auto-run.  Non-IaC runners
+        (Ansible, PyInfra) are skipped here; they run as resource-level
+        event handlers instead.
+
+        After the IaC runner completes, resource lifecycle events
+        (``on_create``, ``on_update``, ``on_destroy``) are fired based
+        on the actual terraform outcomes so that event handlers declared
+        on each resource can execute.
+
         Args:
             env_name: Environment name
             deployment_id: Deployment ID
@@ -340,7 +353,7 @@ class DeploymentExecutor:
             resource_filter: Optional list of resource names to target with -target
 
         Returns:
-            Dict with apply results including terraform and ansible outcomes
+            Dict with apply results including terraform outcomes
         """
         resource_ids: dict[str, int] = {}
         for resource in resources:
@@ -369,8 +382,13 @@ class DeploymentExecutor:
 
         runner_results: dict[str, Any] = {}
         terraform_ids: dict[str, str] = {}
+        all_outcomes: list[ResourceOutcome] = []
 
         for tool_name, runner in self._get_sorted_runners():
+            # Only IaC runners auto-run; config tools run as event handlers
+            if not runner.is_iac_runner:
+                continue
+
             if not isinstance(runner, Applyable):
                 self.console.print(f"  [dim]Skipping {tool_name}: does not support apply[/dim]")
                 continue
@@ -382,6 +400,12 @@ class DeploymentExecutor:
                 "runner": tool_name,
                 "phase": "apply",
             }
+            warnings.warn(
+                "RUNNER_STARTING event is deprecated. "
+                "Use resource lifecycle events (on_create, on_update, on_destroy) instead.",
+                DeprecationWarning,
+                stacklevel=1,
+            )
             self.event_manager.emit_event(
                 EventType.RUNNER_STARTING,
                 env_name,
@@ -392,8 +416,6 @@ class DeploymentExecutor:
             )
 
             try:
-                # Ansible interprets auto_approve=False as check mode (dry-run)
-                # Other runners use it to skip confirmation prompts
                 run_result = runner.apply(
                     provider,
                     auto_approve=auto_approve,
@@ -401,12 +423,23 @@ class DeploymentExecutor:
                 )
                 runner_results[tool_name] = run_result
 
+                # Collect resource outcomes from IaC runner
+                raw_outcomes = run_result.get("resource_outcomes", [])
+                outcomes = cast(list[ResourceOutcome], raw_outcomes)
+                all_outcomes.extend(outcomes)
+
                 completed_event: RunnerEventData = {
                     "provider": provider_name,
                     "runner": tool_name,
                     "phase": "apply",
                     "success": run_result.get("success", True),
                 }
+                warnings.warn(
+                    "RUNNER_COMPLETED event is deprecated. "
+                    "Use resource lifecycle events (on_create, on_update, on_destroy) instead.",
+                    DeprecationWarning,
+                    stacklevel=1,
+                )
                 self.event_manager.emit_event(
                     EventType.RUNNER_COMPLETED,
                     env_name,
@@ -436,7 +469,6 @@ class DeploymentExecutor:
             if run_result["success"] and isinstance(runner, StateAware):
                 state_runner = cast(StateAware, runner)
                 terraform_ids = state_runner.get_resource_ids(provider)
-                # Update tracked resources with Terraform IDs
                 for resource_name, terraform_id in terraform_ids.items():
                     if resource_name in resource_ids:
                         db_resource_id = resource_ids[resource_name]
@@ -465,4 +497,104 @@ class DeploymentExecutor:
                     target_resources=resource_filter,
                 )
 
+        # Fire resource lifecycle events based on IaC outcomes
+        self._fire_resource_lifecycle_events(
+            env_name, provider_name, resources, all_outcomes, resource_filter
+        )
+
         return runner_results
+
+    def _fire_resource_lifecycle_events(
+        self,
+        env_name: str,
+        provider_name: str,
+        resources: list[ResourceConfig],
+        outcomes: list[ResourceOutcome],
+        resource_filter: list[str] | None,
+    ) -> None:
+        """Fire resource lifecycle events based on terraform outcomes.
+
+        Maps terraform actions to resource event keys and registers/executes
+        any handlers declared in the resource's ``events`` configuration.
+
+        Args:
+            env_name: Environment name
+            provider_name: Provider name
+            resources: List of resource configurations
+            outcomes: List of terraform resource outcomes
+            resource_filter: Optional resource name filter
+        """
+        if not outcomes:
+            return
+
+        # Map action -> event key
+        action_to_event_key: dict[str, str] = {
+            "create": "on_create",
+            "update": "on_update",
+            "delete": "on_destroy",
+        }
+
+        # Build resource lookup by name
+        resource_by_name: dict[str, ResourceConfig] = {r.name: r for r in resources}
+
+        for outcome in outcomes:
+            event_key = action_to_event_key.get(outcome.action)
+            if not event_key:
+                continue
+
+            resource = resource_by_name.get(outcome.resource_name)
+            if not resource or not resource.events:
+                continue
+
+            handlers = resource.events.get(event_key, [])
+            if not handlers:
+                continue
+
+            logger.info(
+                "Firing %s handlers for resource '%s' (action=%s)",
+                event_key,
+                outcome.resource_name,
+                outcome.action,
+            )
+
+            # Register and fire handlers for this resource event
+            for handler_config in handlers:
+                try:
+                    self.event_manager.register_handler(
+                        EventType.RESOURCE_CREATED
+                        if outcome.action == "create"
+                        else EventType.RESOURCE_UPDATED
+                        if outcome.action == "update"
+                        else EventType.RESOURCE_DELETED,
+                        handler_config,
+                    )
+                except ValueError as e:
+                    logger.error(
+                        "Failed to register %s handler for resource '%s': %s",
+                        event_key,
+                        outcome.resource_name,
+                        e,
+                    )
+                    continue
+
+            # Emit the event so registered handlers execute
+            event_type = (
+                EventType.RESOURCE_CREATED
+                if outcome.action == "create"
+                else EventType.RESOURCE_UPDATED
+                if outcome.action == "update"
+                else EventType.RESOURCE_DELETED
+            )
+            self.event_manager.emit_event(
+                event_type,
+                env_name,
+                {
+                    "provider": provider_name,
+                    "name": outcome.resource_name,
+                    "address": outcome.address,
+                    "action": outcome.action,
+                },
+                provider=provider_name,
+                resource=outcome.resource_name,
+                target_resources=resource_filter,
+            )

@@ -164,9 +164,14 @@ class PackageLoader:
             parsed = self._parse_resources_from_data(data, resource_file, effective_provider)
             resources.extend(parsed)
 
-        # Rewrite event script paths
+        # Rewrite event script paths (package-level)
         env_dir = self.base_dir / env_name
         events = self._rewrite_event_scripts(manifest.events, package_dir, env_dir)
+
+        # Rewrite resource-level event script paths
+        for resource in resources:
+            if resource.events:
+                resource.events = self._rewrite_event_scripts(resource.events, package_dir, env_dir)
 
         return resources, events
 
@@ -300,6 +305,7 @@ class PackageLoader:
                 type=resource_type,
                 provider=item.get("provider", provider),
                 config=item,
+                events=item.get("events"),
             )
             for item in resource_list
             if isinstance(item, dict) and "name" in item
@@ -336,6 +342,7 @@ class PackageLoader:
                     type=item["type"],
                     provider=item.get("provider", default_provider),
                     config=config,
+                    events=item.get("events"),
                 )
             )
         return result
