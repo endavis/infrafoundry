@@ -51,9 +51,10 @@ class BaseHandler(ABC):
         """Check whether this handler should fire for the given target resources.
 
         A handler fires if:
-        - It has no ``resources`` filter in its config (fires for all).
+        - It has no ``resources`` or ``requires`` filter (fires for all).
         - ``target_resources`` is None (no -r flag, all resources targeted).
-        - There is an intersection between handler resources and target resources.
+        - For ``resources``: intersection between handler and target resources.
+        - For ``requires``: ALL required resources must be in target resources.
 
         Args:
             target_resources: Resource names from the -r CLI filter, or None.
@@ -61,6 +62,14 @@ class BaseHandler(ABC):
         Returns:
             True if this handler should execute, False to skip.
         """
+        # Check 'requires' — ALL must be present (group event semantics)
+        required_resources = self.config.get("requires")
+        if required_resources:
+            if target_resources is None:
+                return True
+            return set(required_resources).issubset(set(target_resources))
+
+        # Check 'resources' — ANY intersection (filter semantics)
         handler_resources = self.config.get("resources")
         if not handler_resources:
             return True

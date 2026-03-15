@@ -398,9 +398,17 @@ class UnifiedEventBus(BaseManager):
                 ],
             }
         """
+        # Map lifecycle shorthand names to EventType values
+        lifecycle_aliases: dict[str, str] = {
+            "on_create": EventType.RESOURCE_CREATED.value,
+            "on_destroy": EventType.RESOURCE_DELETED.value,
+            "on_update": EventType.RESOURCE_UPDATED.value,
+        }
+
         for event_name, handlers in events_config.items():
+            resolved_name = lifecycle_aliases.get(event_name.lower(), event_name.lower())
             try:
-                event_type = EventType(event_name.lower())
+                event_type = EventType(resolved_name)
             except ValueError:
                 self._log_warning(f"Unknown event type in config: {event_name}")
                 continue

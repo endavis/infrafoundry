@@ -199,6 +199,31 @@ class DeploymentExecutor:
             )
             results[provider_name] = result
 
+        # Emit aggregate RESOURCE_CREATED event AFTER all providers complete.
+        # This ensures group handlers (requires: [...]) only fire once when
+        # all required resources exist across all providers.
+        all_created: list[str] = []
+        for result in results.values():
+            if isinstance(result, dict):
+                for tool_result in result.values():
+                    if isinstance(tool_result, dict):
+                        for outcome in tool_result.get("resource_outcomes", []):
+                            name = (
+                                outcome.get("resource_name", "")
+                                if isinstance(outcome, dict)
+                                else ""
+                            )
+                            action = outcome.get("action", "") if isinstance(outcome, dict) else ""
+                            if action == "create" and name:
+                                all_created.append(name)
+        if all_created:
+            self.event_manager.emit_event(
+                EventType.RESOURCE_CREATED,
+                env_name,
+                {"action": "create", "resources": all_created},
+                target_resources=all_created,
+            )
+
         return results
 
     def apply_parallel(
@@ -584,7 +609,9 @@ class DeploymentExecutor:
                     )
                     continue
 
-            # Emit the event so registered handlers execute
+            # Emit per-resource event for resource-level handlers.
+            # Pass only the single resource name as target so that group
+            # handlers with ``requires`` don't match individual emissions.
             event_type = (
                 EventType.RESOURCE_CREATED
                 if outcome.action == "create"
@@ -603,5 +630,9 @@ class DeploymentExecutor:
                 },
                 provider=provider_name,
                 resource=outcome.resource_name,
-                target_resources=resource_filter,
+                target_resources=[outcome.resource_name],
             )
+
+        # NOTE: Aggregate events for group handlers (requires: [...]) are NOT
+        # emitted here. They must be emitted after ALL providers complete to
+        # avoid firing before all required resources exist. See apply_serial().
