@@ -127,10 +127,10 @@ class TestProxmoxTemplates:
         assert "sockets" in content
         assert "memory" in content and "8192" in content
 
-        # Disk configuration is NOT generated when cloning (handled by template)
-        # Only new VMs (without clone) get explicit disk blocks
-        # So no "scsi" or disk size should be in the generated content
+        # Disk configuration is generated for clones too (for resize)
+        assert "disk {" in content
         assert "local-lvm" in content
+        assert "size         = 50" in content
 
         # Check network configuration
         assert "vmbr0" in content

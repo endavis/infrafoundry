@@ -205,10 +205,10 @@ class TestOVACPUType:
     """Tests for CPU type rendering."""
 
     def test_default_cpu_type(self, provider):
-        """Default CPU type should be kvm64."""
+        """Default CPU type should be host."""
         vms = [_make_ova_vm()]
         content = _render_ova_vms(provider, vms)
-        assert "--cpu kvm64" in content
+        assert "--cpu host" in content
 
     def test_custom_cpu_type(self, provider):
         """Custom CPU type should render in qm create."""
@@ -254,7 +254,7 @@ class TestOVADefaults:
         # Default cores
         assert "--cores 2" in content
         # Default CPU type
-        assert "--cpu kvm64" in content
+        assert "--cpu host" in content
         # Default disk bus
         assert 'disk_bus   = "ide"' in content
         # Default storage

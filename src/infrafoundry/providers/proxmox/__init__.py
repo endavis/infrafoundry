@@ -266,9 +266,9 @@ class ProxmoxProvider(
 
         # Store full merged cloud-init as YAML string for direct passthrough
         if merged_cloud_init:
-            config["cloud_init_user_data"] = yaml.dump(
-                merged_cloud_init, default_flow_style=False, sort_keys=False
-            )
+            yaml_str = yaml.dump(merged_cloud_init, default_flow_style=False, sort_keys=False)
+            # Escape ${...} sequences for terraform heredoc (prevents interpolation)
+            config["cloud_init_user_data"] = yaml_str.replace("${", "$${")
 
         return vm_copy
 

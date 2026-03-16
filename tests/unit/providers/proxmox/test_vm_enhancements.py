@@ -48,10 +48,10 @@ class TestCPUType:
         assert 'type    = "host"' in content
 
     def test_vm_cpu_type_default(self, provider):
-        """Default cpu_type should be kvm64."""
+        """Default cpu_type should be host."""
         vms = [_make_vm()]
         content = _render_vms(provider, vms)
-        assert 'type    = "kvm64"' in content
+        assert 'type    = "host"' in content
 
 
 class TestBalloon:
@@ -234,7 +234,7 @@ class TestDefaultsUnchanged:
         """A minimal VM config should produce default values with no new blocks."""
         vms = [_make_vm(clone="100")]
         content = _render_vms(provider, vms)
-        assert 'type    = "kvm64"' in content
+        assert 'type    = "host"' in content
         assert "floating" not in content
         assert "cdrom" not in content
         assert "network_device" not in content  # No network defined
