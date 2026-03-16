@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773655167059,
+  "lastUpdate": 1773665314930,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2232,6 +2232,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004400096579834577",
             "extra": "mean: 103.74059353180553 usec\nrounds: 2721"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cd92cbb08a6b60142eaa6b8e6189e0163b82d1f9",
+          "message": "fix: proxmox VM template defaults for clones, CPU, and cloud-init (merges PR #404, addresses #403)\n\nfix: proxmox VM template defaults for clones, CPU type, and cloud-init escaping\n\n- Allow disk block on cloned VMs for resize (was skipped entirely)\n- Default disk interface to scsi0 for clones (matches virtio-scsi-pci controller)\n- Change default CPU type from kvm64 to host (modern distros need x86-64-v2)\n- Escape ${...} in cloud-init snippets for terraform heredoc compatibility",
+          "timestamp": "2026-03-16T12:48:02Z",
+          "tree_id": "f308c8c72c75edd75cc0560bc048510a05286bf5",
+          "url": "https://github.com/endavis/infrafoundry/commit/cd92cbb08a6b60142eaa6b8e6189e0163b82d1f9"
+        },
+        "date": 1773665314543,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7058.088767467708,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000920529968223612",
+            "extra": "mean: 141.68141446580003 usec\nrounds: 2461"
           }
         ]
       }
