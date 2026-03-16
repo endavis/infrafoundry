@@ -282,6 +282,28 @@ class KubernetesProvider(
         ]
 
     @override
+    def get_terraform_resource_types(self) -> dict[str, list[str]]:
+        """Map InfraFoundry resource types to terraform resource types."""
+        return {
+            "deployments": ["kubernetes_deployment"],
+            "services": ["kubernetes_service"],
+            "namespaces": ["kubernetes_namespace"],
+            "configmaps": ["kubernetes_config_map"],
+            "secrets": ["kubernetes_secret"],
+            "helm_releases": ["helm_release"],
+            "cronjobs": ["kubernetes_cron_job_v1"],
+            "jobs": ["kubernetes_job"],
+            "ingresses": ["kubernetes_ingress_v1"],
+            "persistentvolumeclaims": ["kubernetes_persistent_volume_claim"],
+            "manifests": ["kubernetes_manifest"],
+            "serviceaccounts": ["kubernetes_service_account"],
+            "roles": ["kubernetes_role"],
+            "rolebindings": ["kubernetes_role_binding"],
+            "clusterroles": ["kubernetes_cluster_role"],
+            "clusterrolebindings": ["kubernetes_cluster_role_binding"],
+        }
+
+    @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies for proper ordering."""
         return {

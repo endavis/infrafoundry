@@ -366,6 +366,19 @@ class OPNsenseProvider(
         ]
 
     @override
+    def get_terraform_resource_types(self) -> dict[str, list[str]]:
+        """Map InfraFoundry resource types to terraform resource types."""
+        return {
+            "kea_reservation": ["opnsense_kea_reservation"],
+            "kea_subnet": ["opnsense_kea_subnet"],
+            "aliases": ["opnsense_firewall_alias"],
+            "firewall_rules": ["opnsense_firewall_rule"],
+            "vlans": ["opnsense_vlan"],
+            "dhcp_static_maps": ["opnsense_dhcpv4_static_map"],
+            "unbound_host_override": ["opnsense_unbound_host_override"],
+        }
+
+    @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
