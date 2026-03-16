@@ -401,6 +401,20 @@ class ProxmoxProvider(
         return ["vm", "container", "template", "network", "storage"]
 
     @override
+    def get_terraform_resource_types(self) -> dict[str, list[str]]:
+        """Map InfraFoundry resource types to terraform resource types."""
+        return {
+            "vm": ["proxmox_virtual_environment_vm", "terraform_data"],
+            "template": ["proxmox_virtual_environment_vm"],
+            "container": ["proxmox_virtual_environment_container"],
+            "storage": [
+                "proxmox_virtual_environment_storage_nfs",
+                "proxmox_virtual_environment_storage_cifs",
+                "proxmox_virtual_environment_storage_dir",
+            ],
+        }
+
+    @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {

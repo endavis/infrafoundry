@@ -120,6 +120,9 @@ class TestProviderRegistry:
             def get_resource_types(self):
                 return ["vm"]
 
+            def get_terraform_resource_types(self):
+                return {"vm": ["proxmox_virtual_environment_vm"]}
+
         mock_module.ProxmoxProvider = MockProxmoxProvider
         mock_import.return_value = mock_module
 

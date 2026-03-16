@@ -30,6 +30,10 @@ class StubProviderImplementation(ProviderBase):
         """Get supported resource types."""
         return ["test_resource"]
 
+    def get_terraform_resource_types(self) -> dict[str, list[str]]:
+        """Map InfraFoundry resource types to terraform resource types."""
+        return {"test_resource": ["test_terraform_resource"]}
+
 
 @pytest.mark.unit
 class TestProviderBase:

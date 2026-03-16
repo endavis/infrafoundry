@@ -202,6 +202,7 @@ class DeploymentExecutor:
         # Emit aggregate RESOURCE_CREATED event AFTER all providers complete.
         # This ensures group handlers (requires: [...]) only fire once when
         # all required resources exist across all providers.
+        seen_created: set[str] = set()
         all_created: list[str] = []
         for result in results.values():
             if isinstance(result, dict):
@@ -214,7 +215,8 @@ class DeploymentExecutor:
                                 else ""
                             )
                             action = outcome.get("action", "") if isinstance(outcome, dict) else ""
-                            if action == "create" and name:
+                            if action == "create" and name and name not in seen_created:
+                                seen_created.add(name)
                                 all_created.append(name)
         if all_created:
             self.event_manager.emit_event(
@@ -524,7 +526,7 @@ class DeploymentExecutor:
 
         # Fire resource lifecycle events based on IaC outcomes
         self._fire_resource_lifecycle_events(
-            env_name, provider_name, resources, all_outcomes, resource_filter
+            env_name, provider_name, provider, resources, all_outcomes, resource_filter
         )
 
         # Replace ResourceOutcome objects with JSON-safe dicts for audit logging
@@ -540,6 +542,7 @@ class DeploymentExecutor:
         self,
         env_name: str,
         provider_name: str,
+        provider: ProviderBase,
         resources: list[ResourceConfig],
         outcomes: list[ResourceOutcome],
         resource_filter: list[str] | None,
@@ -548,10 +551,14 @@ class DeploymentExecutor:
 
         Maps terraform actions to resource event keys and registers/executes
         any handlers declared in the resource's ``events`` configuration.
+        Uses the provider's terraform resource type mapping to ensure that
+        only primary terraform resources (not helper resources like
+        cloud-init files) trigger event handlers.
 
         Args:
             env_name: Environment name
             provider_name: Provider name
+            provider: Provider instance (used for terraform type mapping)
             resources: List of resource configurations
             outcomes: List of terraform resource outcomes
             resource_filter: Optional resource name filter
@@ -566,6 +573,13 @@ class DeploymentExecutor:
             "delete": "on_destroy",
         }
 
+        # Build reverse map: terraform_type -> set of InfraFoundry types
+        tf_type_map = provider.get_terraform_resource_types()
+        tf_to_infra: dict[str, set[str]] = {}
+        for infra_type, tf_types in tf_type_map.items():
+            for tf_type in tf_types:
+                tf_to_infra.setdefault(tf_type, set()).add(infra_type)
+
         # Build resource lookup by name
         resource_by_name: dict[str, ResourceConfig] = {r.name: r for r in resources}
 
@@ -576,6 +590,14 @@ class DeploymentExecutor:
 
             resource = resource_by_name.get(outcome.resource_name)
             if not resource or not resource.events:
+                continue
+
+            # Extract terraform resource type from address (part before the dot)
+            tf_type = outcome.address.split(".")[0] if "." in outcome.address else ""
+
+            # Only fire if the terraform type maps to this resource's InfraFoundry type
+            allowed_infra_types = tf_to_infra.get(tf_type, set())
+            if resource.type not in allowed_infra_types:
                 continue
 
             handlers = resource.events.get(event_key, [])

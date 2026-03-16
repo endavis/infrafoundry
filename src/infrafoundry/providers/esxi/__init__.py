@@ -137,6 +137,16 @@ class EsxiProvider(
         return ["vswitch", "portgroup", "vm", "ovf_deployment"]
 
     @override
+    def get_terraform_resource_types(self) -> dict[str, list[str]]:
+        """Map InfraFoundry resource types to terraform resource types."""
+        return {
+            "vm": ["esxi_guest"],
+            "ovf_deployment": ["terraform_data"],
+            "vswitch": ["esxi_vswitch"],
+            "portgroup": ["esxi_portgroup"],
+        }
+
+    @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
