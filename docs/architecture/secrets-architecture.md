@@ -125,6 +125,7 @@ After successful rotation:
 
 - [Age Key Management Best Practices](../guides/age-key-management.md)
 - [Per-Environment Credentials](../configuration/per-environment-credentials.md)
+- [Per-Package Secrets](../configuration/infrastructure-packages.md#per-package-secrets)
 - [Configuration Guide](../configuration/overview.md)
 - [Validation and Pre-Flight Checks](../usage/validation.md)
 
