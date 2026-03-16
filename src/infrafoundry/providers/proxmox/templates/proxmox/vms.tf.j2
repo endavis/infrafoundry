@@ -48,7 +48,7 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   cpu {
     cores   = {{ vm.config.cores | default(2) }}
     sockets = {{ vm.config.sockets | default(1) }}
-    type    = "{{ vm.config.cpu_type | default('kvm64') }}"
+    type    = "{{ vm.config.cpu_type | default('host') }}"
   }
 
   # Memory Configuration
@@ -66,12 +66,12 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   }
   {% endif %}
 
-  {% if vm.config.disk is defined and vm.config.clone is not defined %}
-  # Disk Configuration (only for new VMs, not clones)
+  {% if vm.config.disk is defined %}
+  # Disk Configuration
   disk {
     datastore_id = "{{ vm.config.disk.storage | default('local-lvm') }}"
     size         = {{ vm.config.disk.size | default('32') | replace('G', '') }}
-    interface    = "{{ 'scsi0' if vm.config.disk.type == 'scsi' else ('sata0' if vm.config.disk.type == 'sata' else 'virtio0') }}"
+    interface    = "{{ vm.config.disk.interface | default('scsi0' if (vm.config.clone is defined or vm.config.disk.type is not defined or vm.config.disk.type == 'scsi') else ('sata0' if vm.config.disk.type == 'sata' else 'virtio0')) }}"
   }
   {% endif %}
 
