@@ -241,6 +241,73 @@ class TestTerraformJsonParsing:
         assert len(outcomes) == 1
         assert outcomes[0].resource_name == "some-resource"
 
+    def test_build_address_map_suffix_match(self, tmp_path: Path) -> None:
+        """Prefixed terraform names map to resource names via suffix matching."""
+        tf_file = tmp_path / "main.tf"
+        tf_file.write_text(
+            'resource "terraform_data" "ova_vm_ontapcl_01" {\n'
+            "}\n"
+            'resource "terraform_data" "ova_vm_ontapcl_02" {\n'
+            "}\n"
+        )
+
+        runner = TerraformRunner()
+        name_map = runner._build_address_to_name_map(
+            tmp_path, resource_names=["ontapcl-01", "ontapcl-02"]
+        )
+
+        assert name_map == {
+            "terraform_data.ova_vm_ontapcl_01": "ontapcl-01",
+            "terraform_data.ova_vm_ontapcl_02": "ontapcl-02",
+        }
+
+    def test_build_address_map_exact_match(self, tmp_path: Path) -> None:
+        """Exact match takes priority when resource name matches directly."""
+        tf_file = tmp_path / "main.tf"
+        tf_file.write_text('resource "proxmox_virtual_environment_vm" "infra_web" {\n}\n')
+
+        runner = TerraformRunner()
+        name_map = runner._build_address_to_name_map(tmp_path, resource_names=["infra-web"])
+
+        assert name_map == {
+            "proxmox_virtual_environment_vm.infra_web": "infra-web",
+        }
+
+    def test_build_address_map_fallback_no_resource_names(self, tmp_path: Path) -> None:
+        """Without resource_names, falls back to full name conversion."""
+        tf_file = tmp_path / "main.tf"
+        tf_file.write_text('resource "terraform_data" "ova_vm_ontapcl_01" {\n}\n')
+
+        runner = TerraformRunner()
+        name_map = runner._build_address_to_name_map(tmp_path)
+
+        assert name_map == {
+            "terraform_data.ova_vm_ontapcl_01": "ova-vm-ontapcl-01",
+        }
+
+    def test_parse_json_output_with_resource_names(self, tmp_path: Path) -> None:
+        """End-to-end: prefixed terraform_data produces correct resource name."""
+        tf_file = tmp_path / "main.tf"
+        tf_file.write_text('resource "terraform_data" "ova_vm_ontapcl_01" {\n}\n')
+
+        runner = TerraformRunner()
+        json_lines = [
+            json.dumps(
+                {
+                    "type": "apply_complete",
+                    "hook": {
+                        "resource": {"addr": "terraform_data.ova_vm_ontapcl_01"},
+                        "action": "create",
+                    },
+                }
+            ),
+        ]
+        outcomes = runner._parse_json_output(json_lines, tmp_path, resource_names=["ontapcl-01"])
+
+        assert len(outcomes) == 1
+        assert outcomes[0].resource_name == "ontapcl-01"
+        assert outcomes[0].action == "create"
+
 
 # --- AnsibleHandler ---
 

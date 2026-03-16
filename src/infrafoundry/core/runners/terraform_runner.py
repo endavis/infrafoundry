@@ -348,7 +348,7 @@ class TerraformRunner(BaseRunner):
         }
 
         # Parse resource outcomes from JSON output
-        outcomes = self._parse_json_output(stdout_lines, tf_dir)
+        outcomes = self._parse_json_output(stdout_lines, tf_dir, target_resources)
         response["resource_outcomes"] = outcomes
         # Store JSON-safe version for audit logging
         response["resource_outcomes_summary"] = [o.to_dict() for o in outcomes]
@@ -393,7 +393,12 @@ class TerraformRunner(BaseRunner):
             if detail:
                 self.console.print(f"  [red]{detail}[/red]")
 
-    def _parse_json_output(self, stdout_lines: list[str], tf_dir: Path) -> list[ResourceOutcome]:
+    def _parse_json_output(
+        self,
+        stdout_lines: list[str],
+        tf_dir: Path,
+        resource_names: list[str] | None = None,
+    ) -> list[ResourceOutcome]:
         """Parse terraform JSON output lines into resource outcomes.
 
         Looks for ``apply_complete`` messages which indicate a resource
@@ -403,11 +408,13 @@ class TerraformRunner(BaseRunner):
         Args:
             stdout_lines: Lines of JSON output from terraform
             tf_dir: Terraform working directory (for address-to-name mapping)
+            resource_names: Optional list of known InfraFoundry resource names
+                for suffix-based address mapping
 
         Returns:
             List of ResourceOutcome objects
         """
-        address_to_name = self._build_address_to_name_map(tf_dir)
+        address_to_name = self._build_address_to_name_map(tf_dir, resource_names)
         outcomes: list[ResourceOutcome] = []
 
         for line in stdout_lines:
@@ -445,19 +452,28 @@ class TerraformRunner(BaseRunner):
 
         return outcomes
 
-    def _build_address_to_name_map(self, tf_dir: Path) -> dict[str, str]:
+    def _build_address_to_name_map(
+        self, tf_dir: Path, resource_names: list[str] | None = None
+    ) -> dict[str, str]:
         """Build a mapping from terraform resource addresses to resource names.
 
         Scans ``.tf`` files for ``resource`` blocks and maps each
-        ``type.tf_name`` address back to the original resource name
-        (converting underscores to dashes).
+        ``type.tf_name`` address back to the original resource name.
+        When *resource_names* is provided, suffix matching is used so that
+        prefixed terraform names (e.g. ``ova_vm_ontapcl_01``) are correctly
+        mapped back to their InfraFoundry name (``ontapcl-01``).
 
         Args:
             tf_dir: Terraform working directory
+            resource_names: Optional list of known InfraFoundry resource names
+                for suffix-based matching
 
         Returns:
             Dict mapping e.g. ``proxmox_vm.infra_web`` to ``infra-web``
         """
+        known_tf_names = (
+            {name.replace("-", "_") for name in resource_names} if resource_names else set()
+        )
         address_map: dict[str, str] = {}
         resource_pattern = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
 
@@ -470,13 +486,42 @@ class TerraformRunner(BaseRunner):
                             resource_type = match.group(1)
                             tf_name = match.group(2)
                             address = f"{resource_type}.{tf_name}"
-                            # Convert terraform name back to resource name
-                            resource_name = tf_name.replace("_", "-")
+                            # Resolve resource name using suffix matching
+                            resource_name = self._resolve_resource_name(tf_name, known_tf_names)
                             address_map[address] = resource_name
             except OSError:
                 continue
 
         return address_map
+
+    @staticmethod
+    def _resolve_resource_name(tf_name: str, known_tf_names: set[str]) -> str:
+        """Resolve a terraform resource name back to an InfraFoundry resource name.
+
+        Uses three strategies in order:
+        1. Exact match against known resource names
+        2. Suffix match for prefixed names (e.g. ``ova_vm_ontapcl_01`` → ``ontapcl-01``)
+        3. Fallback: full name conversion (underscores to dashes)
+
+        Args:
+            tf_name: Terraform resource name (e.g. ``ova_vm_ontapcl_01``)
+            known_tf_names: Known resource names in terraform form (underscores)
+
+        Returns:
+            InfraFoundry resource name (with dashes)
+        """
+        # 1. Exact match
+        if tf_name in known_tf_names:
+            return tf_name.replace("_", "-")
+
+        # 2. Suffix match (handles prefixed names like ova_vm_ontapcl_01)
+        if known_tf_names:
+            for known in known_tf_names:
+                if tf_name.endswith(f"_{known}"):
+                    return known.replace("_", "-")
+
+        # 3. Fallback: full name conversion
+        return tf_name.replace("_", "-")
 
     def _resolve_terraform_targets(self, tf_dir: Path, resource_names: list[str]) -> list[str]:
         """Resolve resource names to terraform resource addresses.
