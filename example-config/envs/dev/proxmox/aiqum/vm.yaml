@@ -1,0 +1,33 @@
+resources:
+  - provider: proxmox
+    type: vm
+    name: aiqum
+    config:
+      name: "{{ vm_name }}"
+      vmid: {{ vmid }}
+      target_node: "{{ target_node }}"
+      clone: {{ template_vmid }}
+      cores: {{ cores }}
+      memory: {{ memory }}
+      agent: true
+      disk:
+        storage: "{{ disk_storage }}"
+        size: {{ disk_size }}
+      network:
+        - bridge: vmbr0
+          tag: 10
+{% if mac_address %}
+          macaddr: "{{ mac_address }}"
+{% endif %}
+      cloud_init_snippets:
+        - users/ansible
+        - network/dhcp
+        - packages/qemu-agent
+      tags: [ontap, aiqum]
+      onboot: true
+    events:
+      on_create:
+        - type: script
+          name: aiqum-setup
+          script: scripts/aiqum-post-terraform.sh
+          timeout: 1800
