@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773678772160,
+  "lastUpdate": 1773690942449,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2294,6 +2294,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000765392180491346",
             "extra": "mean: 142.26400823049957 usec\nrounds: 2430"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a0448ca57cc08d48aea47fb27ecc491e508326c2",
+          "message": "docs: update ontap-cluster example and add aiqum example package (merges PR #408, addresses #407)\n\n* docs: update ontap-cluster example and add aiqum example package\n\n* fix: remove clear-text password logging from aiqum setup script",
+          "timestamp": "2026-03-16T19:55:02Z",
+          "tree_id": "97aa7e7513a0c43a446b32ca1d7191db19113ed2",
+          "url": "https://github.com/endavis/infrafoundry/commit/a0448ca57cc08d48aea47fb27ecc491e508326c2"
+        },
+        "date": 1773690941456,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7028.712208267641,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009130979724282525",
+            "extra": "mean: 142.27357307697605 usec\nrounds: 2080"
           }
         ]
       }
