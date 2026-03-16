@@ -46,7 +46,8 @@ def save_option(base_url: str, name: str, value: str | int | bool, auth: tuple) 
     )
     if r.status_code in (200, 201, 204):
         return True
-    print(f"    Failed to set {name}: {r.status_code} {r.text[:200]}")
+    # Avoid logging response body — may contain sensitive data
+    print(f"    Failed to set {name}: {r.status_code}")
     return False
 
 
