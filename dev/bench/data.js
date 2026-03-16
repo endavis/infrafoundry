@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773608857088,
+  "lastUpdate": 1773622631794,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2170,6 +2170,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008373511251836008",
             "extra": "mean: 142.3591520161808 usec\nrounds: 2480"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ec38b4c1d40e3f7c5d44c456160fb4aaa580755b",
+          "message": "fix: prevent group event handlers from firing per-resource (merges PR #397, addresses #394)\n\nfix: pass single resource name in per-resource RESOURCE_CREATED emissions\n\nThe old RESOURCE_CREATED emission in apply_single_provider passed the full\nCLI resource_filter as target_resources, causing group handlers with\nrequires: [a, b] to match individual resource events. Now passes only\n[resource.name] so group handlers only match the aggregate emission.\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-16T00:56:40Z",
+          "tree_id": "be44e2ee0e71079dd8702bf7936c9d58866ded44",
+          "url": "https://github.com/endavis/infrafoundry/commit/ec38b4c1d40e3f7c5d44c456160fb4aaa580755b"
+        },
+        "date": 1773622631353,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7001.515707449657,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011487471386439365",
+            "extra": "mean: 142.82621674846686 usec\nrounds: 2436"
           }
         ]
       }
