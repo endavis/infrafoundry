@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773665314930,
+  "lastUpdate": 1773678772160,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2263,6 +2263,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000920529968223612",
             "extra": "mean: 141.68141446580003 usec\nrounds: 2461"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4475b5c2adbe7a9a800118521be23920c86f10c5",
+          "message": "fix: add type-aware event filtering to prevent duplicate handler firing (merges PR #406, addresses #405)",
+          "timestamp": "2026-03-16T16:32:17Z",
+          "tree_id": "c840d49f370be7376219750cb506bd8ce31f92f7",
+          "url": "https://github.com/endavis/infrafoundry/commit/4475b5c2adbe7a9a800118521be23920c86f10c5"
+        },
+        "date": 1773678771835,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7029.184770189912,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000765392180491346",
+            "extra": "mean: 142.26400823049957 usec\nrounds: 2430"
           }
         ]
       }
