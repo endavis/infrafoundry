@@ -122,6 +122,23 @@ class ProviderBase(ABC):
         """
         return {}
 
+    @abstractmethod
+    def get_terraform_resource_types(self) -> dict[str, list[str]]:
+        """Map InfraFoundry resource types to terraform resource types.
+
+        Returns a dict where keys are InfraFoundry resource type names
+        (matching ``get_resource_types()``) and values are lists of
+        terraform resource type strings that represent that resource.
+        Only terraform types present in this mapping will trigger
+        resource lifecycle events (``on_create``, ``on_update``,
+        ``on_destroy``).
+
+        Returns:
+            Dict mapping resource type names to lists of terraform
+            resource type strings.
+        """
+        pass
+
     def validate_connectivity(self, env_config: EnvironmentData, report: ValidationReport) -> None:
         """Validate connectivity to provider API.
 

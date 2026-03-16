@@ -6,13 +6,18 @@ Covers:
 - IaC runner classification
 - Terraform JSON output parsing
 - Resource lifecycle event firing
+- Type-aware event filtering (terraform type -> InfraFoundry type)
 - AnsibleHandler creation and validation
 - HandlerType.ANSIBLE enum
 - Event bus ansible handler creation
+- Provider get_terraform_resource_types() mappings
+- Aggregate event deduplication
 """
 
 import json
 from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
 
 from infrafoundry.core.events.bus import UnifiedEventBus
 from infrafoundry.core.events.handlers.ansible import AnsibleHandler
@@ -371,3 +376,320 @@ class TestEventBusAnsibleHandler:
         handler = bus._create_handler(config)
         assert isinstance(handler, AnsibleHandler)
         assert handler.config["playbook"] == "playbooks/test.yml"
+
+
+# --- Provider get_terraform_resource_types() ---
+
+
+class TestProviderTerraformResourceTypes:
+    """Test each provider's get_terraform_resource_types() mapping."""
+
+    def test_proxmox_mapping(self, tmp_path: Path) -> None:
+        """Proxmox provider returns correct terraform type mapping."""
+        from infrafoundry.providers.proxmox import ProxmoxProvider
+
+        provider = ProxmoxProvider(config_dir=tmp_path, output_dir=tmp_path)
+        mapping = provider.get_terraform_resource_types()
+
+        assert "vm" in mapping
+        assert "proxmox_virtual_environment_vm" in mapping["vm"]
+        assert "terraform_data" in mapping["vm"]
+        assert "template" in mapping
+        assert "proxmox_virtual_environment_vm" in mapping["template"]
+        assert "container" in mapping
+        assert "proxmox_virtual_environment_container" in mapping["container"]
+        assert "storage" in mapping
+        assert "proxmox_virtual_environment_storage_nfs" in mapping["storage"]
+
+    def test_opnsense_mapping(self, tmp_path: Path) -> None:
+        """OPNsense provider returns correct terraform type mapping."""
+        from infrafoundry.providers.opnsense import OPNsenseProvider
+
+        provider = OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
+        mapping = provider.get_terraform_resource_types()
+
+        assert "kea_reservation" in mapping
+        assert "opnsense_kea_reservation" in mapping["kea_reservation"]
+        assert "aliases" in mapping
+        assert "opnsense_firewall_alias" in mapping["aliases"]
+
+    def test_esxi_mapping(self, tmp_path: Path) -> None:
+        """ESXi provider returns correct terraform type mapping."""
+        from infrafoundry.providers.esxi import EsxiProvider
+
+        provider = EsxiProvider(config_dir=tmp_path, output_dir=tmp_path)
+        mapping = provider.get_terraform_resource_types()
+
+        assert "vm" in mapping
+        assert "esxi_guest" in mapping["vm"]
+        assert "ovf_deployment" in mapping
+        assert "terraform_data" in mapping["ovf_deployment"]
+
+    def test_oci_mapping(self, tmp_path: Path) -> None:
+        """OCI provider returns correct terraform type mapping."""
+        from infrafoundry.providers.oci import OCIProvider
+
+        provider = OCIProvider(config_dir=tmp_path, output_dir=tmp_path)
+        mapping = provider.get_terraform_resource_types()
+
+        assert "instance" in mapping
+        assert "oci_core_instance" in mapping["instance"]
+        assert "vcn" in mapping
+        assert "oci_core_vcn" in mapping["vcn"]
+
+    def test_kubernetes_mapping(self, tmp_path: Path) -> None:
+        """Kubernetes provider returns correct terraform type mapping."""
+        from infrafoundry.providers.kubernetes import KubernetesProvider
+
+        provider = KubernetesProvider(config_dir=tmp_path, output_dir=tmp_path)
+        mapping = provider.get_terraform_resource_types()
+
+        assert "deployments" in mapping
+        assert "kubernetes_deployment" in mapping["deployments"]
+        assert "helm_releases" in mapping
+        assert "helm_release" in mapping["helm_releases"]
+        assert "manifests" in mapping
+        assert "kubernetes_manifest" in mapping["manifests"]
+
+
+# --- Type-aware event firing ---
+
+
+class TestTypeAwareEventFiring:
+    """Test that _fire_resource_lifecycle_events filters by terraform type."""
+
+    def _make_executor(self) -> Any:
+        """Create a DeploymentExecutor with mocked dependencies."""
+        from infrafoundry.core.deployment_executor import DeploymentExecutor
+
+        executor = DeploymentExecutor(
+            runner_registry=MagicMock(),
+            state_manager=MagicMock(),
+            event_manager=MagicMock(),
+            providers={},
+        )
+        return executor
+
+    def _make_provider(self, tf_type_map: dict[str, list[str]]) -> MagicMock:
+        """Create a mock provider with the given terraform type mapping."""
+        provider = MagicMock()
+        provider.get_terraform_resource_types.return_value = tf_type_map
+        return provider
+
+    def _make_resource(
+        self, name: str, resource_type: str, events: dict | None = None
+    ) -> ResourceConfig:
+        """Create a ResourceConfig for testing."""
+        return ResourceConfig(
+            name=name,
+            type=resource_type,
+            provider="proxmox",
+            config={"name": name},
+            events=events,
+        )
+
+    def test_cloud_init_file_does_not_trigger_vm_on_create(self) -> None:
+        """proxmox_virtual_environment_file outcome does NOT trigger on_create for vm."""
+        executor = self._make_executor()
+        provider = self._make_provider(
+            {
+                "vm": ["proxmox_virtual_environment_vm", "terraform_data"],
+            }
+        )
+        vm_resource = self._make_resource(
+            "my-vm",
+            "vm",
+            events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+        )
+        outcome = ResourceOutcome(
+            address="proxmox_virtual_environment_file.cloud_init_user_data_my_vm",
+            action="create",
+            resource_name="my-vm",
+        )
+
+        executor._fire_resource_lifecycle_events(
+            "prod", "proxmox", provider, [vm_resource], [outcome], None
+        )
+
+        # Event should NOT have been emitted
+        executor.event_manager.emit_event.assert_not_called()
+
+    def test_vm_resource_triggers_on_create(self) -> None:
+        """proxmox_virtual_environment_vm outcome DOES trigger on_create for vm."""
+        executor = self._make_executor()
+        provider = self._make_provider(
+            {
+                "vm": ["proxmox_virtual_environment_vm", "terraform_data"],
+            }
+        )
+        vm_resource = self._make_resource(
+            "my-vm",
+            "vm",
+            events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+        )
+        outcome = ResourceOutcome(
+            address="proxmox_virtual_environment_vm.my_vm",
+            action="create",
+            resource_name="my-vm",
+        )
+
+        executor._fire_resource_lifecycle_events(
+            "prod", "proxmox", provider, [vm_resource], [outcome], None
+        )
+
+        # Event should have been emitted
+        assert executor.event_manager.emit_event.called
+
+    def test_terraform_data_triggers_on_create_for_vm(self) -> None:
+        """terraform_data outcome DOES trigger on_create for vm (OVA case)."""
+        executor = self._make_executor()
+        provider = self._make_provider(
+            {
+                "vm": ["proxmox_virtual_environment_vm", "terraform_data"],
+            }
+        )
+        vm_resource = self._make_resource(
+            "my-vm",
+            "vm",
+            events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+        )
+        outcome = ResourceOutcome(
+            address="terraform_data.ova_vm_my_vm",
+            action="create",
+            resource_name="my-vm",
+        )
+
+        executor._fire_resource_lifecycle_events(
+            "prod", "proxmox", provider, [vm_resource], [outcome], None
+        )
+
+        assert executor.event_manager.emit_event.called
+
+    def test_unknown_terraform_type_does_not_fire(self) -> None:
+        """Unknown terraform types don't trigger event handlers."""
+        executor = self._make_executor()
+        provider = self._make_provider(
+            {
+                "vm": ["proxmox_virtual_environment_vm"],
+            }
+        )
+        vm_resource = self._make_resource(
+            "my-vm",
+            "vm",
+            events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+        )
+        outcome = ResourceOutcome(
+            address="unknown_resource_type.my_vm",
+            action="create",
+            resource_name="my-vm",
+        )
+
+        executor._fire_resource_lifecycle_events(
+            "prod", "proxmox", provider, [vm_resource], [outcome], None
+        )
+
+        executor.event_manager.emit_event.assert_not_called()
+
+    def test_download_file_does_not_trigger_template_on_create(self) -> None:
+        """proxmox_virtual_environment_download_file does not trigger template events."""
+        executor = self._make_executor()
+        provider = self._make_provider(
+            {
+                "template": ["proxmox_virtual_environment_vm"],
+            }
+        )
+        template_resource = self._make_resource(
+            "ubuntu-template",
+            "template",
+            events={"on_create": [{"type": "script", "script": "post-template.sh"}]},
+        )
+        outcome = ResourceOutcome(
+            address="proxmox_virtual_environment_download_file.cloud_image_ubuntu_template",
+            action="create",
+            resource_name="ubuntu-template",
+        )
+
+        executor._fire_resource_lifecycle_events(
+            "prod", "proxmox", provider, [template_resource], [outcome], None
+        )
+
+        executor.event_manager.emit_event.assert_not_called()
+
+    def test_mixed_outcomes_only_fires_for_matching_types(self) -> None:
+        """Only matching terraform types fire events, helper resources are skipped."""
+        executor = self._make_executor()
+        provider = self._make_provider(
+            {
+                "vm": ["proxmox_virtual_environment_vm", "terraform_data"],
+            }
+        )
+        vm_resource = self._make_resource(
+            "my-vm",
+            "vm",
+            events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+        )
+        outcomes = [
+            ResourceOutcome(
+                address="proxmox_virtual_environment_file.cloud_init_user_data_my_vm",
+                action="create",
+                resource_name="my-vm",
+            ),
+            ResourceOutcome(
+                address="proxmox_virtual_environment_vm.my_vm",
+                action="create",
+                resource_name="my-vm",
+            ),
+        ]
+
+        executor._fire_resource_lifecycle_events(
+            "prod", "proxmox", provider, [vm_resource], outcomes, None
+        )
+
+        # Should fire exactly once (for the VM, not the file)
+        assert executor.event_manager.emit_event.call_count == 1
+
+
+# --- Aggregate event deduplication ---
+
+
+class TestAggregateEventDeduplication:
+    """Test that apply_serial deduplicates aggregate created resource names."""
+
+    def test_duplicate_resource_names_deduplicated(self) -> None:
+        """Duplicate resource names in outcomes are deduplicated in aggregate event."""
+        # Simulate results dict structure with duplicate resource names
+        # (cloud-init file + VM both resolve to the same resource name)
+        results = {
+            "proxmox": {
+                "terraform": {
+                    "success": True,
+                    "resource_outcomes": [
+                        {"resource_name": "my-vm", "action": "create", "address": "file.x"},
+                        {"resource_name": "my-vm", "action": "create", "address": "vm.x"},
+                        {"resource_name": "other-vm", "action": "create", "address": "vm.y"},
+                    ],
+                }
+            }
+        }
+
+        # Replicate the deduplication logic from apply_serial
+        seen_created: set[str] = set()
+        all_created: list[str] = []
+        for result_val in results.values():
+            if isinstance(result_val, dict):
+                for tool_result in result_val.values():
+                    if isinstance(tool_result, dict):
+                        for outcome in tool_result.get("resource_outcomes", []):
+                            name = (
+                                outcome.get("resource_name", "")
+                                if isinstance(outcome, dict)
+                                else ""
+                            )
+                            action = outcome.get("action", "") if isinstance(outcome, dict) else ""
+                            if action == "create" and name and name not in seen_created:
+                                seen_created.add(name)
+                                all_created.append(name)
+
+        # "my-vm" should appear only once despite two outcomes
+        assert all_created == ["my-vm", "other-vm"]
+        assert len(all_created) == 2

@@ -216,6 +216,14 @@ class OCIProvider(
         return ["vcn", "subnet", "instance"]
 
     @override
+    def get_terraform_resource_types(self) -> dict[str, list[str]]:
+        """Map InfraFoundry resource types to terraform resource types."""
+        return {
+            "instance": ["oci_core_instance"],
+            "vcn": ["oci_core_vcn"],
+        }
+
+    @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
