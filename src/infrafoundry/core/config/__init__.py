@@ -15,6 +15,7 @@ from infrafoundry.core.config.models import EnvironmentConfig, IaCTool, PackageM
 from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
+from infrafoundry.core.config.sops import load_yaml_with_sops
 
 __all__ = [
     "AzureBackendConfig",
@@ -33,4 +34,5 @@ __all__ = [
     "S3BackendConfig",
     "SSHConfig",
     "TerraformCloudBackendConfig",
+    "load_yaml_with_sops",
 ]
