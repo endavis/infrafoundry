@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773622631794,
+  "lastUpdate": 1773655167059,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2201,6 +2201,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011487471386439365",
             "extra": "mean: 142.82621674846686 usec\nrounds: 2436"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "18deb529dab153b184135575b05c7bf0b8df8d72",
+          "message": "fix: use suffix matching for terraform_data address-to-name mapping (merges PR #402, addresses #396)\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-16T09:58:54Z",
+          "tree_id": "096746cb16adbcffbfffa0bba5afe5b40efbd55c",
+          "url": "https://github.com/endavis/infrafoundry/commit/18deb529dab153b184135575b05c7bf0b8df8d72"
+        },
+        "date": 1773655166517,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9639.42817324843,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004400096579834577",
+            "extra": "mean: 103.74059353180553 usec\nrounds: 2721"
           }
         ]
       }
