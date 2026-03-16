@@ -519,7 +519,7 @@ class DeploymentExecutor:
                     EventType.RESOURCE_CREATED,
                     env_name,
                     created_event,
-                    target_resources=resource_filter,
+                    target_resources=[resource.name],
                 )
 
         # Fire resource lifecycle events based on IaC outcomes
