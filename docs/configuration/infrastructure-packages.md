@@ -26,6 +26,7 @@ envs/dev/
     vm.yaml                    # Regular provider resources (deprecated)
     ontap-cluster/             # Infrastructure package
       infrafoundry.yml         # Package manifest
+      secrets.yaml             # Per-package secrets (SOPS-encrypted)
       vm.yaml                  # Resource template (Jinja2)
       network.yaml             # Resource template (Jinja2)
       scripts/
@@ -144,6 +145,64 @@ vm:
 - After rendering, the result must be valid YAML
 - Resource type is derived from the filename (same as regular provider resources)
 - Both singular (`vm`) and plural (`vms`) keys are supported
+
+## Per-Package Secrets
+
+Packages can include a `secrets.yaml` file alongside the manifest. This file holds
+sensitive variables (passwords, API tokens, etc.) that should not be stored in
+plaintext in `infrafoundry.yml`.
+
+### How It Works
+
+1. Place a `secrets.yaml` file in the package directory next to `infrafoundry.yml`
+2. Encrypt it with SOPS: `sops --encrypt --in-place secrets.yaml`
+3. During loading, InfraFoundry automatically detects SOPS encryption and decrypts
+4. Variables under the `variables` key are merged into the manifest variables
+5. Secret variables **override** same-named variables from `infrafoundry.yml`
+
+### Format
+
+```yaml
+# secrets.yaml (encrypt with SOPS before committing)
+variables:
+  ontap_password: "my-secret-password"
+  api_token: "tok-abc123"
+```
+
+### Merge Behavior
+
+- Variables from `secrets.yaml` are merged into the manifest's `variables` dict
+- If a key exists in both `infrafoundry.yml` and `secrets.yaml`, the secret value wins
+- Templates can reference secret variables the same way as regular variables
+- If `secrets.yaml` is absent, the package loads normally with no changes
+
+### Example
+
+**`infrafoundry.yml`:**
+```yaml
+name: ontap-cluster
+variables:
+  cluster_name: lab-ontap
+  ontap_password: "changeme"    # safe default, overridden by secrets
+
+resources:
+  - vm.yaml
+```
+
+**`secrets.yaml`** (SOPS-encrypted at rest):
+```yaml
+variables:
+  ontap_password: "real-secret-from-vault"
+```
+
+After merging, templates see `ontap_password` as `"real-secret-from-vault"`.
+
+### Best Practices
+
+- Keep only sensitive values in `secrets.yaml`; put everything else in `infrafoundry.yml`
+- Always encrypt `secrets.yaml` with SOPS before committing
+- Add a `secrets.yaml.example` file with placeholder values for documentation
+- Use `.gitignore` or `.sops.yaml` rules to prevent accidental plaintext commits
 
 ## Package Events
 
@@ -332,6 +391,8 @@ envs/dev/
   proxmox/
     ontap-cluster/
       infrafoundry.yml
+      secrets.yaml               # SOPS-encrypted secrets (optional)
+      secrets.yaml.example       # Placeholder for documentation
       vm.yaml
       scripts/
         cluster-setup.sh

@@ -14,6 +14,7 @@ import jinja2
 import yaml
 
 from infrafoundry.core.config.models import PackageManifest
+from infrafoundry.core.config.sops import load_yaml_with_sops
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 
@@ -144,6 +145,19 @@ class PackageLoader:
         """
         manifest_path = package_dir / self.MANIFEST_FILENAME
         manifest = self._parse_manifest(manifest_path)
+
+        # Load and merge secrets if secrets.yaml exists
+        secrets_path = package_dir / "secrets.yaml"
+        if secrets_path.exists():
+            secrets_data = load_yaml_with_sops(secrets_path)
+            secret_vars = secrets_data.get("variables", {})
+            if secret_vars:
+                manifest.variables.update(secret_vars)
+                logger.info(
+                    "Loaded %d secret variable(s) from %s",
+                    len(secret_vars),
+                    secrets_path.name,
+                )
 
         # Use manifest provider with fallback to directory-inferred provider
         effective_provider = manifest.provider or provider
