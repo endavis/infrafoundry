@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773690942449,
+  "lastUpdate": 1773693734736,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2325,6 +2325,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009130979724282525",
             "extra": "mean: 142.27357307697605 usec\nrounds: 2080"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3c7d0b53c18417a8fe40f79b4b337cf6f4ab4e87",
+          "message": "feat: add per-package secrets.yaml with SOPS decryption (merges PR #410, addresses #409)\n\nExtract shared load_yaml_with_sops() utility and wire it into\nPackageLoader to automatically detect, decrypt, and merge\nsecrets.yaml variables into package manifests. Update docs.",
+          "timestamp": "2026-03-16T20:41:40Z",
+          "tree_id": "3ddd8a4e3bc370ae1bdeba8516901ef1ec27103f",
+          "url": "https://github.com/endavis/infrafoundry/commit/3c7d0b53c18417a8fe40f79b4b337cf6f4ab4e87"
+        },
+        "date": 1773693734231,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 5920.509941216206,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003660634602256199",
+            "extra": "mean: 168.90436971288617 usec\nrounds: 1915"
           }
         ]
       }
