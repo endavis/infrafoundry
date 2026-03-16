@@ -30,7 +30,7 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
           --name ${self.triggers_replace.name} \
           --memory {{ vm.config.memory | default(2048) }} \
           --cores {{ vm.config.cores | default(2) }} \
-          --cpu {{ vm.config.cpu_type | default('kvm64') }} \
+          --cpu {{ vm.config.cpu_type | default('host') }} \
           --scsihw virtio-scsi-pci \
           {% if vm.config.network is defined %}
           {% for nic in vm.config.network %}
