@@ -10,7 +10,7 @@ resources:
     type: kea_reservation
     name: "{{ node01_name }}"
     config:
-      subnet_ref: {{ dhcp_subnet }}
+      subnet_ref: "{{ dhcp_subnet }}"
       hw_address: "{{ node01_mgmt_mac | lower }}"
       ip_address: "{{ node01_mgmt_ip }}"
       hostname: "{{ node01_name }}"
@@ -20,7 +20,7 @@ resources:
     type: kea_reservation
     name: "{{ node02_name }}"
     config:
-      subnet_ref: {{ dhcp_subnet }}
+      subnet_ref: "{{ dhcp_subnet }}"
       hw_address: "{{ node02_mgmt_mac | lower }}"
       ip_address: "{{ node02_mgmt_ip }}"
       hostname: "{{ node02_name }}"
@@ -30,7 +30,7 @@ resources:
     type: kea_reservation
     name: "{{ cluster_name }}"
     config:
-      subnet_ref: {{ dhcp_subnet }}
+      subnet_ref: "{{ dhcp_subnet }}"
       hw_address: "{{ cluster_mgmt_mac }}"
       ip_address: "{{ cluster_mgmt_ip }}"
       hostname: "{{ cluster_name }}"
@@ -40,7 +40,7 @@ resources:
     type: kea_reservation
     name: labcluster-data1
     config:
-      subnet_ref: {{ dhcp_subnet }}
+      subnet_ref: "{{ dhcp_subnet }}"
       hw_address: "{{ node01_data_mac | lower }}"
       ip_address: "{{ data_lif1_ip }}"
       hostname: labcluster-data1
@@ -50,7 +50,7 @@ resources:
     type: kea_reservation
     name: labcluster-data2
     config:
-      subnet_ref: {{ dhcp_subnet }}
+      subnet_ref: "{{ dhcp_subnet }}"
       hw_address: "{{ node02_data_mac | lower }}"
       ip_address: "{{ data_lif2_ip }}"
       hostname: labcluster-data2

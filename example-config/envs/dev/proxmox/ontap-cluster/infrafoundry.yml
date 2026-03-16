@@ -1,7 +1,7 @@
 # ONTAP Simulator 2-Node Cluster Lab
 #
 # Self-contained infrastructure package. Edit the variables below,
-# then run: infra apply --env dev -r ontap-node-01 -r ontap-node-02
+# then run: infra apply --env dev --package ontap-cluster
 #
 # This file is the ONLY file you need to edit. All playbooks, roles,
 # and templates derive their configuration from these variables.
@@ -58,13 +58,6 @@ variables:
   ontap_password: "changeme123"
   dns_domain: "lab.local"
 
-  # --- DHCP Reservations (optional, for Kea integrated DNS) ---
-  # These create DNS entries via Kea DHCP. All IPs are statically assigned
-  # during ONTAP cluster setup, not via DHCP. Remove this section and
-  # dhcp.yaml from resources if you don't use Kea DHCP.
-  dhcp_subnet: my-subnet
-  cluster_mgmt_mac: "01:01:01:01:01:01"  # placeholder — never used for DHCP
-
   # --- Post-Cluster: SVM & Data LIFs ---
   svm_name: svm_data
   data_lif1_ip: "192.168.1.230"
@@ -75,17 +68,31 @@ variables:
   dns_nameserver: "192.168.1.1"
   ntp_server: "192.168.1.1"
 
+  # --- DHCP Reservations (optional, for Kea integrated DNS) ---
+  # These create DNS entries via Kea DHCP. All IPs are statically assigned
+  # during ONTAP cluster setup, not via DHCP. Remove this section and
+  # dhcp.yaml from resources if you don't use Kea DHCP.
+  dhcp_subnet: my-subnet
+  node01_ip: "192.168.1.221"
+  node02_ip: "192.168.1.222"
+  data_lif1_mac: ""
+  data_lif2_mac: ""
+  cluster_mgmt_mac: "01:01:01:01:01:01"  # placeholder — not used for DHCP
+
 # Resource files (rendered as Jinja2 templates with variables above)
 resources:
   - vm.yaml
   - dhcp.yaml
 
-# Event handlers
+# Resource lifecycle events — fires after both VMs are created
 events:
-  RUNNER_COMPLETED:
+  on_create:
     - type: script
       name: ontap-cluster-setup
       script: scripts/ontap-post-terraform.sh
-      description: "Run ONTAP lab Ansible playbook after Terraform apply"
+      description: "Run ONTAP lab Ansible playbook after both VMs are created"
       timeout: 3600
       continue_on_error: false
+      requires:
+        - ontap-node-01
+        - ontap-node-02

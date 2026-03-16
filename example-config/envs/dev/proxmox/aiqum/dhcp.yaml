@@ -1,0 +1,10 @@
+resources:
+  - provider: opnsense
+    type: kea_reservation
+    name: aiqum
+    config:
+      subnet_ref: "{{ dhcp_subnet }}"
+      hw_address: "{{ mac_address | lower }}"
+      ip_address: "{{ ip_address }}"
+      hostname: "{{ vm_name }}"
+      description: "NetApp Active IQ Unified Manager"
