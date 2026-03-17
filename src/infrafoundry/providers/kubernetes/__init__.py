@@ -41,6 +41,14 @@ class KubernetesProvider(
         return all(field in config for field in required_fields)
 
     @override
+    def get_terraform_env_vars(self) -> dict[str, str]:
+        """Return TF_VAR_* env vars for Kubernetes provider."""
+        return self.build_terraform_env_vars(
+            provider_name="kubernetes",
+            mapping=self._KUBERNETES_TFVARS_MAPPING,
+        )
+
+    @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Kubernetes resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
@@ -59,12 +67,6 @@ class KubernetesProvider(
             "kubernetes/variables.tf.j2",
             context={},
             output_name="variables.tf",
-        )
-
-        # Generate terraform.tfvars from settings.yaml
-        self.generate_provider_tfvars(
-            provider_name="kubernetes",
-            mapping=self._KUBERNETES_TFVARS_MAPPING,
         )
 
         # Generate resources by type - Core resources

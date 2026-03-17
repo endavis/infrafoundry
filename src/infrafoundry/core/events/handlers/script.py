@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess  # nosec B404 - required for running user scripts
@@ -35,6 +36,8 @@ class ScriptHandler(BaseHandler):
         INFRAFOUNDRY_RUNNER: Runner name (if applicable, e.g., "terraform")
         INFRAFOUNDRY_PHASE: Workflow phase (if applicable, e.g., "plan", "apply", "destroy")
         INFRAFOUNDRY_CONFIG_DIR: Path to environment config directory
+        INFRAFOUNDRY_PACKAGE_VARS: JSON string of all package variables (if available)
+        INFRAFOUNDRY_VAR_<key>: Individual package variable values (if available)
 
     Example config:
         type: script
@@ -253,6 +256,12 @@ class ScriptHandler(BaseHandler):
 
         if context.target_resources:
             env["INFRAFOUNDRY_TARGET_RESOURCES"] = ",".join(context.target_resources)
+
+        # Add package variables as JSON and individual env vars
+        if context.package_variables:
+            env["INFRAFOUNDRY_PACKAGE_VARS"] = json.dumps(context.package_variables)
+            for key, value in context.package_variables.items():
+                env[f"INFRAFOUNDRY_VAR_{key}"] = str(value)
 
         # Add custom environment variables from config
         custom_env = self.config.get("env", {})

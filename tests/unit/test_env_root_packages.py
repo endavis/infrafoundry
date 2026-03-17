@@ -181,7 +181,7 @@ class TestManifestProviderField:
             provider="proxmox",
         )
 
-        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        resources, _, _pkg_vars = loader.load_package(pkg_dir, "proxmox", "dev")
         assert len(resources) == 1
         # Should use manifest provider "esxi", not directory-inferred "proxmox"
         assert resources[0].provider == "esxi"
@@ -203,7 +203,7 @@ class TestManifestProviderField:
             provider="proxmox",
         )
 
-        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        resources, _, _pkg_vars = loader.load_package(pkg_dir, "proxmox", "dev")
         assert len(resources) == 1
         assert resources[0].provider == "proxmox"
 

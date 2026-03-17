@@ -667,18 +667,20 @@ class TerraformRunner(BaseRunner):
     def _prepare_environment(self, provider: ProviderBase) -> dict[str, str]:
         """Prepare environment variables for Terraform execution.
 
-        Note: Credentials should be loaded via CredentialLoader before calling this.
-        This method uses environment variables that are already set.
+        Merges provider-specific ``TF_VAR_*`` variables into the process
+        environment so that Terraform reads credentials and settings from
+        the environment instead of ``.tfvars`` files on disk.
 
         Args:
             provider: Provider instance
 
         Returns:
-            Environment variables dict (credentials come from os.environ)
+            Environment variables dict with TF_VAR_* entries
         """
         env = os.environ.copy()
 
-        # Credentials are already set by CredentialLoader in CLI
-        # No need to decrypt secrets here - they're loaded per-environment
+        # Merge provider-specific TF_VAR_* env vars (settings + credentials)
+        tf_vars = provider.get_terraform_env_vars()
+        env.update(tf_vars)
 
         return env

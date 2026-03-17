@@ -45,6 +45,14 @@ class OPNsenseProvider(
         return all(field in config for field in required_fields)
 
     @override
+    def get_terraform_env_vars(self) -> dict[str, str]:
+        """Return TF_VAR_* env vars for OPNsense provider."""
+        return self.build_terraform_env_vars(
+            provider_name="opnsense",
+            mapping=self._OPNSENSE_TFVARS_MAPPING,
+        )
+
+    @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OPNsense resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
@@ -54,12 +62,6 @@ class OPNsenseProvider(
 
         # Generate provider configuration
         self.render_provider_and_variables()
-
-        # Generate terraform.tfvars from settings.yaml
-        self.generate_provider_tfvars(
-            provider_name="opnsense",
-            mapping=self._OPNSENSE_TFVARS_MAPPING,
-        )
 
         # Generate resources by type
         if "firewall_rules" in resources_by_type:

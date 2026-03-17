@@ -89,6 +89,7 @@ vms:
     provider.validate_config = Mock()
     provider.get_resource_types = Mock(return_value=["vm", "template"])
     provider.get_dependencies = Mock(return_value={"vm": ["template"]})
+    provider.get_terraform_env_vars = Mock(return_value={})
 
     orchestrator.register_provider(provider)
 
@@ -208,6 +209,7 @@ class TestDriftDetection:
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.get_resource_types = Mock(return_value=["firewall_rule"])
         opnsense_provider.get_dependencies = Mock(return_value={})
+        opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 
         orchestrator.register_provider(opnsense_provider)
 
@@ -359,6 +361,7 @@ firewall_rules:
         opnsense_provider.get_resource_types = Mock(return_value=["firewall_rule", "alias"])
         opnsense_provider.get_dependencies = Mock(return_value={"firewall_rule": ["alias"]})
         opnsense_provider.set_environment = Mock()
+        opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 
         orchestrator.register_provider(opnsense_provider)
 
@@ -423,6 +426,7 @@ deployments:
         k8s_provider.get_resource_types = Mock(return_value=["deployment", "service"])
         k8s_provider.get_dependencies = Mock(return_value={})
         k8s_provider.set_environment = Mock()
+        k8s_provider.get_terraform_env_vars = Mock(return_value={})
 
         orchestrator.register_provider(k8s_provider)
 

@@ -113,7 +113,7 @@ class ProviderCentricLoader:
 
         # Discover and load packages in provider subdirectories
         for package_dir in self._package_loader.discover_packages(env_name, provider):
-            pkg_resources, pkg_events = self._package_loader.load_package(
+            pkg_resources, pkg_events, _pkg_vars = self._package_loader.load_package(
                 package_dir, provider, env_name
             )
             all_resources.extend(pkg_resources)

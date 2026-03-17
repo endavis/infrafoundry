@@ -224,7 +224,7 @@ class TestPackageSecrets:
         package_dir = _create_package(tmp_path, manifest, resource, secrets)
         loader = PackageLoader(tmp_path)
 
-        resources, _ = loader.load_package(package_dir, "proxmox", "test-env")
+        resources, _, _pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
 
         assert len(resources) == 1
         # The secret variable was available during rendering (no UndefinedError)
@@ -242,7 +242,7 @@ class TestPackageSecrets:
         package_dir = _create_package(tmp_path, manifest, resource, secrets)
         loader = PackageLoader(tmp_path)
 
-        resources, _ = loader.load_package(package_dir, "proxmox", "test-env")
+        resources, _, _pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
 
         assert len(resources) == 1
         assert resources[0].config["pass"] == "encrypted-secret"
@@ -259,7 +259,7 @@ class TestPackageSecrets:
         package_dir = _create_package(tmp_path, manifest, resource, secrets_data=None)
         loader = PackageLoader(tmp_path)
 
-        resources, _ = loader.load_package(package_dir, "proxmox", "test-env")
+        resources, _, _pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
 
         assert len(resources) == 1
         assert resources[0].config["host"] == "localhost"
@@ -279,7 +279,7 @@ class TestPackageSecrets:
         (package_dir / "secrets.yaml").write_text("")
         loader = PackageLoader(tmp_path)
 
-        resources, _ = loader.load_package(package_dir, "proxmox", "test-env")
+        resources, _, _pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
 
         assert len(resources) == 1
         assert resources[0].config["host"] == "localhost"
@@ -297,7 +297,7 @@ class TestPackageSecrets:
         package_dir = _create_package(tmp_path, manifest, resource, secrets)
         loader = PackageLoader(tmp_path)
 
-        resources, _ = loader.load_package(package_dir, "proxmox", "test-env")
+        resources, _, _pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
 
         assert len(resources) == 1
         assert resources[0].config["host"] == "localhost"
@@ -327,7 +327,7 @@ class TestPackageSecrets:
             "infrafoundry.core.config.sops.subprocess.run", return_value=mock_result
         ) as mock_run:
             loader = PackageLoader(tmp_path)
-            _resources, _ = loader.load_package(package_dir, "proxmox", "test-env")
+            _resources, _, _pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
 
         mock_run.assert_called_once()
         call_args = mock_run.call_args
@@ -351,7 +351,7 @@ class TestPackageSecrets:
         (package_dir / "vm.yaml").write_text(resource_content)
 
         loader = PackageLoader(tmp_path)
-        resources, _ = loader.load_package(package_dir, "proxmox", "test-env")
+        resources, _, _pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
 
         assert len(resources) == 1
         assert resources[0].config["password"] == "super-secret"

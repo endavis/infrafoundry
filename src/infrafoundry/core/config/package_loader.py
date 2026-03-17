@@ -126,7 +126,7 @@ class PackageLoader:
 
     def load_package(
         self, package_dir: Path, provider: str, env_name: str
-    ) -> tuple[list[ResourceConfig], dict[str, list[dict[str, Any]]]]:
+    ) -> tuple[list[ResourceConfig], dict[str, list[dict[str, Any]]], dict[str, Any]]:
         """Load an infrastructure package.
 
         Parses the manifest, renders resource templates with variables,
@@ -138,7 +138,9 @@ class PackageLoader:
             env_name: Environment name
 
         Returns:
-            Tuple of (resources, events) where events have rewritten script paths
+            Tuple of (resources, events, variables) where events have
+            rewritten script paths and variables is the merged manifest
+            variables (including secrets from secrets.yaml)
 
         Raises:
             InvalidConfigurationError: If manifest or resource files are invalid
@@ -187,7 +189,7 @@ class PackageLoader:
             if resource.events:
                 resource.events = self._rewrite_event_scripts(resource.events, package_dir, env_dir)
 
-        return resources, events
+        return resources, events, dict(manifest.variables)
 
     def _parse_manifest(self, manifest_path: Path) -> PackageManifest:
         """Parse an infrafoundry.yml manifest file.

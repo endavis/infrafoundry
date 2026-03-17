@@ -223,10 +223,15 @@ class ConfigManager(PathBasedManager):
             for package_dir in self.provider_centric._package_loader.discover_packages(
                 env_name, provider_name
             ):
-                pkg_resources, pkg_events = self.provider_centric._package_loader.load_package(
-                    package_dir, provider_name, env_name
+                pkg_resources, pkg_events, pkg_vars = (
+                    self.provider_centric._package_loader.load_package(
+                        package_dir, provider_name, env_name
+                    )
                 )
+                # Attach package variables to each resource
                 for resource in pkg_resources:
+                    if pkg_vars:
+                        resource.package_variables = pkg_vars
                     key = f"{resource.provider}:{resource.name}"
                     if key not in resource_locations:
                         resource_locations[key] = []
@@ -249,10 +254,13 @@ class ConfigManager(PathBasedManager):
                     f"must declare a 'provider' field in its manifest. "
                     f"Provider cannot be inferred for packages outside provider directories."
                 )
-            pkg_resources, pkg_events = self._package_loader.load_package(
+            pkg_resources, pkg_events, pkg_vars = self._package_loader.load_package(
                 package_dir, manifest.provider, env_name
             )
+            # Attach package variables to each resource
             for resource in pkg_resources:
+                if pkg_vars:
+                    resource.package_variables = pkg_vars
                 key = f"{resource.provider}:{resource.name}"
                 if key not in resource_locations:
                     resource_locations[key] = []
@@ -381,7 +389,7 @@ class ConfigManager(PathBasedManager):
                 )
                 if manifest.name == package_name:
                     effective_provider = manifest.provider or provider_name
-                    pkg_resources, _ = self._package_loader.load_package(
+                    pkg_resources, _, _pkg_vars = self._package_loader.load_package(
                         package_dir, effective_provider, env_name
                     )
                     return list(dict.fromkeys(r.name for r in pkg_resources))
@@ -394,7 +402,7 @@ class ConfigManager(PathBasedManager):
             if manifest.name == package_name:
                 if not manifest.provider:
                     continue
-                pkg_resources, _ = self._package_loader.load_package(
+                pkg_resources, _, _pkg_vars = self._package_loader.load_package(
                     package_dir, manifest.provider, env_name
                 )
                 return list(dict.fromkeys(r.name for r in pkg_resources))
