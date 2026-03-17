@@ -219,11 +219,18 @@ class DeploymentExecutor:
                                 seen_created.add(name)
                                 all_created.append(name)
         if all_created:
+            # Collect package_variables from created resources for group handlers
+            merged_pkg_vars: dict[str, Any] = {}
+            for resources in resources_by_provider.values():
+                for r in resources:
+                    if r.name in seen_created and r.package_variables:
+                        merged_pkg_vars.update(r.package_variables)
             self.event_manager.emit_event(
                 EventType.RESOURCE_CREATED,
                 env_name,
                 {"action": "create", "resources": all_created},
                 target_resources=all_created,
+                package_variables=merged_pkg_vars,
             )
 
         return results
@@ -653,6 +660,7 @@ class DeploymentExecutor:
                 provider=provider_name,
                 resource=outcome.resource_name,
                 target_resources=[outcome.resource_name],
+                package_variables=resource.package_variables or {},
             )
 
         # NOTE: Aggregate events for group handlers (requires: [...]) are NOT

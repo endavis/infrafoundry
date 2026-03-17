@@ -409,7 +409,7 @@ class TestLoadPackage:
             {"vm.yaml": resource_content},
         )
 
-        resources, events = loader.load_package(pkg_dir, "proxmox", "dev")
+        resources, events, _pkg_vars = loader.load_package(pkg_dir, "proxmox", "dev")
 
         assert len(resources) == 2
         assert resources[0].name == "lab-node1"
@@ -438,7 +438,7 @@ class TestLoadPackage:
             {"vm.yaml": resource_content},
         )
 
-        resources, events = loader.load_package(pkg_dir, "proxmox", "dev")
+        resources, events, _pkg_vars = loader.load_package(pkg_dir, "proxmox", "dev")
         assert len(resources) == 1
         assert resources[0].name == "web-01"
         assert events == {}
@@ -458,7 +458,7 @@ class TestLoadPackage:
             manifest,
         )
 
-        resources, events = loader.load_package(pkg_dir, "proxmox", "dev")
+        resources, events, _pkg_vars = loader.load_package(pkg_dir, "proxmox", "dev")
         assert resources == []
         assert "BEFORE_PLAN" in events
 
@@ -515,7 +515,7 @@ resources:
             {"resources.yaml": resource_content},
         )
 
-        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        resources, _, _pkg_vars = loader.load_package(pkg_dir, "proxmox", "dev")
         assert len(resources) == 2
         assert resources[0].provider == "proxmox"
         assert resources[0].type == "ova_vm"
@@ -546,7 +546,7 @@ resources:
             {"resources.yaml": resource_content},
         )
 
-        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        resources, _, _pkg_vars = loader.load_package(pkg_dir, "proxmox", "dev")
         assert len(resources) == 1
         assert resources[0].provider == "proxmox"
         assert resources[0].type == "vm"
@@ -601,7 +601,7 @@ vms:
             {"vms.yaml": resource_content},
         )
 
-        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        resources, _, _pkg_vars = loader.load_package(pkg_dir, "proxmox", "dev")
         assert len(resources) == 2
         assert resources[0].provider == "proxmox"
         assert resources[1].provider == "esxi"
@@ -631,7 +631,7 @@ resources:
             {"resources.yaml": resource_content},
         )
 
-        resources, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        resources, _, _pkg_vars = loader.load_package(pkg_dir, "proxmox", "dev")
         assert len(resources) == 1
         assert resources[0].name == "ontap-01"
         assert resources[0].config["vmid"] == 220

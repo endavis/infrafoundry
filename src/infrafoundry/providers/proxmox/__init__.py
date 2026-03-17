@@ -59,6 +59,16 @@ class ProxmoxProvider(
         validator.validate_references(resources)
 
     @override
+    def get_terraform_env_vars(self) -> dict[str, str]:
+        """Return TF_VAR_* env vars for Proxmox provider."""
+        return self.build_terraform_env_vars(
+            provider_name="proxmox",
+            mapping=self._PROXMOX_TFVARS_MAPPING,
+            include_ssh=True,
+            ssh_prefix="proxmox",
+        )
+
+    @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Proxmox resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
@@ -69,14 +79,6 @@ class ProxmoxProvider(
         # Generate provider configuration with environment context
         self.render_provider_and_variables(
             variables_context={"default_ssh_user": os.getenv("USER", "root")},
-        )
-
-        # Copy or generate terraform.tfvars from environment config
-        self.generate_provider_tfvars(
-            provider_name="proxmox",
-            mapping=self._PROXMOX_TFVARS_MAPPING,
-            include_ssh=True,
-            ssh_prefix="proxmox",
         )
 
         # Generate resources by type (storage before VMs/containers so they can reference it)

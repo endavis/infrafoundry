@@ -460,7 +460,13 @@ class TerraformGeneratorMixin:
         include_ssh: bool = False,
         ssh_prefix: str | None = None,
     ) -> None:
-        """Generate tfvars content using provided mappings."""
+        """Generate tfvars content using provided mappings.
+
+        .. deprecated::
+            This method writes secrets to disk. Use
+            :meth:`build_terraform_env_vars` instead, which returns
+            ``TF_VAR_*`` environment variables for the runner.
+        """
         env_config = self._load_environment_config()
         if not env_config:
             return
@@ -478,6 +484,57 @@ class TerraformGeneratorMixin:
             )
 
         self._write_tfvars_lines(lines)
+
+    def build_terraform_env_vars(
+        self,
+        provider_name: str,
+        mapping: dict[str, str],
+        *,
+        include_ssh: bool = False,
+        ssh_prefix: str | None = None,
+    ) -> dict[str, str]:
+        """Build TF_VAR_* env vars from provider settings.
+
+        This is the environment-variable counterpart of
+        ``generate_provider_tfvars``. Instead of writing a file, it
+        returns a dict suitable for merging into the subprocess
+        environment.
+
+        Args:
+            provider_name: Provider name used to look up settings
+            mapping: Maps settings.yaml keys to terraform variable names
+            include_ssh: Whether to include SSH settings
+            ssh_prefix: Prefix for SSH variable names
+
+        Returns:
+            Dict mapping ``TF_VAR_<name>`` to string values
+        """
+        env_config = self._load_environment_config()
+        if not env_config:
+            return {}
+
+        result: dict[str, str] = {}
+        provider_settings = env_config.get_provider_settings(provider_name)
+        if provider_settings:
+            for source_key, tfvar_name in mapping.items():
+                value = provider_settings.get(source_key)
+                if value not in (None, ""):
+                    result[f"TF_VAR_{tfvar_name}"] = (
+                        json.dumps(value) if not isinstance(value, str) else value
+                    )
+
+        if include_ssh:
+            ssh_config = env_config.get_ssh_config(provider_name)
+            if ssh_config:
+                prefix = ssh_prefix or provider_name
+                if getattr(ssh_config, "user", None):
+                    result[f"TF_VAR_{prefix}_ssh_user"] = str(ssh_config.user)
+                if getattr(ssh_config, "key_path", None):
+                    result[f"TF_VAR_{prefix}_ssh_key_path"] = str(ssh_config.key_path)
+                if getattr(ssh_config, "port", None) and ssh_config.port != 22:
+                    result[f"TF_VAR_{prefix}_ssh_port"] = str(ssh_config.port)
+
+        return result
 
     def render_and_write_terraform(
         self,

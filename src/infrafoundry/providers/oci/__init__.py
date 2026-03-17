@@ -62,6 +62,14 @@ class OCIProvider(
         validator.validate_references(resources)
 
     @override
+    def get_terraform_env_vars(self) -> dict[str, str]:
+        """Return TF_VAR_* env vars for OCI provider."""
+        return self.build_terraform_env_vars(
+            provider_name="oci",
+            mapping=self._OCI_TFVARS_MAPPING,
+        )
+
+    @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OCI resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
@@ -71,12 +79,6 @@ class OCIProvider(
 
         # Generate provider configuration and variables
         self.render_provider_and_variables()
-
-        # Generate terraform.tfvars from environment config
-        self.generate_provider_tfvars(
-            provider_name="oci",
-            mapping=self._OCI_TFVARS_MAPPING,
-        )
 
         # Generate VCN and subnet resources
         if "vcn" in resources_by_type or "subnet" in resources_by_type:
