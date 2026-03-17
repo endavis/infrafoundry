@@ -58,15 +58,28 @@ class ProxmoxProvider(
         validator = ProxmoxValidator(env_config, report)
         validator.validate_references(resources)
 
+    # Maps credential env vars (set by CredentialLoader) to TF_VAR_ names
+    _CREDENTIAL_ENV_MAPPING: ClassVar[dict[str, str]] = {
+        "PROXMOX_API_URL": "proxmox_api_url",
+        "PROXMOX_API_TOKEN_ID": "proxmox_api_token_id",
+        "PROXMOX_API_TOKEN_SECRET": "proxmox_api_token_secret",
+    }
+
     @override
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* env vars for Proxmox provider."""
-        return self.build_terraform_env_vars(
+        result = self.build_terraform_env_vars(
             provider_name="proxmox",
             mapping=self._PROXMOX_TFVARS_MAPPING,
             include_ssh=True,
             ssh_prefix="proxmox",
         )
+        # Map credential env vars to TF_VAR_ equivalents
+        for env_key, tf_var_name in self._CREDENTIAL_ENV_MAPPING.items():
+            value = os.environ.get(env_key)
+            if value:
+                result[f"TF_VAR_{tf_var_name}"] = value
+        return result
 
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
