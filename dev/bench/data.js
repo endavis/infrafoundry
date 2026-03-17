@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773770627147,
+  "lastUpdate": 1773771009895,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2449,6 +2449,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006816210213540791",
             "extra": "mean: 111.61491427153338 usec\nrounds: 2018"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "419bb8c395ee4e0adf15e109a9fc8ec9ca67b695",
+          "message": "docs: update example scripts to use INFRAFOUNDRY_VAR_* env vars (merges PR #418)",
+          "timestamp": "2026-03-17T18:09:32Z",
+          "tree_id": "01d5ff98d569ed0875e79f411ae0fbea3d852343",
+          "url": "https://github.com/endavis/infrafoundry/commit/419bb8c395ee4e0adf15e109a9fc8ec9ca67b695"
+        },
+        "date": 1773771009549,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7077.222375398119,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007805600478906806",
+            "extra": "mean: 141.29837201049463 usec\nrounds: 3387"
           }
         ]
       }
