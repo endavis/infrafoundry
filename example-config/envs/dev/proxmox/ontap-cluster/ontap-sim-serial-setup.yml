@@ -4,8 +4,8 @@
 # Sets serial console as primary and optionally assigns unique serial/sysid.
 # Must run on first boot BEFORE ONTAP initializes disks.
 #
-# All variables are passed as extra-vars from infrafoundry.yml
-# by the ontap-post-terraform.sh event handler script.
+# All variables are read from INFRAFOUNDRY_VAR_* environment variables
+# set by the InfraFoundry framework.
 
 - name: Install dependencies on Proxmox hosts
   hosts: proxmox_hosts
@@ -23,22 +23,22 @@
 
 # Node 01: set serial console as primary (keep default serial/sysid)
 - name: Configure serial console on ONTAP node 01
-  hosts: "{{ node01_target }}"
+  hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_target') }}"
   gather_facts: false
   become: true
   roles:
     - role: ontap-serial-setup
       vars:
-        ontap_vmid: "{{ node01_vmid }}"
+        ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_vmid') }}"
 
 # Node 02: set serial console + unique serial/sysid
 - name: Configure serial console and sysid on ONTAP node 02
-  hosts: "{{ node02_target }}"
+  hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_target') }}"
   gather_facts: false
   become: true
   roles:
     - role: ontap-serial-setup
       vars:
-        ontap_vmid: "{{ node02_vmid }}"
-        ontap_serial_number: "{{ node02_serial_number }}"
-        ontap_sysid: "{{ node02_sysid }}"
+        ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_vmid') }}"
+        ontap_serial_number: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_serial_number') }}"
+        ontap_sysid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_sysid') }}"
