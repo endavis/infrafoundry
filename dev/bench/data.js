@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773766581993,
+  "lastUpdate": 1773770627147,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2418,6 +2418,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007704825771090361",
             "extra": "mean: 112.64403151455348 usec\nrounds: 2126"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "482087554ffbaeab551f5cbd1aee5a87080313f9",
+          "message": "fix: correct proxmox credential loader key names to match SOPS file (merges PR #417, addresses #415)\n\n* fix: correct proxmox credential loader key names to match SOPS file\n\n* test: update credential loader test to match corrected key names",
+          "timestamp": "2026-03-17T18:03:15Z",
+          "tree_id": "90bcbe8462298f68fd4c6374ef24eb745e578d66",
+          "url": "https://github.com/endavis/infrafoundry/commit/482087554ffbaeab551f5cbd1aee5a87080313f9"
+        },
+        "date": 1773770626670,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8959.376141858877,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006816210213540791",
+            "extra": "mean: 111.61491427153338 usec\nrounds: 2018"
           }
         ]
       }
