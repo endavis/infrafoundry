@@ -17,12 +17,27 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGE_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Read variables from infrafoundry.yml
+# Read variables from infrafoundry.yml + secrets.yaml
 eval "$(python3 -c "
-import sys, yaml
+import subprocess, sys, yaml
+from pathlib import Path
+
 with open('${PACKAGE_DIR}/infrafoundry.yml') as f:
     data = yaml.safe_load(f)
 v = data.get('variables', {})
+
+# Merge secrets.yaml if it exists (SOPS-encrypted)
+secrets_path = Path('${PACKAGE_DIR}/secrets.yaml')
+if secrets_path.exists():
+    raw = secrets_path.read_text()
+    if 'sops:' in raw and 'ENC[AES256_GCM,' in raw:
+        result = subprocess.run(['sops', '--decrypt', str(secrets_path)],
+                                capture_output=True, text=True, check=True)
+        secrets = yaml.safe_load(result.stdout) or {}
+    else:
+        secrets = yaml.safe_load(raw) or {}
+    v.update(secrets.get('variables', {}))
+
 for k, val in v.items():
     print(f'{k}={val}')
 ")"

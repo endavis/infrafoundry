@@ -36,12 +36,25 @@ INVENTORY="${PACKAGE_DIR}/.generated-inventory.yml"
 VARS_FILE="${PACKAGE_DIR}/.generated-vars.json"
 
 python3 -c "
-import json, sys, yaml
+import json, subprocess, sys, yaml
+from pathlib import Path
 
 with open(sys.argv[1]) as f:
     data = yaml.safe_load(f)
 
 v = data.get('variables', {})
+
+# Merge secrets.yaml if it exists (SOPS-encrypted)
+secrets_path = Path(sys.argv[1]).parent / 'secrets.yaml'
+if secrets_path.exists():
+    raw = secrets_path.read_text()
+    if 'sops:' in raw and 'ENC[AES256_GCM,' in raw:
+        result = subprocess.run(['sops', '--decrypt', str(secrets_path)],
+                                capture_output=True, text=True, check=True)
+        secrets = yaml.safe_load(result.stdout) or {}
+    else:
+        secrets = yaml.safe_load(raw) or {}
+    v.update(secrets.get('variables', {}))
 
 # Build host lookup from target names
 host_lookup = {}

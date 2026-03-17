@@ -27,12 +27,31 @@ DEFAULT_PASSWORD = "admin"
 
 
 def load_config() -> dict:
-    """Load variables from infrafoundry.yml."""
+    """Load variables from infrafoundry.yml, merging secrets.yaml if present."""
+    import subprocess
+
     script_dir = Path(__file__).resolve().parent
-    config_path = script_dir.parent / "infrafoundry.yml"
+    package_dir = script_dir.parent
+    config_path = package_dir / "infrafoundry.yml"
     with open(config_path) as f:
         data = yaml.safe_load(f)
-    return data.get("variables", {})
+    variables = data.get("variables", {})
+
+    # Merge SOPS-encrypted secrets.yaml if it exists
+    secrets_path = package_dir / "secrets.yaml"
+    if secrets_path.exists():
+        raw = secrets_path.read_text()
+        if "sops:" in raw and "ENC[AES256_GCM," in raw:
+            result = subprocess.run(
+                ["sops", "--decrypt", str(secrets_path)],
+                capture_output=True, text=True, check=True,
+            )
+            secrets = yaml.safe_load(result.stdout) or {}
+        else:
+            secrets = yaml.safe_load(raw) or {}
+        variables.update(secrets.get("variables", {}))
+
+    return variables
 
 
 def save_option(base_url: str, name: str, value: str | int | bool, auth: tuple) -> bool:
