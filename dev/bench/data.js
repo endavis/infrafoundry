@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773763578081,
+  "lastUpdate": 1773766581993,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2387,6 +2387,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008476751675500235",
             "extra": "mean: 144.19424652185444 usec\nrounds: 2300"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "95444180e1100a13bc6b359f69e795198f4bd01a",
+          "message": "fix: map credential env vars to TF_VAR_ for terraform authentication (merges PR #416, addresses #415)\n\n* fix: map credential env vars to TF_VAR_ for terraform authentication\n\n* fix: add nosec B105 for credential mapping variable names",
+          "timestamp": "2026-03-17T16:55:47Z",
+          "tree_id": "19afae858718305b61dc344a7a07628d5425b1dd",
+          "url": "https://github.com/endavis/infrafoundry/commit/95444180e1100a13bc6b359f69e795198f4bd01a"
+        },
+        "date": 1773766581427,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8877.523172373329,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007704825771090361",
+            "extra": "mean: 112.64403151455348 usec\nrounds: 2126"
           }
         ]
       }
