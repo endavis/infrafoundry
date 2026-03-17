@@ -4,50 +4,51 @@
 # Triggered by on_create resource lifecycle event after both ONTAP VMs are created.
 # Runs the full ONTAP lab playbook: serial setup, cluster create, join, post-config.
 #
-# All configuration is read from infrafoundry.yml — no other files need editing.
-# The script generates a dynamic Ansible inventory and extra-vars from
-# the infrafoundry.yml variables section.
+# All variables are provided by the framework via INFRAFOUNDRY_VAR_* env vars.
+# Ansible playbooks read variables directly from the environment via lookup('env', ...).
+# The script only generates a dynamic inventory (host mappings).
 #
 # Environment variables (injected by ScriptHandler):
-#   INFRAFOUNDRY_EVENT    - event type (e.g., "resource_created")
-#   INFRAFOUNDRY_RESOURCE - resource name (if per-resource event)
-#   INFRAFOUNDRY_ENV      - environment name (e.g., "prod")
-#   INFRAFOUNDRY_PROVIDER - provider name (if set)
-#   INFRAFOUNDRY_CONFIG_DIR - path to envs/<env>/
+#   INFRAFOUNDRY_PACKAGE_VARS - JSON string of all package variables (including secrets)
+#   INFRAFOUNDRY_VAR_<key>    - Individual package variables
+#   INFRAFOUNDRY_EVENT        - event type (e.g., "resource_created")
+#   INFRAFOUNDRY_ENV          - environment name (e.g., "prod")
+#   INFRAFOUNDRY_CONFIG_DIR   - path to envs/<env>/
 
 set -euo pipefail
 
 # Script lives in ontap-cluster/scripts/, so package dir is one level up
 PACKAGE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-MANIFEST="${PACKAGE_DIR}/infrafoundry.yml"
 PLAYBOOK="${PACKAGE_DIR}/ontap-lab-playbook.yml"
 
 # Verify required files exist
-for f in "$MANIFEST" "$PLAYBOOK"; do
-    if [ ! -f "$f" ]; then
-        echo "ERROR: Required file not found: $f"
-        exit 1
-    fi
-done
+if [ ! -f "$PLAYBOOK" ]; then
+    echo "ERROR: Playbook not found: $PLAYBOOK"
+    exit 1
+fi
 
-# Generate Ansible inventory and extra-vars from infrafoundry.yml
-echo "Generating Ansible configuration from infrafoundry.yml..."
+# Generate Ansible inventory from package variables
+echo "Generating Ansible inventory from environment variables..."
 INVENTORY="${PACKAGE_DIR}/.generated-inventory.yml"
-VARS_FILE="${PACKAGE_DIR}/.generated-vars.json"
 
 python3 -c "
-import json, sys, yaml
+import json, os, sys, yaml
 
-with open(sys.argv[1]) as f:
-    data = yaml.safe_load(f)
-
-v = data.get('variables', {})
+# Read variables from INFRAFOUNDRY_PACKAGE_VARS env var (set by framework)
+vars_json = os.environ.get('INFRAFOUNDRY_PACKAGE_VARS')
+if vars_json:
+    v = json.loads(vars_json)
+else:
+    # Fallback: read from infrafoundry.yml directly (for manual runs)
+    print('Warning: INFRAFOUNDRY_PACKAGE_VARS not set, reading from infrafoundry.yml')
+    with open(sys.argv[1]) as f:
+        data = yaml.safe_load(f)
+    v = data.get('variables', {})
 
 # Build host lookup from target names
 host_lookup = {}
 for key in v:
     if key.endswith('_host') and key.startswith('pve'):
-        # e.g., pve1_host -> pve1
         host_lookup[key.replace('_host', '')] = v[key]
 
 # Build proxmox_hosts inventory — handle both nodes on same host
@@ -93,11 +94,8 @@ inventory = {
 
 with open(sys.argv[2], 'w') as f:
     yaml.dump(inventory, f, default_flow_style=False)
-
-with open(sys.argv[3], 'w') as f:
-    json.dump(v, f)
-" "$MANIFEST" "$INVENTORY" "$VARS_FILE"
+" "${PACKAGE_DIR}/infrafoundry.yml" "$INVENTORY"
 
 echo "Running ONTAP lab cluster setup playbook..."
 cd "$PACKAGE_DIR"
-ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -e "@${VARS_FILE}" -v
+ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -v

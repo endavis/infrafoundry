@@ -7,6 +7,10 @@
 # All remote commands run through the ansible jumphost since the SSH key
 # for the AIQUM VM only exists there.
 #
+# Package variables (including secrets) are injected by InfraFoundry as:
+#   INFRAFOUNDRY_PACKAGE_VARS  - JSON string of all package variables
+#   INFRAFOUNDRY_VAR_<key>     - Individual variables
+#
 # Prerequisites:
 # - Rocky 9 VM created and booted with cloud-init
 # - AIQUM RPM available at a web server (set aiqum_url_base in infrafoundry.yml)
@@ -17,8 +21,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGE_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Read variables from infrafoundry.yml
-eval "$(python3 -c "
+# Read variables from INFRAFOUNDRY_PACKAGE_VARS or fall back to infrafoundry.yml
+if [ -n "${INFRAFOUNDRY_PACKAGE_VARS:-}" ]; then
+    eval "$(python3 -c "
+import json, os
+v = json.loads(os.environ['INFRAFOUNDRY_PACKAGE_VARS'])
+for k, val in v.items():
+    print(f'{k}={val}')
+")"
+else
+    eval "$(python3 -c "
 import sys, yaml
 with open('${PACKAGE_DIR}/infrafoundry.yml') as f:
     data = yaml.safe_load(f)
@@ -26,6 +38,7 @@ v = data.get('variables', {})
 for k, val in v.items():
     print(f'{k}={val}')
 ")"
+fi
 
 JUMPHOST="${jumphost:-ansible@ansible.example.com}"
 SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"

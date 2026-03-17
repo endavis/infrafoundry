@@ -4,27 +4,27 @@
 # Creates cluster on node 01, joins node 02, then configures via REST API.
 # Run AFTER serial setup (ontap-lab-serial-setup.yml).
 #
-# All variables are passed as extra-vars from infrafoundry.yml
-# by the ontap-post-terraform.sh event handler script.
+# All variables are read from INFRAFOUNDRY_VAR_* environment variables
+# set by the InfraFoundry framework (includes merged secrets from secrets.yaml).
 
 - name: Create ONTAP cluster on node 01
-  hosts: "{{ node01_target }}"
+  hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_target') }}"
   gather_facts: false
   become: true
   roles:
     - role: ontap-cluster-setup
       vars:
-        ontap_vmid: "{{ node01_vmid }}"
+        ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_vmid') }}"
         ontap_cluster_create: true
-        ontap_cluster_name: "{{ cluster_name }}"
-        ontap_cluster_mgmt_ip: "{{ cluster_mgmt_ip }}"
-        ontap_cluster_mgmt_mask: "{{ cluster_mgmt_mask }}"
-        ontap_cluster_mgmt_gateway: "{{ cluster_mgmt_gateway }}"
-        ontap_node_mgmt_ip: "{{ node01_mgmt_ip }}"
-        ontap_node_mgmt_mask: "{{ node_mgmt_mask }}"
-        ontap_node_mgmt_gateway: "{{ node_mgmt_gateway }}"
-        ontap_password: "{{ ontap_password }}"
-        ontap_dns_domain: "{{ dns_domain }}"
+        ontap_cluster_name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_name') }}"
+        ontap_cluster_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}"
+        ontap_cluster_mgmt_mask: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_mask') }}"
+        ontap_cluster_mgmt_gateway: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_gateway') }}"
+        ontap_node_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_mgmt_ip') }}"
+        ontap_node_mgmt_mask: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node_mgmt_mask') }}"
+        ontap_node_mgmt_gateway: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node_mgmt_gateway') }}"
+        ontap_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
+        ontap_dns_domain: "{{ lookup('env', 'INFRAFOUNDRY_VAR_dns_domain') }}"
 
 - name: Discover cluster interconnect IP from node 01
   hosts: ontap_cluster
@@ -33,9 +33,9 @@
   tasks:
     - name: Query cluster network interfaces
       ansible.builtin.uri:
-        url: "https://{{ cluster_mgmt_ip }}/api/network/ip/interfaces?ipspace.name=Cluster&fields=ip.address"
+        url: "https://{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}/api/network/ip/interfaces?ipspace.name=Cluster&fields=ip.address"
         user: "admin"
-        password: "{{ ontap_password }}"
+        password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
         validate_certs: false
         force_basic_auth: true
       register: cluster_interfaces
@@ -49,19 +49,19 @@
         msg: "Cluster interconnect IP for join: {{ ontap_cluster_interconnect_ip }}"
 
 - name: Join ONTAP node 02 to cluster
-  hosts: "{{ node02_target }}"
+  hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_target') }}"
   gather_facts: false
   become: true
   roles:
     - role: ontap-cluster-setup
       vars:
-        ontap_vmid: "{{ node02_vmid }}"
+        ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_vmid') }}"
         ontap_cluster_create: false
         ontap_cluster_join_ip: "{{ hostvars['ontap-cluster']['ontap_cluster_interconnect_ip'] }}"
-        ontap_node_mgmt_ip: "{{ node02_mgmt_ip }}"
-        ontap_node_mgmt_mask: "{{ node_mgmt_mask }}"
-        ontap_node_mgmt_gateway: "{{ node_mgmt_gateway }}"
-        ontap_password: "{{ ontap_password }}"
+        ontap_node_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_mgmt_ip') }}"
+        ontap_node_mgmt_mask: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node_mgmt_mask') }}"
+        ontap_node_mgmt_gateway: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node_mgmt_gateway') }}"
+        ontap_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
 
 - name: Configure ONTAP cluster (aggregates, SVMs, LIFs)
   hosts: ontap_cluster
@@ -70,32 +70,32 @@
   roles:
     - role: ontap-post-cluster
       vars:
-        ontap_cluster_mgmt_ip: "{{ cluster_mgmt_ip }}"
+        ontap_cluster_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}"
         ontap_admin_user: "admin"
-        ontap_admin_password: "{{ ontap_password }}"
+        ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
         ontap_validate_certs: false
         ontap_dns:
-          - vserver: "{{ svm_name }}"
+          - vserver: "{{ lookup('env', 'INFRAFOUNDRY_VAR_svm_name') }}"
             domains:
-              - "{{ dns_domain }}"
+              - "{{ lookup('env', 'INFRAFOUNDRY_VAR_dns_domain') }}"
             nameservers:
-              - "{{ dns_nameserver }}"
+              - "{{ lookup('env', 'INFRAFOUNDRY_VAR_dns_nameserver') }}"
         ontap_ntp_servers:
-          - "{{ ntp_server }}"
+          - "{{ lookup('env', 'INFRAFOUNDRY_VAR_ntp_server') }}"
         ontap_lifs:
-          - name: "{{ svm_name }}_lif1"
-            vserver: "{{ svm_name }}"
+          - name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_svm_name') }}_lif1"
+            vserver: "{{ lookup('env', 'INFRAFOUNDRY_VAR_svm_name') }}"
             role: data
             protocol: nfs
             node_index: 0
             home_port: e0d
-            address: "{{ data_lif1_ip }}"
-            netmask: "{{ data_lif_mask }}"
-          - name: "{{ svm_name }}_lif2"
-            vserver: "{{ svm_name }}"
+            address: "{{ lookup('env', 'INFRAFOUNDRY_VAR_data_lif1_ip') }}"
+            netmask: "{{ lookup('env', 'INFRAFOUNDRY_VAR_data_lif_mask') }}"
+          - name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_svm_name') }}_lif2"
+            vserver: "{{ lookup('env', 'INFRAFOUNDRY_VAR_svm_name') }}"
             role: data
             protocol: nfs
             node_index: 1
             home_port: e0d
-            address: "{{ data_lif2_ip }}"
-            netmask: "{{ data_lif_mask }}"
+            address: "{{ lookup('env', 'INFRAFOUNDRY_VAR_data_lif2_ip') }}"
+            netmask: "{{ lookup('env', 'INFRAFOUNDRY_VAR_data_lif_mask') }}"
