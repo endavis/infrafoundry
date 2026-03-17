@@ -46,7 +46,7 @@ class OPNsenseProvider(
         return all(field in config for field in required_fields)
 
     # Maps credential env vars (set by CredentialLoader) to TF_VAR_ names
-    _CREDENTIAL_ENV_MAPPING: ClassVar[dict[str, str]] = {
+    _CREDENTIAL_ENV_MAPPING: ClassVar[dict[str, str]] = {  # nosec B105
         "OPNSENSE_API_URL": "opnsense_api_url",
         "OPNSENSE_API_KEY": "opnsense_api_key",
         "OPNSENSE_API_SECRET": "opnsense_api_secret",

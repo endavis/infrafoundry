@@ -59,7 +59,7 @@ class ProxmoxProvider(
         validator.validate_references(resources)
 
     # Maps credential env vars (set by CredentialLoader) to TF_VAR_ names
-    _CREDENTIAL_ENV_MAPPING: ClassVar[dict[str, str]] = {
+    _CREDENTIAL_ENV_MAPPING: ClassVar[dict[str, str]] = {  # nosec B105
         "PROXMOX_API_URL": "proxmox_api_url",
         "PROXMOX_API_TOKEN_ID": "proxmox_api_token_id",
         "PROXMOX_API_TOKEN_SECRET": "proxmox_api_token_secret",
