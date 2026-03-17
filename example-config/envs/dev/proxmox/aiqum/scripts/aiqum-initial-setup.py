@@ -27,7 +27,19 @@ DEFAULT_PASSWORD = "admin"
 
 
 def load_config() -> dict:
-    """Load variables from infrafoundry.yml."""
+    """Load package variables from environment or infrafoundry.yml.
+
+    Prefers INFRAFOUNDRY_PACKAGE_VARS env var (set by ScriptHandler)
+    and falls back to reading infrafoundry.yml for standalone usage.
+    """
+    import json
+    import os
+
+    env_vars = os.environ.get("INFRAFOUNDRY_PACKAGE_VARS")
+    if env_vars:
+        return json.loads(env_vars)
+
+    # Fallback: read from infrafoundry.yml
     script_dir = Path(__file__).resolve().parent
     config_path = script_dir.parent / "infrafoundry.yml"
     with open(config_path) as f:
