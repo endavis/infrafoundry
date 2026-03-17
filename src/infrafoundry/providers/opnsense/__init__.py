@@ -1,6 +1,7 @@
 """OPNsense provider for InfraFoundry."""
 
 import base64
+import os
 from pathlib import Path
 from typing import Any, ClassVar, override
 
@@ -44,13 +45,25 @@ class OPNsenseProvider(
         required_fields = ["name"]
         return all(field in config for field in required_fields)
 
+    # Maps credential env vars (set by CredentialLoader) to TF_VAR_ names
+    _CREDENTIAL_ENV_MAPPING: ClassVar[dict[str, str]] = {  # nosec B105
+        "OPNSENSE_API_URL": "opnsense_api_url",
+        "OPNSENSE_API_KEY": "opnsense_api_key",
+        "OPNSENSE_API_SECRET": "opnsense_api_secret",
+    }
+
     @override
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* env vars for OPNsense provider."""
-        return self.build_terraform_env_vars(
+        result = self.build_terraform_env_vars(
             provider_name="opnsense",
             mapping=self._OPNSENSE_TFVARS_MAPPING,
         )
+        for env_key, tf_var_name in self._CREDENTIAL_ENV_MAPPING.items():
+            value = os.environ.get(env_key)
+            if value:
+                result[f"TF_VAR_{tf_var_name}"] = value
+        return result
 
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:

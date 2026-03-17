@@ -1,5 +1,6 @@
 """Kubernetes provider for InfraFoundry."""
 
+import os
 from pathlib import Path
 from typing import Any, ClassVar, override
 
@@ -40,13 +41,22 @@ class KubernetesProvider(
         required_fields = ["name"]
         return all(field in config for field in required_fields)
 
+    _CREDENTIAL_ENV_MAPPING: ClassVar[dict[str, str]] = {
+        "KUBECONFIG": "kubeconfig_path",
+    }
+
     @override
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* env vars for Kubernetes provider."""
-        return self.build_terraform_env_vars(
+        result = self.build_terraform_env_vars(
             provider_name="kubernetes",
             mapping=self._KUBERNETES_TFVARS_MAPPING,
         )
+        for env_key, tf_var_name in self._CREDENTIAL_ENV_MAPPING.items():
+            value = os.environ.get(env_key)
+            if value:
+                result[f"TF_VAR_{tf_var_name}"] = value
+        return result
 
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
