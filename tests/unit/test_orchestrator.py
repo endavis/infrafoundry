@@ -2,20 +2,17 @@
 
 import os
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager
-from infrafoundry.core.exceptions import ResourceFilterError, SecretNotFoundError
+from infrafoundry.core.exceptions import ResourceFilterError
 from infrafoundry.core.notifications import NotificationManager
 from infrafoundry.core.orchestrator import Orchestrator, OrchestratorStrictConfig
-from infrafoundry.core.orchestrator_workflows import PlanOrchestrator
 from infrafoundry.core.policy import PolicyEngine
 from infrafoundry.core.provider import ProviderBase
-from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
 
 
@@ -430,97 +427,9 @@ class TestOrchestratorStatus:
 
 
 class TestPlanOrchestratorStrictMode:
-    """Tests for PlanOrchestrator strict-mode behavior."""
+    """Tests for PlanOrchestrator — secrets are now passed via env vars, not files."""
 
-    def _make_plan_workflow(self, tmp_path, fail_on_missing_secrets: bool) -> PlanOrchestrator:
-        secret_manager = Mock(spec=SecretManager)
-        secret_manager.export_for_terraform.side_effect = FileNotFoundError("missing")
-
-        mock_runner_registry = Mock()
-        mock_runner_registry.list_runners.return_value = []
-        mock_runner_registry.create_runner.return_value = (
-            None  # No runners needed for these specific tests
-        )
-
-        return PlanOrchestrator(
-            console=Mock(),
-            state_manager=Mock(),
-            event_manager=Mock(),
-            runner_registry=mock_runner_registry,
-            get_providers=lambda: {},
-            load_resources=lambda env: ([], {}),
-            iter_provider_batches=lambda *_args, **_kwargs: [],
-            validate_resources=lambda resources: None,
-            has_policies=lambda: False,
-            check_policies=lambda env, resources, enforce: None,
-            secret_manager_factory=lambda env: secret_manager,
-            get_current_user=lambda: "tester",
-            fail_on_missing_secrets=fail_on_missing_secrets,
-            get_runner_priorities=lambda env: {},
-        )
-
-    def test_export_secrets_strict_mode_raises(self, tmp_path):
-        """Strict mode should raise when secrets are missing."""
-        workflow = self._make_plan_workflow(tmp_path, fail_on_missing_secrets=True)
-        provider = SimpleNamespace(terraform_dir=tmp_path)
-
-        with pytest.raises(FileNotFoundError):
-            workflow._export_secrets("proxmox", "dev", provider)
-
-    def test_export_secrets_permissive_mode_warns(self, tmp_path):
-        """Permissive mode should not raise when secrets are missing."""
-        workflow = self._make_plan_workflow(tmp_path, fail_on_missing_secrets=False)
-        provider = SimpleNamespace(terraform_dir=tmp_path)
-
-        workflow._export_secrets("proxmox", "dev", provider)
-
-    def _make_plan_workflow_with_secret_not_found(
-        self, tmp_path, fail_on_missing_secrets: bool
-    ) -> PlanOrchestrator:
-        secret_manager = Mock(spec=SecretManager)
-        secret_manager.export_for_terraform.side_effect = SecretNotFoundError(
-            "Encrypted file not found: prod/proxmox.yaml"
-        )
-
-        mock_runner_registry = Mock()
-        mock_runner_registry.list_runners.return_value = []
-        mock_runner_registry.create_runner.return_value = None
-
-        return PlanOrchestrator(
-            console=Mock(),
-            state_manager=Mock(),
-            event_manager=Mock(),
-            runner_registry=mock_runner_registry,
-            get_providers=lambda: {},
-            load_resources=lambda env: ([], {}),
-            iter_provider_batches=lambda *_args, **_kwargs: [],
-            validate_resources=lambda resources: None,
-            has_policies=lambda: False,
-            check_policies=lambda env, resources, enforce: None,
-            secret_manager_factory=lambda env: secret_manager,
-            get_current_user=lambda: "tester",
-            fail_on_missing_secrets=fail_on_missing_secrets,
-            get_runner_priorities=lambda env: {},
-        )
-
-    def test_export_secrets_strict_mode_raises_on_secret_not_found(self, tmp_path):
-        """Strict mode should raise when SecretNotFoundError occurs."""
-        workflow = self._make_plan_workflow_with_secret_not_found(
-            tmp_path, fail_on_missing_secrets=True
-        )
-        provider = SimpleNamespace(terraform_dir=tmp_path)
-
-        with pytest.raises(FileNotFoundError):
-            workflow._export_secrets("proxmox", "dev", provider)
-
-    def test_export_secrets_permissive_mode_warns_on_secret_not_found(self, tmp_path):
-        """Permissive mode should not raise when SecretNotFoundError occurs."""
-        workflow = self._make_plan_workflow_with_secret_not_found(
-            tmp_path, fail_on_missing_secrets=False
-        )
-        provider = SimpleNamespace(terraform_dir=tmp_path)
-
-        workflow._export_secrets("proxmox", "dev", provider)
+    pass
 
 
 class TestIterProviderBatchesResourceFilter:

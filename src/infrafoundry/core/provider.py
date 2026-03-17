@@ -20,6 +20,7 @@ class ResourceConfig(BaseModel):
     config: dict[str, Any]
     hooks: HooksConfig | None = None
     events: dict[str, list[dict[str, Any]]] | None = None
+    package_variables: dict[str, Any] | None = None
 
 
 class ProviderBase(ABC):
@@ -119,6 +120,18 @@ class ProviderBase(ABC):
 
         Returns:
             Dict mapping resource types to their dependencies
+        """
+        return {}
+
+    def get_terraform_env_vars(self) -> dict[str, str]:
+        """Return TF_VAR_* environment variables for this provider.
+
+        Providers override this to supply their settings and credentials
+        as Terraform input variables via the environment, eliminating the
+        need for terraform.tfvars files on disk.
+
+        Returns:
+            Dict mapping TF_VAR_<name> keys to string values
         """
         return {}
 

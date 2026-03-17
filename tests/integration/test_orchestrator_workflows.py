@@ -27,6 +27,7 @@ def mock_providers(tmp_path):
     proxmox.validate_config = Mock()
     proxmox.get_resource_types = Mock(return_value=["vm", "network", "template"])
     proxmox.get_dependencies = Mock(return_value={})  # No dependencies defined
+    proxmox.get_terraform_env_vars = Mock(return_value={})
 
     return {"proxmox": proxmox}
 
@@ -586,6 +587,7 @@ class TestMultiProviderWorkflow:
         kubernetes.generate_ansible = Mock()
         kubernetes.get_resource_types = Mock(return_value=["deployment", "service"])
         kubernetes.get_dependencies = Mock(return_value={})
+        kubernetes.get_terraform_env_vars = Mock(return_value={})
         mock_providers["kubernetes"] = kubernetes
         orchestrator.providers = mock_providers
 
@@ -621,6 +623,7 @@ class TestMultiProviderWorkflow:
         kubernetes.generate_ansible = Mock()
         kubernetes.get_resource_types = Mock(return_value=["deployment", "service"])
         kubernetes.get_dependencies = Mock(return_value={})
+        kubernetes.get_terraform_env_vars = Mock(return_value={})
         mock_providers["kubernetes"] = kubernetes
         orchestrator.providers = mock_providers
 
