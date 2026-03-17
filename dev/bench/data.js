@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773693734736,
+  "lastUpdate": 1773763578081,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2356,6 +2356,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003660634602256199",
             "extra": "mean: 168.90436971288617 usec\nrounds: 1915"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "57d16730e6be4d61294f91ba4c985b4f50e3883d",
+          "message": "feat: pass all variables via environment instead of files on disk (merges PR #414, addresses #413)\n\n- TerraformRunner sets TF_VAR_* env vars from provider settings/credentials\n- Remove secrets.auto.tfvars and terraform.tfvars file generation\n- Add package_variables to ResourceConfig and EventContext\n- ScriptHandler sets INFRAFOUNDRY_PACKAGE_VARS (JSON) and INFRAFOUNDRY_VAR_*\n- PackageLoader returns merged variables (including secrets.yaml) as third element\n- Aggregate events pass package_variables for group handlers",
+          "timestamp": "2026-03-17T16:05:35Z",
+          "tree_id": "3988988e22115382bdad218044b2c0d6906360c1",
+          "url": "https://github.com/endavis/infrafoundry/commit/57d16730e6be4d61294f91ba4c985b4f50e3883d"
+        },
+        "date": 1773763577165,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6935.089465226601,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008476751675500235",
+            "extra": "mean: 144.19424652185444 usec\nrounds: 2300"
           }
         ]
       }
