@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773771009895,
+  "lastUpdate": 1773773785380,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2480,6 +2480,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007805600478906806",
             "extra": "mean: 141.29837201049463 usec\nrounds: 3387"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1f7caf638f089b984ae2de16864e147a2edc1999",
+          "message": "docs: add README documentation to example packages (merges PR #420)",
+          "timestamp": "2026-03-17T18:55:41Z",
+          "tree_id": "2503c47029e6a749f0d7b6f88d6e599fa90723fb",
+          "url": "https://github.com/endavis/infrafoundry/commit/1f7caf638f089b984ae2de16864e147a2edc1999"
+        },
+        "date": 1773773785048,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9063.848553135287,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006785320159456225",
+            "extra": "mean: 110.3284100719102 usec\nrounds: 2085"
           }
         ]
       }
