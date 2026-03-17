@@ -26,6 +26,6 @@ class ProxmoxCredentialLoader(BaseCredentialLoader):
         """Return mapping of Proxmox secret keys to environment variables."""
         return {
             "proxmox_api_url": "PROXMOX_API_URL",
-            "proxmox_token_id": "PROXMOX_API_TOKEN_ID",  # nosec B105
-            "proxmox_token_secret": "PROXMOX_API_TOKEN_SECRET",  # nosec B105
+            "proxmox_api_token_id": "PROXMOX_API_TOKEN_ID",  # nosec B105
+            "proxmox_api_token_secret": "PROXMOX_API_TOKEN_SECRET",  # nosec B105
         }
