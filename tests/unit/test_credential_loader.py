@@ -72,8 +72,8 @@ class TestCredentialLoader:
 
         mock_provider.load_secret.return_value = {
             "proxmox_api_url": "https://pve.example.com:8006",
-            "proxmox_token_id": "user@pam!token",
-            "proxmox_token_secret": "secret123",
+            "proxmox_api_token_id": "user@pam!token",
+            "proxmox_api_token_secret": "secret123",
         }
 
         credentials = loader.load("dev", providers=["proxmox"])
