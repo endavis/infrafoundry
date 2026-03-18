@@ -1,0 +1,24 @@
+resources:
+  - provider: proxmox
+    type: template
+    name: rocky9-template
+    config:
+      name: "{{ template_name }}"
+      vmid: {{ vmid }}
+      target_node: "{{ target_node }}"
+      cores: 2
+      memory: 2048
+      agent: true
+      cloud_init: true
+      cloud_init_datastore: "{{ storage }}"
+      ciuser: rocky
+      disk:
+        storage: "{{ storage }}"
+        size: 32
+      network:
+        bridge: vmbr0
+      download_image:
+        url: "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+        filename: "Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+      tags: ["template", "rocky9"]
+      description: "Rocky Linux 9 cloud image template"

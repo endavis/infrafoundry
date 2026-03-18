@@ -1,0 +1,23 @@
+# Rocky Linux 9 Cloud Image Template
+#
+# Downloads the Rocky 9 GenericCloud qcow2 image and creates a
+# Proxmox VM template with cloud-init support.
+#
+# Run: infra apply --env dev --package rocky9-template
+#
+# VMs cloned from this template get:
+# - virtio-scsi-pci disk controller
+# - cloud-init drive for user/network configuration
+# - qemu-guest-agent ready (install via cloud-init snippets)
+
+name: rocky9-template
+description: "Rocky Linux 9 cloud image template"
+
+variables:
+  template_name: rocky9-template
+  vmid: 901
+  target_node: pve1
+  storage: local-lvm
+
+resources:
+  - resources.yaml
