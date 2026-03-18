@@ -32,7 +32,7 @@ The Orchestrator is a thin coordinator that wires providers, runners, policy che
   - ConfigManager (resource loading/validation)
   - PolicyEngine (pre-deployment checks)
   - Dependency graph builder (ordering)
-  - SecretManager (exports for Terraform/Ansible)
+  - Provider credential mapping (credentials flow via `TF_VAR_*` env vars)
   - Providers (render Terraform/Ansible)
   - Runners via DeploymentExecutor (Terraform/Ansible execution)
   - StateManager (deployments/resources/events)
@@ -41,7 +41,7 @@ The Orchestrator is a thin coordinator that wires providers, runners, policy che
 - **Workflow outline:**
   1. Create deployment record; emit BEFORE event.
   2. Load/validate resources; check policies; group by provider.
-  3. Track resources in state; render Terraform/Ansible; export secrets.
+  3. Track resources in state; render Terraform/Ansible; credentials passed via `TF_VAR_*` env vars.
   4. Execute via runners; update state; emit AFTER or FAILED events.
 - **Provider registry:** Providers registered once; grouped resources dispatched per provider.
 
@@ -62,7 +62,6 @@ sequenceDiagram
     participant ConfigManager
     participant PolicyEngine
     participant Provider
-    participant SecretManager
     participant Runner
 
     User->>CLI: infra plan --env dev
@@ -95,8 +94,7 @@ sequenceDiagram
             PlanOrchestrator->>Provider: set_environment(env_name)
             PlanOrchestrator->>Provider: ensure_directories()
 
-            PlanOrchestrator->>SecretManager: export_for_terraform(secrets_file, tf_vars)
-            SecretManager-->>PlanOrchestrator: secrets exported
+            Note over PlanOrchestrator,Runner: Credentials passed via TF_VAR_* env vars
 
             loop for each runner (terraform, ansible, etc.)
                 PlanOrchestrator->>Provider: generate_{tool}(resources)
@@ -129,7 +127,6 @@ sequenceDiagram
     participant EventManager
     participant ConfigManager
     participant Provider
-    participant SecretManager
     participant Runner
 
     User->>CLI: infra apply --env dev
@@ -163,8 +160,7 @@ sequenceDiagram
 
             ApplyOrchestrator->>EventManager: emit_event(RESOURCE_APPLYING, env, resource_data)
 
-            ApplyOrchestrator->>SecretManager: export_for_terraform(secrets_file, tf_vars)
-            SecretManager-->>ApplyOrchestrator: secrets exported
+            Note over ApplyOrchestrator,Runner: Credentials passed via TF_VAR_* env vars
 
             loop for each runner (terraform, ansible, etc.)
                 ApplyOrchestrator->>Provider: generate_{tool}(resources)
@@ -284,7 +280,7 @@ sequenceDiagram
 
 ---
 
-Last updated: 2025-12-23
+Last updated: 2026-03-18
 
 
 ---

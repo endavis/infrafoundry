@@ -54,17 +54,21 @@ The `EventContext` includes `provider` and `runner` fields, and the `data` dict 
 
 Event handlers are configured in your environment's `settings.yaml` under the `events:` key. The key is the event type name and the value is a list of handler configurations. Handlers are loaded at the start of each workflow (plan, apply, destroy).
 
+!!! tip "Prefer Resource Lifecycle Events"
+    For post-apply actions, use resource-level `on_create`/`on_update`/`on_destroy`
+    events instead of `RUNNER_COMPLETED`. See [Resource Lifecycle Events](#resource-lifecycle-events).
+
 ```yaml
 # envs/<env>/settings.yaml
 events:
-  RUNNER_COMPLETED:
-    - type: script
-      name: "ontap-setup"
-      script: scripts/ontap-post-terraform.sh
-      timeout: 600
   DRIFT_DETECTED:
     - type: webhook
       url: "https://hooks.slack.com/..."
+  AFTER_APPLY:
+    - type: script
+      name: "post-apply-notify"
+      script: scripts/notify.sh
+      timeout: 60
 ```
 
 **ScriptHandler** exposes the runner name as `INFRAFOUNDRY_RUNNER` environment variable, allowing scripts to filter by runner type:
@@ -81,7 +85,7 @@ events:
 | `INFRAFOUNDRY_DEPLOYMENT_ID` | `context.deployment_id` is set |
 | `INFRAFOUNDRY_TARGET_RESOURCES` | `-r` filter is active (comma-separated list) |
 
-**Example:** Run an Ansible playbook after Terraform finishes for a specific provider:
+**Example (deprecated):** Run a script on `RUNNER_COMPLETED` (use resource lifecycle events instead):
 
 ```yaml
 events:
@@ -91,12 +95,19 @@ events:
     description: "Run post-Terraform Ansible setup"
 ```
 
-```bash
-#!/bin/bash
-# scripts/post-terraform.sh
-if [ "$INFRAFOUNDRY_RUNNER" = "terraform" ] && [ "$INFRAFOUNDRY_PROVIDER" = "proxmox" ] && [ "${INFRAFOUNDRY_PHASE:-}" = "apply" ]; then
-    ansible-playbook -i inventory.yml site.yml
-fi
+**Example (recommended):** Use resource lifecycle events for post-apply actions:
+
+```yaml
+vm:
+  - name: web-server
+    cores: 2
+    memory: 4096
+    events:
+      on_create:
+        - type: script
+          name: post-provision
+          script: scripts/post-provision.sh
+          timeout: 300
 ```
 
 ### Real-Time Output Streaming
@@ -210,6 +221,8 @@ Scripts and playbooks receive resource context via environment variables:
 | `INFRAFOUNDRY_PACKAGE` | Package name |
 | `INFRAFOUNDRY_ENV` | Environment name |
 | `INFRAFOUNDRY_CONFIG_DIR` | Path to environment config directory |
+| `INFRAFOUNDRY_VAR_<key>` | Individual package variable (uppercase key) |
+| `INFRAFOUNDRY_PACKAGE_VARS` | JSON dict of all merged package variables |
 
 ### Deprecation notice
 
@@ -280,7 +293,7 @@ for full details on package structure and configuration.
 
 ---
 
-Last updated: 2026-03-15
+Last updated: 2026-03-18
 
 
 ---

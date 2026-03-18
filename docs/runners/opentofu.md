@@ -44,7 +44,7 @@ The OpenTofu runner is a drop-in alternative to the Terraform runner. OpenTofu i
 - **Default:** `terraform` (backward compatible).
 - **Generated files:** Output goes to `generated/{env}/terraform/{provider}/` regardless of tool selection. The `.tf` file format is shared between Terraform and OpenTofu.
 - **State location:** `generated/{env}/terraform/{provider}/.terraform/terraform.tfstate` (same as Terraform; OpenTofu uses the same state format).
-- **Settings/secrets:** Identical to Terraform; `settings.yaml` maps to `terraform.tfvars`.
+- **Settings/secrets:** Identical to Terraform; provider credentials from `settings.yaml` are passed as `TF_VAR_*` environment variables. No `.tfvars` files are generated.
 
 ## Architecture
 
@@ -86,7 +86,7 @@ BaseRunner
 
 ---
 
-Last updated: 2026-02-08
+Last updated: 2026-03-18
 
 ---
 [Back to Table of Contents](../index.md)

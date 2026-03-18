@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Terraform runner provisions infrastructure from YAML by rendering `.tf` files, mapping settings/secrets into `terraform.tfvars`, and executing `terraform init/plan/apply`.
+The Terraform runner provisions infrastructure from YAML by rendering `.tf` files and executing `terraform init/plan/apply`. Provider credentials and settings are passed to Terraform via `TF_VAR_*` environment variables — no `.tfvars` files are written to disk.
 
 ## Audience and Prerequisites
 
@@ -25,7 +25,7 @@ infra apply --env dev
 ## Configuration Details
 
 - **Resource definitions:** YAML resources map to provider Terraform resources; no direct HCL authoring.
-- **Settings/secrets:** `settings.yaml` → `terraform.tfvars` in `generated/{env}/terraform/{provider}/`.
+- **Settings/secrets:** Provider credentials from `settings.yaml` are mapped to `TF_VAR_*` environment variables via each provider's `_CREDENTIAL_ENV_MAPPING`. The `TerraformRunner._prepare_environment()` method calls `provider.get_terraform_env_vars()` to build the full set of `TF_VAR_*` variables. No `.tfvars` files are generated.
 - **State location:** `generated/{env}/terraform/{provider}/.terraform/terraform.tfstate` (remote backends configurable via env vars/provider settings).
 - **Customization:** Provider-specific options (e.g., cloud-init snippets) are surfaced via YAML fields; raw HCL injection is intentionally limited to preserve consistency.
 
@@ -38,7 +38,6 @@ infra apply --env dev
 - Inspect generated files for debugging:
   ```bash
   cat generated/dev/terraform/proxmox/main.tf
-  cat generated/dev/terraform/proxmox/terraform.tfvars
   ```
 
 ## Examples
@@ -71,13 +70,13 @@ infra apply --env dev
 
 ## Troubleshooting
 
-- **Symptom:** Terraform errors on apply. **Fix:** Inspect generated `.tf`/`terraform.tfvars`; rerun `infra validate --check-api --check-refs`.
+- **Symptom:** Terraform errors on apply. **Fix:** Inspect generated `.tf` files; rerun `infra validate --check-api --check-refs`. Check that provider credentials in `settings.yaml` are correct — they are passed as `TF_VAR_*` env vars.
 - **Symptom:** State conflicts. **Fix:** Configure remote backend with locking (e.g., S3 + DynamoDB) and avoid sharing local state dirs.
-- **Symptom:** Missing credentials. **Fix:** Ensure `settings.yaml` contains provider credentials and is decrypted; confirm env vars if using remote backend.
+- **Symptom:** Missing credentials. **Fix:** Ensure `settings.yaml` contains provider credentials and is decrypted. Credentials are mapped to `TF_VAR_*` env vars automatically via each provider's `_CREDENTIAL_ENV_MAPPING`.
 
 ---
 
-Last updated: 2025-12-23 14:27 GMT
+Last updated: 2026-03-18
 
 
 ---
