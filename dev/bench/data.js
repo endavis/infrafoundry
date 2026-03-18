@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773773785380,
+  "lastUpdate": 1773838412222,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2511,6 +2511,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006785320159456225",
             "extra": "mean: 110.3284100719102 usec\nrounds: 2085"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2faf5acf7d7d2af3370f5e63a1f6e4deb856a93d",
+          "message": "docs: add rocky9-template example package (merges PR #421, addresses #422)",
+          "timestamp": "2026-03-18T12:52:58Z",
+          "tree_id": "5e30fa7548d468353768d1ea0af284dd363889b2",
+          "url": "https://github.com/endavis/infrafoundry/commit/2faf5acf7d7d2af3370f5e63a1f6e4deb856a93d"
+        },
+        "date": 1773838411733,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7023.457225429598,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008060991809665145",
+            "extra": "mean: 142.38002281544954 usec\nrounds: 2323"
           }
         ]
       }
