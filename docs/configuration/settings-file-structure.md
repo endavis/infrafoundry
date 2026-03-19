@@ -100,15 +100,16 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
     - **Proxmox authentication:** Supports two methods:
       - Single token: `api_token: "user@pve!tokenid=secret"`
       - Separate fields: `api_token_id: "user@pve!tokenid"` + `api_token_secret: "secret"`
-- **Generated outputs:** Values populate `generated/{env}/terraform/{provider}/terraform.tfvars` and Ansible vars automatically.
+- **Generated outputs:** Provider credentials are passed to Terraform as `TF_VAR_*` environment variables (no `.tfvars` files are generated). Ansible vars are populated automatically.
 
 ## Validation and Checks
 
 - Run `infra validate --env <env> --check-api` to confirm structure and credentials.
-- Inspect generated tfvars to verify SSH overrides and provider settings:
+- Inspect generated `.tf` files to verify provider configuration and variables:
   ```bash
-  cat generated/dev/terraform/proxmox/terraform.tfvars
+  cat generated/dev/terraform/proxmox/variables.tf
   ```
+- Credentials are passed as `TF_VAR_*` env vars at runtime (not written to disk).
 - Ensure `settings.yaml` is encrypted and keys are git-ignored.
 
 ## Examples
@@ -222,7 +223,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
 
 ## Troubleshooting
 
-- **Symptom:** Missing values in generated tfvars. **Fix:** Ensure fields exist in `settings.yaml` and rerun `infra plan`.
+- **Symptom:** Missing credential values at Terraform runtime. **Fix:** Ensure fields exist in `settings.yaml` under `provider_settings` and rerun `infra plan`. Credentials are mapped to `TF_VAR_*` env vars via each provider's `_CREDENTIAL_ENV_MAPPING`.
 - **Symptom:** SSH fails during Proxmox operations. **Fix:** Verify `ssh`/`provider_ssh` entries and key paths; re-validate with `--check-api`.
 - **Symptom:** Secrets exposed in git. **Fix:** Encrypt `settings.yaml` with SOPS/age and confirm ignore rules include keys.
 - **Symptom:** Provider not loading despite having resources defined. **Fix:** Check `providers` list in `settings.yaml`; if specified, only listed providers will be enabled.
@@ -232,7 +233,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
 
 ---
 
-Last updated: 2025-12-27 15:20 GMT
+Last updated: 2026-03-18
 
 
 ---

@@ -121,6 +121,36 @@ After successful rotation:
 - **Rollback**: Automatic rollback to backup on any failure
 - **Dry-run mode**: Preview rotation without making changes
 
+## Secrets Transport: No Secrets on Disk
+
+InfraFoundry follows a **no-secrets-on-disk** approach for Terraform execution. Provider
+credentials and sensitive settings are never written to `.tfvars` files. Instead:
+
+1. **Provider credentials** from `settings.yaml` are mapped to `TF_VAR_*` environment
+   variables via each provider's `_CREDENTIAL_ENV_MAPPING` dict
+2. `TerraformRunner._prepare_environment()` calls `provider.get_terraform_env_vars()`
+   to build the full set of `TF_VAR_*` variables
+3. `build_terraform_env_vars()` in `provider_mixins.py` reads settings and returns the
+   `TF_VAR_*` dict
+4. These environment variables are passed to the Terraform process at runtime
+
+The deprecated `generate_provider_tfvars()` and `SecretManager.export_for_terraform()` /
+`_export_secrets()` methods have been removed from the orchestration workflow.
+
+### Per-Package Secrets
+
+Packages can include a `secrets.yaml` file alongside their `infrafoundry.yml` manifest.
+This file is SOPS-encrypted and automatically decrypted during package loading:
+
+- Variables from `secrets.yaml` merge into the manifest's `variables` dict
+- Secret values override same-named variables from `infrafoundry.yml`
+- Merged variables are exposed to scripts as `INFRAFOUNDRY_VAR_<KEY>` env vars
+  and as a JSON dict in `INFRAFOUNDRY_PACKAGE_VARS`
+- Scripts read configuration from env vars rather than re-parsing files
+
+See [Infrastructure Packages: Per-Package Secrets](../configuration/infrastructure-packages.md#per-package-secrets)
+for format and usage details.
+
 ## Related Documentation
 
 - [Age Key Management Best Practices](../guides/age-key-management.md)
@@ -140,7 +170,7 @@ After successful rotation:
 
 ---
 
-Last updated: 2025-12-27 19:30 GMT
+Last updated: 2026-03-18
 
 
 ---
