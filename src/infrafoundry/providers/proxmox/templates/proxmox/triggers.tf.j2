@@ -1,0 +1,12 @@
+{% for trigger in triggers %}
+resource "terraform_data" "{{ trigger.name | replace('-', '_') }}" {
+  {% if trigger.config.inputs is defined %}
+  input = {
+    {% for key, value in trigger.config.inputs.items() %}
+    {{ key }} = "{{ value }}"
+    {% endfor %}
+  }
+  {% endif %}
+}
+
+{% endfor %}

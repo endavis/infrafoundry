@@ -107,6 +107,9 @@ class ProxmoxProvider(
         if "template" in resources_by_type:
             self._generate_templates_terraform(resources_by_type["template"])
 
+        if "trigger" in resources_by_type:
+            self._generate_triggers_terraform(resources_by_type["trigger"])
+
         if "network" in resources_by_type:
             self._generate_networks_terraform(resources_by_type["network"])
 
@@ -415,10 +418,26 @@ class ProxmoxProvider(
         content = self.render_template("proxmox/deploy.py.j2", {"resources": resources})
         self._write_pyinfra_file("deploy.py", content)
 
+    def _generate_triggers_terraform(self, triggers: list[ResourceConfig]) -> None:
+        """Generate Terraform for trigger resources.
+
+        Renders lightweight ``terraform_data`` resources that serve as state
+        markers for packages without real infrastructure. Useful for triggering
+        ``on_create`` lifecycle events in script-only packages.
+
+        Args:
+            triggers: List of trigger resource configs.
+        """
+        self.render_and_write_terraform(
+            "proxmox/triggers.tf.j2",
+            context={"triggers": triggers},
+            output_name="triggers.tf",
+        )
+
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["vm", "container", "template", "network", "storage"]
+        return ["vm", "container", "template", "network", "storage", "trigger"]
 
     @override
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
@@ -432,6 +451,7 @@ class ProxmoxProvider(
                 "proxmox_virtual_environment_storage_cifs",
                 "proxmox_virtual_environment_storage_dir",
             ],
+            "trigger": ["terraform_data"],
         }
 
     @override
@@ -443,4 +463,5 @@ class ProxmoxProvider(
             "template": [],
             "network": [],
             "storage": [],
+            "trigger": [],
         }
