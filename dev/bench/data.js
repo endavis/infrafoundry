@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773915631687,
+  "lastUpdate": 1773926795723,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2573,6 +2573,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000026194663626401665",
             "extra": "mean: 153.8408892056854 usec\nrounds: 2455"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ef567f0ce48f82a478b6ae77909ec91851d7db71",
+          "message": "feat: support cross-node VM cloning in Proxmox provider (merges PR #426, addresses #425)\n\nNormalize scalar clone values to dict format and render node_name and\ndatastore_id fields in the VM clone block, matching the existing container\ntemplate pattern. Backward compatible — scalar clone: <vmid> still works.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-19T13:25:54Z",
+          "tree_id": "8222f3fa445808e79428f8150e92e3935ea8af2e",
+          "url": "https://github.com/endavis/infrafoundry/commit/ef567f0ce48f82a478b6ae77909ec91851d7db71"
+        },
+        "date": 1773926794782,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7083.365257905406,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007899322622180482",
+            "extra": "mean: 141.1758343089745 usec\nrounds: 2221"
           }
         ]
       }
