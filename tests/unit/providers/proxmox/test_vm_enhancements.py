@@ -227,6 +227,57 @@ class TestBootOrder:
         assert '"scsi0"' in content
 
 
+class TestClone:
+    """Tests for VM clone block rendering, including cross-node cloning."""
+
+    def test_clone_scalar(self, provider):
+        """Scalar clone value should be normalized to dict and render vm_id."""
+        vms = [_make_vm(clone=100)]
+        content = _render_vms(provider, vms)
+        assert "vm_id = 100" in content
+        # clone block should not contain node_name (top-level node_name is for the VM itself)
+        clone_block = content.split("clone {")[1].split("}")[0]
+        assert "node_name" not in clone_block
+        assert "datastore_id" not in clone_block
+
+    def test_clone_dict_vm_id_only(self, provider):
+        """Dict clone with only vm_id should render vm_id without node_name."""
+        vms = [_make_vm(clone={"vm_id": 901})]
+        content = _render_vms(provider, vms)
+        assert "vm_id = 901" in content
+        clone_block = content.split("clone {")[1].split("}")[0]
+        assert "node_name" not in clone_block
+
+    def test_clone_cross_node(self, provider):
+        """Dict clone with node_name should render both vm_id and node_name."""
+        vms = [_make_vm(clone={"vm_id": 901, "node_name": "pve1"})]
+        content = _render_vms(provider, vms)
+        assert "vm_id = 901" in content
+        assert 'node_name    = "pve1"' in content
+
+    def test_clone_cross_node_with_datastore(self, provider):
+        """Dict clone with node_name and datastore_id should render all fields."""
+        vms = [_make_vm(clone={"vm_id": 901, "node_name": "pve1", "datastore_id": "local-lvm"})]
+        content = _render_vms(provider, vms)
+        assert "vm_id = 901" in content
+        assert 'node_name    = "pve1"' in content
+        assert 'datastore_id = "local-lvm"' in content
+
+    def test_clone_with_full_clone(self, provider):
+        """Clone with full_clone should render the full field."""
+        vms = [_make_vm(clone={"vm_id": 901, "node_name": "pve1"}, full_clone=True)]
+        content = _render_vms(provider, vms)
+        assert "vm_id = 901" in content
+        assert 'node_name    = "pve1"' in content
+        assert "full = true" in content
+
+    def test_clone_string_vmid_normalized(self, provider):
+        """String clone value should be normalized to dict."""
+        vms = [_make_vm(clone="901")]
+        content = _render_vms(provider, vms)
+        assert "vm_id = 901" in content
+
+
 class TestDefaultsUnchanged:
     """Verify that minimal configs still produce the same output."""
 
@@ -271,3 +322,31 @@ class TestNormalization:
         provider._normalize_vm_config(vm)
         # Original should still be a dict
         assert isinstance(vm.config["network"], dict)
+
+    def test_normalize_clone_scalar_to_dict(self, provider):
+        """Scalar clone should be normalized to dict with vm_id key."""
+        vm = _make_vm(clone=901)
+        result = provider._normalize_vm_config(vm)
+        assert isinstance(result.config["clone"], dict)
+        assert result.config["clone"]["vm_id"] == 901
+
+    def test_normalize_clone_string_to_dict(self, provider):
+        """String clone should be normalized to dict with vm_id key."""
+        vm = _make_vm(clone="901")
+        result = provider._normalize_vm_config(vm)
+        assert isinstance(result.config["clone"], dict)
+        assert result.config["clone"]["vm_id"] == "901"
+
+    def test_normalize_clone_dict_unchanged(self, provider):
+        """Dict clone should remain unchanged."""
+        vm = _make_vm(clone={"vm_id": 901, "node_name": "pve1"})
+        result = provider._normalize_vm_config(vm)
+        assert isinstance(result.config["clone"], dict)
+        assert result.config["clone"]["vm_id"] == 901
+        assert result.config["clone"]["node_name"] == "pve1"
+
+    def test_normalize_clone_does_not_mutate_original(self, provider):
+        """Original clone scalar should not be modified."""
+        vm = _make_vm(clone=901)
+        provider._normalize_vm_config(vm)
+        assert vm.config["clone"] == 901
