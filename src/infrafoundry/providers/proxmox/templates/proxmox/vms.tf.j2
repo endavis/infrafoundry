@@ -27,7 +27,13 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   {% if vm.config.clone is defined %}
   # Clone from existing template/VM
   clone {
-    vm_id = "{{ vm.config.clone }}"
+    vm_id = {{ vm.config.clone.vm_id }}
+    {% if vm.config.clone.node_name is defined %}
+    node_name    = "{{ vm.config.clone.node_name }}"
+    {% endif %}
+    {% if vm.config.clone.datastore_id is defined %}
+    datastore_id = "{{ vm.config.clone.datastore_id }}"
+    {% endif %}
     {% if vm.config.full_clone is defined %}
     full = {{ vm.config.full_clone | lower }}
     {% endif %}
