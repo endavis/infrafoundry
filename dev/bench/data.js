@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773838412222,
+  "lastUpdate": 1773915631687,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2542,6 +2542,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008060991809665145",
             "extra": "mean: 142.38002281544954 usec\nrounds: 2323"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f3a3c59b5055acdbb13abb43ecd1b575c09e1841",
+          "message": "docs: update documentation for env-var secrets, lifecycle events, and removed tfvars (merges PR #424, addresses #423)",
+          "timestamp": "2026-03-19T10:19:57Z",
+          "tree_id": "1aabb2995853986257f97c2208713dace3d73443",
+          "url": "https://github.com/endavis/infrafoundry/commit/f3a3c59b5055acdbb13abb43ecd1b575c09e1841"
+        },
+        "date": 1773915631161,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6500.22243867168,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000026194663626401665",
+            "extra": "mean: 153.8408892056854 usec\nrounds: 2455"
           }
         ]
       }
