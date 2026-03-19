@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773926795723,
+  "lastUpdate": 1773933317194,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2604,6 +2604,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007899322622180482",
             "extra": "mean: 141.1758343089745 usec\nrounds: 2221"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "22a2bae38ca722d8646cc13efa50a7b609cdcaa0",
+          "message": "feat: add trigger resource type to Proxmox provider (merges PR #429, addresses #428)\n\nAdd lightweight terraform_data-based trigger resources for packages that\nneed lifecycle events without creating real infrastructure. Used by\nscript-only packages (e.g., Helm deployments) to fire on_create events.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-19T15:14:38Z",
+          "tree_id": "cdde7f16e2c81c200c3ddca9823ce8e38b2ad0ea",
+          "url": "https://github.com/endavis/infrafoundry/commit/22a2bae38ca722d8646cc13efa50a7b609cdcaa0"
+        },
+        "date": 1773933316441,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7000.4861668041485,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008653510598811809",
+            "extra": "mean: 142.84722177467262 usec\nrounds: 2232"
           }
         ]
       }
