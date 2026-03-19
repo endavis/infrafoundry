@@ -221,6 +221,11 @@ class ProxmoxProvider(
         if isinstance(network, dict):
             config["network"] = [network]
 
+        # Normalize clone: wrap scalar VMID in a dict for consistent template handling
+        clone = config.get("clone")
+        if clone is not None and not isinstance(clone, dict):
+            config["clone"] = {"vm_id": clone}
+
         return vm_copy
 
     def _process_cloud_init_snippets(self, vm: ResourceConfig) -> ResourceConfig:

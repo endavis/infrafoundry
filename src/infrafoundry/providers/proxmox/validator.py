@@ -251,9 +251,14 @@ class ProxmoxValidator:
                     bridges.add((target_node, bridge))
 
             # Collect template references (for VMs that clone)
+            # clone can be a scalar VMID or a dict with vm_id key
             if resource.type == "vm" and (clone_ref := config.get("clone")):
-                key = str(clone_ref)
-                template_refs.setdefault(key, []).append(resource_name)
+                if isinstance(clone_ref, dict):
+                    key = str(clone_ref.get("vm_id", ""))
+                else:
+                    key = str(clone_ref)
+                if key:
+                    template_refs.setdefault(key, []).append(resource_name)
 
             # Collect VMIDs/CTIDs and check for duplicates
             # Containers use 'ctid' but share the same Proxmox ID space as VMs
