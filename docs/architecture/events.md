@@ -90,10 +90,18 @@ Categorized event types for different lifecycle phases and operations.
    - `RESOURCE_DELETED`
    - `RESOURCE_FAILED`
 
-3. **Runner Events** - Runner lifecycle within a workflow
-   - `RUNNER_STARTING` - Emitted before a runner executes (plan, apply, destroy)
-   - `RUNNER_COMPLETED` - Emitted after a runner finishes successfully
+3. **Runner Events** - Runner lifecycle within a workflow *(deprecated)*
+   - `RUNNER_STARTING` - Emitted before a runner executes *(deprecated, use resource lifecycle events)*
+   - `RUNNER_COMPLETED` - Emitted after a runner finishes *(deprecated, use resource lifecycle events)*
    - `RUNNER_FAILED` - Emitted when a runner raises an exception
+
+4. **Resource Lifecycle Events** - Per-resource outcome-based events *(primary pattern)*
+   - `on_create` → `RESOURCE_CREATED` - Resource was newly created
+   - `on_update` → `RESOURCE_UPDATED` - Resource was modified in place
+   - `on_destroy` → `RESOURCE_DELETED` - Resource was destroyed
+   - Declared directly on resource definitions with `requires` for group dependencies
+   - Fire based on actual Terraform/OpenTofu outcomes, not runner completion
+   - Type-aware filtering via `get_terraform_resource_types()` prevents helper resources from firing events
 
 5. **Drift Events** - Configuration drift detection
    - `DRIFT_DETECTED`
@@ -186,7 +194,12 @@ Each event type includes specific data fields:
 }
 ```
 
-### Runner Events
+### Runner Events (Deprecated)
+
+!!! warning "Deprecated"
+    Runner events (`RUNNER_STARTING`, `RUNNER_COMPLETED`) are deprecated. Use resource
+    lifecycle events (`on_create`, `on_update`, `on_destroy`) instead. Runner events
+    continue to work but emit `DeprecationWarning` messages.
 
 ```python
 # RUNNER_STARTING / RUNNER_COMPLETED
@@ -202,6 +215,45 @@ Each event type includes specific data fields:
     "runner": "terraform",
     "error": "Command exited with code 1"
 }
+```
+
+### Resource Lifecycle Events (Primary Pattern)
+
+Resource lifecycle events fire based on the **actual outcome** of a Terraform apply
+or destroy. They are declared directly on resource definitions and replace the
+`RUNNER_COMPLETED` pattern.
+
+```yaml
+vm:
+  - name: ontapcl-01
+    cores: 4
+    memory: 16384
+    events:
+      on_create:
+        - type: script
+          name: serial-setup
+          script: scripts/ontap-serial-setup.sh
+          timeout: 600
+      on_update:
+        - type: webhook
+          url: "https://hooks.slack.com/..."
+      on_destroy:
+        - type: script
+          name: cleanup
+          script: scripts/ontap-cleanup.sh
+```
+
+Use `requires` to declare group dependencies:
+
+```yaml
+events:
+  on_create:
+    - type: script
+      name: cluster-init
+      script: scripts/cluster-init.sh
+      requires:
+        - ontap-node1
+        - ontap-node2
 ```
 
 ### Drift Events
@@ -405,4 +457,4 @@ Potential improvements:
 
 ---
 
-**Last Updated:** 2025-12-29
+**Last Updated:** 2026-03-18

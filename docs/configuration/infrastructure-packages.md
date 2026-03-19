@@ -204,6 +204,33 @@ After merging, templates see `ontap_password` as `"real-secret-from-vault"`.
 - Add a `secrets.yaml.example` file with placeholder values for documentation
 - Use `.gitignore` or `.sops.yaml` rules to prevent accidental plaintext commits
 
+## Script Environment Variables
+
+When package event handlers run scripts, the `ScriptHandler` sets the following
+environment variables for the script to consume:
+
+| Variable | Description |
+|:---------|:-----------|
+| `INFRAFOUNDRY_VAR_<KEY>` | Individual package variable (key uppercased, e.g., `INFRAFOUNDRY_VAR_CLUSTER_NAME`) |
+| `INFRAFOUNDRY_PACKAGE_VARS` | JSON dict of all merged package variables (manifest + secrets.yaml) |
+| `INFRAFOUNDRY_ENV` | Environment name |
+| `INFRAFOUNDRY_PROVIDER` | Provider name |
+| `INFRAFOUNDRY_PACKAGE` | Package name |
+| `INFRAFOUNDRY_CONFIG_DIR` | Path to the environment config directory |
+
+Scripts should read configuration from these environment variables rather than
+re-parsing `infrafoundry.yml` or `secrets.yaml` directly:
+
+```bash
+#!/bin/bash
+# Read individual variables
+echo "Cluster: $INFRAFOUNDRY_VAR_CLUSTER_NAME"
+echo "Password available: ${INFRAFOUNDRY_VAR_ONTAP_PASSWORD:+yes}"
+
+# Or parse the full JSON
+echo "$INFRAFOUNDRY_PACKAGE_VARS" | jq '.cluster_name'
+```
+
 ## Package Events
 
 Events declared in the manifest follow the same format as
@@ -415,18 +442,9 @@ variables:
 
 resources:
   - vm.yaml
-
-events:
-  AFTER_APPLY:
-    - type: script
-      script: scripts/cluster-setup.sh
-      timeout: 300
-  BEFORE_DESTROY:
-    - type: script
-      script: scripts/cluster-teardown.sh
 ```
 
-**`vm.yaml`:**
+**`vm.yaml`** (using resource lifecycle events — the recommended pattern):
 ```yaml
 vm:
   - name: {{ cluster_name }}-node1
@@ -434,6 +452,19 @@ vm:
     memory: 16384
     network:
       - bridge: {{ mgmt_network }}
+    events:
+      on_create:
+        - type: script
+          name: cluster-setup
+          script: scripts/cluster-setup.sh
+          timeout: 300
+          requires:
+            - {{ cluster_name }}-node1
+            - {{ cluster_name }}-node2
+      on_destroy:
+        - type: script
+          name: cluster-teardown
+          script: scripts/cluster-teardown.sh
   - name: {{ cluster_name }}-node2
     cores: 4
     memory: 16384

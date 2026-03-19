@@ -224,8 +224,7 @@ After `infra plan`, the generated directory contains:
 ```
 generated/prod/terraform/oci/
 ├── provider.tf          # OCI provider configuration
-├── variables.tf         # Input variables
-├── terraform.tfvars     # Values from settings.yaml
+├── variables.tf         # Input variables (values passed via TF_VAR_* env vars)
 ├── vcn.tf              # VCN, subnet, IGW, route table, security list
 ├── instances.tf        # Compute instances with metadata
 └── outputs.tf          # VCN IDs, subnet IDs, instance IPs

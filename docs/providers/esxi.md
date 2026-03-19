@@ -312,8 +312,7 @@ After `infra plan`, the generated directory contains:
 ```
 generated/prod/terraform/esxi/
 ├── provider.tf          # ESXi provider with per-host aliases
-├── variables.tf         # Per-host credential variables
-├── terraform.tfvars     # Credential values from settings.yaml
+├── variables.tf         # Per-host credential variables (values passed via TF_VAR_* env vars)
 ├── vswitch.tf           # Virtual switch resources
 ├── portgroup.tf         # Port group resources
 ├── vm.tf                # Guest VM resources

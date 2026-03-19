@@ -46,7 +46,7 @@ InfraFoundry automatically loads credentials for the environment you target with
 
 ## Configuration Details
 
-- **Automatic loading:** `infra ... --env <env>` decrypts `envs/{env}/settings.yaml`, extracts `provider_settings`, and exports provider environment variables (e.g., `PROXMOX_API_URL`, `OPNSENSE_API_KEY`).
+- **Automatic loading:** `infra ... --env <env>` decrypts `envs/{env}/settings.yaml`, extracts `provider_settings`, and maps credentials to `TF_VAR_*` environment variables via each provider's `_CREDENTIAL_ENV_MAPPING`. For example, `PROXMOX_API_URL` is mapped to `TF_VAR_proxmox_api_url`. No `.tfvars` files are written to disk.
 - **Recommended structure:**
   ```
   config-repo/
@@ -112,7 +112,7 @@ InfraFoundry automatically loads credentials for the environment you target with
 
 ---
 
-Last updated: 2025-12-23 14:19 GMT
+Last updated: 2026-03-18
 
 
 ---
