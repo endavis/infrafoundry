@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773933317194,
+  "lastUpdate": 1774015232141,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2635,6 +2635,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008653510598811809",
             "extra": "mean: 142.84722177467262 usec\nrounds: 2232"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eccecaaa12a7935a35070cf8c23ab0931b714848",
+          "message": "fix: generate depends_on in kubernetes templates from dependency graph (merges PR #431, addresses #430)\n\nAdd _build_dependency_refs() that translates the provider's type-level\ndependency graph into concrete Terraform depends_on references. Pass\nthese to all 12 templates so resources wait for their dependencies.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-20T13:59:57Z",
+          "tree_id": "b947850951abf52a46d2429754e04f24f38ee3f8",
+          "url": "https://github.com/endavis/infrafoundry/commit/eccecaaa12a7935a35070cf8c23ab0931b714848"
+        },
+        "date": 1774015231508,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7038.392563478468,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009073997136066382",
+            "extra": "mean: 142.07789505645115 usec\nrounds: 2306"
           }
         ]
       }
