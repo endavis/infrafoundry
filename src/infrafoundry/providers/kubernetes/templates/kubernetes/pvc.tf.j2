@@ -75,6 +75,19 @@ resource "kubernetes_persistent_volume_claim" "{{ pvc.name | replace('-', '_') }
   {% if pvc.config.wait_until_bound is defined %}
   wait_until_bound = {{ pvc.config.wait_until_bound | lower }}
   {% endif %}
+
+  {% if dependency_refs or pvc.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if pvc.config.depends_on is defined %}
+    {% for dep in pvc.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}

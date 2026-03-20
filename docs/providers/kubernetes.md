@@ -142,4 +142,20 @@ namespaces → configmaps/secrets/serviceaccounts → deployments → services �
                                                helm_releases → manifests
 ```
 
+The provider automatically generates Terraform `depends_on` blocks for all resource types based on this dependency graph. For example, a `secrets` resource will include `depends_on` referencing the namespace resources it depends on, ensuring Terraform creates namespaces before secrets.
+
 Manifests depend on both namespaces and helm_releases to ensure CRDs are available.
+
+Resources can also declare explicit `depends_on` in their configuration, which are merged with the auto-generated dependencies:
+
+```yaml
+resources:
+  - provider: kubernetes
+    type: deployments
+    name: my-app
+    config:
+      name: my-app
+      namespace: default
+      depends_on:
+        - kubernetes_config_map.extra_config
+```
