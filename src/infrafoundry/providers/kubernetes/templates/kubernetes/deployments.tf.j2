@@ -86,6 +86,19 @@ resource "kubernetes_deployment" "{{ deployment.config.name | replace('-', '_') 
       }
     }
   }
+
+  {% if dependency_refs or deployment.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if deployment.config.depends_on is defined %}
+    {% for dep in deployment.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}

@@ -198,6 +198,19 @@ resource "kubernetes_cron_job_v1" "{{ cronjob.name | replace('-', '_') }}" {
       }
     }
   }
+
+  {% if dependency_refs or cronjob.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if cronjob.config.depends_on is defined %}
+    {% for dep in cronjob.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}

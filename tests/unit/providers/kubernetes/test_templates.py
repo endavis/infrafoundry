@@ -65,7 +65,9 @@ class TestSecretsTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/secrets.tf.j2", {"secrets": secrets})
+        content = provider.render_template(
+            "kubernetes/secrets.tf.j2", {"secrets": secrets, "dependency_refs": []}
+        )
         assert 'resource "kubernetes_secret" "my_secret"' in content
         assert 'type = "Opaque"' in content
         assert '"key" = "dmFsdWU="' in content
@@ -84,7 +86,9 @@ class TestSecretsTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/secrets.tf.j2", {"secrets": secrets})
+        content = provider.render_template(
+            "kubernetes/secrets.tf.j2", {"secrets": secrets, "dependency_refs": []}
+        )
         assert 'type = "kubernetes.io/tls"' in content
 
     def test_renders_secret_with_labels(self, provider):
@@ -101,7 +105,9 @@ class TestSecretsTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/secrets.tf.j2", {"secrets": secrets})
+        content = provider.render_template(
+            "kubernetes/secrets.tf.j2", {"secrets": secrets, "dependency_refs": []}
+        )
         assert '"app" = "myapp"' in content
         assert '"managed-by" = "infrafoundry"' in content
 
@@ -138,7 +144,9 @@ class TestIngressTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/ingress.tf.j2", {"ingresses": ingresses})
+        content = provider.render_template(
+            "kubernetes/ingress.tf.j2", {"ingresses": ingresses, "dependency_refs": []}
+        )
         assert 'resource "kubernetes_ingress_v1" "web_ingress"' in content
         assert 'ingress_class_name = "nginx"' in content
         assert 'host = "example.com"' in content
@@ -168,7 +176,9 @@ class TestIngressTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/ingress.tf.j2", {"ingresses": ingresses})
+        content = provider.render_template(
+            "kubernetes/ingress.tf.j2", {"ingresses": ingresses, "dependency_refs": []}
+        )
         assert "tls {" in content
         assert 'secret_name = "tls-secret"' in content
 
@@ -189,7 +199,9 @@ class TestPVCTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/pvc.tf.j2", {"pvcs": pvcs})
+        content = provider.render_template(
+            "kubernetes/pvc.tf.j2", {"pvcs": pvcs, "dependency_refs": []}
+        )
         assert 'resource "kubernetes_persistent_volume_claim" "data_pvc"' in content
         assert 'storage = "5Gi"' in content
         assert '"ReadWriteOnce"' in content
@@ -207,7 +219,9 @@ class TestPVCTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/pvc.tf.j2", {"pvcs": pvcs})
+        content = provider.render_template(
+            "kubernetes/pvc.tf.j2", {"pvcs": pvcs, "dependency_refs": []}
+        )
         assert 'storage_class_name = "fast-ssd"' in content
 
 
@@ -228,7 +242,9 @@ class TestJobTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/jobs.tf.j2", {"jobs": jobs})
+        content = provider.render_template(
+            "kubernetes/jobs.tf.j2", {"jobs": jobs, "dependency_refs": []}
+        )
         assert 'resource "kubernetes_job" "init_job"' in content
         assert 'restart_policy = "Never"' in content
         assert 'image = "busybox"' in content
@@ -246,7 +262,9 @@ class TestJobTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/jobs.tf.j2", {"jobs": jobs})
+        content = provider.render_template(
+            "kubernetes/jobs.tf.j2", {"jobs": jobs, "dependency_refs": []}
+        )
         assert "backoff_limit = 5" in content
 
 
@@ -266,7 +284,9 @@ class TestCronJobTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/cronjobs.tf.j2", {"cronjobs": cronjobs})
+        content = provider.render_template(
+            "kubernetes/cronjobs.tf.j2", {"cronjobs": cronjobs, "dependency_refs": []}
+        )
         assert 'resource "kubernetes_cron_job_v1" "hourly_task"' in content
         assert 'schedule = "0 * * * *"' in content
 
@@ -284,7 +304,9 @@ class TestCronJobTemplate:
                 },
             )
         ]
-        content = provider.render_template("kubernetes/cronjobs.tf.j2", {"cronjobs": cronjobs})
+        content = provider.render_template(
+            "kubernetes/cronjobs.tf.j2", {"cronjobs": cronjobs, "dependency_refs": []}
+        )
         assert 'concurrency_policy = "Forbid"' in content
 
 
@@ -308,6 +330,11 @@ class TestRBACTemplate:
                 "rolebindings": [],
                 "clusterroles": [],
                 "clusterrolebindings": [],
+                "sa_dependency_refs": [],
+                "role_dependency_refs": [],
+                "rolebinding_dependency_refs": [],
+                "clusterrole_dependency_refs": [],
+                "clusterrolebinding_dependency_refs": [],
             },
         )
         assert 'resource "kubernetes_service_account" "app_sa"' in content
@@ -338,6 +365,11 @@ class TestRBACTemplate:
                 "rolebindings": [],
                 "clusterroles": [],
                 "clusterrolebindings": [],
+                "sa_dependency_refs": [],
+                "role_dependency_refs": [],
+                "rolebinding_dependency_refs": [],
+                "clusterrole_dependency_refs": [],
+                "clusterrolebinding_dependency_refs": [],
             },
         )
         assert 'resource "kubernetes_role" "pod_reader"' in content
@@ -366,6 +398,11 @@ class TestRBACTemplate:
                 ],
                 "clusterroles": [],
                 "clusterrolebindings": [],
+                "sa_dependency_refs": [],
+                "role_dependency_refs": [],
+                "rolebinding_dependency_refs": [],
+                "clusterrole_dependency_refs": [],
+                "clusterrolebinding_dependency_refs": [],
             },
         )
         assert 'resource "kubernetes_role_binding" "read_pods_binding"' in content
@@ -399,6 +436,11 @@ class TestRBACTemplate:
                     )
                 ],
                 "clusterrolebindings": [],
+                "sa_dependency_refs": [],
+                "role_dependency_refs": [],
+                "rolebinding_dependency_refs": [],
+                "clusterrole_dependency_refs": [],
+                "clusterrolebinding_dependency_refs": [],
             },
         )
         assert 'resource "kubernetes_cluster_role" "node_reader"' in content
@@ -423,7 +465,7 @@ class TestHelmReleaseTemplate:
             )
         ]
         content = provider.render_template(
-            "kubernetes/helm_releases.tf.j2", {"helm_releases": releases}
+            "kubernetes/helm_releases.tf.j2", {"helm_releases": releases, "dependency_refs": []}
         )
         assert 'resource "helm_release" "nginx_ingress"' in content
         assert 'chart      = "ingress-nginx"' in content
@@ -447,7 +489,7 @@ class TestHelmReleaseTemplate:
             )
         ]
         content = provider.render_template(
-            "kubernetes/helm_releases.tf.j2", {"helm_releases": releases}
+            "kubernetes/helm_releases.tf.j2", {"helm_releases": releases, "dependency_refs": []}
         )
         assert "create_namespace = true" in content
         assert "values = [<<-EOT" in content
@@ -471,7 +513,7 @@ class TestHelmReleaseTemplate:
             )
         ]
         content = provider.render_template(
-            "kubernetes/helm_releases.tf.j2", {"helm_releases": releases}
+            "kubernetes/helm_releases.tf.j2", {"helm_releases": releases, "dependency_refs": []}
         )
         assert "set {" in content
         assert 'name  = "server.replicaCount"' in content
@@ -504,7 +546,7 @@ class TestManifestsTemplate:
             )
         ]
         content = provider.render_template(
-            "kubernetes/manifests.tf.j2", {"manifests": manifests, "helm_releases": []}
+            "kubernetes/manifests.tf.j2", {"manifests": manifests, "dependency_refs": []}
         )
         assert 'resource "kubernetes_manifest" "my_custom_resource"' in content
         assert '"apiVersion" = "example.com/v1"' in content
@@ -539,7 +581,7 @@ class TestManifestsTemplate:
             )
         ]
         content = provider.render_template(
-            "kubernetes/manifests.tf.j2", {"manifests": manifests, "helm_releases": []}
+            "kubernetes/manifests.tf.j2", {"manifests": manifests, "dependency_refs": []}
         )
         assert 'resource "kubernetes_manifest" "oci_subnet_router"' in content
         assert '"apiVersion" = "tailscale.com/v1alpha1"' in content
@@ -570,7 +612,7 @@ class TestManifestsTemplate:
             )
         ]
         content = provider.render_template(
-            "kubernetes/manifests.tf.j2", {"manifests": manifests, "helm_releases": []}
+            "kubernetes/manifests.tf.j2", {"manifests": manifests, "dependency_refs": []}
         )
         assert '"app" = "myapp"' in content
         assert '"env" = "prod"' in content
@@ -596,14 +638,14 @@ class TestManifestsTemplate:
             )
         ]
         content = provider.render_template(
-            "kubernetes/manifests.tf.j2", {"manifests": manifests, "helm_releases": []}
+            "kubernetes/manifests.tf.j2", {"manifests": manifests, "dependency_refs": []}
         )
         assert '"name"      = "global-config"' in content
         # Should not have namespace line
         assert '"namespace"' not in content
 
     def test_renders_manifest_with_helm_depends_on(self, provider):
-        """Test manifest with automatic depends_on for Helm releases."""
+        """Test manifest with automatic depends_on for Helm releases via dependency_refs."""
         manifests = [
             ResourceConfig(
                 name="my-crd",
@@ -619,20 +661,350 @@ class TestManifestsTemplate:
                 },
             )
         ]
-        helm_releases = [
+        dependency_refs = [
+            "kubernetes_namespace.default",
+            "helm_release.my_operator",
+        ]
+        content = provider.render_template(
+            "kubernetes/manifests.tf.j2",
+            {"manifests": manifests, "dependency_refs": dependency_refs},
+        )
+        assert "depends_on" in content
+        assert "helm_release.my_operator" in content
+        assert "kubernetes_namespace.default" in content
+
+
+class TestDependencyRefs:
+    """Tests for dependency_refs (depends_on) rendering across all templates."""
+
+    def test_secrets_renders_depends_on_with_refs(self, provider):
+        """Test secrets template renders depends_on when dependency_refs present."""
+        secrets = [
             ResourceConfig(
-                name="my-operator",
+                name="my-secret",
+                type="secrets",
+                provider="kubernetes",
+                config={"namespace": "default", "type": "Opaque", "data": {"k": "v"}},
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/secrets.tf.j2",
+            {"secrets": secrets, "dependency_refs": ["kubernetes_namespace.my_ns"]},
+        )
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+
+    def test_secrets_no_depends_on_when_empty(self, provider):
+        """Test secrets template omits depends_on when no refs and no config.depends_on."""
+        secrets = [
+            ResourceConfig(
+                name="my-secret",
+                type="secrets",
+                provider="kubernetes",
+                config={"namespace": "default", "type": "Opaque", "data": {"k": "v"}},
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/secrets.tf.j2",
+            {"secrets": secrets, "dependency_refs": []},
+        )
+        assert "depends_on" not in content
+
+    def test_configmaps_renders_depends_on(self, provider):
+        """Test configmaps template renders depends_on when dependency_refs present."""
+        configmaps = [
+            ResourceConfig(
+                name="my-config",
+                type="configmaps",
+                provider="kubernetes",
+                config={"name": "my-config", "namespace": "default", "data": {"k": "v"}},
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/configmaps.tf.j2",
+            {
+                "configmaps": configmaps,
+                "dependency_refs": ["kubernetes_namespace.my_ns"],
+            },
+        )
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+
+    def test_pvc_renders_depends_on(self, provider):
+        """Test PVC template renders depends_on when dependency_refs present."""
+        pvcs = [
+            ResourceConfig(
+                name="data-pvc",
+                type="persistentvolumeclaims",
+                provider="kubernetes",
+                config={"storage": "5Gi", "access_modes": ["ReadWriteOnce"]},
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/pvc.tf.j2",
+            {"pvcs": pvcs, "dependency_refs": ["kubernetes_namespace.my_ns"]},
+        )
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+
+    def test_deployments_renders_depends_on(self, provider):
+        """Test deployments template renders depends_on when dependency_refs present."""
+        deployments = [
+            ResourceConfig(
+                name="my-app",
+                type="deployments",
+                provider="kubernetes",
+                config={
+                    "name": "my-app",
+                    "containers": [{"name": "app", "image": "nginx:latest"}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/deployments.tf.j2",
+            {
+                "deployments": deployments,
+                "dependency_refs": [
+                    "kubernetes_namespace.my_ns",
+                    "kubernetes_secret.my_secret",
+                ],
+            },
+        )
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+        assert "kubernetes_secret.my_secret" in content
+
+    def test_services_renders_depends_on(self, provider):
+        """Test services template renders depends_on when dependency_refs present."""
+        services = [
+            ResourceConfig(
+                name="my-svc",
+                type="services",
+                provider="kubernetes",
+                config={
+                    "name": "my-svc",
+                    "ports": [{"port": 80, "targetPort": 80}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/services.tf.j2",
+            {
+                "services": services,
+                "dependency_refs": ["kubernetes_deployment.my_app"],
+            },
+        )
+        assert "depends_on" in content
+        assert "kubernetes_deployment.my_app" in content
+
+    def test_ingress_renders_depends_on(self, provider):
+        """Test ingress template renders depends_on when dependency_refs present."""
+        ingresses = [
+            ResourceConfig(
+                name="my-ingress",
+                type="ingresses",
+                provider="kubernetes",
+                config={
+                    "rules": [
+                        {
+                            "host": "example.com",
+                            "paths": [
+                                {
+                                    "path": "/",
+                                    "backend": {
+                                        "service": {
+                                            "name": "svc",
+                                            "port": {"number": 80},
+                                        }
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/ingress.tf.j2",
+            {
+                "ingresses": ingresses,
+                "dependency_refs": ["kubernetes_service.my_svc"],
+            },
+        )
+        assert "depends_on" in content
+        assert "kubernetes_service.my_svc" in content
+
+    def test_jobs_renders_depends_on(self, provider):
+        """Test jobs template renders depends_on when dependency_refs present."""
+        jobs = [
+            ResourceConfig(
+                name="init-job",
+                type="jobs",
+                provider="kubernetes",
+                config={
+                    "containers": [{"name": "init", "image": "busybox"}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/jobs.tf.j2",
+            {"jobs": jobs, "dependency_refs": ["kubernetes_namespace.my_ns"]},
+        )
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+
+    def test_cronjobs_renders_depends_on(self, provider):
+        """Test cronjobs template renders depends_on when dependency_refs present."""
+        cronjobs = [
+            ResourceConfig(
+                name="hourly-task",
+                type="cronjobs",
+                provider="kubernetes",
+                config={
+                    "schedule": "0 * * * *",
+                    "containers": [{"name": "task", "image": "task:latest"}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/cronjobs.tf.j2",
+            {"cronjobs": cronjobs, "dependency_refs": ["kubernetes_namespace.my_ns"]},
+        )
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+
+    def test_helm_releases_renders_automatic_and_manual_depends_on(self, provider):
+        """Test helm_releases merges automatic dependency_refs with config.depends_on."""
+        releases = [
+            ResourceConfig(
+                name="my-chart",
                 type="helm_releases",
                 provider="kubernetes",
                 config={
-                    "chart": "my-operator",
-                    "repository": "https://example.com/charts",
+                    "chart": "my-chart",
+                    "depends_on": ["kubernetes_secret.extra"],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/helm_releases.tf.j2",
+            {
+                "helm_releases": releases,
+                "dependency_refs": ["kubernetes_namespace.my_ns"],
+            },
+        )
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+        assert "kubernetes_secret.extra" in content
+
+    def test_rbac_sa_renders_depends_on(self, provider):
+        """Test RBAC service account renders depends_on with refs."""
+        content = provider.render_template(
+            "kubernetes/rbac.tf.j2",
+            {
+                "serviceaccounts": [
+                    ResourceConfig(
+                        name="app-sa",
+                        type="serviceaccounts",
+                        provider="kubernetes",
+                        config={"namespace": "default"},
+                    )
+                ],
+                "roles": [],
+                "rolebindings": [],
+                "clusterroles": [],
+                "clusterrolebindings": [],
+                "sa_dependency_refs": ["kubernetes_namespace.my_ns"],
+                "role_dependency_refs": [],
+                "rolebinding_dependency_refs": [],
+                "clusterrole_dependency_refs": [],
+                "clusterrolebinding_dependency_refs": [],
+            },
+        )
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+
+    def test_rbac_rolebinding_renders_depends_on(self, provider):
+        """Test RBAC role binding renders depends_on with refs."""
+        content = provider.render_template(
+            "kubernetes/rbac.tf.j2",
+            {
+                "serviceaccounts": [],
+                "roles": [],
+                "rolebindings": [
+                    ResourceConfig(
+                        name="binding",
+                        type="rolebindings",
+                        provider="kubernetes",
+                        config={
+                            "namespace": "default",
+                            "role_ref": {"kind": "Role", "name": "my-role"},
+                            "subjects": [{"kind": "ServiceAccount", "name": "my-sa"}],
+                        },
+                    )
+                ],
+                "clusterroles": [],
+                "clusterrolebindings": [],
+                "sa_dependency_refs": [],
+                "role_dependency_refs": [],
+                "rolebinding_dependency_refs": [
+                    "kubernetes_namespace.my_ns",
+                    "kubernetes_role.my_role",
+                    "kubernetes_service_account.my_sa",
+                ],
+                "clusterrole_dependency_refs": [],
+                "clusterrolebinding_dependency_refs": [],
+            },
+        )
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+        assert "kubernetes_role.my_role" in content
+        assert "kubernetes_service_account.my_sa" in content
+
+    def test_manifest_merges_automatic_and_manual_depends_on(self, provider):
+        """Test manifests template merges dependency_refs with config.depends_on."""
+        manifests = [
+            ResourceConfig(
+                name="my-crd",
+                type="manifests",
+                provider="kubernetes",
+                config={
+                    "manifest": {
+                        "apiVersion": "example.com/v1",
+                        "kind": "Custom",
+                        "metadata": {"name": "my-crd"},
+                        "spec": {},
+                    },
+                    "depends_on": ["kubernetes_secret.extra"],
                 },
             )
         ]
         content = provider.render_template(
             "kubernetes/manifests.tf.j2",
-            {"manifests": manifests, "helm_releases": helm_releases},
+            {
+                "manifests": manifests,
+                "dependency_refs": ["helm_release.my_operator"],
+            },
         )
         assert "depends_on" in content
         assert "helm_release.my_operator" in content
+        assert "kubernetes_secret.extra" in content
+
+    def test_no_depends_on_when_all_empty(self, provider):
+        """Test that no depends_on block is rendered when refs and config are empty."""
+        deployments = [
+            ResourceConfig(
+                name="simple-app",
+                type="deployments",
+                provider="kubernetes",
+                config={
+                    "name": "simple-app",
+                    "containers": [{"name": "app", "image": "nginx"}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/deployments.tf.j2",
+            {"deployments": deployments, "dependency_refs": []},
+        )
+        assert "depends_on" not in content

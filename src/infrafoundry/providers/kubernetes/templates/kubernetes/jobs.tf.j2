@@ -181,6 +181,19 @@ resource "kubernetes_job" "{{ job.name | replace('-', '_') }}" {
   {% if job.config.wait_for_completion is defined %}
   wait_for_completion = {{ job.config.wait_for_completion | lower }}
   {% endif %}
+
+  {% if dependency_refs or job.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if job.config.depends_on is defined %}
+    {% for dep in job.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}

@@ -58,10 +58,50 @@ class KubernetesProvider(
                 result[f"TF_VAR_{tf_var_name}"] = value
         return result
 
+    def _build_dependency_refs(
+        self,
+        resources_by_type: dict[str, list[ResourceConfig]],
+    ) -> dict[str, list[str]]:
+        """Build Terraform resource references from the dependency graph.
+
+        Uses ``get_dependencies()`` and ``get_terraform_resource_types()`` to map
+        each resource type to the concrete Terraform resource references it depends on,
+        based on which dependency types are actually present in ``resources_by_type``.
+
+        Args:
+            resources_by_type: Resources grouped by InfraFoundry type.
+
+        Returns:
+            Mapping of resource type to list of Terraform resource references,
+            e.g. ``{"secrets": ["kubernetes_namespace.my_ns"]}``.
+        """
+        deps = self.get_dependencies()
+        tf_types = self.get_terraform_resource_types()
+        result: dict[str, list[str]] = {}
+
+        for resource_type, dep_types in deps.items():
+            refs: list[str] = []
+            for dep_type in dep_types:
+                # Only add refs for dependency types that actually have resources
+                dep_resources = resources_by_type.get(dep_type, [])
+                if not dep_resources:
+                    continue
+                tf_resource_types = tf_types.get(dep_type, [])
+                for tf_type in tf_resource_types:
+                    for resource in dep_resources:
+                        ref = f"{tf_type}.{resource.name.replace('-', '_')}"
+                        refs.append(ref)
+            result[resource_type] = refs
+
+        return result
+
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Kubernetes resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
+
+        # Build dependency refs once for all templates
+        dep_refs = self._build_dependency_refs(resources_by_type)
 
         # Generate backend configuration if remote backend is configured
         self.render_backend()
@@ -84,42 +124,69 @@ class KubernetesProvider(
             self._generate_namespaces_terraform(resources_by_type["namespaces"])
 
         if "configmaps" in resources_by_type:
-            self._generate_configmaps_terraform(resources_by_type["configmaps"])
+            self._generate_configmaps_terraform(
+                resources_by_type["configmaps"],
+                dep_refs.get("configmaps", []),
+            )
 
         if "secrets" in resources_by_type:
-            self._generate_secrets_terraform(resources_by_type["secrets"])
+            self._generate_secrets_terraform(
+                resources_by_type["secrets"],
+                dep_refs.get("secrets", []),
+            )
 
         if "persistentvolumeclaims" in resources_by_type:
-            self._generate_pvcs_terraform(resources_by_type["persistentvolumeclaims"])
+            self._generate_pvcs_terraform(
+                resources_by_type["persistentvolumeclaims"],
+                dep_refs.get("persistentvolumeclaims", []),
+            )
 
         # RBAC resources
-        self._generate_rbac_terraform(resources_by_type)
+        self._generate_rbac_terraform(resources_by_type, dep_refs)
 
         # Workload resources
         if "deployments" in resources_by_type:
-            self._generate_deployments_terraform(resources_by_type["deployments"])
+            self._generate_deployments_terraform(
+                resources_by_type["deployments"],
+                dep_refs.get("deployments", []),
+            )
 
         if "services" in resources_by_type:
-            self._generate_services_terraform(resources_by_type["services"])
+            self._generate_services_terraform(
+                resources_by_type["services"],
+                dep_refs.get("services", []),
+            )
 
         if "ingresses" in resources_by_type:
-            self._generate_ingresses_terraform(resources_by_type["ingresses"])
+            self._generate_ingresses_terraform(
+                resources_by_type["ingresses"],
+                dep_refs.get("ingresses", []),
+            )
 
         if "jobs" in resources_by_type:
-            self._generate_jobs_terraform(resources_by_type["jobs"])
+            self._generate_jobs_terraform(
+                resources_by_type["jobs"],
+                dep_refs.get("jobs", []),
+            )
 
         if "cronjobs" in resources_by_type:
-            self._generate_cronjobs_terraform(resources_by_type["cronjobs"])
+            self._generate_cronjobs_terraform(
+                resources_by_type["cronjobs"],
+                dep_refs.get("cronjobs", []),
+            )
 
         # Helm releases
         if "helm_releases" in resources_by_type:
-            self._generate_helm_releases_terraform(resources_by_type["helm_releases"])
+            self._generate_helm_releases_terraform(
+                resources_by_type["helm_releases"],
+                dep_refs.get("helm_releases", []),
+            )
 
-        # Custom manifests (CRDs, etc.) - pass helm_releases for depends_on
+        # Custom manifests (CRDs, etc.)
         if "manifests" in resources_by_type:
             self._generate_manifests_terraform(
                 resources_by_type["manifests"],
-                resources_by_type.get("helm_releases", []),
+                dep_refs.get("manifests", []),
             )
 
         # Generate outputs
@@ -141,31 +208,47 @@ class KubernetesProvider(
             output_name="namespaces.tf",
         )
 
-    def _generate_configmaps_terraform(self, configmaps: list[ResourceConfig]) -> None:
+    def _generate_configmaps_terraform(
+        self,
+        configmaps: list[ResourceConfig],
+        dependency_refs: list[str],
+    ) -> None:
         """Generate Terraform for Kubernetes configmaps."""
         self.render_and_write_terraform(
             "kubernetes/configmaps.tf.j2",
-            context={"configmaps": configmaps},
+            context={"configmaps": configmaps, "dependency_refs": dependency_refs},
             output_name="configmaps.tf",
         )
 
-    def _generate_secrets_terraform(self, secrets: list[ResourceConfig]) -> None:
+    def _generate_secrets_terraform(
+        self,
+        secrets: list[ResourceConfig],
+        dependency_refs: list[str],
+    ) -> None:
         """Generate Terraform for Kubernetes secrets."""
         self.render_and_write_terraform(
             "kubernetes/secrets.tf.j2",
-            context={"secrets": secrets},
+            context={"secrets": secrets, "dependency_refs": dependency_refs},
             output_name="secrets.tf",
         )
 
-    def _generate_pvcs_terraform(self, pvcs: list[ResourceConfig]) -> None:
+    def _generate_pvcs_terraform(
+        self,
+        pvcs: list[ResourceConfig],
+        dependency_refs: list[str],
+    ) -> None:
         """Generate Terraform for Kubernetes persistent volume claims."""
         self.render_and_write_terraform(
             "kubernetes/pvc.tf.j2",
-            context={"pvcs": pvcs},
+            context={"pvcs": pvcs, "dependency_refs": dependency_refs},
             output_name="pvc.tf",
         )
 
-    def _generate_rbac_terraform(self, resources_by_type: dict[str, list[ResourceConfig]]) -> None:
+    def _generate_rbac_terraform(
+        self,
+        resources_by_type: dict[str, list[ResourceConfig]],
+        dep_refs: dict[str, list[str]],
+    ) -> None:
         """Generate Terraform for RBAC resources."""
         # Collect all RBAC resource types
         serviceaccounts = resources_by_type.get("serviceaccounts", [])
@@ -184,72 +267,101 @@ class KubernetesProvider(
                     "rolebindings": rolebindings,
                     "clusterroles": clusterroles,
                     "clusterrolebindings": clusterrolebindings,
+                    "sa_dependency_refs": dep_refs.get("serviceaccounts", []),
+                    "role_dependency_refs": dep_refs.get("roles", []),
+                    "rolebinding_dependency_refs": dep_refs.get("rolebindings", []),
+                    "clusterrole_dependency_refs": dep_refs.get("clusterroles", []),
+                    "clusterrolebinding_dependency_refs": dep_refs.get("clusterrolebindings", []),
                 },
                 output_name="rbac.tf",
             )
 
-    def _generate_deployments_terraform(self, deployments: list[ResourceConfig]) -> None:
+    def _generate_deployments_terraform(
+        self,
+        deployments: list[ResourceConfig],
+        dependency_refs: list[str],
+    ) -> None:
         """Generate Terraform for Kubernetes deployments."""
         self.render_and_write_terraform(
             "kubernetes/deployments.tf.j2",
-            context={"deployments": deployments},
+            context={"deployments": deployments, "dependency_refs": dependency_refs},
             output_name="deployments.tf",
         )
 
-    def _generate_services_terraform(self, services: list[ResourceConfig]) -> None:
+    def _generate_services_terraform(
+        self,
+        services: list[ResourceConfig],
+        dependency_refs: list[str],
+    ) -> None:
         """Generate Terraform for Kubernetes services."""
         self.render_and_write_terraform(
             "kubernetes/services.tf.j2",
-            context={"services": services},
+            context={"services": services, "dependency_refs": dependency_refs},
             output_name="services.tf",
         )
 
-    def _generate_ingresses_terraform(self, ingresses: list[ResourceConfig]) -> None:
+    def _generate_ingresses_terraform(
+        self,
+        ingresses: list[ResourceConfig],
+        dependency_refs: list[str],
+    ) -> None:
         """Generate Terraform for Kubernetes ingresses."""
         self.render_and_write_terraform(
             "kubernetes/ingress.tf.j2",
-            context={"ingresses": ingresses},
+            context={"ingresses": ingresses, "dependency_refs": dependency_refs},
             output_name="ingress.tf",
         )
 
-    def _generate_jobs_terraform(self, jobs: list[ResourceConfig]) -> None:
+    def _generate_jobs_terraform(
+        self,
+        jobs: list[ResourceConfig],
+        dependency_refs: list[str],
+    ) -> None:
         """Generate Terraform for Kubernetes jobs."""
         self.render_and_write_terraform(
             "kubernetes/jobs.tf.j2",
-            context={"jobs": jobs},
+            context={"jobs": jobs, "dependency_refs": dependency_refs},
             output_name="jobs.tf",
         )
 
-    def _generate_cronjobs_terraform(self, cronjobs: list[ResourceConfig]) -> None:
+    def _generate_cronjobs_terraform(
+        self,
+        cronjobs: list[ResourceConfig],
+        dependency_refs: list[str],
+    ) -> None:
         """Generate Terraform for Kubernetes cron jobs."""
         self.render_and_write_terraform(
             "kubernetes/cronjobs.tf.j2",
-            context={"cronjobs": cronjobs},
+            context={"cronjobs": cronjobs, "dependency_refs": dependency_refs},
             output_name="cronjobs.tf",
         )
 
-    def _generate_helm_releases_terraform(self, helm_releases: list[ResourceConfig]) -> None:
+    def _generate_helm_releases_terraform(
+        self,
+        helm_releases: list[ResourceConfig],
+        dependency_refs: list[str],
+    ) -> None:
         """Generate Terraform for Helm releases."""
         self.render_and_write_terraform(
             "kubernetes/helm_releases.tf.j2",
-            context={"helm_releases": helm_releases},
+            context={"helm_releases": helm_releases, "dependency_refs": dependency_refs},
             output_name="helm_releases.tf",
         )
 
     def _generate_manifests_terraform(
         self,
         manifests: list[ResourceConfig],
-        helm_releases: list[ResourceConfig],
+        dependency_refs: list[str],
     ) -> None:
         """Generate Terraform for custom Kubernetes manifests (CRDs, etc.).
 
         Args:
-            manifests: List of manifest resources to generate
-            helm_releases: List of helm releases to add as dependencies (for CRDs)
+            manifests: List of manifest resources to generate.
+            dependency_refs: Terraform resource references for automatic depends_on.
         """
         self.render_and_write_terraform(
             "kubernetes/manifests.tf.j2",
-            context={"manifests": manifests, "helm_releases": helm_releases},
+            context={"manifests": manifests, "dependency_refs": dependency_refs},
             output_name="manifests.tf",
         )
 

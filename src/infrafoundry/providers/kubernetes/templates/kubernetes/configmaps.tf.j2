@@ -12,6 +12,19 @@ resource "kubernetes_config_map" "{{ configmap.config.name | replace('-', '_') }
     EOT
     {% endfor %}
   }
+
+  {% if dependency_refs or configmap.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if configmap.config.depends_on is defined %}
+    {% for dep in configmap.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}

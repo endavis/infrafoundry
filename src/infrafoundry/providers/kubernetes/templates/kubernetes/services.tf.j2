@@ -36,6 +36,19 @@ resource "kubernetes_service" "{{ service.config.name | replace('-', '_') }}" {
     }
     {% endfor %}
   }
+
+  {% if dependency_refs or service.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if service.config.depends_on is defined %}
+    {% for dep in service.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}

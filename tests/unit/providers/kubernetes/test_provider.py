@@ -457,3 +457,282 @@ def test_generate_terraform_manifest(provider, tmp_dirs):
     assert "oci_subnet_router" in content
     assert "tailscale.com/v1alpha1" in content
     assert "Connector" in content
+
+
+class TestBuildDependencyRefs:
+    """Tests for _build_dependency_refs() method."""
+
+    def test_builds_refs_for_present_dependencies(self, provider):
+        """Test that refs are built only for dependency types that have resources."""
+        resources_by_type = {
+            "namespaces": [
+                ResourceConfig(name="my-ns", type="namespaces", provider="kubernetes", config={})
+            ],
+            "secrets": [
+                ResourceConfig(
+                    name="my-secret",
+                    type="secrets",
+                    provider="kubernetes",
+                    config={"namespace": "my-ns", "data": {"k": "v"}},
+                )
+            ],
+        }
+        refs = provider._build_dependency_refs(resources_by_type)
+
+        # secrets depends on namespaces, and namespaces are present
+        assert "kubernetes_namespace.my_ns" in refs["secrets"]
+        # namespaces have no dependencies
+        assert refs["namespaces"] == []
+
+    def test_empty_refs_for_missing_dependencies(self, provider):
+        """Test that refs are empty when dependency types have no resources."""
+        resources_by_type = {
+            "secrets": [
+                ResourceConfig(
+                    name="my-secret",
+                    type="secrets",
+                    provider="kubernetes",
+                    config={"namespace": "default", "data": {"k": "v"}},
+                )
+            ],
+        }
+        refs = provider._build_dependency_refs(resources_by_type)
+
+        # secrets depends on namespaces, but no namespaces in resources_by_type
+        assert refs["secrets"] == []
+
+    def test_builds_multiple_refs(self, provider):
+        """Test that multiple resources of a dependency type produce multiple refs."""
+        resources_by_type = {
+            "namespaces": [
+                ResourceConfig(name="ns-a", type="namespaces", provider="kubernetes", config={}),
+                ResourceConfig(name="ns-b", type="namespaces", provider="kubernetes", config={}),
+            ],
+            "configmaps": [
+                ResourceConfig(
+                    name="cm-1",
+                    type="configmaps",
+                    provider="kubernetes",
+                    config={"name": "cm-1", "data": {"k": "v"}},
+                )
+            ],
+        }
+        refs = provider._build_dependency_refs(resources_by_type)
+
+        assert "kubernetes_namespace.ns_a" in refs["configmaps"]
+        assert "kubernetes_namespace.ns_b" in refs["configmaps"]
+        assert len(refs["configmaps"]) == 2
+
+    def test_complex_dependency_chain(self, provider):
+        """Test refs for types with multiple dependency types (e.g. deployments)."""
+        resources_by_type = {
+            "namespaces": [
+                ResourceConfig(name="my-ns", type="namespaces", provider="kubernetes", config={})
+            ],
+            "secrets": [
+                ResourceConfig(
+                    name="db-creds",
+                    type="secrets",
+                    provider="kubernetes",
+                    config={"data": {"pw": "x"}},
+                )
+            ],
+            "configmaps": [
+                ResourceConfig(
+                    name="app-config",
+                    type="configmaps",
+                    provider="kubernetes",
+                    config={"name": "app-config", "data": {"k": "v"}},
+                )
+            ],
+            "deployments": [
+                ResourceConfig(
+                    name="my-app",
+                    type="deployments",
+                    provider="kubernetes",
+                    config={
+                        "name": "my-app",
+                        "containers": [{"name": "app", "image": "nginx"}],
+                    },
+                )
+            ],
+        }
+        refs = provider._build_dependency_refs(resources_by_type)
+
+        deployment_refs = refs["deployments"]
+        assert "kubernetes_namespace.my_ns" in deployment_refs
+        assert "kubernetes_secret.db_creds" in deployment_refs
+        assert "kubernetes_config_map.app_config" in deployment_refs
+
+    def test_manifests_get_helm_refs(self, provider):
+        """Test that manifests get dependency refs for helm_releases."""
+        resources_by_type = {
+            "namespaces": [
+                ResourceConfig(name="my-ns", type="namespaces", provider="kubernetes", config={})
+            ],
+            "helm_releases": [
+                ResourceConfig(
+                    name="cert-manager",
+                    type="helm_releases",
+                    provider="kubernetes",
+                    config={"chart": "cert-manager"},
+                )
+            ],
+            "manifests": [
+                ResourceConfig(
+                    name="issuer",
+                    type="manifests",
+                    provider="kubernetes",
+                    config={
+                        "manifest": {
+                            "apiVersion": "cert-manager.io/v1",
+                            "kind": "Issuer",
+                            "metadata": {"name": "issuer"},
+                        }
+                    },
+                )
+            ],
+        }
+        refs = provider._build_dependency_refs(resources_by_type)
+
+        manifest_refs = refs["manifests"]
+        assert "kubernetes_namespace.my_ns" in manifest_refs
+        assert "helm_release.cert_manager" in manifest_refs
+
+    def test_all_types_have_entries(self, provider):
+        """Test that all resource types from get_dependencies() appear in result."""
+        resources_by_type = {}
+        refs = provider._build_dependency_refs(resources_by_type)
+        deps = provider.get_dependencies()
+        for resource_type in deps:
+            assert resource_type in refs
+
+
+class TestGenerateTerraformDependsOn:
+    """Integration tests for depends_on in generated Terraform files."""
+
+    def test_secrets_have_depends_on_with_namespaces(self, provider, tmp_dirs):
+        """Test that generated secrets.tf has depends_on for namespaces."""
+        _config_dir, output_dir = tmp_dirs
+        provider.set_environment("test")
+
+        resources = [
+            ResourceConfig(
+                name="my-ns",
+                type="namespaces",
+                provider="kubernetes",
+                config={},
+            ),
+            ResourceConfig(
+                name="my-secret",
+                type="secrets",
+                provider="kubernetes",
+                config={
+                    "namespace": "my-ns",
+                    "type": "Opaque",
+                    "data": {"key": "val"},
+                },
+            ),
+        ]
+
+        provider.generate_terraform(resources)
+
+        terraform_dir = output_dir / "test" / "terraform" / "kubernetes"
+        content = (terraform_dir / "secrets.tf").read_text()
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+
+    def test_no_depends_on_when_no_dependencies_present(self, provider, tmp_dirs):
+        """Test that secrets.tf has no depends_on when no namespaces exist."""
+        _config_dir, output_dir = tmp_dirs
+        provider.set_environment("test")
+
+        resources = [
+            ResourceConfig(
+                name="my-secret",
+                type="secrets",
+                provider="kubernetes",
+                config={
+                    "namespace": "default",
+                    "type": "Opaque",
+                    "data": {"key": "val"},
+                },
+            ),
+        ]
+
+        provider.generate_terraform(resources)
+
+        terraform_dir = output_dir / "test" / "terraform" / "kubernetes"
+        content = (terraform_dir / "secrets.tf").read_text()
+        assert "depends_on" not in content
+
+    def test_helm_releases_have_depends_on_with_namespaces(self, provider, tmp_dirs):
+        """Test that generated helm_releases.tf has depends_on for namespaces."""
+        _config_dir, output_dir = tmp_dirs
+        provider.set_environment("test")
+
+        resources = [
+            ResourceConfig(
+                name="my-ns",
+                type="namespaces",
+                provider="kubernetes",
+                config={},
+            ),
+            ResourceConfig(
+                name="nginx",
+                type="helm_releases",
+                provider="kubernetes",
+                config={
+                    "chart": "ingress-nginx",
+                    "namespace": "my-ns",
+                },
+            ),
+        ]
+
+        provider.generate_terraform(resources)
+
+        terraform_dir = output_dir / "test" / "terraform" / "kubernetes"
+        content = (terraform_dir / "helm_releases.tf").read_text()
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+
+    def test_manifests_have_depends_on_with_namespaces_and_helm(self, provider, tmp_dirs):
+        """Test that manifests.tf has depends_on for namespaces and helm releases."""
+        _config_dir, output_dir = tmp_dirs
+        provider.set_environment("test")
+
+        resources = [
+            ResourceConfig(
+                name="my-ns",
+                type="namespaces",
+                provider="kubernetes",
+                config={},
+            ),
+            ResourceConfig(
+                name="my-operator",
+                type="helm_releases",
+                provider="kubernetes",
+                config={"chart": "my-operator"},
+            ),
+            ResourceConfig(
+                name="my-crd",
+                type="manifests",
+                provider="kubernetes",
+                config={
+                    "manifest": {
+                        "apiVersion": "example.com/v1",
+                        "kind": "Custom",
+                        "metadata": {"name": "my-crd"},
+                        "spec": {},
+                    },
+                },
+            ),
+        ]
+
+        provider.generate_terraform(resources)
+
+        terraform_dir = output_dir / "test" / "terraform" / "kubernetes"
+        content = (terraform_dir / "manifests.tf").read_text()
+        assert "depends_on" in content
+        assert "kubernetes_namespace.my_ns" in content
+        assert "helm_release.my_operator" in content

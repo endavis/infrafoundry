@@ -33,6 +33,19 @@ resource "kubernetes_service_account" "{{ sa.name | replace('-', '_') }}" {
   {% if sa.config.automount_service_account_token is defined %}
   automount_service_account_token = {{ sa.config.automount_service_account_token | lower }}
   {% endif %}
+
+  {% if sa_dependency_refs or sa.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in sa_dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if sa.config.depends_on is defined %}
+    {% for dep in sa.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}
@@ -71,6 +84,19 @@ resource "kubernetes_role" "{{ role.name | replace('-', '_') }}" {
     {% endif %}
   }
   {% endfor %}
+
+  {% if role_dependency_refs or role.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in role_dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if role.config.depends_on is defined %}
+    {% for dep in role.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}
@@ -117,6 +143,19 @@ resource "kubernetes_role_binding" "{{ rb.name | replace('-', '_') }}" {
     {% endif %}
   }
   {% endfor %}
+
+  {% if rolebinding_dependency_refs or rb.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in rolebinding_dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if rb.config.depends_on is defined %}
+    {% for dep in rb.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}
@@ -171,6 +210,19 @@ resource "kubernetes_cluster_role" "{{ cr.name | replace('-', '_') }}" {
     {% endfor %}
   }
   {% endif %}
+
+  {% if clusterrole_dependency_refs or cr.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in clusterrole_dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if cr.config.depends_on is defined %}
+    {% for dep in cr.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}
@@ -216,6 +268,19 @@ resource "kubernetes_cluster_role_binding" "{{ crb.name | replace('-', '_') }}" 
     {% endif %}
   }
   {% endfor %}
+
+  {% if clusterrolebinding_dependency_refs or crb.config.depends_on is defined %}
+  depends_on = [
+    {% for ref in clusterrolebinding_dependency_refs %}
+    {{ ref }},
+    {% endfor %}
+    {% if crb.config.depends_on is defined %}
+    {% for dep in crb.config.depends_on %}
+    {{ dep }},
+    {% endfor %}
+    {% endif %}
+  ]
+  {% endif %}
 }
 
 {% endfor %}
