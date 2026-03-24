@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774015232141,
+  "lastUpdate": 1774347443451,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2666,6 +2666,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009073997136066382",
             "extra": "mean: 142.07789505645115 usec\nrounds: 2306"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9502049def328908b247e4e9fa76687624966b4e",
+          "message": "fix: filter package events by --package flag (merges PR #438, addresses #427)\n\nfix: filter package events by --package flag to prevent unrelated handlers from firing\n\nTag handler configs with _package metadata during loading, add\nmatches_package() to BaseHandler, and thread package_filter through\nCLI → orchestrator → workflows → deployment executor → event bus.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T10:16:51Z",
+          "tree_id": "95058fd7b8b5192661cff6cc5782b397e8308499",
+          "url": "https://github.com/endavis/infrafoundry/commit/9502049def328908b247e4e9fa76687624966b4e"
+        },
+        "date": 1774347443002,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7002.057739483188,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008707544615213256",
+            "extra": "mean: 142.81516051505864 usec\nrounds: 2330"
           }
         ]
       }
