@@ -641,10 +641,12 @@ class DeploymentExecutor:
             )
 
             # Register and fire handlers for this resource event.
-            # Tag each handler with _resource_owner so it only fires for
-            # this specific resource, not for any resource with the same name.
+            # Tag each handler with a provider-qualified _resource_owner so it
+            # only fires for this specific resource, not for any resource with
+            # the same name from a different provider.
+            qualified_owner = f"{provider_name}:{outcome.resource_name}"
             for handler_config in handlers:
-                tagged_config = {**handler_config, "_resource_owner": outcome.resource_name}
+                tagged_config = {**handler_config, "_resource_owner": qualified_owner}
                 try:
                     self.event_manager.register_handler(
                         EventType.RESOURCE_CREATED
@@ -664,8 +666,9 @@ class DeploymentExecutor:
                     continue
 
             # Emit per-resource event for resource-level handlers.
-            # Pass only the single resource name as target so that group
-            # handlers with ``requires`` don't match individual emissions.
+            # Include both qualified (provider:name) and unqualified name in
+            # target_resources so _resource_owner matching uses the qualified
+            # form while requires/resources filters still work with plain names.
             event_type = (
                 EventType.RESOURCE_CREATED
                 if outcome.action == "create"
@@ -684,7 +687,7 @@ class DeploymentExecutor:
                 },
                 provider=provider_name,
                 resource=outcome.resource_name,
-                target_resources=[outcome.resource_name],
+                target_resources=[qualified_owner, outcome.resource_name],
                 package_variables=resource.package_variables or {},
                 package_filter=package_filter,
             )
