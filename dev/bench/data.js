@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774361924964,
+  "lastUpdate": 1774364837190,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2759,6 +2759,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008667653245876827",
             "extra": "mean: 141.76930682421857 usec\nrounds: 2301"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "532b96dd869effa4803bf5efc0d518276cce6681",
+          "message": "fix: use provider-qualified resource owner to prevent cross-provider event firing (merges PR #444, addresses #442)\n\nQualify _resource_owner with provider name (e.g., \"proxmox:aiqum\") so\nresource-level events don't fire when a different provider creates a\nresource with the same name (e.g., \"opnsense:aiqum\").\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T15:06:40Z",
+          "tree_id": "5161115f07a12fb9a35b87ec7c6ad3de12ec6c9d",
+          "url": "https://github.com/endavis/infrafoundry/commit/532b96dd869effa4803bf5efc0d518276cce6681"
+        },
+        "date": 1774364836541,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9666.248068029025,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000003673260218444878",
+            "extra": "mean: 103.45275570854483 usec\nrounds: 2759"
           }
         ]
       }
