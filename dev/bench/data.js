@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774353991897,
+  "lastUpdate": 1774361924964,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2728,6 +2728,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008421655060473077",
             "extra": "mean: 140.78703795863626 usec\nrounds: 2371"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1a5a7935641df1bb3ad9be5334960a6d1269efcc",
+          "message": "fix: scope resource-level event handlers to their owning resource (merges PR #443, addresses #442)\n\nTag resource-level handler configs with _resource_owner during registration\nso they only fire when their specific resource is created, not any resource\nsharing the same name from a different provider.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T14:18:13Z",
+          "tree_id": "b7629bfedbd85816097025d74152b004b3157af1",
+          "url": "https://github.com/endavis/infrafoundry/commit/1a5a7935641df1bb3ad9be5334960a6d1269efcc"
+        },
+        "date": 1774361924436,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7053.712982034339,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008667653245876827",
+            "extra": "mean: 141.76930682421857 usec\nrounds: 2301"
           }
         ]
       }
