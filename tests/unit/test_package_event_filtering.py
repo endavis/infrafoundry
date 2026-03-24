@@ -1,7 +1,11 @@
-"""Tests for package-level event filtering (#427).
+"""Tests for package-level and resource-owner event filtering (#427, #442).
 
 When --package is specified, only event handlers from that package should fire.
 Handlers from other packages should be skipped.
+
+When _resource_owner is set on a handler, it should only fire when that
+specific resource is in the target_resources list, preventing cross-provider
+false positives for resources with the same name.
 """
 
 from pathlib import Path
@@ -192,6 +196,142 @@ class TestEventBusPackageFiltering:
         assert len(results) == 0
 
 
+# --- BaseHandler.matches_resources() with _resource_owner (#442) ---
+
+
+class TestResourceOwnerScoping:
+    """Tests for _resource_owner scoping in BaseHandler.matches_resources()."""
+
+    def test_no_owner_no_targets_returns_true(self) -> None:
+        """Handler without _resource_owner fires when no target filter."""
+        handler = _make_handler_with_owner(resource_owner=None)
+        assert handler.matches_resources(None) is True
+
+    def test_no_owner_with_targets_returns_true(self) -> None:
+        """Handler without _resource_owner defers to existing logic."""
+        handler = _make_handler_with_owner(resource_owner=None)
+        # No resources/requires config, so returns True for any targets
+        assert handler.matches_resources(["web-server"]) is True
+
+    def test_owner_matches_target(self) -> None:
+        """Handler fires when its _resource_owner is in target_resources."""
+        handler = _make_handler_with_owner(resource_owner="web-server")
+        assert handler.matches_resources(["web-server", "db-server"]) is True
+
+    def test_owner_does_not_match_target(self) -> None:
+        """Handler is skipped when _resource_owner is not in target_resources."""
+        handler = _make_handler_with_owner(resource_owner="web-server")
+        assert handler.matches_resources(["db-server"]) is False
+
+    def test_owner_with_no_target_filter(self) -> None:
+        """Handler fires when target_resources is None (no -r flag)."""
+        handler = _make_handler_with_owner(resource_owner="web-server")
+        assert handler.matches_resources(None) is True
+
+    def test_same_name_different_owner_blocked(self) -> None:
+        """Two handlers with different _resource_owner values are scoped correctly.
+
+        This is the core bug from #442: a DHCP reservation handler with
+        _resource_owner="web-server" should NOT fire when the target is
+        a VM also named "web-server" from a different provider.
+        """
+        vm_handler = _make_handler_with_owner(resource_owner="web-server")
+        dhcp_handler = _make_handler_with_owner(resource_owner="web-server-dhcp")
+
+        # When VM "web-server" is the target, only vm_handler fires
+        assert vm_handler.matches_resources(["web-server"]) is True
+        assert dhcp_handler.matches_resources(["web-server"]) is False
+
+    def test_owner_with_resources_config_still_checks_owner_first(self) -> None:
+        """_resource_owner check takes precedence over resources config."""
+        handler = _make_handler_with_owner(
+            resource_owner="web-server",
+            resources=["web-server", "db-server"],
+        )
+        # Owner is "web-server" but target only has "db-server" — blocked
+        assert handler.matches_resources(["db-server"]) is False
+
+
+class TestEventBusResourceOwnerFiltering:
+    """Integration tests for _resource_owner filtering in UnifiedEventBus.emit()."""
+
+    def test_owner_scoped_handler_skipped_for_other_resource(self) -> None:
+        """Handler with _resource_owner is skipped when target doesn't match."""
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "_resource_owner": "web-server",
+            },
+        )
+
+        ctx = EventContext(
+            event_type=EventType.RESOURCE_CREATED,
+            environment="prod",
+            target_resources=["db-server"],
+        )
+        results = bus.emit(ctx, abort_on_failure=False)
+        assert len(results) == 0
+
+    def test_owner_scoped_handler_fires_for_matching_resource(self) -> None:
+        """Handler with _resource_owner fires when target matches."""
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "_resource_owner": "web-server",
+            },
+        )
+
+        ctx = EventContext(
+            event_type=EventType.RESOURCE_CREATED,
+            environment="prod",
+            target_resources=["web-server"],
+        )
+        results = bus.emit(ctx, abort_on_failure=False)
+        assert len(results) == 1
+
+    def test_mixed_owner_and_unowned_handlers(self) -> None:
+        """Unowned handlers fire for any target; owned handlers are scoped."""
+        bus = UnifiedEventBus()
+        # Owned handler — only fires for "web-server"
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "_resource_owner": "web-server",
+                "name": "vm-setup",
+            },
+        )
+        # Unowned handler — fires for anything
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "name": "global-notify",
+            },
+        )
+
+        # Target is "db-server" — only unowned handler fires
+        ctx = EventContext(
+            event_type=EventType.RESOURCE_CREATED,
+            environment="prod",
+            target_resources=["db-server"],
+        )
+        results = bus.emit(ctx, abort_on_failure=False)
+        assert len(results) == 1
+
+
 # --- Helpers ---
 
 
@@ -208,6 +348,22 @@ class _StubHandler(BaseHandler):
 def _make_handler(package: str | None) -> _StubHandler:
     """Create a handler with the given _package value."""
     config: dict[str, Any] = {"name": "test-handler"}
+    if package is not None:
+        config["_package"] = package
+    return _StubHandler(config)
+
+
+def _make_handler_with_owner(
+    resource_owner: str | None,
+    resources: list[str] | None = None,
+    package: str | None = None,
+) -> _StubHandler:
+    """Create a handler with optional _resource_owner and resources config."""
+    config: dict[str, Any] = {"name": "test-handler"}
+    if resource_owner is not None:
+        config["_resource_owner"] = resource_owner
+    if resources is not None:
+        config["resources"] = resources
     if package is not None:
         config["_package"] = package
     return _StubHandler(config)

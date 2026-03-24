@@ -640,8 +640,11 @@ class DeploymentExecutor:
                 outcome.action,
             )
 
-            # Register and fire handlers for this resource event
+            # Register and fire handlers for this resource event.
+            # Tag each handler with _resource_owner so it only fires for
+            # this specific resource, not for any resource with the same name.
             for handler_config in handlers:
+                tagged_config = {**handler_config, "_resource_owner": outcome.resource_name}
                 try:
                     self.event_manager.register_handler(
                         EventType.RESOURCE_CREATED
@@ -649,7 +652,7 @@ class DeploymentExecutor:
                         else EventType.RESOURCE_UPDATED
                         if outcome.action == "update"
                         else EventType.RESOURCE_DELETED,
-                        handler_config,
+                        tagged_config,
                     )
                 except ValueError as e:
                     logger.error(
