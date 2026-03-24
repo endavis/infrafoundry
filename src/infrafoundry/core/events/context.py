@@ -42,6 +42,7 @@ class EventContext:
     target_resources: list[str] | None = None
     previous_results: list["EventResult"] = field(default_factory=list)
     package_variables: dict[str, Any] = field(default_factory=dict)
+    package_filter: str | None = None
 
     def __repr__(self) -> str:
         parts = [f"EventContext({self.event_type.value}, env={self.environment}"]

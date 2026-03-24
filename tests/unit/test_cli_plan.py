@@ -35,6 +35,7 @@ def test_plan_basic(cli_runner, mock_orchestrator):
             dry_run=False,
             resource_filter=None,
             enforce_policies=False,
+            package_filter=None,
         )
 
 
@@ -50,6 +51,7 @@ def test_plan_with_dry_run(cli_runner, mock_orchestrator):
             dry_run=True,
             resource_filter=None,
             enforce_policies=False,
+            package_filter=None,
         )
 
 
@@ -67,6 +69,7 @@ def test_plan_with_resource_filter(cli_runner, mock_orchestrator):
             dry_run=False,
             resource_filter=["vm-01", "vm-02"],
             enforce_policies=False,
+            package_filter=None,
         )
 
 
@@ -84,6 +87,7 @@ def test_plan_with_enforce_policies(cli_runner, mock_orchestrator):
             dry_run=False,
             resource_filter=None,
             enforce_policies=True,
+            package_filter=None,
         )
 
 
