@@ -141,6 +141,7 @@ class DeploymentExecutor:
         resources_by_provider: dict[str, list[ResourceConfig]],
         resource_filter: list[str] | None,
         auto_approve: bool,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Apply providers sequentially.
 
@@ -150,6 +151,7 @@ class DeploymentExecutor:
             resources_by_provider: Dict mapping provider names to resources
             resource_filter: Optional list of resource names to target
             auto_approve: If True, skip confirmation prompts
+            package_filter: Optional package name to restrict event handlers
 
         Returns:
             Dict with apply results per provider
@@ -196,6 +198,7 @@ class DeploymentExecutor:
                 resources=resources,
                 auto_approve=auto_approve,
                 resource_filter=resource_filter,
+                package_filter=package_filter,
             )
             results[provider_name] = result
 
@@ -231,6 +234,7 @@ class DeploymentExecutor:
                 {"action": "create", "resources": all_created},
                 target_resources=all_created,
                 package_variables=merged_pkg_vars,
+                package_filter=package_filter,
             )
 
         return results
@@ -243,6 +247,7 @@ class DeploymentExecutor:
         resource_filter: list[str] | None,
         auto_approve: bool,
         max_workers: int,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Apply providers in parallel, respecting provider execution order.
 
@@ -257,6 +262,7 @@ class DeploymentExecutor:
             resource_filter: Optional list of resource names to target
             auto_approve: If True, skip confirmation prompts
             max_workers: Maximum number of parallel workers
+            package_filter: Optional package name to restrict event handlers
 
         Returns:
             Dict with apply results per provider
@@ -324,6 +330,7 @@ class DeploymentExecutor:
                         resources=resources,
                         auto_approve=auto_approve,
                         resource_filter=resource_filter,
+                        package_filter=package_filter,
                     )
                     future_to_provider[future] = provider_name
 
@@ -365,6 +372,7 @@ class DeploymentExecutor:
         resources: list[ResourceConfig],
         auto_approve: bool,
         resource_filter: list[str] | None = None,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Apply a single provider's resources.
 
@@ -385,6 +393,7 @@ class DeploymentExecutor:
             resources: List of resources to apply
             auto_approve: If True, skip confirmation prompts
             resource_filter: Optional list of resource names to target with -target
+            package_filter: Optional package name to restrict event handlers
 
         Returns:
             Dict with apply results including terraform outcomes
@@ -412,6 +421,7 @@ class DeploymentExecutor:
                 env_name,
                 creating_event,
                 target_resources=resource_filter,
+                package_filter=package_filter,
             )
 
         runner_results: dict[str, Any] = {}
@@ -447,6 +457,7 @@ class DeploymentExecutor:
                 provider=provider_name,
                 runner=tool_name,
                 target_resources=resource_filter,
+                package_filter=package_filter,
             )
 
             try:
@@ -481,6 +492,7 @@ class DeploymentExecutor:
                     provider=provider_name,
                     runner=tool_name,
                     target_resources=resource_filter,
+                    package_filter=package_filter,
                 )
             except Exception as exc:
                 failed_event: RunnerEventData = {
@@ -496,6 +508,7 @@ class DeploymentExecutor:
                     provider=provider_name,
                     runner=tool_name,
                     target_resources=resource_filter,
+                    package_filter=package_filter,
                 )
                 raise
 
@@ -529,11 +542,18 @@ class DeploymentExecutor:
                     env_name,
                     created_event,
                     target_resources=[resource.name],
+                    package_filter=package_filter,
                 )
 
         # Fire resource lifecycle events based on IaC outcomes
         self._fire_resource_lifecycle_events(
-            env_name, provider_name, provider, resources, all_outcomes, resource_filter
+            env_name,
+            provider_name,
+            provider,
+            resources,
+            all_outcomes,
+            resource_filter,
+            package_filter,
         )
 
         # Replace ResourceOutcome objects with JSON-safe dicts for audit logging
@@ -553,6 +573,7 @@ class DeploymentExecutor:
         resources: list[ResourceConfig],
         outcomes: list[ResourceOutcome],
         resource_filter: list[str] | None,
+        package_filter: str | None = None,
     ) -> None:
         """Fire resource lifecycle events based on terraform outcomes.
 
@@ -569,6 +590,7 @@ class DeploymentExecutor:
             resources: List of resource configurations
             outcomes: List of terraform resource outcomes
             resource_filter: Optional resource name filter
+            package_filter: Optional package name to restrict event handlers
         """
         if not outcomes:
             return
@@ -661,6 +683,7 @@ class DeploymentExecutor:
                 resource=outcome.resource_name,
                 target_resources=[outcome.resource_name],
                 package_variables=resource.package_variables or {},
+                package_filter=package_filter,
             )
 
         # NOTE: Aggregate events for group handlers (requires: [...]) are NOT

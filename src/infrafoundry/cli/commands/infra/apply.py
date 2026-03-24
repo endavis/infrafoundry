@@ -81,5 +81,6 @@ def apply(
             resource_filter=resource_filter,
             parallel=parallel,
             max_workers=max_workers,
+            package_filter=package_name,
         )
     console.success(f"Apply complete! ({timer.elapsed_str})")

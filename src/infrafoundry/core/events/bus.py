@@ -239,6 +239,12 @@ class UnifiedEventBus(BaseManager):
 
         # Execute registered handlers
         for handler in self._handlers[event_type]:
+            if not handler.matches_package(context.package_filter):
+                self._log_debug(
+                    f"Skipping handler {handler.name}: "
+                    f"no package match for {context.package_filter}"
+                )
+                continue
             if not handler.matches_resources(context.target_resources):
                 self._log_debug(
                     f"Skipping handler {handler.name}: "

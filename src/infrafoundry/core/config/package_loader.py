@@ -184,6 +184,11 @@ class PackageLoader:
         env_dir = self.base_dir / env_name
         events = self._rewrite_event_scripts(manifest.events, package_dir, env_dir)
 
+        # Tag each handler config with its originating package name
+        for _event_key, handler_list in events.items():
+            for handler_config in handler_list:
+                handler_config["_package"] = manifest.name
+
         # Rewrite resource-level event script paths
         for resource in resources:
             if resource.events:
