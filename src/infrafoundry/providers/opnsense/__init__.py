@@ -165,6 +165,134 @@ class OPNsenseProvider(
             output_name="unbound_host_override.tf",
         )
 
+    @staticmethod
+    def _extract_subnet_fields(api_response: dict[str, Any]) -> dict[str, str]:
+        """Extract and normalize subnet fields from an OPNsense GET response.
+
+        The OPNsense API returns GET responses wrapped under a resource key
+        (e.g., ``{"subnet6": {"subnet": "...", "interface": {...}, ...}}``).
+        Select fields like ``interface`` may be returned as dicts with
+        ``selected`` indicators rather than plain strings.  This method
+        normalizes those values so they can be compared with the flat
+        strings we send in update requests.
+
+        Args:
+            api_response: Raw response from ``get_dhcp6_subnet(uuid)``
+
+        Returns:
+            Flat dictionary of normalized field values (all strings)
+        """
+        data = api_response.get("subnet6", {})
+        result: dict[str, str] = {}
+
+        # Simple string fields
+        for field in ("subnet", "pools", "valid_lifetime", "description"):
+            result[field] = str(data.get(field, "") or "")
+
+        # Interface may be a dict with selected keys or a plain string
+        iface_raw = data.get("interface", "")
+        if isinstance(iface_raw, dict):
+            # Find selected interface(s)
+            selected = [
+                name
+                for name, info in iface_raw.items()
+                if isinstance(info, dict) and info.get("selected", 0)
+            ]
+            result["interface"] = ",".join(sorted(selected))
+        else:
+            result["interface"] = str(iface_raw or "")
+
+        # option_data sub-fields
+        option_data = data.get("option_data", {})
+        if isinstance(option_data, dict):
+            result["option_data.dns_servers"] = str(option_data.get("dns_servers", "") or "")
+            result["option_data.domain_search"] = str(option_data.get("domain_search", "") or "")
+        else:
+            result["option_data.dns_servers"] = ""
+            result["option_data.domain_search"] = ""
+
+        return result
+
+    @staticmethod
+    def _extract_reservation_fields(api_response: dict[str, Any]) -> dict[str, str]:
+        """Extract and normalize reservation fields from an OPNsense GET response.
+
+        The OPNsense API returns GET responses wrapped under a resource key
+        (e.g., ``{"reservation": {"ip_address": "...", ...}}``).
+        The ``subnet`` field may be returned as a dict with ``selected``
+        indicators.  This method normalizes values for comparison.
+
+        Args:
+            api_response: Raw response from ``get_dhcp6_reservation(uuid)``
+
+        Returns:
+            Flat dictionary of normalized field values (all strings)
+        """
+        data = api_response.get("reservation", {})
+        result: dict[str, str] = {}
+
+        # Simple string fields
+        for field in ("ip_address", "duid", "hostname", "description"):
+            result[field] = str(data.get(field, "") or "")
+
+        # Subnet may be a dict with selected UUID or a plain string
+        subnet_raw = data.get("subnet", "")
+        if isinstance(subnet_raw, dict):
+            selected = [
+                uuid
+                for uuid, info in subnet_raw.items()
+                if isinstance(info, dict) and info.get("selected", 0)
+            ]
+            result["subnet"] = selected[0] if selected else ""
+        else:
+            result["subnet"] = str(subnet_raw or "")
+
+        return result
+
+    @staticmethod
+    def _build_desired_subnet_fields(subnet_data: dict[str, Any]) -> dict[str, str]:
+        """Build a normalized field dict from the desired subnet data we send to the API.
+
+        Args:
+            subnet_data: Subnet configuration dict prepared for the update call
+
+        Returns:
+            Flat dictionary of normalized field values matching the format
+            returned by ``_extract_subnet_fields``
+        """
+        result: dict[str, str] = {}
+        for field in ("subnet", "pools", "valid_lifetime", "description"):
+            result[field] = str(subnet_data.get(field, "") or "")
+        result["interface"] = str(subnet_data.get("interface", "") or "")
+
+        option_data = subnet_data.get("option_data", {})
+        if isinstance(option_data, dict):
+            result["option_data.dns_servers"] = str(option_data.get("dns_servers", "") or "")
+            result["option_data.domain_search"] = str(option_data.get("domain_search", "") or "")
+        else:
+            result["option_data.dns_servers"] = ""
+            result["option_data.domain_search"] = ""
+
+        return result
+
+    @staticmethod
+    def _build_desired_reservation_fields(
+        reservation_data: dict[str, Any],
+    ) -> dict[str, str]:
+        """Build a normalized field dict from the desired reservation data.
+
+        Args:
+            reservation_data: Reservation configuration dict prepared for the update call
+
+        Returns:
+            Flat dictionary of normalized field values matching the format
+            returned by ``_extract_reservation_fields``
+        """
+        result: dict[str, str] = {}
+        for field in ("subnet", "ip_address", "duid", "hostname", "description"):
+            result[field] = str(reservation_data.get(field, "") or "")
+        return result
+
     def _generate_kea_dhcp6_resources(
         self, subnets: list[ResourceConfig], reservations: list[ResourceConfig]
     ) -> None:
@@ -172,7 +300,8 @@ class OPNsenseProvider(
 
         This method batches all DHCPv6 operations (subnets + reservations) to minimize
         API calls. It creates a single API client, searches existing resources once,
-        processes all resources, and reconfigures the service once at the end.
+        processes all resources, and reconfigures the service only when changes are
+        detected.
 
         Since the Terraform provider doesn't support Kea DHCPv6 resources,
         this method uses the OPNsense API directly to manage DHCPv6 configuration.
@@ -226,6 +355,9 @@ class OPNsenseProvider(
             (r.get("duid"), r.get("subnet")): r.get("uuid") for r in existing_reservations
         }
 
+        # Track whether any changes were made
+        changes_made = False
+
         # Process all subnets
         for subnet_resource in subnets:
             config = subnet_resource.config
@@ -263,8 +395,17 @@ class OPNsenseProvider(
 
             # Create or update subnet
             if existing_uuid:
-                print(f"Updating DHCPv6 subnet {subnet_name} (UUID: {existing_uuid})")
-                kea.update_dhcp6_subnet(existing_uuid, subnet_data)
+                # Fetch current config and compare before updating
+                current = kea.get_dhcp6_subnet(existing_uuid)
+                current_fields = self._extract_subnet_fields(current)
+                desired_fields = self._build_desired_subnet_fields(subnet_data)
+
+                if current_fields != desired_fields:
+                    print(f"Updating DHCPv6 subnet {subnet_name} (UUID: {existing_uuid})")
+                    kea.update_dhcp6_subnet(existing_uuid, subnet_data)
+                    changes_made = True
+                else:
+                    print(f"DHCPv6 subnet {subnet_name} unchanged, skipping update")
             else:
                 print(f"Creating DHCPv6 subnet {subnet_name}")
                 result = kea.add_dhcp6_subnet(subnet_data)
@@ -280,6 +421,7 @@ class OPNsenseProvider(
                 print(f"Created with UUID: {created_uuid}")
                 # Update map for use in reservations
                 existing_subnets_map[subnet_address] = created_uuid
+                changes_made = True
 
         # Process all reservations
         for reservation_resource in reservations:
@@ -311,8 +453,17 @@ class OPNsenseProvider(
 
             # Create or update reservation
             if existing_uuid:
-                print(f"Updating DHCPv6 reservation {reservation_name} (UUID: {existing_uuid})")
-                kea.update_dhcp6_reservation(existing_uuid, reservation_data)
+                # Fetch current config and compare before updating
+                current = kea.get_dhcp6_reservation(existing_uuid)
+                current_fields = self._extract_reservation_fields(current)
+                desired_fields = self._build_desired_reservation_fields(reservation_data)
+
+                if current_fields != desired_fields:
+                    print(f"Updating DHCPv6 reservation {reservation_name} (UUID: {existing_uuid})")
+                    kea.update_dhcp6_reservation(existing_uuid, reservation_data)
+                    changes_made = True
+                else:
+                    print(f"DHCPv6 reservation {reservation_name} unchanged, skipping update")
             else:
                 print(f"Creating DHCPv6 reservation {reservation_name}")
                 result = kea.add_dhcp6_reservation(reservation_data)
@@ -322,11 +473,15 @@ class OPNsenseProvider(
                         f"Failed to create DHCPv6 reservation {reservation_name}: {validations}"
                     )
                 print(f"Created reservation {reservation_name}")
+                changes_made = True
 
-        # Reconfigure service ONCE to apply all changes
-        print("Reconfiguring Kea service...")
-        kea.reconfigure_service()
-        print("DHCPv6 configuration applied")
+        # Reconfigure service ONCE — only if changes were made
+        if changes_made:
+            print("Reconfiguring Kea service...")
+            kea.reconfigure_service()
+            print("DHCPv6 configuration applied")
+        else:
+            print("No DHCPv6 changes detected, skipping Kea reconfigure")
 
     def _generate_kea_dhcp6_subnet_terraform(self, subnets: list[ResourceConfig]) -> None:
         """Generate DHCPv6 subnet configuration using OPNsense API.
