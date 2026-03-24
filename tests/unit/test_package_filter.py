@@ -191,6 +191,7 @@ class TestPlanWithPackage:
                 dry_run=False,
                 resource_filter=["vm-01", "vm-02"],
                 enforce_policies=False,
+                package_filter="my-cluster",
             )
 
     def test_plan_with_unknown_package_fails(self, cli_runner, mock_orchestrator):
@@ -239,6 +240,7 @@ class TestApplyWithPackage:
                 resource_filter=["vm-01"],
                 parallel=False,
                 max_workers=4,
+                package_filter="my-cluster",
             )
 
     def test_apply_with_package_shows_package_in_prompt(self, cli_runner, mock_orchestrator):
@@ -288,6 +290,7 @@ class TestDestroyWithPackage:
             )
             call_args = mock_orchestrator.destroy.call_args
             assert call_args[1]["resource_filter"] == ["vm-01", "vm-02"]
+            assert call_args[1]["package_filter"] == "my-cluster"
 
     def test_destroy_with_package_shows_package_in_prompt(self, cli_runner, mock_orchestrator):
         """Destroy --package shows package name in confirmation prompt."""

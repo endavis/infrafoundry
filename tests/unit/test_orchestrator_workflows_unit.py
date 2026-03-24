@@ -81,12 +81,14 @@ def test_plan_orchestrator_dry_run_skips_generation(console):
         "dev",
         {"deployment_id": 1, "dry_run": True},
         target_resources=None,
+        package_filter=None,
     )
     event_manager.emit_event.assert_any_call(
         EventType.AFTER_PLAN,
         "dev",
         {"deployment_id": 1, "results": result},
         target_resources=None,
+        package_filter=None,
     )
 
 
@@ -336,6 +338,7 @@ def test_plan_emits_runner_starting_and_completed(console):
         "provider": "proxmox",
         "runner": "terraform",
         "target_resources": None,
+        "package_filter": None,
     }
     assert completed_calls[0][0][2] == {
         "provider": "proxmox",
@@ -412,6 +415,7 @@ def test_destroy_emits_runner_starting_and_completed(console):
         "provider": "proxmox",
         "runner": "terraform",
         "target_resources": None,
+        "package_filter": None,
     }
     assert completed_calls[0][0][2] == {
         "provider": "proxmox",

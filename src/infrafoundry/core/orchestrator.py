@@ -509,6 +509,7 @@ class Orchestrator:
         dry_run: bool = False,
         resource_filter: list[str] | None = None,
         enforce_policies: bool = False,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Plan infrastructure changes.
 
@@ -517,11 +518,14 @@ class Orchestrator:
             dry_run: If True, only show what would be done
             resource_filter: Optional list of resource names to target
             enforce_policies: If True, block on policy violations
+            package_filter: Optional package name to restrict event handlers
 
         Returns:
             Dict with plan results per provider
         """
-        return self.plan_orchestrator.plan(env_name, dry_run, resource_filter, enforce_policies)
+        return self.plan_orchestrator.plan(
+            env_name, dry_run, resource_filter, enforce_policies, package_filter
+        )
 
     def apply(
         self,
@@ -530,6 +534,7 @@ class Orchestrator:
         resource_filter: list[str] | None = None,
         parallel: bool = False,
         max_workers: int = 4,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Apply infrastructure changes.
 
@@ -539,18 +544,22 @@ class Orchestrator:
             resource_filter: Optional list of resource names to target
             parallel: If True, apply resources in parallel where possible
             max_workers: Maximum number of parallel workers (default: 4)
+            package_filter: Optional package name to restrict event handlers
 
         Returns:
             Dict with apply results per provider
         """
         # First, generate the plans
-        self.plan(env_name, dry_run=False, resource_filter=resource_filter)
+        self.plan(
+            env_name, dry_run=False, resource_filter=resource_filter, package_filter=package_filter
+        )
         return self.apply_orchestrator.apply(
             env_name=env_name,
             resource_filter=resource_filter,
             auto_approve=auto_approve,
             parallel=parallel,
             max_workers=max_workers,
+            package_filter=package_filter,
         )
 
     def _apply_providers_serial(
@@ -560,6 +569,7 @@ class Orchestrator:
         resources_by_provider: dict[str, list[ResourceConfig]],
         resource_filter: list[str] | None,
         auto_approve: bool,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Apply providers sequentially."""
         # Load runner priorities, IaC tool, and provider order from environment config
@@ -574,7 +584,12 @@ class Orchestrator:
             )
 
         return self.deployment_executor.apply_serial(
-            env_name, deployment_id, resources_by_provider, resource_filter, auto_approve
+            env_name,
+            deployment_id,
+            resources_by_provider,
+            resource_filter,
+            auto_approve,
+            package_filter=package_filter,
         )
 
     def _apply_providers_parallel(
@@ -585,6 +600,7 @@ class Orchestrator:
         resource_filter: list[str] | None,
         auto_approve: bool,
         max_workers: int,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Apply providers in parallel."""
         # Load runner priorities, IaC tool, and provider order from environment config
@@ -605,6 +621,7 @@ class Orchestrator:
             resource_filter,
             auto_approve,
             max_workers,
+            package_filter=package_filter,
         )
 
     def _apply_single_provider(
@@ -628,6 +645,7 @@ class Orchestrator:
         auto_approve: bool = False,
         resource_filter: list[str] | None = None,
         confirm_callback: Callable[[], bool] | None = None,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Destroy infrastructure.
 
@@ -636,12 +654,13 @@ class Orchestrator:
             auto_approve: If True, skip confirmation prompts
             resource_filter: Optional list of resource names to target
             confirm_callback: Optional callback for user confirmation
+            package_filter: Optional package name to restrict event handlers
 
         Returns:
             Dict with destroy results per provider
         """
         return self.destroy_orchestrator.destroy(
-            env_name, resource_filter, auto_approve, confirm_callback
+            env_name, resource_filter, auto_approve, confirm_callback, package_filter
         )
 
     def rollback(

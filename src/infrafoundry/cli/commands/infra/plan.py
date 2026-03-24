@@ -55,6 +55,7 @@ def plan(
             dry_run=dry_run,
             resource_filter=resource_filter,
             enforce_policies=enforce_policies,
+            package_filter=package_name,
         )
 
     if dry_run:

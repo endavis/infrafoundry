@@ -37,6 +37,7 @@ def test_apply_with_confirmation(cli_runner, mock_orchestrator):
             resource_filter=None,
             parallel=False,
             max_workers=4,
+            package_filter=None,
         )
 
 
@@ -64,6 +65,7 @@ def test_apply_with_auto_approve(cli_runner, mock_orchestrator):
             resource_filter=None,
             parallel=False,
             max_workers=4,
+            package_filter=None,
         )
 
 
@@ -82,6 +84,7 @@ def test_apply_with_resource_filter(cli_runner, mock_orchestrator):
             resource_filter=["vm-01", "vm-02"],
             parallel=False,
             max_workers=4,
+            package_filter=None,
         )
 
 
@@ -109,6 +112,7 @@ def test_apply_with_parallel(cli_runner, mock_orchestrator):
             resource_filter=None,
             parallel=True,
             max_workers=8,
+            package_filter=None,
         )
 
 

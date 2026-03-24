@@ -88,6 +88,7 @@ def test_apply_serial_orders_providers_and_tracks_states():
             "terraform_id": None,
         },
         target_resources=None,
+        package_filter=None,
     )
     assert any(
         call_args[0][0] == EventType.RESOURCE_CREATED
@@ -659,6 +660,7 @@ def test_apply_emits_runner_starting_and_completed():
         "provider": "proxmox",
         "runner": "terraform",
         "target_resources": None,
+        "package_filter": None,
     }
 
     assert completed_calls[0][0][2] == {
@@ -671,6 +673,7 @@ def test_apply_emits_runner_starting_and_completed():
         "provider": "proxmox",
         "runner": "terraform",
         "target_resources": None,
+        "package_filter": None,
     }
 
     # Verify ordering: STARTING before apply, COMPLETED after
@@ -744,6 +747,7 @@ def test_apply_emits_runner_failed_on_exception():
         "provider": "proxmox",
         "runner": "terraform",
         "target_resources": None,
+        "package_filter": None,
     }
 
     # RUNNER_COMPLETED should NOT have been emitted

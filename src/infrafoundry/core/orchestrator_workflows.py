@@ -351,6 +351,7 @@ class PlanOrchestrator(HookExecutionMixin):
         dry_run: bool,
         resource_filter: list[str] | None,
         enforce_policies: bool,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Execute the plan workflow for the requested environment."""
         plan_metadata: PlanDeploymentMetadata = {"resource_filter": resource_filter}
@@ -366,6 +367,7 @@ class PlanOrchestrator(HookExecutionMixin):
             env_name,
             {"deployment_id": deployment_id, "dry_run": dry_run},
             target_resources=resource_filter,
+            package_filter=package_filter,
         )
 
         results: dict[str, Any] = {}
@@ -466,6 +468,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                 provider=provider_name,
                                 runner=tool_name,
                                 target_resources=resource_filter,
+                                package_filter=package_filter,
                             )
 
                             try:
@@ -495,6 +498,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                     provider=provider_name,
                                     runner=tool_name,
                                     target_resources=resource_filter,
+                                    package_filter=package_filter,
                                 )
                             except Exception as exc:
                                 failed_event: RunnerEventData = {
@@ -510,6 +514,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                     provider=provider_name,
                                     runner=tool_name,
                                     target_resources=resource_filter,
+                                    package_filter=package_filter,
                                 )
                                 raise
                         else:
@@ -533,6 +538,7 @@ class PlanOrchestrator(HookExecutionMixin):
                 env_name,
                 {"deployment_id": deployment_id, "results": results},
                 target_resources=resource_filter,
+                package_filter=package_filter,
             )
         except Exception as exc:
             self.state_manager.update_deployment_status(
@@ -543,6 +549,7 @@ class PlanOrchestrator(HookExecutionMixin):
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
                 target_resources=resource_filter,
+                package_filter=package_filter,
             )
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
@@ -720,13 +727,8 @@ class ApplyOrchestrator(HookExecutionMixin):
         load_resources: Callable[
             [str], tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]
         ],
-        apply_serial: Callable[
-            [str, int, dict[str, list[ResourceConfig]], list[str] | None, bool], dict[str, Any]
-        ],
-        apply_parallel: Callable[
-            [str, int, dict[str, list[ResourceConfig]], list[str] | None, bool, int],
-            dict[str, Any],
-        ],
+        apply_serial: Callable[..., dict[str, Any]],
+        apply_parallel: Callable[..., dict[str, Any]],
         get_current_user: Callable[[], str],
         hook_manager: HookManager | None = None,
         load_environment: Callable[[str], EnvironmentConfig | None] | None = None,
@@ -748,6 +750,7 @@ class ApplyOrchestrator(HookExecutionMixin):
         auto_approve: bool,
         parallel: bool,
         max_workers: int,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Apply infrastructure across providers."""
         apply_metadata: ApplyDeploymentMetadata = {
@@ -766,6 +769,7 @@ class ApplyOrchestrator(HookExecutionMixin):
             env_name,
             {"deployment_id": deployment_id, "auto_approve": auto_approve},
             target_resources=resource_filter,
+            package_filter=package_filter,
         )
 
         results: dict[str, Any] = {}
@@ -801,6 +805,7 @@ class ApplyOrchestrator(HookExecutionMixin):
                     resource_filter,
                     auto_approve,
                     max_workers,
+                    package_filter=package_filter,
                 )
             else:
                 results = self._apply_serial(
@@ -809,6 +814,7 @@ class ApplyOrchestrator(HookExecutionMixin):
                     resources_by_provider,
                     resource_filter,
                     auto_approve,
+                    package_filter=package_filter,
                 )
 
             # Execute resource-level after_apply hooks
@@ -828,6 +834,7 @@ class ApplyOrchestrator(HookExecutionMixin):
                 env_name,
                 {"deployment_id": deployment_id, "results": results},
                 target_resources=resource_filter,
+                package_filter=package_filter,
             )
         except Exception as exc:
             self.state_manager.update_deployment_status(
@@ -838,6 +845,7 @@ class ApplyOrchestrator(HookExecutionMixin):
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
                 target_resources=resource_filter,
+                package_filter=package_filter,
             )
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
@@ -919,6 +927,7 @@ class DestroyOrchestrator(HookExecutionMixin):
         resource_filter: list[str] | None,
         auto_approve: bool,
         confirm_callback: Callable[[], bool] | None = None,
+        package_filter: str | None = None,
     ) -> dict[str, Any]:
         """Destroy all requested resources."""
         destroy_metadata: DestroyDeploymentMetadata = {
@@ -937,6 +946,7 @@ class DestroyOrchestrator(HookExecutionMixin):
             env_name,
             {"deployment_id": deployment_id, "auto_approve": auto_approve},
             target_resources=resource_filter,
+            package_filter=package_filter,
         )
 
         results: dict[str, Any] = {}
@@ -1037,6 +1047,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                         provider=provider_name,
                         runner=tool_name,
                         target_resources=resource_filter,
+                        package_filter=package_filter,
                     )
 
                     try:
@@ -1071,6 +1082,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                             provider=provider_name,
                             runner=tool_name,
                             target_resources=resource_filter,
+                            package_filter=package_filter,
                         )
                     except Exception as exc:
                         failed_event: RunnerEventData = {
@@ -1086,12 +1098,18 @@ class DestroyOrchestrator(HookExecutionMixin):
                             provider=provider_name,
                             runner=tool_name,
                             target_resources=resource_filter,
+                            package_filter=package_filter,
                         )
                         raise
 
                 # Fire resource lifecycle events for on_destroy handlers
                 self._fire_destroy_lifecycle_events(
-                    env_name, provider_name, resources, all_outcomes, resource_filter
+                    env_name,
+                    provider_name,
+                    resources,
+                    all_outcomes,
+                    resource_filter,
+                    package_filter,
                 )
 
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)
@@ -1118,6 +1136,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                 env_name,
                 {"deployment_id": deployment_id, "results": results},
                 target_resources=resource_filter,
+                package_filter=package_filter,
             )
         except Exception as exc:
             self.state_manager.update_deployment_status(
@@ -1128,6 +1147,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
                 target_resources=resource_filter,
+                package_filter=package_filter,
             )
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
@@ -1189,6 +1209,7 @@ class DestroyOrchestrator(HookExecutionMixin):
         resources: list[ResourceConfig],
         outcomes: list[ResourceOutcome],
         resource_filter: list[str] | None,
+        package_filter: str | None = None,
     ) -> None:
         """Fire on_destroy resource lifecycle events based on terraform outcomes.
 
@@ -1198,6 +1219,7 @@ class DestroyOrchestrator(HookExecutionMixin):
             resources: List of resource configurations
             outcomes: List of terraform resource outcomes
             resource_filter: Optional resource name filter
+            package_filter: Optional package name to restrict event handlers
         """
         if not outcomes:
             return
@@ -1247,6 +1269,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                 provider=provider_name,
                 resource=outcome.resource_name,
                 target_resources=resource_filter,
+                package_filter=package_filter,
             )
 
     def _print_header(

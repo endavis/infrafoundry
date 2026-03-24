@@ -20,6 +20,7 @@ class BaseHandler(ABC):
         """
         self.config = config
         self._name = config.get("name", self.__class__.__name__)
+        self._package: str | None = config.get("_package")
 
     @property
     def name(self) -> str:
@@ -46,6 +47,26 @@ class BaseHandler(ABC):
             List of validation error messages (empty if valid)
         """
         ...
+
+    def matches_package(self, package_filter: str | None) -> bool:
+        """Check whether this handler should fire for the given package filter.
+
+        A handler fires if:
+        - No package filter is set (all packages targeted).
+        - The handler has no ``_package`` (resource-level or env-level events).
+        - The handler's package matches the filter.
+
+        Args:
+            package_filter: Package name from the --package CLI flag, or None.
+
+        Returns:
+            True if this handler should execute, False to skip.
+        """
+        if package_filter is None:
+            return True
+        if self._package is None:
+            return True
+        return self._package == package_filter
 
     def matches_resources(self, target_resources: list[str] | None) -> bool:
         """Check whether this handler should fire for the given target resources.

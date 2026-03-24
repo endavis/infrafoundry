@@ -65,5 +65,6 @@ def destroy(
             env,
             auto_approve=auto_approve,
             resource_filter=resource_filter,
+            package_filter=package_name,
         )
     console.success(f"Destroy complete! ({timer.elapsed_str})")

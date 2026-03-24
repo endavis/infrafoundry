@@ -1,0 +1,213 @@
+"""Tests for package-level event filtering (#427).
+
+When --package is specified, only event handlers from that package should fire.
+Handlers from other packages should be skipped.
+"""
+
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
+
+from infrafoundry.core.config.package_loader import PackageLoader
+from infrafoundry.core.events import EventContext, EventType, UnifiedEventBus
+from infrafoundry.core.events.handlers.base import BaseHandler
+
+# --- BaseHandler.matches_package() ---
+
+
+class TestMatchesPackage:
+    """Tests for BaseHandler.matches_package()."""
+
+    def test_no_filter_returns_true(self) -> None:
+        """No package_filter means all handlers fire."""
+        handler = _make_handler(package="minio")
+        assert handler.matches_package(None) is True
+
+    def test_no_package_on_handler_returns_true(self) -> None:
+        """Handler without _package fires regardless of filter."""
+        handler = _make_handler(package=None)
+        assert handler.matches_package("k3s-cluster") is True
+
+    def test_matching_package_returns_true(self) -> None:
+        """Handler fires when its package matches the filter."""
+        handler = _make_handler(package="k3s-cluster")
+        assert handler.matches_package("k3s-cluster") is True
+
+    def test_different_package_returns_false(self) -> None:
+        """Handler is skipped when its package differs from the filter."""
+        handler = _make_handler(package="minio")
+        assert handler.matches_package("k3s-cluster") is False
+
+
+# --- Package tagging in PackageLoader ---
+
+
+class TestPackageTagging:
+    """Tests for _package tagging in PackageLoader.load_package()."""
+
+    def test_load_package_tags_handlers(self, tmp_path: Path) -> None:
+        """load_package() adds _package field to each handler config."""
+        env_dir = tmp_path / "test-env"
+        provider_dir = env_dir / "kubernetes"
+        pkg_dir = provider_dir / "k3s-cluster"
+        pkg_dir.mkdir(parents=True)
+
+        # Create manifest with events
+        (pkg_dir / "infrafoundry.yml").write_text(
+            "name: k3s-cluster\n"
+            "resources:\n  - vm.yaml\n"
+            "events:\n"
+            "  after_apply:\n"
+            "    - type: script\n"
+            "      name: setup-k3s\n"
+            "      script: scripts/setup.sh\n"
+            "    - type: script\n"
+            "      name: deploy-apps\n"
+            "      script: scripts/deploy.sh\n"
+        )
+        (pkg_dir / "vm.yaml").write_text("vm:\n  - name: k3s-node\n    cores: 4\n")
+
+        loader = PackageLoader(base_dir=tmp_path)
+        _resources, events, _variables = loader.load_package(pkg_dir, "kubernetes", "test-env")
+
+        # All handlers should have _package set
+        assert "after_apply" in events
+        for handler in events["after_apply"]:
+            assert handler["_package"] == "k3s-cluster"
+
+    def test_load_package_tags_multiple_event_types(self, tmp_path: Path) -> None:
+        """_package is set across all event types."""
+        env_dir = tmp_path / "test-env"
+        provider_dir = env_dir / "proxmox"
+        pkg_dir = provider_dir / "minio"
+        pkg_dir.mkdir(parents=True)
+
+        (pkg_dir / "infrafoundry.yml").write_text(
+            "name: minio\n"
+            "resources:\n  - vm.yaml\n"
+            "events:\n"
+            "  before_plan:\n"
+            "    - type: script\n"
+            "      name: pre-check\n"
+            "      script: scripts/check.sh\n"
+            "  after_apply:\n"
+            "    - type: script\n"
+            "      name: configure-minio\n"
+            "      script: scripts/configure.sh\n"
+        )
+        (pkg_dir / "vm.yaml").write_text("vm:\n  - name: minio-srv\n    cores: 2\n")
+
+        loader = PackageLoader(base_dir=tmp_path)
+        _resources, events, _variables = loader.load_package(pkg_dir, "proxmox", "test-env")
+
+        for event_key, handlers in events.items():
+            for handler in handlers:
+                assert handler["_package"] == "minio", f"Handler in {event_key} missing _package"
+
+
+# --- Event bus integration ---
+
+
+class TestEventBusPackageFiltering:
+    """Integration tests for package filtering in UnifiedEventBus.emit()."""
+
+    def test_filter_skips_other_package_handlers(self) -> None:
+        """emit() with package_filter skips handlers from other packages."""
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.AFTER_APPLY,
+            {"type": "python", "module": "dummy", "function": "handler", "_package": "k3s-cluster"},
+        )
+        bus.register_handler(
+            EventType.AFTER_APPLY,
+            {"type": "python", "module": "dummy", "function": "handler", "_package": "minio"},
+        )
+
+        ctx = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="prod",
+            package_filter="k3s-cluster",
+        )
+        # Both handlers will fail to execute (dummy module), but we can check
+        # how many were attempted by examining the results count
+        results = bus.emit(ctx, abort_on_failure=False)
+        # Only the k3s-cluster handler should have been attempted
+        assert len(results) == 1
+
+    def test_no_filter_fires_all_handlers(self) -> None:
+        """emit() without package_filter fires all handlers."""
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.AFTER_APPLY,
+            {"type": "python", "module": "dummy", "function": "handler", "_package": "k3s-cluster"},
+        )
+        bus.register_handler(
+            EventType.AFTER_APPLY,
+            {"type": "python", "module": "dummy", "function": "handler", "_package": "minio"},
+        )
+
+        ctx = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="prod",
+            # No package_filter
+        )
+        results = bus.emit(ctx, abort_on_failure=False)
+        assert len(results) == 2
+
+    def test_handler_without_package_always_fires(self) -> None:
+        """Handlers without _package fire regardless of filter."""
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.AFTER_APPLY,
+            {"type": "python", "module": "dummy", "function": "handler"},
+        )
+        bus.register_handler(
+            EventType.AFTER_APPLY,
+            {"type": "python", "module": "dummy", "function": "handler", "_package": "minio"},
+        )
+
+        ctx = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="prod",
+            package_filter="k3s-cluster",
+        )
+        results = bus.emit(ctx, abort_on_failure=False)
+        # The handler without _package fires; the minio handler does not
+        assert len(results) == 1
+
+    def test_emit_event_passes_package_filter(self) -> None:
+        """emit_event() convenience method passes package_filter to context."""
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.BEFORE_PLAN,
+            {"type": "python", "module": "dummy", "function": "handler", "_package": "minio"},
+        )
+
+        results = bus.emit_event(
+            EventType.BEFORE_PLAN,
+            "prod",
+            package_filter="k3s-cluster",
+        )
+        # minio handler should be skipped
+        assert len(results) == 0
+
+
+# --- Helpers ---
+
+
+class _StubHandler(BaseHandler):
+    """Minimal concrete handler for unit testing matches_package()."""
+
+    def execute(self, context: EventContext) -> Any:
+        return MagicMock(success=True)
+
+    def validate_config(self) -> list[str]:
+        return []
+
+
+def _make_handler(package: str | None) -> _StubHandler:
+    """Create a handler with the given _package value."""
+    config: dict[str, Any] = {"name": "test-handler"}
+    if package is not None:
+        config["_package"] = package
+    return _StubHandler(config)
