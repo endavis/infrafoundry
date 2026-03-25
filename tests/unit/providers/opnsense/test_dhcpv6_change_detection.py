@@ -6,6 +6,7 @@ API responses and desired configuration, as well as the integration behaviour of
 are skipped when no changes are detected.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -13,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.providers.opnsense import OPNsenseProvider
+from infrafoundry.providers.opnsense import OPNsenseProvider, _normalize_field_value
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -392,6 +393,209 @@ class TestTypeNormalization:
             OPNsenseProvider._extract_subnet_fields(api_response)["valid_lifetime"]
             == OPNsenseProvider._build_desired_subnet_fields(desired)["valid_lifetime"]
         )
+
+
+# ---------------------------------------------------------------------------
+# _normalize_field_value
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeFieldValue:
+    """Tests for the _normalize_field_value helper."""
+
+    def test_strips_whitespace(self) -> None:
+        """Leading and trailing whitespace is stripped."""
+        assert _normalize_field_value("  hello  ") == "hello"
+
+    def test_empty_string(self) -> None:
+        """Empty string remains empty."""
+        assert _normalize_field_value("") == ""
+
+    def test_single_line_no_change(self) -> None:
+        """Single-line string without whitespace is unchanged."""
+        assert _normalize_field_value("::10-::ff") == "::10-::ff"
+
+    def test_multiline_sorted(self) -> None:
+        """Multi-line values are sorted and whitespace-stripped."""
+        assert _normalize_field_value("::20-::ff\n::10-::1f") == "::10-::1f\n::20-::ff"
+
+    def test_multiline_whitespace_stripped(self) -> None:
+        """Whitespace around each line is stripped."""
+        assert _normalize_field_value("  ::10-::ff \n ::20-::ff  ") == "::10-::ff\n::20-::ff"
+
+    def test_multiline_empty_lines_removed(self) -> None:
+        """Empty lines within multi-line values are removed."""
+        assert _normalize_field_value("::10-::ff\n\n::20-::ff") == "::10-::ff\n::20-::ff"
+
+
+# ---------------------------------------------------------------------------
+# Normalization edge cases (extract vs build matching)
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizationEdgeCases:
+    """Edge cases where extract and build must produce identical results."""
+
+    def test_pools_with_trailing_whitespace(self) -> None:
+        """Pools with trailing whitespace in API response still match desired."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "interface": "opt1",
+                "pools": "::10-::ff ",
+            }
+        }
+        desired: dict[str, Any] = {
+            "subnet": "fd00:1::/64",
+            "interface": "opt1",
+            "pools": "::10-::ff",
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+
+    def test_pools_different_order(self) -> None:
+        """Pool ranges in different order produce matching fields."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "interface": "opt1",
+                "pools": "::20-::ff\n::10-::1f",
+            }
+        }
+        desired: dict[str, Any] = {
+            "subnet": "fd00:1::/64",
+            "interface": "opt1",
+            "pools": "::10-::1f\n::20-::ff",
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+
+    def test_valid_lifetime_int_in_api(self) -> None:
+        """API returning valid_lifetime as int matches desired string."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "interface": "opt1",
+                "valid_lifetime": 3600,
+            }
+        }
+        desired: dict[str, Any] = {
+            "subnet": "fd00:1::/64",
+            "interface": "opt1",
+            "valid_lifetime": "3600",
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+
+    def test_missing_option_data_matches_empty(self) -> None:
+        """Missing option_data in API matches absent option_data in desired."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "interface": "opt1",
+            }
+        }
+        desired: dict[str, Any] = {
+            "subnet": "fd00:1::/64",
+            "interface": "opt1",
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+
+    def test_empty_option_data_dict_matches_missing(self) -> None:
+        """Empty option_data dict in API matches no option_data in desired."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "interface": "opt1",
+                "option_data": {},
+            }
+        }
+        desired: dict[str, Any] = {
+            "subnet": "fd00:1::/64",
+            "interface": "opt1",
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+
+    def test_option_data_with_whitespace(self) -> None:
+        """Whitespace in option_data values is stripped."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "interface": "opt1",
+                "option_data": {
+                    "dns_servers": " fd00::1,fd00::2 ",
+                    "domain_search": " example.com ",
+                },
+            }
+        }
+        desired: dict[str, Any] = {
+            "subnet": "fd00:1::/64",
+            "interface": "opt1",
+            "option_data": {
+                "dns_servers": "fd00::1,fd00::2",
+                "domain_search": "example.com",
+            },
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+
+    def test_interface_with_whitespace(self) -> None:
+        """Whitespace around interface value is stripped."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "interface": " opt1 ",
+            }
+        }
+        desired: dict[str, Any] = {
+            "subnet": "fd00:1::/64",
+            "interface": "opt1",
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+
+
+# ---------------------------------------------------------------------------
+# Debug logging (_log_field_diff)
+# ---------------------------------------------------------------------------
+
+
+class TestLogFieldDiff:
+    """Tests for _log_field_diff debug logging."""
+
+    def test_logs_differing_fields(self, provider: OPNsenseProvider, caplog: Any) -> None:
+        """Differing fields are logged at DEBUG level."""
+        current = {"subnet": "fd00:1::/64", "description": "old"}
+        desired = {"subnet": "fd00:1::/64", "description": "new"}
+        with caplog.at_level(logging.DEBUG, logger="infrafoundry.providers.opnsense"):
+            provider._log_field_diff("test-subnet", current, desired)
+        assert "description" in caplog.text
+        assert "'old'" in caplog.text
+        assert "'new'" in caplog.text
+
+    def test_no_log_when_fields_match(self, provider: OPNsenseProvider, caplog: Any) -> None:
+        """No log output when all fields match."""
+        fields = {"subnet": "fd00:1::/64", "description": "same"}
+        with caplog.at_level(logging.DEBUG, logger="infrafoundry.providers.opnsense"):
+            provider._log_field_diff("test-subnet", fields, fields)
+        assert caplog.text == ""
+
+    def test_no_log_above_debug(self, provider: OPNsenseProvider, caplog: Any) -> None:
+        """No log output when log level is above DEBUG."""
+        current = {"description": "old"}
+        desired = {"description": "new"}
+        with caplog.at_level(logging.INFO, logger="infrafoundry.providers.opnsense"):
+            provider._log_field_diff("test-subnet", current, desired)
+        assert caplog.text == ""
 
 
 # ---------------------------------------------------------------------------

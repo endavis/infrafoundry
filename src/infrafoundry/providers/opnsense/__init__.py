@@ -1,6 +1,7 @@
 """OPNsense provider for InfraFoundry."""
 
 import base64
+import logging
 import os
 from pathlib import Path
 from typing import Any, ClassVar, override
@@ -15,6 +16,27 @@ from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 
 from .validator import OPNsenseValidator
+
+logger = logging.getLogger(__name__)
+
+
+def _normalize_field_value(value: str) -> str:
+    """Normalize a field value for comparison.
+
+    Strips leading/trailing whitespace and sorts newline-separated lines
+    (e.g., pool ranges) so ordering differences don't cause false positives.
+
+    Args:
+        value: Raw string field value
+
+    Returns:
+        Normalized string value
+    """
+    stripped = value.strip()
+    if "\n" in stripped:
+        lines = [line.strip() for line in stripped.split("\n") if line.strip()]
+        return "\n".join(sorted(lines))
+    return stripped
 
 
 class OPNsenseProvider(
@@ -185,9 +207,9 @@ class OPNsenseProvider(
         data = api_response.get("subnet6", {})
         result: dict[str, str] = {}
 
-        # Simple string fields
+        # Simple string fields — normalize whitespace and sort multi-line values
         for field in ("subnet", "pools", "valid_lifetime", "description"):
-            result[field] = str(data.get(field, "") or "")
+            result[field] = _normalize_field_value(str(data.get(field, "") or ""))
 
         # Interface may be a dict with selected keys or a plain string
         iface_raw = data.get("interface", "")
@@ -200,13 +222,17 @@ class OPNsenseProvider(
             ]
             result["interface"] = ",".join(sorted(selected))
         else:
-            result["interface"] = str(iface_raw or "")
+            result["interface"] = _normalize_field_value(str(iface_raw or ""))
 
         # option_data sub-fields
         option_data = data.get("option_data", {})
         if isinstance(option_data, dict):
-            result["option_data.dns_servers"] = str(option_data.get("dns_servers", "") or "")
-            result["option_data.domain_search"] = str(option_data.get("domain_search", "") or "")
+            result["option_data.dns_servers"] = _normalize_field_value(
+                str(option_data.get("dns_servers", "") or "")
+            )
+            result["option_data.domain_search"] = _normalize_field_value(
+                str(option_data.get("domain_search", "") or "")
+            )
         else:
             result["option_data.dns_servers"] = ""
             result["option_data.domain_search"] = ""
@@ -262,13 +288,17 @@ class OPNsenseProvider(
         """
         result: dict[str, str] = {}
         for field in ("subnet", "pools", "valid_lifetime", "description"):
-            result[field] = str(subnet_data.get(field, "") or "")
-        result["interface"] = str(subnet_data.get("interface", "") or "")
+            result[field] = _normalize_field_value(str(subnet_data.get(field, "") or ""))
+        result["interface"] = _normalize_field_value(str(subnet_data.get("interface", "") or ""))
 
         option_data = subnet_data.get("option_data", {})
         if isinstance(option_data, dict):
-            result["option_data.dns_servers"] = str(option_data.get("dns_servers", "") or "")
-            result["option_data.domain_search"] = str(option_data.get("domain_search", "") or "")
+            result["option_data.dns_servers"] = _normalize_field_value(
+                str(option_data.get("dns_servers", "") or "")
+            )
+            result["option_data.domain_search"] = _normalize_field_value(
+                str(option_data.get("domain_search", "") or "")
+            )
         else:
             result["option_data.dns_servers"] = ""
             result["option_data.domain_search"] = ""
@@ -292,6 +322,37 @@ class OPNsenseProvider(
         for field in ("subnet", "ip_address", "duid", "hostname", "description"):
             result[field] = str(reservation_data.get(field, "") or "")
         return result
+
+    @staticmethod
+    def _log_field_diff(
+        resource_name: str,
+        current_fields: dict[str, str],
+        desired_fields: dict[str, str],
+    ) -> None:
+        """Log field-by-field differences between current and desired state.
+
+        Only logs when DEBUG level is enabled to avoid noise in normal operation.
+
+        Args:
+            resource_name: Human-readable name of the resource for log messages
+            current_fields: Normalized fields extracted from the API response
+            desired_fields: Normalized fields built from the desired configuration
+        """
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
+
+        all_keys = sorted(set(current_fields) | set(desired_fields))
+        for key in all_keys:
+            current_val = current_fields.get(key, "<missing>")
+            desired_val = desired_fields.get(key, "<missing>")
+            if current_val != desired_val:
+                logger.debug(
+                    "%s field %r differs: current=%r desired=%r",
+                    resource_name,
+                    key,
+                    current_val,
+                    desired_val,
+                )
 
     def _generate_kea_dhcp6_resources(
         self, subnets: list[ResourceConfig], reservations: list[ResourceConfig]
@@ -401,6 +462,9 @@ class OPNsenseProvider(
                 desired_fields = self._build_desired_subnet_fields(subnet_data)
 
                 if current_fields != desired_fields:
+                    self._log_field_diff(
+                        f"DHCPv6 subnet {subnet_name}", current_fields, desired_fields
+                    )
                     print(f"Updating DHCPv6 subnet {subnet_name} (UUID: {existing_uuid})")
                     kea.update_dhcp6_subnet(existing_uuid, subnet_data)
                     changes_made = True
@@ -459,6 +523,11 @@ class OPNsenseProvider(
                 desired_fields = self._build_desired_reservation_fields(reservation_data)
 
                 if current_fields != desired_fields:
+                    self._log_field_diff(
+                        f"DHCPv6 reservation {reservation_name}",
+                        current_fields,
+                        desired_fields,
+                    )
                     print(f"Updating DHCPv6 reservation {reservation_name} (UUID: {existing_uuid})")
                     kea.update_dhcp6_reservation(existing_uuid, reservation_data)
                     changes_made = True
