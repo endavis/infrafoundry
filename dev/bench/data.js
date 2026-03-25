@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774364837190,
+  "lastUpdate": 1774447078991,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2790,6 +2790,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000003673260218444878",
             "extra": "mean: 103.45275570854483 usec\nrounds: 2759"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "895a4455857d8ef60be55cb7ebf79441a667ad1f",
+          "message": "fix: normalize Kea DHCPv6 subnet fields to prevent false-positive change detection (merges PR #445, addresses #441)\n\nAdd _normalize_field_value() that strips whitespace and sorts multi-line\nvalues. Apply consistently to both _extract_subnet_fields() and\n_build_desired_subnet_fields(). Add debug diff logging for field mismatches.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-25T13:57:26Z",
+          "tree_id": "5962d5e1b27a973376f8d8bed5d5d37ca39774d4",
+          "url": "https://github.com/endavis/infrafoundry/commit/895a4455857d8ef60be55cb7ebf79441a667ad1f"
+        },
+        "date": 1774447078647,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6718.733144588673,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000029123386340615656",
+            "extra": "mean: 148.83758269301245 usec\nrounds: 2473"
           }
         ]
       }
