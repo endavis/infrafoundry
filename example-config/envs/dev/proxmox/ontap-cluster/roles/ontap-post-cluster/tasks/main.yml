@@ -7,12 +7,16 @@
 # This role runs against the cluster management endpoint (not
 # Proxmox hosts) and handles:
 #   - License installation
+#   - Root volume snapshot management
 #   - Disk assignment
 #   - Aggregate creation
 #   - SVM creation
 #   - Data LIF creation
 #   - DNS configuration
 #   - NTP configuration
+#   - CIFS server (workgroup mode)
+#   - NFS export policies
+#   - Volumes and CIFS shares
 #
 # Requirements:
 #   - netapp.ontap Ansible collection installed
@@ -64,6 +68,51 @@
     state: present
     license_codes: "{{ ontap_licenses }}"
   when: ontap_licenses | length > 0
+
+# ---------------------------------------------------------------
+# Disable root volume snapshots (saves space on simulator)
+# Node root volumes (vol0) can only be managed from the node-shell
+# via ZAPI. Requires netapp_lib Python package (pip install netapp-lib).
+# ---------------------------------------------------------------
+- name: Delete existing root volume snapshots
+  netapp.ontap.na_ontap_command:
+    <<: *ontap_conn
+    command: "run -node {{ item }} snap delete -a -f vol0"
+    privilege: admin
+  loop: "{{ ontap_discovered_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  ignore_errors: true
+
+- name: Disable root volume snapshot schedule
+  netapp.ontap.na_ontap_command:
+    <<: *ontap_conn
+    command: "run -node {{ item }} snap sched vol0 0 0 0"
+    privilege: admin
+  loop: "{{ ontap_discovered_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  ignore_errors: true
+
+- name: Enable root volume snapshot autodelete
+  netapp.ontap.na_ontap_command:
+    <<: *ontap_conn
+    command: "run -node {{ item }} snap autodelete vol0 on"
+    privilege: admin
+  loop: "{{ ontap_discovered_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  ignore_errors: true
+
+- name: Set root volume snapshot autodelete threshold to 35%
+  netapp.ontap.na_ontap_command:
+    <<: *ontap_conn
+    command: "run -node {{ item }} snap autodelete vol0 target_free_space 35"
+    privilege: admin
+  loop: "{{ ontap_discovered_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  ignore_errors: true
 
 # ---------------------------------------------------------------
 # Disk assignment
@@ -154,3 +203,75 @@
   loop: "{{ ontap_ntp_servers }}"
   loop_control:
     label: "{{ item }}"
+
+# ---------------------------------------------------------------
+# CIFS server (workgroup mode)
+# ---------------------------------------------------------------
+- name: Create CIFS server (workgroup mode via ZAPI)
+  netapp.ontap.na_ontap_cifs_server:
+    <<: *ontap_conn
+    state: present
+    name: "{{ ontap_cifs_server.name }}"
+    vserver: "{{ ontap_cifs_server.vserver }}"
+    workgroup: "{{ ontap_cifs_server.workgroup | default('WORKGROUP') }}"
+    service_state: started
+    use_rest: never
+  when: ontap_cifs_server | length > 0
+
+# ---------------------------------------------------------------
+# NFS export policies
+# ---------------------------------------------------------------
+- name: Create export policies
+  netapp.ontap.na_ontap_export_policy:
+    <<: *ontap_conn
+    state: present
+    name: "{{ item.name }}"
+    vserver: "{{ item.vserver }}"
+  loop: "{{ ontap_export_policies }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create export policy rules
+  netapp.ontap.na_ontap_export_policy_rule:
+    <<: *ontap_conn
+    state: present
+    name: "{{ item.0.name }}"
+    vserver: "{{ item.0.vserver }}"
+    client_match: "{{ item.1.client_match }}"
+    protocols: "{{ item.1.protocols }}"
+    ro_rule: "{{ item.1.ro_rule }}"
+    rw_rule: "{{ item.1.rw_rule }}"
+    super_user_security: "{{ item.1.super_user }}"
+  loop: "{{ ontap_export_policies | subelements('rules') }}"
+  loop_control:
+    label: "{{ item.0.name }} - {{ item.1.client_match }}"
+
+# ---------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------
+- name: Create volumes
+  netapp.ontap.na_ontap_volume:
+    <<: *ontap_conn
+    state: present
+    name: "{{ item.name }}"
+    vserver: "{{ item.vserver }}"
+    aggregate_name: "{{ item.aggregate }}"
+    size: "{{ item.size }}"
+    size_unit: gb
+    junction_path: "{{ item.junction_path | default('/' + item.name) }}"
+    export_policy: "{{ item.export_policy | default('default') }}"
+    volume_security_style: "{{ 'ntfs' if item.protocol | default('nfs') == 'cifs' else 'unix' }}"
+  loop: "{{ ontap_volumes }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create CIFS shares
+  netapp.ontap.na_ontap_cifs:
+    <<: *ontap_conn
+    state: present
+    share_name: "{{ item.name }}"
+    path: "{{ item.junction_path | default('/' + item.name) }}"
+    vserver: "{{ item.vserver }}"
+  loop: "{{ ontap_volumes | selectattr('protocol', 'eq', 'cifs') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
