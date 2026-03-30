@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774872291189,
+  "lastUpdate": 1774872910308,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2883,6 +2883,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000043784890801311096",
             "extra": "mean: 103.57469999999559 usec\nrounds: 2680"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "32c6d6218b5b4b7ee4eb466dbb508a686bef0367",
+          "message": "chore(deps): bump opentofu/setup-opentofu from 1 to 2 (merges PR #432)\n\nBumps [opentofu/setup-opentofu](https://github.com/opentofu/setup-opentofu) from 1 to 2.\n- [Release notes](https://github.com/opentofu/setup-opentofu/releases)\n- [Commits](https://github.com/opentofu/setup-opentofu/compare/v1...v2)\n\n---\nupdated-dependencies:\n- dependency-name: opentofu/setup-opentofu\n  dependency-version: '2'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-30T13:14:33+01:00",
+          "tree_id": "da0f307d2d0c5ebe1629eb39df5f59edc311d8c5",
+          "url": "https://github.com/endavis/infrafoundry/commit/32c6d6218b5b4b7ee4eb466dbb508a686bef0367"
+        },
+        "date": 1774872909233,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7302.223043610426,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000936072881786231",
+            "extra": "mean: 136.94459810769786 usec\nrounds: 2431"
           }
         ]
       }
