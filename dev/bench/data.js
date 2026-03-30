@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774882601565,
+  "lastUpdate": 1774883910155,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3038,6 +3038,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009840273313931184",
             "extra": "mean: 129.790123258891 usec\nrounds: 3805"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "531579ed2490d2358187ff6064bfdb18cc11b282",
+          "message": "chore(deps): bump requests from 2.32.5 to 2.33.0 (merges PR #447)\n\nBumps [requests](https://github.com/psf/requests) from 2.32.5 to 2.33.0.\n- [Release notes](https://github.com/psf/requests/releases)\n- [Changelog](https://github.com/psf/requests/blob/main/HISTORY.md)\n- [Commits](https://github.com/psf/requests/compare/v2.32.5...v2.33.0)\n\n---\nupdated-dependencies:\n- dependency-name: requests\n  dependency-version: 2.33.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-30T16:17:49+01:00",
+          "tree_id": "78b2fb6d5f26d2a1ab12f333656455733955a890",
+          "url": "https://github.com/endavis/infrafoundry/commit/531579ed2490d2358187ff6064bfdb18cc11b282"
+        },
+        "date": 1774883909531,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6673.600325094686,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000030854112145941174",
+            "extra": "mean: 149.84415477200636 usec\nrounds: 2326"
           }
         ]
       }
