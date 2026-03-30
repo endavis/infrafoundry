@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774447078991,
+  "lastUpdate": 1774869645890,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2821,6 +2821,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000029123386340615656",
             "extra": "mean: 148.83758269301245 usec\nrounds: 2473"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1ce10fc6d4a6684060e2d0e09640e1018def1a13",
+          "message": "docs: update example packages with ONTAP and AIQUM improvements (merges PR #454, addresses #453)\n\nSync example packages with production improvements: serial setup timing\nfix, root volume snapshot disable, licenses, CIFS/NFS volumes, and\nAIQUM certificate regeneration.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-30T12:20:15+01:00",
+          "tree_id": "ad46b7c4fc4caebefc754e6084ac1edb9503610d",
+          "url": "https://github.com/endavis/infrafoundry/commit/1ce10fc6d4a6684060e2d0e09640e1018def1a13"
+        },
+        "date": 1774869645504,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6926.8870322475195,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000023518080442948683",
+            "extra": "mean: 144.36499329996101 usec\nrounds: 2388"
           }
         ]
       }
