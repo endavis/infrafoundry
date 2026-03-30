@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774891207158,
+  "lastUpdate": 1774897917400,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3162,6 +3162,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009343463169230247",
             "extra": "mean: 136.37097575378212 usec\nrounds: 3217"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "705fa9200b853f265c703e021c30cd30172f5f61",
+          "message": "chore(deps): bump types-requests from 2.32.4.20260107 to 2.33.0.20260327 (merges PR #451)\n\nBumps [types-requests](https://github.com/python/typeshed) from 2.32.4.20260107 to 2.33.0.20260327.\n- [Commits](https://github.com/python/typeshed/commits)\n\n---\nupdated-dependencies:\n- dependency-name: types-requests\n  dependency-version: 2.33.0.20260327\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-30T20:11:22+01:00",
+          "tree_id": "5fec2139eaf30f49f6124365b981652a9e8eda0a",
+          "url": "https://github.com/endavis/infrafoundry/commit/705fa9200b853f265c703e021c30cd30172f5f61"
+        },
+        "date": 1774897916829,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7239.407853920883,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000017869956353703232",
+            "extra": "mean: 138.13284458871829 usec\nrounds: 2310"
           }
         ]
       }
