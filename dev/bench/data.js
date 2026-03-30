@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774887426587,
+  "lastUpdate": 1774891207158,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3131,6 +3131,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000026295671176135416",
             "extra": "mean: 147.86212723412885 usec\nrounds: 2350"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "68f7f72ff20580f7f6a91930fd0e3c11c4f12663",
+          "message": "chore(deps): bump hypothesis from 6.151.9 to 6.151.10 (merges PR #450)\n\nBumps [hypothesis](https://github.com/HypothesisWorks/hypothesis) from 6.151.9 to 6.151.10.\n- [Release notes](https://github.com/HypothesisWorks/hypothesis/releases)\n- [Commits](https://github.com/HypothesisWorks/hypothesis/compare/hypothesis-python-6.151.9...hypothesis-python-6.151.10)\n\n---\nupdated-dependencies:\n- dependency-name: hypothesis\n  dependency-version: 6.151.10\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-30T18:19:36+01:00",
+          "tree_id": "6349ea5da0971f24b43399c6aa4ad2e4a560ccde",
+          "url": "https://github.com/endavis/infrafoundry/commit/68f7f72ff20580f7f6a91930fd0e3c11c4f12663"
+        },
+        "date": 1774891206842,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7332.938658483317,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009343463169230247",
+            "extra": "mean: 136.37097575378212 usec\nrounds: 3217"
           }
         ]
       }
