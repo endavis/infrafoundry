@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774883910155,
+  "lastUpdate": 1774884291714,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3069,6 +3069,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000030854112145941174",
             "extra": "mean: 149.84415477200636 usec\nrounds: 2326"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c61c186c7de99ac614d8f73ba065178bbb0cac1",
+          "message": "chore(deps): bump pip-licenses from 5.5.1 to 5.5.5 (merges PR #448)\n\nBumps [pip-licenses](https://github.com/raimon49/pip-licenses) from 5.5.1 to 5.5.5.\n- [Release notes](https://github.com/raimon49/pip-licenses/releases)\n- [Changelog](https://github.com/raimon49/pip-licenses/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/raimon49/pip-licenses/compare/v-5.5.1...v-5.5.5)\n\n---\nupdated-dependencies:\n- dependency-name: pip-licenses\n  dependency-version: 5.5.5\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-30T16:24:20+01:00",
+          "tree_id": "bcb298d603495139f234e58491902f15a302f84f",
+          "url": "https://github.com/endavis/infrafoundry/commit/7c61c186c7de99ac614d8f73ba065178bbb0cac1"
+        },
+        "date": 1774884291225,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7159.416108372164,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000020689614473958693",
+            "extra": "mean: 139.67619493866377 usec\nrounds: 2529"
           }
         ]
       }
