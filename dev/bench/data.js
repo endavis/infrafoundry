@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774874115285,
+  "lastUpdate": 1774879524107,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2945,6 +2945,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000026555768481597262",
             "extra": "mean: 150.6065206785454 usec\nrounds: 2418"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c1b40b8da1a3a3d11ace40c7fd67476ee8dc2d7c",
+          "message": "chore(deps): bump mkdocs-material from 9.7.5 to 9.7.6 (merges PR #436)\n\nBumps [mkdocs-material](https://github.com/squidfunk/mkdocs-material) from 9.7.5 to 9.7.6.\n- [Release notes](https://github.com/squidfunk/mkdocs-material/releases)\n- [Changelog](https://github.com/squidfunk/mkdocs-material/blob/master/CHANGELOG)\n- [Commits](https://github.com/squidfunk/mkdocs-material/compare/9.7.5...9.7.6)\n\n---\nupdated-dependencies:\n- dependency-name: mkdocs-material\n  dependency-version: 9.7.6\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-30T15:04:48+01:00",
+          "tree_id": "c73e4341c590fb11ff7f57682bca302d7d4d66b0",
+          "url": "https://github.com/endavis/infrafoundry/commit/c1b40b8da1a3a3d11ace40c7fd67476ee8dc2d7c"
+        },
+        "date": 1774879523581,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6570.3014557482375,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000027879036997549364",
+            "extra": "mean: 152.20001802582712 usec\nrounds: 2330"
           }
         ]
       }
