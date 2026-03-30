@@ -79,3 +79,36 @@ ontap_dns:
 # NTP server configuration
 ontap_ntp_servers:
   - "192.168.1.1"
+
+# CIFS server configuration (workgroup mode)
+ontap_cifs_server: {}
+# Example:
+# ontap_cifs_server:
+#   name: ONTAPLAB
+#   vserver: svm_data
+#   workgroup: WORKGROUP
+
+# NFS export policies
+ontap_export_policies: []
+# Example:
+# ontap_export_policies:
+#   - name: nfs_data
+#     vserver: svm_data
+#     rules:
+#       - client_match: "192.168.1.0/24"
+#         protocols: [nfs]
+#         ro_rule: [sys]
+#         rw_rule: [sys]
+#         super_user: [sys]
+
+# Volumes
+ontap_volumes: []
+# Example:
+# ontap_volumes:
+#   - name: NFS_VOL
+#     vserver: svm_data
+#     aggregate: aggr1_node01
+#     size: 1
+#     junction_path: /NFS_VOL
+#     export_policy: nfs_data
+#     protocol: nfs

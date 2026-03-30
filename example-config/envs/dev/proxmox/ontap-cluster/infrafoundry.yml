@@ -43,8 +43,9 @@ variables:
   # system ID. Node 01 keeps OVA defaults; node 02 gets these values.
   # Only applied on first boot — changing after ONTAP initializes disks
   # will corrupt the replicated database.
-  node02_serial_number: "4082368-50-7"
-  node02_sysid: "4082368507"
+  # These are the standard ONTAP Simulator defaults for node 02:
+  node02_serial_number: "4034389-06-2"
+  node02_sysid: "4034389062"
 
   # --- Cluster Configuration ---
   cluster_name: ontap-lab
@@ -63,6 +64,47 @@ variables:
   data_lif1_ip: "192.168.1.230"
   data_lif2_ip: "192.168.1.231"
   data_lif_mask: "255.255.255.0"
+
+  # --- Licenses ---
+  # Cluster base license (Serial 1-80-000008) — applied during cluster creation wizard
+  ontap_cluster_base_license: SMKQROWJNQYQSDAAAAAAAAAAAAAA
+  # Standard ONTAP Simulator feature licenses (same keys for every download)
+  # Node 1 (Serial 4082368507) and Node 2 (Serial 4034389062)
+  ontap_licenses:
+    # Node 1
+    - YVUCRRRRYVHXCFABGAAAAAAAAAAA   # CIFS
+    - WKQGSRRRYVHXCFABGAAAAAAAAAAA   # FCP
+    - SOHOURRRYVHXCFABGAAAAAAAAAAA   # FlexClone
+    - KQSRRRRRYVHXCFABGAAAAAAAAAAA   # iSCSI
+    - MBXNQRRRYVHXCFABGAAAAAAAAAAA   # NFS
+    - GUJZTRRRYVHXCFABGAAAAAAAAAAA   # SnapMirror
+    - UZLKTRRRYVHXCFABGAAAAAAAAAAA   # SnapRestore
+    - EJFDVRRRYVHXCFABGAAAAAAAAAAA   # SnapVault
+    # Node 2
+    - MHEYKUNFXMSMUCEZFAAAAAAAAAAA   # CIFS
+    - KWZBMUNFXMSMUCEZFAAAAAAAAAAA   # FCP
+    - GARJOUNFXMSMUCEZFAAAAAAAAAAA   # FlexClone
+    - YBCNLUNFXMSMUCEZFAAAAAAAAAAA   # iSCSI
+    - ANGJKUNFXMSMUCEZFAAAAAAAAAAA   # NFS
+    - UFTUNUNFXMSMUCEZFAAAAAAAAAAA   # SnapMirror
+    - ILVFNUNFXMSMUCEZFAAAAAAAAAAA   # SnapRestore
+    - SUOYOUNFXMSMUCEZFAAAAAAAAAAA   # SnapVault
+
+  # --- CIFS Server (workgroup mode) ---
+  cifs_server_name: ONTAPLAB
+  cifs_workgroup: WORKGROUP
+
+  # --- NFS Export Policy ---
+  nfs_export_policy: nfs_data
+  nfs_client_match: "192.168.1.0/24"
+
+  # --- Volumes ---
+  nfs_vol_name: NFS_VOL
+  nfs_vol_aggregate: aggr1_node01
+  nfs_vol_size: 1
+  cifs_vol_name: CIFS_VOL
+  cifs_vol_aggregate: aggr1_node02
+  cifs_vol_size: 1
 
   # --- DNS & NTP ---
   dns_nameserver: "192.168.1.1"

@@ -106,9 +106,40 @@ while ! curl -sk -o /dev/null -w "%{http_code}" "https://${ip_address}/" 2>/dev/
 done
 echo "  AIQUM web UI is available"
 
-# --- Phase 4: Run initial setup wizard (FEW) ---
+# --- Phase 4: Regenerate certificates ---
+# The AIQUM HTTPS cert is generated at install time with CN=<short hostname>.
+# The acquisition unit connects to itself via FQDN, causing host verification
+# failure. Regenerate both the HTTPS cert and the client cert (used for mutual
+# auth with ONTAP) so they include the FQDN.
 echo ""
-echo "--- Phase 4: Running initial setup wizard ---"
+echo "--- Phase 4: Regenerating certificates ---"
+
+# Regenerate client certificate (used for ONTAP mutual auth / EMS)
+echo "  Regenerating client certificate..."
+${SSH} ${JUMPHOST} "${SSH} ansible@${ip_address} 'sudo /opt/netapp/ocum/scripts/clientKeyManager.sh regenerate_client_cert jboss'"
+echo "  Client certificate regenerated"
+
+# Restart AIQUM services to pick up new certs
+echo "  Restarting AIQUM services..."
+${SSH} ${JUMPHOST} "${SSH} ansible@${ip_address} 'sudo systemctl restart ocie ocieau'"
+
+# Wait for web UI to come back
+echo "  Waiting for AIQUM web UI to restart..."
+sleep 15
+ELAPSED=0
+while ! curl -sk -o /dev/null -w "%{http_code}" "https://${ip_address}/" 2>/dev/null | grep -q "200\|302\|401"; do
+    if [ $ELAPSED -ge 300 ]; then
+        echo "ERROR: AIQUM web UI not available after restart"
+        exit 1
+    fi
+    sleep 10
+    ELAPSED=$((ELAPSED + 10))
+done
+echo "  AIQUM web UI is back"
+
+# --- Phase 5: Run initial setup wizard (FEW) ---
+echo ""
+echo "--- Phase 5: Running initial setup wizard ---"
 python3 "${SCRIPT_DIR}/aiqum-initial-setup.py"
 
 echo ""
