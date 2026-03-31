@@ -30,7 +30,7 @@ infra apply --env dev
 ## Features
 
 - Pluggable providers (Proxmox, OPNsense, Kubernetes; extensible)
-- Pluggable secrets (SOPS/age default; Vault/AWS/custom via SecretProvider)
+- Secrets management via SOPS/age (pluggable backends planned — see #419)
 - YAML-only configuration; generated Terraform/Ansible artifacts
 - Separate config repos; CI/CD-ready with GitHub/GitLab examples
 - State/history tracking (SQLite/PostgreSQL)
