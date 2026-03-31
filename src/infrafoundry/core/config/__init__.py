@@ -10,7 +10,9 @@ from infrafoundry.core.config.backend_config import (
     S3BackendConfig,
     TerraformCloudBackendConfig,
 )
+from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
 from infrafoundry.core.config.config_manager import ConfigManager
+from infrafoundry.core.config.inventory_generator import InventoryGenerator
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool, PackageManifest, SSHConfig
 from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
@@ -21,10 +23,12 @@ __all__ = [
     "AzureBackendConfig",
     "BackendConfig",
     "BackendType",
+    "BlueprintResolver",
     "ConfigManager",
     "EnvironmentConfig",
     "GCSBackendConfig",
     "IaCTool",
+    "InventoryGenerator",
     "LocalBackendConfig",
     "PackageLoader",
     "PackageManifest",

@@ -3,20 +3,32 @@
 Discovers and loads infrastructure packages from provider subdirectories.
 Each package is a directory containing an infrafoundry.yml manifest that
 declares variables, resource templates, and event handlers.
+
+Packages may reference a shared blueprint via ``blueprint: <name>`` in
+their manifest.  When a blueprint is referenced the loader merges
+blueprint defaults, inherits resources/events/inventory if the package
+does not declare its own, and resolves file paths with a
+package-first / blueprint-fallback strategy.
 """
+
+from __future__ import annotations
 
 import copy
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import jinja2
 import yaml
 
+from infrafoundry.core.config.inventory_generator import InventoryGenerator
 from infrafoundry.core.config.models import PackageManifest
 from infrafoundry.core.config.sops import load_yaml_with_sops
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
+
+if TYPE_CHECKING:
+    from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +69,22 @@ class PackageLoader:
         }
     )
 
-    def __init__(self, base_dir: Path) -> None:
+    def __init__(
+        self,
+        base_dir: Path,
+        blueprint_resolver: BlueprintResolver | None = None,
+    ) -> None:
         """Initialize package loader.
 
         Args:
             base_dir: Base directory for environment configs (e.g., ./envs)
+            blueprint_resolver: Optional resolver for blueprint references.
+                When ``None``, packages that declare ``blueprint:`` will
+                raise an error.
         """
         self.base_dir = base_dir
+        self._blueprint_resolver = blueprint_resolver
+        self._inventory_generator = InventoryGenerator()
 
     def discover_packages(self, env_name: str, provider: str) -> list[Path]:
         """Find subdirectories of a provider directory that contain a manifest.
@@ -129,8 +150,10 @@ class PackageLoader:
     ) -> tuple[list[ResourceConfig], dict[str, list[dict[str, Any]]], dict[str, Any]]:
         """Load an infrastructure package.
 
-        Parses the manifest, renders resource templates with variables,
-        and rewrites event handler script paths.
+        Parses the manifest, optionally resolves a blueprint reference,
+        merges variables (blueprint defaults < package < secrets),
+        renders resource templates, rewrites event handler script paths,
+        and generates inventory if declared.
 
         Args:
             package_dir: Path to the package directory
@@ -148,7 +171,36 @@ class PackageLoader:
         manifest_path = package_dir / self.MANIFEST_FILENAME
         manifest = self._parse_manifest(manifest_path)
 
-        # Load and merge secrets if secrets.yaml exists
+        # ----- Blueprint resolution -----
+        blueprint: dict[str, Any] | None = None
+        blueprint_dir: Path | None = None
+
+        if manifest.blueprint:
+            if self._blueprint_resolver is None:
+                raise InvalidConfigurationError(
+                    f"Package '{manifest.name}' references blueprint "
+                    f"'{manifest.blueprint}' but no blueprint resolver is configured"
+                )
+            blueprint = self._blueprint_resolver.resolve(manifest.blueprint)
+            blueprint_dir = blueprint["blueprint_dir"]
+
+            # Merge defaults: blueprint defaults < package variables
+            merged_vars: dict[str, Any] = {**blueprint["defaults"], **manifest.variables}
+            manifest.variables = merged_vars
+
+            # Inherit resources from blueprint if package doesn't declare its own
+            if not manifest.resources and blueprint["resources"]:
+                manifest.resources = list(blueprint["resources"])
+
+            # Inherit events from blueprint if package doesn't declare its own
+            if not manifest.events and blueprint["events"]:
+                manifest.events = dict(blueprint["events"])
+
+            # Inherit inventory from blueprint if package doesn't declare its own
+            if manifest.inventory is None and blueprint.get("inventory"):
+                manifest.inventory = dict(blueprint["inventory"])
+
+        # ----- Secrets -----
         secrets_path = package_dir / "secrets.yaml"
         if secrets_path.exists():
             secrets_data = load_yaml_with_sops(secrets_path)
@@ -165,34 +217,48 @@ class PackageLoader:
         effective_provider = manifest.provider or provider
 
         logger.debug(
-            "Loading package '%s' from %s (provider=%s, env=%s)",
+            "Loading package '%s' from %s (provider=%s, env=%s, blueprint=%s)",
             manifest.name,
             package_dir,
             effective_provider,
             env_name,
+            manifest.blueprint or "none",
         )
 
-        # Render and parse resource files
+        # ----- Resources -----
         resources: list[ResourceConfig] = []
         for resource_file in manifest.resources:
-            resource_path = package_dir / resource_file
+            resource_path = self._resolve_package_file(resource_file, package_dir, blueprint_dir)
             data = self._render_resource_file(resource_path, manifest.variables)
             parsed = self._parse_resources_from_data(data, resource_file, effective_provider)
             resources.extend(parsed)
 
-        # Rewrite event script paths (package-level)
+        # ----- Events -----
         env_dir = self.base_dir / env_name
-        events = self._rewrite_event_scripts(manifest.events, package_dir, env_dir)
+        events = self._rewrite_event_scripts(
+            manifest.events, package_dir, env_dir, blueprint_dir=blueprint_dir
+        )
 
         # Tag each handler config with its originating package name
         for _event_key, handler_list in events.items():
             for handler_config in handler_list:
                 handler_config["_package"] = manifest.name
+                if blueprint_dir:
+                    handler_config["_blueprint_dir"] = str(blueprint_dir)
 
         # Rewrite resource-level event script paths
         for resource in resources:
             if resource.events:
-                resource.events = self._rewrite_event_scripts(resource.events, package_dir, env_dir)
+                resource.events = self._rewrite_event_scripts(
+                    resource.events, package_dir, env_dir, blueprint_dir=blueprint_dir
+                )
+
+        # ----- Inventory generation -----
+        if manifest.inventory:
+            inventory_path = self._inventory_generator.generate(
+                manifest.inventory, manifest.variables, package_dir
+            )
+            logger.info("Generated inventory for package '%s': %s", manifest.name, inventory_path)
 
         return resources, events, dict(manifest.variables)
 
@@ -368,21 +434,55 @@ class PackageLoader:
             )
         return result
 
+    def _resolve_package_file(
+        self,
+        filename: str,
+        package_dir: Path,
+        blueprint_dir: Path | None,
+    ) -> Path:
+        """Resolve a file with package-first, blueprint fallback.
+
+        Args:
+            filename: Relative filename to locate.
+            package_dir: Package directory (checked first).
+            blueprint_dir: Blueprint directory (fallback).  ``None``
+                means no fallback.
+
+        Returns:
+            Absolute path to the resolved file.
+
+        Raises:
+            InvalidConfigurationError: If the file is not found.
+        """
+        if self._blueprint_resolver and blueprint_dir:
+            return self._blueprint_resolver.resolve_file(filename, package_dir, blueprint_dir)
+
+        package_path = package_dir / filename
+        if not package_path.exists():
+            raise InvalidConfigurationError(f"Resource file not found: {package_path}")
+        return package_path
+
     def _rewrite_event_scripts(
         self,
         events: dict[str, list[dict[str, Any]]],
         package_dir: Path,
         env_dir: Path,
+        *,
+        blueprint_dir: Path | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
-        """Rewrite script paths in event handlers to be relative to env dir.
+        """Rewrite script paths in event handlers.
 
-        For each handler with type=script, the script path is prepended
-        with the relative path from the env directory to the package directory.
+        For each handler with type=script, the script path is resolved
+        using the package-first / blueprint-fallback strategy.  If the
+        script lives in the package dir the path is rewritten relative
+        to *env_dir*.  If it lives in the blueprint dir an absolute path
+        is stored instead (because the blueprint is outside the env tree).
 
         Args:
             events: Event handler configurations from the manifest
             package_dir: Path to the package directory
             env_dir: Path to the environment directory
+            blueprint_dir: Optional blueprint directory for fallback
 
         Returns:
             Deep copy of events with rewritten script paths
@@ -390,12 +490,50 @@ class PackageLoader:
         if not events:
             return {}
 
-        rel_path = package_dir.relative_to(env_dir)
         rewritten = copy.deepcopy(events)
 
         for _, handlers in rewritten.items():
             for handler in handlers:
                 if handler.get("type") == "script" and "script" in handler:
-                    handler["script"] = str(rel_path / handler["script"])
+                    script_name = handler["script"]
+
+                    # Resolve script file location
+                    resolved = self._resolve_script_path(
+                        script_name, package_dir, env_dir, blueprint_dir
+                    )
+                    handler["script"] = resolved
 
         return rewritten
+
+    def _resolve_script_path(
+        self,
+        script_name: str,
+        package_dir: Path,
+        env_dir: Path,
+        blueprint_dir: Path | None,
+    ) -> str:
+        """Resolve a single script path.
+
+        Args:
+            script_name: Script filename from the manifest.
+            package_dir: Package directory.
+            env_dir: Environment directory.
+            blueprint_dir: Optional blueprint directory.
+
+        Returns:
+            Rewritten path string (relative to env_dir or absolute for
+            blueprint scripts).
+        """
+        package_script = package_dir / script_name
+        if package_script.exists():
+            rel_path = package_dir.relative_to(env_dir)
+            return str(rel_path / script_name)
+
+        if blueprint_dir:
+            blueprint_script = blueprint_dir / script_name
+            if blueprint_script.exists():
+                return str(blueprint_script)
+
+        # Fall back to package-relative (original behaviour)
+        rel_path = package_dir.relative_to(env_dir)
+        return str(rel_path / script_name)

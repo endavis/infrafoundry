@@ -95,8 +95,17 @@ class ScriptHandler(BaseHandler):
             EventResult with script output
         """
         env_dir = self.config_base_dir / "envs" / context.environment
-        script_path = env_dir / self.config["script"]
+        raw_script = self.config["script"]
         timeout = self.config.get("timeout", 300)
+
+        # Resolve script path: absolute paths (from blueprint resolution)
+        # are used directly; relative paths are resolved against env_dir
+        script_candidate = Path(raw_script)
+        script_path = script_candidate if script_candidate.is_absolute() else env_dir / raw_script
+
+        # Determine working directory: blueprint dir if set, else env_dir
+        blueprint_dir_str = self.config.get("_blueprint_dir")
+        working_dir = Path(blueprint_dir_str) if blueprint_dir_str else env_dir
 
         # Validate script exists
         if not script_path.exists():
@@ -117,12 +126,23 @@ class ScriptHandler(BaseHandler):
         # Prepare environment
         env = self._prepare_environment(context, env_dir)
 
+        # Inject blueprint-specific env vars
+        if blueprint_dir_str:
+            env["INFRAFOUNDRY_BLUEPRINT_DIR"] = blueprint_dir_str
+
+        # Inject inventory path if a generated inventory exists
+        package_dir = self.config.get("_package_dir")
+        if package_dir:
+            inventory_path = Path(package_dir) / ".generated-inventory.yml"
+            if inventory_path.exists():
+                env["INFRAFOUNDRY_INVENTORY"] = str(inventory_path)
+
         # Execute script with real-time streaming
         start_time = time.monotonic()
         try:
             process = subprocess.Popen(  # nosec B603 - user-controlled scripts
                 [str(script_path)],
-                cwd=env_dir,
+                cwd=working_dir,
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
