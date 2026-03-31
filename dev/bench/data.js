@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774959542971,
+  "lastUpdate": 1774967015298,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3286,6 +3286,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000033738672896181125",
             "extra": "mean: 149.9775242556355 usec\nrounds: 1814"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4c2feb3ef6419d2cafc4c2ed81159851078b9f12",
+          "message": "fix: blueprint resolver, event rendering, and ontap-cluster blueprint (merges PR #459, addresses #456)\n\n- Move blueprints to framework repo (resolve via pyproject.toml root)\n- Render event handler configs through Jinja2 for variable resolution\n  in requires/resources fields\n- Fix CIFS server when condition to check name, not dict length\n- Conditionally build volume/export policy lists in playbook\n- Add ontap-cluster as the first framework blueprint\n- Fix test fixtures for framework-local blueprint resolution\n- Add blueprints/ to .gitignore yaml exceptions\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-31T15:23:02+01:00",
+          "tree_id": "7d10167174d33d0efc2befd424b69246bc1af351",
+          "url": "https://github.com/endavis/infrafoundry/commit/4c2feb3ef6419d2cafc4c2ed81159851078b9f12"
+        },
+        "date": 1774967014822,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7417.916573692935,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009129378433643705",
+            "extra": "mean: 134.80874178963165 usec\nrounds: 3319"
           }
         ]
       }
