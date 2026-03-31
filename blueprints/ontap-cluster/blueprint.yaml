@@ -68,10 +68,9 @@ defaults:
   cifs_vol_size: 1
 
   # --- DHCP ---
+  # MAC addresses use generate_mac filter for deterministic uniqueness.
+  # Override in package infrafoundry.yml if you need specific MACs.
   dhcp_subnet: opt1-infrastructure
-  data_lif1_mac: ""
-  data_lif2_mac: ""
-  cluster_mgmt_mac: "01:01:01:01:01:01"
 
 resources:
   - vm.yaml
