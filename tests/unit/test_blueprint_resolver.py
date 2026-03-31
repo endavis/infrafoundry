@@ -7,6 +7,13 @@ from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
 from infrafoundry.core.exceptions import InvalidConfigurationError
 
 
+def _make_resolver(base_dir):
+    """Create a BlueprintResolver with blueprints_dir overridden for testing."""
+    resolver = BlueprintResolver(base_dir)
+    resolver.blueprints_dir = base_dir.parent / "blueprints"
+    return resolver
+
+
 def _create_blueprint(base_dir, name, manifest_data, extra_files=None):
     """Helper to create a blueprint directory structure.
 
@@ -45,7 +52,7 @@ class TestBlueprintResolverResolve:
         """All fields are parsed and returned correctly."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         manifest = {
             "name": "ontap-cluster",
@@ -73,7 +80,7 @@ class TestBlueprintResolverResolve:
         """Name-only blueprint works with defaults for optional fields."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         _create_blueprint(envs_dir, "minimal", {"name": "minimal"})
 
@@ -91,7 +98,7 @@ class TestBlueprintResolverResolve:
         """Resolving a missing blueprint raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         with pytest.raises(InvalidConfigurationError, match="not found"):
             resolver.resolve("nonexistent")
@@ -100,7 +107,7 @@ class TestBlueprintResolverResolve:
         """Directory without blueprint.yaml raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         # Create directory without manifest
         bp_dir = envs_dir.parent / "blueprints" / "no-manifest"
@@ -113,7 +120,7 @@ class TestBlueprintResolverResolve:
         """Invalid YAML in manifest raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         bp_dir = envs_dir.parent / "blueprints" / "bad-yaml"
         bp_dir.mkdir(parents=True)
@@ -126,7 +133,7 @@ class TestBlueprintResolverResolve:
         """Manifest without name field raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         _create_blueprint(envs_dir, "no-name", {"description": "missing name"})
 
@@ -137,7 +144,7 @@ class TestBlueprintResolverResolve:
         """Empty manifest file raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         bp_dir = envs_dir.parent / "blueprints" / "empty"
         bp_dir.mkdir(parents=True)
@@ -155,7 +162,7 @@ class TestBlueprintResolverExists:
         """Returns True for valid blueprint."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         _create_blueprint(envs_dir, "test-bp", {"name": "test-bp"})
 
@@ -165,7 +172,7 @@ class TestBlueprintResolverExists:
         """Returns False for non-existent blueprint."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         assert resolver.exists("nonexistent") is False
 
@@ -173,7 +180,7 @@ class TestBlueprintResolverExists:
         """Returns False for directory without blueprint.yaml."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         bp_dir = envs_dir.parent / "blueprints" / "no-manifest"
         bp_dir.mkdir(parents=True)
@@ -189,7 +196,7 @@ class TestBlueprintResolverListBlueprints:
         """Lists all valid blueprints sorted by name."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         _create_blueprint(envs_dir, "zeta-bp", {"name": "zeta"})
         _create_blueprint(envs_dir, "alpha-bp", {"name": "alpha"})
@@ -201,7 +208,7 @@ class TestBlueprintResolverListBlueprints:
         """Returns empty list when no blueprints directory exists."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         assert resolver.list_blueprints() == []
 
@@ -209,7 +216,7 @@ class TestBlueprintResolverListBlueprints:
         """Skips directories without blueprint.yaml."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         _create_blueprint(envs_dir, "valid", {"name": "valid"})
         # Create dir without manifest
@@ -227,7 +234,7 @@ class TestBlueprintResolverResolveFile:
         """File in package dir is preferred over blueprint."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         package_dir = temp_dir / "pkg"
         package_dir.mkdir()
@@ -244,7 +251,7 @@ class TestBlueprintResolverResolveFile:
         """File not in package falls back to blueprint."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         package_dir = temp_dir / "pkg"
         package_dir.mkdir()
@@ -260,7 +267,7 @@ class TestBlueprintResolverResolveFile:
         """Nested paths (scripts/setup.sh) resolve correctly."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         package_dir = temp_dir / "pkg"
         package_dir.mkdir()
@@ -277,7 +284,7 @@ class TestBlueprintResolverResolveFile:
         """File in neither location raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
-        resolver = BlueprintResolver(envs_dir)
+        resolver = _make_resolver(envs_dir)
 
         package_dir = temp_dir / "pkg"
         package_dir.mkdir()

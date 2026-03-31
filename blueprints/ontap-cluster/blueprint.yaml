@@ -1,0 +1,90 @@
+name: ontap-cluster
+description: "NetApp ONTAP Simulator 2-node cluster on Proxmox"
+version: "1.0.0"
+
+defaults:
+  # --- VM Configuration ---
+  disk_storage: nas01
+  ova_source: "/mnt/pve/infra/appliances/ontap/9.18.1/vsim-netapp-DOT9.18.1-cm_nodar.ova"
+
+  # --- Network ---
+  bridge: vmbr0
+  mgmt_vlan: 10
+
+  # --- MAC Addresses (optional — set for DHCP reservations) ---
+  node01_mgmt_mac: ""
+  node01_data_mac: ""
+  node02_mgmt_mac: ""
+  node02_data_mac: ""
+
+  # --- Node 02 Identity (standard ONTAP simulator defaults) ---
+  node02_serial_number: "4034389-06-2"
+  node02_sysid: "4034389062"
+
+  # --- Netmasks/Gateways ---
+  cluster_mgmt_mask: "255.255.255.0"
+  node_mgmt_mask: "255.255.255.0"
+
+  # --- Licenses (standard ONTAP simulator keys) ---
+  ontap_cluster_base_license: SMKQROWJNQYQSDAAAAAAAAAAAAAA
+  ontap_licenses:
+    # Node 1 (Serial 4082368507)
+    - YVUCRRRRYVHXCFABGAAAAAAAAAAA   # CIFS
+    - WKQGSRRRYVHXCFABGAAAAAAAAAAA   # FCP
+    - SOHOURRRYVHXCFABGAAAAAAAAAAA   # FlexClone
+    - KQSRRRRRYVHXCFABGAAAAAAAAAAA   # iSCSI
+    - MBXNQRRRYVHXCFABGAAAAAAAAAAA   # NFS
+    - GUJZTRRRYVHXCFABGAAAAAAAAAAA   # SnapMirror
+    - UZLKTRRRYVHXCFABGAAAAAAAAAAA   # SnapRestore
+    - EJFDVRRRYVHXCFABGAAAAAAAAAAA   # SnapVault
+    # Node 2 (Serial 4034389062)
+    - MHEYKUNFXMSMUCEZFAAAAAAAAAAA   # CIFS
+    - KWZBMUNFXMSMUCEZFAAAAAAAAAAA   # FCP
+    - GARJOUNFXMSMUCEZFAAAAAAAAAAA   # FlexClone
+    - YBCNLUNFXMSMUCEZFAAAAAAAAAAA   # iSCSI
+    - ANGJKUNFXMSMUCEZFAAAAAAAAAAA   # NFS
+    - UFTUNUNFXMSMUCEZFAAAAAAAAAAA   # SnapMirror
+    - ILVFNUNFXMSMUCEZFAAAAAAAAAAA   # SnapRestore
+    - SUOYOUNFXMSMUCEZFAAAAAAAAAAA   # SnapVault
+
+  # --- Post-Cluster: SVM ---
+  svm_name: svm_data
+  data_lif_mask: "255.255.255.0"
+
+  # --- CIFS Server (workgroup mode) ---
+  cifs_server_name: ""
+  cifs_workgroup: WORKGROUP
+
+  # --- NFS Export Policy ---
+  nfs_export_policy: ""
+  nfs_client_match: ""
+
+  # --- Volumes ---
+  nfs_vol_name: ""
+  nfs_vol_aggregate: ""
+  nfs_vol_size: 1
+  cifs_vol_name: ""
+  cifs_vol_aggregate: ""
+  cifs_vol_size: 1
+
+  # --- DHCP ---
+  dhcp_subnet: opt1-infrastructure
+  data_lif1_mac: ""
+  data_lif2_mac: ""
+  cluster_mgmt_mac: "01:01:01:01:01:01"
+
+resources:
+  - vm.yaml
+  - dhcp.yaml
+
+events:
+  on_create:
+    - type: script
+      name: ontap-cluster-setup
+      script: scripts/ontap-post-terraform.sh
+      description: "Run ONTAP lab Ansible playbook after both VMs are created"
+      timeout: 3600
+      continue_on_error: false
+      requires:
+        - "{{ node01_name }}"
+        - "{{ node02_name }}"
