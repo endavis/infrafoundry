@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774905585346,
+  "lastUpdate": 1774952785635,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3224,6 +3224,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000042802027972151784",
             "extra": "mean: 170.4481191369448 usec\nrounds: 2409"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d98b0cd18c41fca1e47ea0ef4de57d14fe7f6ee8",
+          "message": "docs: fix overclaimed features in AGENTS.md and README (merges PR #455, addresses #247)\n\nClarify state locking is Terraform backend responsibility, not an\nInfraFoundry feature. Update secrets claim to reflect SOPS-only\nreality with pluggable backends planned (#419).\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-31T11:25:47+01:00",
+          "tree_id": "bb0861e4b250fa344d00c5f5f23d94c914b69e1c",
+          "url": "https://github.com/endavis/infrafoundry/commit/d98b0cd18c41fca1e47ea0ef4de57d14fe7f6ee8"
+        },
+        "date": 1774952784738,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6405.362658847877,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000035239135811645105",
+            "extra": "mean: 156.11918532335974 usec\nrounds: 2412"
           }
         ]
       }
