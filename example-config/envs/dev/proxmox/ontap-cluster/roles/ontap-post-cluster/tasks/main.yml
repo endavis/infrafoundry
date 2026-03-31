@@ -160,6 +160,30 @@
     label: "{{ item.name }}"
 
 # ---------------------------------------------------------------
+# Ensure data service policy includes NFS and CIFS
+# ONTAP 9.18+ uses service policies instead of protocol-based LIF assignment.
+# ---------------------------------------------------------------
+- name: Ensure data service policy includes NFS and CIFS services
+  netapp.ontap.na_ontap_service_policy:
+    <<: *ontap_conn
+    state: present
+    name: default-data-files
+    vserver: "{{ item.name }}"
+    services:
+      - data_core
+      - data_nfs
+      - data_cifs
+      - data_fpolicy_client
+      - management_dns_client
+      - management_ad_client
+      - management_ldap_client
+      - management_nis_client
+      - data_dns_server
+  loop: "{{ ontap_svms }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# ---------------------------------------------------------------
 # Data LIF creation
 # ---------------------------------------------------------------
 - name: Create data LIFs
