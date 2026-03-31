@@ -13,12 +13,16 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
     ssh_target = "{{ ssh_target }}"
   }
 
-  # Phase 1: Extract OVA to temp directory on Proxmox host
+  # Phase 1: Extract OVA to temp directory on Proxmox host (skip if VMDKs exist)
   provisioner "local-exec" {
     command = <<-EOT
       ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} \
         "mkdir -p /tmp/ova-${self.triggers_replace.name} && \
-         tar -xf ${self.triggers_replace.ova_source} -C /tmp/ova-${self.triggers_replace.name}"
+         if ! ls /tmp/ova-${self.triggers_replace.name}/*.vmdk 1>/dev/null 2>&1; then \
+           tar -xf ${self.triggers_replace.ova_source} -C /tmp/ova-${self.triggers_replace.name}; \
+         else \
+           echo 'VMDKs already exist, skipping extraction'; \
+         fi"
     EOT
   }
 
@@ -66,7 +70,7 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
     EOT
   }
 
-  # Phase 4: Configure boot order and cleanup temp files
+  # Phase 4: Configure boot order (extracted files persist for future runs)
   provisioner "local-exec" {
     command = <<-EOT
       ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} "
@@ -81,7 +85,6 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
         {% if vm.config.tags is defined %}
         qm set ${self.triggers_replace.vmid} --tags {{ vm.config.tags | join(',') }}
         {% endif %}
-        rm -rf /tmp/ova-${self.triggers_replace.name}
       "
     EOT
   }
