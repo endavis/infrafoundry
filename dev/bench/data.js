@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774985866287,
+  "lastUpdate": 1774986931923,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3410,6 +3410,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000253448957996936",
             "extra": "mean: 142.1870595041893 usec\nrounds: 2420"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "495bf10ddfc0690c5423abed989561503389a793",
+          "message": "fix: add data_nfs and data_cifs to ONTAP data LIF service policy (merges PR #464, addresses #463)\n\nONTAP 9.18+ uses service policies instead of protocol-based LIF assignment.\nThe default-data-files policy was missing data_nfs and data_cifs, preventing\nNFS/CIFS traffic on data LIFs even when the protocols were enabled.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-31T20:54:56+01:00",
+          "tree_id": "115791ab2272e636ff406adfd613e0ede6c95070",
+          "url": "https://github.com/endavis/infrafoundry/commit/495bf10ddfc0690c5423abed989561503389a793"
+        },
+        "date": 1774986931275,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7253.611920306804,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001085608145885155",
+            "extra": "mean: 137.86235202361135 usec\nrounds: 2372"
           }
         ]
       }
