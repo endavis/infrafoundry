@@ -67,6 +67,19 @@ class TestOVAExtraction:
         content = _render_ova_vms(provider, vms)
         assert "/tmp/ova-${self.triggers_replace.name}" in content
 
+    def test_extraction_checks_for_existing_vmdks(self, provider):
+        """Phase 1 should check if VMDKs exist before extracting."""
+        vms = [_make_ova_vm()]
+        content = _render_ova_vms(provider, vms)
+        assert "ls /tmp/ova-${self.triggers_replace.name}/*.vmdk" in content
+        assert "skipping extraction" in content
+
+    def test_no_cleanup_in_phase_4(self, provider):
+        """Phase 4 should not delete extracted OVA files."""
+        vms = [_make_ova_vm()]
+        content = _render_ova_vms(provider, vms)
+        assert "rm -rf /tmp/ova-" not in content
+
 
 class TestOVADiskImport:
     """Tests for disk bus type rendering in import commands."""
