@@ -135,6 +135,11 @@ class TemplateRendererMixin:
         # Python repr for code generation
         self.jinja_env.filters["repr"] = repr
 
+        # Generate deterministic MAC addresses from strings
+        from infrafoundry.core.config.filters import generate_mac
+
+        self.jinja_env.filters["generate_mac"] = generate_mac
+
     def get_template(self, template_name: str) -> Template:
         """Load a Jinja2 template by name.
 
