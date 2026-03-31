@@ -239,7 +239,7 @@ def generate_terraform(self, resources: list[dict[str, Any]]) -> Path:
 - **YAML Unsafe Loading**: Always use `yaml.safe_load()`, never `yaml.load()`
 
 ### State Management Pitfalls
-- **Race Conditions**: Use state locking for concurrent operations
+- **Race Conditions**: Configure Terraform backend locking (e.g., S3+DynamoDB) for concurrent operations
 - **Stale State**: Always refresh state before operations
 - **Lost State**: Never delete generated configs without destroy first
 
