@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774980724628,
+  "lastUpdate": 1774985866287,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3379,6 +3379,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003658508699829966",
             "extra": "mean: 154.52252759198228 usec\nrounds: 2392"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "566c8cdbca1c53b87d545c33aa13ff653cf43fd5",
+          "message": "fix: use generate_mac filter in ontap-cluster blueprint for virtual IP MACs (merges PR #462, addresses #458)\n\nReplace hardcoded placeholder MACs with deterministic generate_mac filter\nfor cluster management and data LIF DHCP reservations. Each cluster\ninstance gets unique MACs derived from its name, preventing collisions.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-31T20:37:09+01:00",
+          "tree_id": "455314ac178716c31eb160f1d5d11ca7a88d6b39",
+          "url": "https://github.com/endavis/infrafoundry/commit/566c8cdbca1c53b87d545c33aa13ff653cf43fd5"
+        },
+        "date": 1774985865777,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7032.988821113757,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000253448957996936",
+            "extra": "mean: 142.1870595041893 usec\nrounds: 2420"
           }
         ]
       }
