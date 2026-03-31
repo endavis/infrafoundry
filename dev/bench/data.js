@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774970820558,
+  "lastUpdate": 1774980724628,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3348,6 +3348,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000903528663264604",
             "extra": "mean: 134.9236473989008 usec\nrounds: 2249"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4f948c0f8cfa16905ff34b600439557bd5226572",
+          "message": "feat: add generate_mac Jinja2 filter for deterministic virtual MAC addresses (merges PR #461, addresses #458)\n\nSHA-256 hash input string, format first 5 bytes as 02:xx:xx:xx:xx:xx\n(locally administered, unicast). Registered in package resource templates,\nevent rendering, and provider template environments.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-31T19:11:28+01:00",
+          "tree_id": "ebabd5cbb18d4c8bdfff4e129128bea535a024b1",
+          "url": "https://github.com/endavis/infrafoundry/commit/4f948c0f8cfa16905ff34b600439557bd5226572"
+        },
+        "date": 1774980723927,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6471.548295148952,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003658508699829966",
+            "extra": "mean: 154.52252759198228 usec\nrounds: 2392"
           }
         ]
       }
