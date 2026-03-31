@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774952785635,
+  "lastUpdate": 1774959542971,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3255,6 +3255,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000035239135811645105",
             "extra": "mean: 156.11918532335974 usec\nrounds: 2412"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c667ce3566f6ea56431ab9d1e3ad0f693bfa4ec0",
+          "message": "feat: add package blueprints with shared templates and inventory generation (merges PR #457, addresses #456, #348)\n\nfeat: add package blueprints and inventory generation\n\nIntroduce BlueprintResolver for shared reusable package templates\nreferenced via `blueprint:` in manifests, and InventoryGenerator for\ndeclarative Ansible inventory from manifest `inventory:` sections.\nPackages inherit blueprint defaults, resources, events, and inventory\nwith package-first override semantics.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-31T13:18:29+01:00",
+          "tree_id": "640d054d0695a8c53c363269b853a8f578471a24",
+          "url": "https://github.com/endavis/infrafoundry/commit/c667ce3566f6ea56431ab9d1e3ad0f693bfa4ec0"
+        },
+        "date": 1774959542365,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6667.665738337619,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000033738672896181125",
+            "extra": "mean: 149.9775242556355 usec\nrounds: 1814"
           }
         ]
       }
