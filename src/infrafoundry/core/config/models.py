@@ -130,6 +130,8 @@ class PackageManifest(BaseModel):
     name: str
     description: str | None = None
     provider: str | None = None
+    blueprint: str | None = None
     variables: dict[str, Any] = Field(default_factory=dict)
     resources: list[str] = Field(default_factory=list)
     events: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+    inventory: dict[str, Any] | None = None

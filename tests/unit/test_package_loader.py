@@ -3,6 +3,8 @@
 import pytest
 import yaml
 
+from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
+from infrafoundry.core.config.inventory_generator import GENERATED_INVENTORY_FILENAME
 from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.exceptions import InvalidConfigurationError
 
@@ -635,3 +637,423 @@ resources:
         assert len(resources) == 1
         assert resources[0].name == "ontap-01"
         assert resources[0].config["vmid"] == 220
+
+
+def _create_blueprint(base_dir, name, manifest_data, extra_files=None):
+    """Helper to create a blueprint directory under config_repo/blueprints/.
+
+    Args:
+        base_dir: The envs/ directory (base_dir.parent / "blueprints" is used)
+        name: Blueprint name
+        manifest_data: Dict for blueprint.yaml
+        extra_files: Optional dict of relative_path -> content
+    """
+    blueprint_dir = base_dir.parent / "blueprints" / name
+    blueprint_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest_path = blueprint_dir / "blueprint.yaml"
+    with open(manifest_path, "w") as f:
+        yaml.dump(manifest_data, f)
+
+    if extra_files:
+        for rel_path, content in extra_files.items():
+            file_path = blueprint_dir / rel_path
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(content, str):
+                file_path.write_text(content)
+            else:
+                with open(file_path, "w") as f:
+                    yaml.dump(content, f)
+
+    return blueprint_dir
+
+
+@pytest.mark.unit
+class TestBlueprintIntegration:
+    """Tests for blueprint resolution in PackageLoader."""
+
+    def test_blueprint_defaults_merged(self, temp_dir):
+        """Blueprint defaults are merged under package variables."""
+        resolver = BlueprintResolver(temp_dir)
+        _create_blueprint(
+            temp_dir,
+            "test-bp",
+            {
+                "name": "test-bp",
+                "defaults": {"cluster_name": "default-cluster", "node_count": 2},
+                "resources": ["vm.yaml"],
+            },
+            {"vm.yaml": "vm:\n  - name: {{ cluster_name }}-node\n    count: {{ node_count }}\n"},
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        # Package overrides cluster_name but inherits node_count
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "my-cluster",
+            {
+                "name": "my-cluster",
+                "blueprint": "test-bp",
+                "variables": {"cluster_name": "prod-cluster"},
+            },
+        )
+
+        resources, _, variables = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert len(resources) == 1
+        assert resources[0].name == "prod-cluster-node"
+        assert variables["cluster_name"] == "prod-cluster"
+        assert variables["node_count"] == 2
+
+    def test_blueprint_resources_inherited(self, temp_dir):
+        """Package without resources inherits from blueprint."""
+        resolver = BlueprintResolver(temp_dir)
+        _create_blueprint(
+            temp_dir,
+            "infra-bp",
+            {
+                "name": "infra-bp",
+                "defaults": {"vm_name": "web"},
+                "resources": ["vm.yaml"],
+            },
+            {"vm.yaml": "vm:\n  - name: {{ vm_name }}-01\n"},
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "web-pkg",
+            {
+                "name": "web-pkg",
+                "blueprint": "infra-bp",
+            },
+        )
+
+        resources, _, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert len(resources) == 1
+        assert resources[0].name == "web-01"
+
+    def test_blueprint_events_inherited(self, temp_dir):
+        """Package without events inherits from blueprint."""
+        resolver = BlueprintResolver(temp_dir)
+        bp_dir = _create_blueprint(
+            temp_dir,
+            "event-bp",
+            {
+                "name": "event-bp",
+                "events": {"AFTER_APPLY": [{"type": "script", "script": "scripts/setup.sh"}]},
+            },
+            {"scripts/setup.sh": "#!/bin/bash\necho setup\n"},
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "event-pkg",
+            {
+                "name": "event-pkg",
+                "blueprint": "event-bp",
+            },
+        )
+
+        _, events, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert "AFTER_APPLY" in events
+        # Script resolves to blueprint (absolute path) since not in package
+        assert str(bp_dir) in events["AFTER_APPLY"][0]["script"]
+
+    def test_package_overrides_blueprint_resources(self, temp_dir):
+        """Package's own resources take priority over blueprint."""
+        resolver = BlueprintResolver(temp_dir)
+        _create_blueprint(
+            temp_dir,
+            "override-bp",
+            {
+                "name": "override-bp",
+                "defaults": {"name_prefix": "bp"},
+                "resources": ["vm.yaml"],
+            },
+            {"vm.yaml": "vm:\n  - name: {{ name_prefix }}-node\n"},
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "custom-pkg",
+            {
+                "name": "custom-pkg",
+                "blueprint": "override-bp",
+                "variables": {"name_prefix": "custom"},
+                "resources": ["vm.yaml"],
+            },
+            {"vm.yaml": "vm:\n  - name: {{ name_prefix }}-custom\n"},
+        )
+
+        resources, _, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert len(resources) == 1
+        assert resources[0].name == "custom-custom"
+
+    def test_blueprint_file_fallback(self, temp_dir):
+        """Resource files fall back to blueprint dir when not in package."""
+        resolver = BlueprintResolver(temp_dir)
+        _create_blueprint(
+            temp_dir,
+            "fallback-bp",
+            {
+                "name": "fallback-bp",
+                "defaults": {"host": "web"},
+                "resources": ["vm.yaml"],
+            },
+            {"vm.yaml": "vm:\n  - name: {{ host }}-server\n"},
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        # Package references vm.yaml from blueprint resources,
+        # but does NOT have vm.yaml locally
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "fallback-pkg",
+            {
+                "name": "fallback-pkg",
+                "blueprint": "fallback-bp",
+            },
+        )
+
+        resources, _, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert len(resources) == 1
+        assert resources[0].name == "web-server"
+
+    def test_package_file_preferred_over_blueprint(self, temp_dir):
+        """Package's own resource file is used even if blueprint has same name."""
+        resolver = BlueprintResolver(temp_dir)
+        _create_blueprint(
+            temp_dir,
+            "prefer-bp",
+            {
+                "name": "prefer-bp",
+                "defaults": {"x": "bp-value"},
+                "resources": ["vm.yaml"],
+            },
+            {"vm.yaml": "vm:\n  - name: blueprint-vm\n"},
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "prefer-pkg",
+            {
+                "name": "prefer-pkg",
+                "blueprint": "prefer-bp",
+            },
+            {"vm.yaml": "vm:\n  - name: package-vm\n"},
+        )
+
+        resources, _, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert len(resources) == 1
+        assert resources[0].name == "package-vm"
+
+    def test_no_blueprint_works_unchanged(self, temp_dir):
+        """Packages without blueprint: key work exactly as before."""
+        resolver = BlueprintResolver(temp_dir)
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "normal-pkg",
+            {
+                "name": "normal-pkg",
+                "variables": {"prefix": "app"},
+                "resources": ["vm.yaml"],
+            },
+            {"vm.yaml": "vm:\n  - name: {{ prefix }}-01\n"},
+        )
+
+        resources, _, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert len(resources) == 1
+        assert resources[0].name == "app-01"
+
+    def test_blueprint_without_resolver_raises(self, temp_dir):
+        """Package referencing blueprint without resolver raises error."""
+        loader = PackageLoader(temp_dir)  # No resolver
+
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "bad-pkg",
+            {
+                "name": "bad-pkg",
+                "blueprint": "nonexistent",
+            },
+        )
+
+        with pytest.raises(InvalidConfigurationError, match="no blueprint resolver"):
+            loader.load_package(pkg_dir, "proxmox", "dev")
+
+    def test_blueprint_inventory_inherited(self, temp_dir):
+        """Inventory from blueprint is inherited and generated."""
+        resolver = BlueprintResolver(temp_dir)
+        _create_blueprint(
+            temp_dir,
+            "inv-bp",
+            {
+                "name": "inv-bp",
+                "defaults": {"host_ip": "10.0.0.1"},
+                "inventory": {
+                    "groups": {
+                        "servers": {
+                            "hosts": {
+                                "server-01": {
+                                    "ansible_host": "{{ host_ip }}",
+                                }
+                            }
+                        }
+                    }
+                },
+            },
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "inv-pkg",
+            {
+                "name": "inv-pkg",
+                "blueprint": "inv-bp",
+            },
+        )
+
+        loader.load_package(pkg_dir, "proxmox", "dev")
+
+        inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
+        assert inventory_path.exists()
+
+        with open(inventory_path) as f:
+            data = yaml.safe_load(f)
+
+        assert data["groups"]["servers"]["hosts"]["server-01"]["ansible_host"] == "10.0.0.1"
+
+    def test_package_inventory_overrides_blueprint(self, temp_dir):
+        """Package's own inventory overrides blueprint inventory."""
+        resolver = BlueprintResolver(temp_dir)
+        _create_blueprint(
+            temp_dir,
+            "inv-override-bp",
+            {
+                "name": "inv-override-bp",
+                "defaults": {"host_ip": "10.0.0.1"},
+                "inventory": {"groups": {"blueprint_group": {"hosts": {"bp-host": {}}}}},
+            },
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "inv-override-pkg",
+            {
+                "name": "inv-override-pkg",
+                "blueprint": "inv-override-bp",
+                "inventory": {"groups": {"package_group": {"hosts": {"pkg-host": {}}}}},
+            },
+        )
+
+        loader.load_package(pkg_dir, "proxmox", "dev")
+
+        inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
+        assert inventory_path.exists()
+
+        with open(inventory_path) as f:
+            data = yaml.safe_load(f)
+
+        assert "package_group" in data["groups"]
+        assert "blueprint_group" not in data["groups"]
+
+    def test_blueprint_handler_tagged_with_blueprint_dir(self, temp_dir):
+        """Event handlers from blueprint packages have _blueprint_dir tag."""
+        resolver = BlueprintResolver(temp_dir)
+        bp_dir = _create_blueprint(
+            temp_dir,
+            "tagged-bp",
+            {
+                "name": "tagged-bp",
+                "events": {"AFTER_APPLY": [{"type": "script", "script": "scripts/run.sh"}]},
+            },
+            {"scripts/run.sh": "#!/bin/bash\necho run\n"},
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "tagged-pkg",
+            {
+                "name": "tagged-pkg",
+                "blueprint": "tagged-bp",
+            },
+        )
+
+        _, events, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        handler = events["AFTER_APPLY"][0]
+        assert handler["_blueprint_dir"] == str(bp_dir)
+        assert handler["_package"] == "tagged-pkg"
+
+    def test_secrets_override_blueprint_defaults(self, temp_dir):
+        """Secrets take priority over both blueprint defaults and package vars."""
+        resolver = BlueprintResolver(temp_dir)
+        _create_blueprint(
+            temp_dir,
+            "secret-bp",
+            {
+                "name": "secret-bp",
+                "defaults": {"password": "bp-default", "host": "bp-host"},
+                "resources": ["vm.yaml"],
+            },
+            {"vm.yaml": "vm:\n  - name: {{ host }}\n"},
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "secret-pkg",
+            {
+                "name": "secret-pkg",
+                "blueprint": "secret-bp",
+                "variables": {"host": "pkg-host"},
+            },
+            # secrets.yaml with variable overrides
+            {"secrets.yaml": "variables:\n  password: secret-password\n  host: secret-host\n"},
+        )
+
+        resources, _, variables = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        # Secrets override everything
+        assert variables["password"] == "secret-password"
+        assert variables["host"] == "secret-host"
+        assert resources[0].name == "secret-host"

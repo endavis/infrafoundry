@@ -3,26 +3,36 @@
 Loads resources from envs/{env}/{provider}/*.yaml files.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
 from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.provider import ResourceConfig
 
+if TYPE_CHECKING:
+    from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
+
 
 class ProviderCentricLoader:
     """Loads resources from provider-centric directory structure."""
 
-    def __init__(self, base_dir: Path) -> None:
+    def __init__(
+        self,
+        base_dir: Path,
+        blueprint_resolver: BlueprintResolver | None = None,
+    ) -> None:
         """Initialize loader.
 
         Args:
             base_dir: Base directory for environment configs (e.g., ./envs)
+            blueprint_resolver: Optional resolver for blueprint references.
         """
         self.base_dir = base_dir
-        self._package_loader = PackageLoader(base_dir)
+        self._package_loader = PackageLoader(base_dir, blueprint_resolver)
         self._pending_package_events: dict[str, list[dict[str, Any]]] = {}
 
     def load_resources(

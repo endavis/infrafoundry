@@ -8,6 +8,7 @@ from typing import Any
 import yaml
 
 from infrafoundry.core.base_manager import PathBasedManager
+from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
@@ -52,10 +53,11 @@ class ConfigManager(PathBasedManager):
         self.base_dir: Path = base_dir  # Type assertion - base_dir is always Path here
         self._log_debug(f"Initialized ConfigManager with base_dir: {self.base_dir}")
 
-        # Initialize loaders
-        self.provider_centric = ProviderCentricLoader(base_dir)
+        # Initialize blueprint resolver and loaders
+        self._blueprint_resolver = BlueprintResolver(base_dir)
+        self.provider_centric = ProviderCentricLoader(base_dir, self._blueprint_resolver)
         self.resource_centric = ResourceCentricLoader(base_dir)
-        self._package_loader = PackageLoader(base_dir)
+        self._package_loader = PackageLoader(base_dir, self._blueprint_resolver)
 
     def load_environment(self, env_name: str) -> EnvironmentConfig:
         """Load environment configuration.
