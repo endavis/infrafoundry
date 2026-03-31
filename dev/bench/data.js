@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774967015298,
+  "lastUpdate": 1774970820558,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3317,6 +3317,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009129378433643705",
             "extra": "mean: 134.80874178963165 usec\nrounds: 3319"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c0415a8f81d0e3787669afd5390c34f67093167e",
+          "message": "feat: skip OVA extraction when VMDKs already exist (merges PR #460, addresses #362)\n\nCheck for existing VMDKs before extracting OVA tar, and stop deleting\nextracted files after disk import so they persist for future runs.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-31T16:26:18+01:00",
+          "tree_id": "931a03834147649c2f850e71db1b815a5976d5a5",
+          "url": "https://github.com/endavis/infrafoundry/commit/c0415a8f81d0e3787669afd5390c34f67093167e"
+        },
+        "date": 1774970819440,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7411.599221324836,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000903528663264604",
+            "extra": "mean: 134.9236473989008 usec\nrounds: 2249"
           }
         ]
       }
