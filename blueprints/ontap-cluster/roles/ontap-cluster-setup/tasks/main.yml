@@ -1,0 +1,91 @@
+---
+# ONTAP Cluster Setup — Tasks
+#
+# Creates a new ONTAP cluster on the first node or joins an existing
+# cluster on subsequent nodes via the Proxmox serial socket.
+
+- name: Start VM if not running
+  ansible.builtin.command:
+    cmd: "qm start {{ ontap_vmid }}"
+  register: vm_start
+  failed_when: vm_start.rc != 0 and 'already running' not in vm_start.stderr
+  changed_when: vm_start.rc == 0
+
+- name: Wait for serial socket
+  ansible.builtin.wait_for:
+    path: "/var/run/qemu-server/{{ ontap_vmid }}.serial0"
+    timeout: 30
+
+- name: Deploy cluster create expect script
+  when: ontap_cluster_create | bool
+  ansible.builtin.template:
+    src: cluster-create.exp.j2
+    dest: "/tmp/ontap-cluster-create-{{ ontap_vmid }}.exp"
+    mode: "0755"
+
+- name: Run cluster create via expect script
+  when: ontap_cluster_create | bool
+  ansible.builtin.command:
+    cmd: "/tmp/ontap-cluster-create-{{ ontap_vmid }}.exp"
+  register: cluster_create
+  changed_when: true
+
+- name: Find cluster create log
+  when: ontap_cluster_create | bool
+  ansible.builtin.find:
+    paths: /tmp
+    patterns: "ontap-cluster-create-{{ ontap_vmid }}-*.log"
+  register: cluster_create_logs
+
+- name: Fetch cluster create log
+  when: ontap_cluster_create | bool
+  ansible.builtin.fetch:
+    src: "{{ item.path }}"
+    dest: "logs/{{ item.path | basename }}"
+    flat: true
+  loop: "{{ cluster_create_logs.files | default([]) }}"
+  ignore_errors: true
+
+- name: Clean up cluster create script and log
+  when: ontap_cluster_create | bool
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ ['/tmp/ontap-cluster-create-' + ontap_vmid | string + '.exp'] + (cluster_create_logs.files | default([]) | map(attribute='path') | list) }}"
+
+- name: Deploy cluster join expect script
+  when: not (ontap_cluster_create | bool)
+  ansible.builtin.template:
+    src: cluster-join.exp.j2
+    dest: "/tmp/ontap-cluster-join-{{ ontap_vmid }}.exp"
+    mode: "0755"
+
+- name: Run cluster join via expect script
+  when: not (ontap_cluster_create | bool)
+  ansible.builtin.command:
+    cmd: "/tmp/ontap-cluster-join-{{ ontap_vmid }}.exp"
+  register: cluster_join
+  changed_when: true
+
+- name: Find cluster join log
+  when: not (ontap_cluster_create | bool)
+  ansible.builtin.find:
+    paths: /tmp
+    patterns: "ontap-cluster-join-{{ ontap_vmid }}-*.log"
+  register: cluster_join_logs
+
+- name: Fetch cluster join log
+  when: not (ontap_cluster_create | bool)
+  ansible.builtin.fetch:
+    src: "{{ item.path }}"
+    dest: "logs/{{ item.path | basename }}"
+    flat: true
+  loop: "{{ cluster_join_logs.files | default([]) }}"
+  ignore_errors: true
+
+- name: Clean up cluster join script and log
+  when: not (ontap_cluster_create | bool)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ ['/tmp/ontap-cluster-join-' + ontap_vmid | string + '.exp'] + (cluster_join_logs.files | default([]) | map(attribute='path') | list) }}"

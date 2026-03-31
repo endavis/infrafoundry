@@ -675,6 +675,7 @@ class TestBlueprintIntegration:
     def test_blueprint_defaults_merged(self, temp_dir):
         """Blueprint defaults are merged under package variables."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         _create_blueprint(
             temp_dir,
             "test-bp",
@@ -710,6 +711,7 @@ class TestBlueprintIntegration:
     def test_blueprint_resources_inherited(self, temp_dir):
         """Package without resources inherits from blueprint."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         _create_blueprint(
             temp_dir,
             "infra-bp",
@@ -741,6 +743,7 @@ class TestBlueprintIntegration:
     def test_blueprint_events_inherited(self, temp_dir):
         """Package without events inherits from blueprint."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         bp_dir = _create_blueprint(
             temp_dir,
             "event-bp",
@@ -772,6 +775,7 @@ class TestBlueprintIntegration:
     def test_package_overrides_blueprint_resources(self, temp_dir):
         """Package's own resources take priority over blueprint."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         _create_blueprint(
             temp_dir,
             "override-bp",
@@ -806,6 +810,7 @@ class TestBlueprintIntegration:
     def test_blueprint_file_fallback(self, temp_dir):
         """Resource files fall back to blueprint dir when not in package."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         _create_blueprint(
             temp_dir,
             "fallback-bp",
@@ -839,6 +844,7 @@ class TestBlueprintIntegration:
     def test_package_file_preferred_over_blueprint(self, temp_dir):
         """Package's own resource file is used even if blueprint has same name."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         _create_blueprint(
             temp_dir,
             "prefer-bp",
@@ -871,6 +877,7 @@ class TestBlueprintIntegration:
     def test_no_blueprint_works_unchanged(self, temp_dir):
         """Packages without blueprint: key work exactly as before."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
 
         pkg_dir = _create_package(
@@ -912,6 +919,7 @@ class TestBlueprintIntegration:
     def test_blueprint_inventory_inherited(self, temp_dir):
         """Inventory from blueprint is inherited and generated."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         _create_blueprint(
             temp_dir,
             "inv-bp",
@@ -957,6 +965,7 @@ class TestBlueprintIntegration:
     def test_package_inventory_overrides_blueprint(self, temp_dir):
         """Package's own inventory overrides blueprint inventory."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         _create_blueprint(
             temp_dir,
             "inv-override-bp",
@@ -994,6 +1003,7 @@ class TestBlueprintIntegration:
     def test_blueprint_handler_tagged_with_blueprint_dir(self, temp_dir):
         """Event handlers from blueprint packages have _blueprint_dir tag."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         bp_dir = _create_blueprint(
             temp_dir,
             "tagged-bp",
@@ -1025,6 +1035,7 @@ class TestBlueprintIntegration:
     def test_secrets_override_blueprint_defaults(self, temp_dir):
         """Secrets take priority over both blueprint defaults and package vars."""
         resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
         _create_blueprint(
             temp_dir,
             "secret-bp",

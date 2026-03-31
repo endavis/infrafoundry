@@ -1,0 +1,57 @@
+# ONTAP Lab DHCP Reservations — Jinja2 template rendered by infrafoundry.yml variables
+# Uses resource-centric format for cross-provider resources (opnsense DHCP)
+#
+# NOTE: These reservations serve as DNS entries via Kea integrated DNS.
+# All IPs are statically assigned during ONTAP cluster setup, not via DHCP.
+# Placeholder MACs (e.g., 01:01:01:01:01:01) are used where the actual
+# MAC is not known or not applicable.
+resources:
+  - provider: opnsense
+    type: kea_reservation
+    name: "{{ node01_name }}"
+    config:
+      subnet_ref: "{{ dhcp_subnet }}"
+      hw_address: "{{ node01_mgmt_mac | lower }}"
+      ip_address: "{{ node01_mgmt_ip }}"
+      hostname: "{{ node01_name }}"
+      description: "ONTAP Simulator Node 1 (e0c mgmt)"
+
+  - provider: opnsense
+    type: kea_reservation
+    name: "{{ node02_name }}"
+    config:
+      subnet_ref: "{{ dhcp_subnet }}"
+      hw_address: "{{ node02_mgmt_mac | lower }}"
+      ip_address: "{{ node02_mgmt_ip }}"
+      hostname: "{{ node02_name }}"
+      description: "ONTAP Simulator Node 2 (e0c mgmt)"
+
+  - provider: opnsense
+    type: kea_reservation
+    name: "{{ cluster_name }}"
+    config:
+      subnet_ref: "{{ dhcp_subnet }}"
+      hw_address: "{{ cluster_mgmt_mac }}"
+      ip_address: "{{ cluster_mgmt_ip }}"
+      hostname: "{{ cluster_name }}"
+      description: "ONTAP Lab Cluster Management LIF"
+
+  - provider: opnsense
+    type: kea_reservation
+    name: "{{ cluster_name }}-data1"
+    config:
+      subnet_ref: "{{ dhcp_subnet }}"
+      hw_address: "{{ node01_data_mac | lower }}"
+      ip_address: "{{ data_lif1_ip }}"
+      hostname: "{{ cluster_name }}-data1"
+      description: "ONTAP Cluster Data LIF 1 ({{ svm_name }})"
+
+  - provider: opnsense
+    type: kea_reservation
+    name: "{{ cluster_name }}-data2"
+    config:
+      subnet_ref: "{{ dhcp_subnet }}"
+      hw_address: "{{ node02_data_mac | lower }}"
+      ip_address: "{{ data_lif2_ip }}"
+      hostname: "{{ cluster_name }}-data2"
+      description: "ONTAP Cluster Data LIF 2 ({{ svm_name }})"

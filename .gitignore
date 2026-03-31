@@ -46,6 +46,7 @@ envs/
 *.yaml
 !example-config/**/*.yaml
 !src/**/*.yaml
+!blueprints/**/*.yaml
 !.sops.yaml
 !.pre-commit-config.yaml
 .env

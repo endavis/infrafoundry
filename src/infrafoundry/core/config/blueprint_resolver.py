@@ -36,10 +36,18 @@ class BlueprintResolver:
 
         Args:
             base_dir: The ``envs/`` directory (same as PackageLoader.base_dir).
-                The blueprints directory is resolved as ``base_dir.parent / "blueprints"``.
+                Blueprints are resolved from the framework's ``blueprints/``
+                directory (relative to the infrafoundry package installation).
         """
-        self.base_dir = base_dir
-        self.blueprints_dir = base_dir.parent / "blueprints"
+        self.base_dir = base_dir.resolve()
+        # Blueprints live in the framework repo, not the config repo.
+        # Walk up from this file to find the repo root (contains pyproject.toml).
+        framework_root = Path(__file__).resolve().parent
+        while framework_root != framework_root.parent:
+            if (framework_root / "pyproject.toml").exists():
+                break
+            framework_root = framework_root.parent
+        self.blueprints_dir = framework_root / "blueprints"
 
     # ------------------------------------------------------------------
     # Public API
