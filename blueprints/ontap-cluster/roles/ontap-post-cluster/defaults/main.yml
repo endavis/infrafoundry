@@ -1,0 +1,114 @@
+---
+# ONTAP Post-Cluster Setup — Default Variables
+#
+# These variables configure the ONTAP cluster after it has been
+# created and all nodes have joined. Uses netapp.ontap modules
+# via the ONTAP REST API.
+
+# Cluster management endpoint
+ontap_cluster_mgmt_ip: "192.168.1.220"
+ontap_admin_user: "admin"
+ontap_admin_password: "changeme123"
+
+# Set to true to validate SSL certificates
+ontap_validate_certs: false
+
+# ONTAP feature licenses (comma-separated license keys)
+# Leave empty to skip license installation
+ontap_licenses: []
+# Example:
+# ontap_licenses:
+#   - "AAAAAAAAAAAAAAAA"
+#   - "BBBBBBBBBBBBBBBB"
+
+# Disk assignment — assign all unowned disks
+ontap_assign_disks: true
+
+# Aggregate configuration
+# Use node_index (0-based) instead of hardcoded node names.
+# Actual node names are discovered from the ONTAP REST API at runtime.
+ontap_aggregates:
+  - name: aggr1_node01
+    node_index: 0
+    disk_count: 5
+    raid_type: raid_dp
+  - name: aggr1_node02
+    node_index: 1
+    disk_count: 5
+    raid_type: raid_dp
+
+# Storage Virtual Machine (SVM) configuration
+ontap_svms:
+  - name: svm_data
+    root_volume: svm_data_root
+    root_volume_aggregate: aggr1_node01
+    allowed_protocols:
+      - nfs
+      - cifs
+      - iscsi
+
+# Data LIF configuration
+# Use node_index (0-based) instead of hardcoded node names.
+ontap_lifs:
+  - name: svm_data_lif1
+    vserver: svm_data
+    role: data
+    protocol: nfs
+    node_index: 0
+    home_port: e0d
+    address: "192.168.1.230"
+    netmask: "255.255.255.0"
+
+  - name: svm_data_lif2
+    vserver: svm_data
+    role: data
+    protocol: nfs
+    node_index: 1
+    home_port: e0d
+    address: "192.168.1.231"
+    netmask: "255.255.255.0"
+
+# DNS configuration for the SVM
+ontap_dns:
+  - vserver: svm_data
+    domains:
+      - lab.local
+    nameservers:
+      - "192.168.1.1"
+
+# NTP server configuration
+ontap_ntp_servers:
+  - "192.168.1.1"
+
+# CIFS server configuration (workgroup mode)
+ontap_cifs_server: {}
+# Example:
+# ontap_cifs_server:
+#   name: ONTAPCL
+#   vserver: svm_data
+#   workgroup: WORKGROUP
+
+# NFS export policies
+ontap_export_policies: []
+# Example:
+# ontap_export_policies:
+#   - name: nfs_data
+#     vserver: svm_data
+#     rules:
+#       - client_match: "192.168.10.0/24"
+#         protocols: [nfs]
+#         ro_rule: [sys]
+#         rw_rule: [sys]
+#         super_user: [sys]
+
+# Volumes
+ontap_volumes: []
+# Example:
+# ontap_volumes:
+#   - name: NFS_VOL
+#     vserver: svm_data
+#     aggregate: aggr1_node01
+#     size: 1g
+#     junction_path: /NFS_VOL
+#     export_policy: nfs_data
+#     protocol: nfs

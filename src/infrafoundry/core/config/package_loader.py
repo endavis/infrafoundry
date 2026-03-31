@@ -234,6 +234,19 @@ class PackageLoader:
             resources.extend(parsed)
 
         # ----- Events -----
+        # Render event configs through Jinja2 to resolve variable references
+        # (e.g., requires: ["{{ node01_name }}"] → requires: ["ontapcl-test-01"])
+        if manifest.events:
+            import json
+
+            events_json = json.dumps(manifest.events)
+            try:
+                events_template = jinja2.Template(events_json)
+                rendered_events_json = events_template.render(**manifest.variables)
+                manifest.events = json.loads(rendered_events_json)
+            except (jinja2.TemplateError, json.JSONDecodeError) as e:
+                logger.warning("Failed to render event templates: %s", e)
+
         env_dir = self.base_dir / env_name
         events = self._rewrite_event_scripts(
             manifest.events, package_dir, env_dir, blueprint_dir=blueprint_dir

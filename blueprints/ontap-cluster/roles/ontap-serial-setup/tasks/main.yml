@@ -1,0 +1,97 @@
+---
+# ONTAP Serial Setup — Tasks
+#
+# Assigns a unique serial number and system ID to an ONTAP Simulator
+# node at the VLOADER prompt via the Proxmox serial socket.
+
+- name: Stop VM if running
+  ansible.builtin.command:
+    cmd: "qm stop {{ ontap_vmid }}"
+  register: vm_stop
+  failed_when: vm_stop.rc != 0 and 'not running' not in vm_stop.stderr
+  changed_when: vm_stop.rc == 0
+
+- name: Wait for VM to fully stop
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: Deploy expect script
+  ansible.builtin.template:
+    src: serial-setup.exp.j2
+    dest: "/tmp/ontap-serial-setup-{{ ontap_vmid }}.exp"
+    mode: "0755"
+
+- name: Deploy wrapper script that waits for socket then runs expect
+  ansible.builtin.copy:
+    dest: "/tmp/ontap-serial-setup-{{ ontap_vmid }}-wrapper.sh"
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      # Wait for serial socket to appear, then immediately run expect
+      SOCKET="/var/run/qemu-server/{{ ontap_vmid }}.serial0"
+      TIMEOUT=30
+      ELAPSED=0
+      while [ ! -S "$SOCKET" ]; do
+        sleep 0.5
+        ELAPSED=$((ELAPSED + 1))
+        if [ $ELAPSED -ge $((TIMEOUT * 2)) ]; then
+          echo "ERROR: Serial socket not found after ${TIMEOUT}s"
+          exit 1
+        fi
+      done
+      exec /tmp/ontap-serial-setup-{{ ontap_vmid }}.exp
+
+- name: Launch wrapper script in background (listens before VM boots)
+  ansible.builtin.shell: |
+    nohup /tmp/ontap-serial-setup-{{ ontap_vmid }}-wrapper.sh > /tmp/ontap-serial-wrapper-{{ ontap_vmid }}.out 2>&1 &
+    echo $!
+  register: wrapper_bg
+  changed_when: true
+
+- name: Start VM
+  ansible.builtin.command:
+    cmd: "qm start {{ ontap_vmid }}"
+  changed_when: true
+
+- name: Wait for expect script to complete
+  ansible.builtin.shell: |
+    TIMEOUT={{ ontap_loader_timeout | default(120) | int + 60 }}
+    ELAPSED=0
+    while kill -0 {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null; do
+      sleep 2
+      ELAPSED=$((ELAPSED + 2))
+      if [ $ELAPSED -ge $TIMEOUT ]; then
+        kill {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null || true
+        echo "ERROR: Expect script timed out after ${TIMEOUT}s"
+        cat /tmp/ontap-serial-wrapper-{{ ontap_vmid }}.out 2>/dev/null
+        exit 1
+      fi
+    done
+    # Process already exited — check output for errors
+    cat /tmp/ontap-serial-wrapper-{{ ontap_vmid }}.out 2>/dev/null
+    if grep -q "ERROR:" /tmp/ontap-serial-wrapper-{{ ontap_vmid }}.out 2>/dev/null; then
+      exit 1
+    fi
+    exit 0
+  register: serial_setup
+  changed_when: true
+
+- name: Find expect log
+  ansible.builtin.find:
+    paths: /tmp
+    patterns: "ontap-serial-setup-{{ ontap_vmid }}-*.log"
+  register: serial_setup_logs
+
+- name: Fetch expect log
+  ansible.builtin.fetch:
+    src: "{{ item.path }}"
+    dest: "logs/{{ item.path | basename }}"
+    flat: true
+  loop: "{{ serial_setup_logs.files }}"
+  ignore_errors: true
+
+- name: Clean up expect script and log
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ ['/tmp/ontap-serial-setup-' + ontap_vmid | string + '.exp', '/tmp/ontap-serial-setup-' + ontap_vmid | string + '-wrapper.sh', '/tmp/ontap-serial-wrapper-' + ontap_vmid | string + '.out'] + serial_setup_logs.files | map(attribute='path') | list }}"
