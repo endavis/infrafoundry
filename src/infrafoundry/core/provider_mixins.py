@@ -16,6 +16,7 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import TemplateError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.security.file_utils import secure_write
 
 if TYPE_CHECKING:
     # Type stubs for mixin expectations - not used at runtime
@@ -455,7 +456,7 @@ class TerraformGeneratorMixin:
             return
 
         tfvars_path = Path(self.terraform_dir) / "terraform.tfvars"
-        tfvars_path.write_text("".join(lines))
+        secure_write(tfvars_path, "".join(lines))
 
     def generate_provider_tfvars(
         self,

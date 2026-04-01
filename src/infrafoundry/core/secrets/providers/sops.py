@@ -12,6 +12,7 @@ from infrafoundry.core.exceptions import (
     SecretNotFoundError,
 )
 from infrafoundry.core.secrets.provider import SecretProvider
+from infrafoundry.core.security.file_utils import secure_write_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +91,7 @@ class SopsSecretProvider(SecretProvider):
         temp_file = file_path.with_suffix(".tmp")
 
         try:
-            with open(temp_file, "w") as f:
-                yaml.dump(data, f)
+            secure_write_yaml(temp_file, data)
 
             # Encrypt in place
             subprocess.run(  # nosec B603

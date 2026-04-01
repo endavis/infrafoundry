@@ -1,16 +1,17 @@
 """Secret management using SOPS with age encryption."""
 
 import json
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
-
-import yaml
 
 from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.secrets.age_key_manager import check_age_key, create_sops_config
 from infrafoundry.core.secrets.provider import SecretProvider
 from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 from infrafoundry.core.secrets.rotation import SecretsRotator
+from infrafoundry.core.security.file_utils import secure_write, secure_write_yaml
 
 
 class SecretManager(PathBasedManager):
@@ -139,12 +140,13 @@ class SecretManager(PathBasedManager):
             output_file: Path to write tfvars file
         """
         data = self.decrypt_file(filename)
-        with open(output_file, "w") as f:
-            for key, value in data.items():
-                if isinstance(value, str):
-                    f.write(f'{key} = "{value}"\n')
-                else:
-                    f.write(f"{key} = {json.dumps(value)}\n")
+        lines: list[str] = []
+        for key, value in data.items():
+            if isinstance(value, str):
+                lines.append(f'{key} = "{value}"\n')
+            else:
+                lines.append(f"{key} = {json.dumps(value)}\n")
+        secure_write(output_file, "".join(lines))
 
     def export_for_ansible(self, filename: str, output_file: Path) -> None:
         """Export secrets as Ansible vars file.
@@ -154,8 +156,46 @@ class SecretManager(PathBasedManager):
             output_file: Path to write vars file
         """
         data = self.decrypt_file(filename)
-        with open(output_file, "w") as f:
-            yaml.dump(data, f)
+        secure_write_yaml(output_file, data)
+
+    @contextmanager
+    def temporary_export(
+        self, filename: str, output_file: Path, fmt: str = "terraform"
+    ) -> Generator[Path, None, None]:
+        """Export secrets to a temporary file and clean up after use.
+
+        Args:
+            filename: Name of encrypted secrets file
+            output_file: Path to write the exported file
+            fmt: Export format - "terraform" for tfvars or "ansible" for YAML vars
+
+        Yields:
+            Path to the exported file
+
+        Raises:
+            ValueError: If fmt is not "terraform" or "ansible"
+        """
+        if fmt == "terraform":
+            self.export_for_terraform(filename, output_file)
+        elif fmt == "ansible":
+            self.export_for_ansible(filename, output_file)
+        else:
+            raise ValueError(f"Unsupported export format: {fmt}")
+
+        try:
+            yield output_file
+        finally:
+            self.cleanup_secret_files(output_file)
+
+    @staticmethod
+    def cleanup_secret_files(*paths: Path) -> None:
+        """Remove exported secret files from disk.
+
+        Args:
+            paths: Paths to secret files to remove
+        """
+        for path in paths:
+            path.unlink(missing_ok=True)
 
     def cleanup(self) -> None:
         """Cleanup resources (required by BaseManager).
