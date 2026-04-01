@@ -121,6 +121,7 @@ nav:
     - CI/CD Testing: development/ci-cd-testing.md
     - Release & Automation: development/release-and-automation.md
     - Implementing Secret Providers: development/implementing-secret-providers.md
+    - Secrets Handling: development/security/secrets-handling.md
 
   - Runners:
     - Overview: runners/overview.md

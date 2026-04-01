@@ -1,5 +1,7 @@
 """Unit tests for SecretManager."""
 
+import os
+import stat
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -268,3 +270,106 @@ class TestSecretManager:
         assert output_file.exists()
         exported_data = yaml.safe_load(output_file.read_text())
         assert exported_data == decrypted_data
+
+    def test_export_for_terraform_sets_restrictive_permissions(
+        self, temp_secrets_dir, mock_provider
+    ):
+        """Test that export_for_terraform creates files with 0o600 permissions."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
+        mock_provider.load_secret.return_value = {"api_token": "secret123"}
+
+        output_file = temp_secrets_dir / "secrets.tfvars"
+        manager.export_for_terraform("secrets.yaml", output_file)
+
+        assert stat.S_IMODE(os.stat(output_file).st_mode) == 0o600
+
+    def test_export_for_ansible_sets_restrictive_permissions(self, temp_secrets_dir, mock_provider):
+        """Test that export_for_ansible creates files with 0o600 permissions."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
+        mock_provider.load_secret.return_value = {"api_token": "secret123"}
+
+        output_file = temp_secrets_dir / "secrets_vars.yml"
+        manager.export_for_ansible("secrets.yaml", output_file)
+
+        assert stat.S_IMODE(os.stat(output_file).st_mode) == 0o600
+
+    def test_temporary_export_cleans_up_file(self, temp_secrets_dir, mock_provider):
+        """Test that temporary_export removes the file after context manager exits."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
+        mock_provider.load_secret.return_value = {"api_token": "secret123"}
+
+        output_file = temp_secrets_dir / "temp_secrets.tfvars"
+        with manager.temporary_export("secrets.yaml", output_file, fmt="terraform") as path:
+            assert path.exists()
+            assert path == output_file
+
+        assert not output_file.exists()
+
+    def test_temporary_export_cleans_up_on_exception(self, temp_secrets_dir, mock_provider):
+        """Test that temporary_export cleans up even when an exception occurs."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
+        mock_provider.load_secret.return_value = {"api_token": "secret123"}
+
+        output_file = temp_secrets_dir / "temp_secrets.tfvars"
+        with (
+            pytest.raises(RuntimeError, match="test error"),
+            manager.temporary_export("secrets.yaml", output_file, fmt="terraform") as path,
+        ):
+            assert path.exists()
+            raise RuntimeError("test error")
+
+        assert not output_file.exists()
+
+    def test_temporary_export_ansible_format(self, temp_secrets_dir, mock_provider):
+        """Test that temporary_export works with ansible format."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
+        mock_provider.load_secret.return_value = {"api_token": "secret123"}
+
+        output_file = temp_secrets_dir / "temp_vars.yml"
+        with manager.temporary_export("secrets.yaml", output_file, fmt="ansible") as path:
+            assert path.exists()
+            data = yaml.safe_load(path.read_text())
+            assert data == {"api_token": "secret123"}
+
+        assert not output_file.exists()
+
+    def test_temporary_export_invalid_format(self, temp_secrets_dir, mock_provider):
+        """Test that temporary_export raises ValueError for unsupported format."""
+        manager = SecretManager(
+            env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
+        )
+
+        output_file = temp_secrets_dir / "temp.txt"
+        with (
+            pytest.raises(ValueError, match="Unsupported export format"),
+            manager.temporary_export("secrets.yaml", output_file, fmt="invalid"),
+        ):
+            pass  # pragma: no cover
+
+    def test_cleanup_secret_files(self, temp_secrets_dir):
+        """Test that cleanup_secret_files removes specified files."""
+        file1 = temp_secrets_dir / "secret1.tfvars"
+        file2 = temp_secrets_dir / "secret2.yml"
+        file1.write_text("secret")
+        file2.write_text("secret")
+
+        SecretManager.cleanup_secret_files(file1, file2)
+
+        assert not file1.exists()
+        assert not file2.exists()
+
+    def test_cleanup_secret_files_missing_file(self, temp_secrets_dir):
+        """Test that cleanup_secret_files handles already-deleted files gracefully."""
+        missing_file = temp_secrets_dir / "nonexistent.tfvars"
+        # Should not raise
+        SecretManager.cleanup_secret_files(missing_file)
