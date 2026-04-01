@@ -6,18 +6,20 @@
   gather_facts: false
 
   tasks:
-    - name: Reload firewall rules
+    - name: Validate OPNsense API credentials
+      ansible.builtin.assert:
+        that:
+          - {% raw %}opnsense_api_url | default('') | length > 0{% endraw %}
+          - {% raw %}opnsense_api_key | default('') | length > 0{% endraw %}
+          - {% raw %}opnsense_api_secret | default('') | length > 0{% endraw %}
+        fail_msg: >-
+          OPNsense API credentials are not configured.
+          Set OPNSENSE_API_URL, OPNSENSE_API_KEY, and OPNSENSE_API_SECRET
+          environment variables or configure them in your secrets file.
+
+    - name: Apply firewall filter changes
       uri:
         url: "{% raw %}{{ opnsense_api_url }}{% endraw %}/api/firewall/filter/apply"
-        method: POST
-        headers:
-          Authorization: "Basic {% raw %}{{ (opnsense_api_key + ':' + opnsense_api_secret) | b64encode }}{% endraw %}"
-        validate_certs: false
-      when: firewall_rules_changed | default(false)
-
-    - name: Reload filter
-      uri:
-        url: "{% raw %}{{ opnsense_api_url }}{% endraw %}/api/firewall/filter/reload"
         method: POST
         headers:
           Authorization: "Basic {% raw %}{{ (opnsense_api_key + ':' + opnsense_api_secret) | b64encode }}{% endraw %}"

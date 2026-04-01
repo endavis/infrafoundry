@@ -568,7 +568,9 @@ class TestOPNsenseTemplates:
             content = playbook.read_text()
             assert "Configure OPNsense" in content
             assert "api/firewall/filter/apply" in content
-            assert "api/firewall/filter/reload" in content
+            assert "api/firewall/filter/reload" not in content
+            assert "Validate OPNsense API credentials" in content
+            assert "ansible.builtin.assert" in content
 
     def test_generate_outputs_tf(
         self, provider: OPNsenseProvider, firewall_rule: ResourceConfig
