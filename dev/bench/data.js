@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774986931923,
+  "lastUpdate": 1775059468831,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3441,6 +3441,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001085608145885155",
             "extra": "mean: 137.86235202361135 usec\nrounds: 2372"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d8791f5c62af3c3d4e7276a42e2dad20685311e9",
+          "message": "fix: replace broken OPNsense ansible filter reload with credential validation and single apply task (merges PR #465, addresses #391)",
+          "timestamp": "2026-04-01T17:03:49+01:00",
+          "tree_id": "839e5775aa770edf8813bb964e9cf46b73a65d15",
+          "url": "https://github.com/endavis/infrafoundry/commit/d8791f5c62af3c3d4e7276a42e2dad20685311e9"
+        },
+        "date": 1775059467769,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7374.9222045320275,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000986239036178933",
+            "extra": "mean: 135.59465066431227 usec\nrounds: 2333"
           }
         ]
       }
