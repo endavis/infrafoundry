@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775059468831,
+  "lastUpdate": 1775062017768,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3472,6 +3472,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000986239036178933",
             "extra": "mean: 135.59465066431227 usec\nrounds: 2333"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2d4f41d65b2d26af29fc98d1dd00dbf0efd8e94c",
+          "message": "chore: harden secrets handling file permissions (merges PR #466, addresses #359)\n\nchore: harden secrets handling with restrictive file permissions and cleanup utilities",
+          "timestamp": "2026-04-01T17:46:25+01:00",
+          "tree_id": "d3cbca42e65b0077c33565725d4a30d01a427bb4",
+          "url": "https://github.com/endavis/infrafoundry/commit/2d4f41d65b2d26af29fc98d1dd00dbf0efd8e94c"
+        },
+        "date": 1775062017203,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7230.403113978753,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010490862926853432",
+            "extra": "mean: 138.3048751551169 usec\nrounds: 2419"
           }
         ]
       }
