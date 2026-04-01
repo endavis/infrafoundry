@@ -9,6 +9,6 @@ all:
           ansible_host: "{% raw %}{{ lookup('env', 'OPNSENSE_HOST') | default('opnsense.local') }}{% endraw %}"
           ansible_connection: local
       vars:
-        opnsense_api_url: "{% raw %}{{ lookup('env', 'OPNSENSE_API_URL') }}{% endraw %}"
+        opnsense_api_url: "{% raw %}{{ lookup('env', 'OPNSENSE_API_URL') | default('', true) }}{% endraw %}"
         opnsense_api_key: "{% raw %}{{ lookup('env', 'OPNSENSE_API_KEY') }}{% endraw %}"
         opnsense_api_secret: "{% raw %}{{ lookup('env', 'OPNSENSE_API_SECRET') }}{% endraw %}"
