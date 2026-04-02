@@ -38,21 +38,52 @@ class SopsSecretProvider(SecretProvider):
         """Check if sops is installed."""
         _ = self._sops_path  # Will raise SecretError if not found
 
-    def load_secret(self, location: str | Path) -> dict[str, Any]:
-        """
-        Loads a secret from a file using SOPS.
+    @staticmethod
+    def _is_sops_encrypted(file_content: str) -> bool:
+        """Check whether file content contains SOPS encryption markers.
+
+        Both the ``sops:`` metadata key and ``ENC[AES256_GCM,`` value markers
+        must be present for the file to be considered SOPS-encrypted.
 
         Args:
-            location: Path to the encrypted file.
+            file_content: Raw file content to inspect.
 
         Returns:
-            The decrypted data as a dictionary.
+            True if the content appears to be SOPS-encrypted.
         """
-        self._ensure_sops_installed()
+        return "sops:" in file_content and "ENC[AES256_GCM," in file_content
+
+    def load_secret(self, location: str | Path) -> dict[str, Any]:
+        """Load a secret from a file, decrypting with SOPS only if encrypted.
+
+        Reads the file content and checks for SOPS encryption markers.
+        Plaintext YAML files are loaded directly without requiring sops
+        to be installed.  Encrypted files are decrypted via ``sops --decrypt``.
+
+        Args:
+            location: Path to the secret file.
+
+        Returns:
+            The secret data as a dictionary.
+        """
         file_path = Path(location)
         if not file_path.exists():
-            raise SecretNotFoundError(f"Encrypted file not found: {file_path}")
+            raise SecretNotFoundError(f"Secret file not found: {file_path}")
 
+        try:
+            raw = file_path.read_text()
+        except Exception as e:
+            raise SecretError(f"Failed to read secret file {file_path}: {e}") from e
+
+        # Plaintext YAML — return directly without requiring sops
+        if not self._is_sops_encrypted(raw):
+            try:
+                return cast(dict[str, Any], yaml.safe_load(raw)) or {}
+            except yaml.YAMLError as e:
+                raise SecretDecryptionError(f"Failed to parse YAML from {file_path}: {e}") from e
+
+        # Encrypted — sops must be available
+        self._ensure_sops_installed()
         try:
             result = subprocess.run(  # nosec B603
                 [self._sops_path, "--decrypt", str(file_path)],

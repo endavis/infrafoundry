@@ -12,6 +12,7 @@ import yaml
 
 from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.secrets.provider import SecretProvider
 
 if TYPE_CHECKING:
     from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
@@ -24,15 +25,18 @@ class ProviderCentricLoader:
         self,
         base_dir: Path,
         blueprint_resolver: BlueprintResolver | None = None,
+        secret_provider: SecretProvider | None = None,
     ) -> None:
         """Initialize loader.
 
         Args:
             base_dir: Base directory for environment configs (e.g., ./envs)
             blueprint_resolver: Optional resolver for blueprint references.
+            secret_provider: Provider used to load package secrets.
+                Forwarded to ``PackageLoader``.
         """
         self.base_dir = base_dir
-        self._package_loader = PackageLoader(base_dir, blueprint_resolver)
+        self._package_loader = PackageLoader(base_dir, blueprint_resolver, secret_provider)
         self._pending_package_events: dict[str, list[dict[str, Any]]] = {}
 
     def load_resources(

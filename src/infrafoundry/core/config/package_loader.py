@@ -24,9 +24,10 @@ import yaml
 from infrafoundry.core.config.filters import generate_mac
 from infrafoundry.core.config.inventory_generator import InventoryGenerator
 from infrafoundry.core.config.models import PackageManifest
-from infrafoundry.core.config.sops import load_yaml_with_sops
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.secrets.provider import SecretProvider
+from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 
 if TYPE_CHECKING:
     from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
@@ -74,6 +75,7 @@ class PackageLoader:
         self,
         base_dir: Path,
         blueprint_resolver: BlueprintResolver | None = None,
+        secret_provider: SecretProvider | None = None,
     ) -> None:
         """Initialize package loader.
 
@@ -82,9 +84,12 @@ class PackageLoader:
             blueprint_resolver: Optional resolver for blueprint references.
                 When ``None``, packages that declare ``blueprint:`` will
                 raise an error.
+            secret_provider: Provider used to load package secrets.yaml files.
+                Defaults to ``SopsSecretProvider`` when ``None``.
         """
         self.base_dir = base_dir
         self._blueprint_resolver = blueprint_resolver
+        self._secret_provider = secret_provider or SopsSecretProvider()
         self._inventory_generator = InventoryGenerator()
 
     def discover_packages(self, env_name: str, provider: str) -> list[Path]:
@@ -204,7 +209,7 @@ class PackageLoader:
         # ----- Secrets -----
         secrets_path = package_dir / "secrets.yaml"
         if secrets_path.exists():
-            secrets_data = load_yaml_with_sops(secrets_path)
+            secrets_data = self._secret_provider.load_secret(secrets_path)
             secret_vars = secrets_data.get("variables", {})
             if secret_vars:
                 manifest.variables.update(secret_vars)

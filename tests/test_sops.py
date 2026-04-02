@@ -1,9 +1,10 @@
-"""Tests for the shared SOPS decryption utility."""
+"""Tests for the shared SOPS decryption utility and SopsSecretProvider."""
 
 from pathlib import Path
 from unittest.mock import patch
 
 from infrafoundry.core.config.sops import load_yaml_with_sops
+from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 
 
 class TestLoadYamlWithSops:
@@ -82,3 +83,78 @@ class TestLoadYamlWithSops:
             result = load_yaml_with_sops(yaml_file)
 
         assert result == {}
+
+
+class TestSopsSecretProvider:
+    """Tests for SopsSecretProvider plaintext detection and load_secret."""
+
+    def test_is_sops_encrypted_both_markers(self) -> None:
+        """Content with both sops: and ENC markers is detected as encrypted."""
+        content = "key: ENC[AES256_GCM,data:abc]\nsops:\n  version: 3.7.3\n"
+        assert SopsSecretProvider._is_sops_encrypted(content) is True
+
+    def test_is_sops_encrypted_only_sops_marker(self) -> None:
+        """Content with only sops: marker is not encrypted."""
+        content = "sops:\n  note: not encrypted\n"
+        assert SopsSecretProvider._is_sops_encrypted(content) is False
+
+    def test_is_sops_encrypted_only_enc_marker(self) -> None:
+        """Content with only ENC marker is not encrypted."""
+        content = "key: 'ENC[AES256_GCM,data:abc]'\n"
+        assert SopsSecretProvider._is_sops_encrypted(content) is False
+
+    def test_is_sops_encrypted_plaintext(self) -> None:
+        """Plain YAML content is not encrypted."""
+        content = "key: value\nnested:\n  foo: bar\n"
+        assert SopsSecretProvider._is_sops_encrypted(content) is False
+
+    def test_load_secret_plaintext_yaml(self, tmp_path: Path) -> None:
+        """Plaintext YAML file is loaded directly without subprocess call."""
+        yaml_file = tmp_path / "plain.yaml"
+        yaml_file.write_text("variables:\n  host: localhost\n")
+
+        provider = SopsSecretProvider()
+
+        with patch("infrafoundry.core.secrets.providers.sops.subprocess.run") as mock_run:
+            result = provider.load_secret(yaml_file)
+
+        mock_run.assert_not_called()
+        assert result == {"variables": {"host": "localhost"}}
+
+    def test_load_secret_encrypted_yaml(self, tmp_path: Path) -> None:
+        """Encrypted YAML file calls sops --decrypt."""
+        yaml_file = tmp_path / "encrypted.yaml"
+        sops_content = "key: ENC[AES256_GCM,data:abc]\nsops:\n  version: 3.7.3\n"
+        yaml_file.write_text(sops_content)
+
+        decrypted_yaml = "key: decrypted-value\n"
+        mock_result = type("Result", (), {"stdout": decrypted_yaml, "returncode": 0})()
+
+        provider = SopsSecretProvider()
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/sops"),
+            patch(
+                "infrafoundry.core.secrets.providers.sops.subprocess.run",
+                return_value=mock_result,
+            ) as mock_run,
+        ):
+            result = provider.load_secret(yaml_file)
+
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+        assert call_args[0][0] == ["/usr/bin/sops", "--decrypt", str(yaml_file)]
+        assert result == {"key": "decrypted-value"}
+
+    def test_plaintext_works_without_sops_installed(self, tmp_path: Path) -> None:
+        """Plaintext detection skips sops check, so missing sops doesn't matter."""
+        yaml_file = tmp_path / "plain.yaml"
+        yaml_file.write_text("database:\n  host: db.local\n  port: 5432\n")
+
+        provider = SopsSecretProvider()
+
+        # sops is not installed (shutil.which returns None)
+        with patch("shutil.which", return_value=None):
+            result = provider.load_secret(yaml_file)
+
+        assert result == {"database": {"host": "db.local", "port": 5432}}
