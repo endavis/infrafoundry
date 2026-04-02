@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775062017768,
+  "lastUpdate": 1775127999768,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3503,6 +3503,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010490862926853432",
             "extra": "mean: 138.3048751551169 usec\nrounds: 2419"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9d0b6c4d01c5902418d5e04df27cc1b20620b13d",
+          "message": "refactor: make PackageLoader use pluggable SecretProvider instead of hardcoded SOPS (merges PR #467, addresses #419)\n\nBREAKING CHANGE: ConfigManager, ProviderCentricLoader, and PackageLoader constructors\nnow accept an optional secret_provider parameter. Internal attribute initialization\nfor ConfigManager.provider_centric changed to forward the provider. Existing callers\nare unaffected as the parameter defaults to None (uses SopsSecretProvider).",
+          "timestamp": "2026-04-02T12:06:05+01:00",
+          "tree_id": "01e5e9d5e7b96313c0e33c63c0e47668082e3c7b",
+          "url": "https://github.com/endavis/infrafoundry/commit/9d0b6c4d01c5902418d5e04df27cc1b20620b13d"
+        },
+        "date": 1775127999155,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7342.3131852827355,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010788965968231306",
+            "extra": "mean: 136.19685986760211 usec\nrounds: 2569"
           }
         ]
       }
