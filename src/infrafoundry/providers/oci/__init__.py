@@ -4,10 +4,9 @@ import copy
 from pathlib import Path
 from typing import Any, ClassVar, override
 
-import yaml
-
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
+    CloudInitMixin,
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
@@ -23,6 +22,7 @@ class OCIProvider(
     TemplateRendererMixin,
     ResourceGrouperMixin,
     TerraformGeneratorMixin,
+    CloudInitMixin,
 ):
     """OCI provider for managing VCNs, subnets, and compute instances."""
 
@@ -118,66 +118,22 @@ class OCIProvider(
         )
 
     def _process_cloud_init_snippets(self, instance: ResourceConfig) -> ResourceConfig:
-        """Process cloud-init snippets and merge them into instance config."""
+        """Process cloud-init snippets and merge them into instance config.
+
+        Delegates to CloudInitMixin for loading and merging, then stores
+        the merged dict directly in the config.
+
+        Args:
+            instance: Instance resource config with optional cloud_init_snippets.
+
+        Returns:
+            Copy of the instance config with cloud_init_merged set if snippets exist.
+        """
         instance_copy = copy.deepcopy(instance)
-        config = instance_copy.config
-
-        if "cloud_init_snippets" not in config:
-            return instance_copy
-
-        snippet_names = config.get("cloud_init_snippets", [])
-        cloud_init_vars = config.get("cloud_init_vars", {})
-
-        merged_cloud_init: dict[Any, Any] = {}
-
-        for snippet_name in snippet_names:
-            if self._current_environment:
-                snippet_path = (
-                    self.config_dir
-                    / self._current_environment
-                    / "files"
-                    / "cloud-init-snippets"
-                    / f"{snippet_name}.yaml"
-                )
-            else:
-                snippet_path = (
-                    self.config_dir / "files" / "cloud-init-snippets" / f"{snippet_name}.yaml"
-                )
-
-            if not snippet_path.exists():
-                message = f"Cloud-init snippet not found: {snippet_path}"
-                if self.fail_on_missing_snippets:
-                    raise FileNotFoundError(message)
-                continue
-
-            with open(snippet_path) as f:
-                snippet_content = f.read()
-
-                for var_name, var_value in cloud_init_vars.items():
-                    snippet_content = snippet_content.replace(f"${{{var_name}}}", str(var_value))
-
-                snippet_data = yaml.safe_load(snippet_content)
-
-                if snippet_data:
-                    self._deep_merge(merged_cloud_init, snippet_data)
-
-        if merged_cloud_init:
-            config["cloud_init_merged"] = merged_cloud_init
-
+        merged = self._merge_cloud_init_snippets(instance_copy.config)
+        if merged:
+            instance_copy.config["cloud_init_merged"] = merged
         return instance_copy
-
-    def _deep_merge(self, base: dict[str, Any], overlay: dict[str, Any]) -> None:
-        """Deep merge overlay dict into base dict (modifies base in-place)."""
-        for key, value in overlay.items():
-            if key in base:
-                if isinstance(base[key], dict) and isinstance(value, dict):
-                    self._deep_merge(base[key], value)
-                elif isinstance(base[key], list) and isinstance(value, list):
-                    base[key].extend(value)
-                else:
-                    base[key] = value
-            else:
-                base[key] = value
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:

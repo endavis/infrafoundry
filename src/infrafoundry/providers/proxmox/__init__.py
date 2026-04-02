@@ -6,6 +6,7 @@ from typing import Any, ClassVar, override
 
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
+    CloudInitMixin,
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
@@ -21,6 +22,7 @@ class ProxmoxProvider(
     TemplateRendererMixin,
     ResourceGrouperMixin,
     TerraformGeneratorMixin,
+    CloudInitMixin,
 ):
     """Proxmox VE provider for managing VMs, containers, templates, and networks."""
 
@@ -232,81 +234,27 @@ class ProxmoxProvider(
         return vm_copy
 
     def _process_cloud_init_snippets(self, vm: ResourceConfig) -> ResourceConfig:
-        """Process cloud-init snippets and merge them into VM config."""
+        """Process cloud-init snippets and merge them into VM config.
+
+        Delegates to CloudInitMixin for loading and merging, then serializes
+        the result as a YAML string with Terraform ``${`` escaping.
+
+        Args:
+            vm: VM resource config with optional cloud_init_snippets.
+
+        Returns:
+            Copy of the VM config with cloud_init_user_data set if snippets exist.
+        """
         import copy
 
         import yaml
 
-        # Work with a copy to avoid modifying the original
         vm_copy = copy.deepcopy(vm)
-        config = vm_copy.config
-
-        # Check if cloud_init_snippets is defined
-        if "cloud_init_snippets" not in config:
-            return vm_copy
-
-        snippet_names = config.get("cloud_init_snippets", [])
-        cloud_init_vars = config.get("cloud_init_vars", {})
-
-        # Load and merge snippets
-        merged_cloud_init: dict[Any, Any] = {}
-
-        for snippet_name in snippet_names:
-            # Build path to snippet file
-            if self._current_environment:
-                snippet_path = (
-                    self.config_dir
-                    / self._current_environment
-                    / "files"
-                    / "cloud-init-snippets"
-                    / f"{snippet_name}.yaml"
-                )
-            else:
-                snippet_path = (
-                    self.config_dir / "files" / "cloud-init-snippets" / f"{snippet_name}.yaml"
-                )
-
-            if not snippet_path.exists():
-                message = f"Cloud-init snippet not found: {snippet_path}"
-                if self.fail_on_missing_snippets:
-                    raise FileNotFoundError(message)
-                print(f"Warning: {message}")
-                continue
-
-            # Load snippet YAML
-            with open(snippet_path) as f:
-                snippet_content = f.read()
-
-                # Substitute variables
-                for var_name, var_value in cloud_init_vars.items():
-                    snippet_content = snippet_content.replace(f"${{{var_name}}}", str(var_value))
-
-                snippet_data = yaml.safe_load(snippet_content)
-
-                if snippet_data:
-                    # Merge snippet into merged_cloud_init
-                    self._deep_merge(merged_cloud_init, snippet_data)
-
-        # Store full merged cloud-init as YAML string for direct passthrough
-        if merged_cloud_init:
-            yaml_str = yaml.dump(merged_cloud_init, default_flow_style=False, sort_keys=False)
-            # Escape ${...} sequences for terraform heredoc (prevents interpolation)
-            config["cloud_init_user_data"] = yaml_str.replace("${", "$${")
-
+        merged = self._merge_cloud_init_snippets(vm_copy.config)
+        if merged:
+            yaml_str = yaml.dump(merged, default_flow_style=False, sort_keys=False)
+            vm_copy.config["cloud_init_user_data"] = yaml_str.replace("${", "$${")
         return vm_copy
-
-    def _deep_merge(self, base: dict[str, Any], overlay: dict[str, Any]) -> None:
-        """Deep merge overlay dict into base dict (modifies base in-place)."""
-        for key, value in overlay.items():
-            if key in base:
-                if isinstance(base[key], dict) and isinstance(value, dict):
-                    self._deep_merge(base[key], value)
-                elif isinstance(base[key], list) and isinstance(value, list):
-                    base[key].extend(value)
-                else:
-                    base[key] = value
-            else:
-                base[key] = value
 
     def _generate_templates_terraform(self, templates: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox templates.
