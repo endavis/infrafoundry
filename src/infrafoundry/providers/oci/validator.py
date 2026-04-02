@@ -5,12 +5,14 @@ from __future__ import annotations
 import base64
 import email.utils
 import hashlib
-from typing import cast
+from typing import Any, cast
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData, OCIProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+
+from .validators import CompartmentValidator, ImageValidator, NetworkValidator
 
 
 class OCIValidator:
@@ -19,6 +21,9 @@ class OCIValidator:
     Performs pre-flight validation including:
     - API connectivity and authentication
     - VCN/subnet reference validation between resources
+    - Compartment existence validation via OCI API
+    - VCN/subnet name collision detection via OCI API
+    - Image OCID validation via OCI API
     """
 
     OCI_API_BASE = "https://iaas.{region}.oraclecloud.com"
@@ -35,6 +40,11 @@ class OCIValidator:
         self.report = report
         self.api_validator = BaseAPIValidator("oci", env_config, report)
         self.provider_settings = cast(OCIProviderSettings, self.api_validator.provider_settings)
+
+        # Initialize specialized validators
+        self.compartment_validator = CompartmentValidator(report)
+        self.network_validator = NetworkValidator(report)
+        self.image_validator = ImageValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OCI API.
@@ -80,7 +90,19 @@ class OCIValidator:
             )
 
     def validate_references(self, resources: list[ResourceConfig]) -> None:
-        """Validate that referenced OCI resources exist within config.
+        """Validate that referenced OCI resources exist within config and live API.
+
+        Performs local cross-reference checks (always) and API-based validation
+        (when signing succeeds and compartment_ocid is configured).
+
+        Args:
+            resources: List of resources to validate
+        """
+        self._validate_local_references(resources)
+        self._validate_api_references(resources)
+
+    def _validate_local_references(self, resources: list[ResourceConfig]) -> None:
+        """Validate cross-references between resources in the configuration.
 
         Checks:
         - Subnets reference valid VCNs
@@ -140,6 +162,101 @@ class OCIValidator:
                         passed=True,
                         message=f"Instance '{resource.name}' subnet reference valid",
                     )
+
+    def _validate_api_references(self, resources: list[ResourceConfig]) -> None:
+        """Validate resources against live OCI API state.
+
+        Attempts to sign requests independently. If signing fails or
+        compartment_ocid is not configured, API checks are skipped gracefully.
+
+        Args:
+            resources: List of resources to validate
+        """
+        region = self.provider_settings.get("region", "")
+        compartment_ocid = self.provider_settings.get("compartment_ocid", "")
+        tenancy_ocid = self.provider_settings.get("tenancy_ocid", "")
+
+        if not compartment_ocid or not region:
+            return
+
+        # Fetch compartments (uses tenancy_ocid as parent)
+        if tenancy_ocid:
+            compartments = self._fetch_oci_list(
+                base_url=self.IDENTITY_API_BASE.format(region=region),
+                path=f"/20160918/compartments?compartmentId={tenancy_ocid}",
+                check_name="oci_list_compartments",
+            )
+            self.compartment_validator.validate(compartment_ocid, compartments)
+
+        # Fetch VCNs
+        vcns = self._fetch_oci_list(
+            base_url=self.OCI_API_BASE.format(region=region),
+            path=f"/20160918/vcns?compartmentId={compartment_ocid}",
+            check_name="oci_list_vcns",
+        )
+
+        # Fetch subnets
+        subnets = self._fetch_oci_list(
+            base_url=self.OCI_API_BASE.format(region=region),
+            path=f"/20160918/subnets?compartmentId={compartment_ocid}",
+            check_name="oci_list_subnets",
+        )
+
+        self.network_validator.validate(resources, vcns, subnets)
+
+        # Fetch images
+        images = self._fetch_oci_list(
+            base_url=self.OCI_API_BASE.format(region=region),
+            path=f"/20160918/images?compartmentId={compartment_ocid}",
+            check_name="oci_list_images",
+        )
+
+        self.image_validator.validate(resources, images)
+
+    def _fetch_oci_list(
+        self,
+        base_url: str,
+        path: str,
+        check_name: str,
+    ) -> list[dict[str, Any]] | None:
+        """Fetch a list resource from the OCI API with signed authentication.
+
+        OCI list endpoints return JSON arrays directly, so we use api_request()
+        instead of fetch_json() which expects a dict response.
+
+        Args:
+            base_url: API base URL (e.g. iaas or identity endpoint)
+            path: API path including query parameters
+            check_name: Validation check name for error reporting
+
+        Returns:
+            List of resource dicts, or None if signing or request fails
+        """
+        url = f"{base_url}{path}"
+
+        headers = self._build_signed_headers("get", url)
+        if not headers:
+            return None
+
+        response = self.api_validator.api_request(
+            url=url,
+            check_name=check_name,
+            headers=headers,
+            error_level=ValidationLevel.WARNING,
+            optional=True,
+        )
+
+        if not response:
+            return None
+
+        try:
+            data = response.json()
+            if isinstance(data, list):
+                return cast(list[dict[str, Any]], data)
+            # Some endpoints may wrap in a dict — handle gracefully
+            return None
+        except ValueError:
+            return None
 
     def _build_signed_headers(self, method: str, url: str, body: str = "") -> dict[str, str] | None:
         """Build OCI API signed request headers.
