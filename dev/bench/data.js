@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775143470682,
+  "lastUpdate": 1775146697011,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3565,6 +3565,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000037944660132856645",
             "extra": "mean: 102.95767549417171 usec\nrounds: 2681"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c2dd76be7409f647efdf539f97a64d6f17b4849f",
+          "message": "refactor: implement Kubernetes validators for kubeconfig, namespace, CRD, and Helm validation (merges PR #471, addresses #444)",
+          "timestamp": "2026-04-02T17:17:35+01:00",
+          "tree_id": "240eb81cae77df87a6c8d25f897bfa7e689d42ec",
+          "url": "https://github.com/endavis/infrafoundry/commit/c2dd76be7409f647efdf539f97a64d6f17b4849f"
+        },
+        "date": 1775146696031,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7287.44977063358,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009089898492124178",
+            "extra": "mean: 137.22221510599294 usec\nrounds: 2264"
           }
         ]
       }
