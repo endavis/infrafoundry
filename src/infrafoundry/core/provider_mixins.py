@@ -10,6 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
+import yaml
 from jinja2 import Environment, FileSystemLoader, Template, TemplateNotFound
 
 from infrafoundry.core.config import ConfigManager
@@ -756,3 +757,130 @@ class TerraformGeneratorMixin:
             return True
 
         return False
+
+
+class CloudInitMixin:
+    """Mixin for providers that process cloud-init snippets.
+
+    Provides:
+    - Loading cloud-init snippet YAML files from config directory
+    - Variable substitution in snippets
+    - Deep merging of multiple snippets
+
+    Expects from the mixed-in class:
+    - ``config_dir``: Path to configuration directory
+    - ``_current_environment``: Current environment name (str or None)
+    - ``fail_on_missing_snippets``: Whether to raise on missing snippets (bool)
+    - ``_logger``: Logger instance
+
+    Usage:
+        class MyProvider(ProviderBase, CloudInitMixin):
+            def _process_cloud_init_snippets(self, resource):
+                resource_copy = copy.deepcopy(resource)
+                merged = self._merge_cloud_init_snippets(resource_copy.config)
+                if merged:
+                    resource_copy.config["cloud_init_data"] = merged
+                return resource_copy
+    """
+
+    if TYPE_CHECKING:
+        config_dir: Path
+        _current_environment: str | None
+        fail_on_missing_snippets: bool
+        _logger: logging.Logger
+
+    def _merge_cloud_init_snippets(self, config: dict[str, Any]) -> dict[Any, Any] | None:
+        """Load, substitute, and merge cloud-init snippets from config.
+
+        Reads the ``cloud_init_snippets`` list from *config*, loads each
+        snippet YAML file, applies variable substitution from
+        ``cloud_init_vars``, and deep-merges all snippets together.
+
+        Args:
+            config: Resource configuration dict containing optional
+                ``cloud_init_snippets`` and ``cloud_init_vars`` keys.
+
+        Returns:
+            Merged cloud-init dict, or None if no snippets were found or
+            the snippets key is absent/empty.
+
+        Raises:
+            FileNotFoundError: If a snippet file is missing and
+                ``self.fail_on_missing_snippets`` is True.
+        """
+        if "cloud_init_snippets" not in config:
+            return None
+
+        snippet_names = config.get("cloud_init_snippets", [])
+        if not snippet_names:
+            return None
+
+        cloud_init_vars = config.get("cloud_init_vars", {})
+        merged_cloud_init: dict[Any, Any] = {}
+
+        for snippet_name in snippet_names:
+            snippet_path = self._resolve_snippet_path(snippet_name)
+
+            if not snippet_path.exists():
+                message = f"Cloud-init snippet not found: {snippet_path}"
+                if self.fail_on_missing_snippets:
+                    raise FileNotFoundError(message)
+                self._logger.warning(message)
+                continue
+
+            with open(snippet_path) as f:
+                snippet_content = f.read()
+
+            # Substitute variables
+            for var_name, var_value in cloud_init_vars.items():
+                snippet_content = snippet_content.replace(f"${{{var_name}}}", str(var_value))
+
+            snippet_data = yaml.safe_load(snippet_content)
+
+            if snippet_data:
+                CloudInitMixin._deep_merge(merged_cloud_init, snippet_data)
+
+        return merged_cloud_init if merged_cloud_init else None
+
+    def _resolve_snippet_path(self, snippet_name: str) -> Path:
+        """Resolve the filesystem path for a cloud-init snippet.
+
+        Args:
+            snippet_name: Snippet name (may contain subdirectories,
+                e.g. ``storage/nfs``).
+
+        Returns:
+            Absolute path to the snippet YAML file.
+        """
+        if self._current_environment:
+            return (
+                self.config_dir
+                / self._current_environment
+                / "files"
+                / "cloud-init-snippets"
+                / f"{snippet_name}.yaml"
+            )
+        return self.config_dir / "files" / "cloud-init-snippets" / f"{snippet_name}.yaml"
+
+    @staticmethod
+    def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> None:
+        """Deep merge overlay dict into base dict (modifies base in-place).
+
+        - Dicts are merged recursively.
+        - Lists are concatenated.
+        - Scalars are overwritten by the overlay value.
+
+        Args:
+            base: Base dictionary to merge into.
+            overlay: Dictionary to merge from.
+        """
+        for key, value in overlay.items():
+            if key in base:
+                if isinstance(base[key], dict) and isinstance(value, dict):
+                    CloudInitMixin._deep_merge(base[key], value)
+                elif isinstance(base[key], list) and isinstance(value, list):
+                    base[key].extend(value)
+                else:
+                    base[key] = value
+            else:
+                base[key] = value

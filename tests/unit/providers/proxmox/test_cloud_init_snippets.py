@@ -214,13 +214,15 @@ class TestSnippetEdgeCases:
         result = provider._process_cloud_init_snippets(vm)
         assert "cloud_init_user_data" not in result.config
 
-    def test_missing_snippet_warns(self, provider, capsys):
-        """Missing snippet should print a warning (not raise)."""
+    def test_missing_snippet_warns(self, provider, caplog):
+        """Missing snippet should log a warning (not raise)."""
+        import logging
+
         vm = _make_vm(cloud_init_snippets=["nonexistent/snippet"])
         provider.fail_on_missing_snippets = False
-        result = provider._process_cloud_init_snippets(vm)
-        captured = capsys.readouterr()
-        assert "Warning" in captured.out
+        with caplog.at_level(logging.WARNING):
+            result = provider._process_cloud_init_snippets(vm)
+        assert "Cloud-init snippet not found" in caplog.text
         assert "cloud_init_user_data" not in result.config
 
     def test_missing_snippet_strict_raises(self, provider):
