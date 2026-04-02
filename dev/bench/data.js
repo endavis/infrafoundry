@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775146697011,
+  "lastUpdate": 1775149481123,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3596,6 +3596,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009089898492124178",
             "extra": "mean: 137.22221510599294 usec\nrounds: 2264"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "19a2b185d95da475ea718926e9500f8774997dcf",
+          "message": "refactor: complete OCI validator with live API resource validation (merges PR #473, addresses #472)",
+          "timestamp": "2026-04-02T18:04:02+01:00",
+          "tree_id": "8bbeb60ed83e1dac7fde180b27da34dc586c9492",
+          "url": "https://github.com/endavis/infrafoundry/commit/19a2b185d95da475ea718926e9500f8774997dcf"
+        },
+        "date": 1775149480109,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7390.009184944865,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009835047823880381",
+            "extra": "mean: 135.31782910868748 usec\nrounds: 2446"
           }
         ]
       }
