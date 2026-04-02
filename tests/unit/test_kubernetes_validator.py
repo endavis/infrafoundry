@@ -1,7 +1,7 @@
-"""Unit tests for KubernetesValidator."""
+"""Unit tests for KubernetesValidator (composition orchestrator)."""
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,6 +12,12 @@ from infrafoundry.core.validation import (
     ValidationReport,
 )
 from infrafoundry.providers.kubernetes.validator import KubernetesValidator
+from infrafoundry.providers.kubernetes.validators import (
+    CRDValidator,
+    HelmValidator,
+    KubeconfigValidator,
+    NamespaceValidator,
+)
 
 
 @pytest.fixture
@@ -50,6 +56,27 @@ class TestKubernetesValidatorProtocol:
         assert hasattr(validator, "report")
         assert hasattr(validator, "validate_connectivity")
         assert hasattr(validator, "validate_references")
+
+
+@pytest.mark.unit
+class TestKubernetesValidatorComposition:
+    """Tests verifying composition of specialized validators."""
+
+    def test_has_kubeconfig_validator(self, validator):
+        """Test that KubernetesValidator composes KubeconfigValidator."""
+        assert isinstance(validator.kubeconfig_validator, KubeconfigValidator)
+
+    def test_has_namespace_validator(self, validator):
+        """Test that KubernetesValidator composes NamespaceValidator."""
+        assert isinstance(validator.namespace_validator, NamespaceValidator)
+
+    def test_has_crd_validator(self, validator):
+        """Test that KubernetesValidator composes CRDValidator."""
+        assert isinstance(validator.crd_validator, CRDValidator)
+
+    def test_has_helm_validator(self, validator):
+        """Test that KubernetesValidator composes HelmValidator."""
+        assert isinstance(validator.helm_validator, HelmValidator)
 
 
 @pytest.mark.unit
@@ -108,6 +135,33 @@ class TestKubernetesValidatorConnectivity:
         # Should have warning result
         assert any(
             r.level == ValidationLevel.WARNING and not r.passed for r in validation_report.results
+        )
+
+    def test_validate_connectivity_delegates_to_kubeconfig_validator(
+        self, mock_env_config, validation_report
+    ):
+        """Test that connectivity delegates to KubeconfigValidator."""
+        validator = KubernetesValidator(mock_env_config, validation_report)
+        validator.kubeconfig_validator.validate = MagicMock()
+        validator.validate_connectivity()
+        validator.kubeconfig_validator.validate.assert_called_once_with("/path/to/kubeconfig", None)
+
+    def test_validate_connectivity_passes_context_override(self, validation_report):
+        """Test that context override from settings is passed through."""
+        env_config = {
+            "name": "test-env",
+            "provider_settings": {
+                "kubernetes": {
+                    "kubeconfig_path": "/path/to/kubeconfig",
+                    "context": "my-context",
+                }
+            },
+        }
+        validator = KubernetesValidator(env_config, validation_report)
+        validator.kubeconfig_validator.validate = MagicMock()
+        validator.validate_connectivity()
+        validator.kubeconfig_validator.validate.assert_called_once_with(
+            "/path/to/kubeconfig", "my-context"
         )
 
 
@@ -204,3 +258,34 @@ class TestKubernetesValidatorReferences:
 
         # Should report successful validation
         assert any("Validated references" in r.message for r in validation_report.results)
+
+    def test_validate_references_runs_helm_always(self, validator, validation_report):
+        """Test that Helm validation runs regardless of connectivity."""
+        validator.helm_validator.validate = MagicMock()
+        resources = [
+            ResourceConfig(
+                provider="kubernetes",
+                type="helm_releases",
+                name="nginx",
+                config={"chart": "nginx", "repository": "https://charts.bitnami.com"},
+            ),
+        ]
+        validator.validate_references(resources)
+        validator.helm_validator.validate.assert_called_once()
+
+    def test_validate_references_skips_api_when_disconnected(self, validator, validation_report):
+        """Test that API-based checks are skipped when not connected."""
+        validator.namespace_validator.validate = MagicMock()
+        validator.crd_validator.validate = MagicMock()
+        resources = [
+            ResourceConfig(
+                provider="kubernetes",
+                type="deployments",
+                name="my-app",
+                config={"namespace": "default"},
+            ),
+        ]
+        # kubeconfig_validator.is_connected defaults to False
+        validator.validate_references(resources)
+        validator.namespace_validator.validate.assert_not_called()
+        validator.crd_validator.validate.assert_not_called()

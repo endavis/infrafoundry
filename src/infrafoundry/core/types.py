@@ -60,6 +60,7 @@ class KubernetesProviderSettings(TypedDict, total=False):
     """Provider settings expected by the Kubernetes provider."""
 
     kubeconfig_path: str
+    context: str
 
 
 class OPNsenseEnvironmentConfig(TypedDict, total=False):
