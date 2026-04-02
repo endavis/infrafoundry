@@ -2,13 +2,15 @@
 
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import pytest
 import yaml
 
 from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.secrets.provider import SecretProvider
+from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 
 
 @pytest.fixture
@@ -303,7 +305,7 @@ class TestPackageSecrets:
         assert resources[0].config["host"] == "localhost"
 
     def test_sops_encrypted_secrets_are_decrypted(self, tmp_path: Path) -> None:
-        """SOPS-encrypted secrets.yaml triggers sops --decrypt subprocess."""
+        """Encrypted secrets.yaml is loaded via the injected secret provider."""
         manifest = {
             "name": "test-pkg",
             "variables": {"host": "localhost"},
@@ -313,25 +315,20 @@ class TestPackageSecrets:
 
         package_dir = _create_package(tmp_path, manifest, resource, secrets_data=None)
 
-        # Write a fake SOPS-encrypted file
+        # Write a fake SOPS-encrypted file (content doesn't matter — provider is mocked)
         sops_content = (
             "variables:\n    password: ENC[AES256_GCM,data:abc123]\nsops:\n    version: 3.7.3\n"
         )
         (package_dir / "secrets.yaml").write_text(sops_content)
 
-        # Mock subprocess.run to simulate sops --decrypt
-        decrypted_yaml = "variables:\n  password: decrypted-secret\n"
-        mock_result = type("Result", (), {"stdout": decrypted_yaml, "returncode": 0})()
+        # Use a mock secret provider that returns decrypted data
+        mock_provider = MagicMock(spec=SecretProvider)
+        mock_provider.load_secret.return_value = {"variables": {"password": "decrypted-secret"}}
 
-        with patch(
-            "infrafoundry.core.config.sops.subprocess.run", return_value=mock_result
-        ) as mock_run:
-            loader = PackageLoader(tmp_path)
-            _resources, _, _pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
+        loader = PackageLoader(tmp_path, secret_provider=mock_provider)
+        _resources, _, _pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
 
-        mock_run.assert_called_once()
-        call_args = mock_run.call_args
-        assert call_args[0][0] == ["sops", "--decrypt", str(package_dir / "secrets.yaml")]
+        mock_provider.load_secret.assert_called_once_with(package_dir / "secrets.yaml")
 
     def test_secret_variables_available_in_rendered_templates(self, tmp_path: Path) -> None:
         """Variables from secrets are used when rendering resource templates."""
@@ -356,3 +353,33 @@ class TestPackageSecrets:
         assert len(resources) == 1
         assert resources[0].config["password"] == "super-secret"
         assert resources[0].config["host"] == "db.local"
+
+
+class TestSecretProviderInjection:
+    """Tests for pluggable SecretProvider injection into PackageLoader."""
+
+    def test_default_secret_provider_is_sops(self, tmp_path: Path) -> None:
+        """PackageLoader uses SopsSecretProvider by default."""
+        loader = PackageLoader(tmp_path)
+        assert isinstance(loader._secret_provider, SopsSecretProvider)
+
+    def test_custom_secret_provider_is_used(self, tmp_path: Path) -> None:
+        """PackageLoader uses the injected custom secret provider."""
+        manifest = {
+            "name": "test-pkg",
+            "variables": {"host": "localhost"},
+            "resources": ["vm.yaml"],
+        }
+        resource = {"vm": [{"name": "test-vm", "host": "{{ host }}"}]}
+        secrets = {"variables": {"api_key": "custom-provider-secret"}}
+
+        package_dir = _create_package(tmp_path, manifest, resource, secrets)
+
+        mock_provider = MagicMock(spec=SecretProvider)
+        mock_provider.load_secret.return_value = secrets
+
+        loader = PackageLoader(tmp_path, secret_provider=mock_provider)
+        _resources, _, pkg_vars = loader.load_package(package_dir, "proxmox", "test-env")
+
+        mock_provider.load_secret.assert_called_once_with(package_dir / "secrets.yaml")
+        assert pkg_vars["api_key"] == "custom-provider-secret"

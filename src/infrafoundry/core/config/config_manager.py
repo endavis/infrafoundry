@@ -16,6 +16,7 @@ from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoad
 from infrafoundry.core.config.sops import load_yaml_with_sops
 from infrafoundry.core.exceptions import InvalidConfigurationError, PackageNotFoundError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.secrets.provider import SecretProvider
 
 
 class ConfigManager(PathBasedManager):
@@ -25,12 +26,18 @@ class ConfigManager(PathBasedManager):
     to support both configuration formats.
     """
 
-    def __init__(self, base_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        base_dir: Path | None = None,
+        secret_provider: SecretProvider | None = None,
+    ) -> None:
         """Initialize configuration manager.
 
         Args:
             base_dir: Base directory for configs
                 (defaults to INFRAFOUNDRY_CONFIG_REPO/envs)
+            secret_provider: Provider used to load package secrets.
+                Forwarded to ``ProviderCentricLoader`` and ``PackageLoader``.
 
         Raises:
             ValueError: If base_dir is None and INFRAFOUNDRY_CONFIG_REPO is not set
@@ -55,9 +62,11 @@ class ConfigManager(PathBasedManager):
 
         # Initialize blueprint resolver and loaders
         self._blueprint_resolver = BlueprintResolver(base_dir)
-        self.provider_centric = ProviderCentricLoader(base_dir, self._blueprint_resolver)
+        self.provider_centric = ProviderCentricLoader(
+            base_dir, self._blueprint_resolver, secret_provider
+        )
         self.resource_centric = ResourceCentricLoader(base_dir)
-        self._package_loader = PackageLoader(base_dir, self._blueprint_resolver)
+        self._package_loader = PackageLoader(base_dir, self._blueprint_resolver, secret_provider)
 
     def load_environment(self, env_name: str) -> EnvironmentConfig:
         """Load environment configuration.
