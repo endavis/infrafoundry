@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775127999768,
+  "lastUpdate": 1775143470682,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3534,6 +3534,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010788965968231306",
             "extra": "mean: 136.19685986760211 usec\nrounds: 2569"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "559ddbbcd8fd7e2e80ee430321d5cbac463cff5b",
+          "message": "refactor: extract CloudInitMixin from duplicated Proxmox/OCI cloud-init code (merges PR #469, addresses #468)",
+          "timestamp": "2026-04-02T16:23:56+01:00",
+          "tree_id": "6c77710ac3a3279810f3bf9740a6b81f6c1290f2",
+          "url": "https://github.com/endavis/infrafoundry/commit/559ddbbcd8fd7e2e80ee430321d5cbac463cff5b"
+        },
+        "date": 1775143469782,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9712.728994708206,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000037944660132856645",
+            "extra": "mean: 102.95767549417171 usec\nrounds: 2681"
           }
         ]
       }
