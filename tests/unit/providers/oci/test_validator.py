@@ -7,6 +7,11 @@ import pytest
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.oci.validator import OCIValidator
+from infrafoundry.providers.oci.validators import (
+    CompartmentValidator,
+    ImageValidator,
+    NetworkValidator,
+)
 
 
 @pytest.fixture
@@ -38,6 +43,16 @@ def validator(env_config, report):
     return OCIValidator(env_config, report)
 
 
+class TestComposition:
+    """Tests for validator composition."""
+
+    def test_specialized_validators_initialized(self, validator):
+        """Specialized validators are created during init."""
+        assert isinstance(validator.compartment_validator, CompartmentValidator)
+        assert isinstance(validator.network_validator, NetworkValidator)
+        assert isinstance(validator.image_validator, ImageValidator)
+
+
 class TestValidateReferences:
     """Tests for validate_references method."""
 
@@ -58,6 +73,8 @@ class TestValidateReferences:
             ),
         ]
 
+        # Mock _validate_api_references to isolate local checks
+        validator._validate_api_references = MagicMock()
         validator.validate_references(resources)
 
         # Should have passed checks
@@ -77,6 +94,7 @@ class TestValidateReferences:
             ),
         ]
 
+        validator._validate_api_references = MagicMock()
         validator.validate_references(resources)
 
         calls = report.add_check.call_args_list
@@ -102,6 +120,7 @@ class TestValidateReferences:
             ),
         ]
 
+        validator._validate_api_references = MagicMock()
         validator.validate_references(resources)
 
         calls = report.add_check.call_args_list
@@ -124,6 +143,7 @@ class TestValidateReferences:
             ),
         ]
 
+        validator._validate_api_references = MagicMock()
         validator.validate_references(resources)
 
         calls = report.add_check.call_args_list
@@ -143,6 +163,7 @@ class TestValidateReferences:
             ),
         ]
 
+        validator._validate_api_references = MagicMock()
         validator.validate_references(resources)
 
         # No checks for VCN-only resources
@@ -159,6 +180,7 @@ class TestValidateReferences:
             ),
         ]
 
+        validator._validate_api_references = MagicMock()
         validator.validate_references(resources)
 
         # No subnet reference, should pass silently
@@ -203,12 +225,203 @@ class TestValidateReferences:
             ),
         ]
 
+        validator._validate_api_references = MagicMock()
         validator.validate_references(resources)
 
         calls = report.add_check.call_args_list
         # 2 subnet checks + 2 instance checks = 4
         assert len(calls) == 4
         assert all(c[1]["passed"] is True for c in calls)
+
+
+class TestValidateAPIReferences:
+    """Tests for _validate_api_references method."""
+
+    def test_skipped_when_no_compartment_ocid(self, report):
+        """API validation skipped when compartment_ocid is missing."""
+        env_config = {
+            "provider_settings": {
+                "oci": {
+                    "tenancy_ocid": "ocid1.tenancy.oc1..example",
+                    "user_ocid": "ocid1.user.oc1..example",
+                    "fingerprint": "aa:bb:cc:dd:ee:ff:00:11",
+                    "private_key_path": "/tmp/test_key.pem",
+                    "region": "us-ashburn-1",
+                    # No compartment_ocid
+                }
+            }
+        }
+        validator = OCIValidator(env_config, report)
+        validator._fetch_oci_list = MagicMock()
+
+        validator._validate_api_references([])
+
+        validator._fetch_oci_list.assert_not_called()
+
+    def test_skipped_when_no_region(self, report):
+        """API validation skipped when region is missing."""
+        env_config = {
+            "provider_settings": {
+                "oci": {
+                    "tenancy_ocid": "ocid1.tenancy.oc1..example",
+                    "user_ocid": "ocid1.user.oc1..example",
+                    "fingerprint": "aa:bb:cc:dd:ee:ff:00:11",
+                    "private_key_path": "/tmp/test_key.pem",
+                    "compartment_ocid": "ocid1.compartment.oc1..example",
+                    # No region
+                }
+            }
+        }
+        validator = OCIValidator(env_config, report)
+        validator._fetch_oci_list = MagicMock()
+
+        validator._validate_api_references([])
+
+        validator._fetch_oci_list.assert_not_called()
+
+    def test_skipped_when_signing_fails(self, validator):
+        """API validation skips gracefully when signing fails."""
+        validator._build_signed_headers = MagicMock(return_value=None)
+
+        resources = [
+            ResourceConfig(
+                name="my-vcn",
+                type="vcn",
+                provider="oci",
+                config={"cidr_block": "10.0.0.0/16"},
+            ),
+        ]
+
+        # Should not raise
+        validator._validate_api_references(resources)
+
+    def test_fetches_and_delegates_to_validators(self, validator):
+        """API references fetches data and delegates to specialized validators."""
+        # Mock _fetch_oci_list to return test data
+        compartments = [{"id": "ocid1.compartment.oc1..example", "name": "root"}]
+        vcns = [{"displayName": "existing-vcn", "id": "ocid1.vcn.oc1..aaa"}]
+        subnets = [{"displayName": "existing-subnet", "id": "ocid1.subnet.oc1..aaa"}]
+        images = [{"id": "ocid1.image.oc1..aaa", "displayName": "Oracle-Linux-8"}]
+
+        call_count = 0
+
+        def mock_fetch(base_url, path, check_name):
+            nonlocal call_count
+            call_count += 1
+            if "compartments" in path:
+                return compartments
+            elif "vcns" in path:
+                return vcns
+            elif "subnets" in path:
+                return subnets
+            elif "images" in path:
+                return images
+            return None
+
+        validator._fetch_oci_list = MagicMock(side_effect=mock_fetch)
+        validator.compartment_validator.validate = MagicMock()
+        validator.network_validator.validate = MagicMock()
+        validator.image_validator.validate = MagicMock()
+
+        resources = [
+            ResourceConfig(
+                name="my-vcn",
+                type="vcn",
+                provider="oci",
+                config={"cidr_block": "10.0.0.0/16"},
+            ),
+        ]
+
+        validator._validate_api_references(resources)
+
+        # All four list endpoints should be called
+        assert validator._fetch_oci_list.call_count == 4
+
+        # Specialized validators should be called with pre-fetched data
+        validator.compartment_validator.validate.assert_called_once_with(
+            "ocid1.compartment.oc1..example", compartments
+        )
+        validator.network_validator.validate.assert_called_once_with(resources, vcns, subnets)
+        validator.image_validator.validate.assert_called_once_with(resources, images)
+
+
+class TestFetchOCIList:
+    """Tests for _fetch_oci_list helper."""
+
+    def test_returns_list_on_success(self, validator):
+        """Returns list when API returns a JSON array."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            {"id": "ocid1.vcn.oc1..aaa", "displayName": "my-vcn"},
+        ]
+
+        validator._build_signed_headers = MagicMock(return_value={"Authorization": "test"})
+        validator.api_validator.api_request = MagicMock(return_value=mock_response)
+
+        result = validator._fetch_oci_list(
+            base_url="https://iaas.us-ashburn-1.oraclecloud.com",
+            path="/20160918/vcns?compartmentId=test",
+            check_name="oci_list_vcns",
+        )
+
+        assert result == [{"id": "ocid1.vcn.oc1..aaa", "displayName": "my-vcn"}]
+
+    def test_returns_none_when_signing_fails(self, validator):
+        """Returns None when signing fails."""
+        validator._build_signed_headers = MagicMock(return_value=None)
+
+        result = validator._fetch_oci_list(
+            base_url="https://iaas.us-ashburn-1.oraclecloud.com",
+            path="/20160918/vcns?compartmentId=test",
+            check_name="oci_list_vcns",
+        )
+
+        assert result is None
+
+    def test_returns_none_when_request_fails(self, validator):
+        """Returns None when API request fails."""
+        validator._build_signed_headers = MagicMock(return_value={"Authorization": "test"})
+        validator.api_validator.api_request = MagicMock(return_value=None)
+
+        result = validator._fetch_oci_list(
+            base_url="https://iaas.us-ashburn-1.oraclecloud.com",
+            path="/20160918/vcns?compartmentId=test",
+            check_name="oci_list_vcns",
+        )
+
+        assert result is None
+
+    def test_returns_none_on_json_error(self, validator):
+        """Returns None when JSON parsing fails."""
+        mock_response = MagicMock()
+        mock_response.json.side_effect = ValueError("bad json")
+
+        validator._build_signed_headers = MagicMock(return_value={"Authorization": "test"})
+        validator.api_validator.api_request = MagicMock(return_value=mock_response)
+
+        result = validator._fetch_oci_list(
+            base_url="https://iaas.us-ashburn-1.oraclecloud.com",
+            path="/20160918/vcns?compartmentId=test",
+            check_name="oci_list_vcns",
+        )
+
+        assert result is None
+
+    def test_returns_none_on_dict_response(self, validator):
+        """Returns None when API returns a dict instead of a list."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"error": "unexpected format"}
+
+        validator._build_signed_headers = MagicMock(return_value={"Authorization": "test"})
+        validator.api_validator.api_request = MagicMock(return_value=mock_response)
+
+        result = validator._fetch_oci_list(
+            base_url="https://iaas.us-ashburn-1.oraclecloud.com",
+            path="/20160918/vcns?compartmentId=test",
+            check_name="oci_list_vcns",
+        )
+
+        assert result is None
 
 
 class TestValidateConnectivity:
