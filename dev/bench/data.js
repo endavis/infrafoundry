@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775220349064,
+  "lastUpdate": 1775255664417,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3751,6 +3751,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000874050089396922",
             "extra": "mean: 135.76252815887173 usec\nrounds: 2770"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2a4d52e47f73c08c874526d1e2d394a3600a8efb",
+          "message": "chore: synchronize with latest pyproject-template (merges PR #483, addresses #482)\n\n* chore: sync template state to 75cbe9b37181359365d57b4e54cb59b8a47507fb\n\n* chore: synchronize with latest pyproject-template",
+          "timestamp": "2026-04-03T23:33:53+01:00",
+          "tree_id": "76d009b6fc4d7fd8e67c73902acde7e60fa0e39c",
+          "url": "https://github.com/endavis/infrafoundry/commit/2a4d52e47f73c08c874526d1e2d394a3600a8efb"
+        },
+        "date": 1775255663456,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9630.1489066661,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000054635757391543555",
+            "extra": "mean: 103.84055425225964 usec\nrounds: 2728"
           }
         ]
       }
