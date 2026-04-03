@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775218338702,
+  "lastUpdate": 1775219689019,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3689,6 +3689,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010032566844533326",
             "extra": "mean: 136.80601164729288 usec\nrounds: 2404"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "58968cebe8a31a2dd8bddf0f77cc699c55e117f7",
+          "message": "test: expand provider validator test coverage to 71% (merges PR #480, addresses #478)\n\n* test: expand provider validator test coverage to 71%\n\n* test: add kubernetes validator API reference and service selector tests",
+          "timestamp": "2026-04-03T13:34:17+01:00",
+          "tree_id": "13e29e832ee45ed34f6e67e9d20b77627686f57b",
+          "url": "https://github.com/endavis/infrafoundry/commit/58968cebe8a31a2dd8bddf0f77cc699c55e117f7"
+        },
+        "date": 1775219688673,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6493.671486167955,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003162476641759793",
+            "extra": "mean: 153.9960871334623 usec\nrounds: 2456"
           }
         ]
       }
