@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775219689019,
+  "lastUpdate": 1775220349064,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3720,6 +3720,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003162476641759793",
             "extra": "mean: 153.9960871334623 usec\nrounds: 2456"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "482dc6441ba0f20ff5e4810df252ef2fac376a2a",
+          "message": "docs: add validator, API client, and mixin patterns to provider guide (merges PR #481, addresses #479)",
+          "timestamp": "2026-04-03T13:45:16+01:00",
+          "tree_id": "44c5652ec91124efae087fab524f0c77394dcbf3",
+          "url": "https://github.com/endavis/infrafoundry/commit/482dc6441ba0f20ff5e4810df252ef2fac376a2a"
+        },
+        "date": 1775220348372,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7365.802725990653,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000874050089396922",
+            "extra": "mean: 135.76252815887173 usec\nrounds: 2770"
           }
         ]
       }
