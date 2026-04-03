@@ -32,7 +32,7 @@ def task_docs_deploy() -> dict[str, Any]:
 def task_spell_check() -> dict[str, Any]:
     """Check spelling in code and documentation."""
     return {
-        "actions": ["uv run codespell src/ tests/ docs/ README.md"],
+        "actions": ["uv run codespell src/ tests/ tools/ docs/ README.md"],
         "title": title_with_actions,
         "verbosity": 0,
     }

@@ -20,7 +20,7 @@ def task_security() -> dict[str, Any]:
     """Run security checks with bandit (requires security extras)."""
     return {
         "actions": [
-            "uv run bandit -c pyproject.toml -r src/ || "
+            "uv run bandit -c pyproject.toml -r src/ tools/ || "
             "echo 'bandit not installed. Run: uv sync --extra security'"
         ],
         "title": title_with_actions,
