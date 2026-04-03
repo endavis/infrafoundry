@@ -5,6 +5,7 @@ from __future__ import annotations
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation_helpers import BaseAPIValidator
 
 from .validators import (
     HostConnectivityValidator,
@@ -32,6 +33,8 @@ class EsxiValidator:
         """
         self.env_config = env_config
         self.report = report
+        self.api_validator = BaseAPIValidator("esxi", env_config, report)
+        self.provider_settings = self.api_validator.provider_settings
 
         self.host_connectivity_validator = HostConnectivityValidator(report)
         self.vswitch_reference_validator = VswitchReferenceValidator(report)
@@ -43,13 +46,11 @@ class EsxiValidator:
 
         Checks that each configured ESXi host is reachable on port 22.
         """
-        provider_settings = self.env_config.get("provider_settings", {}).get("esxi", {})
-        hosts_config = provider_settings.get("hosts", {})
+        hosts_config = self.provider_settings.get("hosts", {})
 
         if not hosts_config:
-            self.report.add_check(
+            self.api_validator.add_error(
                 check_name="esxi_hosts_configured",
-                passed=False,
                 message="No ESXi hosts configured in provider_settings.esxi.hosts",
             )
             return
