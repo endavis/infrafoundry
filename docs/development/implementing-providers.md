@@ -270,6 +270,266 @@ def generate_pyinfra(self, resources):
   }
   ```
 
+## Validator Architecture
+
+All providers use a **composition pattern** for validation: a main validator composes `BaseAPIValidator` (for credential checking and reporting) and delegates to specialized validators for specific checks.
+
+### Main Validator Pattern
+
+```python
+from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.yourprovider.api_client import YourClient
+
+class YourValidator:
+    def __init__(self, env_config, report):
+        self.env_config = env_config
+        self.report = report
+        self.api_validator = BaseAPIValidator("yourprovider", env_config, report)
+        self.provider_settings = self.api_validator.provider_settings
+
+        # Compose specialized validators
+        self.network_validator = NetworkValidator(report)
+        self.resource_validator = ResourceValidator(report)
+```
+
+### validate_connectivity() Pattern
+
+Credential checking uses `api_validator.get_credentials()`. API calls use a dedicated client:
+
+```python
+def validate_connectivity(self):
+    credentials = self.api_validator.get_credentials(
+        required_fields=["api_url", "api_key"]
+    )
+    if not credentials:
+        return
+
+    client = YourClient.from_provider_settings(self.provider_settings)
+    if not client:
+        self.api_validator.add_error(
+            check_name="yourprovider_credentials",
+            message="Missing API credentials",
+        )
+        return
+
+    try:
+        data = client.get_json("status")
+        self.api_validator.add_success(
+            check_name="yourprovider_connectivity",
+            message=f"Connected (version: {data.get('version')})",
+        )
+    except APIError as exc:
+        self.api_validator.add_error(
+            check_name="yourprovider_connectivity",
+            message=f"Connection failed: {exc.message}",
+        )
+```
+
+### validate_references() Pattern
+
+Collect references from resources, fetch live state, delegate to specialized validators:
+
+```python
+def validate_references(self, resources):
+    client = YourClient.from_provider_settings(self.provider_settings)
+    if not client:
+        return
+
+    try:
+        refs = self._collect_resource_references(resources)
+        live_data = client.get_json("resources")
+
+        self.network_validator.validate(client, refs.networks)
+        self.resource_validator.validate(live_data, refs.resource_refs)
+
+    except Exception as exc:
+        self.api_validator.handle_validation_exception(
+            check_name="yourprovider_validation",
+            error=exc,
+            warning_level=ValidationLevel.WARNING,
+        )
+```
+
+### Specialized Validator Types
+
+1. **API-calling validators** take a client instance and make requests:
+   ```python
+   class NetworkValidator:
+       def __init__(self, report):
+           self.report = report
+
+       def validate(self, client, networks):
+           for network in networks:
+               try:
+                   data = client.get_json(f"networks/{network}")
+                   self.report.add_check(
+                       check_name=f"network_{network}",
+                       passed=True,
+                       message=f"Network '{network}' exists",
+                   )
+               except APIError:
+                   self.report.add_check(
+                       check_name=f"network_{network}",
+                       passed=False,
+                       message=f"Network '{network}' not accessible",
+                       level=ValidationLevel.WARNING,
+                   )
+   ```
+
+2. **Report-only validators** receive pre-fetched data (no client needed):
+   ```python
+   class TemplateValidator:
+       def __init__(self, report):
+           self.report = report
+
+       def validate(self, existing_templates, template_refs):
+           if existing_templates is None:
+               return  # API fetch failed, skip gracefully
+           for ref, users in template_refs.items():
+               if ref in existing_templates:
+                   self.report.add_check(...)
+   ```
+
+### Graceful Degradation
+
+API validation should never block deployment. Use `optional=True` and `ValidationLevel.WARNING` for non-critical API checks. If signing/authentication fails, skip API checks and run only local cross-reference validation.
+
+## API Client Pattern
+
+Providers with HTTP APIs should have a dedicated API client in `api_client.py`. Clients handle authentication and HTTP, raise exceptions on failure, and have no knowledge of validation reporting.
+
+### Client Structure
+
+```python
+from infrafoundry.core.exceptions import APIError, AuthenticationError
+
+class YourClient:
+    def __init__(self, api_url, api_key, timeout=10):
+        self.api_url = api_url
+        self.headers = {"Authorization": f"Bearer {api_key}"}
+        self.timeout = timeout
+
+    @classmethod
+    def from_provider_settings(cls, settings):
+        """Create client from provider settings. Returns None if insufficient."""
+        api_url = settings.get("api_url")
+        api_key = settings.get("api_key")
+        if not api_url or not api_key:
+            return None
+        return cls(api_url=api_url, api_key=api_key)
+
+    def get_json(self, endpoint, **kwargs):
+        """GET endpoint and parse JSON. Raises APIError."""
+        url = f"{self.api_url}/{endpoint}"
+        try:
+            response = requests.get(
+                url, headers=self.headers, timeout=self.timeout, **kwargs
+            )
+        except requests.exceptions.RequestException as e:
+            raise APIError(f"Request failed: {e}", provider="yourprovider") from e
+
+        if response.status_code in (401, 403):
+            raise AuthenticationError(
+                "Authentication failed",
+                status_code=response.status_code,
+                provider="yourprovider",
+            )
+        if not response.ok:
+            raise APIError(
+                f"Request failed: {response.status_code}",
+                status_code=response.status_code,
+                provider="yourprovider",
+            )
+        return response.json()
+```
+
+### Error Handling Convention
+
+| Exception | When |
+|-----------|------|
+| `AuthenticationError` | HTTP 401/403 |
+| `APIError` | Other HTTP errors, connection errors, timeouts, JSON parse failures |
+| `ConfigurationError` | Missing key files, invalid credentials format (at client construction) |
+
+Validators catch these exceptions and report them via `ValidationReport`.
+
+### Existing Clients
+
+- `providers/opnsense/api_client.py` — `OPNsenseClient` (wraps httpx via opnsense-openapi) + `KeaClient` (domain-specific DHCP operations)
+- `providers/proxmox/api_client.py` — `ProxmoxClient` (PVE token auth, `get_json()`)
+- `providers/oci/api_client.py` — `OCIClient` (RSA-SHA256 HTTP Signature auth, `list_resources()`)
+
+## Provider Mixins
+
+Mixins provide reusable functionality via composition. Import from `infrafoundry.core.provider_mixins`.
+
+| Mixin | Purpose | Used By |
+|-------|---------|---------|
+| `TemplateRendererMixin` | Jinja2 template setup and rendering | All providers |
+| `ResourceGrouperMixin` | Group resources by type or dependency | Most providers |
+| `TerraformGeneratorMixin` | Generate `.tf` files and `.tfvars` | All Terraform providers |
+| `CloudInitMixin` | Load, merge, and variable-substitute cloud-init snippets | Proxmox, OCI |
+
+### Using CloudInitMixin
+
+```python
+from infrafoundry.core.provider_mixins import CloudInitMixin
+
+class YourProvider(ProviderBase, CloudInitMixin):
+    def _process_cloud_init(self, config):
+        merged = self._merge_cloud_init_snippets(config)
+        if merged:
+            # Proxmox serializes to YAML, OCI stores as dict
+            config["cloud_init_data"] = yaml.dump(merged)
+```
+
+Cloud-init snippets are loaded from `envs/{env}/cloud-init/` and support variable substitution via `cloud_init_vars` in the resource config.
+
+## New Provider Checklist
+
+### Required Files
+
+| File | Purpose |
+|------|---------|
+| `providers/<name>/__init__.py` | Provider class extending `ProviderBase` |
+| `providers/<name>/templates/` | Jinja2 templates for Terraform/Ansible |
+
+### Recommended Files (for API-backed providers)
+
+| File | Purpose |
+|------|---------|
+| `providers/<name>/api_client.py` | Dedicated API client with auth |
+| `providers/<name>/validator.py` | Main validator composing `BaseAPIValidator` |
+| `providers/<name>/validators/__init__.py` | Specialized validator package |
+| `providers/<name>/validators/*.py` | Individual validators (network, storage, etc.) |
+| `providers/<name>/exporter.py` | Resource exporter (if applicable) |
+
+### Required Methods
+
+- [ ] `__init__(config_dir, output_dir)` — call `super().__init__("name", ...)`
+- [ ] `get_resource_types()` — return list of supported resource type names
+- [ ] `get_dependencies()` — return dependency ordering dict
+- [ ] `validate_config(config)` — validate resource configuration
+- [ ] `generate_terraform(resources)` — render Terraform files
+
+### Recommended Methods
+
+- [ ] `validate_connectivity(env_config, report)` — test API connectivity
+- [ ] `validate_references(resources, env_config, report)` — validate resource cross-references
+- [ ] `generate_ansible(resources)` — render Ansible playbooks (if applicable)
+
+### Testing Requirements
+
+- [ ] Unit tests for API client (`test_api_client.py`)
+- [ ] Unit tests for each specialized validator
+- [ ] Unit tests for main validator orchestration
+- [ ] Integration test in `tests/unit/test_provider_validation.py`
+- [ ] All tests pass: `doit check`
+
+### Registration
+
+Providers are auto-discovered via the plugin system. Ensure the provider module is properly structured with an `__init__.py` that exports the provider class.
+
 ## Related Documentation
 
 - [Manager Patterns](manager-patterns.md)
@@ -287,7 +547,7 @@ def generate_pyinfra(self, resources):
 
 ---
 
-Last updated: 2025-12-27 13:55 GMT
+Last updated: 2026-04-03
 
 
 ---
