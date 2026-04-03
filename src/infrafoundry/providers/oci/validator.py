@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-import base64
-import email.utils
-import hashlib
+import logging
 from typing import Any, cast
 
+from infrafoundry.core.exceptions import APIError, ConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData, OCIProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.oci.api_client import OCIClient
 
 from .validators import CompartmentValidator, ImageValidator, NetworkValidator
+
+logger = logging.getLogger(__name__)
 
 
 class OCIValidator:
@@ -25,9 +27,6 @@ class OCIValidator:
     - VCN/subnet name collision detection via OCI API
     - Image OCID validation via OCI API
     """
-
-    OCI_API_BASE = "https://iaas.{region}.oraclecloud.com"
-    IDENTITY_API_BASE = "https://identity.{region}.oraclecloud.com"
 
     def __init__(self, env_config: EnvironmentData, report: ValidationReport) -> None:
         """Initialize OCI validator.
@@ -45,6 +44,22 @@ class OCIValidator:
         self.compartment_validator = CompartmentValidator(report)
         self.network_validator = NetworkValidator(report)
         self.image_validator = ImageValidator(report)
+
+    def _create_client(self) -> OCIClient | None:
+        """Create an OCIClient from provider settings.
+
+        Returns:
+            OCIClient instance, or None if client creation fails
+        """
+        try:
+            return OCIClient.from_provider_settings(self.provider_settings)
+        except ConfigurationError as exc:
+            self.api_validator.add_error(
+                check_name="oci_client",
+                message=str(exc),
+                level=ValidationLevel.WARNING,
+            )
+            return None
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OCI API.
@@ -65,35 +80,33 @@ class OCIValidator:
         if not credentials:
             return
 
-        region = self.provider_settings.get("region", "")
-        tenancy_ocid = self.provider_settings.get("tenancy_ocid", "")
-
-        # Build the identity API URL for availability domains
-        api_base = self.IDENTITY_API_BASE.format(region=region)
-        url = f"{api_base}/20160918/availabilityDomains?compartmentId={tenancy_ocid}"
-
-        # Build OCI API signature headers
-        headers = self._build_signed_headers("get", url)
-        if not headers:
+        client = self._create_client()
+        if not client:
             return
 
-        # Test API connectivity
-        response_ok = self.api_validator.check_api_connectivity(
-            url=url,
-            headers=headers,
-        )
+        tenancy_ocid = self.provider_settings.get("tenancy_ocid", "")
 
-        if response_ok:
+        # Test API connectivity using availability domains endpoint
+        try:
+            client.list_resources(
+                base_url=client.identity_url(),
+                path=f"/20160918/availabilityDomains?compartmentId={tenancy_ocid}",
+            )
             self.api_validator.add_success(
                 check_name="oci_connectivity",
                 message="OCI API connectivity validated successfully",
+            )
+        except APIError as exc:
+            self.api_validator.add_error(
+                check_name="oci_connectivity",
+                message=f"OCI API connectivity failed: {exc.message}",
             )
 
     def validate_references(self, resources: list[ResourceConfig]) -> None:
         """Validate that referenced OCI resources exist within config and live API.
 
         Performs local cross-reference checks (always) and API-based validation
-        (when signing succeeds and compartment_ocid is configured).
+        (when client creation succeeds and compartment_ocid is configured).
 
         Args:
             resources: List of resources to validate
@@ -166,206 +179,78 @@ class OCIValidator:
     def _validate_api_references(self, resources: list[ResourceConfig]) -> None:
         """Validate resources against live OCI API state.
 
-        Attempts to sign requests independently. If signing fails or
+        Attempts to create an OCIClient. If client creation fails or
         compartment_ocid is not configured, API checks are skipped gracefully.
 
         Args:
             resources: List of resources to validate
         """
-        region = self.provider_settings.get("region", "")
         compartment_ocid = self.provider_settings.get("compartment_ocid", "")
         tenancy_ocid = self.provider_settings.get("tenancy_ocid", "")
 
-        if not compartment_ocid or not region:
+        if not compartment_ocid or not self.provider_settings.get("region", ""):
             return
 
-        # Fetch compartments (uses tenancy_ocid as parent)
-        if tenancy_ocid:
-            compartments = self._fetch_oci_list(
-                base_url=self.IDENTITY_API_BASE.format(region=region),
-                path=f"/20160918/compartments?compartmentId={tenancy_ocid}",
-                check_name="oci_list_compartments",
+        client = self._create_client()
+        if not client:
+            return
+
+        try:
+            # Fetch compartments (uses tenancy_ocid as parent)
+            compartments = None
+            if tenancy_ocid:
+                compartments = self._safe_list(
+                    client,
+                    client.identity_url(),
+                    f"/20160918/compartments?compartmentId={tenancy_ocid}",
+                )
+                self.compartment_validator.validate(compartment_ocid, compartments)
+
+            # Fetch VCNs and subnets
+            vcns = self._safe_list(
+                client,
+                client.iaas_url(),
+                f"/20160918/vcns?compartmentId={compartment_ocid}",
             )
-            self.compartment_validator.validate(compartment_ocid, compartments)
+            subnets = self._safe_list(
+                client,
+                client.iaas_url(),
+                f"/20160918/subnets?compartmentId={compartment_ocid}",
+            )
+            self.network_validator.validate(resources, vcns, subnets)
 
-        # Fetch VCNs
-        vcns = self._fetch_oci_list(
-            base_url=self.OCI_API_BASE.format(region=region),
-            path=f"/20160918/vcns?compartmentId={compartment_ocid}",
-            check_name="oci_list_vcns",
-        )
+            # Fetch images
+            images = self._safe_list(
+                client,
+                client.iaas_url(),
+                f"/20160918/images?compartmentId={compartment_ocid}",
+            )
+            self.image_validator.validate(resources, images)
 
-        # Fetch subnets
-        subnets = self._fetch_oci_list(
-            base_url=self.OCI_API_BASE.format(region=region),
-            path=f"/20160918/subnets?compartmentId={compartment_ocid}",
-            check_name="oci_list_subnets",
-        )
+        except Exception as exc:
+            self.api_validator.handle_validation_exception(
+                check_name="oci_api_validation",
+                error=exc,
+                warning_level=ValidationLevel.WARNING,
+            )
 
-        self.network_validator.validate(resources, vcns, subnets)
-
-        # Fetch images
-        images = self._fetch_oci_list(
-            base_url=self.OCI_API_BASE.format(region=region),
-            path=f"/20160918/images?compartmentId={compartment_ocid}",
-            check_name="oci_list_images",
-        )
-
-        self.image_validator.validate(resources, images)
-
-    def _fetch_oci_list(
+    def _safe_list(
         self,
+        client: OCIClient,
         base_url: str,
         path: str,
-        check_name: str,
     ) -> list[dict[str, Any]] | None:
-        """Fetch a list resource from the OCI API with signed authentication.
-
-        OCI list endpoints return JSON arrays directly, so we use api_request()
-        instead of fetch_json() which expects a dict response.
+        """Safely fetch a list resource, returning None on failure.
 
         Args:
-            base_url: API base URL (e.g. iaas or identity endpoint)
+            client: OCI API client
+            base_url: API base URL
             path: API path including query parameters
-            check_name: Validation check name for error reporting
 
         Returns:
-            List of resource dicts, or None if signing or request fails
+            List of resource dicts, or None if the request fails
         """
-        url = f"{base_url}{path}"
-
-        headers = self._build_signed_headers("get", url)
-        if not headers:
-            return None
-
-        response = self.api_validator.api_request(
-            url=url,
-            check_name=check_name,
-            headers=headers,
-            error_level=ValidationLevel.WARNING,
-            optional=True,
-        )
-
-        if not response:
-            return None
-
         try:
-            data = response.json()
-            if isinstance(data, list):
-                return cast(list[dict[str, Any]], data)
-            # Some endpoints may wrap in a dict — handle gracefully
+            return client.list_resources(base_url, path)
+        except APIError:
             return None
-        except ValueError:
-            return None
-
-    def _build_signed_headers(self, method: str, url: str, body: str = "") -> dict[str, str] | None:
-        """Build OCI API signed request headers.
-
-        Uses HTTP Signatures (RFC 7235) with RSA-SHA256 signing.
-
-        Args:
-            method: HTTP method (lowercase)
-            url: Full request URL
-            body: Request body (empty for GET)
-
-        Returns:
-            Headers dict with Authorization signature, or None on error
-        """
-        from pathlib import Path
-        from urllib.parse import urlparse
-
-        tenancy_ocid = self.provider_settings.get("tenancy_ocid", "")
-        user_ocid = self.provider_settings.get("user_ocid", "")
-        fingerprint = self.provider_settings.get("fingerprint", "")
-        private_key_path = self.provider_settings.get("private_key_path", "")
-
-        # Expand ~ in key path
-        key_path = Path(private_key_path).expanduser()
-        if not key_path.exists():
-            self.api_validator.add_error(
-                check_name="oci_private_key",
-                message=f"OCI private key not found: {key_path}",
-            )
-            return None
-
-        try:
-            from cryptography.hazmat.primitives import hashes, serialization
-            from cryptography.hazmat.primitives.asymmetric import padding
-            from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
-        except ImportError:
-            self.api_validator.add_error(
-                check_name="oci_dependencies",
-                message="'cryptography' package required for OCI API signing",
-                level=ValidationLevel.WARNING,
-            )
-            return None
-
-        # Load private key (OCI requires RSA keys)
-        try:
-            with open(key_path, "rb") as f:
-                loaded_key = serialization.load_pem_private_key(f.read(), password=None)
-            if not isinstance(loaded_key, RSAPrivateKey):
-                self.api_validator.add_error(
-                    check_name="oci_private_key",
-                    message="OCI API requires an RSA private key",
-                )
-                return None
-            private_key = loaded_key
-        except Exception as exc:
-            self.api_validator.add_error(
-                check_name="oci_private_key",
-                message=f"Failed to load OCI private key: {exc}",
-            )
-            return None
-
-        # Parse URL for host and path
-        parsed = urlparse(url)
-        host = parsed.netloc
-        path = parsed.path
-        if parsed.query:
-            path = f"{path}?{parsed.query}"
-
-        # Build signing headers
-        date = email.utils.formatdate(usegmt=True)
-        headers: dict[str, str] = {
-            "date": date,
-            "host": host,
-            "(request-target)": f"{method} {path}",
-        }
-
-        signing_headers = ["date", "(request-target)", "host"]
-
-        if body:
-            body_hash = hashlib.sha256(body.encode()).digest()
-            content_sha256 = base64.b64encode(body_hash).decode()
-            headers["content-type"] = "application/json"
-            headers["x-content-sha256"] = content_sha256
-            headers["content-length"] = str(len(body))
-            signing_headers.extend(["content-type", "x-content-sha256", "content-length"])
-
-        # Build signing string
-        signing_string = "\n".join(f"{h}: {headers[h]}" for h in signing_headers)
-
-        # Sign with RSA-SHA256
-        signature = private_key.sign(
-            signing_string.encode(),
-            padding.PKCS1v15(),
-            hashes.SHA256(),
-        )
-        b64_signature = base64.b64encode(signature).decode()
-
-        # Build Authorization header
-        key_id = f"{tenancy_ocid}/{user_ocid}/{fingerprint}"
-        auth_header = (
-            f'Signature version="1",'
-            f'keyId="{key_id}",'
-            f'algorithm="rsa-sha256",'
-            f'headers="{" ".join(signing_headers)}",'
-            f'signature="{b64_signature}"'
-        )
-
-        return {
-            "date": date,
-            "host": host,
-            "Authorization": auth_header,
-        }
