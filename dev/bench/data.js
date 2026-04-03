@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775217104647,
+  "lastUpdate": 1775218338702,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3658,6 +3658,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009798223946624105",
             "extra": "mean: 136.41327702408176 usec\nrounds: 2285"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b9e0b3c1333656b874d3194cc317ac88468f58b9",
+          "message": "refactor: standardize ESXi validator to use BaseAPIValidator (merges PR #477, addresses #476)",
+          "timestamp": "2026-04-03T13:11:46+01:00",
+          "tree_id": "dcc4b7c9c640f53bc3ddfe59c77b57d873fa88dc",
+          "url": "https://github.com/endavis/infrafoundry/commit/b9e0b3c1333656b874d3194cc317ac88468f58b9"
+        },
+        "date": 1775218338094,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7309.620300737624,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010032566844533326",
+            "extra": "mean: 136.80601164729288 usec\nrounds: 2404"
           }
         ]
       }
