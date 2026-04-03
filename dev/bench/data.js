@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775149481123,
+  "lastUpdate": 1775217104647,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3627,6 +3627,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009835047823880381",
             "extra": "mean: 135.31782910868748 usec\nrounds: 2446"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e5f9c1e5d74b593e065e47e3289fb8d83e0fd038",
+          "message": "refactor: extract dedicated API clients for Proxmox and OCI providers (merges PR #475, addresses #474)",
+          "timestamp": "2026-04-03T12:51:13+01:00",
+          "tree_id": "d6f0a6a756a5edefb24eec985b50ad80c76999ff",
+          "url": "https://github.com/endavis/infrafoundry/commit/e5f9c1e5d74b593e065e47e3289fb8d83e0fd038"
+        },
+        "date": 1775217104146,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7330.664740379081,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009798223946624105",
+            "extra": "mean: 136.41327702408176 usec\nrounds: 2285"
           }
         ]
       }
