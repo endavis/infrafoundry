@@ -6,6 +6,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.esxi.validator import EsxiValidator
 
 
@@ -21,6 +22,22 @@ def _make_env_config(hosts: dict | None = None) -> dict:
     if hosts is not None:
         esxi_settings["hosts"] = hosts
     return {"provider_settings": {"esxi": esxi_settings}}
+
+
+class TestComposition:
+    """Tests for validator composition."""
+
+    def test_api_validator_initialized(self, report):
+        """BaseAPIValidator is composed during init."""
+        env_config = _make_env_config(hosts={"esxi-01": {}})
+        validator = EsxiValidator(env_config, report)
+        assert isinstance(validator.api_validator, BaseAPIValidator)
+
+    def test_provider_settings_accessible(self, report):
+        """Provider settings are accessible via api_validator."""
+        env_config = _make_env_config(hosts={"esxi-01": {"hostname": "192.168.1.10"}})
+        validator = EsxiValidator(env_config, report)
+        assert validator.provider_settings.get("hosts") is not None
 
 
 class TestValidateConnectivity:
