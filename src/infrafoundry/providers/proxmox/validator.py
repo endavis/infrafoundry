@@ -7,10 +7,12 @@ from typing import Any, TypedDict, cast
 
 import urllib3
 
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData, ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.proxmox.api_client import ProxmoxClient
 from infrafoundry.providers.proxmox.validators import (
     NetworkValidator,
     NodeValidator,
@@ -48,10 +50,10 @@ class ProxmoxValidator:
 
     Performs comprehensive pre-flight validation including:
     - API connectivity and authentication
-    - Node availability and status
-    - Storage pool existence and state
-    - Network bridge configuration
-    - Template availability (by VMID or name)
+    - Node availability
+    - Storage pool existence and status
+    - Network bridge availability
+    - VM template existence
     - VMID conflicts and availability
     - MAC address conflicts
     """
@@ -71,9 +73,9 @@ class ProxmoxValidator:
         self._cluster_vm_cache_populated = False
 
         # Initialize specialized validators
-        self.node_validator = NodeValidator(self.api_validator, report)
-        self.storage_validator = StorageValidator(self.api_validator, report)
-        self.network_validator = NetworkValidator(self.api_validator, report)
+        self.node_validator = NodeValidator(report)
+        self.storage_validator = StorageValidator(report)
+        self.network_validator = NetworkValidator(report)
         self.template_validator = TemplateValidator(report)
         self.vmid_validator = VMIDValidator(report)
 
@@ -90,11 +92,9 @@ class ProxmoxValidator:
         if not credentials:
             return
 
-        # Build API token from either format:
-        # Format 1: api_token (full token string)
-        # Format 2: api_token_id + api_token_secret (Terraform provider format)
-        api_token = self._get_api_token()
-        if not api_token:
+        # Create API client from provider settings
+        client = ProxmoxClient.from_provider_settings(self.provider_settings)
+        if not client:
             self.api_validator.add_error(
                 check_name="proxmox_credentials",
                 message=(
@@ -104,35 +104,19 @@ class ProxmoxValidator:
             )
             return
 
-        # Build auth header for Proxmox API
-        # Format: "PVEAPIToken=USER@REALM!TOKENID=SECRET"
-        auth_header = f"PVEAPIToken={api_token}"
-
         # Test API connectivity
-        version_url = f"{credentials['api_url']}/version"
-        response_ok = self.api_validator.check_api_connectivity(
-            url=version_url,
-            headers={"Authorization": auth_header},
-            verify_ssl=False,
-        )
-
-        # If connection succeeded, get version info (best-effort)
-        if response_ok:
-            version_data = self.api_validator.fetch_json(
-                url=version_url,
-                headers={"Authorization": auth_header},
-                verify_ssl=False,
-                timeout=10,
-                check_name="proxmox_version",
-                error_level=ValidationLevel.INFO,
-                optional=True,
+        try:
+            version_data = client.get_json("version")
+            version = version_data.get("data", {}).get("version", "unknown")
+            self.api_validator.add_success(
+                check_name="proxmox_connectivity",
+                message=f"Proxmox API connected successfully (version: {version})",
             )
-            if version_data:
-                version = version_data.get("data", {}).get("version", "unknown")
-                self.api_validator.add_success(
-                    check_name="proxmox_version",
-                    message=f"Proxmox VE version: {version}",
-                )
+        except APIError as exc:
+            self.api_validator.add_error(
+                check_name="proxmox_connectivity",
+                message=f"Proxmox API connectivity failed: {exc.message}",
+            )
 
     def validate_references(self, resources: list[ResourceConfig]) -> None:
         """Validate that referenced Proxmox resources exist.
@@ -148,31 +132,24 @@ class ProxmoxValidator:
         Args:
             resources: List of resources to validate
         """
-        api_url = self.provider_settings.get("api_url")
         default_node = self.provider_settings.get("node")
 
-        # Build API token
-        api_token = self._get_api_token()
-        if api_url is None or api_token is None:
+        # Create API client
+        client = ProxmoxClient.from_provider_settings(self.provider_settings)
+        if not client:
             return  # Already reported in validate_connectivity
 
         try:
-            # Build auth header
-            auth_header = f"PVEAPIToken={api_token}"
-            headers = {"Authorization": auth_header}
-
             # Collect all references from resources
             resource_refs = self._collect_resource_references(resources, default_node)
 
             # Get cluster VMs once for template and VMID validation
-            cluster_vms = self._get_cluster_vms(
-                api_url, headers, check_name="proxmox_cluster_resources"
-            )
+            cluster_vms = self._get_cluster_vms(client)
 
             # Validate each type of reference using specialized validators
-            self.node_validator.validate(api_url, headers, resource_refs.nodes)
-            self.storage_validator.validate(api_url, headers, resource_refs.storage_pools)
-            self.network_validator.validate(api_url, headers, resource_refs.bridges)
+            self.node_validator.validate(client, resource_refs.nodes)
+            self.storage_validator.validate(client, resource_refs.storage_pools)
+            self.network_validator.validate(client, resource_refs.bridges)
             self.template_validator.validate(cluster_vms, resource_refs.template_refs)
             self.vmid_validator.validate(cluster_vms, resource_refs.vmids)
 
@@ -182,24 +159,6 @@ class ProxmoxValidator:
                 error=exc,
                 warning_level=ValidationLevel.WARNING,
             )
-
-    def _get_api_token(self) -> str | None:
-        """Get API token from provider settings.
-
-        Supports both formats:
-        - api_token: Full token string
-        - api_token_id + api_token_secret: Terraform provider format
-
-        Returns:
-            API token string or None if not configured
-        """
-        api_token = self.provider_settings.get("api_token")
-        if not api_token:
-            token_id = self.provider_settings.get("api_token_id")
-            token_secret = self.provider_settings.get("api_token_secret")
-            if token_id and token_secret:
-                api_token = f"{token_id}={token_secret}"
-        return api_token
 
     def _collect_resource_references(
         self, resources: list[ResourceConfig], default_node: str | None
@@ -301,30 +260,23 @@ class ProxmoxValidator:
             mac_addresses=mac_addresses,
         )
 
-    def _get_cluster_vms(
-        self,
-        api_url: str,
-        headers: dict[str, str],
-        *,
-        check_name: str,
-    ) -> list[ClusterVM] | None:
+    def _get_cluster_vms(self, client: ProxmoxClient) -> list[ClusterVM] | None:
         """Fetch and cache cluster VM data for template/vmid checks."""
         if self._cluster_vm_cache_populated:
             return self._cluster_vm_cache
 
-        data = self.api_validator.fetch_json(
-            url=f"{api_url}/cluster/resources",
-            headers=headers,
-            verify_ssl=False,
-            timeout=10,
-            params={"type": "vm"},
-            check_name=check_name,
-            error_message="Failed to query cluster resources (status {status})",
-            error_level=ValidationLevel.WARNING,
-        )
         self._cluster_vm_cache_populated = True
-        if not data:
+        try:
+            data = client.get_json("cluster/resources", params={"type": "vm"})
+        except APIError as exc:
+            self.report.add_check(
+                check_name="proxmox_cluster_resources",
+                passed=False,
+                message=f"Failed to query cluster resources: {exc.message}",
+                level=ValidationLevel.WARNING,
+            )
             self._cluster_vm_cache = None
             return None
+
         self._cluster_vm_cache = data.get("data", [])
         return self._cluster_vm_cache

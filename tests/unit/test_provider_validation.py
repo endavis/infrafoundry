@@ -45,15 +45,16 @@ class TestProxmoxValidation:
         summary = report.get_summary()
         assert summary["errors"] == 1
 
-    @patch("requests.request")
-    def test_validate_connectivity_success(self, mock_request, proxmox_provider, env_config):
+    @patch("requests.get")
+    def test_validate_connectivity_success(self, mock_get, proxmox_provider, env_config):
         """Test successful API connectivity validation."""
         # Mock successful API responses
         mock_response = Mock()
         mock_response.status_code = 200
+        mock_response.ok = True
         mock_response.json.return_value = {"data": {"version": "7.4"}}
 
-        mock_request.return_value = mock_response
+        mock_get.return_value = mock_response
 
         report = ValidationReport()
         proxmox_provider.validate_connectivity(env_config, report)
@@ -62,54 +63,55 @@ class TestProxmoxValidation:
         summary = report.get_summary()
         assert summary["passed"] >= 1
 
-    @patch("requests.request")
-    def test_validate_connectivity_api_error(self, mock_request, proxmox_provider, env_config):
+    @patch("requests.get")
+    def test_validate_connectivity_api_error(self, mock_get, proxmox_provider, env_config):
         """Test validation handles API errors."""
         # Mock failed API response
         mock_response = Mock()
         mock_response.status_code = 401
+        mock_response.ok = False
+        mock_response.text = "Unauthorized"
         mock_response.json.return_value = {}
-        mock_request.return_value = mock_response
+        mock_get.return_value = mock_response
 
         report = ValidationReport()
         proxmox_provider.validate_connectivity(env_config, report)
 
         assert report.has_errors()
 
-    @patch("requests.request")
-    def test_validate_connectivity_timeout(self, mock_request, proxmox_provider, env_config):
+    @patch("requests.get")
+    def test_validate_connectivity_timeout(self, mock_get, proxmox_provider, env_config):
         """Test validation handles connection timeout."""
         import requests
 
-        mock_request.side_effect = requests.exceptions.Timeout()
+        mock_get.side_effect = requests.exceptions.Timeout()
 
         report = ValidationReport()
         proxmox_provider.validate_connectivity(env_config, report)
 
         assert report.has_errors()
 
-    @patch("requests.request")
-    def test_validate_connectivity_connection_error(
-        self, mock_request, proxmox_provider, env_config
-    ):
+    @patch("requests.get")
+    def test_validate_connectivity_connection_error(self, mock_get, proxmox_provider, env_config):
         """Test validation handles connection errors."""
         import requests
 
-        mock_request.side_effect = requests.exceptions.ConnectionError("Cannot connect")
+        mock_get.side_effect = requests.exceptions.ConnectionError("Cannot connect")
 
         report = ValidationReport()
         proxmox_provider.validate_connectivity(env_config, report)
 
         assert report.has_errors()
 
-    @patch("requests.request")
-    def test_validate_references_template_exists(self, mock_request, proxmox_provider, env_config):
+    @patch("requests.get")
+    def test_validate_references_template_exists(self, mock_get, proxmox_provider, env_config):
         """Test validation passes when referenced template exists."""
 
         # Mock different API responses based on URL
         def mock_get_side_effect(url, **kwargs):
             mock_response = Mock()
             mock_response.status_code = 200
+            mock_response.ok = True
 
             if "/nodes/pve01/status" in url:
                 # Node status - data is dict
@@ -134,7 +136,7 @@ class TestProxmoxValidation:
 
             return mock_response
 
-        mock_request.side_effect = mock_get_side_effect
+        mock_get.side_effect = mock_get_side_effect
 
         # Create resources that reference templates
         resources = [
@@ -151,14 +153,15 @@ class TestProxmoxValidation:
 
         assert not report.has_errors()
 
-    @patch("requests.request")
-    def test_validate_references_template_missing(self, mock_request, proxmox_provider, env_config):
+    @patch("requests.get")
+    def test_validate_references_template_missing(self, mock_get, proxmox_provider, env_config):
         """Test validation fails when referenced template doesn't exist."""
 
         # Mock different API responses based on URL
         def mock_get_side_effect(url, **kwargs):
             mock_response = Mock()
             mock_response.status_code = 200
+            mock_response.ok = True
 
             if "/nodes/pve01/status" in url:
                 mock_response.json.return_value = {"data": {"uptime": 12345}}
@@ -176,7 +179,7 @@ class TestProxmoxValidation:
 
             return mock_response
 
-        mock_request.side_effect = mock_get_side_effect
+        mock_get.side_effect = mock_get_side_effect
 
         # Create resources that reference missing template
         resources = [
@@ -215,16 +218,15 @@ class TestProxmoxValidation:
         summary = report.get_summary()
         assert summary["total"] == 0
 
-    @patch("requests.request")
-    def test_validate_references_multiple_templates(
-        self, mock_request, proxmox_provider, env_config
-    ):
+    @patch("requests.get")
+    def test_validate_references_multiple_templates(self, mock_get, proxmox_provider, env_config):
         """Test validation of multiple template references."""
 
         # Mock different API responses based on URL
         def mock_get_side_effect(url, **kwargs):
             mock_response = Mock()
             mock_response.status_code = 200
+            mock_response.ok = True
 
             if "/nodes/pve01/status" in url:
                 mock_response.json.return_value = {"data": {"uptime": 12345}}
@@ -242,7 +244,7 @@ class TestProxmoxValidation:
 
             return mock_response
 
-        mock_request.side_effect = mock_get_side_effect
+        mock_get.side_effect = mock_get_side_effect
 
         # Create multiple VMs with different templates
         resources = [
@@ -274,8 +276,8 @@ class TestProxmoxValidation:
         summary = report.get_summary()
         assert summary["passed"] >= 2
 
-    @patch("requests.request")
-    def test_validate_references_api_error(self, mock_request, proxmox_provider, env_config):
+    @patch("requests.get")
+    def test_validate_references_api_error(self, mock_get, proxmox_provider, env_config):
         """Test validation handles API errors gracefully."""
 
         # Mock different API responses based on URL
@@ -285,19 +287,23 @@ class TestProxmoxValidation:
             if "/nodes/pve01/status" in url:
                 # Node check succeeds
                 mock_response.status_code = 200
+                mock_response.ok = True
                 mock_response.json.return_value = {"data": {"uptime": 12345}}
             elif "/cluster/resources" in url:
                 # Template check fails
                 mock_response.status_code = 500
+                mock_response.ok = False
+                mock_response.text = "Internal Server Error"
                 mock_response.json.return_value = {}
             else:
                 # Other checks succeed
                 mock_response.status_code = 200
+                mock_response.ok = True
                 mock_response.json.return_value = {"data": []}
 
             return mock_response
 
-        mock_request.side_effect = mock_get_side_effect
+        mock_get.side_effect = mock_get_side_effect
 
         resources = [
             ResourceConfig(

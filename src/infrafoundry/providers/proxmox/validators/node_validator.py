@@ -1,40 +1,44 @@
 """Node validation for Proxmox."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
-from infrafoundry.core.validation_helpers import BaseAPIValidator
+
+if TYPE_CHECKING:
+    from infrafoundry.providers.proxmox.api_client import ProxmoxClient
 
 
 class NodeValidator:
     """Validates Proxmox node availability and status."""
 
-    def __init__(self, api_validator: BaseAPIValidator, report: ValidationReport) -> None:
+    def __init__(self, report: ValidationReport) -> None:
         """Initialize node validator.
 
         Args:
-            api_validator: Shared API validator helper
             report: ValidationReport to add results to
         """
-        self.api_validator = api_validator
         self.report = report
 
-    def validate(self, api_url: str, headers: dict[str, str], nodes: set[str]) -> None:
+    def validate(self, client: ProxmoxClient, nodes: set[str]) -> None:
         """Validate that nodes exist and are online.
 
         Args:
-            api_url: Proxmox API base URL
-            headers: HTTP headers with authorization
+            client: Proxmox API client
             nodes: Set of node names to validate
         """
         for node in nodes:
-            status_data = self.api_validator.fetch_json(
-                url=f"{api_url}/nodes/{node}/status",
-                headers=headers,
-                verify_ssl=False,
-                timeout=10,
-                check_name=f"proxmox_node_{node}",
-                error_message=f"Node '{node}' not accessible (status {{status}})",
-            )
-            if not status_data:
+            try:
+                status_data = client.get_json(f"nodes/{node}/status")
+            except APIError:
+                self.report.add_check(
+                    check_name=f"proxmox_node_{node}",
+                    passed=False,
+                    message=f"Node '{node}' not accessible",
+                    level=ValidationLevel.WARNING,
+                )
                 continue
 
             status = status_data.get("data", {})

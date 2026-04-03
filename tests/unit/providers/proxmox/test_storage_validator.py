@@ -4,8 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.validation import ValidationReport
-from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.proxmox.api_client import ProxmoxClient
 from infrafoundry.providers.proxmox.validators.storage_validator import StorageValidator
 
 
@@ -16,30 +17,26 @@ def report():
 
 
 @pytest.fixture
-def api_validator():
-    """Create a mock API validator."""
-    return MagicMock(spec=BaseAPIValidator)
+def client():
+    """Create a mock Proxmox API client."""
+    return MagicMock(spec=ProxmoxClient)
 
 
 @pytest.fixture
-def validator(api_validator, report):
+def validator(report):
     """Create a StorageValidator instance."""
-    return StorageValidator(api_validator, report)
+    return StorageValidator(report)
 
 
-def test_validate_active_storage(validator, api_validator, report):
+def test_validate_active_storage(validator, client, report):
     """Test validation of active storage."""
-    api_validator.fetch_json.return_value = {
+    client.get_json.return_value = {
         "data": [
             {"storage": "local", "active": 1, "type": "dir"},
         ]
     }
 
-    validator.validate(
-        "https://proxmox.example.com/api2/json",
-        {"Authorization": "token"},
-        {("pve1", "local")},
-    )
+    validator.validate(client, {("pve1", "local")})
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -48,19 +45,15 @@ def test_validate_active_storage(validator, api_validator, report):
     assert "active" in call_args["message"]
 
 
-def test_validate_inactive_storage(validator, api_validator, report):
+def test_validate_inactive_storage(validator, client, report):
     """Test validation of inactive storage."""
-    api_validator.fetch_json.return_value = {
+    client.get_json.return_value = {
         "data": [
             {"storage": "local", "active": 0, "type": "dir"},
         ]
     }
 
-    validator.validate(
-        "https://proxmox.example.com/api2/json",
-        {"Authorization": "token"},
-        {("pve1", "local")},
-    )
+    validator.validate(client, {("pve1", "local")})
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -68,19 +61,15 @@ def test_validate_inactive_storage(validator, api_validator, report):
     assert "inactive" in call_args["message"]
 
 
-def test_validate_missing_storage(validator, api_validator, report):
+def test_validate_missing_storage(validator, client, report):
     """Test validation of non-existent storage."""
-    api_validator.fetch_json.return_value = {
+    client.get_json.return_value = {
         "data": [
             {"storage": "local", "active": 1, "type": "dir"},
         ]
     }
 
-    validator.validate(
-        "https://proxmox.example.com/api2/json",
-        {"Authorization": "token"},
-        {("pve1", "missing-storage")},
-    )
+    validator.validate(client, {("pve1", "missing-storage")})
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -88,62 +77,49 @@ def test_validate_missing_storage(validator, api_validator, report):
     assert "not found" in call_args["message"]
 
 
-def test_validate_api_fetch_failure(validator, api_validator, report):
+def test_validate_api_fetch_failure(validator, client, report):
     """Test validation when API fetch fails."""
-    api_validator.fetch_json.return_value = None
+    client.get_json.side_effect = APIError("failed", provider="proxmox")
 
-    validator.validate(
-        "https://proxmox.example.com/api2/json",
-        {"Authorization": "token"},
-        {("pve1", "local")},
-    )
+    validator.validate(client, {("pve1", "local")})
 
-    report.add_check.assert_not_called()
+    report.add_check.assert_called_once()
+    call_args = report.add_check.call_args[1]
+    assert call_args["passed"] is False
+    assert "not accessible" in call_args["message"]
 
 
-def test_validate_duplicate_storage_pools(validator, api_validator, report):
+def test_validate_duplicate_storage_pools(validator, client, report):
     """Test that duplicate storage pools are only checked once."""
-    api_validator.fetch_json.return_value = {
+    client.get_json.return_value = {
         "data": [
             {"storage": "local", "active": 1, "type": "dir"},
         ]
     }
 
-    validator.validate(
-        "https://proxmox.example.com/api2/json",
-        {"Authorization": "token"},
-        {("pve1", "local"), ("pve1", "local")},
-    )
+    validator.validate(client, {("pve1", "local"), ("pve1", "local")})
 
     # Should only check once despite duplicate in set
-    api_validator.fetch_json.assert_called_once()
+    client.get_json.assert_called_once()
     report.add_check.assert_called_once()
 
 
-def test_validate_multiple_storage_pools(validator, api_validator, report):
+def test_validate_multiple_storage_pools(validator, client, report):
     """Test validation of multiple storage pools."""
-    api_validator.fetch_json.side_effect = [
+    client.get_json.side_effect = [
         {"data": [{"storage": "local", "active": 1, "type": "dir"}]},
         {"data": [{"storage": "shared", "active": 1, "type": "nfs"}]},
     ]
 
-    validator.validate(
-        "https://proxmox.example.com/api2/json",
-        {"Authorization": "token"},
-        {("pve1", "local"), ("pve2", "shared")},
-    )
+    validator.validate(client, {("pve1", "local"), ("pve2", "shared")})
 
-    assert api_validator.fetch_json.call_count == 2
+    assert client.get_json.call_count == 2
     assert report.add_check.call_count == 2
 
 
-def test_validate_empty_storage_pools(validator, api_validator, report):
+def test_validate_empty_storage_pools(validator, client, report):
     """Test validation with empty storage pool set."""
-    validator.validate(
-        "https://proxmox.example.com/api2/json",
-        {"Authorization": "token"},
-        set(),
-    )
+    validator.validate(client, set())
 
-    api_validator.fetch_json.assert_not_called()
+    client.get_json.assert_not_called()
     report.add_check.assert_not_called()

@@ -1,50 +1,49 @@
 """Storage validation for Proxmox."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
-from infrafoundry.core.validation_helpers import BaseAPIValidator
+
+if TYPE_CHECKING:
+    from infrafoundry.providers.proxmox.api_client import ProxmoxClient
 
 
 class StorageValidator:
     """Validates Proxmox storage pool availability and status."""
 
-    def __init__(self, api_validator: BaseAPIValidator, report: ValidationReport) -> None:
+    def __init__(self, report: ValidationReport) -> None:
         """Initialize storage validator.
 
         Args:
-            api_validator: Shared API validator helper
             report: ValidationReport to add results to
         """
-        self.api_validator = api_validator
         self.report = report
 
-    def validate(
-        self, api_url: str, headers: dict[str, str], storage_pools: set[tuple[str, str]]
-    ) -> None:
+    def validate(self, client: ProxmoxClient, storage_pools: set[tuple[str, str]]) -> None:
         """Validate that storage pools exist and are active.
 
         Args:
-            api_url: Proxmox API base URL
-            headers: HTTP headers with authorization
+            client: Proxmox API client
             storage_pools: Set of (node, storage) tuples to validate
         """
-        checked_storage = set()
+        checked_storage: set[tuple[str, str]] = set()
         for node, storage in storage_pools:
             if (node, storage) in checked_storage:
                 continue
             checked_storage.add((node, storage))
 
-            storage_data = self.api_validator.fetch_json(
-                url=f"{api_url}/nodes/{node}/storage",
-                headers=headers,
-                verify_ssl=False,
-                timeout=10,
-                check_name=f"proxmox_storage_{node}_{storage}",
-                error_message=(
-                    f"Storage '{storage}' on node '{node}' not accessible (status {{status}})"
-                ),
-                error_level=ValidationLevel.WARNING,
-            )
-            if not storage_data:
+            try:
+                storage_data = client.get_json(f"nodes/{node}/storage")
+            except APIError:
+                self.report.add_check(
+                    check_name=f"proxmox_storage_{node}_{storage}",
+                    passed=False,
+                    message=(f"Storage '{storage}' on node '{node}' not accessible"),
+                    level=ValidationLevel.WARNING,
+                )
                 continue
 
             storages = storage_data.get("data", [])
