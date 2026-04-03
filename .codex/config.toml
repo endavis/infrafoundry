@@ -151,3 +151,9 @@ exclude = [
     "PYPI_TOKEN",
     "CODECOV_TOKEN",
 ]
+
+# Sandbox mode (optional - set to false for local development)
+# sandbox_mode = false
+
+# Network access policy
+# network_access = "prompt"  # Options: "allow", "deny", "prompt"

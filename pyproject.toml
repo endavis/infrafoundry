@@ -114,6 +114,15 @@ ignore = [
     "ANN201",   # Missing return type annotation for public function
     "ANN202",   # Missing return type annotation for private function
 ]
+"tools/opnsense-parser.py" = [
+    "N999",     # Invalid module name (filename has hyphen)
+    "ANN201",   # Missing return type annotation
+    "SIM102",   # Nested if statements (legacy script)
+]
+"tools/pyproject_template/*.py" = [
+    "ANN401",   # Any return type for dynamic GitHub API responses
+    "RUF022",   # __all__ intentionally grouped by category, not sorted
+]
 
 [tool.ruff.format]
 quote-style = "double"
