@@ -289,3 +289,64 @@ class TestKubernetesValidatorReferences:
         validator.validate_references(resources)
         validator.namespace_validator.validate.assert_not_called()
         validator.crd_validator.validate.assert_not_called()
+
+    def test_validate_references_runs_api_when_connected(self, validator, validation_report):
+        """Test that API-based checks run when connected."""
+        from infrafoundry.providers.kubernetes.validators.kubeconfig_validator import (
+            KubeConnectionInfo,
+        )
+
+        conn = KubeConnectionInfo(
+            server_url="https://k8s.example.com:6443",
+            headers={"Authorization": "Bearer token"},
+            verify_ssl=True,
+            connected=True,
+        )
+        validator.kubeconfig_validator._connection_info = conn
+        validator.namespace_validator.validate = MagicMock()
+        validator.crd_validator.validate = MagicMock()
+
+        resources = [
+            ResourceConfig(
+                provider="kubernetes",
+                type="deployments",
+                name="my-app",
+                config={"namespace": "my-ns"},
+            ),
+        ]
+        validator.validate_references(resources)
+
+        validator.namespace_validator.validate.assert_called_once()
+        validator.crd_validator.validate.assert_called_once()
+
+    def test_validate_references_service_account_not_in_config(self, validator, validation_report):
+        """Test service account reference not in config reports info."""
+        resources = [
+            ResourceConfig(
+                provider="kubernetes",
+                type="deployments",
+                name="my-app",
+                config={"namespace": "default", "service_account": "custom-sa"},
+            ),
+        ]
+        validator.validate_references(resources)
+
+        sa_results = [r for r in validation_report.results if "serviceaccount" in r.check_name]
+        assert len(sa_results) == 1
+        assert sa_results[0].level == ValidationLevel.INFO
+
+    def test_validate_references_service_selector_no_match(self, validator, validation_report):
+        """Test service selector not matching any deployment reports info."""
+        resources = [
+            ResourceConfig(
+                provider="kubernetes",
+                type="services",
+                name="my-svc",
+                config={"namespace": "default", "selector": {"app": "nonexistent"}},
+            ),
+        ]
+        validator.validate_references(resources)
+
+        selector_results = [r for r in validation_report.results if "selector" in r.check_name]
+        assert len(selector_results) == 1
+        assert selector_results[0].level == ValidationLevel.INFO
