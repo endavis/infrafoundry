@@ -11,12 +11,16 @@ repos:
         stages: [pre-commit]
       - id: check-added-large-files
         stages: [pre-commit]
+        # Add project-specific exclusions for large data/generated directories:
+        # exclude: ^(vendor/|fixtures/|data/)
       - id: check-toml
         stages: [pre-commit]
       - id: check-merge-conflict
         stages: [pre-commit]
       - id: detect-private-key
         stages: [pre-commit]
+        # Exclude directories with non-secret key-like patterns:
+        # exclude: ^(example-config/|test-fixtures/)
 
   # Conventional commits enforcement
   - repo: https://github.com/compilerla/conventional-pre-commit
