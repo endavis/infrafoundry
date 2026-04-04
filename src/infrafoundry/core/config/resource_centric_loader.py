@@ -94,6 +94,7 @@ class ResourceCentricLoader:
                     type=item["type"],
                     provider=item["provider"],
                     config=config,
+                    import_id=item.get("import_id"),
                 )
             )
 

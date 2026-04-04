@@ -80,6 +80,7 @@ InfraFoundry environments are defined entirely in YAML: `settings.yaml` for envi
     - provider: proxmox
       type: vm
       name: web-server-01
+      import_id: "100"  # optional: import existing resource into Terraform state
       config:
         node: pve1
         cores: 4

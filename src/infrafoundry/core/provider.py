@@ -21,6 +21,7 @@ class ResourceConfig(BaseModel):
     hooks: HooksConfig | None = None
     events: dict[str, list[dict[str, Any]]] | None = None
     package_variables: dict[str, Any] | None = None
+    import_id: str | None = None
 
 
 class ProviderBase(ABC):

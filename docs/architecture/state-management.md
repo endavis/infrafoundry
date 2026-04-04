@@ -280,6 +280,19 @@ cat generated/prod/terraform/proxmox/backend.tf
   psql infrafoundry < infrafoundry-state-20250108.sql
   ```
 - **Import existing resource into Terraform state:**
+  The preferred approach is to add `import_id` to the resource definition in YAML.
+  InfraFoundry generates Terraform `import` blocks automatically:
+  ```yaml
+  # Resource-centric example
+  resources:
+    - provider: proxmox
+      type: vm
+      name: web-server-01
+      import_id: "100"
+      config:
+        target_node: pve1
+  ```
+  For manual imports (e.g., one-off operations), you can still use the CLI:
   ```bash
   cd generated/dev/terraform/proxmox
   terraform import proxmox_vm_qemu.web_server_01 100

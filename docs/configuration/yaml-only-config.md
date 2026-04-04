@@ -71,6 +71,7 @@ InfraFoundry uses **pure YAML** for all environment, resource, and credential co
     - provider: proxmox
       type: vm
       name: web-server-01
+      import_id: "100"  # optional: import existing resource into Terraform state
       config:
         target_node: pve1
         clone: ubuntu-22-04-template
