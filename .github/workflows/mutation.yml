@@ -51,18 +51,26 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
-      - name: Run mutation testing
+      - name: Run mutmut
+        timeout-minutes: 120
         run: |
           mkdir -p tmp
           uv run mutmut run > tmp/mutmut-run-raw.log 2>&1 || true
-          # Strip spinner/carriage-return noise from log
-          sed 's/\r/\n/g' tmp/mutmut-run-raw.log | grep -v '^[[:space:]]*$' | grep -v '^�' > tmp/mutmut-run.log || true
-          echo "=== Mutation run complete ==="
-          cat tmp/mutmut-run.log
-          uv run mutmut results | tee tmp/mutmut-results.txt
+
+      - name: Mutation results
+        if: always()
+        run: |
+          mkdir -p tmp
+          if [ -f tmp/mutmut-run-raw.log ]; then
+            # Strip spinner/carriage-return noise from log
+            tr '\r' '\n' < tmp/mutmut-run-raw.log | grep -v '^[[:space:]]*$' | grep -vP '^\xe2\xa0' > tmp/mutmut-run.log 2>/dev/null || true
+            echo "=== Mutation run log ==="
+            cat tmp/mutmut-run.log
+          fi
+          uv run mutmut results 2>/dev/null | tee tmp/mutmut-results.txt || true
           echo ""
           echo "=== Summary ==="
-          awk -F': ' '{print $NF}' tmp/mutmut-results.txt | sort | uniq -c | sort -rn
+          awk -F': ' '{print $NF}' tmp/mutmut-results.txt 2>/dev/null | sort | uniq -c | sort -rn || true
 
       - name: Upload mutation results
         if: always()
