@@ -93,6 +93,7 @@ class ProviderCentricLoader:
                 type=resource_type,
                 provider=provider,
                 config=item,
+                import_id=item.get("import_id"),
             )
             for item in resource_list
             if isinstance(item, dict) and "name" in item

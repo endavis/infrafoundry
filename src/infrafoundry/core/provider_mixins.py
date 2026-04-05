@@ -6,6 +6,7 @@ reducing code duplication and standardizing provider behavior.
 
 import json
 import logging
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
@@ -18,6 +19,8 @@ from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import TemplateError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.security.file_utils import secure_write
+
+_RESOURCE_DECL_RE = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
 
 if TYPE_CHECKING:
     # Type stubs for mixin expectations - not used at runtime
@@ -543,6 +546,42 @@ class TerraformGeneratorMixin:
 
         return result
 
+    def _generate_import_blocks(self, rendered: str, context: dict[str, Any]) -> str:
+        """Generate Terraform import blocks for resources with import_id.
+
+        Scans the template context for ResourceConfig objects that have an
+        ``import_id`` set, matches them against ``resource`` declarations in
+        the rendered Terraform output, and returns import blocks to prepend.
+
+        Args:
+            rendered: Already-rendered Terraform content.
+            context: Template context containing ResourceConfig objects.
+
+        Returns:
+            A string of import blocks (possibly empty).
+        """
+        importable: dict[str, str] = {}
+        for value in context.values():
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, ResourceConfig) and item.import_id:
+                        importable[item.name.replace("-", "_")] = item.import_id
+
+        if not importable:
+            return ""
+
+        blocks: list[str] = []
+        for line in rendered.splitlines():
+            match = _RESOURCE_DECL_RE.match(line.strip())
+            if match:
+                tf_type, tf_name = match.group(1), match.group(2)
+                if tf_name in importable:
+                    blocks.append(
+                        f'import {{\n  to = {tf_type}.{tf_name}\n  id = "{importable[tf_name]}"\n}}'
+                    )
+
+        return "\n\n".join(blocks)
+
     def render_and_write_terraform(
         self,
         template_name: str,
@@ -572,6 +611,9 @@ class TerraformGeneratorMixin:
             )
 
         rendered = self.render_template(template_name, context or {})
+        import_blocks = self._generate_import_blocks(rendered, context or {})
+        if import_blocks:
+            rendered = import_blocks + "\n\n" + rendered
         self._write_terraform_file(output_name, rendered)
 
     # Files and directories preserved during stale .tf cleanup

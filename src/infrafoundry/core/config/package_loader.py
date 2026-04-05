@@ -415,6 +415,7 @@ class PackageLoader:
                 provider=item.get("provider", provider),
                 config=item,
                 events=item.get("events"),
+                import_id=item.get("import_id"),
             )
             for item in resource_list
             if isinstance(item, dict) and "name" in item
@@ -452,6 +453,7 @@ class PackageLoader:
                     provider=item.get("provider", default_provider),
                     config=config,
                     events=item.get("events"),
+                    import_id=item.get("import_id"),
                 )
             )
         return result
