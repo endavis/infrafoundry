@@ -36,15 +36,10 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
-      - name: Clean dangling symlinks
-        run: |
-          # mutmut 3.x copy_src_dir() crashes on dangling symlinks;
-          # scan entire filesystem in case a mutation walks a directory
-          sudo find / -xtype l -delete 2>/dev/null || true
-
       - name: Run mutation testing
         run: |
-          uv run mutmut run || true
+          mkdir -p tmp
+          uv run mutmut run 2>&1 || true
           uv run mutmut results | tee tmp/mutmut-results.txt
 
       - name: Upload mutation results
