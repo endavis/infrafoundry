@@ -87,18 +87,18 @@ class TestProviderRegistryService:
         assert priorities == {}
         config_manager.load_environment.assert_called_once_with("dev")
 
-    def test_register_default_runners(self, tmp_path):
+    def test_register_default_runners(self, tmp_path, monkeypatch):
         """Test that default runners are registered on init."""
         config_manager = Mock(spec=ConfigManager)
         mock_registry = Mock(spec=RunnerRegistry)
         factory = Mock(return_value=mock_registry)
 
-        with patch.dict("os.environ", {}, clear=True):
-            ProviderRegistryService(
-                base_output_dir=tmp_path,
-                config_manager=config_manager,
-                runner_registry_factory=factory,
-            )
+        monkeypatch.delenv("INFRA_ENABLE_EXPERIMENTAL", raising=False)
+        ProviderRegistryService(
+            base_output_dir=tmp_path,
+            config_manager=config_manager,
+            runner_registry_factory=factory,
+        )
 
         # Verify registration calls
         # We expect register to be called for TerraformRunner, OpenTofuRunner,
@@ -122,7 +122,7 @@ class TestProviderRegistryService:
         # AnsibleRunner, PyInfraRunner, PulumiRunner
         assert mock_registry.register.call_count == 5
 
-    def test_both_iac_runners_registered(self, tmp_path):
+    def test_both_iac_runners_registered(self, tmp_path, monkeypatch):
         """Test that both TerraformRunner and OpenTofuRunner are registered."""
         from infrafoundry.core.runners import OpenTofuRunner, TerraformRunner
 
@@ -130,12 +130,12 @@ class TestProviderRegistryService:
         mock_registry = Mock(spec=RunnerRegistry)
         factory = Mock(return_value=mock_registry)
 
-        with patch.dict("os.environ", {}, clear=True):
-            ProviderRegistryService(
-                base_output_dir=tmp_path,
-                config_manager=config_manager,
-                runner_registry_factory=factory,
-            )
+        monkeypatch.delenv("INFRA_ENABLE_EXPERIMENTAL", raising=False)
+        ProviderRegistryService(
+            base_output_dir=tmp_path,
+            config_manager=config_manager,
+            runner_registry_factory=factory,
+        )
 
         # Both IaC runners should be registered
         register_calls = [call[0][0] for call in mock_registry.register.call_args_list]

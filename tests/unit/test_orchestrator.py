@@ -93,21 +93,18 @@ class TestOrchestratorInit:
             )
             assert orchestrator._get_current_user() == "testuser"
 
-    def test_init_fallback_user(self, tmp_path):
+    def test_init_fallback_user(self, tmp_path, monkeypatch):
         """Test user fallback when USER env var not set."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
 
-        # Clear USER and USERNAME
-        env = os.environ.copy()
-        env.pop("USER", None)
-        env.pop("USERNAME", None)
+        monkeypatch.delenv("USER", raising=False)
+        monkeypatch.delenv("USERNAME", raising=False)
 
-        with patch.dict(os.environ, env, clear=True):
-            orchestrator = Orchestrator(
-                config_manager=config_manager,
-            )
-            assert orchestrator._get_current_user() == "unknown"
+        orchestrator = Orchestrator(
+            config_manager=config_manager,
+        )
+        assert orchestrator._get_current_user() == "unknown"
 
 
 class TestOrchestratorNotifications:

@@ -28,20 +28,6 @@ settings.register_profile(
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 
 
-@pytest.fixture(autouse=True)
-def _preserve_mutant_env():
-    """Preserve MUTANT_UNDER_TEST env var across tests that clear os.environ.
-
-    mutmut 3.x sets this variable and checks for it during test runs.
-    Tests using patch.dict("os.environ", {}, clear=True) would strip it,
-    causing mutmut's initial test run to fail with KeyError.
-    """
-    value = os.environ.get("MUTANT_UNDER_TEST")
-    yield
-    if value is not None:
-        os.environ["MUTANT_UNDER_TEST"] = value
-
-
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for test files."""

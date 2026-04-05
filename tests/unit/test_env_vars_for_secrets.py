@@ -13,7 +13,7 @@ Covers:
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
 from infrafoundry.core.events.context import EventContext
 from infrafoundry.core.events.handlers.script import ScriptHandler
@@ -61,7 +61,7 @@ class TestEventContextPackageVariables:
 class TestTerraformRunnerEnvVars:
     """TerraformRunner._prepare_environment merges TF_VAR_* from provider."""
 
-    def test_sets_tf_var_from_provider(self):
+    def test_sets_tf_var_from_provider(self, monkeypatch):
         """Provider TF_VAR_* env vars are merged into the environment."""
         runner = TerraformRunner(console=Mock())
         provider = MagicMock(spec=ProviderBase)
@@ -70,32 +70,33 @@ class TestTerraformRunnerEnvVars:
             "TF_VAR_proxmox_api_token": "user@pam!token=secret",
         }
 
-        with patch.dict("os.environ", {"HOME": "/home/test"}, clear=True):
-            env = runner._prepare_environment(provider)
+        monkeypatch.delenv("TF_VAR_proxmox_api_url", raising=False)
+        monkeypatch.delenv("TF_VAR_proxmox_api_token", raising=False)
+        env = runner._prepare_environment(provider)
 
         assert env["TF_VAR_proxmox_api_url"] == "https://pve.example.com"
         assert env["TF_VAR_proxmox_api_token"] == "user@pam!token=secret"
         provider.get_terraform_env_vars.assert_called_once()
 
-    def test_empty_provider_vars(self):
+    def test_empty_provider_vars(self, monkeypatch):
         """Empty provider vars don't break environment preparation."""
         runner = TerraformRunner(console=Mock())
         provider = MagicMock(spec=ProviderBase)
         provider.get_terraform_env_vars.return_value = {}
 
-        with patch.dict("os.environ", {"HOME": "/home/test"}, clear=True):
-            env = runner._prepare_environment(provider)
+        monkeypatch.delenv("TF_VAR_proxmox_api_url", raising=False)
+        env = runner._prepare_environment(provider)
 
         assert "TF_VAR_proxmox_api_url" not in env
 
-    def test_preserves_existing_env_vars(self):
+    def test_preserves_existing_env_vars(self, monkeypatch):
         """Existing environment variables are preserved."""
         runner = TerraformRunner(console=Mock())
         provider = MagicMock(spec=ProviderBase)
         provider.get_terraform_env_vars.return_value = {"TF_VAR_new": "value"}
 
-        with patch.dict("os.environ", {"EXISTING": "keep_me"}, clear=True):
-            env = runner._prepare_environment(provider)
+        monkeypatch.setenv("EXISTING", "keep_me")
+        env = runner._prepare_environment(provider)
 
         assert env["EXISTING"] == "keep_me"
         assert env["TF_VAR_new"] == "value"
@@ -110,7 +111,7 @@ class TestScriptHandlerPackageVars:
             config_base_dir=Path("/tmp/config"),
         )
 
-    def test_sets_package_vars_json(self):
+    def test_sets_package_vars_json(self, monkeypatch):
         """INFRAFOUNDRY_PACKAGE_VARS is set as JSON string."""
         handler = self._make_handler()
         vars_ = {"cluster_name": "lab", "admin_password": "secret123"}
@@ -120,14 +121,14 @@ class TestScriptHandlerPackageVars:
             package_variables=vars_,
         )
 
-        with patch.dict("os.environ", {}, clear=True):
-            env = handler._prepare_environment(ctx, Path("/tmp/config/envs/dev"))
+        monkeypatch.delenv("INFRAFOUNDRY_PACKAGE_VARS", raising=False)
+        env = handler._prepare_environment(ctx, Path("/tmp/config/envs/dev"))
 
         assert "INFRAFOUNDRY_PACKAGE_VARS" in env
         parsed = json.loads(env["INFRAFOUNDRY_PACKAGE_VARS"])
         assert parsed == vars_
 
-    def test_sets_individual_var_env_vars(self):
+    def test_sets_individual_var_env_vars(self, monkeypatch):
         """INFRAFOUNDRY_VAR_<key> is set for each variable."""
         handler = self._make_handler()
         vars_ = {"cluster_name": "lab", "node_count": 3}
@@ -137,13 +138,14 @@ class TestScriptHandlerPackageVars:
             package_variables=vars_,
         )
 
-        with patch.dict("os.environ", {}, clear=True):
-            env = handler._prepare_environment(ctx, Path("/tmp/config/envs/dev"))
+        monkeypatch.delenv("INFRAFOUNDRY_VAR_cluster_name", raising=False)
+        monkeypatch.delenv("INFRAFOUNDRY_VAR_node_count", raising=False)
+        env = handler._prepare_environment(ctx, Path("/tmp/config/envs/dev"))
 
         assert env["INFRAFOUNDRY_VAR_cluster_name"] == "lab"
         assert env["INFRAFOUNDRY_VAR_node_count"] == "3"
 
-    def test_empty_package_variables_no_env_vars(self):
+    def test_empty_package_variables_no_env_vars(self, monkeypatch):
         """Empty package_variables doesn't set INFRAFOUNDRY_PACKAGE_VARS."""
         handler = self._make_handler()
         ctx = EventContext(
@@ -152,12 +154,12 @@ class TestScriptHandlerPackageVars:
             package_variables={},
         )
 
-        with patch.dict("os.environ", {}, clear=True):
-            env = handler._prepare_environment(ctx, Path("/tmp/config/envs/dev"))
+        monkeypatch.delenv("INFRAFOUNDRY_PACKAGE_VARS", raising=False)
+        env = handler._prepare_environment(ctx, Path("/tmp/config/envs/dev"))
 
         assert "INFRAFOUNDRY_PACKAGE_VARS" not in env
 
-    def test_none_package_variables_no_env_vars(self):
+    def test_none_package_variables_no_env_vars(self, monkeypatch):
         """Default empty package_variables doesn't set env vars."""
         handler = self._make_handler()
         ctx = EventContext(
@@ -165,8 +167,8 @@ class TestScriptHandlerPackageVars:
             environment="dev",
         )
 
-        with patch.dict("os.environ", {}, clear=True):
-            env = handler._prepare_environment(ctx, Path("/tmp/config/envs/dev"))
+        monkeypatch.delenv("INFRAFOUNDRY_PACKAGE_VARS", raising=False)
+        env = handler._prepare_environment(ctx, Path("/tmp/config/envs/dev"))
 
         assert "INFRAFOUNDRY_PACKAGE_VARS" not in env
 
