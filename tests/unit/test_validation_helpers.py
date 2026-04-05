@@ -199,10 +199,16 @@ class TestBaseProviderValidator:
 
     def test_check_api_connectivity_no_requests_library(self, validator, report):
         """Test API connectivity when requests library is not installed."""
+        real_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
+
+        def selective_import(name, *args, **kwargs):
+            if name == "requests":
+                raise ImportError("No module named 'requests'")
+            return real_import(name, *args, **kwargs)
+
         with (
             patch.dict("sys.modules", {"requests": None}),
-            # Import error will be raised when trying to import requests
-            patch("builtins.__import__", side_effect=ImportError),
+            patch("builtins.__import__", side_effect=selective_import),
         ):
             result = validator.check_api_connectivity(url="https://api.example.com/status")
 
