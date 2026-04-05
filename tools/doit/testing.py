@@ -44,12 +44,3 @@ def task_mutate() -> dict[str, Any]:
         "title": title_with_actions,
         "verbosity": 2,
     }
-
-
-def task_mutate_html() -> dict[str, Any]:
-    """Generate HTML report from mutmut results."""
-    return {
-        "actions": ["uv run mutmut html --html-dir tmp/mutmut"],
-        "title": title_with_actions,
-        "verbosity": 2,
-    }
