@@ -63,7 +63,7 @@ jobs:
           mkdir -p tmp
           if [ -f tmp/mutmut-run-raw.log ]; then
             # Strip spinner/carriage-return noise from log
-            tr '\r' '\n' < tmp/mutmut-run-raw.log | grep -v '^[[:space:]]*$' | grep -vP '^\xe2\xa0' > tmp/mutmut-run.log 2>/dev/null || true
+            tr '\r' '\n' < tmp/mutmut-run-raw.log | grep -v '^[[:space:]]*$' | grep -vP '\xe2\xa0' > tmp/mutmut-run.log 2>/dev/null || true
             echo "=== Mutation run log ==="
             cat tmp/mutmut-run.log
           fi
