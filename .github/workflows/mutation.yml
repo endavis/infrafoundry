@@ -54,17 +54,20 @@ jobs:
       - name: Run mutation testing
         run: |
           mkdir -p tmp
-          uv run mutmut run > tmp/mutmut-run.log 2>&1 || true
+          uv run mutmut run > tmp/mutmut-run-raw.log 2>&1 || true
+          # Strip spinner/carriage-return noise from log
+          sed 's/\r/\n/g' tmp/mutmut-run-raw.log | grep -v '^[[:space:]]*$' | grep -v '^�' > tmp/mutmut-run.log || true
           echo "=== Mutation run complete ==="
-          tail -5 tmp/mutmut-run.log
+          cat tmp/mutmut-run.log
           uv run mutmut results | tee tmp/mutmut-results.txt
+          echo ""
+          echo "=== Summary ==="
+          awk -F': ' '{print $NF}' tmp/mutmut-results.txt | sort | uniq -c | sort -rn
 
       - name: Upload mutation results
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: mutation-results
-          path: |
-            tmp/mutmut-results.txt
-            tmp/mutmut-run.log
+          path: tmp/mutmut-results.txt
           retention-days: 90
