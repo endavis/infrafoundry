@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775255664417,
+  "lastUpdate": 1775384048579,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3782,6 +3782,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000054635757391543555",
             "extra": "mean: 103.84055425225964 usec\nrounds: 2728"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1509233de5da379244b577fdc7ce74f154fb202a",
+          "message": "feat: add terraform import block support for existing resources (merges PR #484, addresses #387)\n\nAdd import_id field to ResourceConfig and generate Terraform import\nblocks automatically in render_and_write_terraform. Works across all\nproviders with no per-provider changes.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-05T11:13:41+01:00",
+          "tree_id": "18c978da019db1854a08eb92fae8c2e9696ca458",
+          "url": "https://github.com/endavis/infrafoundry/commit/1509233de5da379244b577fdc7ce74f154fb202a"
+        },
+        "date": 1775384048056,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9617.408646542433,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004480343672574847",
+            "extra": "mean: 103.97811268625996 usec\nrounds: 2751"
           }
         ]
       }
