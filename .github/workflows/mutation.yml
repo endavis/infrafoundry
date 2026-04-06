@@ -62,8 +62,13 @@ jobs:
         run: |
           mkdir -p tmp
           if [ -f tmp/mutmut-run-raw.log ]; then
-            # Strip spinner/carriage-return noise from log
-            tr '\r' '\n' < tmp/mutmut-run-raw.log | grep -v '^[[:space:]]*$' | grep -vP '\xe2\xa0' > tmp/mutmut-run.log 2>/dev/null || true
+            # Strip spinner/carriage-return noise from log.
+            # mutmut renders progress with braille spinners + \r; convert \r to \n,
+            # drop blank lines, and drop the repeating spinner phrases.
+            tr '\r' '\n' < tmp/mutmut-run-raw.log \
+              | grep -v '^[[:space:]]*$' \
+              | grep -avE 'Generating mutants|Running stats|Running clean tests|Running mutation testing' \
+              > tmp/mutmut-run.log || true
             echo "=== Mutation run log ==="
             cat tmp/mutmut-run.log
           fi
