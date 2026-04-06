@@ -449,17 +449,19 @@ class TestAuditLoggerHelpers:
             logger = AuditLogger(session_factory=db_session_factory)
             assert logger._default_get_user() == "envuser"
 
-    def test_default_get_user_fallback_username(self, db_session_factory):
+    def test_default_get_user_fallback_username(self, db_session_factory, monkeypatch):
         """Test default user getter fallback to USERNAME."""
-        with patch.dict("os.environ", {"USERNAME": "winuser"}, clear=True):
-            logger = AuditLogger(session_factory=db_session_factory)
-            assert logger._default_get_user() == "winuser"
+        monkeypatch.delenv("USER", raising=False)
+        monkeypatch.setenv("USERNAME", "winuser")
+        logger = AuditLogger(session_factory=db_session_factory)
+        assert logger._default_get_user() == "winuser"
 
-    def test_default_get_user_unknown(self, db_session_factory):
+    def test_default_get_user_unknown(self, db_session_factory, monkeypatch):
         """Test default user getter returns unknown when no env vars."""
-        with patch.dict("os.environ", {}, clear=True):
-            logger = AuditLogger(session_factory=db_session_factory)
-            assert logger._default_get_user() == "unknown"
+        monkeypatch.delenv("USER", raising=False)
+        monkeypatch.delenv("USERNAME", raising=False)
+        logger = AuditLogger(session_factory=db_session_factory)
+        assert logger._default_get_user() == "unknown"
 
     def test_get_ip_address(self, audit_logger):
         """Test getting local IP address."""
