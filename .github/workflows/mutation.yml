@@ -67,7 +67,7 @@ jobs:
             # drop blank lines, and drop the repeating spinner phrases.
             tr '\r' '\n' < tmp/mutmut-run-raw.log \
               | grep -v '^[[:space:]]*$' \
-              | grep -avE 'Generating mutants|Running stats|Running clean tests|Running mutation testing' \
+              | grep -avE 'Generating mutants|Running stats|Running clean tests|Running mutation testing|Running forced fail test|^[[:space:]]*[^[:alnum:]]*[[:space:]]*[0-9]+/[0-9]+' \
               > tmp/mutmut-run.log || true
             echo "=== Mutation run log ==="
             cat tmp/mutmut-run.log
