@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775490594807,
+  "lastUpdate": 1775491166875,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3999,6 +3999,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000023612654249040296",
             "extra": "mean: 143.6430958723287 usec\nrounds: 2253"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "60bfd284804463678e0e9320ed950dc1244383fd",
+          "message": "chore(deps): bump vulture from 2.15 to 2.16 (merges PR #491)\n\nBumps [vulture](https://github.com/jendrikseipp/vulture) from 2.15 to 2.16.\n- [Release notes](https://github.com/jendrikseipp/vulture/releases)\n- [Changelog](https://github.com/jendrikseipp/vulture/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/jendrikseipp/vulture/compare/v2.15...v2.16)\n\n---\nupdated-dependencies:\n- dependency-name: vulture\n  dependency-version: '2.16'\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-06T16:58:47+01:00",
+          "tree_id": "2fdc2f5a0bd92b107c834b016d07e5b3d1b4a6b9",
+          "url": "https://github.com/endavis/infrafoundry/commit/60bfd284804463678e0e9320ed950dc1244383fd"
+        },
+        "date": 1775491165706,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7345.090099192828,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009790076677345364",
+            "extra": "mean: 136.14536874229665 usec\nrounds: 2457"
           }
         ]
       }
