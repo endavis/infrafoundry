@@ -81,16 +81,13 @@ class TestSecretManager:
             manager = SecretManager(env_name="dev")
             assert manager.secrets_dir == config_repo / "envs" / "dev"
 
-    def test_init_no_age_key_env(self, mock_sops_age, temp_secrets_dir):
+    def test_init_no_age_key_env(self, mock_sops_age, temp_secrets_dir, monkeypatch):
         """Test initialization fails when SOPS_AGE_KEY_FILE is not set."""
-        with (
-            patch.dict(
-                "os.environ",
-                {"INFRAFOUNDRY_CONFIG_REPO": str(temp_secrets_dir)},
-                clear=True,
-            ),
-            pytest.raises(ValueError, match="SOPS_AGE_KEY_FILE not set"),
-        ):
+        monkeypatch.setenv("INFRAFOUNDRY_CONFIG_REPO", str(temp_secrets_dir))
+        monkeypatch.delenv("SOPS_AGE_KEY_FILE", raising=False)
+        monkeypatch.delenv("INFRAFOUNDRY_SKIP_SOPS_CHECK", raising=False)
+        monkeypatch.setenv("INFRAFOUNDRY_FORCE_SOPS_CHECK", "1")
+        with pytest.raises(ValueError, match="SOPS_AGE_KEY_FILE not set"):
             SecretManager(env_name="dev")
 
     def test_init_age_key_file_missing(self, mock_sops_age):

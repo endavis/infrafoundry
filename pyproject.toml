@@ -280,8 +280,8 @@ ignore_decorators = [
 ]
 
 [tool.mutmut]
-paths_to_mutate = "src/"
-tests_dir = "tests/"
+paths_to_mutate = ["src/"]
+tests_dir = ["tests/"]
 runner = "uv run python -m pytest -x --assert=plain"
 
 [tool.pyright]

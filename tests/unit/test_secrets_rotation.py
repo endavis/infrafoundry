@@ -248,9 +248,8 @@ class TestSecretsRotator:
 
     @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
-    @patch.dict("os.environ", {}, clear=True)
     def test_rotate_with_generate_new_key(
-        self, mock_run, mock_which, temp_secrets_dir, mock_provider
+        self, mock_run, mock_which, temp_secrets_dir, mock_provider, monkeypatch
     ):
         """Test rotation with automatic key generation."""
         # Mock age-keygen for key generation
@@ -268,10 +267,7 @@ class TestSecretsRotator:
 
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir, provider=mock_provider)
 
-        # Set minimal env for test
-        import os
-
-        os.environ["SOPS_AGE_KEY_FILE"] = "/tmp/test_old_key"
+        monkeypatch.setenv("SOPS_AGE_KEY_FILE", "/tmp/test_old_key")
 
         result = rotator.rotate(generate_new_key=True, verify=False)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from infrafoundry.cli.commands.completion import (
@@ -43,10 +44,10 @@ class TestDetectShell:
         with patch.dict("os.environ", {"SHELL": "/bin/sh"}):
             assert _detect_shell() is None
 
-    def test_detect_no_shell_env(self) -> None:
+    def test_detect_no_shell_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Should return None when SHELL not set."""
-        with patch.dict("os.environ", {}, clear=True):
-            assert _detect_shell() is None
+        monkeypatch.delenv("SHELL", raising=False)
+        assert _detect_shell() is None
 
 
 class TestGetCompletionScript:

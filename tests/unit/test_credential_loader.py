@@ -45,11 +45,11 @@ class TestCredentialLoader:
             loader = CredentialLoader()
             assert loader.config_dir == config_dir
 
-    def test_init_defaults_to_cwd(self):
+    def test_init_defaults_to_cwd(self, monkeypatch):
         """Test initialization defaults to current working directory."""
-        with patch.dict(os.environ, {}, clear=True):
-            loader = CredentialLoader()
-            assert loader.config_dir == Path.cwd()
+        monkeypatch.delenv("INFRAFOUNDRY_CONFIG_REPO", raising=False)
+        loader = CredentialLoader()
+        assert loader.config_dir == Path.cwd()
 
     def test_get_secrets_dir(self, loader, temp_config_dir):
         """Test getting secrets directory for environment."""
@@ -179,46 +179,47 @@ class TestCredentialLoader:
             assert credentials == {}
             mock_logger.warning.assert_called_once()
 
-    def test_set_age_key(self, loader, temp_config_dir):
+    def test_set_age_key(self, loader, temp_config_dir, monkeypatch):
         """Test setting per-environment age key."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
         age_key_file = secrets_dir / "age.key"
         age_key_file.write_text("AGE-SECRET-KEY-1...")
 
-        with patch.dict(os.environ, {}, clear=True):
-            loader._set_age_key(secrets_dir)
-            assert os.environ.get("SOPS_AGE_KEY_FILE") == str(age_key_file)
+        monkeypatch.delenv("SOPS_AGE_KEY_FILE", raising=False)
+        loader._set_age_key(secrets_dir)
+        assert os.environ.get("SOPS_AGE_KEY_FILE") == str(age_key_file)
 
-    def test_set_age_key_not_exists(self, loader, temp_config_dir):
+    def test_set_age_key_not_exists(self, loader, temp_config_dir, monkeypatch):
         """Test setting age key when file doesn't exist."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
 
-        with patch.dict(os.environ, {}, clear=True):
-            loader._set_age_key(secrets_dir)
-            assert "SOPS_AGE_KEY_FILE" not in os.environ
+        monkeypatch.delenv("SOPS_AGE_KEY_FILE", raising=False)
+        loader._set_age_key(secrets_dir)
+        assert "SOPS_AGE_KEY_FILE" not in os.environ
 
-    def test_apply_to_environment(self, loader):
+    def test_apply_to_environment(self, loader, monkeypatch):
         """Test applying credentials to environment."""
         credentials = {
             "TEST_VAR_1": "value1",
             "TEST_VAR_2": "value2",
         }
 
-        with patch.dict(os.environ, {}, clear=True):
-            loader.apply_to_environment(credentials)
-            assert os.environ["TEST_VAR_1"] == "value1"
-            assert os.environ["TEST_VAR_2"] == "value2"
+        monkeypatch.delenv("TEST_VAR_1", raising=False)
+        monkeypatch.delenv("TEST_VAR_2", raising=False)
+        loader.apply_to_environment(credentials)
+        assert os.environ["TEST_VAR_1"] == "value1"
+        assert os.environ["TEST_VAR_2"] == "value2"
 
-    def test_apply_to_environment_empty(self, loader):
+    def test_apply_to_environment_empty(self, loader, monkeypatch):
         """Test applying empty credentials dict."""
-        with patch.dict(os.environ, {"EXISTING": "value"}, clear=True):
-            loader.apply_to_environment({})
-            # Existing vars should remain
-            assert os.environ["EXISTING"] == "value"
+        monkeypatch.setenv("EXISTING", "value")
+        loader.apply_to_environment({})
+        # Existing vars should remain
+        assert os.environ["EXISTING"] == "value"
 
-    def test_load_and_apply(self, loader, mock_provider, temp_config_dir):
+    def test_load_and_apply(self, loader, mock_provider, temp_config_dir, monkeypatch):
         """Test convenience method that loads and applies."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -229,13 +230,15 @@ class TestCredentialLoader:
         proxmox_file = secrets_dir / "proxmox.yaml"
         proxmox_file.write_text("encrypted")
 
-        with patch.dict(os.environ, {}, clear=True):
-            credentials = loader.load_and_apply("dev", providers=["proxmox"])
+        monkeypatch.delenv("PROXMOX_API_URL", raising=False)
+        credentials = loader.load_and_apply("dev", providers=["proxmox"])
 
-            assert credentials == {"PROXMOX_API_URL": "https://pve.example.com:8006"}
-            assert os.environ["PROXMOX_API_URL"] == "https://pve.example.com:8006"
+        assert credentials == {"PROXMOX_API_URL": "https://pve.example.com:8006"}
+        assert os.environ["PROXMOX_API_URL"] == "https://pve.example.com:8006"
 
-    def test_temporary_credentials_context_manager(self, loader, mock_provider, temp_config_dir):
+    def test_temporary_credentials_context_manager(
+        self, loader, mock_provider, temp_config_dir, monkeypatch
+    ):
         """Test temporary credentials context manager."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -246,18 +249,19 @@ class TestCredentialLoader:
         proxmox_file = secrets_dir / "proxmox.yaml"
         proxmox_file.write_text("encrypted")
 
-        with patch.dict(os.environ, {"PROXMOX_API_URL": "original"}, clear=True):
-            original_value = os.environ["PROXMOX_API_URL"]
+        monkeypatch.setenv("PROXMOX_API_URL", "original")
 
-            with loader.temporary_credentials("dev", providers=["proxmox"]) as creds:
-                # Inside context, new value is set
-                assert os.environ["PROXMOX_API_URL"] == "https://pve.example.com:8006"
-                assert creds == {"PROXMOX_API_URL": "https://pve.example.com:8006"}
+        with loader.temporary_credentials("dev", providers=["proxmox"]) as creds:
+            # Inside context, new value is set
+            assert os.environ["PROXMOX_API_URL"] == "https://pve.example.com:8006"
+            assert creds == {"PROXMOX_API_URL": "https://pve.example.com:8006"}
 
-            # Outside context, original value is restored
-            assert os.environ["PROXMOX_API_URL"] == original_value
+        # Outside context, original value is restored
+        assert os.environ["PROXMOX_API_URL"] == "original"
 
-    def test_temporary_credentials_new_vars_removed(self, loader, mock_provider, temp_config_dir):
+    def test_temporary_credentials_new_vars_removed(
+        self, loader, mock_provider, temp_config_dir, monkeypatch
+    ):
         """Test that new vars added by context manager are removed after."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -268,12 +272,13 @@ class TestCredentialLoader:
         proxmox_file = secrets_dir / "proxmox.yaml"
         proxmox_file.write_text("encrypted")
 
-        with patch.dict(os.environ, {}, clear=True):
-            with loader.temporary_credentials("dev", providers=["proxmox"]):
-                assert "PROXMOX_API_URL" in os.environ
+        monkeypatch.delenv("PROXMOX_API_URL", raising=False)
 
-            # After context, var should be removed
-            assert "PROXMOX_API_URL" not in os.environ
+        with loader.temporary_credentials("dev", providers=["proxmox"]):
+            assert "PROXMOX_API_URL" in os.environ
+
+        # After context, var should be removed
+        assert "PROXMOX_API_URL" not in os.environ
 
     def test_register_provider(self, loader):
         """Test registering a custom provider."""
@@ -308,11 +313,11 @@ class TestCredentialLoader:
             loader = CredentialLoader(config_dir=temp_config_dir)
             assert loader._debug_mode is True
 
-    def test_debug_logging_disabled(self, temp_config_dir):
+    def test_debug_logging_disabled(self, temp_config_dir, monkeypatch):
         """Test debug logging when not in debug mode."""
-        with patch.dict(os.environ, {}, clear=True):
-            loader = CredentialLoader(config_dir=temp_config_dir)
-            assert loader._debug_mode is False
+        monkeypatch.delenv("INFRAFOUNDRY_LOG_LEVEL", raising=False)
+        loader = CredentialLoader(config_dir=temp_config_dir)
+        assert loader._debug_mode is False
 
     def test_load_with_decryption_error(self, loader, mock_provider, temp_config_dir):
         """Test graceful handling of decryption errors."""
