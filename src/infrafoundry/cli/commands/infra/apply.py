@@ -35,6 +35,18 @@ from ...utils import console
     default=4,
     help="Maximum number of parallel workers (default: 4)",
 )
+@click.option(
+    "--lock-timeout",
+    type=int,
+    default=0,
+    help="Seconds to wait for the environment lock before failing (0 = fail fast).",
+)
+@click.option(
+    "--lock-ttl",
+    type=int,
+    default=3600,
+    help="Lock TTL in seconds for stale-lock recovery (default: 3600).",
+)
 @with_orchestrator("Apply failed")
 def apply(
     _ctx: click.Context,
@@ -45,6 +57,8 @@ def apply(
     package_name: str | None,
     parallel: bool,
     max_workers: int,
+    lock_timeout: int,
+    lock_ttl: int,
 ) -> None:
     """Apply infrastructure changes."""
     if package_name and resource:
@@ -82,5 +96,7 @@ def apply(
             parallel=parallel,
             max_workers=max_workers,
             package_filter=package_name,
+            lock_timeout=lock_timeout,
+            lock_ttl=lock_ttl,
         )
     console.success(f"Apply complete! ({timer.elapsed_str})")

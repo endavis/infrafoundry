@@ -519,3 +519,91 @@ class TestIterProviderBatchesResourceFilter:
         assert len(batches) == 2
         all_names = {r.name for b in batches for r in b.resources}
         assert all_names == {"vm1", "fw1"}
+
+
+class TestOrchestratorLocking:
+    """Tests for environment locking around apply/destroy."""
+
+    def _make_orchestrator(self, tmp_path):
+        from infrafoundry.core.state import StateManager
+
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        state_manager = StateManager(connection_string=f"sqlite:///{tmp_path / 'state.db'}")
+        state_manager.initialize()
+        orchestrator = Orchestrator(
+            config_manager=config_manager,
+            state_manager=state_manager,
+        )
+        # Stub sub-orchestrators to avoid running real workflows.
+        orchestrator.plan_orchestrator = Mock()
+        orchestrator.plan_orchestrator.plan = Mock(return_value={})
+        orchestrator.apply_orchestrator = Mock()
+        orchestrator.apply_orchestrator.apply = Mock(return_value={})
+        orchestrator.destroy_orchestrator = Mock()
+        orchestrator.destroy_orchestrator.destroy = Mock(return_value={})
+        return orchestrator
+
+    def test_apply_acquires_lock_around_workflow(self, tmp_path):
+        orchestrator = self._make_orchestrator(tmp_path)
+
+        captured = {}
+
+        def record_apply(**kwargs):
+            captured["lock"] = orchestrator.state_manager.get_lock("dev")
+            return {}
+
+        orchestrator.apply_orchestrator.apply.side_effect = record_apply
+
+        orchestrator.apply("dev", auto_approve=True)
+
+        assert captured["lock"] is not None
+        assert orchestrator.state_manager.get_lock("dev") is None
+
+    def test_apply_releases_lock_on_failure(self, tmp_path):
+        orchestrator = self._make_orchestrator(tmp_path)
+        orchestrator.apply_orchestrator.apply.side_effect = RuntimeError("boom")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            orchestrator.apply("dev", auto_approve=True)
+
+        assert orchestrator.state_manager.get_lock("dev") is None
+
+    def test_apply_fails_when_locked(self, tmp_path):
+        from infrafoundry.core.exceptions import LockAcquisitionError
+
+        orchestrator = self._make_orchestrator(tmp_path)
+        orchestrator.state_manager.acquire_lock("dev", ttl_seconds=60, locked_by="someone@else:99")
+
+        with pytest.raises(LockAcquisitionError):
+            orchestrator.apply("dev", auto_approve=True)
+
+        # Pre-existing lock untouched.
+        lock = orchestrator.state_manager.get_lock("dev")
+        assert lock is not None
+        assert lock.locked_by == "someone@else:99"
+
+    def test_destroy_acquires_lock_around_workflow(self, tmp_path):
+        orchestrator = self._make_orchestrator(tmp_path)
+
+        captured = {}
+
+        def record_destroy(*args, **kwargs):
+            captured["lock"] = orchestrator.state_manager.get_lock("dev")
+            return {}
+
+        orchestrator.destroy_orchestrator.destroy.side_effect = record_destroy
+
+        orchestrator.destroy("dev", auto_approve=True)
+
+        assert captured["lock"] is not None
+        assert orchestrator.state_manager.get_lock("dev") is None
+
+    def test_plan_does_not_acquire_lock(self, tmp_path):
+        orchestrator = self._make_orchestrator(tmp_path)
+        # Pre-seed an active lock; plan should still proceed.
+        orchestrator.state_manager.acquire_lock("dev", ttl_seconds=60, locked_by="someone@else:99")
+
+        result = orchestrator.plan("dev")
+        assert result == {}
+        orchestrator.plan_orchestrator.plan.assert_called_once()

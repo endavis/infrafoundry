@@ -232,6 +232,11 @@ InfraFoundry automatically detects backend configuration changes and triggers re
 
 ### State Locking
 
+State locking happens at **two** layers in InfraFoundry. Both are needed for
+correctness; one does not replace the other.
+
+#### 1. Terraform backend locking
+
 **Why Locking Matters:**
 - Prevents concurrent modifications to infrastructure state
 - Avoids race conditions in team environments
@@ -250,6 +255,55 @@ infra backend validate --env prod
 # Check generated backend.tf
 cat generated/prod/terraform/proxmox/backend.tf
 ```
+
+#### 2. InfraFoundry-level locking
+
+Terraform backend locks only protect the `.tfstate` file. InfraFoundry's own
+state DB, event log, and multi-runner workflow sit *outside* that lock, so
+concurrent `foundry infra apply --env prod` runs can corrupt the deployment
+history, duplicate resource tracking rows, and race on runner execution even
+when the Terraform backend is locking correctly.
+
+InfraFoundry therefore wraps `apply` and `destroy` in a second lock, stored in
+the `deployment_locks` table in the state DB. The unique constraint on
+`environment` is the atomic primitive - exactly one writer wins.
+
+Key behavior:
+
+- **`plan` is not locked.** Preview jobs never queue behind an apply.
+- **Fail fast by default.** `foundry infra apply --env prod` rejects
+  immediately if another run holds the lock. Pass `--lock-timeout <seconds>`
+  to wait instead.
+- **TTL-based stale recovery.** Locks carry an `expires_at` (default 1 hour,
+  tunable via `--lock-ttl <seconds>`). A crashed run stops blocking new runs
+  once its lock expires.
+- **Holder identity.** Each lock records `user@host:pid` in `locked_by` and a
+  timestamp in `acquired_at`.
+- **Event emission.** `LOCK_ACQUIRED`, `LOCK_RELEASED`, and `LOCK_TIMEOUT`
+  events flow through the existing `EventManager` for auditing and
+  notifications.
+
+Managing locks from the CLI:
+
+```bash
+# List all currently held locks (shows active vs. expired)
+foundry infra unlock --list
+
+# Release an expired lock (safe — refuses active locks)
+foundry infra unlock --env prod
+
+# Force-release an active lock after confirming the holder is dead
+foundry infra unlock --env prod --force           # prompts for confirmation
+foundry infra unlock --env prod --force --yes     # skip the prompt (scripts)
+```
+
+Emergency escape hatch: set `INFRAFOUNDRY_SKIP_LOCK=1` to bypass locking
+entirely. A loud warning is logged. Only use this when the state DB itself is
+inaccessible — it defeats the correctness guarantee that this feature exists
+to provide.
+
+See [ADR-0002: State locking via deployment_locks table](../decisions/0002-state-locking.md)
+for the full rationale and trade-offs.
 
 ## Validation and Checks
 

@@ -24,6 +24,18 @@ from ...utils import console
     "package_name",
     help="Target a specific package by name (mutually exclusive with -r)",
 )
+@click.option(
+    "--lock-timeout",
+    type=int,
+    default=0,
+    help="Seconds to wait for the environment lock before failing (0 = fail fast).",
+)
+@click.option(
+    "--lock-ttl",
+    type=int,
+    default=3600,
+    help="Lock TTL in seconds for stale-lock recovery (default: 3600).",
+)
 @with_orchestrator("Destroy failed")
 def destroy(
     _ctx: click.Context,
@@ -32,6 +44,8 @@ def destroy(
     auto_approve: bool,
     resource: tuple[str, ...],
     package_name: str | None,
+    lock_timeout: int,
+    lock_ttl: int,
 ) -> None:
     """Destroy infrastructure."""
     if package_name and resource:
@@ -66,5 +80,7 @@ def destroy(
             auto_approve=auto_approve,
             resource_filter=resource_filter,
             package_filter=package_name,
+            lock_timeout=lock_timeout,
+            lock_ttl=lock_ttl,
         )
     console.success(f"Destroy complete! ({timer.elapsed_str})")
