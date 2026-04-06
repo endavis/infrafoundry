@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775494042857,
+  "lastUpdate": 1775494451118,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4123,6 +4123,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011471155198819854",
             "extra": "mean: 136.498721208881 usec\nrounds: 3673"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7a24b7ecfec38359d916b38fcb746cb992a41c6c",
+          "message": "chore(deps): bump boto3 from 1.42.78 to 1.42.83 (merges PR #495)\n\nBumps [boto3](https://github.com/boto/boto3) from 1.42.78 to 1.42.83.\n- [Release notes](https://github.com/boto/boto3/releases)\n- [Commits](https://github.com/boto/boto3/compare/1.42.78...1.42.83)\n\n---\nupdated-dependencies:\n- dependency-name: boto3\n  dependency-version: 1.42.83\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-06T17:53:32+01:00",
+          "tree_id": "6baf2615d55938f1a93f31e06a14dbb70f1f2d08",
+          "url": "https://github.com/endavis/infrafoundry/commit/7a24b7ecfec38359d916b38fcb746cb992a41c6c"
+        },
+        "date": 1775494450014,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7415.332203811486,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000890720518557519",
+            "extra": "mean: 134.8557249378523 usec\nrounds: 2414"
           }
         ]
       }
