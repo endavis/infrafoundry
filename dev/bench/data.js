@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775487371709,
+  "lastUpdate": 1775490064553,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3937,6 +3937,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009183554819561374",
             "extra": "mean: 137.08697865071272 usec\nrounds: 2342"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7464305088d69ff0840615b9cbbdedc906c42532",
+          "message": "chore(deps): bump click from 8.3.1 to 8.3.2 (merges PR #489)\n\nBumps [click](https://github.com/pallets/click) from 8.3.1 to 8.3.2.\n- [Release notes](https://github.com/pallets/click/releases)\n- [Changelog](https://github.com/pallets/click/blob/main/CHANGES.rst)\n- [Commits](https://github.com/pallets/click/compare/8.3.1...8.3.2)\n\n---\nupdated-dependencies:\n- dependency-name: click\n  dependency-version: 8.3.2\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-06T16:40:25+01:00",
+          "tree_id": "edb86614e3d0725d041e66381e47ebd923c84448",
+          "url": "https://github.com/endavis/infrafoundry/commit/7464305088d69ff0840615b9cbbdedc906c42532"
+        },
+        "date": 1775490063748,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6746.481529957256,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000025287323557980654",
+            "extra": "mean: 148.22541135843528 usec\nrounds: 2606"
           }
         ]
       }
