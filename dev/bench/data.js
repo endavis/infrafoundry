@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775490064553,
+  "lastUpdate": 1775490594807,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3968,6 +3968,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000025287323557980654",
             "extra": "mean: 148.22541135843528 usec\nrounds: 2606"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "887cffe3d21918046a81fc265dd0806a0f810ee6",
+          "message": "chore(deps): bump cyclonedx-bom from 7.2.2 to 7.3.0 (merges PR #490)\n\nBumps [cyclonedx-bom](https://github.com/CycloneDX/cyclonedx-python) from 7.2.2 to 7.3.0.\n- [Release notes](https://github.com/CycloneDX/cyclonedx-python/releases)\n- [Changelog](https://github.com/CycloneDX/cyclonedx-python/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/CycloneDX/cyclonedx-python/compare/v7.2.2...v7.3.0)\n\n---\nupdated-dependencies:\n- dependency-name: cyclonedx-bom\n  dependency-version: 7.3.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-06T16:49:21+01:00",
+          "tree_id": "a1cf49f446b6e380c36c7e5ab028ae0531b50639",
+          "url": "https://github.com/endavis/infrafoundry/commit/887cffe3d21918046a81fc265dd0806a0f810ee6"
+        },
+        "date": 1775490594327,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6961.699021641869,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000023612654249040296",
+            "extra": "mean: 143.6430958723287 usec\nrounds: 2253"
           }
         ]
       }
