@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775491166875,
+  "lastUpdate": 1775492744977,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4030,6 +4030,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009790076677345364",
             "extra": "mean: 136.14536874229665 usec\nrounds: 2457"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b9956f799e9b0b1b5b32374a9576523ddc2ee1b4",
+          "message": "chore(deps): bump sqlalchemy from 2.0.48 to 2.0.49 (merges PR #492)\n\nBumps [sqlalchemy](https://github.com/sqlalchemy/sqlalchemy) from 2.0.48 to 2.0.49.\n- [Release notes](https://github.com/sqlalchemy/sqlalchemy/releases)\n- [Changelog](https://github.com/sqlalchemy/sqlalchemy/blob/main/CHANGES.rst)\n- [Commits](https://github.com/sqlalchemy/sqlalchemy/commits)\n\n---\nupdated-dependencies:\n- dependency-name: sqlalchemy\n  dependency-version: 2.0.49\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-06T17:25:15+01:00",
+          "tree_id": "28d746db00ff41130fca4050acbc9190d0f7e754",
+          "url": "https://github.com/endavis/infrafoundry/commit/b9956f799e9b0b1b5b32374a9576523ddc2ee1b4"
+        },
+        "date": 1775492744429,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9711.666653751456,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004572958462610542",
+            "extra": "mean: 102.96893784072753 usec\nrounds: 2751"
           }
         ]
       }
