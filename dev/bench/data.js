@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775384048579,
+  "lastUpdate": 1775476598337,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3813,6 +3813,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004480343672574847",
             "extra": "mean: 103.97811268625996 usec\nrounds: 2751"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0734fba76205e122e4911dcd01e65cd4d5877364",
+          "message": "fix: restore mutation testing workflow for mutmut 3.x (merges PR #496, addresses #485)\n\n* fix: update mutation testing for mutmut 3.x compatibility\n\n- Add dangling symlink cleanup step before mutmut run\n- Remove mutmut html command (removed in 3.x)\n- Save mutmut results as text artifact instead of HTML\n- Remove task_mutate_html doit task\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: correct mutmut 3.x config and workflow compatibility\n\n- Change paths_to_mutate and tests_dir from strings to lists in\n  pyproject.toml (strings are iterated as characters, causing mutmut\n  to walk the entire filesystem via PosixPath('/'))\n- Remove mutmut html step from workflow (removed in mutmut 3.x)\n- Remove task_mutate_html doit task\n- Add mkdir -p tmp before saving results artifact\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: preserve MUTANT_UNDER_TEST env var and fix mutmut config types\n\n- Add autouse fixture to preserve MUTANT_UNDER_TEST across tests that\n  clear os.environ (mutmut 3.x requires this var during test runs)\n- Change paths_to_mutate and tests_dir from strings to lists\n- Add mkdir -p tmp before saving results artifact\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: replace patch.dict clear=True with monkeypatch.delenv for mutmut 3.x\n\nmutmut 3.x injects a trampoline that reads os.environ['MUTANT_UNDER_TEST']\nvia direct dict access. Tests using patch.dict(clear=True) wipe this var,\ncausing KeyError during mutmut's initial test run.\n\nReplace all clear=True usages with targeted monkeypatch.delenv/setenv\ncalls that only remove the specific vars each test needs absent.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: add terraform install step to mutation testing workflow\n\nThe TerraformRunner constructor validates terraform is on PATH.\nWithout it, mutmut's initial test run fails before testing any mutants.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: add age and sops install to mutation testing workflow\n\nTests that exercise secrets rotation require age-keygen on PATH.\nMirror the system tools install step from CI workflow.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: scope builtins.__import__ mock to requests only\n\nThe previous mock used side_effect=ImportError on builtins.__import__\nwhich blocks ALL imports including mutmut's trampoline `import os`.\nUse a selective import function that only raises for 'requests'.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: suppress hypothesis differing_executors and quiet mutmut output\n\n- Suppress HealthCheck.differing_executors in Hypothesis profiles\n  (mutmut runs tests from multiple executors, triggering this check)\n- Redirect mutmut run output to log file, show only summary in CI\n- Include full run log in uploaded artifacts for debugging\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: strip spinner noise from mutmut output and add summary\n\n- Redirect mutmut run to raw log, then strip carriage returns and\n  spinner characters for a clean log\n- Print clean log and results summary (counts by status) in CI output\n- Only upload results text as artifact (raw log is transient)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: split mutation run and results into separate steps\n\n- Separate mutmut run from results reporting so results/summary\n  are shown even if mutmut is killed or times out\n- Add explicit 120-minute timeout for mutation run\n- Use tr + grep -vP to strip UTF-8 spinner characters from log\n- Results step runs with if: always()\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: match spinner bytes anywhere on line, not just at start\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: filter spinner phrases by name instead of byte pattern\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: also filter forced-fail spinner and N/M progress lines\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: also force SOPS check in test_init_no_age_key_env\n\nCI sets INFRAFOUNDRY_SKIP_SOPS_CHECK, which the previous patch.dict\nclear=True approach implicitly removed. The monkeypatch replacement\nonly deleted SOPS_AGE_KEY_FILE, so under CI the check was skipped and\nthe expected ValueError was never raised.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-06T12:56:02+01:00",
+          "tree_id": "a829008451440ce5c425c2658496b5431de0cfb3",
+          "url": "https://github.com/endavis/infrafoundry/commit/0734fba76205e122e4911dcd01e65cd4d5877364"
+        },
+        "date": 1775476597340,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7321.627841176612,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009763977747444397",
+            "extra": "mean: 136.58164846566368 usec\nrounds: 2509"
           }
         ]
       }
