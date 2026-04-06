@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775486271890,
+  "lastUpdate": 1775486978539,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3875,6 +3875,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009659308621158289",
             "extra": "mean: 136.71650618633376 usec\nrounds: 2748"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "71c58f91b7e7cb201163047623a1f920c16eb882",
+          "message": "chore(deps): bump ansible from 13.4.0 to 13.5.0 (merges PR #487)\n\nBumps [ansible](https://github.com/ansible-community/ansible-build-data) from 13.4.0 to 13.5.0.\n- [Changelog](https://github.com/ansible-community/ansible-build-data/blob/main/docs/release-process.md)\n- [Commits](https://github.com/ansible-community/ansible-build-data/compare/13.4.0...13.5.0)\n\n---\nupdated-dependencies:\n- dependency-name: ansible\n  dependency-version: 13.5.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-06T15:48:56+01:00",
+          "tree_id": "6c506e88b2c16214413db2c6b9d3695f2e4fe64e",
+          "url": "https://github.com/endavis/infrafoundry/commit/71c58f91b7e7cb201163047623a1f920c16eb882"
+        },
+        "date": 1775486977564,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7290.510396958515,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001101363043315345",
+            "extra": "mean: 137.16460790141443 usec\nrounds: 2354"
           }
         ]
       }
