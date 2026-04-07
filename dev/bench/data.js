@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775551964238,
+  "lastUpdate": 1775559141892,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4185,6 +4185,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022733180194095485",
             "extra": "mean: 147.3922991072201 usec\nrounds: 2240"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c20b8dd531db8b73a9da7e07bb115ed55e438ecb",
+          "message": "feat: add lock heartbeat for long-running applies (merges PR #499, addresses #498)\n\nA background daemon thread now auto-extends the environment lock every\nttl/3 seconds while apply/destroy is running, so long applies never\nself-evict. Heartbeat failures log and emit LOCK_HEARTBEAT_FAILED but\ndo not abort the in-flight run — aborting on a transient DB blip is\nstrictly worse than letting the apply finish under a ticking TTL.\n\nBecause live runs no longer depend on the TTL to stay alive, the\ndefault --lock-ttl drops from 3600 s to 600 s, shrinking the stale-\nrecovery window for crashed holders by 6× without penalizing healthy\nlong-running applies.\n\nAddresses #498",
+          "timestamp": "2026-04-07T11:51:47+01:00",
+          "tree_id": "3a7f0cb05e4fb4854ea4640397bf36a59c126cf8",
+          "url": "https://github.com/endavis/infrafoundry/commit/c20b8dd531db8b73a9da7e07bb115ed55e438ecb"
+        },
+        "date": 1775559141533,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7260.831351497563,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010760325555912795",
+            "extra": "mean: 137.7252757418402 usec\nrounds: 2292"
           }
         ]
       }
