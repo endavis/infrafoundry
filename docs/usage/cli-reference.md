@@ -57,9 +57,17 @@ infra destroy --env dev --auto-approve
   - `infra diff --env-a <env1> --env-b <env2> [--provider ...] [--verbose]` — compare configurations between two environments.
 - **Plan/Apply/Destroy**
   - `infra plan --env <env> [--resource ...] [--package <name>] [--dry-run]`
-  - `infra apply --env <env> [--resource ...] [--package <name>] [--auto-approve]`
-  - `infra destroy --env <env> [--resource ...] [--package <name>] [--auto-approve]`
+  - `infra apply --env <env> [--resource ...] [--package <name>] [--auto-approve] [--lock-timeout <seconds>] [--lock-ttl <seconds>]`
+  - `infra destroy --env <env> [--resource ...] [--package <name>] [--auto-approve] [--lock-timeout <seconds>] [--lock-ttl <seconds>]`
   - `infra reset --env <env> --provider <provider> --component <component> [--auto-approve]` — completely remove component configuration from provider for clean reapply.
+  - **Lock options on apply/destroy:**
+    - `--lock-timeout <seconds>` — how long to wait for an existing lock before failing. Default `0` (fail fast).
+    - `--lock-ttl <seconds>` — how long the acquired lock is valid before it is considered stale. Default `3600` (1 hour).
+- **Locking**
+  - `infra unlock --env <env>` — release an expired lock for the environment (refuses to release active locks).
+  - `infra unlock --env <env> --force [--yes]` — force-release an active lock; prompts for confirmation unless `--yes` is supplied.
+  - `infra unlock --list` — list all current deployment locks across environments.
+  - Set `INFRAFOUNDRY_SKIP_LOCK=1` to bypass locking entirely (emergency use only — emits a loud warning).
 - **Rollback and Recovery**
   - `infra rollback-points --env <env> [--limit <n>]` — list available rollback points for an environment.
   - `infra rollback --deployment-id <id> [--auto-approve]` — rollback infrastructure to a previous deployment state.
@@ -183,6 +191,23 @@ infra destroy --env dev --auto-approve
   ```bash
   infra drift --env prod
   ```
+- **Manage deployment locks:**
+  ```bash
+  # Wait up to 5 minutes for an active lock before failing
+  infra apply --env prod --lock-timeout 300
+
+  # Use a longer TTL for a slow apply
+  infra apply --env prod --lock-ttl 7200
+
+  # Inspect current locks
+  infra unlock --list
+
+  # Release an expired lock
+  infra unlock --env prod
+
+  # Force-release an active lock (use with caution)
+  infra unlock --env prod --force --yes
+  ```
 - **Graph dependencies:**
   ```bash
   infra graph --env dev --format mermaid > graph.mmd
@@ -210,7 +235,7 @@ infra destroy --env dev --auto-approve
 
 ---
 
-Last updated: 2025-12-27 13:45 GMT
+Last updated: 2026-04-06 GMT
 
 
 ---

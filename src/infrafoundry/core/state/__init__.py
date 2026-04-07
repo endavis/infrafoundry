@@ -1,10 +1,12 @@
 """State management package for InfraFoundry."""
 
 from infrafoundry.core.state.deployment_repository import DeploymentRepository
+from infrafoundry.core.state.lock_repository import LockRepository
 from infrafoundry.core.state.models import (
     Base,
     Deployment,
     DeploymentEvent,
+    DeploymentLock,
     DeploymentStatus,
     Resource,
     ResourceDependency,
@@ -17,8 +19,10 @@ __all__ = [
     "Base",
     "Deployment",
     "DeploymentEvent",
+    "DeploymentLock",
     "DeploymentRepository",
     "DeploymentStatus",
+    "LockRepository",
     "Resource",
     "ResourceDependency",
     "ResourceRepository",

@@ -13,6 +13,7 @@ from infrafoundry.core.exceptions import (
     ConfigurationError,
     EnvironmentNotFoundError,
     InfraFoundryError,
+    LockAcquisitionError,
 )
 
 from .utils import raise_cli_error
@@ -74,6 +75,15 @@ def with_orchestrator(
             except (EnvironmentNotFoundError, ConfigurationError) as exc:
                 # Configuration errors - show helpful message with error codes
                 raise_cli_error(action, exc)
+            except LockAcquisitionError as exc:
+                # Lock contention - render actionable unlock instructions.
+                msg = (
+                    f"Environment '{exc.environment}' is locked by "
+                    f"{exc.locked_by} since {exc.acquired_at} "
+                    f"(expires {exc.expires_at}). Use 'foundry infra unlock "
+                    f"--env {exc.environment}' to release."
+                )
+                raise click.ClickException(msg) from exc
             except InfraFoundryError as exc:
                 # Other InfraFoundry errors - show with error codes
                 raise_cli_error(action, exc)

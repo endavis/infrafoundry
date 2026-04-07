@@ -157,6 +157,48 @@ class StateInconsistencyError(StateError):
     """State database is inconsistent."""
 
 
+class LockAcquisitionError(InfraFoundryError):
+    """Raised when a deployment lock cannot be acquired.
+
+    Carries metadata about the currently-held lock so callers and CLI
+    error handlers can render actionable messages.
+    """
+
+    def __init__(
+        self,
+        environment: str,
+        locked_by: str,
+        acquired_at: Any,
+        expires_at: Any,
+        message: str | None = None,
+    ) -> None:
+        """Initialize lock acquisition error.
+
+        Args:
+            environment: Environment whose lock could not be acquired.
+            locked_by: Identifier of the lock holder (``user@host:pid``).
+            acquired_at: When the existing lock was acquired (``datetime``).
+            expires_at: When the existing lock expires (``datetime``).
+            message: Optional override message; a default is generated otherwise.
+        """
+        self.environment = environment
+        self.locked_by = locked_by
+        self.acquired_at = acquired_at
+        self.expires_at = expires_at
+        if message is None:
+            message = (
+                f"Environment '{environment}' is locked by {locked_by} "
+                f"since {acquired_at} (expires {expires_at})"
+            )
+        context: dict[str, Any] = {
+            "environment": environment,
+            "locked_by": locked_by,
+            "acquired_at": str(acquired_at),
+            "expires_at": str(expires_at),
+        }
+        super().__init__(message, context)
+
+
 # Resource Filter Errors
 
 
@@ -314,6 +356,7 @@ __all__ = [
     "InfraFoundryError",
     "InvalidConfigurationError",
     "InvalidCredentialError",
+    "LockAcquisitionError",
     "MissingConfigurationError",
     "MissingCredentialError",
     "MissingDependencyError",

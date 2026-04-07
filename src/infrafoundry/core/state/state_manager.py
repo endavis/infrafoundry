@@ -12,9 +12,11 @@ from sqlalchemy.orm import sessionmaker
 
 from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.state.deployment_repository import DeploymentRepository
+from infrafoundry.core.state.lock_repository import LockRepository
 from infrafoundry.core.state.models import (
     Base,
     Deployment,
+    DeploymentLock,
     DeploymentStatus,
     Resource,
     ResourceState,
@@ -50,6 +52,7 @@ class StateManager(BaseManager):
         # Initialize repositories
         self.deployments = DeploymentRepository(self.SessionLocal)
         self.resources = ResourceRepository(self.SessionLocal)
+        self.locks = LockRepository(self.SessionLocal)
         self._log_debug("StateManager initialized successfully")
 
     def initialize(self) -> None:
@@ -289,6 +292,57 @@ class StateManager(BaseManager):
             Resource object or None
         """
         return self.resources.get_by_name(environment, provider, name)
+
+    # Lock operations - delegate to LockRepository
+    def acquire_lock(
+        self,
+        environment: str,
+        ttl_seconds: int,
+        locked_by: str,
+        deployment_id: int | None = None,
+    ) -> DeploymentLock:
+        """Acquire an exclusive deployment lock for ``environment``.
+
+        Args:
+            environment: Environment name.
+            ttl_seconds: Lock TTL in seconds.
+            locked_by: Lock holder identifier (e.g. ``user@host:pid``).
+            deployment_id: Optional deployment ID to associate with the lock.
+
+        Returns:
+            The acquired :class:`DeploymentLock`.
+        """
+        return self.locks.acquire(environment, ttl_seconds, locked_by, deployment_id)
+
+    def release_lock(
+        self,
+        environment: str,
+        locked_by: str | None = None,
+        force: bool = False,
+    ) -> bool:
+        """Release the deployment lock on ``environment``.
+
+        Args:
+            environment: Environment name.
+            locked_by: Optional owner identifier used to guard release.
+            force: If True, release regardless of owner.
+
+        Returns:
+            True if a lock row was removed, False otherwise.
+        """
+        return self.locks.release(environment, locked_by=locked_by, force=force)
+
+    def get_lock(self, environment: str) -> DeploymentLock | None:
+        """Return the current lock row for ``environment`` if any."""
+        return self.locks.get(environment)
+
+    def list_locks(self) -> list[DeploymentLock]:
+        """Return all deployment lock rows."""
+        return self.locks.list_all()
+
+    def cleanup_stale_locks(self) -> int:
+        """Remove all expired locks; return count removed."""
+        return self.locks.cleanup_stale()
 
     def cleanup(self) -> None:
         """Cleanup database resources (required by BaseManager).

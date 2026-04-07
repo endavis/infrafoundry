@@ -241,6 +241,8 @@ class TestApplyWithPackage:
                 parallel=False,
                 max_workers=4,
                 package_filter="my-cluster",
+                lock_timeout=0,
+                lock_ttl=3600,
             )
 
     def test_apply_with_package_shows_package_in_prompt(self, cli_runner, mock_orchestrator):

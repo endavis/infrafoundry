@@ -73,6 +73,11 @@ class EventType(StrEnum):
     HOOK_COMPLETED = "hook_completed"
     HOOK_FAILED = "hook_failed"
 
+    # Lock lifecycle
+    LOCK_ACQUIRED = "lock_acquired"
+    LOCK_RELEASED = "lock_released"
+    LOCK_TIMEOUT = "lock_timeout"
+
 
 class HandlerType(StrEnum):
     """Types of event handlers."""
