@@ -148,3 +148,28 @@ class DeploymentEvent(Base):
 
     # Relationships
     deployment = relationship("Deployment", back_populates="events")
+
+
+class DeploymentLock(Base):
+    """Exclusive per-environment lock for deployment operations.
+
+    A row in this table represents an active lock on a given environment.
+    The unique constraint on ``environment`` provides the atomic primitive
+    that prevents concurrent apply/destroy operations from colliding.
+    Locks carry a ``expires_at`` TTL so stale locks from crashed processes
+    can be taken over automatically.
+    """
+
+    __tablename__ = "deployment_locks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    environment: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
+    locked_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    deployment_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("deployments.id"), nullable=True
+    )
+    extra_data: Mapped[dict[str, Any] | None] = mapped_column(JSON)

@@ -1,6 +1,8 @@
 """Core orchestration for infrastructure deployment."""
 
+import getpass
 import os
+import socket
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +37,7 @@ from infrafoundry.core.provider_registry_service import ProviderRegistryService
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
+from infrafoundry.core.state.lock_context import environment_lock
 
 
 @dataclass(slots=True)
@@ -535,6 +538,8 @@ class Orchestrator:
         parallel: bool = False,
         max_workers: int = 4,
         package_filter: str | None = None,
+        lock_timeout: int = 0,
+        lock_ttl: int = 3600,
     ) -> dict[str, Any]:
         """Apply infrastructure changes.
 
@@ -545,22 +550,37 @@ class Orchestrator:
             parallel: If True, apply resources in parallel where possible
             max_workers: Maximum number of parallel workers (default: 4)
             package_filter: Optional package name to restrict event handlers
+            lock_timeout: Seconds to wait for the environment lock before
+                failing. ``0`` (default) fails fast.
+            lock_ttl: Lock TTL in seconds (default: 1 hour).
 
         Returns:
             Dict with apply results per provider
         """
-        # First, generate the plans
-        self.plan(
-            env_name, dry_run=False, resource_filter=resource_filter, package_filter=package_filter
-        )
-        return self.apply_orchestrator.apply(
-            env_name=env_name,
-            resource_filter=resource_filter,
-            auto_approve=auto_approve,
-            parallel=parallel,
-            max_workers=max_workers,
-            package_filter=package_filter,
-        )
+        locked_by = _build_lock_holder_id()
+        with environment_lock(
+            self.state_manager,
+            env_name,
+            ttl=lock_ttl,
+            locked_by=locked_by,
+            timeout=lock_timeout,
+            event_manager=self.event_manager,
+        ):
+            # First, generate the plans
+            self.plan(
+                env_name,
+                dry_run=False,
+                resource_filter=resource_filter,
+                package_filter=package_filter,
+            )
+            return self.apply_orchestrator.apply(
+                env_name=env_name,
+                resource_filter=resource_filter,
+                auto_approve=auto_approve,
+                parallel=parallel,
+                max_workers=max_workers,
+                package_filter=package_filter,
+            )
 
     def _apply_providers_serial(
         self,
@@ -646,6 +666,8 @@ class Orchestrator:
         resource_filter: list[str] | None = None,
         confirm_callback: Callable[[], bool] | None = None,
         package_filter: str | None = None,
+        lock_timeout: int = 0,
+        lock_ttl: int = 3600,
     ) -> dict[str, Any]:
         """Destroy infrastructure.
 
@@ -655,13 +677,25 @@ class Orchestrator:
             resource_filter: Optional list of resource names to target
             confirm_callback: Optional callback for user confirmation
             package_filter: Optional package name to restrict event handlers
+            lock_timeout: Seconds to wait for the environment lock before
+                failing. ``0`` (default) fails fast.
+            lock_ttl: Lock TTL in seconds (default: 1 hour).
 
         Returns:
             Dict with destroy results per provider
         """
-        return self.destroy_orchestrator.destroy(
-            env_name, resource_filter, auto_approve, confirm_callback, package_filter
-        )
+        locked_by = _build_lock_holder_id()
+        with environment_lock(
+            self.state_manager,
+            env_name,
+            ttl=lock_ttl,
+            locked_by=locked_by,
+            timeout=lock_timeout,
+            event_manager=self.event_manager,
+        ):
+            return self.destroy_orchestrator.destroy(
+                env_name, resource_filter, auto_approve, confirm_callback, package_filter
+            )
 
     def rollback(
         self,
@@ -691,3 +725,16 @@ class Orchestrator:
             env_name: Environment name
         """
         self.status_orchestrator.show(env_name)
+
+
+def _build_lock_holder_id() -> str:
+    """Construct a ``user@host:pid`` identifier for the current process."""
+    try:
+        user = getpass.getuser()
+    except Exception:
+        user = os.environ.get("USER", "unknown")
+    try:
+        host = socket.gethostname()
+    except Exception:
+        host = "unknown"
+    return f"{user}@{host}:{os.getpid()}"

@@ -12,6 +12,7 @@ from .rollback import rollback
 from .security import security
 from .status import status
 from .test import test
+from .unlock import unlock
 
 
 @click.group()
@@ -31,6 +32,7 @@ infra.add_command(security)
 infra.add_command(status)
 infra.add_command(test)
 infra.add_command(history)
+infra.add_command(unlock)
 
 
 __all__ = ["infra"]
