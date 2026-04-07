@@ -1,0 +1,25 @@
+# AIQUM VM — shorthand vms: format (proxmox provider, vm type inferred).
+# Multi-instance safe: outer name is templated.
+vms:
+  - name: "{{ vm_name }}"
+    vmid: {{ vmid }}
+    target_node: "{{ target_node }}"
+    clone: {{ template_vmid }}
+    cores: {{ cores }}
+    memory: {{ memory }}
+    agent: true
+    disk:
+      storage: "{{ disk_storage }}"
+      size: {{ disk_size }}
+    network:
+      - bridge: "{{ bridge }}"
+        tag: {{ vlan_tag }}
+{% if mac_address %}
+        macaddr: "{{ mac_address }}"
+{% endif %}
+    cloud_init_snippets:
+      - users/ansible
+      - network/dhcp
+      - packages/qemu-agent
+    tags: [ontap, aiqum]
+    onboot: true
