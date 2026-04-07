@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775560982728,
+  "lastUpdate": 1775566363485,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4247,6 +4247,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001970628194927461",
             "extra": "mean: 112.12258368301308 usec\nrounds: 2145"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d8e600f2acbb4a1f80a14294b10e893a90edf430",
+          "message": "refactor: convert rocky9-template example to a blueprint (merges PR #509, addresses #503)\n\nExtract the rocky9-template resource definition into a reusable blueprint\nat blueprints/rocky9-template/ and collapse the example-config entry to a\nthin consumer that overrides only vmid, target_node, and storage.\n\nThis eliminates duplication between the example and downstream consumers\nthat re-implemented the same Rocky 9 template logic, and unblocks #502\n(aiqum) and #504 (proxmox-k3s), both of which consume this blueprint as\ntheir base image. The new tests/unit/test_rocky9_blueprint.py\nPackageLoader-based integration test establishes the test pattern that\nthe remaining blueprint conversions (#502, #504, #505, #506) will copy.\n\nThis is the first of five blueprint conversions tracked under #508.\n\nAddresses #503",
+          "timestamp": "2026-04-07T13:52:01+01:00",
+          "tree_id": "11c326eddfe6d10905e6c9eb68cd67c881c33805",
+          "url": "https://github.com/endavis/infrafoundry/commit/d8e600f2acbb4a1f80a14294b10e893a90edf430"
+        },
+        "date": 1775566362372,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7308.352250433004,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000979979868726522",
+            "extra": "mean: 136.82974844853055 usec\nrounds: 2417"
           }
         ]
       }
