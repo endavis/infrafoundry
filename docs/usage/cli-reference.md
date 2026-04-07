@@ -62,7 +62,7 @@ infra destroy --env dev --auto-approve
   - `infra reset --env <env> --provider <provider> --component <component> [--auto-approve]` — completely remove component configuration from provider for clean reapply.
   - **Lock options on apply/destroy:**
     - `--lock-timeout <seconds>` — how long to wait for an existing lock before failing. Default `0` (fail fast).
-    - `--lock-ttl <seconds>` — how long the acquired lock is valid before it is considered stale. Default `3600` (1 hour).
+    - `--lock-ttl <seconds>` — how long the acquired lock is valid before it is considered stale. The lock is auto-extended every `ttl / 3` seconds while the process runs, so this only governs stale-lock recovery after a crash. Default `600` (10 minutes).
 - **Locking**
   - `infra unlock --env <env>` — release an expired lock for the environment (refuses to release active locks).
   - `infra unlock --env <env> --force [--yes]` — force-release an active lock; prompts for confirmation unless `--yes` is supplied.
@@ -196,8 +196,9 @@ infra destroy --env dev --auto-approve
   # Wait up to 5 minutes for an active lock before failing
   infra apply --env prod --lock-timeout 300
 
-  # Use a longer TTL for a slow apply
-  infra apply --env prod --lock-ttl 7200
+  # Use a longer TTL as a safety net (the lock is auto-extended while the
+  # process runs; this only matters for recovering from a crashed holder).
+  infra apply --env prod --lock-ttl 1800
 
   # Inspect current locks
   infra unlock --list

@@ -77,6 +77,7 @@ class EventType(StrEnum):
     LOCK_ACQUIRED = "lock_acquired"
     LOCK_RELEASED = "lock_released"
     LOCK_TIMEOUT = "lock_timeout"
+    LOCK_HEARTBEAT_FAILED = "lock_heartbeat_failed"
 
 
 class HandlerType(StrEnum):

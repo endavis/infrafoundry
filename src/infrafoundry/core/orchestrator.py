@@ -539,7 +539,7 @@ class Orchestrator:
         max_workers: int = 4,
         package_filter: str | None = None,
         lock_timeout: int = 0,
-        lock_ttl: int = 3600,
+        lock_ttl: int = 600,
     ) -> dict[str, Any]:
         """Apply infrastructure changes.
 
@@ -552,7 +552,9 @@ class Orchestrator:
             package_filter: Optional package name to restrict event handlers
             lock_timeout: Seconds to wait for the environment lock before
                 failing. ``0`` (default) fails fast.
-            lock_ttl: Lock TTL in seconds (default: 1 hour).
+            lock_ttl: Lock TTL in seconds (default: 10 minutes). The lock is
+                extended automatically while the process runs, so this only
+                governs stale-lock recovery after a crash.
 
         Returns:
             Dict with apply results per provider
@@ -667,7 +669,7 @@ class Orchestrator:
         confirm_callback: Callable[[], bool] | None = None,
         package_filter: str | None = None,
         lock_timeout: int = 0,
-        lock_ttl: int = 3600,
+        lock_ttl: int = 600,
     ) -> dict[str, Any]:
         """Destroy infrastructure.
 
@@ -679,7 +681,9 @@ class Orchestrator:
             package_filter: Optional package name to restrict event handlers
             lock_timeout: Seconds to wait for the environment lock before
                 failing. ``0`` (default) fails fast.
-            lock_ttl: Lock TTL in seconds (default: 1 hour).
+            lock_ttl: Lock TTL in seconds (default: 10 minutes). The lock is
+                extended automatically while the process runs, so this only
+                governs stale-lock recovery after a crash.
 
         Returns:
             Dict with destroy results per provider

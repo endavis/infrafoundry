@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from infrafoundry.core.events.types import EventType
@@ -108,9 +110,33 @@ def environment_lock(
             },
         )
 
+    # Start the heartbeat thread that periodically extends the lock so a
+    # long-running apply does not self-evict when it exceeds ``ttl``.
+    heartbeat_interval = max(1.0, ttl / 3)
+    stop_event = threading.Event()
+    heartbeat_thread = threading.Thread(
+        target=_heartbeat_loop,
+        args=(
+            stop_event,
+            state_manager,
+            env_name,
+            locked_by,
+            ttl,
+            heartbeat_interval,
+            event_manager,
+        ),
+        daemon=True,
+        name=f"lock-heartbeat-{env_name}",
+    )
+    heartbeat_thread.start()
+
     try:
         yield
     finally:
+        # Signal the heartbeat thread to stop before releasing the lock so a
+        # final in-flight extend cannot race the delete.
+        stop_event.set()
+        heartbeat_thread.join(timeout=heartbeat_interval + 1)
         try:
             state_manager.release_lock(env_name, locked_by=locked_by, force=True)
         except Exception:
@@ -122,6 +148,62 @@ def environment_lock(
                     env_name,
                     {"locked_by": locked_by},
                 )
+
+
+def _heartbeat_loop(
+    stop_event: threading.Event,
+    state_manager: StateManager,
+    env_name: str,
+    locked_by: str,
+    ttl: int,
+    interval: float,
+    event_manager: EventManager | None,
+) -> None:
+    """Periodically extend the environment lock until signaled to stop.
+
+    Runs in a daemon thread. Each iteration waits ``interval`` seconds on
+    ``stop_event`` (which atomically returns True when set). On wakeup it
+    attempts to extend the lock. Any failure is logged and emitted as a
+    ``LOCK_HEARTBEAT_FAILED`` event, but the loop continues — aborting an
+    in-flight apply on a transient DB hiccup is worse than letting it run.
+    The outer ``try/except Exception`` ensures a bug inside this loop can
+    never kill the daemon thread silently.
+    """
+    while True:
+        if stop_event.wait(interval):
+            return
+        try:
+            new_expires_at = datetime.now(UTC) + timedelta(seconds=ttl)
+            extended = state_manager.extend_lock(env_name, locked_by, new_expires_at)
+            if not extended:
+                logger.warning(
+                    "Failed to extend lock on environment '%s' "
+                    "(row missing or owned by another holder); continuing.",
+                    env_name,
+                )
+                if event_manager is not None:
+                    event_manager.emit_event(
+                        EventType.LOCK_HEARTBEAT_FAILED,
+                        env_name,
+                        {
+                            "locked_by": locked_by,
+                            "reason": "extend_returned_false",
+                        },
+                    )
+        except Exception as exc:
+            logger.exception("Heartbeat for environment '%s' raised; continuing.", env_name)
+            if event_manager is not None:
+                try:
+                    event_manager.emit_event(
+                        EventType.LOCK_HEARTBEAT_FAILED,
+                        env_name,
+                        {
+                            "locked_by": locked_by,
+                            "reason": f"exception: {exc}",
+                        },
+                    )
+                except Exception:
+                    logger.exception("Failed to emit LOCK_HEARTBEAT_FAILED for '%s'.", env_name)
 
 
 def _acquire_with_timeout(

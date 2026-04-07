@@ -33,8 +33,12 @@ from ...utils import console
 @click.option(
     "--lock-ttl",
     type=int,
-    default=3600,
-    help="Lock TTL in seconds for stale-lock recovery (default: 3600).",
+    default=600,
+    help=(
+        "Lock TTL in seconds. The lock is auto-extended while the process "
+        "runs; this only governs stale-lock recovery after a crash "
+        "(default: 600)."
+    ),
 )
 @with_orchestrator("Destroy failed")
 def destroy(

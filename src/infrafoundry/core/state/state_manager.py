@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -331,6 +332,26 @@ class StateManager(BaseManager):
             True if a lock row was removed, False otherwise.
         """
         return self.locks.release(environment, locked_by=locked_by, force=force)
+
+    def extend_lock(
+        self,
+        environment: str,
+        locked_by: str,
+        new_expires_at: datetime,
+    ) -> bool:
+        """Extend the expiration of an owned deployment lock.
+
+        Args:
+            environment: Environment name.
+            locked_by: Owner identifier; extension only succeeds when it
+                matches the current holder.
+            new_expires_at: New absolute expiration timestamp.
+
+        Returns:
+            True if the row was updated, False when missing or owned by
+            another holder.
+        """
+        return self.locks.extend(environment, locked_by, new_expires_at)
 
     def get_lock(self, environment: str) -> DeploymentLock | None:
         """Return the current lock row for ``environment`` if any."""

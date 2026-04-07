@@ -133,6 +133,47 @@ class TestLockRepositoryCleanup:
         assert {lock.environment for lock in locks} == {"a", "b"}
 
 
+class TestLockRepositoryExtend:
+    def test_extend_advances_expires_at(self, repo: LockRepository) -> None:
+        lock = repo.acquire("dev", ttl_seconds=60, locked_by="alice@host:1")
+        original_expires = lock.expires_at
+        new_expires = datetime.now(UTC) + timedelta(seconds=600)
+        assert repo.extend("dev", "alice@host:1", new_expires) is True
+
+        current = repo.get("dev")
+        assert current is not None
+        current_expires = current.expires_at
+        if current_expires.tzinfo is None:
+            current_expires = current_expires.replace(tzinfo=UTC)
+        if original_expires.tzinfo is None:
+            original_expires = original_expires.replace(tzinfo=UTC)
+        assert current_expires > original_expires
+
+    def test_extend_wrong_owner_returns_false(self, repo: LockRepository) -> None:
+        repo.acquire("dev", ttl_seconds=60, locked_by="alice@host:1")
+        before = repo.get("dev")
+        assert before is not None
+        new_expires = datetime.now(UTC) + timedelta(seconds=600)
+        assert repo.extend("dev", "bob@host:2", new_expires) is False
+
+        after = repo.get("dev")
+        assert after is not None
+        # Row unchanged: same owner, same expires_at.
+        assert after.locked_by == "alice@host:1"
+        before_expires = before.expires_at
+        after_expires = after.expires_at
+        if before_expires.tzinfo is None:
+            before_expires = before_expires.replace(tzinfo=UTC)
+        if after_expires.tzinfo is None:
+            after_expires = after_expires.replace(tzinfo=UTC)
+        assert before_expires == after_expires
+
+    def test_extend_missing_row_returns_false(self, repo: LockRepository) -> None:
+        new_expires = datetime.now(UTC) + timedelta(seconds=600)
+        assert repo.extend("ghost", "alice@host:1", new_expires) is False
+        assert repo.get("ghost") is None
+
+
 class TestLockRepositoryConcurrency:
     def test_concurrent_acquire_only_one_wins(self, tmp_path: Path) -> None:
         """Two threads racing on the same SQLite file: exactly one wins."""
