@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775559141892,
+  "lastUpdate": 1775560982728,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4216,6 +4216,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010760325555912795",
             "extra": "mean: 137.7252757418402 usec\nrounds: 2292"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3a9afbb8122cf1f1a3b5f04efed48d2cb0b58a8d",
+          "message": "fix: render full timestamps in 'infra unlock --list' (merges PR #501, addresses #500)\n\nThe Acquired and Expires columns previously rendered str(datetime),\nwhich produces ~32-character strings ending in microseconds and a\ntimezone offset. Rich's auto-sized columns squeezed those down to\njust the date — defeating the diagnostic purpose of --list, which\nexists to watch the heartbeat advance expires_at over time.\n\nFormat the columns as 'YYYY-MM-DD HH:MM:SS UTC' (~23 chars) so the\nfull timestamp survives column auto-sizing in any terminal wide\nenough for the rest of the table.\n\nAddresses #500",
+          "timestamp": "2026-04-07T12:22:30+01:00",
+          "tree_id": "2660218c2737082507ee5be4c40575ad4cf68824",
+          "url": "https://github.com/endavis/infrafoundry/commit/3a9afbb8122cf1f1a3b5f04efed48d2cb0b58a8d"
+        },
+        "date": 1775560982315,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8918.809816469678,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001970628194927461",
+            "extra": "mean: 112.12258368301308 usec\nrounds: 2145"
           }
         ]
       }
