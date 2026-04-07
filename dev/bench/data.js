@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775576905737,
+  "lastUpdate": 1775584428737,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4309,6 +4309,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000949142077707954",
             "extra": "mean: 135.9787777776746 usec\nrounds: 2412"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d606f023112e1f507a8794d2333a3af1e27cd670",
+          "message": "refactor: convert aiqum example to a blueprint (merges PR #513, addresses #502)\n\nEliminate duplicated VM, DHCP, and post-provisioning logic by\nextracting the AIQUM example into a reusable blueprint at\nblueprints/aiqum/. The example config now consumes the blueprint\nvia a thin instantiation.\n\nSecond of five blueprint conversions tracked under #508\n(rocky9-template was first via PR #509 + #512).\n\nApply the format split learned from #511: shorthand `vms:` for the\nproxmox VM (templated name for multi-instance) and the generic\n`resources:` format for the opnsense kea_reservation, since\nshorthand is single-provider and cannot express cross-provider\nDHCP. A multi-instance regression test guards against the\n#511-style templated-name collapse bug.\n\nMove the on_create handler from the per-resource VM to top-level\nblueprint events because the shorthand format does not extract\nper-resource events during expansion. Drop dead `gateway` and\n`dns_server` variables that were never consumed. Promote previously\nhardcoded `vlan_tag` and `bridge` values to overridable blueprint\ndefaults.\n\nAddresses #502",
+          "timestamp": "2026-04-07T18:53:04+01:00",
+          "tree_id": "c11cb7e74f1b35c6828e4710ef551d149c7e1b48",
+          "url": "https://github.com/endavis/infrafoundry/commit/d606f023112e1f507a8794d2333a3af1e27cd670"
+        },
+        "date": 1775584427696,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7044.771383645811,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001952466855874089",
+            "extra": "mean: 141.9492479658694 usec\nrounds: 2335"
           }
         ]
       }
