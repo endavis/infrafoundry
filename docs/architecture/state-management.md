@@ -274,14 +274,40 @@ Key behavior:
 - **Fail fast by default.** `foundry infra apply --env prod` rejects
   immediately if another run holds the lock. Pass `--lock-timeout <seconds>`
   to wait instead.
-- **TTL-based stale recovery.** Locks carry an `expires_at` (default 1 hour,
-  tunable via `--lock-ttl <seconds>`). A crashed run stops blocking new runs
-  once its lock expires.
+- **TTL-based stale recovery.** Locks carry an `expires_at` (default 10
+  minutes, tunable via `--lock-ttl <seconds>`). A crashed run stops blocking
+  new runs once its lock expires. Live runs are kept alive past the TTL by
+  the heartbeat (see below).
 - **Holder identity.** Each lock records `user@host:pid` in `locked_by` and a
   timestamp in `acquired_at`.
-- **Event emission.** `LOCK_ACQUIRED`, `LOCK_RELEASED`, and `LOCK_TIMEOUT`
-  events flow through the existing `EventManager` for auditing and
-  notifications.
+- **Event emission.** `LOCK_ACQUIRED`, `LOCK_RELEASED`, `LOCK_TIMEOUT`, and
+  `LOCK_HEARTBEAT_FAILED` events flow through the existing `EventManager` for
+  auditing and notifications.
+
+##### Heartbeat
+
+While `apply` or `destroy` is running, a background daemon thread
+auto-extends the lock every `ttl / 3` seconds. With the default TTL of 600 s
+the heartbeat fires every ~200 s, giving three chances to refresh before
+expiry. This decouples "how long can an apply run" from "how long is a
+crashed holder considered dead":
+
+- Long applies (hours) keep their lock indefinitely while the process is
+  alive — there is no need to guess a TTL upfront.
+- Crashed holders free the lock within the TTL window instead of within an
+  hour, so the next run recovers quickly.
+
+If the heartbeat cannot extend the lock (DB hiccup, row taken over after a
+previous expiry, etc.), it logs the failure and emits a
+`LOCK_HEARTBEAT_FAILED` event, then **continues looping**. The in-flight
+apply is deliberately **not** aborted — aborting on a transient DB failure
+is strictly worse than letting the apply finish under a still-ticking TTL.
+
+If you see `LOCK_HEARTBEAT_FAILED` events in your logs, investigate the
+state DB connectivity. The apply itself is unaffected as long as it finishes
+before the TTL elapses; if it does not, another process may take over the
+stale row. There is no knob to disable or reconfigure the heartbeat — the
+interval is always `ttl / 3`.
 
 Managing locks from the CLI:
 

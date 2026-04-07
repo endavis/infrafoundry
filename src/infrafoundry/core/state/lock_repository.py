@@ -162,6 +162,44 @@ class LockRepository:
             session.commit()
             return True
 
+    def extend(
+        self,
+        environment: str,
+        locked_by: str,
+        new_expires_at: datetime,
+    ) -> bool:
+        """Extend the expiration of an owned lock.
+
+        Args:
+            environment: Environment name whose lock should be extended.
+            locked_by: Owner identifier; the row is only updated when this
+                matches the current ``locked_by`` value.
+            new_expires_at: New absolute expiration timestamp.
+
+        Returns:
+            ``True`` if the row was updated. ``False`` if the row is missing
+            or owned by a different holder (e.g. it was taken over after
+            expiry by another process). Caller is responsible for deciding
+            what to do with a ``False`` return — typically: log, emit a
+            ``LOCK_HEARTBEAT_FAILED`` event, and continue. No exception path
+            is taken for "wrong owner" — heartbeat must not raise into the
+            caller's apply loop.
+        """
+        with self.SessionLocal() as session:
+            lock = (
+                session.query(DeploymentLock)
+                .filter(DeploymentLock.environment == environment)
+                .one_or_none()
+            )
+            if lock is None:
+                return False
+            if lock.locked_by != locked_by:
+                # Wrong owner: silent refusal, caller handles via return value.
+                return False
+            lock.expires_at = new_expires_at
+            session.commit()
+            return True
+
     def get(self, environment: str) -> DeploymentLock | None:
         """Return the current lock row for ``environment``, if any.
 
