@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775494451118,
+  "lastUpdate": 1775551964238,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4154,6 +4154,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000890720518557519",
             "extra": "mean: 134.8557249378523 usec\nrounds: 2414"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "19c67f8bb280f4d01dbd98556f0c18db41efc95f",
+          "message": "feat: add per-environment state locking for apply and destroy (merges PR #497, addresses #246)\n\nConcurrent runs of `foundry infra apply` / `foundry infra destroy` against\nthe same environment could previously corrupt the InfraFoundry state DB,\nduplicate resource tracking rows, and race on runner execution. Terraform\nbackend locks only protect the .tfstate file; InfraFoundry's own state\nsits outside that lock and needed its own coordination primitive.\n\nIntroduce a `deployment_locks` table with a unique constraint on\n`environment` and wrap Orchestrator.apply/destroy in an `environment_lock`\ncontext manager. The unique constraint is the atomic primitive, so the\nsame mechanism works on SQLite and PostgreSQL with no backend-specific\ncode. Acquisition fails fast by default (`--lock-timeout 0`), with opt-in\nblocking via `--lock-timeout <seconds>` and a configurable `--lock-ttl`\nfor stale-lock recovery. `plan` is intentionally left unlocked so CI\npreview jobs keep running alongside an active apply. All transitions\nemit LOCK_ACQUIRED / LOCK_RELEASED / LOCK_TIMEOUT events through the\nexisting EventManager.\n\nAdds a `foundry infra unlock` command (`--env`, `--force`, `--yes`,\n`--list`) for operator visibility and recovery, an `INFRAFOUNDRY_SKIP_LOCK`\nemergency escape hatch, ADR-0002 documenting the design, and 29 new\nunit tests covering the repository, context manager, CLI, and\norchestrator integration.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-07T09:52:10+01:00",
+          "tree_id": "1b6dafda9d957fda087ff602de835b91cbdff92f",
+          "url": "https://github.com/endavis/infrafoundry/commit/19c67f8bb280f4d01dbd98556f0c18db41efc95f"
+        },
+        "date": 1775551963867,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6784.6149768825635,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022733180194095485",
+            "extra": "mean: 147.3922991072201 usec\nrounds: 2240"
           }
         ]
       }
