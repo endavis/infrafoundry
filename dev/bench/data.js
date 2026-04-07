@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775566363485,
+  "lastUpdate": 1775576905737,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4278,6 +4278,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000979979868726522",
             "extra": "mean: 136.82974844853055 usec\nrounds: 2417"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fea50bd61fb62ffe30f02c6579c3ccd9a2f6bd24",
+          "message": "fix: rocky9-template blueprint must use shorthand format for multi-instance (merges PR #512, addresses #503, #511)\n\nPR #509 used the generic resource format with a hardcoded outer `name`,\nwhich made multi-instance use of the blueprint impossible — two packages\ninstantiating it produced two resources with the same framework\nidentifier, and the framework correctly rejected them with a duplicate-\nname error.\n\nSwitch to the provider-centric shorthand format already used by\nblueprints/ontap-cluster/vm.yaml: rename vm.yaml → template.yaml so the\nfilename-derived resource type matches the proxmox `template` type, and\ntemplate the `name:` field per-instance from `template_name`. Add a\nmulti-instance regression test that creates two synthetic packages and\nverifies they coexist without collision.\n\nValidated live against the prod rocky9-template on Proxmox: re-apply\nthrough the new format produces a working template VM end-to-end.\n\nAddresses #511",
+          "timestamp": "2026-04-07T16:47:49+01:00",
+          "tree_id": "78f5168011d310546462d43a2014cc34d84f051d",
+          "url": "https://github.com/endavis/infrafoundry/commit/fea50bd61fb62ffe30f02c6579c3ccd9a2f6bd24"
+        },
+        "date": 1775576905194,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7354.088750782866,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000949142077707954",
+            "extra": "mean: 135.9787777776746 usec\nrounds: 2412"
           }
         ]
       }
