@@ -12,6 +12,7 @@ The test depends only on files checked into this repository:
 It does NOT depend on the private endavis-infra/ config repo.
 """
 
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -94,3 +95,68 @@ def test_rocky9_example_resource_config_merges_defaults_and_overrides(
     assert config["tags"] == ["template", "rocky9"]
     assert config["download_image"]["filename"] == "Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
     assert "rockylinux.org" in config["download_image"]["url"]
+
+
+def test_rocky9_blueprint_supports_multiple_instances(tmp_path: Path) -> None:
+    """Two packages instantiating the same blueprint must produce distinct
+    resources without colliding on the framework resource identifier.
+
+    Regression guard for issue #511: the original PR #509 hardcoded the
+    outer resource ``name`` instead of using the provider-centric shorthand
+    format, which made multi-instance use impossible.
+    """
+    envs = tmp_path / "envs"
+    pkg_a = envs / "test" / "proxmox" / "rocky9-a"
+    pkg_b = envs / "test" / "proxmox" / "rocky9-b"
+    pkg_a.mkdir(parents=True)
+    pkg_b.mkdir(parents=True)
+
+    (pkg_a / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: rocky9-a
+            description: "Rocky 9 template instance A"
+            blueprint: rocky9-template
+            variables:
+              template_name: rocky9-a
+              vmid: 910
+              target_node: pve1
+              storage: local-lvm
+            """
+        )
+    )
+    (pkg_b / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: rocky9-b
+            description: "Rocky 9 template instance B"
+            blueprint: rocky9-template
+            variables:
+              template_name: rocky9-b
+              vmid: 911
+              target_node: pve2
+              storage: local-lvm
+            """
+        )
+    )
+
+    resolver = BlueprintResolver(envs)
+    loader = PackageLoader(envs, blueprint_resolver=resolver)
+
+    resources_a, _, _ = loader.load_package(pkg_a, provider="proxmox", env_name="test")
+    resources_b, _, _ = loader.load_package(pkg_b, provider="proxmox", env_name="test")
+
+    assert len(resources_a) == 1
+    assert len(resources_b) == 1
+
+    # Framework identifiers must come from the per-instance template_name
+    # so the two packages produce distinct resources.
+    assert resources_a[0].name == "rocky9-a"
+    assert resources_b[0].name == "rocky9-b"
+    assert resources_a[0].name != resources_b[0].name
+
+    # Per-instance config values flow through too.
+    assert resources_a[0].config["vmid"] == 910
+    assert resources_b[0].config["vmid"] == 911
+    assert resources_a[0].config["target_node"] == "pve1"
+    assert resources_b[0].config["target_node"] == "pve2"

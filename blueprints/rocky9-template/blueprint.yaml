@@ -16,4 +16,4 @@ defaults:
   template_name: rocky9-template
 
 resources:
-  - vm.yaml
+  - template.yaml
