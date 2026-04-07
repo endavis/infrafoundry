@@ -1,0 +1,39 @@
+name: aiqum
+description: "NetApp Active IQ Unified Manager on Rocky 9 (Proxmox VM)"
+version: "1.0.0"
+
+defaults:
+  # --- VM hardware ---
+  template_vmid: 901          # Standard rocky9-template vmid
+  cores: 4
+  memory: 12288               # AIQUM minimum recommendation (12 GiB)
+  disk_size: 150              # AIQUM minimum (~100 GB+)
+
+  # --- Network ---
+  bridge: vmbr0
+  vlan_tag: 10
+  mac_address: ""             # Empty: Proxmox auto-assigns
+
+  # --- AIQUM ---
+  aiqum_admin_user: umadmin
+
+  # --- SMTP ---
+  smtp_port: 587
+
+  # --- ONTAP integration ---
+  ontap_admin_user: admin
+
+resources:
+  - vm.yaml
+  - dhcp.yaml
+
+events:
+  on_create:
+    - type: script
+      name: aiqum-setup
+      script: scripts/aiqum-post-terraform.sh
+      description: "Install AIQUM, complete first-experience wizard, add ONTAP cluster"
+      timeout: 1800
+      continue_on_error: false
+      requires:
+        - "{{ vm_name }}"
