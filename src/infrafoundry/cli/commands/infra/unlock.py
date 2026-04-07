@@ -43,6 +43,9 @@ def unlock(
         table.add_column("Status", style="magenta")
         now = datetime.now(UTC)
         for lock in locks:
+            acquired = lock.acquired_at
+            if acquired.tzinfo is None:
+                acquired = acquired.replace(tzinfo=UTC)
             expires = lock.expires_at
             if expires.tzinfo is None:
                 expires = expires.replace(tzinfo=UTC)
@@ -50,8 +53,8 @@ def unlock(
             table.add_row(
                 lock.environment,
                 lock.locked_by,
-                str(lock.acquired_at),
-                str(lock.expires_at),
+                acquired.strftime("%Y-%m-%d %H:%M:%S %Z"),
+                expires.strftime("%Y-%m-%d %H:%M:%S %Z"),
                 status,
             )
         console.print(table)

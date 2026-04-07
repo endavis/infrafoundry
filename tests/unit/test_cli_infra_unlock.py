@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
@@ -79,13 +80,19 @@ def test_unlock_list_shows_all_locks(cli_runner, mock_orchestrator):
     ]
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
-        result = cli_runner.invoke(main, ["infra", "unlock", "--list"])
+        # Wider terminal so rich does not squeeze the auto-sized columns and we
+        # can assert on the full rendered output.
+        result = cli_runner.invoke(main, ["infra", "unlock", "--list"], env={"COLUMNS": "200"})
 
     assert result.exit_code == 0, result.output
     assert "dev" in result.output
     assert "prod" in result.output
     assert "active" in result.output
     assert "expired" in result.output
+    # Timestamps must render with full HH:MM:SS UTC, not be truncated to a date.
+    # The pattern is enforced so a regression to bare str(datetime) (which gets
+    # truncated by rich's column auto-sizing) is caught.
+    assert re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC", result.output)
 
 
 def test_unlock_nonexistent_env_reports_no_lock(cli_runner, mock_orchestrator):
