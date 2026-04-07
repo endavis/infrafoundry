@@ -6,19 +6,19 @@ resources:
       name: "{{ template_name }}"
       vmid: {{ vmid }}
       target_node: "{{ target_node }}"
-      cores: 2
-      memory: 2048
+      cores: {{ cores }}
+      memory: {{ memory }}
       agent: true
       cloud_init: true
       cloud_init_datastore: "{{ storage }}"
-      ciuser: rocky
+      ciuser: "{{ ciuser }}"
       disk:
         storage: "{{ storage }}"
-        size: 32
+        size: {{ disk_size }}
       network:
-        bridge: vmbr0
+        bridge: "{{ bridge }}"
       download_image:
-        url: "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
-        filename: "Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+        url: "{{ image_url }}"
+        filename: "{{ image_filename }}"
       tags: ["template", "rocky9"]
       description: "Rocky Linux 9 cloud image template"

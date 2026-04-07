@@ -1,0 +1,19 @@
+name: rocky9-template
+description: "Rocky Linux 9 GenericCloud Proxmox VM template"
+version: "1.0.0"
+
+defaults:
+  # --- Recipe constants (rarely overridden) ---
+  image_url: "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+  image_filename: "Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+  ciuser: rocky
+  cores: 2
+  memory: 2048
+  disk_size: 32
+  bridge: vmbr0
+
+  # --- Per-instance overrides (typical) ---
+  template_name: rocky9-template
+
+resources:
+  - vm.yaml

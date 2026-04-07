@@ -1,8 +1,12 @@
-# Rocky Linux 9 Cloud Image Template
+# Rocky Linux 9 Cloud Image Template (Example)
 
-Creates a Proxmox VM template from the Rocky Linux 9 GenericCloud qcow2 image.
-VMs cloned from this template support cloud-init for automated user, network,
-and package configuration.
+Example package that consumes the `rocky9-template` blueprint to build a
+Proxmox VM template from the Rocky Linux 9 GenericCloud qcow2 image.
+
+The implementation (resource definitions, defaults, image URL, cloud-init
+wiring) lives in the blueprint at `blueprints/rocky9-template/`. See
+[`blueprints/rocky9-template/README.md`](../../../../../blueprints/rocky9-template/README.md)
+for the full variable reference and details about what gets deployed.
 
 ## Quick Start
 
@@ -14,72 +18,29 @@ infra apply --env dev --package rocky9-template
 infra destroy --env dev --package rocky9-template
 ```
 
-## What It Does
+## What This Example Sets
 
-1. **Downloads** the Rocky 9 GenericCloud qcow2 image to Proxmox storage
-2. **Creates** a VM template with:
-   - `virtio-scsi-pci` disk controller (scsi0)
-   - Cloud-init drive for user/network injection
-   - Default user `rocky` with cloud-init
-   - DHCP networking via cloud-init
-   - qemu-guest-agent enabled
+This example overrides only the three per-instance values the blueprint
+requires. Everything else (cores, memory, disk size, image URL, etc.) is
+inherited from the blueprint defaults.
 
-## Configuration
+| Variable | Value |
+|---|---|
+| `vmid` | `901` |
+| `target_node` | `pve1` |
+| `storage` | `local-lvm` |
 
-Edit `infrafoundry.yml`:
-
-| Variable | Description | Default |
-|---|---|---|
-| `template_name` | Template VM name | `rocky9-template` |
-| `vmid` | Proxmox VM ID | `901` |
-| `target_node` | Proxmox host to create on | `pve1` |
-| `storage` | Proxmox storage for disk | `local-lvm` |
+To customise any other field (e.g. `cores`, `memory`, `disk_size`, `bridge`),
+add it under `variables:` in `infrafoundry.yml`. The full list of overridable
+fields is documented in the blueprint README.
 
 ## Package Structure
 
 ```
 rocky9-template/
-  infrafoundry.yml    # Config — edit this
-  resources.yaml      # Template resource definition
+  infrafoundry.yml    # Thin blueprint instantiation — edit this
   README.md           # This file
 ```
 
-## Cloning VMs from This Template
-
-Other packages clone from this template by referencing its VM ID:
-
-```yaml
-# In a VM package's resource file
-config:
-  clone: 901              # Template VM ID
-  disk:
-    storage: local-lvm
-    size: 50              # Resizes the cloned disk
-  cloud_init_snippets:    # Inject cloud-init config
-    - users/ansible
-    - network/dhcp
-    - packages/qemu-agent
-```
-
-## Cloud-Init Snippets
-
-VMs cloned from this template can use cloud-init snippets stored at
-`envs/{env}/files/cloud-init-snippets/`. Example snippets:
-
-- `users/ansible` — Create ansible user with SSH key and sudo
-- `network/dhcp` — Configure DHCP networking via netplan
-- `packages/qemu-agent` — Install and enable qemu-guest-agent
-
-Snippet names in configs should **not** include the `.yaml` extension —
-the framework appends it automatically.
-
-## Notes
-
-- The template is created with `lifecycle { prevent_destroy = true }` to
-  avoid accidental deletion
-- The downloaded cloud image is cached on Proxmox storage — subsequent
-  applies don't re-download
-- Rocky 9 requires `cpu_type: host` (not `kvm64`) — this is the default
-  for VMs cloned from any template
-- Disk size in the template (32G) is a base size — cloned VMs can resize
-  larger via their `disk.size` config
+The resource definitions live in `blueprints/rocky9-template/vm.yaml`, not
+in this directory.
