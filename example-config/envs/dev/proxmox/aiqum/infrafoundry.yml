@@ -1,51 +1,41 @@
-# AIQUM (Active IQ Unified Manager) on Rocky 9
+# AIQUM (Active IQ Unified Manager) — example consumer of the aiqum blueprint.
 #
-# Deploys a Rocky 9 VM from template, installs AIQUM RPM,
-# configures admin credentials, and adds the ONTAP cluster.
+# All deployment logic (VM definition, DHCP reservation, install scripts,
+# event handlers) lives in blueprints/aiqum/. This file only supplies the
+# per-instance values.
 #
-# Run: infra apply --env dev --package aiqum
+# See blueprints/aiqum/README.md for the full variable reference.
+#
+# Run: foundry infra apply --env dev --package aiqum
 
 name: aiqum
-description: "NetApp Active IQ Unified Manager on Rocky 9"
+description: "NetApp Active IQ Unified Manager (example)"
+blueprint: aiqum
 
 variables:
-  # --- VM Configuration ---
+  # --- VM placement ---
   vm_name: aiqum
   vmid: 222
   target_node: pve1
-  template_vmid: 901           # Rocky 9 cloud-init template
-  cores: 4
-  memory: 12288                # 12GB — AIQUM minimum recommendation
-  disk_size: 150               # GB — AIQUM requires ~100GB+
   disk_storage: local-lvm
 
   # --- Network ---
-  mac_address: ""              # Leave empty to let Proxmox assign
   ip_address: "192.168.1.50"
-  gateway: "192.168.1.1"
-  dns_server: "192.168.1.1"
   dhcp_subnet: my-subnet
 
   # --- AIQUM ---
-  aiqum_admin_user: umadmin
   aiqum_admin_password: "CHANGE_ME"
   aiqum_admin_email: "admin@example.com"
   aiqum_url_base: "http://your-web-server/applications/aiqum"
 
-  # --- SSH Jumphost (for remote VM access during setup) ---
+  # --- SSH jumphost (for remote VM access during install) ---
   jumphost: "ansible@ansible.example.com"
 
-  # --- SMTP ---
+  # --- SMTP (notifications) ---
   smtp_server: "smtp.example.com"
-  smtp_port: 587
   smtp_user: "aiqum"
   smtp_password: "CHANGE_ME"
 
-  # --- ONTAP Cluster ---
+  # --- ONTAP cluster ---
   ontap_cluster_ip: "192.168.1.220"
-  ontap_admin_user: admin
   ontap_admin_password: "CHANGE_ME"
-
-resources:
-  - vm.yaml
-  - dhcp.yaml
