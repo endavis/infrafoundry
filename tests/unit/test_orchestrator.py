@@ -599,6 +599,34 @@ class TestOrchestratorLocking:
         assert captured["lock"] is not None
         assert orchestrator.state_manager.get_lock("dev") is None
 
+    def test_apply_default_ttl_is_600(self, tmp_path):
+        from datetime import UTC
+
+        orchestrator = self._make_orchestrator(tmp_path)
+
+        captured: dict = {}
+
+        def record_apply(**kwargs):
+            captured["lock"] = orchestrator.state_manager.get_lock("dev")
+            return {}
+
+        orchestrator.apply_orchestrator.apply.side_effect = record_apply
+
+        orchestrator.apply("dev", auto_approve=True)
+
+        lock = captured["lock"]
+        assert lock is not None
+        acquired = lock.acquired_at
+        expires = lock.expires_at
+        if acquired.tzinfo is None:
+            acquired = acquired.replace(tzinfo=UTC)
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        delta = (expires - acquired).total_seconds()
+        # Default TTL is 600s; allow a small tolerance for heartbeat
+        # extensions that might have fired before we captured the row.
+        assert 590 <= delta <= 1200
+
     def test_plan_does_not_acquire_lock(self, tmp_path):
         orchestrator = self._make_orchestrator(tmp_path)
         # Pre-seed an active lock; plan should still proceed.

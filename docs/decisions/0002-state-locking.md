@@ -28,7 +28,9 @@ Introduce a `deployment_locks` table with a unique index on `environment`. Wrap 
 3. On contention, immediately raises `LockAcquisitionError` (default `--lock-timeout 0`). Operators can opt into blocking waits with `--lock-timeout <seconds>`.
 4. Recovers automatically from expired locks: the next acquirer updates the row in place rather than refusing.
 5. Always releases in `finally`, even on exception.
-6. Emits `LOCK_ACQUIRED` / `LOCK_RELEASED` / `LOCK_TIMEOUT` events through the existing `EventManager`.
+6. Emits `LOCK_ACQUIRED` / `LOCK_RELEASED` / `LOCK_TIMEOUT` / `LOCK_HEARTBEAT_FAILED` events through the existing `EventManager`.
+
+A background heartbeat thread started by `environment_lock` auto-extends the lock every `ttl/3` seconds while the holding process is alive, so a long-running apply never self-evicts. Because the heartbeat decouples "how long can an apply run" from "how long must we wait before considering a crashed holder dead", the default TTL was lowered from 1 hour to **10 minutes** (600 s). Heartbeat failures (DB hiccup, row taken over after a prior expiry) are logged and emitted as `LOCK_HEARTBEAT_FAILED` but do **not** abort the in-flight apply — aborting on a transient failure is worse than continuing under a ticking TTL.
 
 Management surface:
 - `foundry infra unlock --env <name>` refuses active locks, releases expired ones.
@@ -52,14 +54,17 @@ Schema change is delivered through `Base.metadata.create_all()` - the existing i
 
 **Negative / trade-offs**
 
-- TTL-based recovery introduces a time window where a truly alive but slow process may have its lock taken over. The default TTL (1 hour) is conservative for realistic apply durations, but operations running longer than the TTL need to supply `--lock-ttl`.
+- TTL-based recovery introduces a time window where a truly alive but slow process may have its lock taken over. With the heartbeat in place the default TTL is 10 minutes — small enough for fast crash recovery, and the heartbeat keeps live applies from self-evicting. Operators can still raise `--lock-ttl` if their environment has sustained DB connectivity issues that block heartbeats.
 - The lock is advisory from Terraform's perspective - if someone runs `terraform apply` directly against the same generated files while a foundry apply holds the lock, the direct invocation is not blocked. See feedback `feedback_use_infra_not_terraform.md` for the mitigating user contract.
 - Requires manual intervention (`unlock --force`) when a process dies holding a lock and TTL has not yet expired.
 - `INFRAFOUNDRY_SKIP_LOCK` exists and can be abused; this is an accepted trade-off for emergencies.
 
+**Follow-ups (resolved)**
+
+- Lock heartbeat / TTL extension during long applies — delivered in #498. See the "Decision" section above and `docs/architecture/state-management.md` (section "Heartbeat").
+
 **Out of scope (follow-ups)**
 
-- Lock heartbeat / TTL extension during long applies.
 - Distributed coordination backends (Redis, etcd).
 - Locking `plan`.
 - Alembic migrations (tracked separately under #196).
