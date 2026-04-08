@@ -1,0 +1,28 @@
+# k3s cluster DHCP reservations — opnsense in a proxmox-providered package
+# directory. Uses the generic resources: format because the resource provider
+# differs from the package directory provider. Outer names are templated for
+# multi-instance safety. Agents are produced by a Jinja loop over the agents:
+# list (see blueprint README for the dict schema).
+resources:
+  # --- Server node ---
+  - provider: opnsense
+    type: kea_reservation
+    name: "{{ server_name }}-dhcp"
+    config:
+      subnet_ref: "{{ dhcp_subnet }}"
+      hw_address: "{{ server_mac | lower }}"
+      ip_address: "{{ server_ip }}"
+      hostname: "{{ server_name }}"
+      description: "k3s server (control plane)"
+
+{% for agent in agents %}
+  - provider: opnsense
+    type: kea_reservation
+    name: "{{ agent.name }}-dhcp"
+    config:
+      subnet_ref: "{{ dhcp_subnet }}"
+      hw_address: "{{ agent.mac | lower }}"
+      ip_address: "{{ agent.ip }}"
+      hostname: "{{ agent.name }}"
+      description: "k3s agent node"
+{% endfor %}
