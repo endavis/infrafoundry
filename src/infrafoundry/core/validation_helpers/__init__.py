@@ -27,6 +27,9 @@ from infrafoundry.core.validation_helpers.connectivity_validator import Connecti
 from infrafoundry.core.validation_helpers.credential_validator import CredentialValidator
 from infrafoundry.core.validation_helpers.report_helper import ValidationReportHelper
 from infrafoundry.core.validation_helpers.resource_validator import ResourceValidator
+from infrafoundry.core.validation_helpers.terraform_secrets_validator import (
+    validate_terraform_secrets_references,
+)
 
 __all__ = [
     "BaseAPIValidator",
@@ -35,4 +38,5 @@ __all__ = [
     "CredentialValidator",
     "ResourceValidator",
     "ValidationReportHelper",
+    "validate_terraform_secrets_references",
 ]

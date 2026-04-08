@@ -17,6 +17,10 @@ from infrafoundry.core.config.sops import load_yaml_with_sops
 from infrafoundry.core.exceptions import InvalidConfigurationError, PackageNotFoundError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.secrets.provider import SecretProvider
+from infrafoundry.core.secrets.secret_manager import (
+    DEFAULT_SECRETS_FILENAME,
+    SecretManager,
+)
 
 
 class ConfigManager(PathBasedManager):
@@ -59,6 +63,9 @@ class ConfigManager(PathBasedManager):
 
         self.base_dir: Path = base_dir  # Type assertion - base_dir is always Path here
         self._log_debug(f"Initialized ConfigManager with base_dir: {self.base_dir}")
+
+        # Stash the secret provider for use when populating env_config.secrets
+        self._secret_provider = secret_provider
 
         # Initialize blueprint resolver and loaders
         self._blueprint_resolver = BlueprintResolver(base_dir)
@@ -108,8 +115,37 @@ class ConfigManager(PathBasedManager):
             except ValueError:
                 self._log_warning(f"Invalid INFRAFOUNDRY_IAC_TOOL value '{iac_tool_env}', ignoring")
 
+        env_config = EnvironmentConfig(**data)
+
+        # Populate decrypted secrets onto env_config (if a secrets file
+        # exists for this env). This is what enables resource-level
+        # ``terraform_secrets:`` references to resolve at apply time.
+        self._populate_secrets(env_name, env_config)
+
         self._log_debug(f"Loaded environment config: {env_name}")
-        return EnvironmentConfig(**data)
+        return env_config
+
+    def _populate_secrets(self, env_name: str, env_config: EnvironmentConfig) -> None:
+        """Decrypt the env's secrets file (if any) and attach to env_config.
+
+        Defensive wrapper around ``SecretManager.populate_environment_config``.
+        Skipped silently if no secrets file is present. Errors during
+        decryption propagate so callers see the failure.
+
+        Args:
+            env_name: Environment name.
+            env_config: EnvironmentConfig to populate in place.
+        """
+        secrets_file = self.base_dir / env_name / DEFAULT_SECRETS_FILENAME
+        if not secrets_file.exists():
+            return
+
+        secret_manager = SecretManager(
+            env_name=env_name,
+            secrets_dir=self.base_dir / env_name,
+            provider=self._secret_provider,
+        )
+        secret_manager.populate_environment_config(env_config)
 
     @staticmethod
     def _load_yaml_with_sops(file_path: Path) -> dict[str, Any]:

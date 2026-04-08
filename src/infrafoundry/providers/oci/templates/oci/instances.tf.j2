@@ -1,5 +1,54 @@
 # OCI Compute Instances
 
+{# Tailscale cloud-init modules — one per instance with a tailscale: block. #}
+{# Issue #212 phase 2: replaces the custom cloud_init_snippets path. #}
+{% for instance in instances %}
+{% if instance.config.get('tailscale_module_config') %}
+{% set ts = instance.config.tailscale_module_config %}
+module "{{ ts.module_name }}" {
+  source  = "{{ ts.source }}"
+  version = "{{ ts.version }}"
+
+  hostname      = "{{ ts.hostname }}"
+  enable_ssh    = {{ ts.enable_ssh | lower }}
+  accept_dns    = {{ ts.accept_dns | lower }}
+  accept_routes = {{ ts.accept_routes | lower }}
+  base64_encode = {{ ts.base64_encode | lower }}
+  track         = "{{ ts.track }}"
+  {% if ts.advertise_tags %}
+  advertise_tags = {{ ts.advertise_tags | tojson }}
+  {% endif %}
+  {% if ts.advertise_routes %}
+  advertise_routes = {{ ts.advertise_routes | tojson }}
+  {% endif %}
+
+  {% if ts.auth_mode == 'auth_key' %}
+  auth_key = var.{{ ts.auth_key_var }}
+  {% else %}
+  client_id     = var.{{ ts.oauth_client_id_var }}
+  client_secret = var.{{ ts.oauth_client_secret_var }}
+  {% endif %}
+
+  {% if ts.additional_parts %}
+  additional_parts = [
+    {% for part in ts.additional_parts %}
+    {
+      {% if part.get('filename') %}filename     = "{{ part.filename }}"
+      {% endif %}{% if part.get('content_type') %}content_type = "{{ part.content_type }}"
+      {% endif %}content      = <<-TSEOT
+{{ part.content }}
+TSEOT
+      {% if part.get('merge_type') %}
+      merge_type   = "{{ part.merge_type }}"
+      {% endif %}
+    },
+    {% endfor %}
+  ]
+  {% endif %}
+}
+
+{% endif %}
+{% endfor %}
 {% for instance in instances %}
 resource "oci_core_instance" "{{ instance.name | to_terraform_name }}" {
   compartment_id      = var.oci_compartment_ocid
@@ -36,7 +85,9 @@ resource "oci_core_instance" "{{ instance.name | to_terraform_name }}" {
     {% if instance.config.get('ssh_authorized_keys') %}
     ssh_authorized_keys = "{{ instance.config.ssh_authorized_keys | join('\\n') }}"
     {% endif %}
-    {% if instance.config.get('cloud_init_merged') %}
+    {% if instance.config.get('tailscale_module_config') %}
+    user_data = module.{{ instance.config.tailscale_module_config.module_name }}.rendered
+    {% elif instance.config.get('cloud_init_merged') %}
     user_data = base64encode(join("\n", ["#cloud-config", yamlencode({{ instance.config.cloud_init_merged | tojson }})]))
     {% elif instance.config.get('user_data') %}
     user_data = base64encode({{ instance.config.user_data | tojson }})
