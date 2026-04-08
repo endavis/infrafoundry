@@ -1,0 +1,44 @@
+# k3s cluster — example consumer of the proxmox-k3s-cluster blueprint.
+#
+# All deployment logic (VM definitions, DHCP reservations, install script,
+# event handler) lives in blueprints/proxmox-k3s-cluster/. This file only
+# supplies the per-instance values.
+#
+# See blueprints/proxmox-k3s-cluster/README.md for the full variable reference.
+#
+# Run: foundry infra apply --env dev --package k3s-cluster
+
+name: k3s-cluster
+description: "k3s Kubernetes cluster (example: 1 server + 2 agents)"
+blueprint: proxmox-k3s-cluster
+
+variables:
+  # --- Cluster identity ---
+  cluster_name: k3s-dev
+
+  # --- VM placement / network ---
+  disk_storage: local-lvm
+  dhcp_subnet: my-subnet
+
+  # --- SSH jumphost ---
+  jumphost: "ansible@ansible.example.com"
+
+  # --- Server node ---
+  server_name: k3s-dev-server
+  server_vmid: 240
+  server_target: pve1
+  server_mac: "BC:24:11:00:08:00"
+  server_ip: "192.168.10.80"
+
+  # --- Agent nodes ---
+  agents:
+    - name: k3s-dev-agent-1
+      vmid: 241
+      target_node: pve1
+      mac: "BC:24:11:00:08:01"
+      ip: "192.168.10.81"
+    - name: k3s-dev-agent-2
+      vmid: 242
+      target_node: pve1
+      mac: "BC:24:11:00:08:02"
+      ip: "192.168.10.82"

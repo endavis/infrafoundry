@@ -1,0 +1,42 @@
+name: proxmox-k3s-cluster
+description: "k3s Kubernetes cluster on Rocky 9 (1 server + N agents) on Proxmox"
+version: "1.0.0"
+
+defaults:
+  # --- Cluster identity ---
+  cluster_name: k3s-cluster
+
+  # --- Template ---
+  template_vmid: 901          # Standard rocky9-template vmid
+  template_node: pve1         # Proxmox node hosting the template
+
+  # --- VM hardware ---
+  cores: 2
+  memory: 4096                # MiB
+  disk_size: 56               # GiB
+  disk_storage: local-lvm
+
+  # --- Network ---
+  bridge: vmbr0
+  vlan_tag: 10
+
+  # --- k3s installer flags ---
+  k3s_server_args: "--disable traefik --disable servicelb"
+
+  # --- Local kubeconfig destination (rendered with HOME by the post-deploy script) ---
+  kubeconfig_local_path: "~/.kube/{{ cluster_name }}.yaml"
+
+resources:
+  - vm.yaml
+  - dhcp.yaml
+
+events:
+  on_create:
+    - type: script
+      name: k3s-install
+      script: scripts/k3s-post-terraform.sh
+      description: "Install k3s server and agents after VMs are created"
+      timeout: 1800
+      continue_on_error: false
+      requires:
+        - "{{ server_name }}"
