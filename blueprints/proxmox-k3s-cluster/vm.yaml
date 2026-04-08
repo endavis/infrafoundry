@@ -1,0 +1,56 @@
+# k3s cluster VMs — shorthand vms: format (proxmox provider, vm type inferred).
+# One server entry plus a Jinja loop over the agents: list. Multi-instance safe:
+# every outer name is templated. The agents: variable is a list of dicts with
+# the schema {name, vmid, target_node, mac, ip}; see blueprint README.
+vms:
+  # --- Server node ---
+  - name: "{{ server_name }}"
+    vmid: {{ server_vmid }}
+    target_node: "{{ server_target }}"
+    clone:
+      vm_id: {{ template_vmid }}
+      node_name: "{{ template_node }}"
+    cores: {{ cores }}
+    memory: {{ memory }}
+    agent: true
+    disk:
+      storage: "{{ disk_storage }}"
+      size: {{ disk_size }}
+    network:
+      - bridge: "{{ bridge }}"
+        tag: {{ vlan_tag }}
+        macaddr: "{{ server_mac }}"
+    cloud_init_snippets:
+      - system/hostname
+      - users/ansible
+      - network/dhcp
+      - packages/qemu-agent
+    tags: [k3s, k3s-server]
+    onboot: true
+
+  # --- Agent nodes (one entry per item in agents:) ---
+{% for agent in agents %}
+  - name: "{{ agent.name }}"
+    vmid: {{ agent.vmid }}
+    target_node: "{{ agent.target_node }}"
+    clone:
+      vm_id: {{ template_vmid }}
+      node_name: "{{ template_node }}"
+    cores: {{ cores }}
+    memory: {{ memory }}
+    agent: true
+    disk:
+      storage: "{{ disk_storage }}"
+      size: {{ disk_size }}
+    network:
+      - bridge: "{{ bridge }}"
+        tag: {{ vlan_tag }}
+        macaddr: "{{ agent.mac }}"
+    cloud_init_snippets:
+      - system/hostname
+      - users/ansible
+      - network/dhcp
+      - packages/qemu-agent
+    tags: [k3s, k3s-agent]
+    onboot: true
+{% endfor %}
