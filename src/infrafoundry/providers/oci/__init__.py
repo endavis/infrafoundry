@@ -10,6 +10,7 @@ from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
+    sanitize_secret_ref_to_tf_var,
 )
 from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
@@ -39,6 +40,10 @@ class OCIProvider(
         """Initialize OCI provider."""
         super().__init__("oci", config_dir, output_dir)
         self.fail_on_missing_snippets = False
+        # Cache of resources from the most recent generate_terraform call.
+        # Used by get_terraform_env_vars to resolve resource-level
+        # ``terraform_secrets`` references into TF_VAR_* env vars.
+        self._last_terraform_resources: list[ResourceConfig] = []
         self._setup_template_environment()
 
     @override
@@ -67,18 +72,33 @@ class OCIProvider(
         return self.build_terraform_env_vars(
             provider_name="oci",
             mapping=self._OCI_TFVARS_MAPPING,
+            resources=self._last_terraform_resources,
         )
 
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OCI resources."""
+        # Cache resources so get_terraform_env_vars can resolve any
+        # ``terraform_secrets`` references at apply time.
+        self._last_terraform_resources = list(resources)
+
         resources_by_type = self.prepare_terraform_generation(resources)
 
         # Generate backend configuration if remote backend is configured
         self.render_backend()
 
+        # Build the set of dynamic sensitive vars driven by resource-level
+        # ``terraform_secrets`` references so the variables.tf template can
+        # declare them.
+        secret_refs = self.collect_terraform_secret_refs(resources)
+        terraform_secret_vars = [
+            {"name": sanitize_secret_ref_to_tf_var(ref), "source": ref} for ref in secret_refs
+        ]
+
         # Generate provider configuration and variables
-        self.render_provider_and_variables()
+        self.render_provider_and_variables(
+            variables_context={"terraform_secret_vars": terraform_secret_vars},
+        )
 
         # Generate VCN and subnet resources
         if "vcn" in resources_by_type or "subnet" in resources_by_type:

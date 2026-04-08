@@ -22,6 +22,44 @@ from infrafoundry.core.security.file_utils import secure_write
 
 _RESOURCE_DECL_RE = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
 
+#: Pattern matching legal Terraform variable name characters.
+_TF_VAR_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
+
+
+def sanitize_secret_ref_to_tf_var(dotted_path: str) -> str:
+    """Convert a dotted secret path to a Terraform-safe variable name.
+
+    Sanitization is deterministic and reversible-by-convention:
+    - lowercase the path
+    - replace ``.`` with ``_``
+
+    The original dotted path is recoverable for error messages, since the
+    framework knows the source key (it iterates ``terraform_secrets`` lists
+    explicitly). The result is validated to match the Terraform variable
+    name grammar (``^[a-zA-Z][a-zA-Z0-9_]*$``).
+
+    Args:
+        dotted_path: A dotted secret reference, e.g.
+            ``"tailscale.oauth_client_secret"``.
+
+    Returns:
+        A Terraform-safe variable name (the ``TF_VAR_`` prefix is added by
+        callers, not this function).
+
+    Raises:
+        ValueError: If the resulting name is not a legal Terraform variable
+            identifier.
+    """
+    sanitized = dotted_path.lower().replace(".", "_")
+    if not _TF_VAR_NAME_RE.match(sanitized):
+        raise ValueError(
+            f"Secret reference '{dotted_path}' sanitizes to '{sanitized}', "
+            f"which is not a valid Terraform variable name "
+            f"(must match ^[a-zA-Z][a-zA-Z0-9_]*$)."
+        )
+    return sanitized
+
+
 if TYPE_CHECKING:
     # Type stubs for mixin expectations - not used at runtime
     class _TerraformGeneratorBase(Protocol):
@@ -502,22 +540,38 @@ class TerraformGeneratorMixin:
         *,
         include_ssh: bool = False,
         ssh_prefix: str | None = None,
+        resources: list[ResourceConfig] | None = None,
     ) -> dict[str, str]:
-        """Build TF_VAR_* env vars from provider settings.
+        """Build TF_VAR_* env vars from provider settings (and resource secrets).
 
         This is the environment-variable counterpart of
         ``generate_provider_tfvars``. Instead of writing a file, it
         returns a dict suitable for merging into the subprocess
         environment.
 
+        If ``resources`` is supplied, the method also walks each resource's
+        optional ``terraform_secrets:`` list (a list of dotted paths into
+        ``env_config.secrets``), resolves each path against the flattened
+        secrets dict, and emits a ``TF_VAR_<sanitized>`` entry per unique
+        reference. Unknown references raise ``KeyError`` with the offending
+        path so misconfiguration is caught early. Sensitive values are
+        never logged.
+
         Args:
             provider_name: Provider name used to look up settings
             mapping: Maps settings.yaml keys to terraform variable names
             include_ssh: Whether to include SSH settings
             ssh_prefix: Prefix for SSH variable names
+            resources: Optional resource list. When provided, each
+                resource's ``terraform_secrets`` field is resolved against
+                the env's decrypted secrets and emitted as TF vars.
 
         Returns:
             Dict mapping ``TF_VAR_<name>`` to string values
+
+        Raises:
+            KeyError: If a resource references a secret path that does not
+                exist in ``env_config.secrets``.
         """
         env_config = self._load_environment_config()
         if not env_config:
@@ -544,6 +598,87 @@ class TerraformGeneratorMixin:
                 if getattr(ssh_config, "port", None) and ssh_config.port != 22:
                     result[f"TF_VAR_{prefix}_ssh_port"] = str(ssh_config.port)
 
+        # Resource-level terraform_secrets bridge.
+        if resources:
+            secret_vars = self._build_terraform_secret_env_vars(env_config, resources)
+            result.update(secret_vars)
+
+        return result
+
+    @staticmethod
+    def collect_terraform_secret_refs(
+        resources: list[ResourceConfig],
+    ) -> list[str]:
+        """Return the unique, ordered list of ``terraform_secrets`` refs.
+
+        Walks each resource's ``config["terraform_secrets"]`` list (if any)
+        and returns the de-duplicated, insertion-ordered set of dotted
+        secret paths. Used by both the env-var bridge and the variables.tf
+        template context (so the same set of TF variables get declared).
+
+        Args:
+            resources: Resource configs to scan.
+
+        Returns:
+            Ordered, de-duplicated list of dotted secret paths.
+        """
+        seen: dict[str, None] = {}
+        for resource in resources:
+            refs = resource.config.get("terraform_secrets") if resource.config else None
+            if not refs:
+                continue
+            if not isinstance(refs, list):
+                raise TypeError(
+                    f"Resource '{resource.name}' has a non-list "
+                    f"terraform_secrets value: {type(refs).__name__}"
+                )
+            for ref in refs:
+                if not isinstance(ref, str):
+                    raise TypeError(
+                        f"Resource '{resource.name}' has a non-string entry "
+                        f"in terraform_secrets: {ref!r}"
+                    )
+                seen.setdefault(ref, None)
+        return list(seen.keys())
+
+    def _build_terraform_secret_env_vars(
+        self,
+        env_config: EnvironmentConfig,
+        resources: list[ResourceConfig],
+    ) -> dict[str, str]:
+        """Resolve resource ``terraform_secrets`` refs against env secrets.
+
+        Args:
+            env_config: Environment configuration with populated secrets.
+            resources: Resources whose ``terraform_secrets`` refs to resolve.
+
+        Returns:
+            Dict mapping ``TF_VAR_<sanitized>`` to the secret value.
+
+        Raises:
+            KeyError: If a referenced secret path is not present in
+                ``env_config.secrets``. Error message names the missing
+                dotted path; the value itself is never included.
+        """
+        # Local import to avoid a circular import at module load time.
+        from infrafoundry.core.secrets.secret_manager import SecretManager
+
+        refs = self.collect_terraform_secret_refs(resources)
+        if not refs:
+            return {}
+
+        flat_secrets = SecretManager.flatten_dict(env_config.secrets)
+        result: dict[str, str] = {}
+        for ref in refs:
+            if ref not in flat_secrets:
+                raise KeyError(
+                    f"terraform_secrets reference '{ref}' is not present in "
+                    f"env '{env_config.name}' secrets. "
+                    f"Available top-level keys: "
+                    f"{sorted({k.split('.')[0] for k in flat_secrets})}"
+                )
+            tf_name = sanitize_secret_ref_to_tf_var(ref)
+            result[f"TF_VAR_{tf_name}"] = flat_secrets[ref]
         return result
 
     def _generate_import_blocks(self, rendered: str, context: dict[str, Any]) -> str:

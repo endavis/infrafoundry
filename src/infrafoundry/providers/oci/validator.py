@@ -9,7 +9,10 @@ from infrafoundry.core.exceptions import APIError, ConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData, OCIProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
-from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.core.validation_helpers import (
+    BaseAPIValidator,
+    validate_terraform_secrets_references,
+)
 from infrafoundry.providers.oci.api_client import OCIClient
 
 from .validators import CompartmentValidator, ImageValidator, NetworkValidator
@@ -120,10 +123,12 @@ class OCIValidator:
         Checks:
         - Subnets reference valid VCNs
         - Instances reference valid subnets
+        - ``terraform_secrets`` references resolve in env secrets
 
         Args:
             resources: List of resources to validate
         """
+        validate_terraform_secrets_references("oci", resources, self.env_config, self.report)
         # Collect resource names by type
         vcn_names: set[str] = set()
         subnet_names: set[str] = set()

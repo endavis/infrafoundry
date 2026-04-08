@@ -10,6 +10,7 @@ from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
+    sanitize_secret_ref_to_tf_var,
 )
 from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
@@ -37,6 +38,10 @@ class ProxmoxProvider(
         """Initialize Proxmox provider."""
         super().__init__("proxmox", config_dir, output_dir)
         self.fail_on_missing_snippets = False
+        # Cache of resources from the most recent generate_terraform call.
+        # Used by get_terraform_env_vars to resolve resource-level
+        # ``terraform_secrets`` references into TF_VAR_* env vars.
+        self._last_terraform_resources: list[ResourceConfig] = []
         # Use TemplateRendererMixin to set up Jinja2 environment
         self._setup_template_environment()
 
@@ -75,6 +80,7 @@ class ProxmoxProvider(
             mapping=self._PROXMOX_TFVARS_MAPPING,
             include_ssh=True,
             ssh_prefix="proxmox",
+            resources=self._last_terraform_resources,
         )
         # Map credential env vars to TF_VAR_ equivalents
         for env_key, tf_var_name in self._CREDENTIAL_ENV_MAPPING.items():
@@ -86,14 +92,29 @@ class ProxmoxProvider(
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Proxmox resources."""
+        # Cache resources so get_terraform_env_vars can resolve any
+        # ``terraform_secrets`` references at apply time.
+        self._last_terraform_resources = list(resources)
+
         resources_by_type = self.prepare_terraform_generation(resources)
 
         # Generate backend configuration if remote backend is configured
         self.render_backend()
 
+        # Build the set of dynamic sensitive vars driven by resource-level
+        # ``terraform_secrets`` references so the variables.tf template can
+        # declare them.
+        secret_refs = self.collect_terraform_secret_refs(resources)
+        terraform_secret_vars = [
+            {"name": sanitize_secret_ref_to_tf_var(ref), "source": ref} for ref in secret_refs
+        ]
+
         # Generate provider configuration with environment context
         self.render_provider_and_variables(
-            variables_context={"default_ssh_user": os.getenv("USER", "root")},
+            variables_context={
+                "default_ssh_user": os.getenv("USER", "root"),
+                "terraform_secret_vars": terraform_secret_vars,
+            },
         )
 
         # Generate resources by type (storage before VMs/containers so they can reference it)

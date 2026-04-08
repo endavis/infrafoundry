@@ -11,7 +11,10 @@ from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import EnvironmentData, ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
-from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.core.validation_helpers import (
+    BaseAPIValidator,
+    validate_terraform_secrets_references,
+)
 from infrafoundry.providers.proxmox.api_client import ProxmoxClient
 from infrafoundry.providers.proxmox.validators import (
     NetworkValidator,
@@ -128,10 +131,16 @@ class ProxmoxValidator:
         - Storage pools exist and are active
         - VMIDs are not already in use
         - MAC addresses are not duplicated
+        - ``terraform_secrets`` references resolve in env secrets
 
         Args:
             resources: List of resources to validate
         """
+        # Local: validate terraform_secrets references against env secrets.
+        # Done before live API checks so misconfigurations surface even when
+        # the cluster is unreachable.
+        validate_terraform_secrets_references("proxmox", resources, self.env_config, self.report)
+
         default_node = self.provider_settings.get("node")
 
         # Create API client
