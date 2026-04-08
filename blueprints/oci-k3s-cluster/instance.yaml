@@ -1,0 +1,64 @@
+# OCI k3s cluster compute instances.
+#
+# One explicit control-plane entry plus a Jinja loop over the workers: list.
+# Multi-instance safe: every outer name is templated. workers: is a list of
+# dicts with schema {name, ocpus, memory_gb}; see blueprint README.
+#
+# Tailscale is wired up via the official tailscale/cloudinit/tailscale
+# Terraform module (issue #212). Auth credentials live in the env's
+# sops-encrypted secrets.yaml under secrets.tailscale.* and flow into
+# Terraform via the framework's secrets→TF_VAR_* bridge — values never
+# land in generated/*.tf. The consumer must supply OAuth client
+# credentials in secrets.tailscale.{oauth_client_id,oauth_client_secret}.
+instance:
+  # --- Control plane (public subnet) ---
+  - name: "{{ control_name }}"
+    shape: "{{ instance_shape }}"
+    shape_config:
+      ocpus: {{ control_ocpus }}
+      memory_in_gbs: {{ control_memory_gb }}
+    subnet: "{{ control_subnet_name }}"
+    image: "{{ image }}"
+    boot_volume_size_in_gbs: {{ control_boot_volume_gb }}
+    assign_public_ip: true
+    ssh_authorized_keys:
+      - "{{ ssh_public_key }}"
+    freeform_tags:
+      role: control-plane
+      cluster: "{{ cluster_name }}"
+      managed_by: infrafoundry
+    tailscale:
+      hostname: "{{ control_name }}"
+      enable_ssh: true
+      advertise_tags: {{ ts_tags | tojson }}
+      auth:
+        oauth:
+          client_id_secret: "tailscale.oauth_client_id"
+          client_secret_secret: "tailscale.oauth_client_secret"
+
+  # --- Worker nodes (private subnet, one per item in workers:) ---
+{% for worker in workers %}
+  - name: "{{ worker.name }}"
+    shape: "{{ instance_shape }}"
+    shape_config:
+      ocpus: {{ worker.ocpus }}
+      memory_in_gbs: {{ worker.memory_gb }}
+    subnet: "{{ worker_subnet_name }}"
+    image: "{{ image }}"
+    boot_volume_size_in_gbs: {{ worker_boot_volume_gb }}
+    assign_public_ip: false
+    ssh_authorized_keys:
+      - "{{ ssh_public_key }}"
+    freeform_tags:
+      role: worker
+      cluster: "{{ cluster_name }}"
+      managed_by: infrafoundry
+    tailscale:
+      hostname: "{{ worker.name }}"
+      enable_ssh: true
+      advertise_tags: {{ ts_tags | tojson }}
+      auth:
+        oauth:
+          client_id_secret: "tailscale.oauth_client_id"
+          client_secret_secret: "tailscale.oauth_client_secret"
+{% endfor %}

@@ -1,0 +1,25 @@
+---
+# k3s cluster playbook — blueprint-owned entry point.
+#
+# Hosts groups (k3s_control and k3s_workers) are supplied by the inventory
+# that the wrapper script (scripts/k3s-post-terraform.sh) generates from
+# INFRAFOUNDRY_PACKAGE_VARS. The roles themselves live in the config repo
+# at roles/k3s-server and roles/k3s-agent (provider-agnostic, shared with
+# the proxmox variant). The wrapper script sets ANSIBLE_ROLES_PATH to
+# point at ${INFRAFOUNDRY_CONFIG_DIR}/roles.
+
+- name: Install k3s control plane
+  hosts: k3s_control
+  gather_facts: true
+  become: true
+  roles:
+    - k3s-server
+
+- name: Install k3s workers
+  hosts: k3s_workers
+  gather_facts: true
+  become: true
+  vars:
+    k3s_control_host: "{{ groups['k3s_control'][0] }}"
+  roles:
+    - k3s-agent
