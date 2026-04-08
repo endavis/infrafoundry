@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775645461262,
+  "lastUpdate": 1775660859766,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4371,6 +4371,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003509518918982362",
             "extra": "mean: 160.00517132291736 usec\nrounds: 1897"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b68596f278ebedc46499e21761e894bce622a1e0",
+          "message": "feat: integrate official Tailscale cloud-init Terraform module (merges PR #519, addresses #212)\n\n* feat: add secrets to TF_VAR_* bridge for terraform variable injection\n\nAdds a framework mechanism for injecting sops-encrypted secrets into\nTerraform as sensitive variables, without writing values to disk.\n\nResource configs declare a 'terraform_secrets:' list of dotted paths\ninto the env's secrets dict. The framework resolves each at apply time\nand sets TF_VAR_<sanitized> environment variables. Provider variables.tf\ntemplates declare matching sensitive variables, defaulted to empty\nstrings so plan succeeds when no secrets are set.\n\nWired through OCI and Proxmox providers via cached resources on\ngenerate_terraform() and a new optional resources= parameter on\nbuild_terraform_env_vars().\n\nValidation rejects unknown secret references with a clear error\nnaming the missing dotted path.\n\nThis is phase 1 of the work tracked in #212. The Tailscale module\nintegration that consumes this bridge will land in subsequent commits\non the same branch.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* feat: integrate official Tailscale cloud-init module in OCI and Proxmox\n\nReplaces the custom Tailscale cloud-init snippet with calls to the\nofficial tailscale/cloudinit/tailscale Terraform module (pinned to\n0.0.11) in both providers. Closes the maintenance burden flagged in\nissue #212.\n\nNew optional 'tailscale:' resource config schema on OCI instances and\nProxmox VMs. Supports both static auth_key and OAuth client credentials\nauth modes (mutually exclusive). Auth secrets are dotted references\ninto the env's secrets dict and flow through the phase 1 secrets to\nTF_VAR_* bridge — values never land in generated/*.tf files.\n\nOCI: instances reference module.tailscale_<name>.rendered as user_data\n(base64 multipart MIME, the OCI default).\nProxmox: the existing proxmox_virtual_environment_file resource sources\nits data from module.tailscale_<vm>.rendered with base64_encode=false\n(raw multipart MIME — Proxmox stores it via source_raw and decodes at\nboot).\n\nValidation enforces:\n- exactly-one-of auth modes\n- advertise_tags entries start with 'tag:'\n- tailscale: and cloud_init_snippets are mutually exclusive\n\nThe hashicorp/cloudinit provider is declared unconditionally in both\nproviders' provider.tf for simplicity. Existing cloud_init_snippets\npath is unchanged for resources without a tailscale: block (regression\nguards in the existing test suites still pass).\n\n29 new tests cover the schema, both auth modes, additional_parts\nescape hatch, multi-instance dedup, and the unchanged existing path.\n\nAddresses #212\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-08T16:06:41+01:00",
+          "tree_id": "2055cf6cd887fc4c7981120e3d8b7e7f93799674",
+          "url": "https://github.com/endavis/infrafoundry/commit/b68596f278ebedc46499e21761e894bce622a1e0"
+        },
+        "date": 1775660859057,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9703.156260937449,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000070291750551252",
+            "extra": "mean: 103.05924929043525 usec\nrounds: 2114"
           }
         ]
       }
