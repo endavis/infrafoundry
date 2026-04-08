@@ -47,3 +47,19 @@ locals {
   ssh_opts = var.proxmox_ssh_key_path != "" ? "-i ${var.proxmox_ssh_key_path} -p ${var.proxmox_ssh_port}" : "-p ${var.proxmox_ssh_port}"
   ssh_cmd  = "ssh ${local.ssh_opts} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 }
+
+{# Dynamic sensitive variables from resource ``terraform_secrets`` references.
+   Each entry has ``name`` (sanitized terraform variable name) and ``source``
+   (the original dotted secret reference, recorded in the description for
+   traceability). Values are injected at apply time via TF_VAR_* env vars by
+   the framework's secrets→TF_VAR bridge; defaults stay empty so terraform
+   plan does not fail when a secret is unset. #}
+{% for var in terraform_secret_vars | default([]) %}
+variable "{{ var.name }}" {
+  description = "Injected from secret reference '{{ var.source }}' via TF_VAR_{{ var.name }}."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+{% endfor %}

@@ -10,7 +10,9 @@ from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
+    sanitize_secret_ref_to_tf_var,
 )
+from infrafoundry.core.tailscale import process_tailscale_config
 from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 
@@ -39,6 +41,10 @@ class OCIProvider(
         """Initialize OCI provider."""
         super().__init__("oci", config_dir, output_dir)
         self.fail_on_missing_snippets = False
+        # Cache of resources from the most recent generate_terraform call.
+        # Used by get_terraform_env_vars to resolve resource-level
+        # ``terraform_secrets`` references into TF_VAR_* env vars.
+        self._last_terraform_resources: list[ResourceConfig] = []
         self._setup_template_environment()
 
     @override
@@ -67,6 +73,7 @@ class OCIProvider(
         return self.build_terraform_env_vars(
             provider_name="oci",
             mapping=self._OCI_TFVARS_MAPPING,
+            resources=self._last_terraform_resources,
         )
 
     @override
@@ -74,11 +81,43 @@ class OCIProvider(
         """Generate Terraform configuration for OCI resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
 
+        # Pre-process instances FIRST so any ``tailscale:`` blocks
+        # auto-populate ``terraform_secrets`` on the resource. This must
+        # happen before ``collect_terraform_secret_refs`` runs so the
+        # variables.tf template sees the dynamic sensitive vars.
+        processed_instances = [
+            self._process_cloud_init_snippets(instance)
+            for instance in resources_by_type.get("instance", [])
+        ]
+        if processed_instances:
+            resources_by_type["instance"] = processed_instances
+
+        # Cache the post-processed resources so get_terraform_env_vars can
+        # resolve all ``terraform_secrets`` references (including the ones
+        # auto-populated by process_tailscale_config) at apply time.
+        all_processed: list[ResourceConfig] = []
+        for type_name, type_resources in resources_by_type.items():
+            if type_name == "instance":
+                all_processed.extend(type_resources)
+            else:
+                all_processed.extend(type_resources)
+        self._last_terraform_resources = all_processed
+
         # Generate backend configuration if remote backend is configured
         self.render_backend()
 
+        # Build the set of dynamic sensitive vars driven by resource-level
+        # ``terraform_secrets`` references so the variables.tf template can
+        # declare them.
+        secret_refs = self.collect_terraform_secret_refs(all_processed)
+        terraform_secret_vars = [
+            {"name": sanitize_secret_ref_to_tf_var(ref), "source": ref} for ref in secret_refs
+        ]
+
         # Generate provider configuration and variables
-        self.render_provider_and_variables()
+        self.render_provider_and_variables(
+            variables_context={"terraform_secret_vars": terraform_secret_vars},
+        )
 
         # Generate VCN and subnet resources
         if "vcn" in resources_by_type or "subnet" in resources_by_type:
@@ -87,9 +126,13 @@ class OCIProvider(
                 resources_by_type.get("subnet", []),
             )
 
-        # Generate compute instances
-        if "instance" in resources_by_type:
-            self._generate_instances_terraform(resources_by_type["instance"])
+        # Generate compute instances (already processed above)
+        if processed_instances:
+            self.render_and_write_terraform(
+                "oci/instances.tf.j2",
+                context={"instances": processed_instances},
+                output_name="instances.tf",
+            )
 
         # Generate outputs
         self.render_outputs_terraform(resources_by_type)
@@ -105,12 +148,15 @@ class OCIProvider(
         )
 
     def _generate_instances_terraform(self, instances: list[ResourceConfig]) -> None:
-        """Generate Terraform for OCI compute instances."""
-        processed_instances = []
-        for instance in instances:
-            processed = self._process_cloud_init_snippets(instance)
-            processed_instances.append(processed)
+        """Generate Terraform for OCI compute instances.
 
+        Note: ``generate_terraform`` now pre-processes instances inline so
+        the secrets→TF_VAR_* bridge can see auto-populated terraform_secrets
+        before variables.tf is rendered. This method is kept for backwards
+        compatibility but the inline path in ``generate_terraform`` is the
+        primary entry point.
+        """
+        processed_instances = [self._process_cloud_init_snippets(i) for i in instances]
         self.render_and_write_terraform(
             "oci/instances.tf.j2",
             context={"instances": processed_instances},
@@ -118,18 +164,33 @@ class OCIProvider(
         )
 
     def _process_cloud_init_snippets(self, instance: ResourceConfig) -> ResourceConfig:
-        """Process cloud-init snippets and merge them into instance config.
+        """Process cloud-init snippets or tailscale module and merge into config.
 
-        Delegates to CloudInitMixin for loading and merging, then stores
-        the merged dict directly in the config.
+        Two mutually exclusive paths:
+
+        - If the instance config has a ``tailscale:`` block, it is validated
+          and normalized into a ``tailscale_module_config`` dict. The
+          resource's ``terraform_secrets`` list is auto-populated with the
+          referenced secret paths so the framework's secrets→TF_VAR_* bridge
+          (phase 1 of #212) injects the values at apply time.
+        - Otherwise, any ``cloud_init_snippets`` are loaded, merged, and
+          stored as ``cloud_init_merged`` for the existing template path.
 
         Args:
-            instance: Instance resource config with optional cloud_init_snippets.
+            instance: Instance resource config.
 
         Returns:
-            Copy of the instance config with cloud_init_merged set if snippets exist.
+            Copy of the instance config with exactly one of
+            ``cloud_init_merged`` or ``tailscale_module_config`` set
+            (or neither, if no cloud-init is configured).
         """
         instance_copy = copy.deepcopy(instance)
+        # OCI's user_data expects base64; the Tailscale module's default
+        # ``base64_encode = true`` matches that, so we pass True here.
+        tailscale_module_config = process_tailscale_config(instance_copy, base64_encode=True)
+        if tailscale_module_config is not None:
+            instance_copy.config["tailscale_module_config"] = tailscale_module_config
+            return instance_copy
         merged = self._merge_cloud_init_snippets(instance_copy.config)
         if merged:
             instance_copy.config["cloud_init_merged"] = merged

@@ -7,9 +7,13 @@ from typing import Any, cast
 
 from infrafoundry.core.exceptions import APIError, ConfigurationError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.tailscale import TailscaleSchemaError, process_tailscale_config
 from infrafoundry.core.types import EnvironmentData, OCIProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
-from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.core.validation_helpers import (
+    BaseAPIValidator,
+    validate_terraform_secrets_references,
+)
 from infrafoundry.providers.oci.api_client import OCIClient
 
 from .validators import CompartmentValidator, ImageValidator, NetworkValidator
@@ -120,10 +124,34 @@ class OCIValidator:
         Checks:
         - Subnets reference valid VCNs
         - Instances reference valid subnets
+        - ``tailscale:`` schema is well-formed and mutually exclusive with
+          ``cloud_init_snippets`` (issue #212)
+        - ``terraform_secrets`` references resolve in env secrets
 
         Args:
             resources: List of resources to validate
         """
+        # Tailscale schema must run before terraform_secrets validation
+        # because process_tailscale_config auto-populates terraform_secrets
+        # from the tailscale.auth.* secret references.
+        for resource in resources:
+            if resource.type != "instance":
+                continue
+            if (resource.config or {}).get("tailscale") is None:
+                continue
+            try:
+                # base64_encode flag is irrelevant for validation; just need
+                # the schema check + terraform_secrets auto-population.
+                process_tailscale_config(resource, base64_encode=True)
+            except TailscaleSchemaError as exc:
+                self.report.add_check(
+                    check_name=f"oci_tailscale_schema_{resource.name}",
+                    passed=False,
+                    message=str(exc),
+                    level=ValidationLevel.ERROR,
+                )
+
+        validate_terraform_secrets_references("oci", resources, self.env_config, self.report)
         # Collect resource names by type
         vcn_names: set[str] = set()
         subnet_names: set[str] = set()

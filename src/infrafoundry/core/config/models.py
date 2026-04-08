@@ -103,6 +103,17 @@ class EnvironmentConfig(BaseModel):
     notifications: NotificationsConfig | None = None
     # Infrastructure as Code tool selection (terraform or opentofu)
     iac_tool: IaCTool = IaCTool.TERRAFORM
+    # Decrypted secrets for this environment.
+    #
+    # NOTE: This field is NOT loaded from settings.yaml. It is populated by
+    # ``SecretManager.populate_environment_config`` after sops decryption of
+    # ``envs/{env}/secrets.yaml`` (or equivalent). It holds plaintext values
+    # in memory only and must never be serialized back to disk.
+    #
+    # Consumers (e.g. provider mixins) flatten this dict to dotted keys and
+    # resolve resource-level ``terraform_secrets:`` references against it to
+    # build ``TF_VAR_*`` environment variables.
+    secrets: dict[str, Any] | None = None
 
     def get_ssh_config(self, provider_name: str) -> SSHConfig | None:
         """Get SSH config for a specific provider.
