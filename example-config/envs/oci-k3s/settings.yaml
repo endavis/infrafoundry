@@ -30,13 +30,20 @@ provider_settings:
     compartment_ocid: "ocid1.compartment.oc1..aaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # Secrets for cloud-init and lifecycle scripts.
-# Referenced via ${SECRET_NAME}-style substitution in cloud-init snippets
-# and via {{ secrets.<path> }} templating in event handler env: blocks.
+# Two delivery paths:
+#   - tailscale.oauth_client_{id,secret} → flow into Terraform via the
+#     framework's secrets→TF_VAR_* bridge (issue #212). Values never land
+#     in generated/*.tf files.
+#   - tailscale.api_key → consumed by the before_destroy event handler
+#     env: block via {{ secrets.tailscale.api_key }} templating.
 secrets:
   tailscale:
-    # Generate at https://login.tailscale.com/admin/settings/keys
-    # Recommended: reusable + ephemeral.
-    auth_key: "tskey-auth-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    # OAuth client credentials for the official tailscale/cloudinit/tailscale
+    # Terraform module. Generate at:
+    #   https://login.tailscale.com/admin/settings/oauth
+    # Required scope: Devices Core (read+write).
+    oauth_client_id: "tskey-client-XXXXXXXXXXXX"
+    oauth_client_secret: "tskey-client-XXXXXXXXXXXX-secret"
     # API access token (Settings -> Keys -> API access tokens) for
     # the before_destroy Tailscale device cleanup script.
     api_key: "tskey-api-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"

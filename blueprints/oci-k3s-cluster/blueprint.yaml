@@ -46,6 +46,18 @@ defaults:
   # via Tailscale, so a tailnet value is effectively required for apply).
   tailnet: ""
 
+  # ACL tags applied to every node by the Tailscale module (issue #212).
+  # Override per consumer (e.g. ["tag:k3s", "tag:homelab"]). Empty list is
+  # valid but means the node has no tags assigned.
+  ts_tags: []
+
+  # OAuth credentials for the official tailscale/cloudinit/tailscale module
+  # are read from the env's secrets.tailscale.{oauth_client_id, oauth_client_secret}
+  # block via the framework's secrets→TF_VAR_* bridge. The blueprint declares
+  # the references in instance.yaml; the consumer just needs to put the values
+  # in its sops-encrypted secrets.yaml. No defaults — supplying these is the
+  # consumer's responsibility.
+
   # --- k3s installer flags ---
   k3s_version: ""                              # empty = latest
   k3s_server_args: ""                          # e.g. "--disable traefik"

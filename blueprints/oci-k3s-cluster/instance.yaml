@@ -4,10 +4,12 @@
 # Multi-instance safe: every outer name is templated. workers: is a list of
 # dicts with schema {name, ocpus, memory_gb}; see blueprint README.
 #
-# The cloud-init "tailscale" snippet is expected to live in the consumer
-# environment's files/cloud-init-snippets/ directory (the framework only
-# looks inside the env, not inside blueprints). Consumers can copy the
-# snippet from the example env at example-config/envs/oci-k3s/files/.
+# Tailscale is wired up via the official tailscale/cloudinit/tailscale
+# Terraform module (issue #212). Auth credentials live in the env's
+# sops-encrypted secrets.yaml under secrets.tailscale.* and flow into
+# Terraform via the framework's secrets→TF_VAR_* bridge — values never
+# land in generated/*.tf. The consumer must supply OAuth client
+# credentials in secrets.tailscale.{oauth_client_id,oauth_client_secret}.
 instance:
   # --- Control plane (public subnet) ---
   - name: "{{ control_name }}"
@@ -25,11 +27,14 @@ instance:
       role: control-plane
       cluster: "{{ cluster_name }}"
       managed_by: infrafoundry
-    cloud_init_snippets:
-      - tailscale
-    cloud_init_vars:
-      TS_AUTH_KEY: "{{ tailscale_auth_key | default('') }}"
-      HOSTNAME: "{{ control_name }}"
+    tailscale:
+      hostname: "{{ control_name }}"
+      enable_ssh: true
+      advertise_tags: {{ ts_tags | tojson }}
+      auth:
+        oauth:
+          client_id_secret: "tailscale.oauth_client_id"
+          client_secret_secret: "tailscale.oauth_client_secret"
 
   # --- Worker nodes (private subnet, one per item in workers:) ---
 {% for worker in workers %}
@@ -48,9 +53,12 @@ instance:
       role: worker
       cluster: "{{ cluster_name }}"
       managed_by: infrafoundry
-    cloud_init_snippets:
-      - tailscale
-    cloud_init_vars:
-      TS_AUTH_KEY: "{{ tailscale_auth_key | default('') }}"
-      HOSTNAME: "{{ worker.name }}"
+    tailscale:
+      hostname: "{{ worker.name }}"
+      enable_ssh: true
+      advertise_tags: {{ ts_tags | tojson }}
+      auth:
+        oauth:
+          client_id_secret: "tailscale.oauth_client_id"
+          client_secret_secret: "tailscale.oauth_client_secret"
 {% endfor %}

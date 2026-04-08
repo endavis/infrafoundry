@@ -38,6 +38,16 @@ variables:
   # --- Required: Tailscale tailnet DNS suffix ---
   tailnet: "your-tailnet.ts.net"
 
+  # --- Optional: Tailscale ACL tags applied to every node ---
+  ts_tags: ["tag:k3s"]
+
+  # --- Required: Tailscale OAuth credentials in env secrets.yaml ---
+  # secrets.tailscale.oauth_client_id and secrets.tailscale.oauth_client_secret
+  # must exist in envs/oci-k3s/secrets.yaml (sops-encrypted). The framework's
+  # secrets→TF_VAR_* bridge (issue #212) injects them at terraform apply time
+  # so values never land in generated/*.tf files. Generate the OAuth client at
+  # https://login.tailscale.com/admin/settings/oauth.
+
   # --- Worker list inherited from blueprint defaults (2 workers). ---
   # Override here to add/remove workers:
   # workers:

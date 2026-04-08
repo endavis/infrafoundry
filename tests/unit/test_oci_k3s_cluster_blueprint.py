@@ -148,8 +148,8 @@ def test_oci_k3s_cluster_example_instance_configs(loader: PackageLoader) -> None
     assert control["freeform_tags"]["role"] == "control-plane"
     assert control["freeform_tags"]["cluster"] == "oci-k3s"
     assert control["freeform_tags"]["managed_by"] == "infrafoundry"
-    assert control["cloud_init_snippets"] == ["tailscale"]
-    assert control["cloud_init_vars"]["HOSTNAME"] == "k3s-control"
+    assert "tailscale" in control
+    assert control["tailscale"]["hostname"] == "k3s-control"
 
     worker0 = instances_by_name["k3s-worker-0"].config
     assert worker0["shape"] == "VM.Standard.A1.Flex"
@@ -158,14 +158,14 @@ def test_oci_k3s_cluster_example_instance_configs(loader: PackageLoader) -> None
     assert worker0["subnet"] == "k3s-worker-subnet"
     assert worker0["assign_public_ip"] is False
     assert worker0["freeform_tags"]["role"] == "worker"
-    assert worker0["cloud_init_vars"]["HOSTNAME"] == "k3s-worker-0"
+    assert worker0["tailscale"]["hostname"] == "k3s-worker-0"
 
     worker1 = instances_by_name["k3s-worker-1"].config
     assert worker1["shape_config"]["ocpus"] == 1
     assert worker1["subnet"] == "k3s-worker-subnet"
     assert worker1["assign_public_ip"] is False
     assert worker1["freeform_tags"]["role"] == "worker"
-    assert worker1["cloud_init_vars"]["HOSTNAME"] == "k3s-worker-1"
+    assert worker1["tailscale"]["hostname"] == "k3s-worker-1"
 
 
 def test_oci_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) -> None:
@@ -202,10 +202,12 @@ def test_oci_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) -> Non
     assert after_apply[0]["continue_on_error"] is True
 
 
-def test_oci_k3s_cluster_example_cloud_init_uses_snippet(loader: PackageLoader) -> None:
-    """Every instance references the 'tailscale' cloud-init snippet and
-    passes its per-instance HOSTNAME via cloud_init_vars. Cloud-init vars
-    are what the CloudInitMixin substitutes into the snippet content."""
+def test_oci_k3s_cluster_example_uses_tailscale_module(loader: PackageLoader) -> None:
+    """Every instance declares a tailscale: block referencing the OAuth
+    secrets in the env's secrets.tailscale.* dict. Issue #212 phase 2
+    replaced the custom cloud-init snippet with the official
+    tailscale/cloudinit/tailscale Terraform module; this test verifies
+    every blueprint instance opted into the new schema."""
     resources, _events, _variables = loader.load_package(
         PACKAGE_DIR, provider="oci", env_name="oci-k3s"
     )
@@ -213,9 +215,16 @@ def test_oci_k3s_cluster_example_cloud_init_uses_snippet(loader: PackageLoader) 
     instances = [r for r in resources if r.type == "instance"]
     assert len(instances) == 3
     for inst in instances:
-        assert inst.config["cloud_init_snippets"] == ["tailscale"]
-        assert inst.config["cloud_init_vars"]["HOSTNAME"] == inst.name
-        assert "TS_AUTH_KEY" in inst.config["cloud_init_vars"]
+        ts = inst.config.get("tailscale")
+        assert ts is not None, f"{inst.name} missing tailscale: block"
+        assert ts["hostname"] == inst.name
+        assert ts["enable_ssh"] is True
+        # OAuth credentials come from secrets.tailscale.{client_id,client_secret}
+        # via the framework's secrets→TF_VAR_* bridge.
+        assert ts["auth"]["oauth"]["client_id_secret"] == "tailscale.oauth_client_id"
+        assert ts["auth"]["oauth"]["client_secret_secret"] == "tailscale.oauth_client_secret"
+        # Should NOT have the legacy cloud_init_snippets path
+        assert "cloud_init_snippets" not in inst.config
 
 
 def test_oci_k3s_cluster_blueprint_supports_multiple_worker_counts(tmp_path: Path) -> None:
