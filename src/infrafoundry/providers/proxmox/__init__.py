@@ -92,11 +92,23 @@ class ProxmoxProvider(
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for Proxmox resources."""
-        # Cache resources so get_terraform_env_vars can resolve any
-        # ``terraform_secrets`` references at apply time.
-        self._last_terraform_resources = list(resources)
-
         resources_by_type = self.prepare_terraform_generation(resources)
+
+        # Pre-process VMs FIRST so any ``tailscale:`` blocks auto-populate
+        # ``terraform_secrets`` on the resource. This must happen before
+        # ``collect_terraform_secret_refs`` runs so the variables.tf
+        # template sees the dynamic sensitive vars.
+        processed_vms = self._preprocess_vms_for_secrets(resources_by_type.get("vm", []))
+        if processed_vms:
+            resources_by_type["vm"] = processed_vms
+
+        # Cache the post-processed resources so get_terraform_env_vars can
+        # resolve all ``terraform_secrets`` references (including the ones
+        # auto-populated by process_tailscale_config) at apply time.
+        all_processed: list[ResourceConfig] = []
+        for type_resources in resources_by_type.values():
+            all_processed.extend(type_resources)
+        self._last_terraform_resources = all_processed
 
         # Generate backend configuration if remote backend is configured
         self.render_backend()
@@ -104,7 +116,7 @@ class ProxmoxProvider(
         # Build the set of dynamic sensitive vars driven by resource-level
         # ``terraform_secrets`` references so the variables.tf template can
         # declare them.
-        secret_refs = self.collect_terraform_secret_refs(resources)
+        secret_refs = self.collect_terraform_secret_refs(all_processed)
         terraform_secret_vars = [
             {"name": sanitize_secret_ref_to_tf_var(ref), "source": ref} for ref in secret_refs
         ]
@@ -139,12 +151,43 @@ class ProxmoxProvider(
         # Generate outputs
         self.render_outputs_terraform(resources_by_type)
 
+    def _preprocess_vms_for_secrets(self, vms: list[ResourceConfig]) -> list[ResourceConfig]:
+        """Pre-process VMs so tailscale: blocks auto-populate terraform_secrets.
+
+        Called from ``generate_terraform`` BEFORE ``collect_terraform_secret_refs``
+        so that any auto-populated ``terraform_secrets`` entries are visible
+        when the variables.tf template renders.
+
+        Issue #212 phase 2: the result is the same list of resources, but
+        each VM that has a ``tailscale:`` block has had its
+        ``terraform_secrets`` extended with the referenced secret paths.
+        ``_generate_vms_terraform`` will later run the full processing
+        (snippet merge / tailscale module normalization) on the same
+        objects. The tailscale helper is idempotent so the duplicate call
+        is safe.
+        """
+        processed: list[ResourceConfig] = []
+        for vm in vms:
+            if "ova_source" in vm.config:
+                # OVA VMs don't go through cloud-init / tailscale processing.
+                processed.append(vm)
+            else:
+                processed.append(self._process_cloud_init_snippets(vm))
+        return processed
+
     def _generate_vms_terraform(self, vms: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox VMs.
 
         Partitions VMs into regular VMs (using bpg/proxmox provider) and OVA VMs
         (using terraform_data with SSH-based qm commands). Regular VMs get cloud-init
         processing; OVA VMs get network normalization only.
+
+        Note: ``generate_terraform`` pre-processes VMs (via
+        ``_preprocess_vms_for_secrets``) so the secrets→TF_VAR_* bridge can
+        see auto-populated terraform_secrets before variables.tf is rendered.
+        The cloud-init processing call here is idempotent and intentional —
+        it normalizes VMs that didn't get pre-processed (e.g. when this
+        method is called by code paths other than ``generate_terraform``).
         """
         regular_vms = []
         ova_vms = []
@@ -255,22 +298,46 @@ class ProxmoxProvider(
         return vm_copy
 
     def _process_cloud_init_snippets(self, vm: ResourceConfig) -> ResourceConfig:
-        """Process cloud-init snippets and merge them into VM config.
+        """Process cloud-init snippets or tailscale module and merge into config.
 
-        Delegates to CloudInitMixin for loading and merging, then serializes
-        the result as a YAML string with Terraform ``${`` escaping.
+        Two mutually exclusive paths (issue #212 phase 2):
+
+        - If the VM config has a ``tailscale:`` block, it is validated and
+          normalized into a ``tailscale_module_config`` dict. The resource's
+          ``terraform_secrets`` list is auto-populated with the referenced
+          secret paths so the framework's secrets→TF_VAR_* bridge (phase 1
+          of #212) injects the values at apply time. The Tailscale module is
+          rendered with ``base64_encode = false`` so the bpg/proxmox file
+          resource can store the raw multipart MIME directly via
+          ``source_raw.data``.
+        - Otherwise, any ``cloud_init_snippets`` are loaded, merged, and
+          stored as ``cloud_init_user_data`` (YAML string with Terraform
+          ``${`` escaping) for the existing template path.
 
         Args:
-            vm: VM resource config with optional cloud_init_snippets.
+            vm: VM resource config.
 
         Returns:
-            Copy of the VM config with cloud_init_user_data set if snippets exist.
+            Copy of the VM config with exactly one of
+            ``cloud_init_user_data`` or ``tailscale_module_config`` set
+            (or neither, if no cloud-init is configured).
         """
         import copy
 
         import yaml
 
+        from infrafoundry.core.tailscale import process_tailscale_config
+
         vm_copy = copy.deepcopy(vm)
+        # Proxmox stores cloud-init as a file via ``source_raw``; the
+        # Tailscale module's ``rendered`` output is the raw multipart MIME
+        # when base64_encode=False, which Proxmox can hand to cloud-init
+        # at boot without further decoding.
+        tailscale_module_config = process_tailscale_config(vm_copy, base64_encode=False)
+        if tailscale_module_config is not None:
+            vm_copy.config["tailscale_module_config"] = tailscale_module_config
+            return vm_copy
+
         merged = self._merge_cloud_init_snippets(vm_copy.config)
         if merged:
             yaml_str = yaml.dump(merged, default_flow_style=False, sort_keys=False)

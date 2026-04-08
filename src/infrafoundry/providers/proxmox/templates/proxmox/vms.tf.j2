@@ -1,5 +1,61 @@
 {% for vm in vms %}
-{% if vm.config.cloud_init_user_data is defined %}
+{% if vm.config.tailscale_module_config is defined %}
+{% set ts = vm.config.tailscale_module_config %}
+# Tailscale cloud-init module (issue #212 phase 2)
+module "{{ ts.module_name }}" {
+  source  = "{{ ts.source }}"
+  version = "{{ ts.version }}"
+
+  hostname      = "{{ ts.hostname }}"
+  enable_ssh    = {{ ts.enable_ssh | lower }}
+  accept_dns    = {{ ts.accept_dns | lower }}
+  accept_routes = {{ ts.accept_routes | lower }}
+  base64_encode = {{ ts.base64_encode | lower }}
+  track         = "{{ ts.track }}"
+  {% if ts.advertise_tags %}
+  advertise_tags = {{ ts.advertise_tags | tojson }}
+  {% endif %}
+  {% if ts.advertise_routes %}
+  advertise_routes = {{ ts.advertise_routes | tojson }}
+  {% endif %}
+
+  {% if ts.auth_mode == 'auth_key' %}
+  auth_key = var.{{ ts.auth_key_var }}
+  {% else %}
+  client_id     = var.{{ ts.oauth_client_id_var }}
+  client_secret = var.{{ ts.oauth_client_secret_var }}
+  {% endif %}
+
+  {% if ts.additional_parts %}
+  additional_parts = [
+    {% for part in ts.additional_parts %}
+    {
+      {% if part.get('filename') %}filename     = "{{ part.filename }}"
+      {% endif %}{% if part.get('content_type') %}content_type = "{{ part.content_type }}"
+      {% endif %}content      = <<-TSEOT
+{{ part.content }}
+TSEOT
+      {% if part.get('merge_type') %}
+      merge_type   = "{{ part.merge_type }}"
+      {% endif %}
+    },
+    {% endfor %}
+  ]
+  {% endif %}
+}
+
+# Cloud-init user-data from Tailscale module (raw multipart MIME)
+resource "proxmox_virtual_environment_file" "cloud_init_user_data_{{ vm.name | replace('-', '_') }}" {
+  content_type = "snippets"
+  datastore_id = "{{ vm.config.cloud_init_snippets_storage | default('nas01') }}"
+  node_name    = "{{ vm.config.target_node }}"
+
+  source_raw {
+    data      = module.{{ ts.module_name }}.rendered
+    file_name = "cloud-init-user-data-{{ vm.name }}.yml"
+  }
+}
+{% elif vm.config.cloud_init_user_data is defined %}
 # Cloud-init user-data from merged snippets
 resource "proxmox_virtual_environment_file" "cloud_init_user_data_{{ vm.name | replace('-', '_') }}" {
   content_type = "snippets"
@@ -116,7 +172,7 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   }
   {% endif %}
 
-  {% if vm.config.iso is not defined and (vm.config.ipconfig is defined or vm.config.ssh_user is defined or vm.config.ssh_keys is defined or vm.config.cloud_init_user_data is defined) %}
+  {% if vm.config.iso is not defined and (vm.config.ipconfig is defined or vm.config.ssh_user is defined or vm.config.ssh_keys is defined or vm.config.cloud_init_user_data is defined or vm.config.tailscale_module_config is defined) %}
   # Cloud-init Configuration
   initialization {
     datastore_id = "{{ vm.config.cloud_init_datastore | default((vm.config.disk.storage if vm.config.disk is defined else 'local-lvm')) }}"
@@ -155,12 +211,12 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
     }
     {% endif %}
 
-    {% if vm.config.cloud_init_user_data is defined %}
-    # Cloud-init user-data from merged snippets
+    {% if vm.config.cloud_init_user_data is defined or vm.config.tailscale_module_config is defined %}
+    # Cloud-init user-data (from snippet merge or Tailscale module)
     user_data_file_id = proxmox_virtual_environment_file.cloud_init_user_data_{{ vm.name | replace('-', '_') }}.id
     {% endif %}
 
-    {% if vm.config.ipconfig is defined and vm.config.cloud_init_user_data is defined %}
+    {% if vm.config.ipconfig is defined and (vm.config.cloud_init_user_data is defined or vm.config.tailscale_module_config is defined) %}
     # IP configuration alongside custom user-data
     ip_config {
       {% if 'dhcp' in vm.config.ipconfig %}
