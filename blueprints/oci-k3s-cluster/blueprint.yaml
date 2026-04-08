@@ -1,0 +1,102 @@
+name: oci-k3s-cluster
+description: "k3s Kubernetes cluster on OCI ARM Always-Free-Tier (1 control + N workers) with Tailscale overlay"
+version: "1.0.0"
+
+defaults:
+  # --- Cluster identity ---
+  cluster_name: k3s-cluster
+  control_name: k3s-control
+
+  # --- OCI instance sizing ---
+  # ARM Always-Free-Tier budget: 4 OCPUs, 24 GB RAM, 200 GB block storage.
+  # The default layout (control=2 ocpus/8 GB, 2 workers=1 ocpu/8 GB each)
+  # maxes the free-tier CPU allocation and uses 24 GB RAM.
+  instance_shape: "VM.Standard.A1.Flex"
+  control_ocpus: 2
+  control_memory_gb: 8
+  control_boot_volume_gb: 50
+  worker_boot_volume_gb: 50
+
+  # Worker node list. Each dict is {name, ocpus, memory_gb}. The blueprint
+  # loops over this list in instances.yaml, so 0, 1, or N workers all work
+  # without blueprint changes.
+  workers:
+    - name: k3s-worker-0
+      ocpus: 1
+      memory_gb: 8
+    - name: k3s-worker-1
+      ocpus: 1
+      memory_gb: 8
+
+  # --- Network ---
+  vcn_name: k3s-vcn
+  vcn_cidr: "10.0.0.0/16"
+  vcn_dns_label: k3svcn
+  control_subnet_name: k3s-control-subnet
+  control_subnet_cidr: "10.0.0.0/24"
+  control_subnet_dns_label: ctrl
+  worker_subnet_name: k3s-worker-subnet
+  worker_subnet_cidr: "10.0.1.0/24"
+  worker_subnet_dns_label: work
+
+  # --- Tailscale ---
+  # Tailnet DNS suffix used when building ansible host FQDNs
+  # (e.g., "k3s-control.tail-abcd.ts.net"). Empty string falls back to the
+  # node hostname only (workers are in the private subnet and only reachable
+  # via Tailscale, so a tailnet value is effectively required for apply).
+  tailnet: ""
+
+  # ACL tags applied to every node by the Tailscale module (issue #212).
+  # Override per consumer (e.g. ["tag:k3s", "tag:homelab"]). Empty list is
+  # valid but means the node has no tags assigned.
+  ts_tags: []
+
+  # OAuth credentials for the official tailscale/cloudinit/tailscale module
+  # are read from the env's secrets.tailscale.{oauth_client_id, oauth_client_secret}
+  # block via the framework's secrets→TF_VAR_* bridge. The blueprint declares
+  # the references in instance.yaml; the consumer just needs to put the values
+  # in its sops-encrypted secrets.yaml. No defaults — supplying these is the
+  # consumer's responsibility.
+
+  # --- k3s installer flags ---
+  k3s_version: ""                              # empty = latest
+  k3s_server_args: ""                          # e.g. "--disable traefik"
+  k3s_oci_firewall_fix: true                   # apply iptables fix after k3s install
+
+  # --- Required variables (no defaults — consumer must supply) ---
+  # image: "ocid1.image.oc1..."                # Ubuntu ARM image OCID
+  # ssh_public_key: "ssh-rsa AAAA..."          # SSH public key for ubuntu user
+
+  # --- Local kubeconfig destination (rendered by the post-deploy script) ---
+  kubeconfig_local_path: "~/.kube/{{ cluster_name }}.yaml"
+
+resources:
+  - network.yaml
+  - instance.yaml
+
+events:
+  on_create:
+    - type: script
+      name: k3s-install
+      script: scripts/k3s-post-terraform.sh
+      description: "Install k3s server and workers via ansible after instances are created"
+      timeout: 1800
+      continue_on_error: false
+      requires:
+        - "{{ control_name }}"
+
+  before_destroy:
+    - type: script
+      name: tailscale-cleanup
+      script: scripts/cleanup-tailscale-devices.sh
+      description: "Remove Tailscale devices for this cluster before destroy"
+      timeout: 60
+      continue_on_error: true
+
+  after_apply:
+    - type: script
+      name: verify-cluster
+      script: scripts/verify-cluster.sh
+      description: "Verify k3s cluster health after apply"
+      timeout: 120
+      continue_on_error: true
