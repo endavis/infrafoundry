@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775660859766,
+  "lastUpdate": 1775663720650,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4402,6 +4402,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000070291750551252",
             "extra": "mean: 103.05924929043525 usec\nrounds: 2114"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1c9eebce3cc8ba090b4289bf8dde03783b7e9efc",
+          "message": "refactor: convert oci-k3s example to a blueprint (merges PR #518, addresses #505)\n\n* refactor: convert oci-k3s example to a blueprint\n\nExtracts blueprints/oci-k3s-cluster/ from the example oci-k3s\nenvironment and collapses the example to a thin env-root subdir\npackage consumer. Fourth blueprint conversion in the #508 chain\n(after #503, #502, #504).\n\nThe previous example was structurally broken — no infrafoundry.yml\nexisted in the env, so the package loader never discovered it. The\noci/instances.yaml and oci/network.yaml were orphaned files. This\nconversion is effectively a fresh-start blueprint design using the\nold files as a recipe reference.\n\nFirst blueprint to use the env-root subdir package pattern\n(envs/<env>/<subdir>/infrafoundry.yml without a provider directory\nin between). Surfaces two framework gaps tracked separately as #516\n(_package_dir plumbing dead code) and #517 (inventory generator\ncan't render Jinja loops).\n\nAddresses #505\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* refactor: migrate oci-k3s-cluster blueprint to Tailscale module schema\n\nReplaces the custom 'cloud_init_snippets: [tailscale]' wiring in the\noci-k3s-cluster blueprint with the new 'tailscale:' resource block\nintroduced by issue #212. Each instance now declares its tailscale\nconfig inline (hostname, enable_ssh, advertise_tags, OAuth secret refs)\nand the framework's secrets→TF_VAR_* bridge injects the OAuth client\ncredentials at apply time without writing them to disk.\n\nDeletes the obsolete tailscale.yaml cloud-init snippet from the\nexample consumer (it was a hand-rolled retry-loop installer that the\nofficial Tailscale Terraform module replaces).\n\nUpdates the example consumer secrets schema to use\nsecrets.tailscale.{oauth_client_id,oauth_client_secret} instead of\nthe old static auth_key.\n\nUpdates the test_oci_k3s_cluster_example_uses_tailscale_module test\nto assert the new tailscale: schema instead of cloud_init_snippets.\n\nPlan smoke test against example-config/envs/oci-k3s passes:\n- 6 OCI resources rendered (1 vcn + 2 subnets + 3 instances)\n- module 'tailscale_k3s_{control,worker_0,worker_1}' blocks emitted\n- user_data references 'module.tailscale_<name>.rendered'\n- variables.tf declares the sensitive var.tailscale_oauth_client_*\n- No secret values in generated/*.tf (verified via grep)\n\nAddresses #212 #505\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* ci: trigger CodeQL re-analysis for PR 518\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-08T16:53:15+01:00",
+          "tree_id": "345e9f26cab07b823003c60a4c93ede47107a3b0",
+          "url": "https://github.com/endavis/infrafoundry/commit/1c9eebce3cc8ba090b4289bf8dde03783b7e9efc"
+        },
+        "date": 1775663720129,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7423.886845370227,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008817114824590832",
+            "extra": "mean: 134.70032892858973 usec\nrounds: 2119"
           }
         ]
       }
