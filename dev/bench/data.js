@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775584428737,
+  "lastUpdate": 1775645461262,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4340,6 +4340,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001952466855874089",
             "extra": "mean: 141.9492479658694 usec\nrounds: 2335"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5308e6360c4996d75cc65071c37c9da94e91698f",
+          "message": "refactor: convert k3s-cluster example to a blueprint (merges PR #514, addresses #504)\n\n* refactor: convert k3s-cluster example to a blueprint\n\nExtracts blueprints/proxmox-k3s-cluster/ from the example k3s-cluster\npackage and collapses the example consumer to a thin instantiation.\nThird blueprint conversion in the #508 chain (after #503 and #502).\n\nFirst blueprint to use Jinja {% for %} loops over a list of dicts in\nresource files, supporting variable agent count. Multi-instance and\nzero-agents regression guards included in the test suite.\n\nAddresses #504\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* refactor: make k3s-cluster blueprint jumphost optional\n\nThe post-deploy script now SSHes directly from the InfraFoundry host to\neach node when jumphost is empty, and tunnels through the jumphost when\nset. Default is direct mode.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-08T11:50:21+01:00",
+          "tree_id": "f353190ee08d8825b42b1279f728edea172f93e3",
+          "url": "https://github.com/endavis/infrafoundry/commit/5308e6360c4996d75cc65071c37c9da94e91698f"
+        },
+        "date": 1775645460413,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6249.798001727279,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003509518918982362",
+            "extra": "mean: 160.00517132291736 usec\nrounds: 1897"
           }
         ]
       }
