@@ -1,19 +1,18 @@
-# OCI K3s Cluster Environment Settings
+# OCI k3s Cluster Environment Settings
 #
-# This example deploys a K3s cluster on Oracle Cloud Infrastructure (OCI)
-# using the Always Free Tier ARM instances with Tailscale for secure access.
+# This example environment consumes the oci-k3s-cluster blueprint. The
+# actual deployment logic lives in blueprints/oci-k3s-cluster/ and the
+# per-tenancy values live in k3s-cluster/infrafoundry.yml.
 #
 # SECURITY NOTE: Encrypt with SOPS before committing:
 #   sops --encrypt --in-place envs/oci-k3s/settings.yaml
 
 name: oci-k3s
-description: OCI K3s cluster - ARM free tier with Tailscale overlay
+description: "OCI ARM Always-Free-Tier k3s cluster (example consumer of oci-k3s-cluster blueprint)"
 
 variables:
   environment: oci-k3s
   managed_by: infrafoundry
-  # Tailscale network name (used in ansible_host)
-  tailnet: your-tailnet.ts.net
 
 ssh:
   user: ubuntu
@@ -30,29 +29,18 @@ provider_settings:
     # Create a compartment or use root compartment OCID
     compartment_ocid: "ocid1.compartment.oc1..aaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
-# Secrets for cloud-init (referenced via ${SECRET_NAME} in snippets)
+# Secrets for cloud-init and lifecycle scripts.
+# Referenced via ${SECRET_NAME}-style substitution in cloud-init snippets
+# and via {{ secrets.<path> }} templating in event handler env: blocks.
 secrets:
   tailscale:
-    # Generate an auth key at https://login.tailscale.com/admin/settings/keys
-    # Use a reusable, ephemeral key for best security
+    # Generate at https://login.tailscale.com/admin/settings/keys
+    # Recommended: reusable + ephemeral.
     auth_key: "tskey-auth-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-    # API key for device management (Settings -> Keys -> API access tokens)
+    # API access token (Settings -> Keys -> API access tokens) for
+    # the before_destroy Tailscale device cleanup script.
     api_key: "tskey-api-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
-# Lifecycle hooks for custom automation
-# See: https://infrafoundry.dev/docs/configuration/lifecycle-hooks/
-hooks:
-  # Run before destroying any resources in this environment
-  before_destroy:
-    - script: scripts/cleanup-tailscale-devices.sh
-      description: "Remove all Tailscale devices for this environment"
-      env:
-        TAILSCALE_API_KEY: "{{ secrets.tailscale.api_key }}"
-      timeout: 60
-
-  # Run after successful apply
-  after_apply:
-    - script: scripts/verify-cluster.sh
-      description: "Verify K3s cluster is healthy"
-      continue_on_error: true  # Don't fail if verification fails
-      timeout: 120
+# NOTE: lifecycle hooks (before_destroy tailscale cleanup, after_apply
+# cluster verify) are owned by the oci-k3s-cluster blueprint's events:
+# block. They move with the recipe so all consumers inherit them.

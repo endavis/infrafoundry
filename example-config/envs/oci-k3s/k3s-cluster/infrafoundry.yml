@@ -1,0 +1,46 @@
+# k3s cluster — example consumer of the oci-k3s-cluster blueprint.
+#
+# All deployment logic (VCN, subnets, instances, cloud-init, ansible
+# playbook, scripts) lives in blueprints/oci-k3s-cluster/. This file only
+# supplies the per-tenancy values.
+#
+# Env-root package: this package lives directly under envs/oci-k3s/ rather
+# than under a provider subdirectory, so it must declare provider: oci
+# explicitly.
+#
+# See blueprints/oci-k3s-cluster/README.md for the full variable reference.
+#
+# Run: foundry infra apply --env oci-k3s
+
+name: k3s-cluster
+description: "OCI ARM Always-Free-Tier k3s cluster (example)"
+blueprint: oci-k3s-cluster
+provider: oci
+
+variables:
+  # --- Cluster identity ---
+  cluster_name: oci-k3s
+  control_name: k3s-control
+
+  # --- Required: Ubuntu ARM image OCID for your region ---
+  # Find with:
+  #   oci compute image list --compartment-id <compartment-ocid> \
+  #     --operating-system "Canonical Ubuntu" \
+  #     --operating-system-version "22.04" \
+  #     --shape "VM.Standard.A1.Flex" \
+  #     --sort-by TIMECREATED --sort-order DESC \
+  #     --query 'data[0].id' --raw-output
+  image: "ocid1.image.oc1.iad.aaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+  # --- Required: SSH public key for the ubuntu user ---
+  ssh_public_key: "ssh-rsa AAAA... your-ssh-public-key"
+
+  # --- Required: Tailscale tailnet DNS suffix ---
+  tailnet: "your-tailnet.ts.net"
+
+  # --- Worker list inherited from blueprint defaults (2 workers). ---
+  # Override here to add/remove workers:
+  # workers:
+  #   - name: k3s-worker-0
+  #     ocpus: 1
+  #     memory_gb: 8

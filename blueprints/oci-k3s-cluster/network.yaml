@@ -1,0 +1,59 @@
+# OCI k3s cluster network — VCN + 2 subnets.
+#
+# Uses the generic resources: format because the filename stem "network"
+# is not an OCI resource type; this file declares resources of multiple
+# types (vcn and subnet) side by side.
+#
+# Architecture:
+#   - VCN with a /16 CIDR for cluster networking
+#   - Internet Gateway for public subnet (control plane)
+#   - NAT Gateway for private subnet (workers) so they can pull images
+#   - Public subnet: control plane, public IP for Tailscale bootstrap
+#   - Private subnet: worker nodes, no public IPs, reached via Tailscale
+resources:
+  - provider: oci
+    type: vcn
+    name: "{{ vcn_name }}"
+    config:
+      cidr_block: "{{ vcn_cidr }}"
+      dns_label: "{{ vcn_dns_label }}"
+      internet_gateway: true
+      nat_gateway: true
+      security_list:
+        egress_rules:
+          - destination: "0.0.0.0/0"
+            protocol: "all"
+        ingress_rules:
+          # SSH from anywhere (initial bootstrap; switch to Tailscale after)
+          - source: "0.0.0.0/0"
+            protocol: "6"  # TCP
+            tcp_options:
+              min: 22
+              max: 22
+          # All intra-VCN traffic
+          - source: "{{ vcn_cidr }}"
+            protocol: "all"
+          # Kubernetes API server from VCN
+          - source: "{{ vcn_cidr }}"
+            protocol: "6"
+            tcp_options:
+              min: 6443
+              max: 6443
+
+  - provider: oci
+    type: subnet
+    name: "{{ control_subnet_name }}"
+    config:
+      vcn: "{{ vcn_name }}"
+      cidr_block: "{{ control_subnet_cidr }}"
+      dns_label: "{{ control_subnet_dns_label }}"
+      public: true
+
+  - provider: oci
+    type: subnet
+    name: "{{ worker_subnet_name }}"
+    config:
+      vcn: "{{ vcn_name }}"
+      cidr_block: "{{ worker_subnet_cidr }}"
+      dns_label: "{{ worker_subnet_dns_label }}"
+      public: false

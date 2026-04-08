@@ -1,0 +1,56 @@
+# OCI k3s cluster compute instances.
+#
+# One explicit control-plane entry plus a Jinja loop over the workers: list.
+# Multi-instance safe: every outer name is templated. workers: is a list of
+# dicts with schema {name, ocpus, memory_gb}; see blueprint README.
+#
+# The cloud-init "tailscale" snippet is expected to live in the consumer
+# environment's files/cloud-init-snippets/ directory (the framework only
+# looks inside the env, not inside blueprints). Consumers can copy the
+# snippet from the example env at example-config/envs/oci-k3s/files/.
+instance:
+  # --- Control plane (public subnet) ---
+  - name: "{{ control_name }}"
+    shape: "{{ instance_shape }}"
+    shape_config:
+      ocpus: {{ control_ocpus }}
+      memory_in_gbs: {{ control_memory_gb }}
+    subnet: "{{ control_subnet_name }}"
+    image: "{{ image }}"
+    boot_volume_size_in_gbs: {{ control_boot_volume_gb }}
+    assign_public_ip: true
+    ssh_authorized_keys:
+      - "{{ ssh_public_key }}"
+    freeform_tags:
+      role: control-plane
+      cluster: "{{ cluster_name }}"
+      managed_by: infrafoundry
+    cloud_init_snippets:
+      - tailscale
+    cloud_init_vars:
+      TS_AUTH_KEY: "{{ tailscale_auth_key | default('') }}"
+      HOSTNAME: "{{ control_name }}"
+
+  # --- Worker nodes (private subnet, one per item in workers:) ---
+{% for worker in workers %}
+  - name: "{{ worker.name }}"
+    shape: "{{ instance_shape }}"
+    shape_config:
+      ocpus: {{ worker.ocpus }}
+      memory_in_gbs: {{ worker.memory_gb }}
+    subnet: "{{ worker_subnet_name }}"
+    image: "{{ image }}"
+    boot_volume_size_in_gbs: {{ worker_boot_volume_gb }}
+    assign_public_ip: false
+    ssh_authorized_keys:
+      - "{{ ssh_public_key }}"
+    freeform_tags:
+      role: worker
+      cluster: "{{ cluster_name }}"
+      managed_by: infrafoundry
+    cloud_init_snippets:
+      - tailscale
+    cloud_init_vars:
+      TS_AUTH_KEY: "{{ tailscale_auth_key | default('') }}"
+      HOSTNAME: "{{ worker.name }}"
+{% endfor %}
