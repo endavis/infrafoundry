@@ -20,6 +20,11 @@ defaults:
   bridge: vmbr0
   vlan_tag: 10
 
+  # --- SSH access ---
+  # Optional: SSH jumphost (e.g., "ansible@jump.example.com"). When empty, the
+  # post-deploy script SSHes directly from the InfraFoundry host to each node.
+  jumphost: ""
+
   # --- k3s installer flags ---
   k3s_server_args: "--disable traefik --disable servicelb"
 

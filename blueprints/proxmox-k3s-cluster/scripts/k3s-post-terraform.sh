@@ -25,7 +25,7 @@ set -euo pipefail
 # --- Read scalar variables from environment ---
 SERVER_IP="${INFRAFOUNDRY_VAR_server_ip}"
 SERVER_NAME="${INFRAFOUNDRY_VAR_server_name}"
-JUMPHOST="${INFRAFOUNDRY_VAR_jumphost}"
+JUMPHOST="${INFRAFOUNDRY_VAR_jumphost:-}"
 K3S_SERVER_ARGS="${INFRAFOUNDRY_VAR_k3s_server_args}"
 KUBECONFIG_LOCAL=$(eval echo "${INFRAFOUNDRY_VAR_kubeconfig_local_path}")
 
@@ -43,26 +43,54 @@ SSH_KEEPALIVE="${SSH} -o ServerAliveInterval=30"
 ALL_IPS=("${SERVER_IP}" "${AGENT_IPS[@]}")
 ALL_NAMES=("${SERVER_NAME}" "${AGENT_NAMES[@]}")
 
-# Helper: run command on a remote node via jumphost (as ansible user)
-remote_cmd() {
-    local ip="$1"
-    shift
-    ${SSH_KEEPALIVE} "${JUMPHOST}" "${SSH} ansible@${ip} '$*'"
-}
+# SSH helpers — when JUMPHOST is set, tunnel through it (run inner ssh on the
+# jumphost). When JUMPHOST is empty, ssh directly from the InfraFoundry host
+# to the target node. Direct mode is suitable when the workstation has line-of-
+# sight to the cluster network.
 
-# Helper: run command as root on a remote node via jumphost (for installs/system config)
-remote_root_cmd() {
-    local ip="$1"
-    shift
-    ${SSH_KEEPALIVE} "${JUMPHOST}" "${SSH} ansible@${ip} 'sudo PATH=/usr/local/bin:\$PATH bash -c \"$*\"'"
-}
+if [ -n "${JUMPHOST}" ]; then
+    # Helper: run command on a remote node via jumphost (as ansible user)
+    remote_cmd() {
+        local ip="$1"
+        shift
+        ${SSH_KEEPALIVE} "${JUMPHOST}" "${SSH} ansible@${ip} '$*'"
+    }
 
-# Helper: run kubectl on k3s server as ansible user (no sudo needed)
-remote_kubectl() {
-    local ip="$1"
-    shift
-    ${SSH_KEEPALIVE} "${JUMPHOST}" "${SSH} ansible@${ip} 'KUBECONFIG=/etc/rancher/k3s/k3s.yaml PATH=/usr/local/bin:\$PATH $*'"
-}
+    # Helper: run command as root on a remote node via jumphost (for installs/system config)
+    remote_root_cmd() {
+        local ip="$1"
+        shift
+        ${SSH_KEEPALIVE} "${JUMPHOST}" "${SSH} ansible@${ip} 'sudo PATH=/usr/local/bin:\$PATH bash -c \"$*\"'"
+    }
+
+    # Helper: run kubectl on k3s server as ansible user (no sudo needed)
+    remote_kubectl() {
+        local ip="$1"
+        shift
+        ${SSH_KEEPALIVE} "${JUMPHOST}" "${SSH} ansible@${ip} 'KUBECONFIG=/etc/rancher/k3s/k3s.yaml PATH=/usr/local/bin:\$PATH $*'"
+    }
+else
+    # Helper: run command on a remote node directly (as ansible user)
+    remote_cmd() {
+        local ip="$1"
+        shift
+        ${SSH_KEEPALIVE} "ansible@${ip}" "$*"
+    }
+
+    # Helper: run command as root on a remote node directly (for installs/system config)
+    remote_root_cmd() {
+        local ip="$1"
+        shift
+        ${SSH_KEEPALIVE} "ansible@${ip}" "sudo PATH=/usr/local/bin:\$PATH bash -c \"$*\""
+    }
+
+    # Helper: run kubectl on k3s server as ansible user directly (no sudo needed)
+    remote_kubectl() {
+        local ip="$1"
+        shift
+        ${SSH_KEEPALIVE} "ansible@${ip}" "KUBECONFIG=/etc/rancher/k3s/k3s.yaml PATH=/usr/local/bin:\$PATH $*"
+    }
+fi
 
 echo "=== k3s Cluster Setup ==="
 echo "Server: ${SERVER_NAME} (${SERVER_IP})"
@@ -70,7 +98,7 @@ echo "Agents (${#AGENT_NAMES[@]}):"
 for i in "${!AGENT_NAMES[@]}"; do
     echo "  - ${AGENT_NAMES[$i]} (${AGENT_IPS[$i]})"
 done
-echo "Jumphost: ${JUMPHOST}"
+echo "Jumphost: ${JUMPHOST:-<direct>}"
 
 # ===========================================================================
 # Phase 1: Wait for all VMs to be reachable

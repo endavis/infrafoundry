@@ -34,7 +34,9 @@ variables:
   cluster_name: my-k3s
   disk_storage: local-lvm
   dhcp_subnet: my-subnet
-  jumphost: "ansible@jump.example.com"
+
+  # Optional: route SSH through a bastion. Omit for direct SSH.
+  # jumphost: "ansible@jump.example.com"
 
   # --- Server node ---
   server_name: my-k3s-server
@@ -71,7 +73,6 @@ infra apply --env <env> --package k3s-cluster
 |---|---|---|
 | `disk_storage` | Proxmox storage pool for VM disks | `local-lvm` |
 | `dhcp_subnet` | OPNsense Kea subnet reference | `opt1-infrastructure` |
-| `jumphost` | SSH jumphost for VM access during install | `ansible@jump.example.com` |
 | `server_name` | Server VM hostname | `k3s-server` |
 | `server_vmid` | Server Proxmox VM ID | `230` |
 | `server_target` | Proxmox host for the server VM | `pve1` |
@@ -91,6 +92,7 @@ infra apply --env <env> --package k3s-cluster
 | `disk_size` | `56` | Disk size in GiB per VM |
 | `bridge` | `vmbr0` | Network bridge |
 | `vlan_tag` | `10` | VLAN tag for the VM NIC |
+| `jumphost` | `""` (direct SSH) | SSH jumphost for VM access during install. When empty, the post-deploy script SSHes directly from the InfraFoundry host to each node. Set to e.g. `ansible@jump.example.com` to tunnel through a bastion. |
 | `k3s_server_args` | `--disable traefik --disable servicelb` | Extra flags for the k3s server installer |
 | `kubeconfig_local_path` | `~/.kube/{{ cluster_name }}.yaml` | Local destination for the fetched kubeconfig |
 
@@ -112,8 +114,9 @@ The blueprint supports zero agents (empty list) for a single-node cluster.
 
 - The `rocky9-template` blueprint applied (provides the template VM to clone from)
 - An OPNsense Kea subnet reference matching `dhcp_subnet`
-- An SSH jumphost reachable from the InfraFoundry host with the `ansible` user
-  configured on every target VM (provided by the rocky9-template cloud-init)
+- SSH access from the InfraFoundry host to every target VM as the `ansible`
+  user (provided by the rocky9-template cloud-init). Either direct (default)
+  or via an SSH jumphost — see the `jumphost` variable.
 - `jq` and `bash 4+` available on the InfraFoundry host (post-deploy script
   uses `mapfile` and `jq -r '.agents[]'` to iterate the agent list)
 
