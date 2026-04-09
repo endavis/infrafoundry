@@ -21,32 +21,26 @@ GENERATED_INVENTORY_FILENAME = ".generated-inventory.yml"
 class InventoryGenerator:
     """Generates Ansible inventory files from manifest declarations.
 
-    The ``inventory`` section of a package manifest (or blueprint) declares
-    host groups with optional Jinja2 templating.  This class renders those
-    declarations with the merged variable set and writes the result to
-    the package directory.
+    The ``inventory`` section of a package manifest (or blueprint) is
+    extracted from the manifest file as raw YAML text before parsing.
+    This class renders that raw text through Jinja2 (with full control
+    flow support including ``{% for %}`` and ``{% if %}``), parses the
+    rendered YAML, and writes the result to the package directory.
     """
 
     def generate(
         self,
-        inventory_schema: dict[str, Any],
+        inventory_raw: str,
         variables: dict[str, Any],
         output_dir: Path,
     ) -> Path:
-        """Render an inventory declaration and write it to disk.
+        """Render a raw inventory YAML block and write the result.
 
         Args:
-            inventory_schema: The ``inventory`` dict from the manifest.
-                Expected structure::
-
-                    groups:
-                      group_name:
-                        hosts:
-                          host_name:
-                            ansible_host: "{{ some_var }}"
-                        vars:
-                          key: value
-
+            inventory_raw: Raw YAML text of the inventory block as
+                extracted from the manifest file.  The text is the
+                *body* of the ``inventory:`` key (dedented); it should
+                not include the leading ``inventory:`` line.
             variables: Merged variables for Jinja2 rendering.
             output_dir: Directory to write the generated inventory file.
 
@@ -56,7 +50,7 @@ class InventoryGenerator:
         Raises:
             InvalidConfigurationError: If rendering or writing fails.
         """
-        rendered = self._render_inventory(inventory_schema, variables)
+        rendered = self._render_inventory(inventory_raw, variables)
         output_path = output_dir / GENERATED_INVENTORY_FILENAME
         self._write_inventory(rendered, output_path)
 
@@ -69,32 +63,34 @@ class InventoryGenerator:
 
     def _render_inventory(
         self,
-        inventory_schema: dict[str, Any],
+        inventory_raw: str,
         variables: dict[str, Any],
     ) -> dict[str, Any]:
-        """Render Jinja2 templates in an inventory schema.
+        """Render Jinja2 templates in raw inventory YAML text.
 
-        Serialises the inventory dict to YAML, renders Jinja2, then
-        parses back to a dict.  This allows templates anywhere in the
-        structure (host names, vars, etc.).
+        Runs the raw inventory text through Jinja2 (with
+        ``StrictUndefined``) and then parses the rendered output as
+        YAML.  This allows full control-flow templating (``{% for %}``,
+        ``{% if %}``) that would otherwise be impossible because Jinja
+        control-flow tags are not valid YAML and cannot survive a
+        dict-first pipeline.
 
         Args:
-            inventory_schema: Raw inventory declaration.
+            inventory_raw: Raw YAML text of the inventory block.
             variables: Template variables.
 
         Returns:
             Rendered inventory as a dict.
 
         Raises:
-            InvalidConfigurationError: On template or YAML errors.
+            InvalidConfigurationError: On template or YAML errors, or
+                when the rendered output is not a YAML mapping.
         """
-        raw_yaml = yaml.dump(inventory_schema, default_flow_style=False)
-
         try:
             env = jinja2.Environment(
                 undefined=jinja2.StrictUndefined,
             )  # nosec B701 - rendering YAML, not HTML
-            template = env.from_string(raw_yaml)
+            template = env.from_string(inventory_raw)
             rendered_yaml = template.render(**variables)
         except jinja2.UndefinedError as e:
             raise InvalidConfigurationError(

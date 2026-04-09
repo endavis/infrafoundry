@@ -1034,6 +1034,123 @@ class TestBlueprintIntegration:
         assert handler["_blueprint_dir"] == str(bp_dir)
         assert handler["_package"] == "tagged-pkg"
 
+    def test_blueprint_inventory_with_loop_renders_via_consumer_variables(self, temp_dir):
+        """Blueprint inventory `{% for %}` expands using consumer-supplied workers."""
+        resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+
+        blueprint_dir = temp_dir.parent / "blueprints" / "loop-bp"
+        blueprint_dir.mkdir(parents=True, exist_ok=True)
+        (blueprint_dir / "blueprint.yaml").write_text(
+            "name: loop-bp\n"
+            "inventory:\n"
+            "  groups:\n"
+            "    k3s_workers:\n"
+            "      hosts:\n"
+            "        {% for w in workers %}\n"
+            "        {{ w.name }}:\n"
+            '          ansible_host: "{{ w.ip }}"\n'
+            "        {% endfor %}\n"
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = temp_dir / "dev" / "proxmox" / "loop-pkg"
+        pkg_dir.mkdir(parents=True, exist_ok=True)
+        (pkg_dir / "infrafoundry.yml").write_text(
+            "name: loop-pkg\n"
+            "blueprint: loop-bp\n"
+            "variables:\n"
+            "  workers:\n"
+            "    - name: worker-01\n"
+            "      ip: 10.0.0.11\n"
+            "    - name: worker-02\n"
+            "      ip: 10.0.0.12\n"
+        )
+
+        loader.load_package(pkg_dir, "proxmox", "dev")
+
+        inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
+        assert inventory_path.exists()
+        with open(inventory_path) as f:
+            data = yaml.safe_load(f)
+        hosts = data["groups"]["k3s_workers"]["hosts"]
+        assert set(hosts.keys()) == {"worker-01", "worker-02"}
+        assert hosts["worker-01"]["ansible_host"] == "10.0.0.11"
+        assert hosts["worker-02"]["ansible_host"] == "10.0.0.12"
+
+    def test_package_inventory_with_loop(self, temp_dir):
+        """Package-level inventory with `{% for %}` expands using package variables."""
+        loader = PackageLoader(temp_dir)
+        pkg_dir = temp_dir / "dev" / "proxmox" / "pkg-loop"
+        pkg_dir.mkdir(parents=True, exist_ok=True)
+        (pkg_dir / "infrafoundry.yml").write_text(
+            "name: pkg-loop\n"
+            "variables:\n"
+            "  nodes:\n"
+            "    - name: n1\n"
+            "      addr: 1.1.1.1\n"
+            "    - name: n2\n"
+            "      addr: 2.2.2.2\n"
+            "inventory:\n"
+            "  groups:\n"
+            "    cluster:\n"
+            "      hosts:\n"
+            "        {% for n in nodes %}\n"
+            "        {{ n.name }}:\n"
+            '          ansible_host: "{{ n.addr }}"\n'
+            "        {% endfor %}\n"
+        )
+
+        loader.load_package(pkg_dir, "proxmox", "dev")
+
+        inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
+        assert inventory_path.exists()
+        with open(inventory_path) as f:
+            data = yaml.safe_load(f)
+        hosts = data["groups"]["cluster"]["hosts"]
+        assert set(hosts.keys()) == {"n1", "n2"}
+        assert hosts["n1"]["ansible_host"] == "1.1.1.1"
+        assert hosts["n2"]["ansible_host"] == "2.2.2.2"
+
+    def test_blueprint_inventory_raw_inheritance(self, temp_dir):
+        """Blueprint `inventory_raw` is inherited onto a consumer with no inventory."""
+        resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+
+        blueprint_dir = temp_dir.parent / "blueprints" / "raw-inherit-bp"
+        blueprint_dir.mkdir(parents=True, exist_ok=True)
+        (blueprint_dir / "blueprint.yaml").write_text(
+            "name: raw-inherit-bp\n"
+            "defaults:\n"
+            "  host_ip: 10.0.0.99\n"
+            "inventory:\n"
+            "  groups:\n"
+            "    only:\n"
+            "      hosts:\n"
+            "        sole:\n"
+            '          ansible_host: "{{ host_ip }}"\n'
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "raw-inherit-pkg",
+            {
+                "name": "raw-inherit-pkg",
+                "blueprint": "raw-inherit-bp",
+            },
+        )
+
+        loader.load_package(pkg_dir, "proxmox", "dev")
+
+        inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
+        assert inventory_path.exists()
+        with open(inventory_path) as f:
+            data = yaml.safe_load(f)
+        assert data["groups"]["only"]["hosts"]["sole"]["ansible_host"] == "10.0.0.99"
+
     def test_secrets_override_blueprint_defaults(self, temp_dir):
         """Secrets take priority over both blueprint defaults and package vars."""
         resolver = BlueprintResolver(temp_dir)
