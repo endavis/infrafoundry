@@ -193,3 +193,104 @@ class TestResolveTargets:
         assert result["success"]
         # subprocess.run should NOT have been called (no init, no apply)
         mock_run.assert_not_called()
+
+
+class TestDestroyFailureCapture:
+    """Tests for _run_terraform capturing stderr/error on destroy failures."""
+
+    def _popen_mock(
+        self, returncode: int, stdout_lines: list[str], stderr_lines: list[str]
+    ) -> MagicMock:
+        process = MagicMock()
+        process.stdout = iter([line + "\n" for line in stdout_lines])
+        process.stderr = MagicMock()
+        process.stderr.__iter__ = MagicMock(
+            return_value=iter([line + "\n" for line in stderr_lines])
+        )
+        process.returncode = returncode
+        process.wait.return_value = returncode
+        return process
+
+    def test_run_terraform_destroy_includes_stderr_in_response(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        """On non-zero exit the response surfaces stderr and error keys."""
+        (provider.terraform_dir / ".terraform").mkdir()
+        process = self._popen_mock(
+            returncode=1,
+            stdout_lines=[],
+            stderr_lines=["Error: Instance cannot be destroyed"],
+        )
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.Popen", return_value=process),
+        ):
+            result = runner.destroy(provider, auto_approve=True)
+
+        assert result["success"] is False
+        assert result["exit_code"] == 1
+        assert "Instance cannot be destroyed" in result["stderr"]
+        assert "Instance cannot be destroyed" in result["error"]
+
+    def test_run_terraform_destroy_extracts_diagnostic_summary(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        """JSON diagnostic summaries are extracted into the error field."""
+        (provider.terraform_dir / ".terraform").mkdir()
+        diagnostic = json.dumps(
+            {
+                "@level": "error",
+                "@message": "Error: Instance cannot be destroyed",
+                "type": "diagnostic",
+                "diagnostic": {
+                    "summary": "Instance cannot be destroyed",
+                    "detail": "Resource has lifecycle.prevent_destroy set",
+                },
+            }
+        )
+        process = self._popen_mock(
+            returncode=1,
+            stdout_lines=[diagnostic],
+            stderr_lines=["(from terraform)"],
+        )
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.Popen", return_value=process),
+        ):
+            result = runner.destroy(provider, auto_approve=True)
+
+        assert result["success"] is False
+        assert "Instance cannot be destroyed" in result["error"]
+
+
+class TestVerifyDestroyed:
+    """Tests for TerraformRunner.verify_destroyed."""
+
+    def test_verify_destroyed_returns_empty_when_state_is_clean(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        """Empty state means nothing remains."""
+        with patch.object(runner, "get_resource_ids", return_value={}):
+            assert runner.verify_destroyed(provider, ["vm1"]) == []
+
+    def test_verify_destroyed_returns_remaining_names(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        """Names still in state are reported; missing ones are not."""
+        with patch.object(runner, "get_resource_ids", return_value={"vm1": "proxmox_vm_qemu.vm1"}):
+            result = runner.verify_destroyed(provider, ["vm1", "vm2"])
+        assert result == ["vm1"]
+
+    def test_verify_destroyed_handles_templated_names(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        """Suffix matching mirrors _resolve_terraform_targets for templated names."""
+        with patch.object(
+            runner,
+            "get_resource_ids",
+            return_value={"ovf_ontap_node_01": "terraform_data.ovf_ontap_node_01"},
+        ):
+            result = runner.verify_destroyed(provider, ["ontap-node-01"])
+        assert result == ["ontap-node-01"]

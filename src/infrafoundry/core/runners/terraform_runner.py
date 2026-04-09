@@ -342,9 +342,12 @@ class TerraformRunner(BaseRunner):
         process.wait()
         stderr_thread.join(timeout=10)
 
+        stderr_text = "\n".join(stderr_lines)
         response: dict[str, Any] = {
             "exit_code": process.returncode,
             "success": process.returncode == 0,
+            "stderr": stderr_text,
+            "error": self._extract_error_summary(stdout_lines, stderr_text),
         }
 
         # Parse resource outcomes from JSON output
@@ -354,6 +357,47 @@ class TerraformRunner(BaseRunner):
         response["resource_outcomes_summary"] = [o.to_dict() for o in outcomes]
 
         return response
+
+    @staticmethod
+    def _extract_error_summary(stdout_lines: list[str], stderr_text: str) -> str:
+        """Build a short error summary from terraform JSON diagnostics or stderr.
+
+        Scans stdout for JSON ``diagnostic`` events with ``@level == "error"``
+        and concatenates their ``summary`` fields. Falls back to a truncated
+        stderr when no JSON diagnostics are present.
+
+        Args:
+            stdout_lines: Lines of terraform JSON output.
+            stderr_text: Joined stderr content.
+
+        Returns:
+            Short human-readable error summary (possibly empty).
+        """
+        summaries: list[str] = []
+        for line in stdout_lines:
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if data.get("type") != "diagnostic":
+                continue
+            if data.get("@level") != "error":
+                continue
+            diagnostic = data.get("diagnostic", {})
+            summary = diagnostic.get("summary") or data.get("@message", "")
+            if summary:
+                summaries.append(summary)
+
+        if summaries:
+            return "; ".join(summaries)
+
+        # Fallback: truncated stderr
+        if stderr_text:
+            truncated = stderr_text.strip()
+            if len(truncated) > 500:
+                truncated = truncated[:500] + "..."
+            return truncated
+        return ""
 
     @staticmethod
     def _collect_stream(stream: IO[str] | None, collected: list[str]) -> None:
@@ -523,6 +567,24 @@ class TerraformRunner(BaseRunner):
         # 3. Fallback: full name conversion
         return tf_name.replace("_", "-")
 
+    @staticmethod
+    def _name_matches_tf_name(infra_name: str, tf_name: str) -> bool:
+        """Return True if *tf_name* corresponds to InfraFoundry *infra_name*.
+
+        Matches either the exact dash-to-underscore conversion or a
+        suffix match for templated/prefixed terraform names
+        (e.g. ``ovf_ontap_node_01`` corresponds to ``ontap-node-01``).
+
+        Args:
+            infra_name: InfraFoundry resource name (dashes allowed).
+            tf_name: Terraform resource name as it appears in state/.tf.
+
+        Returns:
+            True if ``tf_name`` represents ``infra_name``.
+        """
+        target = infra_name.replace("-", "_")
+        return tf_name == target or tf_name.endswith(f"_{target}")
+
     def _resolve_terraform_targets(self, tf_dir: Path, resource_names: list[str]) -> list[str]:
         """Resolve resource names to terraform resource addresses.
 
@@ -537,9 +599,6 @@ class TerraformRunner(BaseRunner):
             List of terraform resource addresses (e.g.,
             ["proxmox_virtual_environment_vm.infra_web"])
         """
-        # Convert resource names to terraform-style names (dashes to underscores)
-        tf_names = {name.replace("-", "_") for name in resource_names}
-
         targets: list[str] = []
         # Pattern matches: resource "type" "name" {
         resource_pattern = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
@@ -553,12 +612,40 @@ class TerraformRunner(BaseRunner):
                         resource_name = match.group(2)
                         # Exact match or suffix match for prefixed resources
                         # (e.g., "ovf_ontap_node_01" matches "ontap_node_01")
-                        if resource_name in tf_names or any(
-                            resource_name.endswith(f"_{tf_name}") for tf_name in tf_names
+                        if any(
+                            self._name_matches_tf_name(infra_name, resource_name)
+                            for infra_name in resource_names
                         ):
                             targets.append(f"{resource_type}.{resource_name}")
 
         return targets
+
+    def verify_destroyed(
+        self, provider: ProviderBase, expected_destroyed_names: list[str]
+    ) -> list[str]:
+        """Return resource names that are still present in terraform state.
+
+        Used after destroy to detect cases where terraform exited 0 but a
+        resource remains in state (e.g. ``lifecycle { prevent_destroy }``
+        blocks, partial failures, silent terraform quirks).
+
+        Args:
+            provider: Provider whose state to inspect.
+            expected_destroyed_names: Names of resources that should no longer
+                be in state.
+
+        Returns:
+            List of names from ``expected_destroyed_names`` that are still
+            present. Empty list means verification passed.
+        """
+        current = self.get_resource_ids(provider)  # {tf_name: tf_address}
+        still_present: list[str] = []
+        for infra_name in expected_destroyed_names:
+            for tf_name in current:
+                if self._name_matches_tf_name(infra_name, tf_name):
+                    still_present.append(infra_name)
+                    break
+        return still_present
 
     def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
         """Extract Terraform resource IDs from state.
