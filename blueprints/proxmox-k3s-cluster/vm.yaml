@@ -25,6 +25,8 @@ vms:
       - users/ansible
       - network/dhcp
       - packages/qemu-agent
+    cloud_init_vars:
+      HOSTNAME: "{{ server_name }}"
     tags: [k3s, k3s-server]
     onboot: true
 
@@ -51,6 +53,8 @@ vms:
       - users/ansible
       - network/dhcp
       - packages/qemu-agent
+    cloud_init_vars:
+      HOSTNAME: "{{ agent.name }}"
     tags: [k3s, k3s-agent]
     onboot: true
 {% endfor %}
