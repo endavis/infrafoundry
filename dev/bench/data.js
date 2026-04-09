@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775727426699,
+  "lastUpdate": 1775732591298,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4464,6 +4464,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000066236372799346846",
             "extra": "mean: 103.38616658743304 usec\nrounds: 2101"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d61bdcbcce3167f4db17372fe3bca4442b00a0b0",
+          "message": "fix: honor runner failure in infra apply and destroy (merges PR #521, addresses #510)\n\nBoth DestroyOrchestrator.destroy and DeploymentExecutor.apply_single_provider\nread the runner result dict but never raised on success: False. The runner\ncorrectly captured terraform's non-zero exit, but the orchestrator/executor\nemitted RUNNER_COMPLETED with a hardcoded success: True and the CLI printed\nthe green checkmark anyway. Original reproduction: a Proxmox template with\nlifecycle { prevent_destroy = true } — terraform refused, framework lied.\n\nFix is in three pieces:\n\n1. Runner: TerraformRunner._run_terraform now captures stderr and a parsed\n   error summary from terraform's JSON diagnostic output, so callers have\n   meaningful context to surface.\n\n2. Shared helper: new raise_on_runner_failure() in core/runner_results.py\n   converts a failed result dict into TerraformError. Used by both destroy\n   and apply paths. Helper is intentionally pure — it raises but does not\n   emit events; each call site's existing except handler emits RUNNER_FAILED\n   exactly once.\n\n3. State verification (destroy only): new TerraformRunner.verify_destroyed\n   reuses get_resource_ids to assert resources we asked to destroy are\n   actually gone from state. Catches the case where terraform exits 0 but\n   leaves things behind. Shares _name_matches_tf_name with the existing\n   _resolve_terraform_targets to handle templated resource names.\n\nCLI required no changes — with_orchestrator already catches InfraFoundryError\nand routes through raise_cli_error, so the success message simply never\nprints when the exception propagates.\n\nSibling to PR #515 (destroy regenerates .tf before invoking terraform).\nTogether they close the destroy-lied bug class: #515 makes terraform run\nagainst the right config; this PR makes the framework believe terraform\nwhen it says no.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-09T12:02:32+01:00",
+          "tree_id": "9b80ad6ccc2a21096098b69b982416c6520296c3",
+          "url": "https://github.com/endavis/infrafoundry/commit/d61bdcbcce3167f4db17372fe3bca4442b00a0b0"
+        },
+        "date": 1775732590137,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7279.237794412334,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009790961886117077",
+            "extra": "mean: 137.3770205402023 usec\nrounds: 2629"
           }
         ]
       }
