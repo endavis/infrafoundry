@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775732591298,
+  "lastUpdate": 1775742215330,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4495,6 +4495,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009790961886117077",
             "extra": "mean: 137.3770205402023 usec\nrounds: 2629"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fb8495eaef3856b1f064d1d4a35f4f50732bb180",
+          "message": "fix: populate _package_dir on event handler configs (merges PR #522, addresses #516)\n\nThe script handler at events/handlers/script.py:133-138 reads\nself.config.get(\"_package_dir\") to locate the package's\n.generated-inventory.yml and inject INFRAFOUNDRY_INVENTORY into the\nscript's env. The read was correct but nothing in the codebase ever\npopulated _package_dir, so the env var was never set. Dead code.\n\nSurfaced during the oci-k3s-cluster blueprint conversion (#505): the\nblueprint had to fall back to building the inventory via jq in its\non_create script because the framework's intended pathway was broken.\n\nExtract a _tag_handler_configs() private helper on PackageLoader and\ncall it from both the package-level event tagging path and the\nresource-level event rewrite path in load_package(). Resource-level\nevents previously received NO framework-internal tags at all\n(_package, _blueprint_dir, _package_dir) — this fixes that parallel\ngap alongside the _package_dir fix.\n\nScript handler source is unchanged; the read site was already correct.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-09T14:42:36+01:00",
+          "tree_id": "64f1aa81501d912e14917c1e19c5c617880ccdf8",
+          "url": "https://github.com/endavis/infrafoundry/commit/fb8495eaef3856b1f064d1d4a35f4f50732bb180"
+        },
+        "date": 1775742214753,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7391.56082337901,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009775658528309005",
+            "extra": "mean: 135.28942315364128 usec\nrounds: 2505"
           }
         ]
       }
