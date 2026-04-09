@@ -11,6 +11,7 @@ from typing import Any
 
 import yaml
 
+from infrafoundry.core.config.manifest_utils import extract_inventory_block
 from infrafoundry.core.exceptions import InvalidConfigurationError
 
 logger = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ class BlueprintResolver:
         if not manifest_path.exists():
             raise InvalidConfigurationError(f"Blueprint manifest not found: {manifest_path}")
 
-        data = self._load_manifest(manifest_path)
+        data, inventory_raw = self._load_manifest(manifest_path)
         self._validate_manifest(data, manifest_path)
 
         # Normalise optional fields
@@ -91,6 +92,7 @@ class BlueprintResolver:
             "resources": data.get("resources", []),
             "events": data.get("events", {}),
             "inventory": data.get("inventory"),
+            "inventory_raw": inventory_raw,
             "blueprint_dir": blueprint_dir,
         }
 
@@ -167,21 +169,33 @@ class BlueprintResolver:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _load_manifest(manifest_path: Path) -> dict[str, Any]:
+    def _load_manifest(manifest_path: Path) -> tuple[dict[str, Any], str | None]:
         """Load a blueprint.yaml file.
+
+        Extracts the top-level ``inventory:`` block as raw text before
+        YAML parsing so that Jinja control-flow tags can survive to the
+        inventory generator.
 
         Args:
             manifest_path: Path to the blueprint.yaml file.
 
         Returns:
-            Parsed YAML data.
+            Tuple of ``(parsed_data, inventory_raw)``.
 
         Raises:
             InvalidConfigurationError: On YAML errors.
         """
         try:
-            with open(manifest_path) as f:
-                data = yaml.safe_load(f)
+            file_text = manifest_path.read_text()
+        except OSError as e:
+            raise InvalidConfigurationError(
+                f"Failed to read blueprint manifest {manifest_path}: {e}"
+            ) from e
+
+        text_without_inventory, inventory_raw = extract_inventory_block(file_text)
+
+        try:
+            data = yaml.safe_load(text_without_inventory)
         except yaml.YAMLError as e:
             raise InvalidConfigurationError(
                 f"Invalid YAML in blueprint manifest {manifest_path}: {e}"
@@ -193,7 +207,7 @@ class BlueprintResolver:
             )
 
         result: dict[str, Any] = data
-        return result
+        return result, inventory_raw
 
     @staticmethod
     def _validate_manifest(data: dict[str, Any], manifest_path: Path) -> None:

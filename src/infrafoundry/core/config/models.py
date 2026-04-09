@@ -146,3 +146,8 @@ class PackageManifest(BaseModel):
     resources: list[str] = Field(default_factory=list)
     events: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
     inventory: dict[str, Any] | None = None
+    # Raw YAML text of the manifest's ``inventory:`` block, extracted
+    # before ``yaml.safe_load`` so the generator can render it through
+    # Jinja2 with full control-flow support.  Framework-internal; not
+    # serialised back to disk.
+    inventory_raw: str | None = Field(default=None, exclude=True)

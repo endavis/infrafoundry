@@ -73,7 +73,12 @@ class TestBlueprintResolverResolve:
         assert result["defaults"]["cluster_name"] == "default-cluster"
         assert result["resources"] == ["vm.yaml", "network.yaml"]
         assert len(result["events"]["AFTER_APPLY"]) == 1
-        assert result["inventory"]["groups"]["hosts"]["host1"] == {}
+        # ``inventory`` is stripped from the parsed data; the raw block is
+        # carried separately so the generator can Jinja-render it.
+        assert result["inventory"] is None
+        assert result["inventory_raw"] is not None
+        assert "groups:" in result["inventory_raw"]
+        assert "host1" in result["inventory_raw"]
         assert result["blueprint_dir"].name == "ontap-cluster"
 
     def test_resolve_minimal_blueprint(self, temp_dir):
