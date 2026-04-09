@@ -136,6 +136,34 @@ def test_proxmox_k3s_cluster_example_vm_configs(loader: PackageLoader) -> None:
     assert agent2["tags"] == ["k3s", "k3s-agent"]
 
 
+def test_proxmox_k3s_cluster_example_sets_per_vm_cloud_init_hostname(
+    loader: PackageLoader,
+) -> None:
+    """Each VM resource carries a ``cloud_init_vars['HOSTNAME']`` matching its own name.
+
+    Regression guard for #526. The blueprint references the shared
+    ``system/hostname`` cloud-init snippet which contains a ``${HOSTNAME}``
+    placeholder. Before this fix the blueprint never populated
+    ``cloud_init_vars`` so the placeholder was never substituted and every VM
+    came up with the same broken hostname, causing k3s cluster formation to
+    fail with node-name collisions.
+    """
+    resources, _events, _variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
+    )
+    vms = [r for r in resources if r.type == "vm"]
+    assert vms, "expected at least one VM resource"
+    for vm in vms:
+        assert "cloud_init_vars" in vm.config, (
+            f"VM {vm.name} is missing cloud_init_vars; system/hostname snippet "
+            f"substitution will fail"
+        )
+        assert vm.config["cloud_init_vars"]["HOSTNAME"] == vm.name, (
+            f"VM {vm.name}'s HOSTNAME cloud_init_var must match its own name "
+            f"(got {vm.config['cloud_init_vars']['HOSTNAME']!r})"
+        )
+
+
 def test_proxmox_k3s_cluster_example_dhcp_configs(loader: PackageLoader) -> None:
     """Each rendered kea_reservation matches its corresponding VM."""
     resources, _events, _variables = loader.load_package(
