@@ -1,5 +1,7 @@
 """Unit tests for PackageLoader."""
 
+from pathlib import Path
+
 import pytest
 import yaml
 
@@ -1068,3 +1070,148 @@ class TestBlueprintIntegration:
         assert variables["password"] == "secret-password"
         assert variables["host"] == "secret-host"
         assert resources[0].name == "secret-host"
+
+
+@pytest.mark.unit
+class TestHandlerConfigTagging:
+    """Tests for _package_dir/_package/_blueprint_dir injection on handler configs."""
+
+    def test_load_package_tags_package_event_handlers_with_package_dir(self, temp_dir):
+        """Package-level event handlers carry _package_dir pointing at the package."""
+        loader = PackageLoader(temp_dir)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "tagged-pkg",
+            {
+                "name": "tagged-pkg",
+                "events": {
+                    "AFTER_APPLY": [{"type": "script", "script": "scripts/run.sh"}],
+                },
+            },
+            {"scripts/run.sh": "#!/bin/bash\necho run\n"},
+        )
+
+        _, events, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        handler = events["AFTER_APPLY"][0]
+        assert handler["_package"] == "tagged-pkg"
+        assert handler["_package_dir"] == str(pkg_dir)
+        assert "_blueprint_dir" not in handler
+
+    def test_load_package_tags_resource_event_handlers_with_package_dir(self, temp_dir):
+        """Resource-level event handlers carry _package and _package_dir tags."""
+        loader = PackageLoader(temp_dir)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "res-evt-pkg",
+            {
+                "name": "res-evt-pkg",
+                "resources": ["vm.yaml"],
+            },
+            {
+                "vm.yaml": (
+                    "vm:\n"
+                    "  - name: my-vm\n"
+                    "    events:\n"
+                    "      AFTER_APPLY:\n"
+                    "        - type: script\n"
+                    "          script: scripts/post.sh\n"
+                ),
+                "scripts/post.sh": "#!/bin/bash\necho post\n",
+            },
+        )
+
+        resources, _, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert len(resources) == 1
+        resource = resources[0]
+        assert resource.events is not None
+        handler = resource.events["AFTER_APPLY"][0]
+        assert handler["_package"] == "res-evt-pkg"
+        assert handler["_package_dir"] == str(pkg_dir)
+        assert "_blueprint_dir" not in handler
+
+    def test_load_package_handler_package_dir_matches_inventory_output_dir(self, temp_dir):
+        """_package_dir on handlers points at the dir where inventory was generated."""
+        loader = PackageLoader(temp_dir)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "inv-tagged-pkg",
+            {
+                "name": "inv-tagged-pkg",
+                "events": {
+                    "AFTER_APPLY": [{"type": "script", "script": "scripts/run.sh"}],
+                },
+                "inventory": {
+                    "groups": {
+                        "all": {
+                            "hosts": {
+                                "host-01": {"ansible_host": "10.0.0.5"},
+                            }
+                        }
+                    }
+                },
+            },
+            {"scripts/run.sh": "#!/bin/bash\necho run\n"},
+        )
+
+        _, events, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        handler = events["AFTER_APPLY"][0]
+        expected_inventory = Path(handler["_package_dir"]) / GENERATED_INVENTORY_FILENAME
+        assert expected_inventory.exists()
+        # And the dir the generator wrote to is exactly the package dir
+        assert (pkg_dir / GENERATED_INVENTORY_FILENAME).exists()
+        assert handler["_package_dir"] == str(pkg_dir)
+
+    def test_blueprint_consumer_tags_resource_handlers_with_blueprint_dir(self, temp_dir):
+        """When a package consumes a blueprint, resource-level handlers also get _blueprint_dir."""
+        resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        bp_dir = _create_blueprint(
+            temp_dir,
+            "res-evt-bp",
+            {
+                "name": "res-evt-bp",
+                "resources": ["vm.yaml"],
+            },
+            {
+                "vm.yaml": (
+                    "vm:\n"
+                    "  - name: bp-vm\n"
+                    "    events:\n"
+                    "      AFTER_APPLY:\n"
+                    "        - type: script\n"
+                    "          script: scripts/bp-post.sh\n"
+                ),
+                "scripts/bp-post.sh": "#!/bin/bash\necho bp-post\n",
+            },
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "bp-consumer",
+            {
+                "name": "bp-consumer",
+                "blueprint": "res-evt-bp",
+            },
+        )
+
+        resources, _, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert len(resources) == 1
+        resource = resources[0]
+        assert resource.events is not None
+        handler = resource.events["AFTER_APPLY"][0]
+        assert handler["_package"] == "bp-consumer"
+        assert handler["_package_dir"] == str(pkg_dir)
+        assert handler["_blueprint_dir"] == str(bp_dir)

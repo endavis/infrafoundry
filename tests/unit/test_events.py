@@ -230,6 +230,102 @@ class TestScriptHandlerEnvironment:
         assert "INFRAFOUNDRY_RUNNER" not in env
 
 
+def _make_dump_env_script(tmp_path: Path, name: str) -> tuple[Path, Path]:
+    """Create an executable script that dumps its environment to a file.
+
+    Returns:
+        (script_rel_path, output_file_path) where ``script_rel_path`` is the
+        filename relative to ``envs/dev/`` and ``output_file_path`` is the
+        absolute path the script writes to.
+    """
+    env_dir = tmp_path / "envs" / "dev"
+    env_dir.mkdir(parents=True, exist_ok=True)
+    out_file = tmp_path / "env-dump.txt"
+    script = env_dir / name
+    script.write_text(f"#!/bin/bash\nenv > {out_file}\n")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    return Path(name), out_file
+
+
+def _parse_env_dump(path: Path) -> dict[str, str]:
+    """Parse a file produced by ``env`` into a dict."""
+    result: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        if "=" in line:
+            k, _, v = line.partition("=")
+            result[k] = v
+    return result
+
+
+@pytest.mark.unit
+class TestScriptHandlerInventoryInjection:
+    """Tests for INFRAFOUNDRY_INVENTORY injection from _package_dir."""
+
+    def test_injects_inventory_env_when_package_dir_has_generated_inventory(self, tmp_path: Path):
+        """INFRAFOUNDRY_INVENTORY is set when _package_dir contains .generated-inventory.yml."""
+        script_rel, out_file = _make_dump_env_script(tmp_path, "dump.sh")
+
+        # Create a fake package dir with a generated inventory file
+        pkg_dir = tmp_path / "envs" / "dev" / "proxmox" / "my-pkg"
+        pkg_dir.mkdir(parents=True, exist_ok=True)
+        inventory_path = pkg_dir / ".generated-inventory.yml"
+        inventory_path.write_text("groups: {}\n")
+
+        handler = ScriptHandler(
+            {"script": str(script_rel), "_package_dir": str(pkg_dir)},
+            config_base_dir=tmp_path,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+        assert result.success, result.reason
+
+        env = _parse_env_dump(out_file)
+        assert env.get("INFRAFOUNDRY_INVENTORY") == str(inventory_path)
+
+    def test_does_not_inject_inventory_when_file_missing(self, tmp_path: Path):
+        """INFRAFOUNDRY_INVENTORY is not set when _package_dir has no inventory file."""
+        script_rel, out_file = _make_dump_env_script(tmp_path, "dump-no-inv.sh")
+
+        pkg_dir = tmp_path / "envs" / "dev" / "proxmox" / "no-inv-pkg"
+        pkg_dir.mkdir(parents=True, exist_ok=True)
+        # No .generated-inventory.yml created
+
+        handler = ScriptHandler(
+            {"script": str(script_rel), "_package_dir": str(pkg_dir)},
+            config_base_dir=tmp_path,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+        assert result.success, result.reason
+
+        env = _parse_env_dump(out_file)
+        assert "INFRAFOUNDRY_INVENTORY" not in env
+
+    def test_does_not_inject_inventory_when_package_dir_absent(self, tmp_path: Path):
+        """INFRAFOUNDRY_INVENTORY is unset when config has no _package_dir (env-level handler)."""
+        script_rel, out_file = _make_dump_env_script(tmp_path, "dump-no-pkg.sh")
+
+        handler = ScriptHandler(
+            {"script": str(script_rel)},
+            config_base_dir=tmp_path,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+        assert result.success, result.reason
+
+        env = _parse_env_dump(out_file)
+        assert "INFRAFOUNDRY_INVENTORY" not in env
+
+
 def _make_script(tmp_path: Path, name: str, content: str) -> Path:
     """Create an executable script in the expected directory structure.
 

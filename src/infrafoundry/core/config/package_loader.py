@@ -259,19 +259,25 @@ class PackageLoader:
         events = self._rewrite_event_scripts(
             manifest.events, package_dir, env_dir, blueprint_dir=blueprint_dir
         )
+        self._tag_handler_configs(
+            events,
+            package_name=manifest.name,
+            package_dir=package_dir,
+            blueprint_dir=blueprint_dir,
+        )
 
-        # Tag each handler config with its originating package name
-        for _event_key, handler_list in events.items():
-            for handler_config in handler_list:
-                handler_config["_package"] = manifest.name
-                if blueprint_dir:
-                    handler_config["_blueprint_dir"] = str(blueprint_dir)
-
-        # Rewrite resource-level event script paths
+        # Rewrite resource-level event script paths and tag them with the
+        # same framework-internal keys as package-level handlers.
         for resource in resources:
             if resource.events:
                 resource.events = self._rewrite_event_scripts(
                     resource.events, package_dir, env_dir, blueprint_dir=blueprint_dir
+                )
+                self._tag_handler_configs(
+                    resource.events,
+                    package_name=manifest.name,
+                    package_dir=package_dir,
+                    blueprint_dir=blueprint_dir,
                 )
 
         # ----- Inventory generation -----
@@ -485,6 +491,35 @@ class PackageLoader:
         if not package_path.exists():
             raise InvalidConfigurationError(f"Resource file not found: {package_path}")
         return package_path
+
+    def _tag_handler_configs(
+        self,
+        events: dict[str, list[dict[str, Any]]],
+        *,
+        package_name: str,
+        package_dir: Path,
+        blueprint_dir: Path | None,
+    ) -> None:
+        """Inject framework-internal keys onto every handler config in *events*.
+
+        Mutates *events* in place so downstream consumers (e.g. the script
+        handler) can introspect the originating package when they run.
+
+        Args:
+            events: Event handler configurations, grouped by event name.
+            package_name: Name of the originating package.
+            package_dir: Directory of the originating package.
+            blueprint_dir: Optional blueprint directory when the package
+                consumes a blueprint.
+        """
+        if not events:
+            return
+        for handler_list in events.values():
+            for handler_config in handler_list:
+                handler_config["_package"] = package_name
+                handler_config["_package_dir"] = str(package_dir)
+                if blueprint_dir:
+                    handler_config["_blueprint_dir"] = str(blueprint_dir)
 
     def _rewrite_event_scripts(
         self,
