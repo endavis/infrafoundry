@@ -36,15 +36,131 @@ def test_is_available(runner: TerraformRunner) -> None:
         assert not runner.is_available()
 
 
-def test_initialize_skips_when_already_initialized(
+def test_initialize_runs_init_even_when_already_initialized(
     runner: TerraformRunner, provider: MagicMock
 ) -> None:
-    """Initialization short-circuits when .terraform exists."""
+    """Init is always invoked, even when ``.terraform/`` is already present.
+
+    Regression test for #524: the previous short-circuit trusted
+    ``.terraform/`` presence as proof of consistency and hid ``provider.tf``
+    changes (e.g. a newly-declared provider) until apply time, producing
+    an ``Inconsistent dependency lock file`` error. ``terraform init`` is
+    idempotent and cheap, so we always run it.
+    """
     (provider.terraform_dir / ".terraform").mkdir()
-    with patch("shutil.which", return_value="/usr/bin/terraform"):
+    with (
+        patch("shutil.which", return_value="/usr/bin/terraform"),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
         result = runner.initialize(provider.terraform_dir)
     assert result["success"]
-    assert "Already initialized" in result["message"]
+    mock_run.assert_called_once()
+    assert mock_run.call_args[0][0][1] == "init"
+    # No special flags should be added in the default re-init case
+    assert "-reconfigure" not in mock_run.call_args[0][0]
+    assert "-upgrade" not in mock_run.call_args[0][0]
+
+
+def test_initialize_detects_stale_provider_lock_scenario(
+    runner: TerraformRunner, provider: MagicMock
+) -> None:
+    """Documents the #524 repro: stale ``.terraform.lock.hcl`` after a new provider is added.
+
+    Creates a working dir with ``.terraform/``, a stale lock file containing
+    only provider A, and a ``provider.tf`` declaring both A and B. Before
+    the fix, initialize short-circuited and apply later failed with
+    ``Inconsistent dependency lock file``. After the fix, init runs and
+    (in a real terraform invocation) would download B and update the lock.
+    Here we mock subprocess and assert init is actually called.
+    """
+    (provider.terraform_dir / ".terraform").mkdir()
+    (provider.terraform_dir / ".terraform.lock.hcl").write_text(
+        'provider "registry.terraform.io/bpg/proxmox" {\n  version = "0.98.1"\n}\n'
+    )
+    (provider.terraform_dir / "provider.tf").write_text(
+        "terraform {\n  required_providers {\n"
+        '    proxmox = { source = "bpg/proxmox" }\n'
+        '    cloudinit = { source = "hashicorp/cloudinit" }\n'
+        "  }\n}\n"
+    )
+    with (
+        patch("shutil.which", return_value="/usr/bin/terraform"),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+        result = runner.initialize(provider.terraform_dir)
+    assert result["success"]
+    mock_run.assert_called_once()
+    assert mock_run.call_args[0][0][1] == "init"
+
+
+def test_initialize_preserves_backend_change_reconfigure(
+    runner: TerraformRunner, provider: MagicMock
+) -> None:
+    """Backend swap detection still adds ``-reconfigure`` to the init command."""
+    (provider.terraform_dir / ".terraform").mkdir()
+    # Simulate prior local-backend state + a new backend.tf (i.e. a swap TO remote)
+    (provider.terraform_dir / ".terraform" / "terraform.tfstate").write_text(
+        json.dumps({"backend": {"type": "local"}})
+    )
+    (provider.terraform_dir / "backend.tf").write_text('terraform { backend "s3" {} }\n')
+    with (
+        patch("shutil.which", return_value="/usr/bin/terraform"),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+        result = runner.initialize(provider.terraform_dir)
+    assert result["success"]
+    args = mock_run.call_args[0][0]
+    assert "-reconfigure" in args
+
+
+def test_initialize_honors_explicit_upgrade_flag(
+    runner: TerraformRunner, provider: MagicMock
+) -> None:
+    """Explicit ``upgrade=True`` still triggers ``terraform init -upgrade``."""
+    (provider.terraform_dir / ".terraform").mkdir()
+    with (
+        patch("shutil.which", return_value="/usr/bin/terraform"),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+        runner.initialize(provider.terraform_dir, upgrade=True)
+    args = mock_run.call_args[0][0]
+    assert "-upgrade" in args
+
+
+def test_initialize_honors_explicit_reconfigure_flag(
+    runner: TerraformRunner, provider: MagicMock
+) -> None:
+    """Explicit ``reconfigure=True`` still triggers ``terraform init -reconfigure``."""
+    (provider.terraform_dir / ".terraform").mkdir()
+    with (
+        patch("shutil.which", return_value="/usr/bin/terraform"),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+        runner.initialize(provider.terraform_dir, reconfigure=True)
+    args = mock_run.call_args[0][0]
+    assert "-reconfigure" in args
+
+
+def test_initialize_fresh_directory(runner: TerraformRunner, provider: MagicMock) -> None:
+    """Fresh directory (no ``.terraform/``) runs plain ``terraform init``."""
+    # provider fixture already leaves .terraform absent
+    assert not (provider.terraform_dir / ".terraform").exists()
+    with (
+        patch("shutil.which", return_value="/usr/bin/terraform"),
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+        result = runner.initialize(provider.terraform_dir)
+    assert result["success"]
+    args = mock_run.call_args[0][0]
+    assert args[1] == "init"
+    assert "-reconfigure" not in args
+    assert "-upgrade" not in args
 
 
 def test_initialize_missing_binary(runner: TerraformRunner, provider: MagicMock) -> None:
@@ -180,19 +296,21 @@ class TestResolveTargets:
     def test_unmatched_filter_skips_terraform(
         self, runner: TerraformRunner, provider: MagicMock
     ) -> None:
-        """When no targets match, terraform is skipped instead of running unfiltered."""
+        """When no targets match, the apply subprocess is skipped."""
         (provider.terraform_dir / "main.tf").write_text('resource "esxi_guest" "other_vm" {\n}\n')
         (provider.terraform_dir / ".terraform").mkdir()
         with (
             patch("shutil.which", return_value="/usr/bin/terraform"),
             patch("subprocess.run") as mock_run,
+            patch("subprocess.Popen") as mock_popen,
         ):
             mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
             result = runner.apply(provider, auto_approve=True, target_resources=["no-match"])
 
         assert result["success"]
-        # subprocess.run should NOT have been called (no init, no apply)
-        mock_run.assert_not_called()
+        # Init runs (via subprocess.run) regardless, but the apply itself
+        # (via subprocess.Popen) must be skipped when the filter matches nothing.
+        mock_popen.assert_not_called()
 
 
 class TestDestroyFailureCapture:
@@ -224,8 +342,10 @@ class TestDestroyFailureCapture:
 
         with (
             patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
             patch("subprocess.Popen", return_value=process),
         ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
             result = runner.destroy(provider, auto_approve=True)
 
         assert result["success"] is False
@@ -257,8 +377,10 @@ class TestDestroyFailureCapture:
 
         with (
             patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
             patch("subprocess.Popen", return_value=process),
         ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
             result = runner.destroy(provider, auto_approve=True)
 
         assert result["success"] is False
