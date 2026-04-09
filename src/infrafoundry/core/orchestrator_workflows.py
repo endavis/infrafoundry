@@ -17,9 +17,11 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.exceptions import TerraformError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.protocols import Destroyable, Plannable
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.secrets.secret_manager import SecretManager
@@ -1139,11 +1141,39 @@ class DestroyOrchestrator(HookExecutionMixin):
                         outcomes = cast(list[ResourceOutcome], raw_outcomes)
                         all_outcomes.extend(outcomes)
 
+                        # Honor the runner's success flag: if terraform
+                        # exited non-zero (e.g. prevent_destroy), raise so
+                        # the CLI reports failure rather than printing a
+                        # misleading success message. The surrounding
+                        # ``except Exception`` handler emits RUNNER_FAILED.
+                        raise_on_runner_failure(
+                            runner_result,
+                            provider_name=provider_name,
+                            phase="destroy",
+                        )
+
+                        # Verify state: defense-in-depth check for the case
+                        # where terraform exits 0 but a resource is still
+                        # present in state.
+                        if hasattr(runner, "verify_destroyed"):
+                            expected_names = [r.name for r in resources]
+                            still_present = runner.verify_destroyed(provider, expected_names)
+                            if still_present:
+                                raise TerraformError(
+                                    (
+                                        f"Destroy reported success for provider "
+                                        f"'{provider_name}' but "
+                                        f"{len(still_present)} resource(s) remain "
+                                        f"in state: {still_present}"
+                                    ),
+                                    exit_code=runner_result.get("exit_code"),
+                                )
+
                         completed_event: RunnerEventData = {
                             "provider": provider_name,
                             "runner": tool_name,
                             "phase": "destroy",
-                            "success": True,
+                            "success": bool(runner_result.get("success", False)),
                         }
                         warnings.warn(
                             "RUNNER_COMPLETED event is deprecated. "

@@ -28,6 +28,9 @@ class BaseResult(TypedDict):
     output: NotRequired[str]
     """Raw output from the tool."""
 
+    stderr: NotRequired[str]
+    """Captured standard-error stream from the underlying tool."""
+
 
 class PlanResult(BaseResult):
     """Result from plan operation.

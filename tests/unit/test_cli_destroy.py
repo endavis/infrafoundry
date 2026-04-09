@@ -6,6 +6,7 @@ import pytest
 from click.testing import CliRunner
 
 from infrafoundry.cli.main import main
+from infrafoundry.core.exceptions import TerraformError
 from infrafoundry.core.orchestrator import Orchestrator
 
 
@@ -93,3 +94,21 @@ def test_destroy_orchestrator_failure(cli_runner, mock_orchestrator):
 
         assert result.exit_code == 1
         assert "Destroy failed" in result.output
+
+
+def test_destroy_cli_does_not_print_success_on_orchestrator_failure(cli_runner, mock_orchestrator):
+    """Regression for #510: TerraformError from orchestrator must not show 'Destroy complete!'."""
+    mock_orchestrator.destroy.side_effect = TerraformError(
+        "Terraform destroy failed for provider 'proxmox': Instance cannot be destroyed",
+        exit_code=1,
+        stderr="Error: Instance cannot be destroyed",
+    )
+
+    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+        result = cli_runner.invoke(main, ["infra", "destroy", "--env", "test", "--auto-approve"])
+
+    assert result.exit_code != 0
+    assert "Destroy complete!" not in result.output
+    # Error is reported via the framework's error catalog (IF-RUNNER-001).
+    assert "Terraform" in result.output
+    assert "Destroy failed" in result.output

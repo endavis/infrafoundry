@@ -13,6 +13,7 @@ from infrafoundry.core.exceptions import InfraFoundryError, ResourceFilterError
 from infrafoundry.core.execution_planner import ExecutionPlanner
 from infrafoundry.core.protocols import Applyable, StateAware
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.state import ResourceState, StateManager
@@ -472,6 +473,16 @@ class DeploymentExecutor:
                 raw_outcomes = run_result.get("resource_outcomes", [])
                 outcomes = cast(list[ResourceOutcome], raw_outcomes)
                 all_outcomes.extend(outcomes)
+
+                # Honor the runner's success flag: if terraform exited
+                # non-zero, raise so the CLI reports failure rather than
+                # printing a misleading success message. The surrounding
+                # ``except Exception`` handler emits RUNNER_FAILED.
+                raise_on_runner_failure(
+                    run_result,
+                    provider_name=provider_name,
+                    phase="apply",
+                )
 
                 completed_event: RunnerEventData = {
                     "provider": provider_name,

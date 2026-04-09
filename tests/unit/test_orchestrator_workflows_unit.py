@@ -360,6 +360,7 @@ def test_destroy_emits_runner_starting_and_completed(console):
     tf_runner = MagicMock()
     tf_runner.priority = 0
     tf_runner.destroy = MagicMock(return_value={"success": True})
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
 
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -438,6 +439,7 @@ def test_destroy_orchestrator_regenerates_configs_before_destroy(console):
     tf_runner.priority = 0
     tf_runner.is_iac_runner = True
     tf_runner.destroy = MagicMock(return_value={"success": True})
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
 
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -496,6 +498,7 @@ def test_destroy_orchestrator_regenerates_with_all_resources_when_filtered(conso
     tf_runner.priority = 0
     tf_runner.is_iac_runner = True
     tf_runner.destroy = MagicMock(return_value={"success": True})
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
 
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -547,6 +550,7 @@ def test_destroy_orchestrator_skips_generate_when_provider_lacks_method(console)
     tf_runner.priority = 0
     tf_runner.is_iac_runner = True
     tf_runner.destroy = MagicMock(return_value={"success": True})
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
 
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -584,6 +588,271 @@ def test_destroy_orchestrator_skips_generate_when_provider_lacks_method(console)
 
     tf_runner.destroy.assert_called_once()
     assert not hasattr(provider, "generate_terraform")
+
+
+def test_destroy_orchestrator_raises_on_runner_failure(console):
+    """When runner returns success=False, destroy raises TerraformError and fires RUNNER_FAILED."""
+    from infrafoundry.core.exceptions import TerraformError
+
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 40
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.is_iac_runner = True
+    tf_runner.destroy = MagicMock(
+        return_value={
+            "success": False,
+            "exit_code": 1,
+            "stderr": "Error: Instance cannot be destroyed",
+            "error": "Instance cannot be destroyed",
+        }
+    )
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    provider = MagicMock()
+    providers = cast("dict[str, ProviderBase]", {"proxmox": provider})
+
+    resources = [_resource("vm1")]
+
+    def load_resources(env: str):
+        return resources, {"proxmox": resources}
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        get_current_user=lambda: "tester",
+    )
+    orchestrator.runners = cast("dict[str, BaseRunner]", {"terraform": tf_runner})
+
+    with pytest.raises(TerraformError) as excinfo:
+        orchestrator.destroy(
+            env_name="dev",
+            resource_filter=None,
+            auto_approve=True,
+            confirm_callback=lambda: True,
+        )
+
+    assert "Instance cannot be destroyed" in str(excinfo.value)
+    assert excinfo.value.exit_code == 1
+
+    failed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_FAILED
+    ]
+    completed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_COMPLETED
+    ]
+    assert len(failed_calls) == 1
+    assert len(completed_calls) == 0
+
+    # Deployment marked FAILED
+    status_calls = state_manager.update_deployment_status.call_args_list
+    assert any(call[0][1] == DeploymentStatus.FAILED for call in status_calls)
+
+
+def test_destroy_orchestrator_raises_when_resource_remains_in_state(console):
+    """Defense-in-depth: success=True but state still has the resource -> TerraformError."""
+    from infrafoundry.core.exceptions import TerraformError
+
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 41
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.is_iac_runner = True
+    tf_runner.destroy = MagicMock(return_value={"success": True, "exit_code": 0})
+    tf_runner.verify_destroyed = MagicMock(return_value=["vm1"])
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    provider = MagicMock()
+    providers = cast("dict[str, ProviderBase]", {"proxmox": provider})
+
+    resources = [_resource("vm1")]
+
+    def load_resources(env: str):
+        return resources, {"proxmox": resources}
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        get_current_user=lambda: "tester",
+    )
+    orchestrator.runners = cast("dict[str, BaseRunner]", {"terraform": tf_runner})
+
+    with pytest.raises(TerraformError) as excinfo:
+        orchestrator.destroy(
+            env_name="dev",
+            resource_filter=None,
+            auto_approve=True,
+            confirm_callback=lambda: True,
+        )
+
+    assert "vm1" in str(excinfo.value)
+    tf_runner.verify_destroyed.assert_called_once_with(provider, ["vm1"])
+
+
+def test_destroy_orchestrator_skips_verify_when_runner_lacks_method(console):
+    """A runner without verify_destroyed (e.g. Ansible) proceeds without AttributeError."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 42
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    # spec the mock so hasattr(runner, "verify_destroyed") is False
+    tf_runner = MagicMock(
+        spec=[
+            "priority",
+            "is_iac_runner",
+            "destroy",
+        ]
+    )
+    tf_runner.priority = 0
+    tf_runner.is_iac_runner = True
+    tf_runner.destroy = MagicMock(return_value={"success": True, "exit_code": 0})
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    provider = MagicMock()
+    providers = cast("dict[str, ProviderBase]", {"proxmox": provider})
+
+    resources = [_resource("vm1")]
+
+    def load_resources(env: str):
+        return resources, {"proxmox": resources}
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        get_current_user=lambda: "tester",
+    )
+    orchestrator.runners = cast("dict[str, BaseRunner]", {"terraform": tf_runner})
+
+    # Should not raise
+    orchestrator.destroy(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        confirm_callback=lambda: True,
+    )
+
+    tf_runner.destroy.assert_called_once()
+    assert not hasattr(tf_runner, "verify_destroyed")
+
+
+def test_destroy_orchestrator_aggregates_failures_across_providers(console):
+    """With two providers, the second's failure surfaces while the first completes."""
+    from infrafoundry.core.exceptions import TerraformError
+
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 43
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    # Single runner instance; returns success for provider-a then failure for provider-b.
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.is_iac_runner = True
+    tf_runner.destroy = MagicMock(
+        side_effect=[
+            {"success": True, "exit_code": 0},
+            {
+                "success": False,
+                "exit_code": 1,
+                "stderr": "nope",
+                "error": "prevent_destroy",
+            },
+        ]
+    )
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    provider_a = MagicMock()
+    provider_b = MagicMock()
+    providers = cast("dict[str, ProviderBase]", {"prov_a": provider_a, "prov_b": provider_b})
+
+    res_a = [_resource("vm_a", provider="prov_a")]
+    res_b = [_resource("vm_b", provider="prov_b")]
+
+    def load_resources(env: str):
+        return res_a + res_b, {"prov_a": res_a, "prov_b": res_b}
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("prov_a", rbp["prov_a"], 1),
+            ProviderResourceBatch("prov_b", rbp["prov_b"], 1),
+        ],
+        get_current_user=lambda: "tester",
+    )
+    orchestrator.runners = cast("dict[str, BaseRunner]", {"terraform": tf_runner})
+
+    with pytest.raises(TerraformError):
+        orchestrator.destroy(
+            env_name="dev",
+            resource_filter=None,
+            auto_approve=True,
+            confirm_callback=lambda: True,
+        )
+
+    completed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_COMPLETED
+    ]
+    failed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_FAILED
+    ]
+    assert len(completed_calls) == 1
+    assert len(failed_calls) == 1
+    assert completed_calls[0][1]["provider"] == "prov_a"
+    assert failed_calls[0][1]["provider"] == "prov_b"
+
+    status_calls = state_manager.update_deployment_status.call_args_list
+    assert any(call[0][1] == DeploymentStatus.FAILED for call in status_calls)
 
 
 def test_drift_orchestrator_sets_providers():
