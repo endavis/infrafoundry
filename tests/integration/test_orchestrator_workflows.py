@@ -461,9 +461,15 @@ class TestDestroyOrchestrator:
 
     def test_destroy_basic_workflow(self, orchestrator, mock_providers):
         """Test basic destroy workflow execution."""
-        with patch(
-            "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
-        ) as mock_destroy:
+        with (
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
+            ) as mock_destroy,
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.verify_destroyed",
+                return_value=[],
+            ),
+        ):
             mock_destroy.return_value = {"success": True, "destroyed": 2}
 
             result = orchestrator.destroy(env_name="dev", auto_approve=True)
@@ -473,9 +479,15 @@ class TestDestroyOrchestrator:
 
     def test_destroy_creates_deployment_record(self, orchestrator):
         """Test that destroy creates a deployment record."""
-        with patch(
-            "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
-        ) as mock_destroy:
+        with (
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
+            ) as mock_destroy,
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.verify_destroyed",
+                return_value=[],
+            ),
+        ):
             mock_destroy.return_value = {"success": True}
             orchestrator.destroy(env_name="dev", auto_approve=True)
 
@@ -499,9 +511,15 @@ class TestDestroyOrchestrator:
 
     def test_destroy_proceeds_with_confirmation(self, orchestrator):
         """Test that destroy proceeds when user confirms."""
-        with patch(
-            "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
-        ) as mock_destroy:
+        with (
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
+            ) as mock_destroy,
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.verify_destroyed",
+                return_value=[],
+            ),
+        ):
             mock_destroy.return_value = {"success": True}
 
             result = orchestrator.destroy(
@@ -513,9 +531,15 @@ class TestDestroyOrchestrator:
 
     def test_destroy_with_resource_filter(self, orchestrator):
         """Test destroy with resource filter."""
-        with patch(
-            "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
-        ) as mock_destroy:
+        with (
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
+            ) as mock_destroy,
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.verify_destroyed",
+                return_value=[],
+            ),
+        ):
             mock_destroy.return_value = {"success": True}
             result = orchestrator.destroy(
                 env_name="dev", auto_approve=True, resource_filter=["web-01"]
@@ -534,9 +558,15 @@ class TestDestroyOrchestrator:
         orchestrator.event_manager.subscribe(EventType.BEFORE_DESTROY, capture_event)
         orchestrator.event_manager.subscribe(EventType.AFTER_DESTROY, capture_event)
 
-        with patch(
-            "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
-        ) as mock_destroy:
+        with (
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
+            ) as mock_destroy,
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.verify_destroyed",
+                return_value=[],
+            ),
+        ):
             mock_destroy.return_value = {"success": True}
             orchestrator.destroy(env_name="dev", auto_approve=True)
 
@@ -545,9 +575,15 @@ class TestDestroyOrchestrator:
 
     def test_destroy_tracks_resources_as_destroyed(self, orchestrator):
         """Test that destroy marks resources as destroyed in state."""
-        with patch(
-            "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
-        ) as mock_destroy:
+        with (
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
+            ) as mock_destroy,
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.verify_destroyed",
+                return_value=[],
+            ),
+        ):
             mock_destroy.return_value = {"success": True}
             orchestrator.destroy(env_name="dev", auto_approve=True)
 
@@ -685,9 +721,15 @@ class TestMultiProviderWorkflow:
         opn_resource.hooks = None  # No lifecycle hooks configured
         mock_config["resources"].append(opn_resource)
 
-        with patch(
-            "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
-        ) as mock_destroy:
+        with (
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
+            ) as mock_destroy,
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.verify_destroyed",
+                return_value=[],
+            ),
+        ):
             mock_destroy.return_value = {"success": True}
             result = orchestrator.destroy(env_name="dev", auto_approve=True)
 

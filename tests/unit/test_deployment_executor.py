@@ -9,7 +9,7 @@ import pytest
 from infrafoundry.core.config.models import IaCTool
 from infrafoundry.core.deployment_executor import DeploymentExecutor
 from infrafoundry.core.events import EventType
-from infrafoundry.core.exceptions import ResourceFilterError
+from infrafoundry.core.exceptions import ResourceFilterError, TerraformError
 from infrafoundry.core.state import ResourceState
 
 
@@ -751,6 +751,76 @@ def test_apply_emits_runner_failed_on_exception():
     }
 
     # RUNNER_COMPLETED should NOT have been emitted
+    completed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_COMPLETED
+    ]
+    assert len(completed_calls) == 0
+
+
+def test_apply_single_provider_raises_on_runner_failure():
+    """When runner.apply returns success=False the executor raises TerraformError.
+
+    The RUNNER_FAILED event must be emitted (via the existing except handler)
+    and RUNNER_COMPLETED must NOT be emitted.
+    """
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.apply = MagicMock(
+        return_value={
+            "success": False,
+            "exit_code": 1,
+            "error": "boom",
+            "stderr": "boom stderr",
+            "resource_outcomes": [],
+        }
+    )
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={})
+
+    runner_registry.create_runner.return_value = tf_runner
+
+    state_manager = MagicMock()
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    provider = MagicMock()
+    providers = {"proxmox": provider}
+    resources = [_resource("vm1")]
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+    )
+
+    with pytest.raises(TerraformError, match="boom"):
+        executor.apply_single_provider(
+            env_name="dev",
+            deployment_id=1,
+            provider_name="proxmox",
+            provider=provider,
+            resources=resources,
+            auto_approve=True,
+        )
+
+    # RUNNER_FAILED should have been emitted exactly once
+    failed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_FAILED
+    ]
+    assert len(failed_calls) == 1
+    assert failed_calls[0][0][2]["phase"] == "apply"
+    assert failed_calls[0][0][2]["provider"] == "proxmox"
+
+    # RUNNER_COMPLETED must NOT have been emitted
     completed_calls = [
         call
         for call in event_manager.emit_event.call_args_list
