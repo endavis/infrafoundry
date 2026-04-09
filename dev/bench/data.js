@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775748200496,
+  "lastUpdate": 1775750944379,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4557,6 +4557,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008656576826840589",
             "extra": "mean: 135.58713823978653 usec\nrounds: 2568"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fe482296854d6757059de7402efa7bdab744cf42",
+          "message": "fix: always run terraform init so provider.tf changes are detected (merges PR #525, addresses #524)\n\nTerraformRunner.initialize had a fast-path that returned \"Already\ninitialized\" whenever .terraform/ existed, without running terraform\ninit. The only exception was backend-swap detection. The fast-path\ndid not detect changes to required_providers in provider.tf, so when\na generated provider.tf added or removed a provider (exactly what\nPR #519 did by adding hashicorp/cloudinit to the proxmox provider.tf\nfor the Tailscale module), the old .terraform/ and .terraform.lock.hcl\nbecame stale. Apply then failed with Inconsistent dependency lock file.\n\nDrop the fast-path entirely. terraform init is idempotent and fast\n(~100ms no-op) for unchanged directories, so running it unconditionally\neliminates an entire class of stale-.terraform bugs. The backend-swap\ndetection logic is preserved — it still sets reconfigure=True\npreemptively so terraform init -reconfigure is used when a swap is\ndetected.\n\nReproduced today while applying the prod homelab k3s-cluster package\nfor the first time after PR #519 landed. #510's error handling\ncorrectly surfaced the failure as a TerraformError instead of a green\ncheckmark (first real-world validation of that fix), but the root\ncause is this init-time staleness.\n\nAlso updates 3 pre-existing tests that were passively depending on\nthe fast-path (they mocked Popen but not subprocess.run, and worked\nonly because init was being skipped).\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-09T17:08:30+01:00",
+          "tree_id": "4b6b59fd242ed0c81bc541176cd4d59cdab2f56d",
+          "url": "https://github.com/endavis/infrafoundry/commit/fe482296854d6757059de7402efa7bdab744cf42"
+        },
+        "date": 1775750943823,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7080.683394114881,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000018901261580318737",
+            "extra": "mean: 141.22930575192098 usec\nrounds: 2260"
           }
         ]
       }
