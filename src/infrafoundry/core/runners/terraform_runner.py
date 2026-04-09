@@ -85,10 +85,10 @@ class TerraformRunner(BaseRunner):
         migrate_state = kwargs.get("migrate_state", False)
         upgrade = kwargs.get("upgrade", False)
 
-        # If already initialized and no special flags, check if backend changed
+        # If already initialized, sniff the state file to detect a backend
+        # swap so we can preemptively add -reconfigure (terraform would
+        # otherwise error on the first re-init after a swap).
         if is_initialized and not (reconfigure or migrate_state or upgrade):
-            # If backend.tf exists now but wasn't used before, or vice versa,
-            # we need to reconfigure
             terraform_state = working_dir / ".terraform" / "terraform.tfstate"
             if terraform_state.exists():
                 import json
@@ -111,10 +111,10 @@ class TerraformRunner(BaseRunner):
                 except (json.JSONDecodeError, FileNotFoundError):
                     pass
 
-            if not reconfigure:
-                return {"success": True, "message": "Already initialized"}
-
-        # Build init command using full path to terraform binary
+        # Always run terraform init. It's idempotent for unchanged configs
+        # and cheap (~100ms no-op). Running it unconditionally avoids a
+        # class of stale-lock / stale-.terraform bugs that arose when we
+        # trusted .terraform/ presence as proof of consistency. See #524.
         cmd = [self.tool_path, "init"]
         if reconfigure:
             cmd.append("-reconfigure")
@@ -124,11 +124,14 @@ class TerraformRunner(BaseRunner):
             cmd.append("-upgrade")
 
         try:
-            msg = "Initializing Terraform..."
             if reconfigure:
                 msg = "Reconfiguring Terraform backend..."
             elif migrate_state:
                 msg = "Migrating Terraform state..."
+            elif is_initialized:
+                msg = "Refreshing Terraform init..."
+            else:
+                msg = "Initializing Terraform..."
             self.console.print(f"[dim]{msg}[/dim]")
 
             result = subprocess.run(  # nosec B603
