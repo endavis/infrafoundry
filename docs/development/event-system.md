@@ -84,6 +84,7 @@ events:
 | `INFRAFOUNDRY_CONFIG_DIR` | Always |
 | `INFRAFOUNDRY_DEPLOYMENT_ID` | `context.deployment_id` is set |
 | `INFRAFOUNDRY_TARGET_RESOURCES` | `-r` filter is active (comma-separated list) |
+| `INFRAFOUNDRY_INVENTORY` | Package has an `inventory:` block and a `.generated-inventory.yml` exists in the package directory |
 
 **Example (deprecated):** Run a script on `RUNNER_COMPLETED` (use resource lifecycle events instead):
 
@@ -223,6 +224,7 @@ Scripts and playbooks receive resource context via environment variables:
 | `INFRAFOUNDRY_CONFIG_DIR` | Path to environment config directory |
 | `INFRAFOUNDRY_VAR_<key>` | Individual package variable (uppercase key) |
 | `INFRAFOUNDRY_PACKAGE_VARS` | JSON dict of all merged package variables |
+| `INFRAFOUNDRY_INVENTORY` | Absolute path to the package's `.generated-inventory.yml` (set only when the package defines an `inventory:` block) |
 
 ### Deprecation notice
 
