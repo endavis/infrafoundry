@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775663720650,
+  "lastUpdate": 1775727426699,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4433,6 +4433,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008817114824590832",
             "extra": "mean: 134.70032892858973 usec\nrounds: 2119"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cf413d2fff531ac38efebc600e597b87655d2ce0",
+          "message": "fix: regenerate iac configs before infra destroy (merges PR #520, addresses #515)\n\ninfra destroy previously ran terraform destroy against whatever .tf\nfiles happened to be on disk from the last plan/apply. If resources\nhad been renamed or re-keyed in YAML since then, destroy would act\non the stale addresses and could silently leave real infrastructure\nbehind.\n\nExtract the apply-time generation step into a module-level helper\n_regenerate_iac_configs() and call it from both PlanOrchestrator.plan\nand DestroyOrchestrator.destroy. The destroy path mirrors plan's\nfilter rule: when resource_filter is active, regen passes ALL provider\nresources so terraform doesn't see filtered-out resources as deletions\n(the filter is still honored via -target).\n\nScope boundary: this PR adds regen only. Detecting and reporting\nmismatch when state no longer references regenerated addresses is\n#510's responsibility and intentionally out of scope.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-09T10:36:32+01:00",
+          "tree_id": "57c27c80aa65c9b0b04a5a0a6c09bbc26232f31e",
+          "url": "https://github.com/endavis/infrafoundry/commit/cf413d2fff531ac38efebc600e597b87655d2ce0"
+        },
+        "date": 1775727426284,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9672.47391994466,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000066236372799346846",
+            "extra": "mean: 103.38616658743304 usec\nrounds: 2101"
           }
         ]
       }
