@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775750944379,
+  "lastUpdate": 1775766978091,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4588,6 +4588,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000018901261580318737",
             "extra": "mean: 141.22930575192098 usec\nrounds: 2260"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "39e3e43692741f2ade60addffe90ad2419ca5913",
+          "message": "fix: populate cloud_init_vars.HOSTNAME in proxmox-k3s-cluster blueprint (merges PR #527, addresses #526)\n\nThe blueprint references a shared system/hostname cloud-init snippet\ncontaining ${HOSTNAME} as a placeholder, but never populated\ncloud_init_vars to tell the framework what to substitute. The\nplaceholder fell through to the generated cloud-init YAML as a\nliteral string, every VM came up with the same broken hostname,\nk3s nodes collided on registration, and the on_create handler timed\nout after 30 minutes waiting for agents to become Ready.\n\nThe framework's _merge_cloud_init_snippets at provider_mixins.py:969\nalready does per-VM variable substitution from cloud_init_vars; the\nmechanism is tested at test_cloud_init_mixin.py:96. The blueprint\njust wasn't using it.\n\nAdd the missing 6 lines of YAML wiring per-VM hostname into the\nsubstitution context: HOSTNAME: \"{{ server_name }}\" on the server\nentry, HOSTNAME: \"{{ agent.name }}\" inside the for-agents loop. The\nframework's existing substitution does the rest.\n\nReproduced live in this session during the first homelab k3s-cluster\napply after #515, #510, #516, #517, #524 all landed. The cluster had\nto be destroyed before this fix could be applied.\n\nThe oci-k3s-cluster blueprint is not affected — it sets hostname\ndirectly via the OCI provider's native cloud-init field instead of\nthe snippet pathway.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-09T21:35:34+01:00",
+          "tree_id": "9f67c189e3f03f7c6475cab4bcc79f1fd2ea6aa1",
+          "url": "https://github.com/endavis/infrafoundry/commit/39e3e43692741f2ade60addffe90ad2419ca5913"
+        },
+        "date": 1775766977008,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7197.916748141159,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001225545574662642",
+            "extra": "mean: 138.92908670529528 usec\nrounds: 2249"
           }
         ]
       }
