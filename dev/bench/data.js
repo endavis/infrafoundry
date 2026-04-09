@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775742215330,
+  "lastUpdate": 1775748200496,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4526,6 +4526,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009775658528309005",
             "extra": "mean: 135.28942315364128 usec\nrounds: 2505"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "79afc44e15d96da7cf9bd0e184972598cbaa6211",
+          "message": "feat: support jinja control-flow loops in inventory schemas (merges PR #523, addresses #517)\n\nInventoryGenerator previously serialized the inventory dict back to\nYAML and only then ran Jinja, which made {% for %} and {% if %}\nimpossible at YAML structural positions: yaml.safe_load choked on the\ncontrol-flow tag long before Jinja got a chance to expand it.\nBlueprints with variable-cardinality hosts (proxmox-k3s, oci-k3s) had\nto fall back to building the inventory in their on_create scripts via\njq over INFRAFOUNDRY_PACKAGE_VARS.\n\nReplace the dict-then-render pipeline with a render-then-parse\npipeline that mirrors the existing _render_resource_file precedent\nfor vm.yaml/instances.yaml. The raw YAML substring of the inventory:\nblock is extracted from the manifest file before yaml.safe_load runs,\nthen rendered through Jinja, then parsed.\n\n- New manifest_utils.extract_inventory_block helper line-scans for a\n  column-0 inventory: key, captures and dedents the body, replaces\n  the slice with inventory: null plus blank-line padding to preserve\n  line numbers for parser error messages. Rejects flow-style.\n- Both PackageLoader._parse_manifest and BlueprintResolver._load_manifest\n  (separate parsers) now use the extractor and store the raw block.\n- PackageManifest gains inventory_raw: str | None. Legacy inventory\n  field stays for back-compat but is always None when an inventory\n  block exists.\n- InventoryGenerator.generate signature changes to take inventory_raw:\n  str (dict pathway dropped — strictly more capable since string\n  substitution is a subset of full Jinja).\n- load_package blueprint inheritance propagates inventory_raw.\n\nSibling to #516 (_package_dir plumbing for INFRAFOUNDRY_INVENTORY\ninjection). With both landed, blueprints with variable-cardinality\ninventories can use the framework's intended pathway end-to-end.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-09T16:22:43+01:00",
+          "tree_id": "d52f8e61d481a458ea3fa65e68f1e06711b698c6",
+          "url": "https://github.com/endavis/infrafoundry/commit/79afc44e15d96da7cf9bd0e184972598cbaa6211"
+        },
+        "date": 1775748199312,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7375.330824015881,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008656576826840589",
+            "extra": "mean: 135.58713823978653 usec\nrounds: 2568"
           }
         ]
       }
