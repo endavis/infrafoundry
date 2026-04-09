@@ -42,6 +42,46 @@ logger = logging.getLogger(__name__)
 _IAC_TOOL_KEYS = {tool.value for tool in IaCTool}
 
 
+def _regenerate_iac_configs(
+    provider: ProviderBase,
+    provider_name: str,
+    resources_to_generate: list[ResourceConfig],
+    runners: list[tuple[str, BaseRunner]],
+    console: Console,
+) -> None:
+    """Regenerate IaC config files (e.g. ``.tf``) for a provider.
+
+    Iterates the provided runners; for each IaC runner that has a matching
+    ``provider.generate_<tool_name>()`` method, invokes it with the supplied
+    resource list. The caller is responsible for runner ordering and for
+    choosing the correct resource set (filtered vs all-when-filter-active).
+
+    Args:
+        provider: The provider whose configs should be regenerated.
+        provider_name: Name of the provider, used for diagnostic output.
+        resources_to_generate: Resources to pass to the generate method.
+        runners: Iterable of ``(tool_name, runner)`` pairs to consider.
+            Only IaC runners with a matching ``generate_<tool_name>`` method
+            on the provider will be invoked.
+        console: Rich console used for progress output.
+    """
+    for tool_name, runner in runners:
+        # Only IaC runners auto-run; config tools run as event handlers
+        if not runner.is_iac_runner:
+            continue
+
+        generate_method = getattr(provider, f"generate_{tool_name}", None)
+        if generate_method and callable(generate_method):
+            console.print(f"  [dim]Generating {tool_name} configuration...[/dim]")
+            logger.debug(
+                "Regenerating %s configs for provider %s (%d resources)",
+                tool_name,
+                provider_name,
+                len(resources_to_generate),
+            )
+            generate_method(resources_to_generate)
+
+
 @dataclass(slots=True)
 class ProviderResourceBatch:
     """Represents the resources for a single provider after optional filtering."""
@@ -431,7 +471,18 @@ class PlanOrchestrator(HookExecutionMixin):
                     )
 
                     iac_tool = env_config.iac_tool if env_config else IaCTool.TERRAFORM
-                    for tool_name, runner in self._get_sorted_runners(runner_priorities, iac_tool):
+                    sorted_runners = self._get_sorted_runners(runner_priorities, iac_tool)
+
+                    # Regenerate IaC configs from current resources before planning
+                    _regenerate_iac_configs(
+                        provider,
+                        provider_name,
+                        generate_resources,
+                        sorted_runners,
+                        self.console,
+                    )
+
+                    for tool_name, runner in sorted_runners:
                         # Only IaC runners auto-run; config tools run as event handlers
                         if not runner.is_iac_runner:
                             continue
@@ -444,10 +495,6 @@ class PlanOrchestrator(HookExecutionMixin):
                                 )
                                 continue
 
-                            self.console.print(
-                                f"  [dim]Generating {tool_name} configuration...[/dim]"
-                            )
-                            generate_method(generate_resources)
                             self.console.print(f"  [dim]Running {tool_name} plan...[/dim]")
 
                             starting_event: RunnerEventData = {
@@ -1000,6 +1047,35 @@ class DestroyOrchestrator(HookExecutionMixin):
 
                 self.console.print(f"\n[bold]Destroying {provider_name}...[/bold]")
                 provider.set_environment(env_name)
+
+                # Regenerate IaC configs from current resources so terraform
+                # destroy operates on the current package configuration, not a
+                # stale snapshot from the last plan/apply. Mirrors plan's
+                # filter logic: when a filter is active, generate ALL resources
+                # for the provider so terraform doesn't see filtered-out
+                # resources as deletions (the filter is applied via -target).
+                ensure_directories = getattr(provider, "ensure_directories", None)
+                if callable(ensure_directories):
+                    ensure_directories()
+
+                all_provider_resources = resources_by_provider.get(provider_name, [])
+                generate_resources = all_provider_resources if resource_filter else resources
+                active_iac_value = (
+                    env_config.iac_tool.value if env_config else IaCTool.TERRAFORM.value
+                )
+                iac_runners = [
+                    (tool_name, runner)
+                    for tool_name, runner in self.runners.items()
+                    if runner.is_iac_runner
+                    and not (tool_name in _IAC_TOOL_KEYS and tool_name != active_iac_value)
+                ]
+                _regenerate_iac_configs(
+                    provider,
+                    provider_name,
+                    generate_resources,
+                    iac_runners,
+                    self.console,
+                )
 
                 # Execute resource-level before_destroy hooks
                 for resource in resources:
