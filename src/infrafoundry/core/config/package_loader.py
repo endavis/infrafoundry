@@ -23,6 +23,7 @@ import yaml
 
 from infrafoundry.core.config.filters import generate_mac
 from infrafoundry.core.config.inventory_generator import InventoryGenerator
+from infrafoundry.core.config.manifest_utils import extract_inventory_block
 from infrafoundry.core.config.models import PackageManifest
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
@@ -203,8 +204,8 @@ class PackageLoader:
                 manifest.events = dict(blueprint["events"])
 
             # Inherit inventory from blueprint if package doesn't declare its own
-            if manifest.inventory is None and blueprint.get("inventory"):
-                manifest.inventory = dict(blueprint["inventory"])
+            if manifest.inventory_raw is None and blueprint.get("inventory_raw"):
+                manifest.inventory_raw = blueprint["inventory_raw"]
 
         # ----- Secrets -----
         secrets_path = package_dir / "secrets.yaml"
@@ -281,9 +282,9 @@ class PackageLoader:
                 )
 
         # ----- Inventory generation -----
-        if manifest.inventory:
+        if manifest.inventory_raw:
             inventory_path = self._inventory_generator.generate(
-                manifest.inventory, manifest.variables, package_dir
+                manifest.inventory_raw, manifest.variables, package_dir
             )
             logger.info("Generated inventory for package '%s': %s", manifest.name, inventory_path)
 
@@ -306,8 +307,16 @@ class PackageLoader:
             raise InvalidConfigurationError(f"Package manifest not found: {manifest_path}")
 
         try:
-            with open(manifest_path) as f:
-                data = yaml.safe_load(f)
+            file_text = manifest_path.read_text()
+        except OSError as e:
+            raise InvalidConfigurationError(
+                f"Failed to read package manifest {manifest_path}: {e}"
+            ) from e
+
+        text_without_inventory, inventory_raw = extract_inventory_block(file_text)
+
+        try:
+            data = yaml.safe_load(text_without_inventory)
         except yaml.YAMLError as e:
             raise InvalidConfigurationError(
                 f"Invalid YAML in package manifest {manifest_path}: {e}"
@@ -318,10 +327,16 @@ class PackageLoader:
                 f"Package manifest must be a YAML mapping: {manifest_path}"
             )
 
+        # ``inventory`` is always ``None`` in ``data`` when an inventory
+        # block existed (extractor replaced it with ``inventory: null``).
+        # The raw text is carried separately for the generator.
         try:
-            return PackageManifest(**data)
+            manifest = PackageManifest(**data)
         except Exception as e:
             raise InvalidConfigurationError(f"Invalid package manifest {manifest_path}: {e}") from e
+
+        manifest.inventory_raw = inventory_raw
+        return manifest
 
     def _render_resource_file(
         self, resource_path: Path, variables: dict[str, Any]
