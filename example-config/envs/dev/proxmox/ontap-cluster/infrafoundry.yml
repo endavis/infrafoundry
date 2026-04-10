@@ -1,98 +1,50 @@
-# ONTAP Simulator 2-Node Cluster Lab
+# ONTAP Simulator 2-node cluster — example consumer of the ontap-cluster blueprint.
 #
-# Self-contained infrastructure package. Edit the variables below,
-# then run: infra apply --env dev --package ontap-cluster
+# All deployment logic (VM definitions, DHCP reservations, Ansible playbooks,
+# roles, event handler) lives in blueprints/ontap-cluster/. This file only
+# supplies the per-instance values.
 #
-# This file is the ONLY file you need to edit. All playbooks, roles,
-# and templates derive their configuration from these variables.
+# See blueprints/ontap-cluster/README.md for the full variable reference.
+#
+# Run: foundry infra apply --env dev --package ontap-cluster
 
 name: ontap-cluster
-description: "NetApp ONTAP Simulator 2-node cluster lab"
+description: "NetApp ONTAP Simulator 2-node cluster (example)"
+blueprint: ontap-cluster
 
-# All user-customizable values in one place.
 variables:
-  # --- VM Configuration ---
+  # --- Node identity ---
   node01_name: ontap-node-01
   node02_name: ontap-node-02
   node01_vmid: 220
   node02_vmid: 221
   node01_target: pve1
   node02_target: pve2
+
+  # --- OVA source ---
   ova_source: "/path/to/vsim-netapp-DOT9.18.1-cm_nodar.ova"
   disk_storage: local-lvm
 
-  # --- Proxmox Hosts ---
+  # --- Proxmox hosts (for serial console access) ---
   pve1_host: "192.168.1.10"
   pve2_host: "192.168.1.11"
 
-  # --- Network ---
-  # All NICs use the same bridge; management and data ports are
-  # separated by VLAN tag. Set mgmt_vlan to empty string for flat networks.
-  bridge: vmbr0
-  mgmt_vlan: 10
-
-  # --- MAC Addresses (optional) ---
-  # Set these for DHCP reservations. Leave empty to let Proxmox assign.
-  node01_mgmt_mac: ""
-  node01_data_mac: ""
-  node02_mgmt_mac: ""
-  node02_data_mac: ""
-
-  # --- Node 02 Identity ---
-  # Each node in a 2-node cluster must have a unique serial number and
-  # system ID. Node 01 keeps OVA defaults; node 02 gets these values.
-  # Only applied on first boot — changing after ONTAP initializes disks
-  # will corrupt the replicated database.
-  # These are the standard ONTAP Simulator defaults for node 02:
-  node02_serial_number: "4034389-06-2"
-  node02_sysid: "4034389062"
-
-  # --- Cluster Configuration ---
+  # --- Cluster ---
   cluster_name: ontap-lab
   cluster_mgmt_ip: "192.168.1.220"
-  cluster_mgmt_mask: "255.255.255.0"
   cluster_mgmt_gateway: "192.168.1.1"
   node01_mgmt_ip: "192.168.1.221"
   node02_mgmt_ip: "192.168.1.222"
-  node_mgmt_mask: "255.255.255.0"
   node_mgmt_gateway: "192.168.1.1"
   ontap_password: "changeme123"
   dns_domain: "lab.local"
 
-  # --- Post-Cluster: SVM & Data LIFs ---
-  svm_name: svm_data
+  # --- Data LIFs ---
   data_lif1_ip: "192.168.1.230"
   data_lif2_ip: "192.168.1.231"
-  data_lif_mask: "255.255.255.0"
 
-  # --- Licenses ---
-  # Cluster base license (Serial 1-80-000008) — applied during cluster creation wizard
-  ontap_cluster_base_license: SMKQROWJNQYQSDAAAAAAAAAAAAAA
-  # Standard ONTAP Simulator feature licenses (same keys for every download)
-  # Node 1 (Serial 4082368507) and Node 2 (Serial 4034389062)
-  ontap_licenses:
-    # Node 1
-    - YVUCRRRRYVHXCFABGAAAAAAAAAAA   # CIFS
-    - WKQGSRRRYVHXCFABGAAAAAAAAAAA   # FCP
-    - SOHOURRRYVHXCFABGAAAAAAAAAAA   # FlexClone
-    - KQSRRRRRYVHXCFABGAAAAAAAAAAA   # iSCSI
-    - MBXNQRRRYVHXCFABGAAAAAAAAAAA   # NFS
-    - GUJZTRRRYVHXCFABGAAAAAAAAAAA   # SnapMirror
-    - UZLKTRRRYVHXCFABGAAAAAAAAAAA   # SnapRestore
-    - EJFDVRRRYVHXCFABGAAAAAAAAAAA   # SnapVault
-    # Node 2
-    - MHEYKUNFXMSMUCEZFAAAAAAAAAAA   # CIFS
-    - KWZBMUNFXMSMUCEZFAAAAAAAAAAA   # FCP
-    - GARJOUNFXMSMUCEZFAAAAAAAAAAA   # FlexClone
-    - YBCNLUNFXMSMUCEZFAAAAAAAAAAA   # iSCSI
-    - ANGJKUNFXMSMUCEZFAAAAAAAAAAA   # NFS
-    - UFTUNUNFXMSMUCEZFAAAAAAAAAAA   # SnapMirror
-    - ILVFNUNFXMSMUCEZFAAAAAAAAAAA   # SnapRestore
-    - SUOYOUNFXMSMUCEZFAAAAAAAAAAA   # SnapVault
-
-  # --- CIFS Server (workgroup mode) ---
+  # --- CIFS ---
   cifs_server_name: ONTAPLAB
-  cifs_workgroup: WORKGROUP
 
   # --- NFS Export Policy ---
   nfs_export_policy: nfs_data
@@ -101,40 +53,14 @@ variables:
   # --- Volumes ---
   nfs_vol_name: NFS_VOL
   nfs_vol_aggregate: aggr1_node01
-  nfs_vol_size: 1
   cifs_vol_name: CIFS_VOL
   cifs_vol_aggregate: aggr1_node02
-  cifs_vol_size: 1
 
   # --- DNS & NTP ---
   dns_nameserver: "192.168.1.1"
   ntp_server: "192.168.1.1"
 
-  # --- DHCP Reservations (optional, for Kea integrated DNS) ---
-  # These create DNS entries via Kea DHCP. All IPs are statically assigned
-  # during ONTAP cluster setup, not via DHCP. Remove this section and
-  # dhcp.yaml from resources if you don't use Kea DHCP.
+  # --- DHCP ---
   dhcp_subnet: my-subnet
   node01_ip: "192.168.1.221"
   node02_ip: "192.168.1.222"
-  data_lif1_mac: ""
-  data_lif2_mac: ""
-  cluster_mgmt_mac: "01:01:01:01:01:01"  # placeholder — not used for DHCP
-
-# Resource files (rendered as Jinja2 templates with variables above)
-resources:
-  - vm.yaml
-  - dhcp.yaml
-
-# Resource lifecycle events — fires after both VMs are created
-events:
-  on_create:
-    - type: script
-      name: ontap-cluster-setup
-      script: scripts/ontap-post-terraform.sh
-      description: "Run ONTAP lab Ansible playbook after both VMs are created"
-      timeout: 3600
-      continue_on_error: false
-      requires:
-        - ontap-node-01
-        - ontap-node-02

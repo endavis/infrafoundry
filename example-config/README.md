@@ -21,13 +21,8 @@ This repository contains your infrastructure configurations, environment definit
 │   │   ├── settings.yaml    # Environment definition + provider credentials (SOPS encrypted)
 │   │   ├── proxmox/         # Proxmox resources (YAML, not encrypted)
 │   │   │   ├── vms.yaml           # Standard VMs (clone, ISO boot)
-│   │   │   └── ontap-cluster/     # ONTAP lab infrastructure package
-│   │   │       ├── infrafoundry.yml       # Package manifest (edit this!)
-│   │   │       ├── ova_vms.yaml           # VM definitions (Jinja2 template)
-│   │   │       ├── ontap-lab-playbook.yml # Ansible orchestration playbook
-│   │   │       ├── ontap-lab-inventory.yml# Ansible inventory
-│   │   │       ├── scripts/               # Event handler scripts
-│   │   │       └── roles/                 # ONTAP Ansible roles
+│   │   │   └── ontap-cluster/     # ONTAP cluster (blueprint consumer)
+│   │   │       └── infrafoundry.yml       # Package manifest (edit this!)
 │   │   ├── opnsense/        # OPNsense resources (YAML, not encrypted)
 │   │   └── kubernetes/      # Kubernetes resources (YAML, not encrypted)
 │   ├── staging/             # Staging environment
@@ -37,9 +32,6 @@ This repository contains your infrastructure configurations, environment definit
 │       ├── age.key          # Production encryption key (DO NOT COMMIT)
 │       └── settings.yaml    # Production environment + credentials (SOPS encrypted)
 ├── roles/                   # Ansible roles for post-deploy automation
-│   ├── ontap-serial-setup/  # Assign unique serial/sysid to ONTAP nodes
-│   ├── ontap-cluster-setup/ # Create/join ONTAP cluster via serial console
-│   ├── ontap-post-cluster/  # Configure ONTAP via REST API (netapp.ontap)
 │   ├── k3s-server/          # Install k3s control plane
 │   ├── k3s-agent/           # Install k3s worker node
 │   └── tailscale-exit-node/ # Configure Tailscale exit node
