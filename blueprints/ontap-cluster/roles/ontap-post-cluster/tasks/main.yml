@@ -111,6 +111,41 @@
   ignore_errors: true
 
 # ---------------------------------------------------------------
+# Root aggregate expansion — add spare disks to aggr0
+# ---------------------------------------------------------------
+- name: Assign unowned disks for root aggregate expansion
+  netapp.ontap.na_ontap_disks:
+    <<: *ontap_conn
+    node: "{{ item }}"
+  loop: "{{ ontap_discovered_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  when: ontap_root_aggregate_disk_count | int > 0
+  ignore_errors: true
+
+- name: Add disks to root aggregates
+  netapp.ontap.na_ontap_command:
+    <<: *ontap_conn
+    command: "storage aggregate add-disks -aggregate aggr0_{{ item | regex_replace('-', '_') }} -diskcount {{ ontap_root_aggregate_disk_count }} -disksize 1"
+    privilege: admin
+  loop: "{{ ontap_discovered_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  when: ontap_root_aggregate_disk_count | int > 0
+  ignore_errors: true
+
+- name: Expand root volume to use new aggregate space
+  netapp.ontap.na_ontap_command:
+    <<: *ontap_conn
+    command: "volume size -vserver {{ item }} -volume vol0 -new-size {{ ontap_root_volume_size }}"
+    privilege: admin
+  loop: "{{ ontap_discovered_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  when: ontap_root_aggregate_disk_count | int > 0 and ontap_root_volume_size | default('') | length > 0
+  ignore_errors: true
+
+# ---------------------------------------------------------------
 # Disk assignment
 # ---------------------------------------------------------------
 - name: Assign all unowned disks
