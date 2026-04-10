@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775816198232,
+  "lastUpdate": 1775817730953,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4650,6 +4650,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011430377721815713",
             "extra": "mean: 135.9656309322182 usec\nrounds: 2360"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "97b0a2e0a505d80611a500c6acb8f87cc0705ba0",
+          "message": "fix: build kubeconfig path from cluster_name in k3s blueprint script (merges PR #531, addresses #530)",
+          "timestamp": "2026-04-10T11:41:39+01:00",
+          "tree_id": "375932a63497f6ec726a8041316996fc642b39ed",
+          "url": "https://github.com/endavis/infrafoundry/commit/97b0a2e0a505d80611a500c6acb8f87cc0705ba0"
+        },
+        "date": 1775817730581,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9792.324805064423,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000715981586016909",
+            "extra": "mean: 102.12079561360312 usec\nrounds: 2143"
           }
         ]
       }
