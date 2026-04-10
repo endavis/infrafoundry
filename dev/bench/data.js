@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775766978091,
+  "lastUpdate": 1775816198232,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4619,6 +4619,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001225545574662642",
             "extra": "mean: 138.92908670529528 usec\nrounds: 2249"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a5d9c8d883a664c6c3bd7d086bd27901889878e6",
+          "message": "fix: add terraform -parallelism flag support (merges PR #529, addresses #528)\n\nfix: add terraform parallelism support to prevent CFS lock timeouts",
+          "timestamp": "2026-04-10T11:16:01+01:00",
+          "tree_id": "628be2c7ce9d0e690f0654cb77610684065af78a",
+          "url": "https://github.com/endavis/infrafoundry/commit/a5d9c8d883a664c6c3bd7d086bd27901889878e6"
+        },
+        "date": 1775816197582,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7354.799835397533,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011430377721815713",
+            "extra": "mean: 135.9656309322182 usec\nrounds: 2360"
           }
         ]
       }
