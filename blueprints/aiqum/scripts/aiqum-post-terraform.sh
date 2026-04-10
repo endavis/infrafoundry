@@ -40,19 +40,35 @@ for k, val in v.items():
 ")"
 fi
 
-JUMPHOST="${jumphost:-ansible@ansible.example.com}"
+JUMPHOST="${jumphost:-}"
 SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
+SSH_USER="${ssh_user:-ansible}"
+
+# Build remote command helpers based on whether a jumphost is configured
+if [ -n "${JUMPHOST}" ]; then
+    remote_cmd() { ${SSH} ${JUMPHOST} "${SSH} ${SSH_USER}@${1} '${2}'"; }
+    remote_cmd_long() { ${SSH} -o ServerAliveInterval=30 ${JUMPHOST} "${SSH} -o ServerAliveInterval=30 ${SSH_USER}@${1} '${2}'"; }
+    remote_upload() { scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$1" "${JUMPHOST}:/tmp/_aiqum_upload" && ${SSH} ${JUMPHOST} "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/_aiqum_upload ${SSH_USER}@${2}:${3}"; }
+else
+    remote_cmd() { ${SSH} ${SSH_USER}@${1} "${2}"; }
+    remote_cmd_long() { ${SSH} -o ServerAliveInterval=30 ${SSH_USER}@${1} "${2}"; }
+    remote_upload() { scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$1" "${SSH_USER}@${2}:${3}"; }
+fi
 
 echo "=== AIQUM Post-Terraform Setup ==="
 echo "VM: ${vm_name} (${ip_address})"
-echo "Jumphost: ${JUMPHOST}"
+if [ -n "${JUMPHOST}" ]; then
+    echo "Jumphost: ${JUMPHOST}"
+else
+    echo "Jumphost: (direct SSH)"
+fi
 
 # --- Phase 1: Wait for VM to be reachable ---
 echo ""
 echo "--- Phase 1: Waiting for VM to be reachable ---"
 MAX_WAIT=300
 ELAPSED=0
-while ! ${SSH} ${JUMPHOST} "${SSH} ansible@${ip_address} 'echo ready'" &>/dev/null; do
+while ! remote_cmd "${ip_address}" "echo ready" &>/dev/null; do
     if [ $ELAPSED -ge $MAX_WAIT ]; then
         echo "ERROR: VM not reachable after ${MAX_WAIT}s"
         exit 1
@@ -73,20 +89,13 @@ if [ ! -f "${REMOTE_SCRIPT}" ]; then
     exit 1
 fi
 
-# Step 1: Upload install script to jumphost
-echo "  Uploading install script to jumphost..."
-scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    "${REMOTE_SCRIPT}" "${JUMPHOST}:/tmp/aiqum-install-remote.sh"
+# Step 1: Upload install script to VM
+echo "  Uploading install script to VM..."
+remote_upload "${REMOTE_SCRIPT}" "${ip_address}" "/tmp/aiqum-install-remote.sh"
 
-# Step 2: Copy from jumphost to VM
-echo "  Copying install script to VM..."
-${SSH} ${JUMPHOST} "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    /tmp/aiqum-install-remote.sh ansible@${ip_address}:/tmp/aiqum-install-remote.sh"
-
-# Step 3: Run the install script on the VM (via jumphost)
+# Step 2: Run the install script on the VM
 echo "  Running install script on VM (downloading 1.9GB RPM + installing)..."
-${SSH} -o ServerAliveInterval=30 ${JUMPHOST} \
-    "${SSH} -o ServerAliveInterval=30 ansible@${ip_address} 'chmod +x /tmp/aiqum-install-remote.sh && bash /tmp/aiqum-install-remote.sh'"
+remote_cmd_long "${ip_address}" "chmod +x /tmp/aiqum-install-remote.sh && AIQUM_URL_BASE='${aiqum_url_base}' bash /tmp/aiqum-install-remote.sh"
 
 echo "  AIQUM RPM installed successfully"
 
@@ -116,12 +125,12 @@ echo "--- Phase 4: Regenerating certificates ---"
 
 # Regenerate client certificate (used for ONTAP mutual auth / EMS)
 echo "  Regenerating client certificate..."
-${SSH} ${JUMPHOST} "${SSH} ansible@${ip_address} 'sudo /opt/netapp/ocum/scripts/clientKeyManager.sh regenerate_client_cert jboss'"
+remote_cmd "${ip_address}" "sudo /opt/netapp/ocum/scripts/clientKeyManager.sh regenerate_client_cert jboss"
 echo "  Client certificate regenerated"
 
 # Restart AIQUM services to pick up new certs
 echo "  Restarting AIQUM services..."
-${SSH} ${JUMPHOST} "${SSH} ansible@${ip_address} 'sudo systemctl restart ocie ocieau'"
+remote_cmd "${ip_address}" "sudo systemctl restart ocie ocieau"
 
 # Wait for web UI to come back
 echo "  Waiting for AIQUM web UI to restart..."

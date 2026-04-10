@@ -117,6 +117,7 @@ def test_aiqum_example_vm_config_uses_merged_values(loader: PackageLoader) -> No
         "users/ansible",
         "network/dhcp",
         "packages/qemu-agent",
+        "system/hostname",
     ]
 
 
