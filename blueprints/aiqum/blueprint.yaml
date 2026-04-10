@@ -14,7 +14,12 @@ defaults:
   vlan_tag: 10
   mac_address: ""             # Empty: Proxmox auto-assigns
 
+  # --- SSH access ---
+  jumphost: ""                # Empty: direct SSH. Set to e.g. "ansible@jump.example.com"
+  ssh_user: ansible
+
   # --- AIQUM ---
+  aiqum_url_base: ""            # URL base for AIQUM install files (e.g. http://web.example.com/aiqum)
   aiqum_admin_user: umadmin
 
   # --- SMTP ---

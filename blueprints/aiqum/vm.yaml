@@ -21,5 +21,8 @@ vms:
       - users/ansible
       - network/dhcp
       - packages/qemu-agent
+      - system/hostname
+    cloud_init_vars:
+      HOSTNAME: "{{ vm_name }}"
     tags: [ontap, aiqum]
     onboot: true
