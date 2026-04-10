@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775850903714,
+  "lastUpdate": 1775852098361,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4805,6 +4805,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000019978768349982164",
             "extra": "mean: 112.87924359695732 usec\nrounds: 1835"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a4d861f52fdeffe70c95e6d522a02f64dbcfd38d",
+          "message": "refactor: extract ubuntu-template blueprint (merges PR #543, addresses #542)",
+          "timestamp": "2026-04-10T21:14:17+01:00",
+          "tree_id": "d9de6344b52c666e5b9654df9b98fc5ba6719342",
+          "url": "https://github.com/endavis/infrafoundry/commit/a4d861f52fdeffe70c95e6d522a02f64dbcfd38d"
+        },
+        "date": 1775852097285,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7309.356624289536,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010485210837558697",
+            "extra": "mean: 136.8109467633479 usec\nrounds: 2348"
           }
         ]
       }
