@@ -28,8 +28,8 @@ defaults:
   # --- k3s installer flags ---
   k3s_server_args: "--disable traefik --disable servicelb"
 
-  # --- Local kubeconfig destination (rendered with HOME by the post-deploy script) ---
-  kubeconfig_local_path: "~/.kube/{{ cluster_name }}.yaml"
+  # --- Local kubeconfig destination directory (expanded by the post-deploy script) ---
+  kubeconfig_dir: "~/.kube"
 
 resources:
   - vm.yaml

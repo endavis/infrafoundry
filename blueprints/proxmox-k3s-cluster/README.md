@@ -94,7 +94,7 @@ infra apply --env <env> --package k3s-cluster
 | `vlan_tag` | `10` | VLAN tag for the VM NIC |
 | `jumphost` | `""` (direct SSH) | SSH jumphost for VM access during install. When empty, the post-deploy script SSHes directly from the InfraFoundry host to each node. Set to e.g. `ansible@jump.example.com` to tunnel through a bastion. |
 | `k3s_server_args` | `--disable traefik --disable servicelb` | Extra flags for the k3s server installer |
-| `kubeconfig_local_path` | `~/.kube/{{ cluster_name }}.yaml` | Local destination for the fetched kubeconfig |
+| `kubeconfig_dir` | `~/.kube` | Directory for the fetched kubeconfig (file is named `<cluster_name>.yaml`) |
 
 ### Agent dict schema
 
