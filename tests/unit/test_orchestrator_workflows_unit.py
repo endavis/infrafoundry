@@ -556,7 +556,8 @@ def test_destroy_orchestrator_skips_generate_when_provider_lacks_method(console)
     runner_registry.list_runners.return_value = ["terraform"]
 
     # Provider deliberately lacks generate_terraform
-    provider = MagicMock(spec=["set_environment", "ensure_directories"])
+    provider = MagicMock(spec=["set_environment", "ensure_directories", "terraform_parallelism"])
+    provider.terraform_parallelism = None
     providers = cast("dict[str, ProviderBase]", {"proxmox": provider})
 
     resources = [_resource("vm1")]

@@ -66,6 +66,11 @@ class TestProviderBase:
         deps = provider.get_dependencies()
         assert deps == {}
 
+    def test_terraform_parallelism_defaults_to_none(self, temp_dir):
+        """Test terraform_parallelism defaults to None (terraform default of 10)."""
+        provider = StubProviderImplementation("test", temp_dir / "cfg", temp_dir / "out")
+        assert provider.terraform_parallelism is None
+
     def test_resource_config_creation(self):
         """Test ResourceConfig dataclass."""
         resource = ResourceConfig(

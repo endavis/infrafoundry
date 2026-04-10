@@ -44,6 +44,7 @@ class ProviderBase(ABC):
         self.ansible_dir = output_dir / "ansible" / name
         self.pyinfra_dir = output_dir / "pyinfra" / name
         self._current_environment: str | None = None
+        self.terraform_parallelism: int | None = None
 
     def set_environment(self, env_name: str) -> None:
         """Set the current environment and update output directories.

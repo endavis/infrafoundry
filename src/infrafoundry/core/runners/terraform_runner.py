@@ -164,15 +164,20 @@ class TerraformRunner(BaseRunner):
 
         Args:
             provider: Provider instance
-            **kwargs: Options including auto_approve, target_resources
+            **kwargs: Options including auto_approve, target_resources, parallelism
 
         Returns:
             Dict with apply results
         """
         auto_approve = kwargs.get("auto_approve", False)
         target_resources = kwargs.get("target_resources")
+        parallelism = kwargs.get("parallelism")
         return self._run_terraform(
-            provider, "apply", auto_approve=auto_approve, target_resources=target_resources
+            provider,
+            "apply",
+            auto_approve=auto_approve,
+            target_resources=target_resources,
+            parallelism=parallelism,
         )
 
     def destroy(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
@@ -180,15 +185,20 @@ class TerraformRunner(BaseRunner):
 
         Args:
             provider: Provider instance
-            **kwargs: Options including auto_approve, target_resources
+            **kwargs: Options including auto_approve, target_resources, parallelism
 
         Returns:
             Dict with destroy results
         """
         auto_approve = kwargs.get("auto_approve", False)
         target_resources = kwargs.get("target_resources")
+        parallelism = kwargs.get("parallelism")
         return self._run_terraform(
-            provider, "destroy", auto_approve=auto_approve, target_resources=target_resources
+            provider,
+            "destroy",
+            auto_approve=auto_approve,
+            target_resources=target_resources,
+            parallelism=parallelism,
         )
 
     @override
@@ -240,6 +250,7 @@ class TerraformRunner(BaseRunner):
         command: str,
         auto_approve: bool = False,
         target_resources: list[str] | None = None,
+        parallelism: int | None = None,
     ) -> dict[str, Any]:
         """Run Terraform command for a provider.
 
@@ -255,6 +266,11 @@ class TerraformRunner(BaseRunner):
             command: Terraform command (plan, apply, destroy)
             auto_approve: If True, add -auto-approve flag
             target_resources: Optional list of resource names to target with -target
+            parallelism: Max number of concurrent terraform operations. When
+                ``None`` (the default), terraform's built-in default of 10 is
+                used.  Set to 1 to serialize all resource operations — useful
+                for providers like Proxmox where parallel clones cause CFS lock
+                timeouts on shared storage.
 
         Returns:
             Dict with command results.  For apply/destroy, includes a
@@ -274,6 +290,11 @@ class TerraformRunner(BaseRunner):
         cmd = [self.tool_path, command]
         if auto_approve and command in {"apply", "destroy"}:
             cmd.append("-auto-approve")
+
+        # Limit concurrent operations when requested (e.g. -parallelism=1
+        # to serialize Proxmox VM clones that contend on NFS storage locks).
+        if parallelism is not None and command in {"apply", "destroy", "plan"}:
+            cmd.append(f"-parallelism={parallelism}")
 
         # Add -target flags for resource filtering
         if target_resources:
