@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from infrafoundry.core.config.models import IaCTool
-from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.events import EventAbortedError, EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError, ResourceFilterError
 from infrafoundry.core.execution_planner import ExecutionPlanner
 from infrafoundry.core.protocols import Applyable, StateAware
@@ -229,7 +229,7 @@ class DeploymentExecutor:
                 for r in resources:
                     if r.name in seen_created and r.package_variables:
                         merged_pkg_vars.update(r.package_variables)
-            self.event_manager.emit_event(
+            handler_results = self.event_manager.emit_event(
                 EventType.RESOURCE_CREATED,
                 env_name,
                 {"action": "create", "resources": all_created},
@@ -237,6 +237,9 @@ class DeploymentExecutor:
                 package_variables=merged_pkg_vars,
                 package_filter=package_filter,
             )
+            for hr in handler_results:
+                if not hr.success and hr.abort:
+                    raise EventAbortedError(EventType.RESOURCE_CREATED, hr)
 
         return results
 
@@ -688,7 +691,7 @@ class DeploymentExecutor:
                 if outcome.action == "update"
                 else EventType.RESOURCE_DELETED
             )
-            self.event_manager.emit_event(
+            handler_results = self.event_manager.emit_event(
                 event_type,
                 env_name,
                 {
@@ -703,6 +706,9 @@ class DeploymentExecutor:
                 package_variables=resource.package_variables or {},
                 package_filter=package_filter,
             )
+            for hr in handler_results:
+                if not hr.success and hr.abort:
+                    raise EventAbortedError(event_type, hr)
 
         # NOTE: Aggregate events for group handlers (requires: [...]) are NOT
         # emitted here. They must be emitted after ALL providers complete to
