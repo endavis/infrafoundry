@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775823482289,
+  "lastUpdate": 1775832450704,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4712,6 +4712,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00004314188208202026",
             "extra": "mean: 175.49840425523786 usec\nrounds: 1363"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "422519c31b572c77b64e8e035ada1337cc498484",
+          "message": "fix: propagate event handler failures to apply result (merges PR #534, addresses #532)",
+          "timestamp": "2026-04-10T15:46:49+01:00",
+          "tree_id": "6a27f9cea0a6e0dfeb60c2295f54e462d7abf576",
+          "url": "https://github.com/endavis/infrafoundry/commit/422519c31b572c77b64e8e035ada1337cc498484"
+        },
+        "date": 1775832449629,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7397.328766135749,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009606424697541613",
+            "extra": "mean: 135.18393350014435 usec\nrounds: 2000"
           }
         ]
       }
