@@ -27,7 +27,9 @@ SERVER_IP="${INFRAFOUNDRY_VAR_server_ip}"
 SERVER_NAME="${INFRAFOUNDRY_VAR_server_name}"
 JUMPHOST="${INFRAFOUNDRY_VAR_jumphost:-}"
 K3S_SERVER_ARGS="${INFRAFOUNDRY_VAR_k3s_server_args}"
-KUBECONFIG_LOCAL=$(eval echo "${INFRAFOUNDRY_VAR_kubeconfig_local_path}")
+CLUSTER_NAME="${INFRAFOUNDRY_VAR_cluster_name}"
+KUBECONFIG_DIR=$(eval echo "${INFRAFOUNDRY_VAR_kubeconfig_dir}")
+KUBECONFIG_LOCAL="${KUBECONFIG_DIR}/${CLUSTER_NAME}.yaml"
 
 # --- Read agents list from the JSON-serialized package vars via jq ---
 mapfile -t AGENT_NAMES < <(echo "${INFRAFOUNDRY_PACKAGE_VARS}" | jq -r '.agents[].name')

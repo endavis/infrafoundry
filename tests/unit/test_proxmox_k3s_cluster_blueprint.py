@@ -66,11 +66,7 @@ def test_proxmox_k3s_cluster_example_loads_blueprint(loader: PackageLoader) -> N
     assert variables["bridge"] == "vmbr0"
     assert variables["vlan_tag"] == 10
     assert variables["k3s_server_args"] == "--disable traefik --disable servicelb"
-    # kubeconfig_local_path default contains a Jinja expression that is rendered
-    # at script-execution time (the bash script does the eval), so the variable
-    # value here may either be the literal template or the post-render string,
-    # depending on whether PackageLoader renders defaults. Just assert it's set.
-    assert "kubeconfig_local_path" in variables
+    assert variables["kubeconfig_dir"] == "~/.kube"
 
 
 def test_proxmox_k3s_cluster_example_renders_correct_resource_count(
