@@ -8,9 +8,11 @@ import pytest
 
 from infrafoundry.core.config.models import IaCTool
 from infrafoundry.core.deployment_executor import DeploymentExecutor
-from infrafoundry.core.events import EventType
+from infrafoundry.core.events import EventAbortedError, EventType
+from infrafoundry.core.events.context import EventResult
 from infrafoundry.core.exceptions import ResourceFilterError, TerraformError
 from infrafoundry.core.state import ResourceState
+from infrafoundry.core.types import ResourceOutcome
 
 
 def _resource(name: str, provider: str = "proxmox", type_: str = "vm"):
@@ -927,4 +929,275 @@ def test_apply_parallel_raises_on_zero_filter_matches():
             resource_filter=["nonexistent"],
             auto_approve=True,
             max_workers=2,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Event handler failure propagation tests
+# ---------------------------------------------------------------------------
+
+
+def _resource_with_events(
+    name: str,
+    provider: str = "proxmox",
+    type_: str = "vm",
+    events: dict | None = None,
+):
+    """Create a mock resource with event handlers configured."""
+    res = MagicMock()
+    res.name = name
+    res.provider = provider
+    res.type = type_
+    res.config = {"id": name}
+    res.events = events
+    res.package_variables = {}
+    return res
+
+
+def _make_executor_with_outcomes(
+    outcomes: list[ResourceOutcome],
+    emit_results: list[EventResult] | None = None,
+):
+    """Build an executor whose IaC runner returns *outcomes* and whose
+    event_manager.emit_event returns *emit_results* for lifecycle events.
+
+    Returns (executor, event_manager) so callers can inspect calls.
+    """
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.apply = MagicMock(return_value={"success": True, "resource_outcomes": outcomes})
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={})
+
+    runner_registry.create_runner.return_value = tf_runner
+
+    state_manager = MagicMock()
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+
+    event_manager = MagicMock()
+    # By default, emit_event returns an empty list (no handler results).
+    # Callers override this via side_effect for specific event types.
+    event_manager.emit_event.return_value = []
+    if emit_results is not None:
+        # Return handler results only for RESOURCE_CREATED/UPDATED/DELETED calls
+        lifecycle_types = {
+            EventType.RESOURCE_CREATED,
+            EventType.RESOURCE_UPDATED,
+            EventType.RESOURCE_DELETED,
+        }
+
+        def emit_side_effect(event_type, *args, **kwargs):
+            if event_type in lifecycle_types:
+                return emit_results
+            return []
+
+        event_manager.emit_event.side_effect = emit_side_effect
+
+    provider = MagicMock()
+    # Map vm type -> proxmox_virtual_environment_vm terraform type
+    provider.get_terraform_resource_types.return_value = {
+        "vm": ["proxmox_virtual_environment_vm"],
+    }
+
+    providers = {"proxmox": provider}
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+    )
+
+    return executor, event_manager, provider
+
+
+def test_event_handler_failure_abort_raises_from_lifecycle_events():
+    """Handler failure with abort=True raises EventAbortedError."""
+    outcomes = [
+        ResourceOutcome(
+            address="proxmox_virtual_environment_vm.web",
+            action="create",
+            resource_name="web",
+        ),
+    ]
+    abort_result = EventResult(
+        success=False,
+        abort=True,
+        reason="script timed out",
+        handler_name="on_create_script",
+    )
+
+    resource = _resource_with_events(
+        "web",
+        events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+    )
+
+    executor, _event_manager, provider = _make_executor_with_outcomes(
+        outcomes, emit_results=[abort_result]
+    )
+
+    with pytest.raises(EventAbortedError, match="script timed out"):
+        executor.apply_single_provider(
+            env_name="dev",
+            deployment_id=1,
+            provider_name="proxmox",
+            provider=provider,
+            resources=[resource],
+            auto_approve=True,
+        )
+
+
+def test_event_handler_failure_continue_on_error_does_not_raise():
+    """Handler failure with abort=False (continue_on_error) does not raise."""
+    outcomes = [
+        ResourceOutcome(
+            address="proxmox_virtual_environment_vm.web",
+            action="create",
+            resource_name="web",
+        ),
+    ]
+    non_abort_result = EventResult(
+        success=False,
+        abort=False,
+        reason="script failed but continue_on_error is true",
+        handler_name="on_create_script",
+    )
+
+    resource = _resource_with_events(
+        "web",
+        events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+    )
+
+    executor, _event_manager, provider = _make_executor_with_outcomes(
+        outcomes, emit_results=[non_abort_result]
+    )
+
+    # Should NOT raise
+    result = executor.apply_single_provider(
+        env_name="dev",
+        deployment_id=1,
+        provider_name="proxmox",
+        provider=provider,
+        resources=[resource],
+        auto_approve=True,
+    )
+
+    assert "terraform" in result
+
+
+def test_event_handler_success_does_not_raise():
+    """Successful handler results do not raise."""
+    outcomes = [
+        ResourceOutcome(
+            address="proxmox_virtual_environment_vm.web",
+            action="create",
+            resource_name="web",
+        ),
+    ]
+    success_result = EventResult(
+        success=True,
+        abort=False,
+        reason="",
+        handler_name="on_create_script",
+    )
+
+    resource = _resource_with_events(
+        "web",
+        events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+    )
+
+    executor, _event_manager, provider = _make_executor_with_outcomes(
+        outcomes, emit_results=[success_result]
+    )
+
+    result = executor.apply_single_provider(
+        env_name="dev",
+        deployment_id=1,
+        provider_name="proxmox",
+        provider=provider,
+        resources=[resource],
+        auto_approve=True,
+    )
+
+    assert "terraform" in result
+
+
+def test_aggregate_group_handler_failure_raises_from_apply_serial():
+    """Aggregate RESOURCE_CREATED handler abort raises EventAbortedError."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    outcome = ResourceOutcome(
+        address="proxmox_vm.web",
+        action="create",
+        resource_name="web",
+    )
+    tf_runner.apply = MagicMock(
+        return_value={
+            "success": True,
+            "resource_outcomes": [outcome],
+        }
+    )
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={})
+
+    runner_registry.create_runner.return_value = tf_runner
+
+    state_manager = MagicMock()
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+
+    abort_result = EventResult(
+        success=False,
+        abort=True,
+        reason="group handler failed",
+        handler_name="group_setup",
+    )
+
+    event_manager = MagicMock()
+    call_count = 0
+
+    def emit_side_effect(event_type, *args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        # The aggregate RESOURCE_CREATED call in apply_serial is the one
+        # that includes "resources" in data and target_resources as a list
+        # of all created resource names. Return abort result for it.
+        data = args[1] if len(args) > 1 else kwargs.get("data")
+        if (
+            event_type == EventType.RESOURCE_CREATED
+            and isinstance(data, dict)
+            and "resources" in data
+        ):
+            return [abort_result]
+        return []
+
+    event_manager.emit_event.side_effect = emit_side_effect
+
+    provider = MagicMock()
+    provider.get_terraform_resource_types.return_value = {}
+    providers = {"proxmox": provider}
+
+    resource = _resource_with_events("web")
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers=providers,
+    )
+
+    with pytest.raises(EventAbortedError, match="group handler failed"):
+        executor.apply_serial(
+            env_name="dev",
+            deployment_id=1,
+            resources_by_provider={"proxmox": [resource]},
+            resource_filter=None,
+            auto_approve=True,
         )
