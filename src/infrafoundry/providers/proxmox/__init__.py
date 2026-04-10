@@ -38,6 +38,9 @@ class ProxmoxProvider(
         """Initialize Proxmox provider."""
         super().__init__("proxmox", config_dir, output_dir)
         self.fail_on_missing_snippets = False
+        # Serialize terraform operations to avoid CFS lock timeouts when
+        # cloning VMs onto shared (NFS/CIFS) storage in a Proxmox cluster.
+        self.terraform_parallelism = 1
         # Cache of resources from the most recent generate_terraform call.
         # Used by get_terraform_env_vars to resolve resource-level
         # ``terraform_secrets`` references into TF_VAR_* env vars.

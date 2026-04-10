@@ -34,6 +34,13 @@ class TestProxmoxProvider:
         assert "vm" in types
         assert "template" in types
 
+    def test_terraform_parallelism_defaults_to_one(self, temp_dir):
+        """Proxmox serializes terraform operations to avoid CFS lock timeouts."""
+        config_dir = temp_dir / "config"
+        config_dir.mkdir()
+        provider = ProxmoxProvider(config_dir=config_dir, output_dir=temp_dir / "output")
+        assert provider.terraform_parallelism == 1
+
     def test_get_dependencies(self, temp_dir):
         """Test dependency resolution."""
         config_dir = temp_dir / "config"

@@ -28,6 +28,7 @@ def mock_providers(tmp_path):
     proxmox.get_resource_types = Mock(return_value=["vm", "network", "template"])
     proxmox.get_dependencies = Mock(return_value={})  # No dependencies defined
     proxmox.get_terraform_env_vars = Mock(return_value={})
+    proxmox.terraform_parallelism = None
 
     return {"proxmox": proxmox}
 

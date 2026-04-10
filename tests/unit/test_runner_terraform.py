@@ -214,6 +214,70 @@ def test_apply_adds_auto_approve(runner: TerraformRunner, provider: MagicMock) -
         assert mock_popen.call_args[1]["cwd"] == provider.terraform_dir
 
 
+def test_apply_passes_parallelism_flag(runner: TerraformRunner, provider: MagicMock) -> None:
+    """Apply passes -parallelism=N when requested."""
+    mock_process = MagicMock()
+    mock_process.stdout = iter([])
+    mock_process.stderr = MagicMock()
+    mock_process.stderr.__iter__ = MagicMock(return_value=iter([]))
+    mock_process.returncode = 0
+    mock_process.wait.return_value = 0
+
+    with (
+        patch("shutil.which", return_value="/usr/bin/terraform"),
+        patch("subprocess.run") as mock_run,
+        patch("subprocess.Popen", return_value=mock_process) as mock_popen,
+    ):
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+        runner.apply(provider, auto_approve=True, parallelism=1)
+
+        args = mock_popen.call_args[0][0]
+        assert "-parallelism=1" in args
+        assert "-auto-approve" in args
+
+
+def test_apply_omits_parallelism_when_none(runner: TerraformRunner, provider: MagicMock) -> None:
+    """Apply does not add -parallelism when parallelism is None."""
+    mock_process = MagicMock()
+    mock_process.stdout = iter([])
+    mock_process.stderr = MagicMock()
+    mock_process.stderr.__iter__ = MagicMock(return_value=iter([]))
+    mock_process.returncode = 0
+    mock_process.wait.return_value = 0
+
+    with (
+        patch("shutil.which", return_value="/usr/bin/terraform"),
+        patch("subprocess.run") as mock_run,
+        patch("subprocess.Popen", return_value=mock_process) as mock_popen,
+    ):
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+        runner.apply(provider, auto_approve=True)
+
+        args = mock_popen.call_args[0][0]
+        assert not any(a.startswith("-parallelism") for a in args)
+
+
+def test_destroy_passes_parallelism_flag(runner: TerraformRunner, provider: MagicMock) -> None:
+    """Destroy passes -parallelism=N when requested."""
+    mock_process = MagicMock()
+    mock_process.stdout = iter([])
+    mock_process.stderr = MagicMock()
+    mock_process.stderr.__iter__ = MagicMock(return_value=iter([]))
+    mock_process.returncode = 0
+    mock_process.wait.return_value = 0
+
+    with (
+        patch("shutil.which", return_value="/usr/bin/terraform"),
+        patch("subprocess.run") as mock_run,
+        patch("subprocess.Popen", return_value=mock_process) as mock_popen,
+    ):
+        mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+        runner.destroy(provider, auto_approve=True, parallelism=2)
+
+        args = mock_popen.call_args[0][0]
+        assert "-parallelism=2" in args
+
+
 def test_validate_config_success(runner: TerraformRunner, provider: MagicMock) -> None:
     """Validate config succeeds when terraform validate exits 0."""
     (provider.terraform_dir / "main.tf").write_text("# test")
