@@ -1,0 +1,20 @@
+templates:
+  - name: "{{ template_name }}"
+    vmid: {{ vmid }}
+    target_node: "{{ target_node }}"
+    cores: {{ cores }}
+    memory: {{ memory }}
+    agent: true
+    cloud_init: true
+    cloud_init_datastore: "{{ storage }}"
+    ciuser: "{{ ciuser }}"
+    disk:
+      storage: "{{ storage }}"
+      size: {{ disk_size }}
+    network:
+      bridge: "{{ bridge }}"
+    download_image:
+      url: "{{ image_url }}"
+      filename: "{{ image_filename }}"
+    tags: ["template", "ubuntu"]
+    description: "Ubuntu 24.04 LTS cloud image template"
