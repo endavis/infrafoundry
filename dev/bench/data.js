@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775832450704,
+  "lastUpdate": 1775845088245,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4743,6 +4743,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009606424697541613",
             "extra": "mean: 135.18393350014435 usec\nrounds: 2000"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9fac7b0a7412a14f86638de8a8266fd929002892",
+          "message": "fix: expand ontap root aggregate and vol0 to prevent disk full (merges PR #537, addresses #536)",
+          "timestamp": "2026-04-10T19:17:32+01:00",
+          "tree_id": "7f7b73773b69b9ee2a6d1343fd94dd4960231e26",
+          "url": "https://github.com/endavis/infrafoundry/commit/9fac7b0a7412a14f86638de8a8266fd929002892"
+        },
+        "date": 1775845087282,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6388.783616162056,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000064812195105713",
+            "extra": "mean: 156.524318255238 usec\nrounds: 2476"
           }
         ]
       }
