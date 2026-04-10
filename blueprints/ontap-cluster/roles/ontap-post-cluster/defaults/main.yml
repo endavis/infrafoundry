@@ -24,6 +24,10 @@ ontap_licenses: []
 # Disk assignment — assign all unowned disks
 ontap_assign_disks: true
 
+# Root aggregate expansion — add spare disks to aggr0 to prevent vol0 from filling up
+ontap_root_aggregate_disk_count: 2
+ontap_root_volume_size: "3GB"
+
 # Aggregate configuration
 # Use node_index (0-based) instead of hardcoded node names.
 # Actual node names are discovered from the ONTAP REST API at runtime.
