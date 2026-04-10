@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775845088245,
+  "lastUpdate": 1775850903714,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4774,6 +4774,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000064812195105713",
             "extra": "mean: 156.524318255238 usec\nrounds: 2476"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f8bec2cb88e7db171133a37fee91c48374dcac61",
+          "message": "fix: add hostname, optional jumphost, and install URL to aiqum blueprint (merges PR #541, addresses #540)",
+          "timestamp": "2026-04-10T20:54:30+01:00",
+          "tree_id": "2ca6d8c2c20d4130022df3c35afdf13067e83d05",
+          "url": "https://github.com/endavis/infrafoundry/commit/f8bec2cb88e7db171133a37fee91c48374dcac61"
+        },
+        "date": 1775850903201,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8859.024636722097,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000019978768349982164",
+            "extra": "mean: 112.87924359695732 usec\nrounds: 1835"
           }
         ]
       }
