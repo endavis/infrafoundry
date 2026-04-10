@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775817730953,
+  "lastUpdate": 1775823482289,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4681,6 +4681,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000715981586016909",
             "extra": "mean: 102.12079561360312 usec\nrounds: 2143"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e239ed13bf9f7cadbc7d03fd2c310d8a217f4067",
+          "message": "refactor: convert ontap-cluster example to use ontap-cluster blueprint (merges PR #533, addresses #506)",
+          "timestamp": "2026-04-10T13:17:28+01:00",
+          "tree_id": "c37e48f70e111dca3600d729bef8103983503057",
+          "url": "https://github.com/endavis/infrafoundry/commit/e239ed13bf9f7cadbc7d03fd2c310d8a217f4067"
+        },
+        "date": 1775823481804,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 5698.057507951126,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004314188208202026",
+            "extra": "mean: 175.49840425523786 usec\nrounds: 1363"
           }
         ]
       }
