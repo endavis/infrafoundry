@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775929245304,
+  "lastUpdate": 1775929570276,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4867,6 +4867,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000033697037739638156",
             "extra": "mean: 152.73774456047346 usec\nrounds: 2298"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c64aa3d6f0d594fc9cef3a00a226522a4b975116",
+          "message": "fix: translate separate api_token_id/secret keys in proxmox tfvars mapping (merges PR #553, addresses #552)\n\nProxmoxProvider._PROXMOX_TFVARS_MAPPING translated api_token (combined\n\"tokenid=secret\" form) but not the separate api_token_id/api_token_secret\nform, even though every other code path in the Proxmox provider accepts\nboth forms — the validator, api_client, exporter, and the parallel\n_CREDENTIAL_ENV_MAPPING for the env-var credential path.\n\nOnly the settings-path tfvars translation had the gap. Result: an\nenvironment whose credentials are configured only in settings.yaml\nunder proxmox: (nested form) with the separate token_id/token_secret\nkeys silently got no TF_VAR_proxmox_api_token_id / _secret. The\nprovider.tf.j2 expression that combines them produced null, and\nProxmox API auth failed with no useful error.\n\nThis wasn't noticed until a homelab test env was configured with only\nsettings.yaml (no proxmox.yaml credential file feeding the env-var\npath) — environments with proxmox.yaml get credentials via the env-var\npath, which already handles both forms correctly.\n\nFix: add the two missing keys to _PROXMOX_TFVARS_MAPPING so the settings\npath produces the same TF_VAR_ output as the env-var path.\n\nAddresses #552.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-11T18:45:38+01:00",
+          "tree_id": "6a27fd75e611ac53a49310b1fa6f0f0f5a27fb3c",
+          "url": "https://github.com/endavis/infrafoundry/commit/c64aa3d6f0d594fc9cef3a00a226522a4b975116"
+        },
+        "date": 1775929569939,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9810.133524307377,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006431121989365887",
+            "extra": "mean: 101.9354117374873 usec\nrounds: 2164"
           }
         ]
       }
