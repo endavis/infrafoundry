@@ -23,15 +23,6 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGE_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Re-execute on the jumphost if one is configured. No-op otherwise.
-# See blueprints/_lib/reexec-on-jumphost.sh for behavior details.
-# The file-exists check is intentional: when the reexec'd copy of this
-# script runs on the jumphost, _lib/ has not been rsynced alongside, so
-# the helper is absent and the source is skipped. That's the base case
-# that breaks the reexec loop.
-_REEXEC_HELPER="${SCRIPT_DIR}/../../_lib/reexec-on-jumphost.sh"
-[ -f "${_REEXEC_HELPER}" ] && source "${_REEXEC_HELPER}"
-
 # Read variables from INFRAFOUNDRY_PACKAGE_VARS or fall back to infrafoundry.yml
 if [ -n "${INFRAFOUNDRY_PACKAGE_VARS:-}" ]; then
     eval "$(python3 -c "
