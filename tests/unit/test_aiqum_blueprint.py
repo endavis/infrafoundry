@@ -151,7 +151,7 @@ def test_aiqum_blueprint_inherits_events(loader: PackageLoader) -> None:
     assert handler["type"] == "script"
     assert handler["name"] == "aiqum-setup"
     assert handler["script"].endswith("scripts/aiqum-post-terraform.sh")
-    assert handler["timeout"] == 1800
+    assert handler["timeout"] == 5400
     assert handler["continue_on_error"] is False
     # Templated requires field rendered with per-instance vm_name
     assert handler["requires"] == ["aiqum"]

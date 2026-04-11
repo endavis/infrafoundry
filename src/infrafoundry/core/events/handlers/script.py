@@ -79,8 +79,8 @@ class ScriptHandler(BaseHandler):
             errors.append("Script handler requires 'script' field")
 
         timeout = self.config.get("timeout", 300)
-        if not isinstance(timeout, int) or timeout < 1 or timeout > 3600:
-            errors.append("Timeout must be an integer between 1 and 3600")
+        if not isinstance(timeout, int) or timeout < 1 or timeout > 14400:
+            errors.append("Timeout must be an integer between 1 and 14400")
 
         return errors
 
