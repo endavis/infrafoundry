@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775929570276,
+  "lastUpdate": 1775930207201,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4898,6 +4898,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006431121989365887",
             "extra": "mean: 101.9354117374873 usec\nrounds: 2164"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8a15e15bf3f7d5ea0752be11370898bf251c07df",
+          "message": "chore: raise script and ansible handler timeout cap to 14400 (merges PR #547, addresses #546)\n\nBoth ScriptHandler and AnsibleHandler capped event-handler timeout at\n3600 seconds (60 minutes). That's too tight for legitimate long-running\npost-terraform installers — the aiqum blueprint is a concrete example\nthat needs ~30-60 minutes for the netapp-um RPM install alone, plus\ncert regeneration, service startup, and first-experience setup.\n\nRaise the upper bound to 14400 seconds (4 hours) in both handlers. 4h\nis still a ceiling that catches runaway/infinite-loop bugs without\nrestricting legitimate workloads. The floor stays at 1.\n\nAlso bump the aiqum blueprint's event handler timeout from 1800 to\n5400 seconds (90 minutes) — the immediate user of the raised cap.\nUpdated the test_aiqum_blueprint.py assertion to match.\n\nAddresses #546.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-11T18:56:15+01:00",
+          "tree_id": "81f6425fdcbdaa956d3476016a6cd2a89928697d",
+          "url": "https://github.com/endavis/infrafoundry/commit/8a15e15bf3f7d5ea0752be11370898bf251c07df"
+        },
+        "date": 1775930206394,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9432.55321913186,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014899153375846335",
+            "extra": "mean: 106.0158343948402 usec\nrounds: 2198"
           }
         ]
       }
