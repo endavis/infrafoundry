@@ -133,12 +133,6 @@ tools the blueprint script itself needs. SSH must be reachable from the
 operator's host using the value of `jumphost` as a destination (e.g.
 `ansible@jump.example.com` or an alias defined in `~/.ssh/config`).
 
-**Migration note:** Existing blueprints that source
-`blueprints/_lib/reexec-on-jumphost.sh` continue to work unchanged. The shell
-helper self-deactivates when `INFRAFOUNDRY_ON_JUMPHOST=1` is already set, so
-the framework-level path takes effect and the in-script helper becomes a
-no-op. The shell helper will be removed in a separate follow-up.
-
 ### Real-Time Output Streaming
 
 Script handlers stream stdout and stderr to the console in real-time, line by line, instead of buffering all output until the script completes. This is essential for long-running handlers (e.g., Ansible playbooks) where the user needs to see progress.
