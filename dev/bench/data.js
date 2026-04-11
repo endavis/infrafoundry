@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775930793540,
+  "lastUpdate": 1775938864595,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4991,6 +4991,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002534292577674835",
             "extra": "mean: 144.61306515237322 usec\nrounds: 2333"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4a67823d25ebbb2f12d4a68f95363769e6208182",
+          "message": "feat: add framework-native jumphost reexec to script handler (merges PR #557, addresses #544)\n\nWhen a script handler's package variables include a non-empty `jumphost`\nkey, ScriptHandler now rsyncs the script's parent directory to a fresh\n/tmp/infrafoundry-<uuid>/ on the jumphost and invokes the script there\nover SSH. The remote process sees INFRAFOUNDRY_ON_JUMPHOST=1 (recursion\nguard) and receives a stripped INFRAFOUNDRY_PACKAGE_VARS JSON on stdin\nwith the `jumphost` key removed, so downstream logic does not attempt a\nsecond hop and secrets never appear in the jumphost's `ps` output. The\nremote tmp directory is always cleaned up, including on failure and on\ntimeout.\n\nThis replaces the per-blueprint shell helper pattern from #548 with a\nframework-level mechanism. The helper and each blueprint's `source\nblueprints/_lib/reexec-on-jumphost.sh` line are intentionally left in\nplace for this PR: the helper self-deactivates when\nINFRAFOUNDRY_ON_JUMPHOST=1 is already set, so both layers coexist. A\nseparate follow-up PR will remove the helper after this has soaked in\nproduction. AnsibleHandler is out of scope and is tracked in #556.\n\nAddresses #544\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-11T21:20:31+01:00",
+          "tree_id": "9a6f83416351b16ae040478585650bc3dc061ef4",
+          "url": "https://github.com/endavis/infrafoundry/commit/4a67823d25ebbb2f12d4a68f95363769e6208182"
+        },
+        "date": 1775938863770,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9752.012703538117,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006232998774181159",
+            "extra": "mean: 102.5429345100413 usec\nrounds: 2153"
           }
         ]
       }
