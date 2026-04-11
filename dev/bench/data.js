@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775930540702,
+  "lastUpdate": 1775930793540,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4960,6 +4960,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010037653401859425",
             "extra": "mean: 137.07288654145012 usec\nrounds: 2556"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ba0b3109ec874272ac0f241de45339d5a8e1f304",
+          "message": "refactor: add timestamps and jumphost-reexec helper to aiqum scripts (merges PR #549, addresses #548)\n\nTwo related improvements to the aiqum post-terraform scripts:\n\n1. log() helper with [HH:MM:SS] timestamps on every phase and step\n   banner in both aiqum-install-remote.sh and aiqum-post-terraform.sh.\n   Pure observability: when the handler log spans 20-40 minutes, it's\n   now obvious where time was spent per phase.\n\n2. New blueprints/_lib/reexec-on-jumphost.sh shared helper. Any blueprint\n   script can source it at the top; if a jumphost package variable is\n   set, the helper rsyncs the calling script's directory to the jumphost,\n   strips jumphost from INFRAFOUNDRY_PACKAGE_VARS, pipes the modified JSON\n   via stdin, and re-executes the same script on the jumphost with\n   INFRAFOUNDRY_ON_JUMPHOST=1 as a recursion guard. aiqum-post-terraform.sh\n   sources this helper so the entire post-terraform script runs on the\n   jumphost when one is configured. Phases 1-4 use direct SSH (the\n   remote_cmd helpers' no-jumphost branch), and Phase 5's Python wizard\n   reaches the VM directly from the jumphost without needing the\n   operator host to have routing to the target VLAN.\n\nThe reachability issue surfaced concretely during an aiqum-test deploy on\na newly-added VLAN that wasn't advertised by the tailscale subnet router.\nPhases 1-4 succeeded via the jumphost but Phase 5 hung because the\nPython wizard runs locally and made requests.post calls directly to the VM.\n\nThe reexec helper is interim — the long-term solution is framework-native\nsupport in ScriptHandler, tracked as #544. Once that lands, the helper\nand the source line can be removed.\n\nAddresses #548.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-11T19:05:53+01:00",
+          "tree_id": "530b4f4f0d979b51b5752eab89814097c8f93689",
+          "url": "https://github.com/endavis/infrafoundry/commit/ba0b3109ec874272ac0f241de45339d5a8e1f304"
+        },
+        "date": 1775930792811,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6915.004525672272,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002534292577674835",
+            "extra": "mean: 144.61306515237322 usec\nrounds: 2333"
           }
         ]
       }
