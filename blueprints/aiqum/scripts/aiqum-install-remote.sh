@@ -5,37 +5,39 @@
 # then installs the AIQUM RPM.
 set -euo pipefail
 
+log() { echo "[$(date +%H:%M:%S)] $*"; }
+
 AIQUM_URL_BASE="${AIQUM_URL_BASE:-http://your-web-server/applications/aiqum}"
 
 mkdir -p /tmp/aiqum-install
 cd /tmp/aiqum-install
 
 # --- Step 1: Install basic tools ---
-echo "=== Step 1: Installing basic tools ==="
+log "=== Step 1: Installing basic tools ==="
 sudo yum install -y wget unzip
 
 # --- Step 2: Configure EPEL repository ---
 echo ""
-echo "=== Step 2: Configuring EPEL repository ==="
+log "=== Step 2: Configuring EPEL repository ==="
 wget -4 -q https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm -O epel-release-latest-9.noarch.rpm
 sudo yum install -y ./epel-release-latest-9.noarch.rpm
 
 # --- Step 3: Configure MySQL 8.4 Community repository ---
 echo ""
-echo "=== Step 3: Configuring MySQL 8.4 Community repository ==="
+log "=== Step 3: Configuring MySQL 8.4 Community repository ==="
 wget -4 -q http://repo.mysql.com/yum/mysql-8.4-community/el/9/x86_64/mysql84-community-release-el9-1.noarch.rpm -O mysql84-community-release-el9-1.noarch.rpm
 sudo yum install -y ./mysql84-community-release-el9-1.noarch.rpm
 
 # --- Step 4: Install 7-Zip ---
 echo ""
-echo "=== Step 4: Installing 7-Zip ==="
+log "=== Step 4: Installing 7-Zip ==="
 curl -4 -sO "${AIQUM_URL_BASE}/install7zip.sh"
 chmod +x install7zip.sh
 sudo bash install7zip.sh
 
 # --- Step 5: Install firewalld and open AIQUM ports ---
 echo ""
-echo "=== Step 5: Configuring firewall ==="
+log "=== Step 5: Configuring firewall ==="
 sudo yum install -y firewalld
 sudo systemctl enable firewalld
 sudo systemctl start firewalld
@@ -47,7 +49,7 @@ sudo firewall-cmd --reload
 
 # --- Step 6: Download AIQUM files ---
 echo ""
-echo "=== Step 6: Downloading AIQUM files ==="
+log "=== Step 6: Downloading AIQUM files ==="
 curl -4 -sO "${AIQUM_URL_BASE}/pre_install_check.sh"
 chmod +x pre_install_check.sh
 
@@ -61,12 +63,12 @@ fi
 
 # --- Step 7: Verify prerequisites ---
 echo ""
-echo "=== Step 7: Verifying prerequisites ==="
+log "=== Step 7: Verifying prerequisites ==="
 sudo bash pre_install_check.sh || true
 
 # --- Step 8: Install AIQUM RPM ---
 echo ""
-echo "=== Step 8: Installing AIQUM RPM ==="
+log "=== Step 8: Installing AIQUM RPM ==="
 echo "This may take several minutes..."
 sudo yum install -y ./netapp-um-9.18-el9.x86_64.rpm
 
