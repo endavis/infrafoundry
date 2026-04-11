@@ -111,6 +111,34 @@ vm:
           timeout: 300
 ```
 
+### Jumphost Reexec
+
+When a script handler's `EventContext.package_variables` contains a non-empty
+`jumphost` key, the framework transparently runs the configured script on that
+jumphost instead of the operator's workstation. This is how blueprints reach
+API endpoints sitting on VLANs that are not directly routable from the
+operator's host.
+
+The mechanics are: `ScriptHandler` rsyncs the script's **parent directory** to
+a fresh `/tmp/infrafoundry-<uuid>/` on the jumphost (so sibling helpers ship
+along), then invokes the script over SSH. The remote process sees
+`INFRAFOUNDRY_ON_JUMPHOST=1` (a recursion guard) and receives a stripped
+`INFRAFOUNDRY_PACKAGE_VARS` JSON on stdin with the `jumphost` key removed, so
+any downstream logic that branches on `jumphost` does not attempt a second
+hop and so secrets never appear in the jumphost's `ps` output. The remote tmp
+directory is always cleaned up, including on failure or timeout.
+
+**Prerequisites on the jumphost:** `bash`, `rsync`, `ssh`, `python3`, plus any
+tools the blueprint script itself needs. SSH must be reachable from the
+operator's host using the value of `jumphost` as a destination (e.g.
+`ansible@jump.example.com` or an alias defined in `~/.ssh/config`).
+
+**Migration note:** Existing blueprints that source
+`blueprints/_lib/reexec-on-jumphost.sh` continue to work unchanged. The shell
+helper self-deactivates when `INFRAFOUNDRY_ON_JUMPHOST=1` is already set, so
+the framework-level path takes effect and the in-script helper becomes a
+no-op. The shell helper will be removed in a separate follow-up.
+
 ### Real-Time Output Streaming
 
 Script handlers stream stdout and stderr to the console in real-time, line by line, instead of buffering all output until the script completes. This is essential for long-running handlers (e.g., Ansible playbooks) where the user needs to see progress.
