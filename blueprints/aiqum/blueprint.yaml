@@ -38,7 +38,7 @@ events:
       name: aiqum-setup
       script: scripts/aiqum-post-terraform.sh
       description: "Install AIQUM, complete first-experience wizard, add ONTAP cluster"
-      timeout: 1800
+      timeout: 5400
       continue_on_error: false
       requires:
         - "{{ vm_name }}"
