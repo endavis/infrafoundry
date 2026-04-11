@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775930207201,
+  "lastUpdate": 1775930540702,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4929,6 +4929,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014899153375846335",
             "extra": "mean: 106.0158343948402 usec\nrounds: 2198"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4f36b192e53d2ac1630a3cffcd75906b6705bedc",
+          "message": "fix: support cloning aiqum VM from template on a different node (merges PR #551, addresses #550)\n\nThe aiqum blueprint's vm.yaml used the scalar shorthand\n\"clone: {{ template_vmid }}\", which the framework normalizes to\n{\"vm_id\": <scalar>} with no node_name. The generated terraform then\nproduces a clone block with only vm_id, and the Proxmox provider\ndefaults the clone source node to target_node. This silently breaks\nwhen the rocky9 template and the target VM live on different Proxmox\nnodes.\n\nThis homelab has rocky9-template (vmid 901) only on pve1, and\naiqum-test targets pve3 (moved there because pve2 was oversubscribed).\nThe fix uses the dict form of clone so the blueprint can specify\nnode_name explicitly. The framework already supports this form via the\nnormalization code in providers/proxmox/__init__.py and the conditional\nnode_name emission in vms.tf.j2 — the aiqum blueprint just wasn't using\nit.\n\nChanges:\n- blueprints/aiqum/vm.yaml: clone switched from scalar to dict form\n  with vm_id and node_name.\n- blueprints/aiqum/blueprint.yaml: added template_node default (pve1,\n  the current location of rocky9-template). Packages can override.\n- tests/unit/test_aiqum_blueprint.py: updated clone assertion to match\n  the new dict form.\n\nAddresses #550.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-11T19:01:44+01:00",
+          "tree_id": "86c541baa1f67a63efd92324cb82508008c2d2df",
+          "url": "https://github.com/endavis/infrafoundry/commit/4f36b192e53d2ac1630a3cffcd75906b6705bedc"
+        },
+        "date": 1775930539738,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7295.388790821192,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010037653401859425",
+            "extra": "mean: 137.07288654145012 usec\nrounds: 2556"
           }
         ]
       }
