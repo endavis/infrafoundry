@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775938864595,
+  "lastUpdate": 1775940117011,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5022,6 +5022,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006232998774181159",
             "extra": "mean: 102.5429345100413 usec\nrounds: 2153"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "486f8570fb89f643ac61e531fee40e1a46b552ff",
+          "message": "refactor: retire user-space reexec-on-jumphost shell helper (merges PR #559, addresses #558)\n\nThe blueprints/_lib/reexec-on-jumphost.sh helper was an interim\nsolution (added in #548/#549) that let blueprint scripts re-invoke\nthemselves over SSH on a jumphost when the target API was on a\nnon-routable VLAN. Framework-native jumphost reexec landed in #544\n(merged as #557) via ScriptHandler._execute_on_jumphost(), so the\nshell helper is now dead code: the framework sets\nINFRAFOUNDRY_ON_JUMPHOST=1 before the script runs, which makes the\nhelper's recursion guard trip immediately and self-deactivate.\n\nRemoves the helper script, the source guard in the aiqum blueprint's\npost-terraform script, and the stale migration note in the event\nsystem docs. Pure deletion, 72 lines removed.\n\nEnd-to-end behavior was validated during #557's finalization on\naiqum-test (VLAN 110, all 5 phases) with the helper's source line\ntemporarily commented out — functionally identical to this state.\n\nAddresses #558\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-11T21:41:25+01:00",
+          "tree_id": "d469bd50353f6ff80aaf73667adec3a52f15b096",
+          "url": "https://github.com/endavis/infrafoundry/commit/486f8570fb89f643ac61e531fee40e1a46b552ff"
+        },
+        "date": 1775940116596,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6625.138876514806,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003060032011752702",
+            "extra": "mean: 150.94023214288543 usec\nrounds: 2072"
           }
         ]
       }
