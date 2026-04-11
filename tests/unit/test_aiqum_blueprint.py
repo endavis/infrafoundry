@@ -97,7 +97,7 @@ def test_aiqum_example_vm_config_uses_merged_values(loader: PackageLoader) -> No
     assert config["disk"]["storage"] == "local-lvm"
 
     # Blueprint defaults
-    assert config["clone"] == 901
+    assert config["clone"] == {"vm_id": 901, "node_name": "pve1"}
     assert config["cores"] == 4
     assert config["memory"] == 12288
     assert config["disk"]["size"] == 150
