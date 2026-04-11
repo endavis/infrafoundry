@@ -649,6 +649,62 @@ class TestTypeAwareEventFiring:
         assert executor.event_manager.emit_event.call_count == 1
 
 
+# --- Per-resource events pass resource_scoped=True (#539) ---
+
+
+class TestPerResourceEventResourceScoped:
+    """Test that _fire_resource_lifecycle_events passes resource_scoped=True.
+
+    This ensures package-level handlers (without _resource_owner) are NOT
+    triggered by per-resource events, only by the aggregate event in apply_serial.
+    """
+
+    def _make_executor(self) -> Any:
+        """Create a DeploymentExecutor with mocked dependencies."""
+        from infrafoundry.core.deployment_executor import DeploymentExecutor
+
+        executor = DeploymentExecutor(
+            runner_registry=MagicMock(),
+            state_manager=MagicMock(),
+            event_manager=MagicMock(),
+            providers={},
+        )
+        return executor
+
+    def _make_provider(self, tf_type_map: dict[str, list[str]]) -> MagicMock:
+        """Create a mock provider with the given terraform type mapping."""
+        provider = MagicMock()
+        provider.get_terraform_resource_types.return_value = tf_type_map
+        return provider
+
+    def test_per_resource_event_sets_resource_scoped(self) -> None:
+        """emit_event in _fire_resource_lifecycle_events passes resource_scoped=True."""
+        executor = self._make_executor()
+        provider = self._make_provider(
+            {"vm": ["proxmox_virtual_environment_vm"]},
+        )
+        resource = ResourceConfig(
+            name="aiqum",
+            type="vm",
+            provider="proxmox",
+            config={"name": "aiqum"},
+            events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+        )
+        outcome = ResourceOutcome(
+            address="proxmox_virtual_environment_vm.aiqum",
+            action="create",
+            resource_name="aiqum",
+        )
+
+        executor._fire_resource_lifecycle_events(
+            "prod", "proxmox", provider, [resource], [outcome], None
+        )
+
+        assert executor.event_manager.emit_event.called
+        call_kwargs = executor.event_manager.emit_event.call_args
+        assert call_kwargs.kwargs.get("resource_scoped") is True
+
+
 # --- Aggregate event deduplication ---
 
 

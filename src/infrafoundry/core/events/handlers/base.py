@@ -28,6 +28,16 @@ class BaseHandler(ABC):
         """Handler name for logging and identification."""
         return str(self._name)
 
+    @property
+    def is_resource_scoped(self) -> bool:
+        """Whether this handler is scoped to a specific resource.
+
+        Returns:
+            True when ``_resource_owner`` is set, meaning the handler was
+            registered for a specific resource (e.g., on_create on a VM).
+        """
+        return self._resource_owner is not None
+
     @abstractmethod
     def execute(self, context: EventContext) -> EventResult:
         """Execute the handler for an event.

@@ -218,12 +218,18 @@ class UnifiedEventBus(BaseManager):
         self,
         context: EventContext,
         abort_on_failure: bool = True,
+        resource_scoped: bool = False,
     ) -> list[EventResult]:
         """Emit an event to all registered handlers.
 
         Args:
             context: Event context with all relevant information
             abort_on_failure: If True, raise EventAbortedError on handler abort
+            resource_scoped: If True, only fire handlers that have
+                ``_resource_owner`` set (i.e., resource-level handlers).
+                Package-level handlers (without ``_resource_owner``) are
+                skipped. This prevents package-level ``on_create`` handlers
+                from firing on per-resource events.
 
         Returns:
             List of results from all handlers
@@ -239,6 +245,12 @@ class UnifiedEventBus(BaseManager):
 
         # Execute registered handlers
         for handler in self._handlers[event_type]:
+            if resource_scoped and not handler.is_resource_scoped:
+                self._log_debug(
+                    f"Skipping handler {handler.name}: "
+                    f"resource_scoped emit but handler has no _resource_owner"
+                )
+                continue
             if not handler.matches_package(context.package_filter):
                 self._log_debug(
                     f"Skipping handler {handler.name}: "
@@ -273,6 +285,8 @@ class UnifiedEventBus(BaseManager):
         event_type: EventType,
         environment: str,
         data: Mapping[str, Any] | None = None,
+        *,
+        resource_scoped: bool = False,
         **kwargs: Any,
     ) -> list[EventResult]:
         """Convenience method to create context and emit.
@@ -283,6 +297,8 @@ class UnifiedEventBus(BaseManager):
             event_type: Type of event
             environment: Environment name
             data: Event-specific data (dict or TypedDict)
+            resource_scoped: If True, only fire resource-level handlers
+                (those with ``_resource_owner`` set).
             **kwargs: Additional context fields (provider, resource, etc.)
 
         Returns:
@@ -294,7 +310,7 @@ class UnifiedEventBus(BaseManager):
             data=dict(data) if data else {},
             **kwargs,
         )
-        return self.emit(context)
+        return self.emit(context, resource_scoped=resource_scoped)
 
     def _execute_handler(
         self,
