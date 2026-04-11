@@ -13,7 +13,6 @@ from rich.console import Console
 
 from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.events.context import Event, EventContext, EventResult
-from infrafoundry.core.events.handlers.ansible import AnsibleHandler
 from infrafoundry.core.events.handlers.base import BaseHandler
 from infrafoundry.core.events.handlers.python import PythonHandler
 from infrafoundry.core.events.handlers.script import ScriptHandler
@@ -164,14 +163,6 @@ class UnifiedEventBus(BaseManager):
 
         elif handler_type == HandlerType.WEBHOOK.value:
             return WebhookHandler(config)
-
-        elif handler_type == HandlerType.ANSIBLE.value:
-            return AnsibleHandler(
-                config,
-                config_base_dir=self.config_base_dir,
-                secret_resolver=self.secret_resolver,
-                console=self.console,
-            )
 
         else:
             raise ValueError(f"Unknown handler type: {handler_type}")

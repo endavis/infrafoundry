@@ -7,9 +7,6 @@ Covers:
 - Terraform JSON output parsing
 - Resource lifecycle event firing
 - Type-aware event filtering (terraform type -> InfraFoundry type)
-- AnsibleHandler creation and validation
-- HandlerType.ANSIBLE enum
-- Event bus ansible handler creation
 - Provider get_terraform_resource_types() mappings
 - Aggregate event deduplication
 """
@@ -19,9 +16,6 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
-from infrafoundry.core.events.bus import UnifiedEventBus
-from infrafoundry.core.events.handlers.ansible import AnsibleHandler
-from infrafoundry.core.events.types import HandlerType
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.runners.ansible_runner import AnsibleRunner
 from infrafoundry.core.runners.base_runner import BaseRunner
@@ -44,7 +38,7 @@ class TestResourceConfigEvents:
         """ResourceConfig accepts events dict."""
         events = {
             "on_create": [{"type": "script", "script": "scripts/setup.sh"}],
-            "on_destroy": [{"type": "ansible", "playbook": "cleanup.yml"}],
+            "on_destroy": [{"type": "script", "script": "scripts/cleanup.sh"}],
         }
         rc = ResourceConfig(
             name="test",
@@ -312,70 +306,6 @@ class TestTerraformJsonParsing:
         assert len(outcomes) == 1
         assert outcomes[0].resource_name == "ontapcl-01"
         assert outcomes[0].action == "create"
-
-
-# --- AnsibleHandler ---
-
-
-class TestAnsibleHandler:
-    """Test AnsibleHandler creation and validation."""
-
-    def test_validate_config_valid(self) -> None:
-        """Valid config passes validation."""
-        handler = AnsibleHandler({"type": "ansible", "playbook": "playbooks/setup.yml"})
-        errors = handler.validate_config()
-        assert errors == []
-
-    def test_validate_config_missing_playbook(self) -> None:
-        """Missing playbook field fails validation."""
-        handler = AnsibleHandler({"type": "ansible"})
-        errors = handler.validate_config()
-        assert len(errors) == 1
-        assert "playbook" in errors[0].lower()
-
-    def test_validate_config_bad_timeout(self) -> None:
-        """Invalid timeout fails validation."""
-        handler = AnsibleHandler({"type": "ansible", "playbook": "test.yml", "timeout": 0})
-        errors = handler.validate_config()
-        assert len(errors) == 1
-        assert "timeout" in errors[0].lower()
-
-    def test_handler_name(self) -> None:
-        """Handler uses config name or class name."""
-        handler = AnsibleHandler({"type": "ansible", "playbook": "test.yml", "name": "my-handler"})
-        assert handler.name == "my-handler"
-
-    def test_handler_default_name(self) -> None:
-        """Handler defaults to class name."""
-        handler = AnsibleHandler({"type": "ansible", "playbook": "test.yml"})
-        assert handler.name == "AnsibleHandler"
-
-
-# --- HandlerType.ANSIBLE ---
-
-
-class TestHandlerTypeAnsible:
-    """Test HandlerType enum includes ANSIBLE."""
-
-    def test_ansible_value(self) -> None:
-        """HandlerType.ANSIBLE has value 'ansible'."""
-        assert HandlerType.ANSIBLE == "ansible"
-        assert HandlerType.ANSIBLE.value == "ansible"
-
-
-# --- Event bus ansible handler creation ---
-
-
-class TestEventBusAnsibleHandler:
-    """Test event bus creates AnsibleHandler correctly."""
-
-    def test_creates_ansible_handler(self) -> None:
-        """Event bus _create_handler creates AnsibleHandler for type=ansible."""
-        bus = UnifiedEventBus()
-        config = {"type": "ansible", "playbook": "playbooks/test.yml"}
-        handler = bus._create_handler(config)
-        assert isinstance(handler, AnsibleHandler)
-        assert handler.config["playbook"] == "playbooks/test.yml"
 
 
 # --- Provider get_terraform_resource_types() ---
