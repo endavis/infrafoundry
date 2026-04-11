@@ -214,24 +214,6 @@ plan/apply/destroy execution. They are intended to run as resource lifecycle
 event handlers instead. The `is_iac_runner` property on `BaseRunner` controls
 this behavior.
 
-### Ansible handler type
-
-A new `ansible` handler type runs Ansible playbooks as event handlers:
-
-```yaml
-events:
-  on_create:
-    - type: ansible
-      name: configure
-      playbook: playbooks/configure.yml
-      inventory: inventory/hosts.yml
-      extra_vars:
-        target_host: web-01
-      timeout: 300
-```
-
-See [Infrastructure Packages: Ansible handler configuration](../configuration/infrastructure-packages.md#ansible-handler-configuration) for full details.
-
 ### Environment variables
 
 Scripts and playbooks receive resource context via environment variables:
