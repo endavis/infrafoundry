@@ -18,8 +18,19 @@
 # - SSH jumphost reachable (set jumphost in infrafoundry.yml)
 set -euo pipefail
 
+log() { echo "[$(date +%H:%M:%S)] $*"; }
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGE_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Re-execute on the jumphost if one is configured. No-op otherwise.
+# See blueprints/_lib/reexec-on-jumphost.sh for behavior details.
+# The file-exists check is intentional: when the reexec'd copy of this
+# script runs on the jumphost, _lib/ has not been rsynced alongside, so
+# the helper is absent and the source is skipped. That's the base case
+# that breaks the reexec loop.
+_REEXEC_HELPER="${SCRIPT_DIR}/../../_lib/reexec-on-jumphost.sh"
+[ -f "${_REEXEC_HELPER}" ] && source "${_REEXEC_HELPER}"
 
 # Read variables from INFRAFOUNDRY_PACKAGE_VARS or fall back to infrafoundry.yml
 if [ -n "${INFRAFOUNDRY_PACKAGE_VARS:-}" ]; then
@@ -55,7 +66,7 @@ else
     remote_upload() { scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$1" "${SSH_USER}@${2}:${3}"; }
 fi
 
-echo "=== AIQUM Post-Terraform Setup ==="
+log "=== AIQUM Post-Terraform Setup ==="
 echo "VM: ${vm_name} (${ip_address})"
 if [ -n "${JUMPHOST}" ]; then
     echo "Jumphost: ${JUMPHOST}"
@@ -65,7 +76,7 @@ fi
 
 # --- Phase 1: Wait for VM to be reachable ---
 echo ""
-echo "--- Phase 1: Waiting for VM to be reachable ---"
+log "--- Phase 1: Waiting for VM to be reachable ---"
 MAX_WAIT=300
 ELAPSED=0
 while ! remote_cmd "${ip_address}" "echo ready" &>/dev/null; do
@@ -81,7 +92,7 @@ echo "  VM is reachable via SSH"
 
 # --- Phase 2: Upload and run install script ---
 echo ""
-echo "--- Phase 2: Installing AIQUM RPM ---"
+log "--- Phase 2: Installing AIQUM RPM ---"
 
 REMOTE_SCRIPT="${SCRIPT_DIR}/aiqum-install-remote.sh"
 if [ ! -f "${REMOTE_SCRIPT}" ]; then
@@ -101,7 +112,7 @@ echo "  AIQUM RPM installed successfully"
 
 # --- Phase 3: Wait for AIQUM web UI ---
 echo ""
-echo "--- Phase 3: Waiting for AIQUM web UI ---"
+log "--- Phase 3: Waiting for AIQUM web UI ---"
 MAX_WAIT=600
 ELAPSED=0
 while ! curl -sk -o /dev/null -w "%{http_code}" "https://${ip_address}/" 2>/dev/null | grep -q "200\|302\|401"; do
@@ -121,7 +132,7 @@ echo "  AIQUM web UI is available"
 # failure. Regenerate both the HTTPS cert and the client cert (used for mutual
 # auth with ONTAP) so they include the FQDN.
 echo ""
-echo "--- Phase 4: Regenerating certificates ---"
+log "--- Phase 4: Regenerating certificates ---"
 
 # Regenerate client certificate (used for ONTAP mutual auth / EMS)
 echo "  Regenerating client certificate..."
@@ -148,10 +159,10 @@ echo "  AIQUM web UI is back"
 
 # --- Phase 5: Run initial setup wizard (FEW) ---
 echo ""
-echo "--- Phase 5: Running initial setup wizard ---"
+log "--- Phase 5: Running initial setup wizard ---"
 python3 "${SCRIPT_DIR}/aiqum-initial-setup.py"
 
 echo ""
-echo "=== AIQUM Setup Complete ==="
+log "=== AIQUM Setup Complete ==="
 echo "  URL: https://${ip_address}/"
 echo "  User: ${aiqum_admin_user}"
