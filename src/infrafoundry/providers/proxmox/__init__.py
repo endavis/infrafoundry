@@ -30,6 +30,8 @@ class ProxmoxProvider(
     _PROXMOX_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
         "api_url": "proxmox_api_url",
         "api_token": "proxmox_api_token",  # nosec B105
+        "api_token_id": "proxmox_api_token_id",  # nosec B105
+        "api_token_secret": "proxmox_api_token_secret",  # nosec B105
         "node": "proxmox_node",
         "storage": "proxmox_storage",
     }
