@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775940117011,
+  "lastUpdate": 1775942068823,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5053,6 +5053,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003060032011752702",
             "extra": "mean: 150.94023214288543 usec\nrounds: 2072"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e99fca015656c315aeac42a173ff548974b311da",
+          "message": "chore: delete unused ansible event handler (merges PR #560, addresses #556)\n\nRemove AnsibleHandler, the HandlerType.ANSIBLE enum member, and the\nbus factory branch that constructed it. The handler had zero blueprint\nconsumers, only validation-only test coverage (no execute() tests),\nand every ansible-using blueprint (ontap-cluster, oci-k3s-cluster)\nalready wraps ansible-playbook inside a type: script handler for direct\ncontrol over arguments and output streaming.\n\nBREAKING CHANGE: any config declaring `type: ansible` under an event\nkey (package-level events or resource-level on_create/on_update/\non_destroy) now fails fast at handler registration with\n`ValueError: Unknown handler type: ansible`. Grep confirmed zero such\nconfigs exist in this repo or in the private config repo, so no\ninternal consumers are affected. External users should switch to\n`type: script` wrapping ansible-playbook directly.\n\nAlso removes the three now-orphaned test classes, the ansible-handler\ndocumentation subsections, and the ansible row from the handler-types\ntable.\n\nAddresses #556\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-11T22:13:46+01:00",
+          "tree_id": "d8c6aada0037e11ab1a03c4608f6e0b5e460d79a",
+          "url": "https://github.com/endavis/infrafoundry/commit/e99fca015656c315aeac42a173ff548974b311da"
+        },
+        "date": 1775942067837,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7360.994213311055,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009730163379733235",
+            "extra": "mean: 135.8512139829803 usec\nrounds: 2360"
           }
         ]
       }
