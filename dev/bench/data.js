@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775852098361,
+  "lastUpdate": 1775929245304,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4836,6 +4836,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010485210837558697",
             "extra": "mean: 136.8109467633479 usec\nrounds: 2348"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2648ac9ebf538f211ecac10a70b24dfc712af0fd",
+          "message": "fix: scope on_create event handlers to the created resource (merges PR #545, addresses #539)\n\nEvent handlers with resource-scoped filtering could fire against resources\nthat weren't part of the triggering create, because the resource_scoped flag\nwas not set on all emit_event call sites in DeploymentExecutor. This caused\non_create handlers attached to one package to fire for unrelated resources\nin the same terraform apply.\n\nSet resource_scoped=True on the two emit_event call sites in\nDeploymentExecutor.apply_serial that fire RESOURCE_CREATED, and add helper\nsupport in the event bus and BaseEventHandler so the scoping flag is\nrespected consistently. Tests cover both the package-filter path and the\nper-resource lifecycle path.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-11T18:40:06+01:00",
+          "tree_id": "f024554b4a6e4ecfa7c80cb3ac389d2ddc79ddfc",
+          "url": "https://github.com/endavis/infrafoundry/commit/2648ac9ebf538f211ecac10a70b24dfc712af0fd"
+        },
+        "date": 1775929244176,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6547.170137137059,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000033697037739638156",
+            "extra": "mean: 152.73774456047346 usec\nrounds: 2298"
           }
         ]
       }
