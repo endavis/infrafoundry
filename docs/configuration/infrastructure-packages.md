@@ -344,48 +344,21 @@ resources:
       target_node: pve1
     events:
       on_create:
-        - type: ansible
+        - type: script
           name: configure-node
-          playbook: playbooks/configure.yml
+          script: scripts/configure.sh
           timeout: 300
 ```
 
 ### Handler types
 
-Resource-level events support the same handler types as package-level events,
-plus a new `ansible` handler type:
+Resource-level events support the same handler types as package-level events:
 
 | Type | Description |
 |:-----|:-----------|
 | `script` | Run a shell script |
 | `webhook` | Send an HTTP webhook |
 | `python` | Call a Python callable |
-| `ansible` | Run an Ansible playbook |
-
-### Ansible handler configuration
-
-The `ansible` handler runs an Ansible playbook as an event handler:
-
-```yaml
-events:
-  on_create:
-    - type: ansible
-      name: configure-node
-      playbook: playbooks/configure.yml
-      inventory: inventory/hosts.yml    # optional
-      extra_vars:                        # optional
-        target_host: "{{ resource_name }}"
-      timeout: 300
-      continue_on_error: false
-```
-
-| Field | Type | Required | Description |
-|:------|:-----|:---------|:-----------|
-| `playbook` | string | Yes | Path to playbook (relative to environment directory) |
-| `inventory` | string | No | Inventory file path (relative to environment directory) |
-| `extra_vars` | dict | No | Extra variables passed via `--extra-vars` |
-| `timeout` | int | No | Max execution time in seconds (default: 300, max: 3600) |
-| `continue_on_error` | bool | No | Don't abort on failure (default: false) |
 
 ### Script path rewriting
 

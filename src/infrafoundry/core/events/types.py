@@ -86,7 +86,6 @@ class HandlerType(StrEnum):
     PYTHON = "python"
     SCRIPT = "script"
     WEBHOOK = "webhook"
-    ANSIBLE = "ansible"
 
 
 # Lifecycle stages that can have handlers configured
