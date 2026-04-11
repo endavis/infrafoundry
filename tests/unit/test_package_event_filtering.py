@@ -252,6 +252,174 @@ class TestResourceOwnerScoping:
         assert handler.matches_resources(["db-server"]) is False
 
 
+# --- BaseHandler.is_resource_scoped property (#539) ---
+
+
+class TestIsResourceScoped:
+    """Tests for BaseHandler.is_resource_scoped property."""
+
+    def test_handler_with_resource_owner_is_scoped(self) -> None:
+        """Handler with _resource_owner is resource-scoped."""
+        handler = _make_handler_with_owner(resource_owner="web-server")
+        assert handler.is_resource_scoped is True
+
+    def test_handler_without_resource_owner_is_not_scoped(self) -> None:
+        """Handler without _resource_owner is not resource-scoped."""
+        handler = _make_handler_with_owner(resource_owner=None)
+        assert handler.is_resource_scoped is False
+
+    def test_package_level_handler_is_not_scoped(self) -> None:
+        """Package-level handler (with _package but no _resource_owner) is not scoped."""
+        handler = _make_handler(package="k3s-cluster")
+        assert handler.is_resource_scoped is False
+
+
+# --- resource_scoped emit (#539) ---
+
+
+class TestResourceScopedEmit:
+    """Tests for resource_scoped parameter in UnifiedEventBus.emit()."""
+
+    def test_resource_scoped_skips_package_level_handler(self) -> None:
+        """emit() with resource_scoped=True skips handlers without _resource_owner."""
+        bus = UnifiedEventBus()
+        # Package-level handler with requires (the bug scenario)
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "name": "pkg-handler",
+                "requires": ["aiqum"],
+            },
+        )
+
+        ctx = EventContext(
+            event_type=EventType.RESOURCE_CREATED,
+            environment="prod",
+            target_resources=["aiqum"],
+        )
+        results = bus.emit(ctx, abort_on_failure=False, resource_scoped=True)
+        assert len(results) == 0
+
+    def test_resource_scoped_fires_resource_level_handler(self) -> None:
+        """emit() with resource_scoped=True fires handlers with _resource_owner."""
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "name": "res-handler",
+                "_resource_owner": "aiqum",
+            },
+        )
+
+        ctx = EventContext(
+            event_type=EventType.RESOURCE_CREATED,
+            environment="prod",
+            target_resources=["aiqum"],
+        )
+        results = bus.emit(ctx, abort_on_failure=False, resource_scoped=True)
+        assert len(results) == 1
+
+    def test_non_resource_scoped_fires_all(self) -> None:
+        """emit() without resource_scoped fires both package and resource handlers."""
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "name": "pkg-handler",
+                "requires": ["aiqum"],
+            },
+        )
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "name": "res-handler",
+                "_resource_owner": "aiqum",
+            },
+        )
+
+        ctx = EventContext(
+            event_type=EventType.RESOURCE_CREATED,
+            environment="prod",
+            target_resources=["aiqum"],
+        )
+        results = bus.emit(ctx, abort_on_failure=False, resource_scoped=False)
+        assert len(results) == 2
+
+    def test_emit_event_passes_resource_scoped(self) -> None:
+        """emit_event() convenience method passes resource_scoped to emit()."""
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "name": "pkg-handler",
+                "requires": ["aiqum"],
+            },
+        )
+
+        results = bus.emit_event(
+            EventType.RESOURCE_CREATED,
+            "prod",
+            {"action": "create"},
+            resource_scoped=True,
+            target_resources=["aiqum"],
+        )
+        assert len(results) == 0
+
+    def test_resource_scoped_mixed_handlers(self) -> None:
+        """resource_scoped=True: only resource-level handler fires, not package-level.
+
+        This is the exact scenario from issue #539: a package-level on_create
+        handler with requires: ["aiqum"] should NOT fire when a DHCP
+        reservation named "aiqum" triggers a per-resource RESOURCE_CREATED event.
+        """
+        bus = UnifiedEventBus()
+        # Package-level handler (no _resource_owner) — should be skipped
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "name": "pkg-on-create",
+                "requires": ["aiqum"],
+            },
+        )
+        # Resource-level handler (has _resource_owner) — should fire
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "name": "res-on-create",
+                "_resource_owner": "aiqum",
+            },
+        )
+
+        ctx = EventContext(
+            event_type=EventType.RESOURCE_CREATED,
+            environment="prod",
+            target_resources=["opnsense:aiqum", "aiqum"],
+        )
+        results = bus.emit(ctx, abort_on_failure=False, resource_scoped=True)
+        assert len(results) == 1
+
+
 class TestEventBusResourceOwnerFiltering:
     """Integration tests for _resource_owner filtering in UnifiedEventBus.emit()."""
 

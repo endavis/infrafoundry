@@ -558,6 +558,7 @@ class DeploymentExecutor:
                     created_event,
                     target_resources=[resource.name],
                     package_filter=package_filter,
+                    resource_scoped=True,
                 )
 
         # Fire resource lifecycle events based on IaC outcomes
@@ -700,6 +701,7 @@ class DeploymentExecutor:
                     "address": outcome.address,
                     "action": outcome.action,
                 },
+                resource_scoped=True,
                 provider=provider_name,
                 resource=outcome.resource_name,
                 target_resources=[qualified_owner, outcome.resource_name],
