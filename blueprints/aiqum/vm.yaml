@@ -4,7 +4,9 @@ vms:
   - name: "{{ vm_name }}"
     vmid: {{ vmid }}
     target_node: "{{ target_node }}"
-    clone: {{ template_vmid }}
+    clone:
+      vm_id: {{ template_vmid }}
+      node_name: "{{ template_node }}"
     cores: {{ cores }}
     memory: {{ memory }}
     agent: true

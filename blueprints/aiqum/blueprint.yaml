@@ -5,6 +5,7 @@ version: "1.0.0"
 defaults:
   # --- VM hardware ---
   template_vmid: 901          # Standard rocky9-template vmid
+  template_node: pve1         # Proxmox node hosting the template
   cores: 4
   memory: 12288               # AIQUM minimum recommendation (12 GiB)
   disk_size: 150              # AIQUM minimum (~100 GB+)
