@@ -1,8 +1,10 @@
 """Unit tests for EventManager and event handlers."""
 
+import json
 import stat
+import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -657,3 +659,383 @@ class TestPackageEventsIntegration:
             pkg_event_calls = [c for c in load_config_calls if "AFTER_APPLY" in c]
             assert len(pkg_event_calls) == 1
             assert pkg_event_calls[0]["AFTER_APPLY"][0]["type"] == "webhook"
+
+
+def _make_fake_process(
+    returncode: int = 0,
+    stdout: str = "",
+    stderr: str = "",
+    wait_raises: Exception | None = None,
+) -> MagicMock:
+    """Build a mock subprocess.Popen result used by jumphost reexec tests.
+
+    The ``_read_stream`` helper iterates line-by-line with ``for line in
+    stream``, so ``stdout``/``stderr`` are exposed as iterators over the
+    configured content. ``stdin`` supports ``write`` and ``close``.
+    """
+    import io
+
+    proc = MagicMock()
+    proc.stdout = io.StringIO(stdout)
+    proc.stderr = io.StringIO(stderr)
+    proc.stdin = MagicMock()
+    proc.stdin.write = MagicMock()
+    proc.stdin.close = MagicMock()
+    proc.returncode = returncode
+    if wait_raises is not None:
+        proc.wait = MagicMock(side_effect=wait_raises)
+    else:
+        proc.wait = MagicMock(return_value=returncode)
+    proc.kill = MagicMock()
+    return proc
+
+
+@pytest.mark.unit
+class TestScriptHandlerJumphostReexec:
+    """Tests for ScriptHandler jumphost reexec dispatch (#544)."""
+
+    def _handler(self, tmp_path: Path, script_name: str = "run.sh") -> tuple[ScriptHandler, Path]:
+        """Create a ScriptHandler with a minimal executable script on disk."""
+        env_dir = tmp_path / "envs" / "dev"
+        env_dir.mkdir(parents=True, exist_ok=True)
+        script = env_dir / script_name
+        script.write_text("#!/bin/bash\necho hi\n")
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+        handler = ScriptHandler(
+            {"script": script_name},
+            config_base_dir=tmp_path,
+        )
+        return handler, script
+
+    def _context(self, **vars: object) -> EventContext:
+        """Build an EventContext carrying the given package variables."""
+        return EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+            package_variables=dict(vars),
+        )
+
+    def test_no_jumphost_runs_locally(self, tmp_path: Path):
+        """Empty/missing jumphost takes the local subprocess path."""
+        handler, script = self._handler(tmp_path)
+        context = self._context()  # no jumphost
+
+        with patch("infrafoundry.core.events.handlers.script.subprocess.Popen") as mock_popen:
+            mock_popen.return_value = _make_fake_process(returncode=0)
+            result = handler.execute(context)
+
+        assert mock_popen.call_count == 1
+        args, _ = mock_popen.call_args
+        # Local path: first positional is [str(script_path)]
+        assert args[0] == [str(script)]
+        assert result.success
+
+    def test_jumphost_set_triggers_reexec(self, tmp_path: Path):
+        """jumphost variable causes ssh-based remote execution."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="ansible@jump", other="val")
+
+        run_result = MagicMock(returncode=0, stdout="", stderr="")
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                return_value=run_result,
+            ),
+            patch("infrafoundry.core.events.handlers.script.subprocess.Popen") as mock_popen,
+        ):
+            mock_popen.return_value = _make_fake_process(returncode=0)
+            result = handler.execute(context)
+
+        assert result.success
+        assert mock_popen.call_count == 1
+        cmd = mock_popen.call_args[0][0]
+        assert cmd[0] == "ssh"
+        assert "StrictHostKeyChecking=no" in cmd
+        assert "ansible@jump" in cmd
+        # The last arg is the remote bash command string
+        assert cmd[-1].startswith("INFRAFOUNDRY_ON_JUMPHOST=1")
+        assert "bash /tmp/infrafoundry-" in cmd[-1]
+
+    def test_jumphost_stripped_from_forwarded_json(self, tmp_path: Path):
+        """Package vars JSON piped to stdin excludes 'jumphost'."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh", foo="bar", num=7)
+
+        run_result = MagicMock(returncode=0, stdout="", stderr="")
+        fake_proc = _make_fake_process(returncode=0)
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                return_value=run_result,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=fake_proc,
+            ),
+        ):
+            handler.execute(context)
+
+        fake_proc.stdin.write.assert_called_once()
+        written = fake_proc.stdin.write.call_args[0][0]
+        parsed = json.loads(written)
+        assert "jumphost" not in parsed
+        assert parsed["foo"] == "bar"
+        assert parsed["num"] == 7
+        fake_proc.stdin.close.assert_called_once()
+
+    def test_infrafoundry_on_jumphost_env_set_in_remote_command(self, tmp_path: Path):
+        """Remote bash command sets INFRAFOUNDRY_ON_JUMPHOST=1 for recursion guard."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh")
+
+        run_result = MagicMock(returncode=0, stdout="", stderr="")
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                return_value=run_result,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ) as mock_popen,
+        ):
+            handler.execute(context)
+
+        remote_bash = mock_popen.call_args[0][0][-1]
+        assert "INFRAFOUNDRY_ON_JUMPHOST=1" in remote_bash
+        assert 'INFRAFOUNDRY_PACKAGE_VARS="$(cat)"' in remote_bash
+
+    def test_remote_exit_code_propagated(self, tmp_path: Path):
+        """Non-zero remote returncode surfaces as failure with abort."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh")
+
+        run_result = MagicMock(returncode=0, stdout="", stderr="")
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                return_value=run_result,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=17),
+            ),
+        ):
+            result = handler.execute(context)
+
+        assert result.success is False
+        assert result.abort is True
+        assert result.data.get("returncode") == 17
+        assert "17" in (result.reason or "")
+
+    def test_rsync_failure(self, tmp_path: Path):
+        """Rsync failure returns a clear reason and never launches the remote script."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh")
+
+        mkdir_ok = MagicMock(returncode=0, stdout="", stderr="")
+        rsync_fail = MagicMock(returncode=23, stdout="", stderr="permission denied")
+        cleanup_ok = MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            if cmd[0] == "rsync":
+                return rsync_fail
+            if cmd[0] == "ssh" and cmd[-1].startswith("mkdir"):
+                return mkdir_ok
+            return cleanup_ok
+
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch("infrafoundry.core.events.handlers.script.subprocess.Popen") as mock_popen,
+        ):
+            result = handler.execute(context)
+
+        assert result.success is False
+        assert "rsync" in (result.reason or "")
+        assert mock_popen.call_count == 0
+
+    def test_ssh_mkdir_failure(self, tmp_path: Path):
+        """mkdir failure returns a clear reason and never runs rsync or remote."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh")
+
+        mkdir_fail = MagicMock(returncode=255, stdout="", stderr="host unreachable")
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            if cmd[0] == "ssh" and cmd[-1].startswith("mkdir"):
+                return mkdir_fail
+            # rsync/cleanup should not be reached
+            raise AssertionError(f"unexpected call: {cmd}")
+
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch("infrafoundry.core.events.handlers.script.subprocess.Popen") as mock_popen,
+        ):
+            result = handler.execute(context)
+
+        assert result.success is False
+        assert "mkdir" in (result.reason or "")
+        assert mock_popen.call_count == 0
+
+    def test_cleanup_runs_on_success(self, tmp_path: Path):
+        """Cleanup ssh rm -rf fires after a successful remote run."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh")
+
+        calls: list[list[str]] = []
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            calls.append(list(cmd))
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ),
+        ):
+            result = handler.execute(context)
+
+        assert result.success is True
+        cleanup_calls = [c for c in calls if c[0] == "ssh" and "rm -rf" in c[-1]]
+        assert len(cleanup_calls) == 1
+
+    def test_cleanup_runs_on_failure(self, tmp_path: Path):
+        """Cleanup ssh rm -rf fires even when remote script returns non-zero."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh")
+
+        calls: list[list[str]] = []
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            calls.append(list(cmd))
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=5),
+            ),
+        ):
+            result = handler.execute(context)
+
+        assert result.success is False
+        cleanup_calls = [c for c in calls if c[0] == "ssh" and "rm -rf" in c[-1]]
+        assert len(cleanup_calls) == 1
+
+    def test_cleanup_error_ignored(self, tmp_path: Path):
+        """Non-zero cleanup return code does not affect the main EventResult."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh")
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            if cmd[0] == "ssh" and "rm -rf" in cmd[-1]:
+                return MagicMock(returncode=1, stdout=b"", stderr=b"cleanup failed")
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=3),
+            ),
+        ):
+            result = handler.execute(context)
+
+        # Reflects real remote exit code, not cleanup's rc
+        assert result.data.get("returncode") == 3
+        assert result.success is False
+
+    def test_stream_output_from_remote(self, tmp_path: Path):
+        """stdout/stderr from the remote Popen are captured in EventResult."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh")
+
+        run_result = MagicMock(returncode=0, stdout="", stderr="")
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                return_value=run_result,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(
+                    returncode=0,
+                    stdout="out-line-1\nout-line-2\n",
+                    stderr="err-line-1\n",
+                ),
+            ),
+        ):
+            result = handler.execute(context)
+
+        assert "out-line-1" in result.stdout
+        assert "out-line-2" in result.stdout
+        assert "err-line-1" in result.stderr
+
+    def test_timeout_kills_ssh_subprocess(self, tmp_path: Path):
+        """Timeout on remote wait kills ssh process and still runs cleanup."""
+        handler, _ = self._handler(tmp_path)
+        handler.config["timeout"] = 1
+        context = self._context(jumphost="jh")
+
+        cleanup_seen: list[list[str]] = []
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            if cmd[0] == "ssh" and "rm -rf" in cmd[-1]:
+                cleanup_seen.append(list(cmd))
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        fake_proc = _make_fake_process(
+            returncode=0,
+            wait_raises=subprocess.TimeoutExpired(cmd="ssh", timeout=1),
+        )
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=fake_proc,
+            ),
+        ):
+            result = handler.execute(context)
+
+        fake_proc.kill.assert_called_once()
+        assert result.success is False
+        assert "Timeout" in (result.reason or "")
+        assert len(cleanup_seen) == 1
+
+    def test_infrafoundry_on_jumphost_already_set_skips_reexec(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """If INFRAFOUNDRY_ON_JUMPHOST is already set, local path is taken."""
+        handler, script = self._handler(tmp_path)
+        context = self._context(jumphost="jh")
+
+        monkeypatch.setenv("INFRAFOUNDRY_ON_JUMPHOST", "1")
+        with patch("infrafoundry.core.events.handlers.script.subprocess.Popen") as mock_popen:
+            mock_popen.return_value = _make_fake_process(returncode=0)
+            result = handler.execute(context)
+
+        assert mock_popen.call_count == 1
+        # Local path signature: first arg list is [str(script)]
+        assert mock_popen.call_args[0][0] == [str(script)]
+        assert result.success

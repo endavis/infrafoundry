@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import subprocess  # nosec B404 - required for running user scripts
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, override
 
@@ -16,6 +18,8 @@ from infrafoundry.core.events.handlers.base import BaseHandler
 
 if TYPE_CHECKING:
     from rich.console import Console
+
+logger = logging.getLogger(__name__)
 
 
 class ScriptHandler(BaseHandler):
@@ -96,7 +100,6 @@ class ScriptHandler(BaseHandler):
         """
         env_dir = self.config_base_dir / "envs" / context.environment
         raw_script = self.config["script"]
-        timeout = self.config.get("timeout", 300)
 
         # Resolve script path: absolute paths (from blueprint resolution)
         # are used directly; relative paths are resolved against env_dir
@@ -137,7 +140,31 @@ class ScriptHandler(BaseHandler):
             if inventory_path.exists():
                 env["INFRAFOUNDRY_INVENTORY"] = str(inventory_path)
 
-        # Execute script with real-time streaming
+        # Dispatch: jumphost reexec if configured, else run locally.
+        # The INFRAFOUNDRY_ON_JUMPHOST env guard prevents double-reexec if the
+        # framework is ever invoked on the jumphost itself with that flag set.
+        jumphost = str((context.package_variables or {}).get("jumphost", "")).strip()
+        if jumphost and not os.environ.get("INFRAFOUNDRY_ON_JUMPHOST"):
+            return self._execute_on_jumphost(script_path, env, context, jumphost)
+        return self._execute_locally(script_path, working_dir, env)
+
+    def _execute_locally(
+        self,
+        script_path: Path,
+        working_dir: Path,
+        env: dict[str, str],
+    ) -> EventResult:
+        """Execute the script on the local host with real-time streaming.
+
+        Args:
+            script_path: Absolute path to the script to run
+            working_dir: Working directory for the subprocess
+            env: Environment variables for the subprocess
+
+        Returns:
+            EventResult with captured stdout/stderr and exit status
+        """
+        timeout = self.config.get("timeout", 300)
         start_time = time.monotonic()
         try:
             process = subprocess.Popen(  # nosec B603 - user-controlled scripts
@@ -194,6 +221,7 @@ class ScriptHandler(BaseHandler):
                 stdout="\n".join(stdout_lines),
                 stderr="\n".join(stderr_lines),
                 duration_seconds=duration,
+                data={"returncode": process.returncode},
                 handler_name=self.name,
             )
 
@@ -212,6 +240,217 @@ class ScriptHandler(BaseHandler):
                 handler_name=self.name,
                 duration_seconds=time.monotonic() - start_time,
             )
+
+    def _execute_on_jumphost(
+        self,
+        script_path: Path,
+        env: dict[str, str],
+        context: EventContext,
+        jumphost: str,
+    ) -> EventResult:
+        """Execute the script on a remote jumphost via SSH.
+
+        Rsyncs the script's parent directory to a temp directory on the
+        jumphost, then re-executes the script remotely. The package variables
+        (minus ``jumphost``) are forwarded as JSON on stdin so secrets never
+        appear on the command line or in remote ``ps`` output. The remote
+        process sees ``INFRAFOUNDRY_ON_JUMPHOST=1`` so any blueprint-side shell
+        helper that also implements reexec logic self-deactivates.
+
+        Args:
+            script_path: Absolute path to the script on the operator's host
+            env: Environment variables used when invoking ssh locally
+            context: Event context (source of ``package_variables``)
+            jumphost: SSH destination (``user@host`` or host alias)
+
+        Returns:
+            EventResult with remote stdout/stderr and exit status
+        """
+        timeout = self.config.get("timeout", 300)
+        script_dir = script_path.parent
+        remote_dir = f"/tmp/infrafoundry-{uuid.uuid4().hex}"  # nosec B108
+
+        # Strip 'jumphost' from forwarded package variables so any remote
+        # script that branches on ${jumphost:-} does not attempt another hop.
+        remote_vars = dict(context.package_variables or {})
+        remote_vars.pop("jumphost", None)
+        remote_vars_json = json.dumps(remote_vars)
+
+        ssh_opts = ["-o", "StrictHostKeyChecking=no"]
+        mkdir_cmd = ["ssh", *ssh_opts, jumphost, f"mkdir -p {remote_dir}"]
+        rsync_cmd = [
+            "rsync",
+            "-a",
+            "-e",
+            "ssh -o StrictHostKeyChecking=no",
+            f"{script_dir}/",
+            f"{jumphost}:{remote_dir}/",
+        ]
+        remote_bash = (
+            f'INFRAFOUNDRY_ON_JUMPHOST=1 INFRAFOUNDRY_PACKAGE_VARS="$(cat)" '
+            f"bash {remote_dir}/{script_path.name}"
+        )
+        ssh_run_cmd = ["ssh", *ssh_opts, jumphost, remote_bash]
+        cleanup_cmd = ["ssh", *ssh_opts, jumphost, f"rm -rf {remote_dir}"]
+
+        start_time = time.monotonic()
+
+        # Step 1: mkdir remote tmp dir
+        try:
+            mkdir_result = subprocess.run(  # nosec B603
+                mkdir_cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return EventResult(
+                success=False,
+                abort=not self.config.get("continue_on_error", False),
+                reason=f"remote mkdir failed: {e}",
+                duration_seconds=time.monotonic() - start_time,
+                handler_name=self.name,
+            )
+        if mkdir_result.returncode != 0:
+            return EventResult(
+                success=False,
+                abort=not self.config.get("continue_on_error", False),
+                reason=f"remote mkdir failed: {mkdir_result.stderr.strip()}",
+                stdout=mkdir_result.stdout,
+                stderr=mkdir_result.stderr,
+                duration_seconds=time.monotonic() - start_time,
+                handler_name=self.name,
+            )
+
+        # Step 2: rsync script directory to jumphost
+        try:
+            rsync_result = subprocess.run(  # nosec B603
+                rsync_cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            self._cleanup_remote(cleanup_cmd)
+            return EventResult(
+                success=False,
+                abort=not self.config.get("continue_on_error", False),
+                reason=f"rsync setup failed: {e}",
+                duration_seconds=time.monotonic() - start_time,
+                handler_name=self.name,
+            )
+        if rsync_result.returncode != 0:
+            self._cleanup_remote(cleanup_cmd)
+            return EventResult(
+                success=False,
+                abort=not self.config.get("continue_on_error", False),
+                reason=f"rsync setup failed: {rsync_result.stderr.strip()}",
+                stdout=rsync_result.stdout,
+                stderr=rsync_result.stderr,
+                duration_seconds=time.monotonic() - start_time,
+                handler_name=self.name,
+            )
+
+        # Step 3: run the script remotely with streaming output.
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
+        try:
+            try:
+                process = subprocess.Popen(  # nosec B603
+                    ssh_run_cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    env=env,
+                )
+            except OSError as e:
+                return EventResult(
+                    success=False,
+                    abort=not self.config.get("continue_on_error", False),
+                    reason=f"failed to launch remote ssh: {e}",
+                    duration_seconds=time.monotonic() - start_time,
+                    handler_name=self.name,
+                )
+
+            # Forward package vars JSON via stdin, then close it so the
+            # remote $(cat) returns.
+            if process.stdin is not None:
+                try:
+                    process.stdin.write(remote_vars_json)
+                    process.stdin.close()
+                except BrokenPipeError:
+                    pass
+
+            stdout_thread = threading.Thread(
+                target=self._read_stream,
+                args=(process.stdout, stdout_lines, ""),
+                daemon=True,
+            )
+            stderr_thread = threading.Thread(
+                target=self._read_stream,
+                args=(process.stderr, stderr_lines, "red"),
+                daemon=True,
+            )
+            stdout_thread.start()
+            stderr_thread.start()
+
+            try:
+                process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                stdout_thread.join(timeout=5)
+                stderr_thread.join(timeout=5)
+                duration = time.monotonic() - start_time
+                return EventResult(
+                    success=False,
+                    abort=not self.config.get("continue_on_error", False),
+                    reason=f"Timeout after {timeout} seconds",
+                    stdout="\n".join(stdout_lines),
+                    stderr="\n".join(stderr_lines),
+                    duration_seconds=duration,
+                    handler_name=self.name,
+                )
+
+            stdout_thread.join(timeout=5)
+            stderr_thread.join(timeout=5)
+            duration = time.monotonic() - start_time
+
+            success = process.returncode == 0
+            return EventResult(
+                success=success,
+                abort=not success and not self.config.get("continue_on_error", False),
+                reason=None if success else f"Exit code: {process.returncode}",
+                stdout="\n".join(stdout_lines),
+                stderr="\n".join(stderr_lines),
+                duration_seconds=duration,
+                data={"returncode": process.returncode},
+                handler_name=self.name,
+            )
+        finally:
+            self._cleanup_remote(cleanup_cmd)
+
+    def _cleanup_remote(self, cleanup_cmd: list[str]) -> None:
+        """Run the remote tmp dir cleanup, swallowing all errors.
+
+        Args:
+            cleanup_cmd: The full ssh+rm-rf command list to run
+        """
+        try:
+            result = subprocess.run(  # nosec B603
+                cleanup_cmd,
+                capture_output=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                logger.warning(
+                    "Remote cleanup failed (ignored): %s",
+                    result.stderr.decode(errors="replace").strip()
+                    if result.stderr
+                    else f"exit {result.returncode}",
+                )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            logger.warning("Remote cleanup failed (ignored): %s", e)
 
     def _read_stream(
         self,

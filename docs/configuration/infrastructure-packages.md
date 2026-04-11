@@ -231,6 +231,13 @@ echo "Password available: ${INFRAFOUNDRY_VAR_ONTAP_PASSWORD:+yes}"
 echo "$INFRAFOUNDRY_PACKAGE_VARS" | jq '.cluster_name'
 ```
 
+!!! note "Jumphost reexec"
+    When a package's merged variables include a non-empty `jumphost` key,
+    `ScriptHandler` transparently rsyncs the script's parent directory to the
+    jumphost and runs the script there over SSH. See
+    [Event System: Jumphost Reexec](../development/event-system.md#jumphost-reexec)
+    for the full mechanics, prerequisites, and environment variables.
+
 ## Package Events
 
 Events declared in the manifest follow the same format as
