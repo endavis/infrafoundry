@@ -445,6 +445,267 @@ class TestMultiProviderBlueprint:
         assert resources[0].name == "node-oci"
         assert resources[0].provider == "oci"
 
+    def test_selects_provider_specific_events(self, temp_dir):
+        """Blueprint with provider-specific events selects correct events for provider."""
+        resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        _create_blueprint(
+            temp_dir,
+            "events-bp",
+            {
+                "name": "events-bp",
+                "defaults": {"vm_name": "node"},
+                "providers": {
+                    "proxmox": {
+                        "resources": ["providers/proxmox/vm.yaml"],
+                        "events": {
+                            "on_create": [
+                                {
+                                    "type": "script",
+                                    "name": "proxmox-setup",
+                                    "script": "scripts/proxmox/setup.sh",
+                                    "timeout": 300,
+                                }
+                            ],
+                        },
+                    },
+                    "oci": {
+                        "resources": ["providers/oci/instance.yaml"],
+                        "events": {
+                            "on_create": [
+                                {
+                                    "type": "script",
+                                    "name": "oci-setup",
+                                    "script": "scripts/oci/setup.sh",
+                                    "timeout": 600,
+                                }
+                            ],
+                            "before_destroy": [
+                                {
+                                    "type": "script",
+                                    "name": "oci-cleanup",
+                                    "script": "scripts/oci/cleanup.sh",
+                                    "timeout": 60,
+                                }
+                            ],
+                        },
+                    },
+                },
+            },
+            {
+                "providers/proxmox/vm.yaml": "vm:\n  - name: {{ vm_name }}-proxmox\n",
+                "providers/oci/instance.yaml": "instance:\n  - name: {{ vm_name }}-oci\n",
+                "scripts/proxmox/setup.sh": "#!/bin/bash\necho proxmox\n",
+                "scripts/oci/setup.sh": "#!/bin/bash\necho oci\n",
+                "scripts/oci/cleanup.sh": "#!/bin/bash\necho cleanup\n",
+            },
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+
+        # Proxmox package should get proxmox events
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "events-pkg-proxmox",
+            {
+                "name": "events-pkg-proxmox",
+                "blueprint": "events-bp",
+            },
+        )
+        _, events, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert "on_create" in events
+        assert len(events["on_create"]) == 1
+        assert events["on_create"][0]["name"] == "proxmox-setup"
+        assert "before_destroy" not in events
+
+    def test_selects_oci_provider_specific_events(self, temp_dir):
+        """Blueprint with provider-specific events selects OCI events when provider is oci."""
+        resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        _create_blueprint(
+            temp_dir,
+            "events-bp-oci",
+            {
+                "name": "events-bp-oci",
+                "defaults": {"vm_name": "node"},
+                "providers": {
+                    "proxmox": {
+                        "resources": ["providers/proxmox/vm.yaml"],
+                        "events": {
+                            "on_create": [
+                                {
+                                    "type": "script",
+                                    "name": "proxmox-setup",
+                                    "script": "scripts/proxmox/setup.sh",
+                                    "timeout": 300,
+                                }
+                            ],
+                        },
+                    },
+                    "oci": {
+                        "resources": ["providers/oci/instance.yaml"],
+                        "events": {
+                            "on_create": [
+                                {
+                                    "type": "script",
+                                    "name": "oci-setup",
+                                    "script": "scripts/oci/setup.sh",
+                                    "timeout": 600,
+                                }
+                            ],
+                            "before_destroy": [
+                                {
+                                    "type": "script",
+                                    "name": "oci-cleanup",
+                                    "script": "scripts/oci/cleanup.sh",
+                                    "timeout": 60,
+                                }
+                            ],
+                        },
+                    },
+                },
+            },
+            {
+                "providers/proxmox/vm.yaml": "vm:\n  - name: {{ vm_name }}-proxmox\n",
+                "providers/oci/instance.yaml": "instance:\n  - name: {{ vm_name }}-oci\n",
+                "scripts/proxmox/setup.sh": "#!/bin/bash\necho proxmox\n",
+                "scripts/oci/setup.sh": "#!/bin/bash\necho oci\n",
+                "scripts/oci/cleanup.sh": "#!/bin/bash\necho cleanup\n",
+            },
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+
+        # OCI package should get oci events (including before_destroy)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "oci",
+            "events-pkg-oci",
+            {
+                "name": "events-pkg-oci",
+                "blueprint": "events-bp-oci",
+            },
+        )
+        _, events, _ = loader.load_package(pkg_dir, "oci", "dev")
+
+        assert "on_create" in events
+        assert len(events["on_create"]) == 1
+        assert events["on_create"][0]["name"] == "oci-setup"
+        assert "before_destroy" in events
+        assert len(events["before_destroy"]) == 1
+        assert events["before_destroy"][0]["name"] == "oci-cleanup"
+
+    def test_package_events_override_provider_events(self, temp_dir):
+        """Package's own events take priority over provider-specific events."""
+        resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        _create_blueprint(
+            temp_dir,
+            "events-override-bp",
+            {
+                "name": "events-override-bp",
+                "defaults": {"vm_name": "node"},
+                "providers": {
+                    "proxmox": {
+                        "resources": ["vm.yaml"],
+                        "events": {
+                            "on_create": [
+                                {
+                                    "type": "script",
+                                    "name": "bp-setup",
+                                    "script": "scripts/setup.sh",
+                                    "timeout": 300,
+                                }
+                            ],
+                        },
+                    },
+                },
+            },
+            {
+                "vm.yaml": "vm:\n  - name: {{ vm_name }}-01\n",
+                "scripts/setup.sh": "#!/bin/bash\necho blueprint\n",
+            },
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "events-override-pkg",
+            {
+                "name": "events-override-pkg",
+                "blueprint": "events-override-bp",
+                "events": {
+                    "on_create": [
+                        {
+                            "type": "script",
+                            "name": "pkg-setup",
+                            "script": "scripts/my-setup.sh",
+                            "timeout": 600,
+                        }
+                    ],
+                },
+            },
+            {"scripts/my-setup.sh": "#!/bin/bash\necho package\n"},
+        )
+
+        _, events, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert "on_create" in events
+        assert len(events["on_create"]) == 1
+        assert events["on_create"][0]["name"] == "pkg-setup"
+
+    def test_provider_events_not_inherited_when_no_providers_section(self, temp_dir):
+        """Blueprint without providers section uses top-level events as before."""
+        resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        _create_blueprint(
+            temp_dir,
+            "classic-events-bp",
+            {
+                "name": "classic-events-bp",
+                "defaults": {"vm_name": "node"},
+                "resources": ["vm.yaml"],
+                "events": {
+                    "on_create": [
+                        {
+                            "type": "script",
+                            "name": "classic-setup",
+                            "script": "scripts/setup.sh",
+                            "timeout": 300,
+                        }
+                    ],
+                },
+            },
+            {
+                "vm.yaml": "vm:\n  - name: {{ vm_name }}-01\n",
+                "scripts/setup.sh": "#!/bin/bash\necho classic\n",
+            },
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "classic-events-pkg",
+            {
+                "name": "classic-events-pkg",
+                "blueprint": "classic-events-bp",
+            },
+        )
+
+        _, events, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert "on_create" in events
+        assert len(events["on_create"]) == 1
+        assert events["on_create"][0]["name"] == "classic-setup"
+
     def test_providers_without_defaults_key(self, temp_dir):
         """Provider block without defaults key works (no provider-specific defaults)."""
         resolver = BlueprintResolver(temp_dir)

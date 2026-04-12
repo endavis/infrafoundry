@@ -1,20 +1,20 @@
-# k3s cluster — example consumer of the oci-k3s-cluster blueprint.
+# k3s cluster — example consumer of the k3s-cluster blueprint (oci variant).
 #
 # All deployment logic (VCN, subnets, instances, cloud-init, ansible
-# playbook, scripts) lives in blueprints/oci-k3s-cluster/. This file only
+# playbook, scripts) lives in blueprints/k3s-cluster/. This file only
 # supplies the per-tenancy values.
 #
 # Env-root package: this package lives directly under envs/oci-k3s/ rather
 # than under a provider subdirectory, so it must declare provider: oci
 # explicitly.
 #
-# See blueprints/oci-k3s-cluster/README.md for the full variable reference.
+# See blueprints/k3s-cluster/README.md for the full variable reference.
 #
 # Run: foundry infra apply --env oci-k3s
 
 name: k3s-cluster
 description: "OCI ARM Always-Free-Tier k3s cluster (example)"
-blueprint: oci-k3s-cluster
+blueprint: k3s-cluster
 provider: oci
 
 variables:
