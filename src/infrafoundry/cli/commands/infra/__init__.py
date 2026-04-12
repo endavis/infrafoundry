@@ -6,6 +6,7 @@ from .apply import apply
 from .destroy import destroy
 from .drift import drift
 from .history import history
+from .list_packages import list_packages
 from .plan import plan
 from .reset import reset
 from .rollback import rollback
@@ -32,6 +33,7 @@ infra.add_command(security)
 infra.add_command(status)
 infra.add_command(test)
 infra.add_command(history)
+infra.add_command(list_packages)
 infra.add_command(unlock)
 
 
