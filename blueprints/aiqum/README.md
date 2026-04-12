@@ -59,6 +59,7 @@ infra apply --env <env> --package aiqum
 | `smtp_password` | SMTP auth password | (secret) |
 | `ontap_cluster_ip` | ONTAP cluster management IP | `192.168.1.220` |
 | `ontap_admin_password` | ONTAP admin password | (secret) |
+| `aiqum_alert_email` | Email address for alert notifications (empty = skip) | `alerts@example.com` |
 
 ### Optional (blueprint defaults)
 
@@ -116,6 +117,7 @@ infra apply --package aiqum
                  +-- Step 4: Enable API Gateway
                  +-- Step 5: Add ONTAP cluster
                  +-- Step 6: Mark setup complete
+                 +-- Step 7: Create default alert policy (if aiqum_alert_email set)
 ```
 
 ## Firewall Ports
