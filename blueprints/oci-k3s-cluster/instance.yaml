@@ -27,6 +27,9 @@ instance:
       role: control-plane
       cluster: "{{ cluster_name }}"
       managed_by: infrafoundry
+{% for key, value in extra_freeform_tags.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
     tailscale:
       hostname: "{{ control_name }}"
       enable_ssh: true
@@ -53,6 +56,9 @@ instance:
       role: worker
       cluster: "{{ cluster_name }}"
       managed_by: infrafoundry
+{% for key, value in extra_freeform_tags.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
     tailscale:
       hostname: "{{ worker.name }}"
       enable_ssh: true

@@ -110,6 +110,7 @@ The consumer environment's `settings.yaml` must supply:
 | `k3s_version` | `""` (latest) | Pinned k3s version for the installer |
 | `k3s_server_args` | `""` | Extra k3s server installer flags |
 | `k3s_oci_firewall_fix` | `true` | Apply the OCI iptables fix after k3s installation (see Design Notes) |
+| `extra_freeform_tags` | `{}` | Additional OCI freeform tags merged into each instance |
 | `kubeconfig_local_path` | `~/.kube/{{ cluster_name }}.yaml` | Local destination for the fetched kubeconfig |
 
 ### Worker dict schema
