@@ -11,10 +11,14 @@ Steps:
   4. Enable API Gateway
   5. Add ONTAP cluster
   6. Mark setup complete
+  7. Create default alert policy (if aiqum_alert_email set)
+  8. Send test alert email (if alert created)
 """
 
+import smtplib
 import sys
 import urllib3
+from email.mime.text import MIMEText
 from pathlib import Path
 
 import requests
@@ -24,6 +28,73 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 HAL_JSON = "application/vnd.netapp.v1.hal+json"
 DEFAULT_PASSWORD = "admin"
+
+DEFAULT_ALERT_SEVERITIES = ["critical", "error", "warning"]
+
+DEFAULT_ALERT_EVENT_TYPES = [
+    "Cluster Monitoring Failed",
+    "Some Unassigned Disks",
+    "Cluster Lacks Spare Disks",
+    "Some Failed Disks",
+    "Cluster Not Reachable",
+    "Protection Job Failed",
+    "Space In Audit Volume Almost Full",
+    "MetroCluster Spare Disks Left Behind",
+    "Flash Disks - Spare Blocks Almost Consumed",
+    "Flash Disks - No Spare Blocks",
+    "Some Unsupported Disks",
+    "MetroCluster Automatic Unplanned Switchover Disabled",
+    "Critical EMS received",
+    "Warning EMS received",
+    "Error EMS received",
+    "Informational EMS received",
+    "Notice EMS received",
+    "Debug EMS received",
+    "Emergency EMS received",
+    "Alert EMS received",
+    "Cluster IOPS Critical Threshold Breached",
+    "Cluster IOPS Warning Threshold Breached",
+    "Cluster MB/s Critical Threshold Breached",
+    "Cluster MB/s Warning Threshold Breached",
+    "Cluster FabricPool License Capacity Limits Exceeded",
+    "Object Maintenance Window Started",
+    "Cluster Cloud Tier Planning",
+    "FabricPool Space Nearly Full",
+    "NVMe-oF Grace Period Started",
+    "NVMe-oF Grace Period Active",
+    "NVMe-oF Grace Period Expired",
+    "Cluster Load Imbalance Threshold Breached",
+    "NTP server count is low",
+    "FIPS Mode Disabled",
+    "Telnet Protocol Enabled",
+    "Default local admin user enabled",
+    "Log Forwarding Not Encrypted",
+    "Login Banner Disabled",
+    "SSH is using insecure ciphers",
+    "Cluster Peer Communication Not Encrypted",
+    "AutoSupport HTTPS transport disabled",
+    "Cluster Capacity Imbalance Threshold Breached",
+    "Cluster Login Banner Changed",
+    "Cluster Log Forwarding Destinations Changed",
+    "Cluster NTP Server Names Changed",
+    "Remote Shell is Enabled on the cluster",
+    "Cluster uses a self-signed certificate",
+    "Passwords of some ONTAP user accounts use the less secure MD5 hash function",
+    "Cluster Certificate Expired",
+    "Cluster Certificate About to Expire",
+    "Mutual TLS Certificate Expired",
+    "Mutual TLS Certificate About to Expire",
+    "Controller Susceptible To Bug 509721",
+    "Controller Susceptible To Bug 677849",
+    "Cluster HA Configuration Is Not Set",
+    "ONTAP Version Mismatch",
+    "Controller Has Only One Cluster LIF",
+    "Unsupported HA Interconnect Cables",
+    "Cluster Health Is Intact",
+    "Advisory ID: NTAP-20170331-0002",
+    "Advisory ID: NTAP-20160722-0001",
+    "CN1610 FastPath OS Is In Limited Support",
+]
 
 
 def load_config() -> dict:
@@ -61,6 +132,82 @@ def save_option(base_url: str, name: str, value: str | int | bool, auth: tuple) 
     # Avoid logging response body — may contain sensitive data
     print(f"    Failed to set {name}: {r.status_code}")
     return False
+
+
+def create_alert(base_url: str, name: str, email: str, auth: tuple) -> bool:
+    """Create a default alert policy via the management-server API.
+
+    Args:
+        base_url: AIQUM base URL (e.g. https://192.168.1.50).
+        name: Display name for the alert policy.
+        email: Recipient email address for notifications.
+        auth: Tuple of (username, password) for Basic auth.
+
+    Returns:
+        True on success or if the alert already exists (409), False otherwise.
+    """
+    payload = {
+        "name": name,
+        "enabled": True,
+        "action": {
+            "notification": {
+                "emails": [email],
+                "send_snmp_trap": False,
+            }
+        },
+        "resource": [{"type": "cluster", "include_all": True}],
+        "event": {
+            "severities": DEFAULT_ALERT_SEVERITIES,
+            "types": DEFAULT_ALERT_EVENT_TYPES,
+        },
+    }
+    r = requests.post(
+        f"{base_url}/api/management-server/alerts",
+        json=payload,
+        headers={"Content-Type": "application/json"},
+        auth=auth,
+        verify=False,
+    )
+    if r.status_code in (200, 201):
+        return True
+    if r.status_code == 409:
+        print("    Alert already exists (OK)")
+        return True
+    print(f"    Failed to create alert: {r.status_code}")
+    return False
+
+
+def send_test_email(config: dict, recipient: str) -> bool:
+    """Send a test email via SMTP to verify the alert delivery path.
+
+    Uses the same SMTP settings configured in Step 1 to send a short
+    verification message to the alert recipient.
+
+    Args:
+        config: Package variables dict with smtp_server, smtp_port,
+            smtp_user, smtp_password, and aiqum_admin_email.
+        recipient: Email address to send the test to.
+
+    Returns:
+        True if the email was sent successfully, False otherwise.
+    """
+    msg = MIMEText(
+        "This is a test email from the AIQUM initial setup wizard.\n\n"
+        "If you received this message, alert email delivery is working.\n"
+    )
+    msg["Subject"] = f"[AIQUM] Test alert email from {config.get('ip_address', 'unknown')}"
+    msg["From"] = config["aiqum_admin_email"]
+    msg["To"] = recipient
+
+    try:
+        with smtplib.SMTP(config["smtp_server"], int(config["smtp_port"]), timeout=30) as srv:
+            srv.starttls()
+            srv.login(config["smtp_user"], config["smtp_password"])
+            srv.send_message(msg)
+        return True
+    except Exception as exc:
+        print(f"    SMTP error: {exc}")
+        return False
 
 
 def main() -> int:
@@ -185,6 +332,24 @@ def main() -> int:
     else:
         print("  Setup complete: FAILED")
         return 1
+
+    # Step 7: Create default alert policy
+    alert_email = config.get("aiqum_alert_email", "")
+    if alert_email:
+        alert_name = f"Alerts to {alert_email}"
+        print("\nStep 7: Creating default alert policy...")
+        if create_alert(base_url, alert_name, alert_email, auth):
+            print(f"  Alert: OK ({alert_name})")
+            # Step 8: Send test email
+            print("\nStep 8: Sending test alert email...")
+            if send_test_email(config, alert_email):
+                print(f"  Test email: OK (sent to {alert_email})")
+            else:
+                print("  Test email: FAILED (non-fatal)")
+        else:
+            print("  Alert: FAILED (non-fatal)")
+    else:
+        print("\nStep 7: Skipping alert setup (aiqum_alert_email not set)")
 
     print(f"\n=== AIQUM Initial Setup Complete ===")
     print(f"  URL: {base_url}/")

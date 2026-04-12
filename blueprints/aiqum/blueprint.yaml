@@ -26,6 +26,9 @@ defaults:
   # --- SMTP ---
   smtp_port: 587
 
+  # --- Alerting ---
+  aiqum_alert_email: ""           # Empty: skip alerting. Set to receive storage alerts.
+
   # --- ONTAP integration ---
   ontap_admin_user: admin
 
