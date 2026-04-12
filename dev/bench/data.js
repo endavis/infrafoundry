@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775997161202,
+  "lastUpdate": 1776009116399,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5270,6 +5270,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000067658569855234",
             "extra": "mean: 102.5603345604013 usec\nrounds: 2173"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9c65a91e670cd683e63e1f8725c924d356bdace9",
+          "message": "feat: add multi-provider blueprint support (merges PR #569, addresses #507)\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-12T16:51:23+01:00",
+          "tree_id": "3feedd5a4c67afc9e4800d43a610eaf5fec62fd8",
+          "url": "https://github.com/endavis/infrafoundry/commit/9c65a91e670cd683e63e1f8725c924d356bdace9"
+        },
+        "date": 1776009115962,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9896.492130759772,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000730986417774006",
+            "extra": "mean: 101.0459046283532 usec\nrounds: 2139"
           }
         ]
       }
