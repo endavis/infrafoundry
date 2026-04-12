@@ -75,6 +75,7 @@ infra apply --env <env> --package aiqum
 | `aiqum_admin_user` | `umadmin` | AIQUM admin username |
 | `smtp_port` | `587` | SMTP port |
 | `ontap_admin_user` | `admin` | ONTAP admin username |
+| `extra_tags` | `[]` | Additional Proxmox tags to append |
 
 ## Prerequisites
 
@@ -144,8 +145,8 @@ After a successful deploy:
 
 - VM hardware (`cores`, `memory`, `disk_size`) is set to AIQUM minimum
   recommendations and is rarely overridden.
-- The `tags: [ontap, aiqum]` and `cloud_init_snippets` are recipe-level
-  metadata baked into the blueprint.
+- The default tags (`ontap`, `aiqum`) and `cloud_init_snippets` are recipe-level
+  metadata baked into the blueprint. Additional tags can be appended via `extra_tags`.
 - Events live at the top of `blueprint.yaml` (not embedded in `vm.yaml`)
   because the shorthand `vms:` format does not extract per-resource events.
 - See `blueprints/ontap-cluster/` for the canonical structure reference for

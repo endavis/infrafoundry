@@ -26,5 +26,5 @@ vms:
       - system/hostname
     cloud_init_vars:
       HOSTNAME: "{{ vm_name }}"
-    tags: [ontap, aiqum]
+    tags: {{ ["ontap", "aiqum"] + extra_tags }}
     onboot: true

@@ -53,6 +53,7 @@ infra apply --env <env> --package rocky9-template
 | `ciuser` | `rocky` | Default cloud-init user |
 | `image_url` | Rocky 9 latest qcow2 URL | Source image to download |
 | `image_filename` | `Rocky-9-GenericCloud-Base.latest.x86_64.qcow2` | Local filename on Proxmox storage |
+| `extra_tags` | `[]` | Additional Proxmox tags to append |
 
 ## What It Does
 

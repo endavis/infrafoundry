@@ -12,7 +12,7 @@ vms:
     serial: true
     boot_order: [ide0]
     onboot: false
-    tags: [ontap, ontap-sim]
+    tags: {{ ["ontap", "ontap-sim"] + extra_tags }}
     network:
       - bridge: {{ bridge }}
         model: e1000        # e0a — cluster interconnect
@@ -47,7 +47,7 @@ vms:
     serial: true
     boot_order: [ide0]
     onboot: false
-    tags: [ontap, ontap-sim]
+    tags: {{ ["ontap", "ontap-sim"] + extra_tags }}
     network:
       - bridge: {{ bridge }}
         model: e1000        # e0a — cluster interconnect

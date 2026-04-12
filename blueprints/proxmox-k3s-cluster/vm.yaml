@@ -27,7 +27,7 @@ vms:
       - packages/qemu-agent
     cloud_init_vars:
       HOSTNAME: "{{ server_name }}"
-    tags: [k3s, k3s-server]
+    tags: {{ ["k3s", "k3s-server"] + extra_tags }}
     onboot: true
 
   # --- Agent nodes (one entry per item in agents:) ---
@@ -55,6 +55,6 @@ vms:
       - packages/qemu-agent
     cloud_init_vars:
       HOSTNAME: "{{ agent.name }}"
-    tags: [k3s, k3s-agent]
+    tags: {{ ["k3s", "k3s-agent"] + extra_tags }}
     onboot: true
 {% endfor %}

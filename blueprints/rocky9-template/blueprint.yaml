@@ -15,5 +15,8 @@ defaults:
   # --- Per-instance overrides (typical) ---
   template_name: rocky9-template
 
+  # Extra Proxmox tags appended to the blueprint's default tags
+  extra_tags: []
+
 resources:
   - template.yaml

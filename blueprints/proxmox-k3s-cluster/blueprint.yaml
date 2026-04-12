@@ -31,6 +31,9 @@ defaults:
   # --- Local kubeconfig destination directory (expanded by the post-deploy script) ---
   kubeconfig_dir: "~/.kube"
 
+  # Extra Proxmox tags appended to the blueprint's default tags
+  extra_tags: []
+
 resources:
   - vm.yaml
   - dhcp.yaml
