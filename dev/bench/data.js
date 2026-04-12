@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775990335816,
+  "lastUpdate": 1775992289243,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5146,6 +5146,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003221489887316013",
             "extra": "mean: 160.88282352952507 usec\nrounds: 17"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fe0ed482c89d55a6530446e948b6e12f0318e3e2",
+          "message": "feat: support configurable tags in Proxmox blueprints (merges PR #564, addresses #538)\n\nfeat: support configurable extra_tags in all blueprints\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-12T12:10:53+01:00",
+          "tree_id": "5f8599992583d68c1af395e56574903f366eb33a",
+          "url": "https://github.com/endavis/infrafoundry/commit/fe0ed482c89d55a6530446e948b6e12f0318e3e2"
+        },
+        "date": 1775992288631,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7424.428325613167,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016787767393012278",
+            "extra": "mean: 134.69050493088469 usec\nrounds: 2535"
           }
         ]
       }
