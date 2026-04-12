@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775942068823,
+  "lastUpdate": 1775988497205,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5084,6 +5084,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009730163379733235",
             "extra": "mean: 135.8512139829803 usec\nrounds: 2360"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "75f3d27c2c3750a4c3e0bfeb8b30a6644dadfabb",
+          "message": "feat: add default alert policy to aiqum setup wizard (merges PR #561, addresses #555)\n\n* feat: add default alert policy to aiqum setup wizard\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* feat: send test email after alert policy creation\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-12T11:07:44+01:00",
+          "tree_id": "20e4b57c4bbb406e2de64036ae1a0906e393ebff",
+          "url": "https://github.com/endavis/infrafoundry/commit/75f3d27c2c3750a4c3e0bfeb8b30a6644dadfabb"
+        },
+        "date": 1775988496778,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9439.317642212467,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016589072149731227",
+            "extra": "mean: 105.93986111114825 usec\nrounds: 2124"
           }
         ]
       }
