@@ -51,6 +51,9 @@ defaults:
   # valid but means the node has no tags assigned.
   ts_tags: []
 
+  # Extra OCI freeform tags merged into each instance's freeform_tags
+  extra_freeform_tags: {}
+
   # OAuth credentials for the official tailscale/cloudinit/tailscale module
   # are read from the env's secrets.tailscale.{oauth_client_id, oauth_client_secret}
   # block via the framework's secrets→TF_VAR_* bridge. The blueprint declares
