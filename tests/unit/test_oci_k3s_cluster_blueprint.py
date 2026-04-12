@@ -1,4 +1,4 @@
-"""Integration test for the oci-k3s-cluster blueprint conversion.
+"""Integration test for the k3s-cluster blueprint conversion.
 
 Loads the real example-config oci-k3s env-root package via PackageLoader and
 asserts that the merged configuration (blueprint defaults + package overrides)
@@ -12,7 +12,7 @@ by ``test_proxmox_k3s_cluster_blueprint.py`` (#504, #514), the closest
 structural reference (multi-VM blueprint with Jinja loops).
 
 The test depends only on files checked into this repository:
-  - blueprints/oci-k3s-cluster/                       (the blueprint)
+  - blueprints/k3s-cluster/                       (the blueprint)
   - example-config/envs/oci-k3s/k3s-cluster/          (the example consumer)
 
 It does NOT depend on the private endavis-infra/ config repo.
@@ -182,7 +182,7 @@ def test_oci_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) -> Non
     handler = on_create[0]
     assert handler["type"] == "script"
     assert handler["name"] == "k3s-install"
-    assert handler["script"].endswith("scripts/k3s-post-terraform.sh")
+    assert handler["script"].endswith("scripts/oci/k3s-post-terraform.sh")
     assert handler["timeout"] == 1800
     assert handler["continue_on_error"] is False
     assert handler["requires"] == ["k3s-control"]
@@ -191,14 +191,14 @@ def test_oci_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) -> Non
     before_destroy = events["before_destroy"]
     assert len(before_destroy) == 1
     assert before_destroy[0]["name"] == "tailscale-cleanup"
-    assert before_destroy[0]["script"].endswith("scripts/cleanup-tailscale-devices.sh")
+    assert before_destroy[0]["script"].endswith("scripts/oci/cleanup-tailscale-devices.sh")
     assert before_destroy[0]["continue_on_error"] is True
 
     assert "after_apply" in events
     after_apply = events["after_apply"]
     assert len(after_apply) == 1
     assert after_apply[0]["name"] == "verify-cluster"
-    assert after_apply[0]["script"].endswith("scripts/verify-cluster.sh")
+    assert after_apply[0]["script"].endswith("scripts/oci/verify-cluster.sh")
     assert after_apply[0]["continue_on_error"] is True
 
 
@@ -228,7 +228,7 @@ def test_oci_k3s_cluster_example_uses_tailscale_module(loader: PackageLoader) ->
 
 
 def test_oci_k3s_cluster_blueprint_supports_multiple_worker_counts(tmp_path: Path) -> None:
-    """Two packages instantiating the oci-k3s-cluster blueprint with different
+    """Two packages instantiating the k3s-cluster blueprint with different
     worker counts must produce distinct resources without colliding.
 
     Regression guard for the Jinja-loop pattern: every outer name must be
@@ -246,7 +246,7 @@ def test_oci_k3s_cluster_blueprint_supports_multiple_worker_counts(tmp_path: Pat
             """\
             name: k3s-a
             description: "k3s cluster A (1 worker)"
-            blueprint: oci-k3s-cluster
+            blueprint: k3s-cluster
             provider: oci
             variables:
               cluster_name: k3s-a
@@ -266,7 +266,7 @@ def test_oci_k3s_cluster_blueprint_supports_multiple_worker_counts(tmp_path: Pat
             """\
             name: k3s-b
             description: "k3s cluster B (4 workers)"
-            blueprint: oci-k3s-cluster
+            blueprint: k3s-cluster
             provider: oci
             variables:
               cluster_name: k3s-b
@@ -346,7 +346,7 @@ def test_oci_k3s_cluster_blueprint_with_zero_workers(tmp_path: Path) -> None:
             """\
             name: k3s-solo
             description: "Single-node k3s cluster (no workers)"
-            blueprint: oci-k3s-cluster
+            blueprint: k3s-cluster
             provider: oci
             variables:
               cluster_name: k3s-solo

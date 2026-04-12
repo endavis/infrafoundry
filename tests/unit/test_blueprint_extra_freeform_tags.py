@@ -85,12 +85,14 @@ class TestBlueprintDefaultsIncludeExtraFreeformTags:
 
     def test_extra_freeform_tags_in_defaults(self):
         """Blueprint defaults must include extra_freeform_tags with an empty dict."""
-        blueprint_path = BLUEPRINTS_DIR / "oci-k3s-cluster" / "blueprint.yaml"
+        blueprint_path = BLUEPRINTS_DIR / "k3s-cluster" / "blueprint.yaml"
         data = yaml.safe_load(blueprint_path.read_text())
-        assert "extra_freeform_tags" in data["defaults"], (
-            "oci-k3s-cluster/blueprint.yaml missing extra_freeform_tags in defaults"
+        # Multi-provider blueprint: extra_freeform_tags is under providers.oci.defaults
+        defaults = data["providers"]["oci"]["defaults"]
+        assert "extra_freeform_tags" in defaults, (
+            "k3s-cluster/blueprint.yaml missing extra_freeform_tags in oci defaults"
         )
-        assert data["defaults"]["extra_freeform_tags"] == {}
+        assert defaults["extra_freeform_tags"] == {}
 
 
 @pytest.mark.unit
@@ -99,8 +101,8 @@ class TestResourceTemplatesUseExtraFreeformTags:
 
     def test_template_contains_extra_freeform_tags(self):
         """Resource template must contain 'extra_freeform_tags' in a loop."""
-        resource_path = BLUEPRINTS_DIR / "oci-k3s-cluster" / "instance.yaml"
+        resource_path = BLUEPRINTS_DIR / "k3s-cluster" / "providers" / "oci" / "instance.yaml"
         content = resource_path.read_text()
         assert "extra_freeform_tags" in content, (
-            "oci-k3s-cluster/instance.yaml does not reference extra_freeform_tags"
+            "k3s-cluster/providers/oci/instance.yaml does not reference extra_freeform_tags"
         )

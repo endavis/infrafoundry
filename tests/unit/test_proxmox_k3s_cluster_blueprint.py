@@ -1,4 +1,4 @@
-"""Integration test for the proxmox-k3s-cluster blueprint conversion.
+"""Integration test for the k3s-cluster blueprint conversion.
 
 Loads the real example-config k3s-cluster package via PackageLoader and asserts
 that the merged configuration (blueprint defaults + package overrides) produces
@@ -11,7 +11,7 @@ by ``test_aiqum_blueprint.py`` (#502, #513) and ``test_rocky9_blueprint.py``
 (#503, #511).
 
 The test depends only on files checked into this repository:
-  - blueprints/proxmox-k3s-cluster/                       (the blueprint)
+  - blueprints/k3s-cluster/                       (the blueprint)
   - example-config/envs/dev/proxmox/k3s-cluster/          (the example consumer)
 
 It does NOT depend on the private endavis-infra/ config repo.
@@ -204,7 +204,7 @@ def test_proxmox_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) ->
     handler = handlers[0]
     assert handler["type"] == "script"
     assert handler["name"] == "k3s-install"
-    assert handler["script"].endswith("scripts/k3s-post-terraform.sh")
+    assert handler["script"].endswith("scripts/proxmox/k3s-post-terraform.sh")
     assert handler["timeout"] == 1800
     assert handler["continue_on_error"] is False
     # Templated requires field rendered with per-instance server_name
@@ -212,7 +212,7 @@ def test_proxmox_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) ->
 
 
 def test_proxmox_k3s_cluster_blueprint_supports_multiple_instances(tmp_path: Path) -> None:
-    """Two packages instantiating the proxmox-k3s-cluster blueprint with
+    """Two packages instantiating the k3s-cluster blueprint with
     different agent counts must produce distinct resources without colliding.
 
     Regression guard against #511-style bugs and the new Jinja-loop pattern:
@@ -230,7 +230,7 @@ def test_proxmox_k3s_cluster_blueprint_supports_multiple_instances(tmp_path: Pat
             """\
             name: k3s-a
             description: "k3s instance A (2 agents)"
-            blueprint: proxmox-k3s-cluster
+            blueprint: k3s-cluster
             variables:
               cluster_name: k3s-a
               disk_storage: local-lvm
@@ -260,7 +260,7 @@ def test_proxmox_k3s_cluster_blueprint_supports_multiple_instances(tmp_path: Pat
             """\
             name: k3s-b
             description: "k3s instance B (4 agents)"
-            blueprint: proxmox-k3s-cluster
+            blueprint: k3s-cluster
             variables:
               cluster_name: k3s-b
               disk_storage: local-lvm
@@ -354,7 +354,7 @@ def test_proxmox_k3s_cluster_blueprint_with_zero_agents(tmp_path: Path) -> None:
             """\
             name: k3s-solo
             description: "Single-node k3s cluster (no agents)"
-            blueprint: proxmox-k3s-cluster
+            blueprint: k3s-cluster
             variables:
               cluster_name: k3s-solo
               disk_storage: local-lvm
