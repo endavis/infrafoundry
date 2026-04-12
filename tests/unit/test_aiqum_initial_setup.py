@@ -6,6 +6,7 @@ its filesystem path.
 """
 
 import importlib.util
+import smtplib
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -31,6 +32,7 @@ spec.loader.exec_module(aiqum_setup)
 
 # Re-export for convenience
 create_alert = aiqum_setup.create_alert
+send_test_email = aiqum_setup.send_test_email
 DEFAULT_ALERT_SEVERITIES = aiqum_setup.DEFAULT_ALERT_SEVERITIES
 DEFAULT_ALERT_EVENT_TYPES = aiqum_setup.DEFAULT_ALERT_EVENT_TYPES
 
@@ -159,9 +161,55 @@ def _mock_requests_post_ok(status_code: int = 201) -> MagicMock:
     return resp
 
 
+# ---------------------------------------------------------------------------
+# Tests: send_test_email function
+# ---------------------------------------------------------------------------
+class TestSendTestEmail:
+    """Tests for the ``send_test_email`` helper."""
+
+    def test_returns_true_on_success(self) -> None:
+        """Successful send returns True."""
+        config = _make_config("alerts@test.com")
+        with patch("aiqum_initial_setup.smtplib.SMTP") as mock_smtp:
+            mock_srv = MagicMock()
+            mock_smtp.return_value.__enter__ = MagicMock(return_value=mock_srv)
+            mock_smtp.return_value.__exit__ = MagicMock(return_value=False)
+            result = send_test_email(config, "alerts@test.com")
+
+        assert result is True
+        mock_srv.starttls.assert_called_once()
+        mock_srv.login.assert_called_once_with("aiqum", "smtppass")
+        mock_srv.send_message.assert_called_once()
+
+    def test_returns_false_on_smtp_error(self, capsys: pytest.CaptureFixture) -> None:
+        """SMTP failure returns False and prints error."""
+        config = _make_config("alerts@test.com")
+        with patch("aiqum_initial_setup.smtplib.SMTP") as mock_smtp:
+            mock_smtp.return_value.__enter__ = MagicMock(
+                side_effect=smtplib.SMTPException("connection refused")
+            )
+            mock_smtp.return_value.__exit__ = MagicMock(return_value=False)
+            result = send_test_email(config, "alerts@test.com")
+
+        assert result is False
+        assert "SMTP error" in capsys.readouterr().out
+
+    def test_uses_correct_smtp_settings(self) -> None:
+        """SMTP connection uses server and port from config."""
+        config = _make_config("alerts@test.com")
+        with patch("aiqum_initial_setup.smtplib.SMTP") as mock_smtp:
+            mock_srv = MagicMock()
+            mock_smtp.return_value.__enter__ = MagicMock(return_value=mock_srv)
+            mock_smtp.return_value.__exit__ = MagicMock(return_value=False)
+            send_test_email(config, "alerts@test.com")
+
+        mock_smtp.assert_called_once_with("smtp.example.com", 587, timeout=30)
+
+
 class TestMainAlertStep:
     """Tests for Step 7 (alert creation) within ``main()``."""
 
+    @patch("aiqum_initial_setup.send_test_email", return_value=True)
     @patch("aiqum_initial_setup.create_alert", return_value=True)
     @patch("aiqum_initial_setup.load_config")
     @patch("aiqum_initial_setup.requests.post")
@@ -174,6 +222,7 @@ class TestMainAlertStep:
         mock_post: MagicMock,
         mock_load_config: MagicMock,
         mock_create_alert: MagicMock,
+        mock_send_test: MagicMock,
     ) -> None:
         """Step 7 calls create_alert when aiqum_alert_email is configured."""
         mock_load_config.return_value = _make_config("alerts@test.com")
@@ -190,6 +239,7 @@ class TestMainAlertStep:
             "alerts@test.com",
             ("umadmin", "newpass"),
         )
+        mock_send_test.assert_called_once()
 
     @patch("aiqum_initial_setup.create_alert")
     @patch("aiqum_initial_setup.load_config")
@@ -245,6 +295,7 @@ class TestMainAlertStep:
         mock_create_alert.assert_not_called()
         assert "Skipping alert setup" in capsys.readouterr().out
 
+    @patch("aiqum_initial_setup.send_test_email")
     @patch("aiqum_initial_setup.create_alert", return_value=False)
     @patch("aiqum_initial_setup.load_config")
     @patch("aiqum_initial_setup.requests.post")
@@ -257,6 +308,7 @@ class TestMainAlertStep:
         mock_post: MagicMock,
         mock_load_config: MagicMock,
         mock_create_alert: MagicMock,
+        mock_send_test: MagicMock,
         capsys: pytest.CaptureFixture,
     ) -> None:
         """main() returns 0 even when alert creation fails (non-fatal)."""
@@ -269,6 +321,7 @@ class TestMainAlertStep:
 
         assert result == 0
         mock_create_alert.assert_called_once()
+        mock_send_test.assert_not_called()
         assert "FAILED (non-fatal)" in capsys.readouterr().out
 
 

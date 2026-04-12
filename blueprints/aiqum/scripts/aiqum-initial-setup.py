@@ -12,10 +12,13 @@ Steps:
   5. Add ONTAP cluster
   6. Mark setup complete
   7. Create default alert policy (if aiqum_alert_email set)
+  8. Send test alert email (if alert created)
 """
 
+import smtplib
 import sys
 import urllib3
+from email.mime.text import MIMEText
 from pathlib import Path
 
 import requests
@@ -174,6 +177,39 @@ def create_alert(base_url: str, name: str, email: str, auth: tuple) -> bool:
     return False
 
 
+def send_test_email(config: dict, recipient: str) -> bool:
+    """Send a test email via SMTP to verify the alert delivery path.
+
+    Uses the same SMTP settings configured in Step 1 to send a short
+    verification message to the alert recipient.
+
+    Args:
+        config: Package variables dict with smtp_server, smtp_port,
+            smtp_user, smtp_password, and aiqum_admin_email.
+        recipient: Email address to send the test to.
+
+    Returns:
+        True if the email was sent successfully, False otherwise.
+    """
+    msg = MIMEText(
+        "This is a test email from the AIQUM initial setup wizard.\n\n"
+        "If you received this message, alert email delivery is working.\n"
+    )
+    msg["Subject"] = f"[AIQUM] Test alert email from {config.get('ip_address', 'unknown')}"
+    msg["From"] = config["aiqum_admin_email"]
+    msg["To"] = recipient
+
+    try:
+        with smtplib.SMTP(config["smtp_server"], int(config["smtp_port"]), timeout=30) as srv:
+            srv.starttls()
+            srv.login(config["smtp_user"], config["smtp_password"])
+            srv.send_message(msg)
+        return True
+    except Exception as exc:
+        print(f"    SMTP error: {exc}")
+        return False
+
+
 def main() -> int:
     config = load_config()
     base_url = f"https://{config['ip_address']}"
@@ -304,6 +340,12 @@ def main() -> int:
         print("\nStep 7: Creating default alert policy...")
         if create_alert(base_url, alert_name, alert_email, auth):
             print(f"  Alert: OK ({alert_name})")
+            # Step 8: Send test email
+            print("\nStep 8: Sending test alert email...")
+            if send_test_email(config, alert_email):
+                print(f"  Test email: OK (sent to {alert_email})")
+            else:
+                print("  Test email: FAILED (non-fatal)")
         else:
             print("  Alert: FAILED (non-fatal)")
     else:

@@ -118,6 +118,7 @@ infra apply --package aiqum
                  +-- Step 5: Add ONTAP cluster
                  +-- Step 6: Mark setup complete
                  +-- Step 7: Create default alert policy (if aiqum_alert_email set)
+                 +-- Step 8: Send test alert email (if alert created)
 ```
 
 ## Firewall Ports
