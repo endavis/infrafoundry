@@ -94,6 +94,7 @@ class BlueprintResolver:
             "inventory": data.get("inventory"),
             "inventory_raw": inventory_raw,
             "blueprint_dir": blueprint_dir,
+            "providers": data.get("providers"),
         }
 
         logger.debug(
