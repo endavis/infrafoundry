@@ -3,6 +3,7 @@
 import click
 
 from .apply import apply
+from .deployed import deployed
 from .destroy import destroy
 from .drift import drift
 from .history import history
@@ -25,6 +26,7 @@ def infra() -> None:
 # Register all subcommands
 infra.add_command(plan)
 infra.add_command(apply)
+infra.add_command(deployed)
 infra.add_command(destroy)
 infra.add_command(drift)
 infra.add_command(rollback)
