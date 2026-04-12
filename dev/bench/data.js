@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775992289243,
+  "lastUpdate": 1775993634534,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5177,6 +5177,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016787767393012278",
             "extra": "mean: 134.69050493088469 usec\nrounds: 2535"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "02a65460dfc792c3d3673c5a310e2c647e735b3f",
+          "message": "feat: support configurable freeform_tags in OCI blueprint (merges PR #565, addresses #563)\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-12T12:33:23+01:00",
+          "tree_id": "e92a708b0d1d106b0fc09ee5a35cb76b4b961b17",
+          "url": "https://github.com/endavis/infrafoundry/commit/02a65460dfc792c3d3673c5a310e2c647e735b3f"
+        },
+        "date": 1775993634103,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9764.965693050512,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006568826066227606",
+            "extra": "mean: 102.40691380121035 usec\nrounds: 2123"
           }
         ]
       }
