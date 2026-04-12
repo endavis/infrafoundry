@@ -32,6 +32,9 @@ defaults:
   # --- ONTAP integration ---
   ontap_admin_user: admin
 
+  # Extra Proxmox tags appended to the blueprint's default tags
+  extra_tags: []
+
 resources:
   - vm.yaml
   - dhcp.yaml

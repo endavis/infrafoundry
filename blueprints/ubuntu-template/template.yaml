@@ -16,5 +16,5 @@ templates:
     download_image:
       url: "{{ image_url }}"
       filename: "{{ image_filename }}"
-    tags: ["template", "ubuntu"]
+    tags: {{ ["template", "ubuntu"] + extra_tags }}
     description: "Ubuntu 24.04 LTS cloud image template"
