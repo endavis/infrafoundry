@@ -32,20 +32,20 @@ with loader.temporary_credentials("prod"):
 
 - **CredentialLoader:** Factory/coordinator that discovers provider loaders, decrypts secrets (via SecretProvider), and applies env vars.
 - **BaseCredentialLoader:** Defines interface for provider-specific loaders (file name, field mapping).
-- **Provider loaders:** Map secret keys → environment variables (e.g., Proxmox, OPNsense, Kubernetes); extensible for new providers.
-- **Storage:** Encrypted YAML per environment (e.g., `envs/{env}/proxmox.yaml`, `envs/{env}/opnsense.yaml`) with age keys per env.
+- **Provider loaders:** Map secret keys → environment variables (e.g., Kubernetes); extensible for new providers.
+- **Storage:** Encrypted YAML per environment (e.g., `envs/{env}/kubernetes.yaml`) with age keys per env.
 
 ## Validation and Checks
 
 - Confirm secrets are encrypted (SOPS/age) and keys are git-ignored.
 - Use `loader.load(env, providers=[...])` to target specific providers and verify mappings.
-- Ensure mappings match provider env var expectations (e.g., `PROXMOX_API_URL`, `PROXMOX_API_TOKEN_ID`).
+- Ensure mappings match provider env var expectations (e.g., `KUBECONFIG`).
 
 ## Examples
 
 - **Load specific providers:**
   ```python
-  creds = loader.load("dev", providers=["proxmox", "opnsense"])
+  creds = loader.load("dev", providers=["kubernetes"])
   loader.apply_to_environment(creds)
   ```
 - **Context manager for temporary credentials:**

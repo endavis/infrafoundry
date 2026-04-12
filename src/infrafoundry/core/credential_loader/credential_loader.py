@@ -12,8 +12,6 @@ from infrafoundry.core.credential_loader.base_loader import (
     CredentialLoaderError,
 )
 from infrafoundry.core.credential_loader.kubernetes_loader import KubernetesCredentialLoader
-from infrafoundry.core.credential_loader.opnsense_loader import OPNsenseCredentialLoader
-from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
 from infrafoundry.core.secrets.provider import SecretProvider
 from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 
@@ -30,7 +28,7 @@ class CredentialLoader:
         >>> loader = CredentialLoader(config_dir=Path("/path/to/config"))
         >>> credentials = loader.load("dev")
         >>> loader.apply_to_environment(credentials)
-        # Now PROXMOX_API_URL, etc. are set in os.environ
+        # Now KUBECONFIG, etc. are set in os.environ
 
         >>> # Or use context manager
         >>> with loader.temporary_credentials("dev") as creds:
@@ -41,8 +39,6 @@ class CredentialLoader:
 
     # Registry of available provider loaders
     PROVIDER_LOADERS: ClassVar[dict[str, type[BaseCredentialLoader]]] = {
-        "proxmox": ProxmoxCredentialLoader,
-        "opnsense": OPNsenseCredentialLoader,
         "kubernetes": KubernetesCredentialLoader,
     }
 
@@ -102,12 +98,12 @@ class CredentialLoader:
             providers: List of providers to load credentials for (default: all)
 
         Returns:
-            Dictionary of environment variables (e.g., {'PROXMOX_API_URL': '...', ...})
+            Dictionary of environment variables (e.g., {'KUBECONFIG': '...', ...})
 
         Example:
             >>> loader = CredentialLoader()
             >>> creds = loader.load("dev")
-            >>> creds = loader.load("dev", providers=["proxmox"])  # Only Proxmox
+            >>> creds = loader.load("dev", providers=["kubernetes"])  # Only Kubernetes
         """
         secrets_dir = self.get_secrets_dir(env_name)
 

@@ -8,8 +8,6 @@ from infrafoundry.core.credential_loader.base_loader import (
 )
 from infrafoundry.core.credential_loader.credential_loader import CredentialLoader
 from infrafoundry.core.credential_loader.kubernetes_loader import KubernetesCredentialLoader
-from infrafoundry.core.credential_loader.opnsense_loader import OPNsenseCredentialLoader
-from infrafoundry.core.credential_loader.proxmox_loader import ProxmoxCredentialLoader
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +16,5 @@ __all__ = [
     "CredentialLoader",
     "CredentialLoaderError",
     "KubernetesCredentialLoader",
-    "OPNsenseCredentialLoader",
-    "ProxmoxCredentialLoader",
     "logger",
 ]

@@ -58,9 +58,7 @@
   ```bash
   export INFRAFOUNDRY_CONFIG_REPO=$HOME/my-infra-config
   export INFRAFOUNDRY_LOG_LEVEL=DEBUG
-  export PROXMOX_API_URL=https://proxmox.local:8006/api2/json
-  export PROXMOX_API_TOKEN_ID=myuser@pam!mytoken
-  export PROXMOX_API_TOKEN_SECRET=abc123-secret
+  export KUBECONFIG=$HOME/.kube/config
   layout python python3.11
   ```
 - **Temporary disable/enable:**
