@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775994778572,
+  "lastUpdate": 1775997161202,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5239,6 +5239,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010844419205649",
             "extra": "mean: 103.41758658125212 usec\nrounds: 2027"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e386e3963e6f3cb75008116e68adb5a88b6950bf",
+          "message": "feat: add infra deployed command to show deployment status (merges PR #568, addresses #566)\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-12T13:32:09+01:00",
+          "tree_id": "f7c1f74dd9d96c051ddaf7516f4d0f910f77c46a",
+          "url": "https://github.com/endavis/infrafoundry/commit/e386e3963e6f3cb75008116e68adb5a88b6950bf"
+        },
+        "date": 1775997160258,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9750.358209011745,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000067658569855234",
+            "extra": "mean: 102.5603345604013 usec\nrounds: 2173"
           }
         ]
       }
