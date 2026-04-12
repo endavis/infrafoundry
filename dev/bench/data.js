@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776009116399,
+  "lastUpdate": 1776012569559,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5301,6 +5301,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000730986417774006",
             "extra": "mean: 101.0459046283532 usec\nrounds: 2139"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cb5b5ff043b8be78d1140389fa88851101558a89",
+          "message": "feat: unify k3s blueprints using multi-provider support (merges PR #574, addresses #570)\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-12T17:48:55+01:00",
+          "tree_id": "47cd91eb77ba7a2387858284ff925dfe53d372ed",
+          "url": "https://github.com/endavis/infrafoundry/commit/cb5b5ff043b8be78d1140389fa88851101558a89"
+        },
+        "date": 1776012569189,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8687.082541234973,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000025414384101943947",
+            "extra": "mean: 115.11344519328557 usec\nrounds: 2226"
           }
         ]
       }
