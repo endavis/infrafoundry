@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775988497205,
+  "lastUpdate": 1775990335816,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5115,6 +5115,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016589072149731227",
             "extra": "mean: 105.93986111114825 usec\nrounds: 2124"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "286d6bba3ba327f5d0da2784703e0296407ab644",
+          "message": "refactor: retire env-var credential path for proxmox and opnsense providers (merges PR #562, addresses #554)\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-12T11:38:23+01:00",
+          "tree_id": "b30bf48b69e14a9522b2cf8093dd53a095432e0f",
+          "url": "https://github.com/endavis/infrafoundry/commit/286d6bba3ba327f5d0da2784703e0296407ab644"
+        },
+        "date": 1775990335378,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6215.703939435653,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003221489887316013",
+            "extra": "mean: 160.88282352952507 usec\nrounds: 17"
           }
         ]
       }
