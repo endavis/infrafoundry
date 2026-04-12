@@ -113,15 +113,6 @@ jobs:
           echo "SOPS_AGE_KEY_FILE=$(pwd)/envs/dev/age.key" >> $GITHUB_ENV
           echo "INFRAFOUNDRY_LOG_LEVEL=INFO" >> $GITHUB_ENV
 
-          # Provider credentials
-          echo "PROXMOX_API_URL=${{ secrets.PROXMOX_API_URL }}" >> $GITHUB_ENV
-          echo "PROXMOX_API_TOKEN_ID=${{ secrets.PROXMOX_API_TOKEN_ID }}" >> $GITHUB_ENV
-          echo "PROXMOX_API_TOKEN_SECRET=${{ secrets.PROXMOX_API_TOKEN_SECRET }}" >> $GITHUB_ENV
-
-          echo "OPNSENSE_API_URL=${{ secrets.OPNSENSE_API_URL }}" >> $GITHUB_ENV
-          echo "OPNSENSE_API_KEY=${{ secrets.OPNSENSE_API_KEY }}" >> $GITHUB_ENV
-          echo "OPNSENSE_API_SECRET=${{ secrets.OPNSENSE_API_SECRET }}" >> $GITHUB_ENV
-
       - name: Validate configuration
         run: |
           infra envs
@@ -312,16 +303,6 @@ In your **config repository** settings, add:
   cat envs/dev/age.key | base64 -w0
   ```
 
-**Proxmox:**
-- `PROXMOX_API_URL` - `https://proxmox.example.com:8006`
-- `PROXMOX_API_TOKEN_ID` - `terraform@pve!token`
-- `PROXMOX_API_TOKEN_SECRET` - Your token secret
-
-**OPNsense:**
-- `OPNSENSE_API_URL` - `https://firewall.example.com`
-- `OPNSENSE_API_KEY` - Your API key
-- `OPNSENSE_API_SECRET` - Your API secret
-
 **Kubernetes:**
 - `KUBECONFIG` - Base64-encoded kubeconfig file (if needed)
 
@@ -330,10 +311,7 @@ In your **config repository** settings, add:
 In your **config repository** Settings > CI/CD > Variables, add:
 
 - `SOPS_AGE_KEY` - Base64-encoded age key (Masked, Protected)
-- `PROXMOX_API_URL` - Proxmox URL
-- `PROXMOX_API_TOKEN_ID` - Proxmox token ID (Masked)
-- `PROXMOX_API_TOKEN_SECRET` - Proxmox secret (Masked, Protected)
-- Similar for other providers
+- `KUBECONFIG` - Kubernetes configuration (Masked, if needed)
 
 ## Framework Repository CI/CD
 

@@ -61,53 +61,6 @@ class TestCredentialLoader:
         credentials = loader.load("nonexistent")
         assert credentials == {}
 
-    def test_load_proxmox_credentials(self, loader, mock_provider, temp_config_dir):
-        """Test loading Proxmox credentials from settings.yaml."""
-        env_dir = temp_config_dir / "envs" / "dev"
-        env_dir.mkdir(parents=True)
-
-        # Create proxmox.yaml for backward compatibility (tests still look for it)
-        proxmox_yaml = env_dir / "proxmox.yaml"
-        proxmox_yaml.write_text("encrypted")
-
-        mock_provider.load_secret.return_value = {
-            "proxmox_api_url": "https://pve.example.com:8006",
-            "proxmox_api_token_id": "user@pam!token",
-            "proxmox_api_token_secret": "secret123",
-        }
-
-        credentials = loader.load("dev", providers=["proxmox"])
-
-        assert credentials == {
-            "PROXMOX_API_URL": "https://pve.example.com:8006",
-            "PROXMOX_API_TOKEN_ID": "user@pam!token",
-            "PROXMOX_API_TOKEN_SECRET": "secret123",
-        }
-        mock_provider.load_secret.assert_called()
-
-    def test_load_opnsense_credentials(self, loader, mock_provider, temp_config_dir):
-        """Test loading OPNsense credentials."""
-        secrets_dir = temp_config_dir / "envs" / "dev"
-        secrets_dir.mkdir(parents=True)
-
-        mock_data = {
-            "opnsense_api_url": "https://fw.example.com",
-            "opnsense_api_key": "key123",
-            "opnsense_api_secret": "secret456",
-        }
-        mock_provider.load_secret.return_value = mock_data
-
-        opnsense_file = secrets_dir / "opnsense.yaml"
-        opnsense_file.write_text("encrypted")
-
-        credentials = loader.load("dev", providers=["opnsense"])
-
-        assert credentials == {
-            "OPNSENSE_API_URL": "https://fw.example.com",
-            "OPNSENSE_API_KEY": "key123",
-            "OPNSENSE_API_SECRET": "secret456",
-        }
-
     def test_load_kubernetes_credentials(self, loader, mock_provider, temp_config_dir):
         """Test loading Kubernetes credentials."""
         secrets_dir = temp_config_dir / "envs" / "dev"
@@ -128,26 +81,13 @@ class TestCredentialLoader:
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
 
-        # Create all credential files
-        (secrets_dir / "proxmox.yaml").write_text("encrypted")
-        (secrets_dir / "opnsense.yaml").write_text("encrypted")
+        # Create credential files
         (secrets_dir / "kubernetes.yaml").write_text("encrypted")
 
-        def mock_load(file_path):
-            if "proxmox" in str(file_path):
-                return {"proxmox_api_url": "https://pve.example.com:8006"}
-            elif "opnsense" in str(file_path):
-                return {"opnsense_api_url": "https://fw.example.com"}
-            elif "kubernetes" in str(file_path):
-                return {"kubeconfig": "/path/to/kubeconfig"}
-            return {}
-
-        mock_provider.load_secret.side_effect = mock_load
+        mock_provider.load_secret.return_value = {"kubeconfig": "/path/to/kubeconfig"}
 
         credentials = loader.load("dev")
 
-        assert "PROXMOX_API_URL" in credentials
-        assert "OPNSENSE_API_URL" in credentials
         assert "KUBECONFIG" in credentials
 
     def test_load_partial_credentials(self, loader, mock_provider, temp_config_dir):
@@ -156,17 +96,16 @@ class TestCredentialLoader:
         secrets_dir.mkdir(parents=True)
 
         # Only some fields present
-        mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
+        mock_data = {"kubeconfig": "/path/to/kubeconfig"}
         mock_provider.load_secret.return_value = mock_data
 
-        proxmox_file = secrets_dir / "proxmox.yaml"
-        proxmox_file.write_text("encrypted")
+        k8s_file = secrets_dir / "kubernetes.yaml"
+        k8s_file.write_text("encrypted")
 
-        credentials = loader.load("dev", providers=["proxmox"])
+        credentials = loader.load("dev", providers=["kubernetes"])
 
         # Only the available field is returned
-        assert credentials == {"PROXMOX_API_URL": "https://pve.example.com:8006"}
-        assert "PROXMOX_API_TOKEN_ID" not in credentials
+        assert credentials == {"KUBECONFIG": "/path/to/kubeconfig"}
 
     def test_load_unknown_provider(self, loader, temp_config_dir):
         """Test loading credentials for unknown provider."""
@@ -224,17 +163,17 @@ class TestCredentialLoader:
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
 
-        mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
+        mock_data = {"kubeconfig": "/path/to/kubeconfig"}
         mock_provider.load_secret.return_value = mock_data
 
-        proxmox_file = secrets_dir / "proxmox.yaml"
-        proxmox_file.write_text("encrypted")
+        k8s_file = secrets_dir / "kubernetes.yaml"
+        k8s_file.write_text("encrypted")
 
-        monkeypatch.delenv("PROXMOX_API_URL", raising=False)
-        credentials = loader.load_and_apply("dev", providers=["proxmox"])
+        monkeypatch.delenv("KUBECONFIG", raising=False)
+        credentials = loader.load_and_apply("dev", providers=["kubernetes"])
 
-        assert credentials == {"PROXMOX_API_URL": "https://pve.example.com:8006"}
-        assert os.environ["PROXMOX_API_URL"] == "https://pve.example.com:8006"
+        assert credentials == {"KUBECONFIG": "/path/to/kubeconfig"}
+        assert os.environ["KUBECONFIG"] == "/path/to/kubeconfig"
 
     def test_temporary_credentials_context_manager(
         self, loader, mock_provider, temp_config_dir, monkeypatch
@@ -243,21 +182,21 @@ class TestCredentialLoader:
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
 
-        mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
+        mock_data = {"kubeconfig": "/path/to/kubeconfig"}
         mock_provider.load_secret.return_value = mock_data
 
-        proxmox_file = secrets_dir / "proxmox.yaml"
-        proxmox_file.write_text("encrypted")
+        k8s_file = secrets_dir / "kubernetes.yaml"
+        k8s_file.write_text("encrypted")
 
-        monkeypatch.setenv("PROXMOX_API_URL", "original")
+        monkeypatch.setenv("KUBECONFIG", "original")
 
-        with loader.temporary_credentials("dev", providers=["proxmox"]) as creds:
+        with loader.temporary_credentials("dev", providers=["kubernetes"]) as creds:
             # Inside context, new value is set
-            assert os.environ["PROXMOX_API_URL"] == "https://pve.example.com:8006"
-            assert creds == {"PROXMOX_API_URL": "https://pve.example.com:8006"}
+            assert os.environ["KUBECONFIG"] == "/path/to/kubeconfig"
+            assert creds == {"KUBECONFIG": "/path/to/kubeconfig"}
 
         # Outside context, original value is restored
-        assert os.environ["PROXMOX_API_URL"] == "original"
+        assert os.environ["KUBECONFIG"] == "original"
 
     def test_temporary_credentials_new_vars_removed(
         self, loader, mock_provider, temp_config_dir, monkeypatch
@@ -266,19 +205,19 @@ class TestCredentialLoader:
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
 
-        mock_data = {"proxmox_api_url": "https://pve.example.com:8006"}
+        mock_data = {"kubeconfig": "/path/to/kubeconfig"}
         mock_provider.load_secret.return_value = mock_data
 
-        proxmox_file = secrets_dir / "proxmox.yaml"
-        proxmox_file.write_text("encrypted")
+        k8s_file = secrets_dir / "kubernetes.yaml"
+        k8s_file.write_text("encrypted")
 
-        monkeypatch.delenv("PROXMOX_API_URL", raising=False)
+        monkeypatch.delenv("KUBECONFIG", raising=False)
 
-        with loader.temporary_credentials("dev", providers=["proxmox"]):
-            assert "PROXMOX_API_URL" in os.environ
+        with loader.temporary_credentials("dev", providers=["kubernetes"]):
+            assert "KUBECONFIG" in os.environ
 
         # After context, var should be removed
-        assert "PROXMOX_API_URL" not in os.environ
+        assert "KUBECONFIG" not in os.environ
 
     def test_register_provider(self, loader):
         """Test registering a custom provider."""
@@ -323,11 +262,11 @@ class TestCredentialLoader:
         """Test graceful handling of decryption errors."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
-        proxmox_file = secrets_dir / "proxmox.yaml"
-        proxmox_file.write_text("encrypted")
+        k8s_file = secrets_dir / "kubernetes.yaml"
+        k8s_file.write_text("encrypted")
 
         mock_provider.load_secret.side_effect = Exception("Decryption failed")
 
-        credentials = loader.load("dev", providers=["proxmox"])
+        credentials = loader.load("dev", providers=["kubernetes"])
         # Should return empty dict, not raise exception
         assert credentials == {}

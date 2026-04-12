@@ -29,7 +29,7 @@ This example illustrates a legacy `.env` file for CI/local use, defining InfraFo
 
 ## Configuration Details
 
-- **Variables:** `INFRAFOUNDRY_CONFIG_REPO`, log level, provider credentials (`PROXMOX_*`, etc.).
+- **Variables:** `INFRAFOUNDRY_CONFIG_REPO`, log level, provider credentials (`KUBECONFIG`, etc.).
 - **Location:** At repo root; adjust paths for CI runners or local shells.
 
 ## Validation and Checks
@@ -43,9 +43,7 @@ This example illustrates a legacy `.env` file for CI/local use, defining InfraFo
   ```bash
   export INFRAFOUNDRY_CONFIG_REPO=/home/user/my-infra-config
   export INFRAFOUNDRY_LOG_LEVEL=INFO
-  export PROXMOX_API_URL=https://pve.example.com:8006/api2/json
-  export PROXMOX_API_TOKEN_ID=user@pam!token
-  export PROXMOX_API_TOKEN_SECRET=super-secret
+  export KUBECONFIG=/path/to/kubeconfig
   ```
 
 ## Related Documentation

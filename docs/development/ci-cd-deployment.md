@@ -137,12 +137,6 @@ infra apply --env dev --auto-approve
 - `INFRAFOUNDRY_ENV` - Target environment (dev, staging, prod)
 
 **Provider Credentials:**
-- `PROXMOX_API_URL` - Proxmox API endpoint
-- `PROXMOX_API_TOKEN_ID` - Proxmox token ID
-- `PROXMOX_API_TOKEN_SECRET` - Proxmox token secret
-- `OPNSENSE_API_URL` - OPNsense API endpoint
-- `OPNSENSE_API_KEY` - OPNsense API key
-- `OPNSENSE_API_SECRET` - OPNsense API secret
 - `KUBECONFIG` (optional) - Kubernetes configuration
 
 ---
