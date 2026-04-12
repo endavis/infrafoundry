@@ -72,6 +72,9 @@ defaults:
   # Override in package infrafoundry.yml if you need specific MACs.
   dhcp_subnet: opt1-infrastructure
 
+  # Extra Proxmox tags appended to the blueprint's default tags
+  extra_tags: []
+
 resources:
   - vm.yaml
   - dhcp.yaml

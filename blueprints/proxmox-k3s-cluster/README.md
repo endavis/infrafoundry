@@ -95,6 +95,7 @@ infra apply --env <env> --package k3s-cluster
 | `jumphost` | `""` (direct SSH) | SSH jumphost for VM access during install. When empty, the post-deploy script SSHes directly from the InfraFoundry host to each node. Set to e.g. `ansible@jump.example.com` to tunnel through a bastion. |
 | `k3s_server_args` | `--disable traefik --disable servicelb` | Extra flags for the k3s server installer |
 | `kubeconfig_dir` | `~/.kube` | Directory for the fetched kubeconfig (file is named `<cluster_name>.yaml`) |
+| `extra_tags` | `[]` | Additional Proxmox tags to append |
 
 ### Agent dict schema
 
@@ -145,8 +146,8 @@ infra apply --package k3s-cluster
 
 - VM hardware (`cores`, `memory`, `disk_size`) is set to sensible homelab
   defaults and is rarely overridden.
-- The `tags: [k3s, k3s-server]` / `[k3s, k3s-agent]` and `cloud_init_snippets`
-  are recipe-level metadata baked into the blueprint.
+- The default tags (`k3s`, `k3s-server` / `k3s-agent`) and `cloud_init_snippets`
+  are recipe-level metadata baked into the blueprint. Additional tags can be appended via `extra_tags`.
 - Events live at the top of `blueprint.yaml` (not embedded in `vm.yaml`)
   because the shorthand `vms:` format does not extract per-resource events.
 - The `requires:` field of the on_create handler lists only the server VM.

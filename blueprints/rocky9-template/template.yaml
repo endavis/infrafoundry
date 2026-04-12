@@ -16,5 +16,5 @@ templates:
     download_image:
       url: "{{ image_url }}"
       filename: "{{ image_filename }}"
-    tags: ["template", "rocky9"]
+    tags: {{ ["template", "rocky9"] + extra_tags }}
     description: "Rocky Linux 9 cloud image template"
