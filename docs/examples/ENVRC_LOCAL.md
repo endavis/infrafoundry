@@ -41,9 +41,7 @@ This example shows a personal `.envrc.local` for direnv to load InfraFoundry con
   ```bash
   export INFRAFOUNDRY_CONFIG_REPO=$HOME/my-infra-config
   export INFRAFOUNDRY_LOG_LEVEL=INFO
-  export PROXMOX_API_URL=https://pve.example.com:8006/api2/json
-  export PROXMOX_API_TOKEN_ID=user@pam!token
-  export PROXMOX_API_TOKEN_SECRET=super-secret
+  export KUBECONFIG=$HOME/.kube/config
   ```
 
 ## Related Documentation

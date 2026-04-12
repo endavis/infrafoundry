@@ -23,8 +23,7 @@ def mock_credentials_setup(tmp_path):
     secrets_dir.mkdir(parents=True)
 
     # Create mock credential files
-    (secrets_dir / "proxmox.yaml").write_text("encrypted proxmox credentials")
-    (secrets_dir / "opnsense.yaml").write_text("encrypted opnsense credentials")
+    (secrets_dir / "kubernetes.yaml").write_text("encrypted kubernetes credentials")
 
     return tmp_path
 
@@ -48,9 +47,7 @@ class TestCLICredentialLoading:
     def test_plan_command_loads_credentials(self, cli_runner, mock_credentials_setup):
         """Test that plan command loads credentials automatically."""
         mock_creds = {
-            "PROXMOX_API_URL": "https://proxmox-dev.example.com:8006",
-            "PROXMOX_API_TOKEN_ID": "dev@pam!token",
-            "PROXMOX_API_TOKEN_SECRET": "dev-secret",
+            "KUBECONFIG": "/path/to/kubeconfig",
         }
 
         with patch("infrafoundry.core.credential_loader.CredentialLoader") as mock_loader_class:
@@ -75,9 +72,7 @@ class TestCLICredentialLoading:
         """Test that apply command loads credentials automatically."""
         # Credentials defined for test setup reference
         _ = {
-            "PROXMOX_API_URL": "https://proxmox-prod.example.com:8006",
-            "PROXMOX_API_TOKEN_ID": "prod@pam!token",
-            "PROXMOX_API_TOKEN_SECRET": "prod-secret",
+            "KUBECONFIG": "/path/to/kubeconfig",
         }
 
         with (
@@ -196,10 +191,7 @@ class TestCLICredentialLoading:
     def test_credentials_set_in_environment(self, cli_runner, mock_credentials_setup):
         """Test that loaded credentials are set in os.environ."""
         mock_creds = {
-            "PROXMOX_API_URL": "https://test-proxmox.example.com:8006",
-            "PROXMOX_API_TOKEN_ID": "test@pam!token",
-            "PROXMOX_API_TOKEN_SECRET": "test-secret",
-            "OPNSENSE_API_URL": "https://test-opnsense.example.com",
+            "KUBECONFIG": "/path/to/kubeconfig",
         }
 
         original_env = os.environ.copy()
@@ -268,18 +260,16 @@ class TestCLICredentialLoading:
     ):
         """Test that different commands can load different environment credentials."""
         dev_creds = {
-            "PROXMOX_API_URL": "https://proxmox-dev.example.com:8006",
-            "PROXMOX_API_TOKEN_ID": "dev@pam!token",
+            "KUBECONFIG": "/path/to/dev/kubeconfig",
         }
         prod_creds = {
-            "PROXMOX_API_URL": "https://proxmox-prod.example.com:8006",
-            "PROXMOX_API_TOKEN_ID": "prod@pam!token",
+            "KUBECONFIG": "/path/to/prod/kubeconfig",
         }
 
         # Setup prod secrets too
         prod_secrets = mock_credentials_setup / "secrets" / "prod"
         prod_secrets.mkdir(parents=True)
-        (prod_secrets / "proxmox.yaml").write_text("encrypted prod credentials")
+        (prod_secrets / "kubernetes.yaml").write_text("encrypted prod credentials")
 
         def mock_load_env(env_name):
             if env_name == "dev":
@@ -324,7 +314,7 @@ class TestCLICredentialLoading:
 
         secrets_dir = custom_config_dir / "secrets" / "dev"
         secrets_dir.mkdir(parents=True)
-        (secrets_dir / "proxmox.yaml").write_text("encrypted")
+        (secrets_dir / "kubernetes.yaml").write_text("encrypted")
 
         with (
             patch(
@@ -371,7 +361,7 @@ class TestCredentialLoadingDebugLogging:
 
     def test_debug_logging_when_enabled(self, cli_runner, mock_credentials_setup):
         """Test that debug logging shows credential loading when enabled."""
-        mock_creds = {"PROXMOX_API_URL": "https://proxmox.example.com:8006"}
+        mock_creds = {"KUBECONFIG": "/path/to/kubeconfig"}
 
         with (
             patch(
@@ -395,7 +385,7 @@ class TestCredentialLoadingDebugLogging:
 
     def test_no_debug_logging_by_default(self, cli_runner, mock_credentials_setup):
         """Test that credential loading is silent by default."""
-        mock_creds = {"PROXMOX_API_URL": "https://proxmox.example.com:8006"}
+        mock_creds = {"KUBECONFIG": "/path/to/kubeconfig"}
 
         with (
             patch(
