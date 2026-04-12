@@ -17,8 +17,8 @@ BLUEPRINTS_DIR = Path(__file__).resolve().parents[2] / "blueprints"
 # Each entry: (blueprint, resource_file, base_tags_list)
 BLUEPRINT_TAG_CASES = [
     ("aiqum", "vm.yaml", ["ontap", "aiqum"]),
-    ("proxmox-k3s-cluster", "vm.yaml", ["k3s", "k3s-server"]),
-    ("proxmox-k3s-cluster", "vm.yaml", ["k3s", "k3s-agent"]),
+    ("k3s-cluster", "providers/proxmox/vm.yaml", ["k3s", "k3s-server"]),
+    ("k3s-cluster", "providers/proxmox/vm.yaml", ["k3s", "k3s-agent"]),
     ("ontap-cluster", "vm.yaml", ["ontap", "ontap-lab"]),
     ("rocky9-template", "template.yaml", ["template", "rocky9"]),
     ("ubuntu-template", "template.yaml", ["template", "ubuntu"]),
@@ -121,7 +121,7 @@ class TestBlueprintDefaultsIncludeExtraTags:
         "blueprint",
         [
             "aiqum",
-            "proxmox-k3s-cluster",
+            "k3s-cluster",
             "ontap-cluster",
             "rocky9-template",
             "ubuntu-template",
@@ -131,10 +131,15 @@ class TestBlueprintDefaultsIncludeExtraTags:
         """Blueprint defaults must include extra_tags with an empty list default."""
         blueprint_path = BLUEPRINTS_DIR / blueprint / "blueprint.yaml"
         data = yaml.safe_load(blueprint_path.read_text())
-        assert "extra_tags" in data["defaults"], (
+        # Multi-provider blueprints store extra_tags under providers.<name>.defaults
+        if "providers" in data and "proxmox" in data.get("providers", {}):
+            defaults = data["providers"]["proxmox"].get("defaults", {})
+        else:
+            defaults = data.get("defaults", {})
+        assert "extra_tags" in defaults, (
             f"{blueprint}/blueprint.yaml missing extra_tags in defaults"
         )
-        assert data["defaults"]["extra_tags"] == []
+        assert defaults["extra_tags"] == []
 
 
 @pytest.mark.unit
@@ -145,7 +150,7 @@ class TestResourceTemplatesUseExtraTags:
         "blueprint,resource_file",
         [
             ("aiqum", "vm.yaml"),
-            ("proxmox-k3s-cluster", "vm.yaml"),
+            ("k3s-cluster", "providers/proxmox/vm.yaml"),
             ("ontap-cluster", "vm.yaml"),
             ("rocky9-template", "template.yaml"),
             ("ubuntu-template", "template.yaml"),

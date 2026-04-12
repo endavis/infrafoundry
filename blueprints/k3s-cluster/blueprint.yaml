@@ -1,0 +1,131 @@
+name: k3s-cluster
+description: "k3s Kubernetes cluster — multi-provider (Proxmox or OCI)"
+version: "1.0.0"
+
+defaults:
+  # --- Shared cluster identity ---
+  cluster_name: k3s-cluster
+  k3s_version: ""                              # empty = latest
+  k3s_server_args: ""                          # e.g. "--disable traefik"
+
+providers:
+  # =====================================================================
+  # Proxmox — Rocky 9 VMs (1 server + N agents)
+  # =====================================================================
+  proxmox:
+    defaults:
+      # --- Template ---
+      template_vmid: 901          # Standard rocky9-template vmid
+      template_node: pve1         # Proxmox node hosting the template
+
+      # --- VM hardware ---
+      cores: 2
+      memory: 4096                # MiB
+      disk_size: 56               # GiB
+      disk_storage: local-lvm
+
+      # --- Network ---
+      bridge: vmbr0
+      vlan_tag: 10
+
+      # --- SSH access ---
+      jumphost: ""
+
+      # --- k3s installer flags ---
+      k3s_server_args: "--disable traefik --disable servicelb"
+
+      # --- Local kubeconfig destination directory ---
+      kubeconfig_dir: "~/.kube"
+
+      # Extra Proxmox tags appended to the blueprint's default tags
+      extra_tags: []
+
+    resources:
+      - providers/proxmox/vm.yaml
+      - providers/proxmox/dhcp.yaml
+
+    events:
+      on_create:
+        - type: script
+          name: k3s-install
+          script: scripts/proxmox/k3s-post-terraform.sh
+          description: "Install k3s server and agents after VMs are created"
+          timeout: 1800
+          continue_on_error: false
+          requires:
+            - "{{ server_name }}"
+
+  # =====================================================================
+  # OCI — ARM Always-Free-Tier (1 control + N workers) with Tailscale
+  # =====================================================================
+  oci:
+    defaults:
+      control_name: k3s-control
+
+      # --- OCI instance sizing ---
+      instance_shape: "VM.Standard.A1.Flex"
+      control_ocpus: 2
+      control_memory_gb: 8
+      control_boot_volume_gb: 50
+      worker_boot_volume_gb: 50
+
+      workers:
+        - name: k3s-worker-0
+          ocpus: 1
+          memory_gb: 8
+        - name: k3s-worker-1
+          ocpus: 1
+          memory_gb: 8
+
+      # --- Network ---
+      vcn_name: k3s-vcn
+      vcn_cidr: "10.0.0.0/16"
+      vcn_dns_label: k3svcn
+      control_subnet_name: k3s-control-subnet
+      control_subnet_cidr: "10.0.0.0/24"
+      control_subnet_dns_label: ctrl
+      worker_subnet_name: k3s-worker-subnet
+      worker_subnet_cidr: "10.0.1.0/24"
+      worker_subnet_dns_label: work
+
+      # --- Tailscale ---
+      tailnet: ""
+      ts_tags: []
+      extra_freeform_tags: {}
+
+      # --- k3s OCI-specific ---
+      k3s_oci_firewall_fix: true
+
+      # --- Local kubeconfig destination ---
+      kubeconfig_local_path: "~/.kube/{{ cluster_name }}.yaml"
+
+    resources:
+      - providers/oci/network.yaml
+      - providers/oci/instance.yaml
+
+    events:
+      on_create:
+        - type: script
+          name: k3s-install
+          script: scripts/oci/k3s-post-terraform.sh
+          description: "Install k3s server and workers via ansible after instances are created"
+          timeout: 1800
+          continue_on_error: false
+          requires:
+            - "{{ control_name }}"
+
+      before_destroy:
+        - type: script
+          name: tailscale-cleanup
+          script: scripts/oci/cleanup-tailscale-devices.sh
+          description: "Remove Tailscale devices for this cluster before destroy"
+          timeout: 60
+          continue_on_error: true
+
+      after_apply:
+        - type: script
+          name: verify-cluster
+          script: scripts/oci/verify-cluster.sh
+          description: "Verify k3s cluster health after apply"
+          timeout: 120
+          continue_on_error: true

@@ -1,16 +1,16 @@
-# k3s cluster — example consumer of the proxmox-k3s-cluster blueprint.
+# k3s cluster — example consumer of the k3s-cluster blueprint (proxmox variant).
 #
 # All deployment logic (VM definitions, DHCP reservations, install script,
-# event handler) lives in blueprints/proxmox-k3s-cluster/. This file only
+# event handler) lives in blueprints/k3s-cluster/. This file only
 # supplies the per-instance values.
 #
-# See blueprints/proxmox-k3s-cluster/README.md for the full variable reference.
+# See blueprints/k3s-cluster/README.md for the full variable reference.
 #
 # Run: foundry infra apply --env dev --package k3s-cluster
 
 name: k3s-cluster
 description: "k3s Kubernetes cluster (example: 1 server + 2 agents)"
-blueprint: proxmox-k3s-cluster
+blueprint: k3s-cluster
 
 variables:
   # --- Cluster identity ---

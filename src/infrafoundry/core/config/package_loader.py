@@ -220,6 +220,10 @@ class PackageLoader:
                 if not manifest.resources and provider_block.get("resources"):
                     manifest.resources = list(provider_block["resources"])
 
+                # Use provider-specific events when package doesn't declare its own
+                if not manifest.events and provider_block.get("events"):
+                    manifest.events = dict(provider_block["events"])
+
             manifest.variables = merged_vars
 
             # Inherit resources from blueprint if package doesn't declare its own
