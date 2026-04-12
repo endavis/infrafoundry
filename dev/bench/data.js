@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775993634534,
+  "lastUpdate": 1775994778572,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5208,6 +5208,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006568826066227606",
             "extra": "mean: 102.40691380121035 usec\nrounds: 2123"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e6db4f2384121247361526236922c0dd98e1c0b8",
+          "message": "feat: add infra list command to show packages in an environment (merges PR #567, addresses #535)\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-12T12:52:20+01:00",
+          "tree_id": "9b965b2f4407ba6059b8b2556a4a22b06d99d5e9",
+          "url": "https://github.com/endavis/infrafoundry/commit/e6db4f2384121247361526236922c0dd98e1c0b8"
+        },
+        "date": 1775994777618,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9669.535260468776,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010844419205649",
+            "extra": "mean: 103.41758658125212 usec\nrounds: 2027"
           }
         ]
       }
