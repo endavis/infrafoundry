@@ -193,9 +193,37 @@ class PackageLoader:
 
             # Merge defaults: blueprint defaults < package variables
             merged_vars: dict[str, Any] = {**blueprint["defaults"], **manifest.variables}
+
+            # Provider-conditional resource and defaults selection
+            bp_providers = blueprint.get("providers")
+            effective_provider = manifest.provider or provider
+            if bp_providers:
+                if not effective_provider:
+                    raise InvalidConfigurationError(
+                        f"Blueprint '{manifest.blueprint}' declares provider-specific "
+                        f"resources but package '{manifest.name}' has no provider"
+                    )
+                if effective_provider not in bp_providers:
+                    available = ", ".join(sorted(bp_providers))
+                    raise InvalidConfigurationError(
+                        f"Blueprint '{manifest.blueprint}' has no resources for "
+                        f"provider '{effective_provider}' "
+                        f"(available providers: {available})"
+                    )
+                provider_block = bp_providers[effective_provider]
+                # Merge provider-specific defaults between blueprint defaults
+                # and package variables:
+                # blueprint.defaults < providers[x].defaults < package.variables
+                provider_defaults = provider_block.get("defaults", {})
+                merged_vars = {**blueprint["defaults"], **provider_defaults, **manifest.variables}
+                # Use provider-specific resources when package doesn't declare its own
+                if not manifest.resources and provider_block.get("resources"):
+                    manifest.resources = list(provider_block["resources"])
+
             manifest.variables = merged_vars
 
             # Inherit resources from blueprint if package doesn't declare its own
+            # (only when no provider-conditional selection occurred above)
             if not manifest.resources and blueprint["resources"]:
                 manifest.resources = list(blueprint["resources"])
 
