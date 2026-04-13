@@ -43,7 +43,7 @@ def test_impact_low_risk(cli_runner, mock_orchestrator, mock_dependency_graph):
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
-            main, ["analyze", "impact", "--env", "test", "--resource", "vm-01"]
+            main, ["infra", "analyze", "impact", "--env", "test", "--resource", "vm-01"]
         )
 
         assert result.exit_code == 0
@@ -67,7 +67,7 @@ def test_impact_medium_risk(cli_runner, mock_orchestrator, mock_dependency_graph
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
-            main, ["analyze", "impact", "--env", "test", "--resource", "vm-01"]
+            main, ["infra", "analyze", "impact", "--env", "test", "--resource", "vm-01"]
         )
 
         assert result.exit_code == 0
@@ -89,7 +89,7 @@ def test_impact_high_risk(cli_runner, mock_orchestrator, mock_dependency_graph):
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
-            main, ["analyze", "impact", "--env", "test", "--resource", "vm-01"]
+            main, ["infra", "analyze", "impact", "--env", "test", "--resource", "vm-01"]
         )
 
         assert result.exit_code == 0
@@ -104,7 +104,7 @@ def test_impact_resource_not_found(cli_runner, mock_orchestrator, mock_dependenc
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
-            main, ["analyze", "impact", "--env", "test", "--resource", "nonexistent"]
+            main, ["infra", "analyze", "impact", "--env", "test", "--resource", "nonexistent"]
         )
 
         assert result.exit_code == 0
@@ -118,7 +118,7 @@ def test_impact_orchestrator_failure(cli_runner, mock_orchestrator):
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
-            main, ["analyze", "impact", "--env", "test", "--resource", "vm-01"]
+            main, ["infra", "analyze", "impact", "--env", "test", "--resource", "vm-01"]
         )
 
         assert result.exit_code == 1

@@ -293,16 +293,12 @@ def foundry(
 
 
 # Import and register command groups
-from infrafoundry.cli.commands.analyze import analyze
-from infrafoundry.cli.commands.audit import audit
 from infrafoundry.cli.commands.blueprint import blueprint
 from infrafoundry.cli.commands.completion import completion
 from infrafoundry.cli.commands.config import config
 from infrafoundry.cli.commands.doctor import doctor
 from infrafoundry.cli.commands.infra import infra
 from infrafoundry.cli.commands.policy import policy
-from infrafoundry.cli.commands.proxmox import proxmox
-from infrafoundry.cli.commands.schema import schema
 from infrafoundry.cli.commands.secrets import secrets
 from infrafoundry.cli.commands.state import state
 
@@ -313,11 +309,7 @@ foundry.add_command(infra)
 foundry.add_command(config)
 foundry.add_command(state)
 foundry.add_command(secrets)
-foundry.add_command(schema)
-foundry.add_command(analyze)
-foundry.add_command(audit)
 foundry.add_command(policy)
-foundry.add_command(proxmox)
 
 # Alias for backwards compatibility during development
 main = foundry

@@ -83,15 +83,20 @@ infra destroy --env dev --auto-approve
   - `infra policies check --env <env> [--enforce]`
 - **Secrets**
   - `infra secrets init|encrypt|decrypt`
-- **Dependency Analysis**
-  - `infra dependencies --env <env> [--resource <provider:name>] [--format list|mermaid]` — show dependency graph or analyze specific resource dependencies.
-  - `infra impact --env <env> --resource <name>` — analyze the impact of changes to a resource and show what depends on it.
-- **Graphing**
-  - `infra graph --env <env> --format mermaid|dot` — generate visual topology graph.
-- **Migrations/Helpers**
-  - `infra export-proxmox --env <env> --output <dir> [--node ...] [--resource-type ...]` — export Proxmox configuration to InfraFoundry YAML.
-  - `infra isc-to-kea ...` — migrate ISC DHCP to Kea format.
-  - `infra download-template ...` — fetch templates where supported.
+- **Dependency Analysis** (under `infra analyze`)
+  - `infra analyze dependencies --env <env> [--resource <provider:name>] [--format list|mermaid]` — show dependency graph or analyze specific resource dependencies.
+  - `infra analyze impact --env <env> --resource <name>` — analyze the impact of changes to a resource and show what depends on it.
+  - `infra analyze graph --env <env> --format mermaid|dot` — generate visual topology graph.
+- **Configuration Export**
+  - `config export --env <env> --output <dir> [--provider proxmox] [--node ...] [--resource-type ...]` — export provider configuration to InfraFoundry YAML.
+- **Schema Management** (under `config schema`)
+  - `config schema export [--output <dir>]` — export all JSON schemas for IDE autocomplete.
+  - `config schema list` — list available schemas.
+  - `config schema show <name> [--format json|yaml]` — show a specific schema.
+- **Audit Trail** (under `state audit`)
+  - `state audit list [--env ... --user ... --action ... --limit ... --since ...]` — list audit entries.
+  - `state audit export --output <file> [--format json|csv] [--env ... --since ...]` — export audit entries.
+  - `state audit verify <ENTRY_ID>` — verify integrity of an audit entry.
 
 ## Validation and Checks
 
@@ -150,13 +155,13 @@ infra destroy --env dev --auto-approve
 - **Analyze dependencies and impact:**
   ```bash
   # Show full dependency graph for environment
-  infra dependencies --env prod --format mermaid > deps.mmd
+  infra analyze dependencies --env prod --format mermaid > deps.mmd
 
   # Analyze dependencies for specific resource
-  infra dependencies --env prod --resource proxmox:vm-web-01
+  infra analyze dependencies --env prod --resource proxmox:vm-web-01
 
   # Analyze impact of changing a resource
-  infra impact --env prod --resource vm-database-01
+  infra analyze impact --env prod --resource vm-database-01
   # Shows: What resources depend on vm-database-01 and risk level
   ```
 - **Reset component configuration:**
@@ -167,16 +172,16 @@ infra destroy --env dev --auto-approve
   # Reset both DHCPv4 and DHCPv6 (without confirmation)
   infra reset --env prod --provider opnsense --component kea/dhcp --auto-approve
   ```
-- **Export Proxmox configuration:**
+- **Export provider configuration:**
   ```bash
   # Export all Proxmox resources to YAML
-  infra export-proxmox --env prod --output ./exported
+  config export --env prod --output ./exported --provider proxmox
 
   # Export only VMs from specific node
-  infra export-proxmox --env prod --output ./exported --node pve01 --resource-type vm
+  config export --env prod --output ./exported --provider proxmox --node pve01 --resource-type vm
 
   # Export network configurations
-  infra export-proxmox --env prod --output ./exported --resource-type network
+  config export --env prod --output ./exported --provider proxmox --resource-type network
   ```
 - **List rollback points:**
   ```bash
@@ -225,7 +230,7 @@ infra destroy --env dev --auto-approve
   ```
 - **Graph dependencies:**
   ```bash
-  infra graph --env dev --format mermaid > graph.mmd
+  infra analyze graph --env dev --format mermaid > graph.mmd
   ```
 
 ## Related Documentation
@@ -245,9 +250,9 @@ infra destroy --env dev --auto-approve
 - **Symptom:** Rollback fails with "deployment not found". **Fix:** Use `infra history` or `infra rollback-points --env <env>` to verify deployment ID exists and has rollback data available.
 - **Symptom:** State backup skips database file. **Fix:** Ensure using SQLite backend (default); PostgreSQL and other remote databases cannot be backed up via file copy.
 - **Symptom:** `diff` shows no differences but configs look different. **Fix:** Check if provider filtering is hiding changes; remove `--provider` flag to see all differences.
-- **Symptom:** `dependencies` or `impact` shows unexpected results. **Fix:** Ensure resources are loaded from YAML; check `get_dependencies()` implementation in provider.
+- **Symptom:** `infra analyze dependencies` or `infra analyze impact` shows unexpected results. **Fix:** Ensure resources are loaded from YAML; check `get_dependencies()` implementation in provider.
 - **Symptom:** `reset` command fails or doesn't clean properly. **Fix:** Verify provider and component names are correct; currently only supports OPNsense Kea components (kea/dhcpv4, kea/dhcpv6, kea/dhcp).
-- **Symptom:** `export-proxmox` fails to connect. **Fix:** Verify environment credentials in `settings.yaml`; ensure Proxmox API is accessible and credentials have read permissions.
+- **Symptom:** `config export` fails to connect. **Fix:** Verify environment credentials in `settings.yaml`; ensure provider API is accessible and credentials have read permissions.
 
 ---
 
