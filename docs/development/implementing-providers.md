@@ -34,7 +34,7 @@ Provider plugins implement `ProviderBase`, render Terraform/Ansible via Jinja2, 
 
 - Validate required fields per resource type; surface clear errors.
 - Ensure templates produce deterministic output; keep secrets out of generated files.
-- Run `infra validate --env <env> --check-api --check-refs` for new providers; add provider-specific validators as needed.
+- Run `foundry infra doctor --env <env>` for new providers; add provider-specific validators as needed.
 
 ## Environment Configuration
 
@@ -109,7 +109,7 @@ def validate_connectivity(self, env_config, report):
         report.add_error(f"{self.name}: Connection failed - {e}")
 ```
 
-**Usage:** Called by `infra validate --env <env> --check-api`
+**Usage:** Called by `foundry infra doctor --env <env>`
 
 ---
 
@@ -162,7 +162,7 @@ def validate_references(self, resources, env_config, report):
                 )
 ```
 
-**Usage:** Called by `infra validate --env <env> --check-refs`
+**Usage:** Called by `foundry infra doctor --env <env>`
 
 ---
 

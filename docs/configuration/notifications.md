@@ -32,8 +32,8 @@ InfraFoundry can emit deployment, drift, and policy events to Slack, Discord, or
    ```
 2. Run InfraFoundry; events matching the config will be sent:
    ```bash
-   infra apply --env dev
-   infra drift --env prod
+   foundry infra apply --env dev
+   foundry infra drift --env prod
    ```
 
 ## Configuration Details
@@ -68,7 +68,7 @@ InfraFoundry can emit deployment, drift, and policy events to Slack, Discord, or
 
 - Validate config structure:
   ```bash
-  infra validate --env dev
+  foundry infra doctor --env dev
   ```
 - Send a test event by running a dry plan/apply; check target channel for delivery.
 - For Slack/Discord, verify webhook URL is active and workspace permissions allow incoming webhooks.

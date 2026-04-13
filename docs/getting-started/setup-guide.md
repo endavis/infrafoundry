@@ -31,7 +31,8 @@ This guide helps you stand up InfraFoundry with Proxmox and OPNsense, covering b
    ```
 4. Validate connectivity and structure:
    ```bash
-   infra validate --env dev --check-api --check-refs
+   foundry config doctor --deep
+   foundry infra doctor --env dev
    ```
 
 ## Configuration Details
@@ -57,23 +58,23 @@ This guide helps you stand up InfraFoundry with Proxmox and OPNsense, covering b
 
 ## Validation and Checks
 
-- Run `infra validate --env <env>` after populating settings and resources.
-- Add `--check-api --check-refs` before first apply to catch connectivity and reference issues.
+- Run `foundry config doctor` after populating settings and resources.
+- Run `foundry infra doctor --env <env>` before first apply to catch connectivity and reference issues.
 - Review generated outputs in `generated/{env}/terraform` and `generated/{env}/ansible` when planning.
 
 ## Examples
 
 - **Plan after setup:**
   ```bash
-  infra plan --env dev
+  foundry infra plan --env dev
   ```
 - **Apply a newly configured environment:**
   ```bash
-  infra apply --env dev
+  foundry infra apply --env dev
   ```
 - **Destroy if you need to reset:**
   ```bash
-  infra destroy --env dev
+  foundry infra destroy --env dev
   ```
 
 ## Related Documentation
@@ -87,7 +88,7 @@ This guide helps you stand up InfraFoundry with Proxmox and OPNsense, covering b
 ## Troubleshooting
 
 - **Symptom:** Missing dependencies. **Fix:** Re-run `./scripts/setup-dependencies.sh`; confirm `uv` is on `PATH`.
-- **Symptom:** Cannot reach Proxmox/OPNsense. **Fix:** Verify API URLs, tokens/keys, and network access; rerun `infra validate --check-api`.
+- **Symptom:** Cannot reach Proxmox/OPNsense. **Fix:** Verify API URLs, tokens/keys, and network access; rerun `foundry infra doctor --env <env>`.
 - **Symptom:** Configs not found. **Fix:** Ensure `INFRAFOUNDRY_CONFIG_REPO` or `--config-dir` points to your repo and `envs/{env}` exists.
 
 ---

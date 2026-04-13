@@ -2,12 +2,12 @@
 
 ## Overview
 
-`infra graph` builds a dependency graph of resources to show creation/destruction order. Output is Mermaid (or DOT) so you can visualize relationships and debug dependencies.
+`foundry infra analyze graph` builds a dependency graph of resources to show creation/destruction order. Output is Mermaid (or DOT) so you can visualize relationships and debug dependencies.
 
 ## Audience and Prerequisites
 
 - **Audience:** Operators and reviewers inspecting dependencies before apply/destroy.
-- **Prereqs:** Config repo available; `uv run infra` installed; a target environment with resources.
+- **Prereqs:** Config repo available; `foundry` installed; a target environment with resources.
 
 ## When to Use This
 
@@ -18,21 +18,21 @@
 ## Quick Start
 
 ```bash
-infra graph --env dev --format mermaid > graph.mmd
+foundry infra analyze graph --env dev --format mermaid > graph.mmd
 ```
 
 Render with Mermaid Live Editor or embed in Markdown. Use DOT for alternative tooling (`--format dot`).
 
 ## Configuration Details
 
-- **Command:** `infra graph --env <env> [--format mermaid|dot]`.
+- **Command:** `foundry infra analyze graph --env <env> [--format mermaid|dot]`.
 - **Nodes:** Provider-scoped resources (e.g., `proxmox:vm-01`, `opnsense:firewall-rule-100`).
 - **Edges:** `A --> B` means A depends on B (B created before A; A destroyed before B).
 - **Sources of dependencies:** Provider rules, cross-resource references, and future explicit `depends_on`.
 
 ## Validation and Checks
 
-- Run `infra validate --env <env> --check-refs` to ensure referenced resources exist before graphing.
+- Run `foundry infra doctor --env <env>` to ensure referenced resources exist before graphing.
 - Review generated graph to confirm expected ordering; missing edges can signal missing references.
 
 ## Examples
@@ -49,7 +49,7 @@ Render with Mermaid Live Editor or embed in Markdown. Use DOT for alternative to
   ```
 - **Generate DOT:**
   ```bash
-  infra graph --env prod --format dot > graph.dot
+  foundry infra analyze graph --env prod --format dot > graph.dot
   ```
 
 ## Related Documentation
@@ -61,7 +61,7 @@ Render with Mermaid Live Editor or embed in Markdown. Use DOT for alternative to
 
 ## Troubleshooting
 
-- **Symptom:** Missing nodes or edges. **Fix:** Ensure resources declare correct references; rerun `infra validate --check-refs`.
+- **Symptom:** Missing nodes or edges. **Fix:** Ensure resources declare correct references; rerun `foundry infra doctor --env <env>`.
 - **Symptom:** Unexpected ordering. **Fix:** Check provider rules and references; verify resource names match between configs.
 - **Symptom:** Graph output unreadable. **Fix:** Switch format (`--format dot`) and render with DOT tools; simplify by filtering resources before generation (future enhancement).
 

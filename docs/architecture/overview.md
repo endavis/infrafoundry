@@ -19,15 +19,15 @@ InfraFoundry separates code generation from execution: YAML configs are rendered
 
 1. Generate only:
    ```bash
-   infra plan --env dev
+   foundry infra plan --env dev
    ```
 2. Generate + execute:
    ```bash
-   infra apply --env dev
+   foundry infra apply --env dev
    ```
 3. Destroy:
    ```bash
-   infra destroy --env dev
+   foundry infra destroy --env dev
    ```
 
 ## Architecture Details
@@ -65,14 +65,14 @@ InfraFoundry separates code generation from execution: YAML configs are rendered
 
 ## Validation and Checks
 
-- `infra validate --env <env> --check-api --check-refs` before plan/apply.
+- `foundry infra doctor --env <env>` before plan/apply.
 - Inspect generated Terraform/Ansible under `generated/{env}/...` to verify outputs before execution.
 
 ## Examples
 
-- **Review without applying:** `infra plan --env dev --dry-run` (validate only).
-- **Full run:** `infra apply --env prod` (generate + terraform + ansible + state tracking).
-- **Remove:** `infra destroy --env prod` (tears down resources via Terraform/Ansible).
+- **Review without applying:** `foundry infra plan --env dev --dry-run` (validate only).
+- **Full run:** `foundry infra apply --env prod` (generate + terraform + ansible + state tracking).
+- **Remove:** `foundry infra destroy --env prod` (tears down resources via Terraform/Ansible).
 
 ## Related Documentation
 
@@ -84,8 +84,8 @@ InfraFoundry separates code generation from execution: YAML configs are rendered
 
 ## Troubleshooting
 
-- **Symptom:** Generated files missing. **Fix:** Run `infra plan --env <env>` and ensure configs are present; check `generated/{env}`.
-- **Symptom:** Execution fails after generation. **Fix:** Inspect generated Terraform/Ansible, rerun `infra validate --check-api --check-refs`, and address provider-specific errors.
+- **Symptom:** Generated files missing. **Fix:** Run `foundry infra plan --env <env>` and ensure configs are present; check `generated/{env}`.
+- **Symptom:** Execution fails after generation. **Fix:** Inspect generated Terraform/Ansible, rerun `foundry infra doctor --env <env>`, and address provider-specific errors.
 - **Symptom:** Policies or events not triggered. **Fix:** Confirm event subscriptions and policy files are present; run with validation/policy checks to surface issues.
 
 ---

@@ -116,7 +116,7 @@ export SOPS_AGE_KEY=$(cat envs/dev/age.key | base64 -w 0)
 ./ci/setup-ci.sh dev
 
 # Deploy infrastructure
-infra apply --env dev --auto-approve
+foundry infra apply --env dev --auto-approve
 ```
 
 ---

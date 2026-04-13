@@ -86,22 +86,22 @@ On failure, automatically rolls back to the backup.
 
 ```bash
 # Generate new key and rotate all secrets for dev environment
-infra secrets rotate --env dev --generate-new-key
+foundry secrets rotate --env dev --generate-new-key
 
 # Rotate with an existing new key file
-infra secrets rotate --env prod --new-key-file /path/to/new_age.key
+foundry secrets rotate --env prod --new-key-file /path/to/new_age.key
 
 # Rotate specific files only
-infra secrets rotate --env dev --generate-new-key --files proxmox.yaml --files opnsense.yaml
+foundry secrets rotate --env dev --generate-new-key --files proxmox.yaml --files opnsense.yaml
 
 # Dry run to preview rotation
-infra secrets rotate --env dev --generate-new-key --dry-run
+foundry secrets rotate --env dev --generate-new-key --dry-run
 
 # Skip verification (not recommended)
-infra secrets rotate --env dev --generate-new-key --no-verify
+foundry secrets rotate --env dev --generate-new-key --no-verify
 
 # Don't keep backup after rotation (not recommended)
-infra secrets rotate --env dev --generate-new-key --no-backup
+foundry secrets rotate --env dev --generate-new-key --no-backup
 ```
 
 ### Post-Rotation Steps

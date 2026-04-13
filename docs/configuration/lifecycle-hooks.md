@@ -245,7 +245,7 @@ Test your hooks with a dry run:
 
 ```bash
 # See what hooks would be executed
-infra plan --env prod --dry-run
+foundry infra plan --env prod --dry-run
 ```
 
 Check script permissions:

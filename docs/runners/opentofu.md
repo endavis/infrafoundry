@@ -34,8 +34,8 @@ The OpenTofu runner is a drop-in alternative to the Terraform runner. OpenTofu i
 
 3. Run as usual:
    ```bash
-   infra plan --env dev
-   infra apply --env dev
+   foundry infra plan --env dev
+   foundry infra apply --env dev
    ```
 
 ## Configuration Details

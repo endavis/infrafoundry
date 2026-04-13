@@ -7,7 +7,7 @@ InfraFoundry uses **pure YAML** for all environment, resource, and credential co
 ## Audience and Prerequisites
 
 - **Audience:** Config repo maintainers and operators defining environments/resources.
-- **Prereqs:** Config repo available, `sops`/`age` for secrets, `uv run infra` installed, and provider credentials ready.
+- **Prereqs:** Config repo available, `sops`/`age` for secrets, `foundry` installed, and provider credentials ready.
 
 ## When to Use This
 
@@ -22,8 +22,8 @@ InfraFoundry uses **pure YAML** for all environment, resource, and credential co
 3. Encrypt secrets with SOPS/age as needed.
 4. Generate and validate:
    ```bash
-   infra validate --env dev
-   infra plan --env dev
+   foundry infra doctor --env dev
+   foundry infra plan --env dev
    ```
 
 ## Configuration Details
@@ -35,7 +35,7 @@ InfraFoundry uses **pure YAML** for all environment, resource, and credential co
 
 ## Validation and Checks
 
-- Run `infra validate --env <env> --check-api --check-refs` to confirm YAML structure, provider discovery, connectivity, and referenced templates/networks/aliases.
+- Run `foundry infra doctor --env <env>` to confirm YAML structure, provider discovery, connectivity, and referenced templates/networks/aliases.
 - Inspect generated Terraform inputs under `generated/{env}/terraform/{provider}/terraform.tfvars` to confirm values and SSH overrides.
 
 ## Examples
@@ -99,9 +99,9 @@ InfraFoundry uses **pure YAML** for all environment, resource, and credential co
 
 ## Troubleshooting
 
-- **Symptom:** Generated `terraform.tfvars` missing values. **Fix:** Ensure fields exist in `settings.yaml`; rerun `infra plan`.
+- **Symptom:** Generated `terraform.tfvars` missing values. **Fix:** Ensure fields exist in `settings.yaml`; rerun `foundry infra plan`.
 - **Symptom:** Providers not discovered. **Fix:** Confirm resource files include `provider` keys and are placed under `resources/` or provider directories.
-- **Symptom:** SSH fails during Proxmox operations. **Fix:** Verify `ssh` or `provider_ssh` entries and that keys are accessible; re-run `infra validate --check-api`.
+- **Symptom:** SSH fails during Proxmox operations. **Fix:** Verify `ssh` or `provider_ssh` entries and that keys are accessible; re-run `foundry infra doctor --env <env>`.
 
 ---
 
