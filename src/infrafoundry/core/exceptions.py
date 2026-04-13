@@ -213,6 +213,36 @@ class PackageNotFoundError(InfraFoundryError):
     """Raised when a named package is not found in the environment."""
 
 
+class PackageMoveRollbackError(InfraFoundryError):
+    """Raised when a package move fails and rollback also encounters errors.
+
+    Carries both the original error that triggered rollback and any errors
+    that occurred during the rollback attempt itself.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        original_error: Exception,
+        rollback_errors: list[Exception],
+    ) -> None:
+        """Initialize package move rollback error.
+
+        Args:
+            message: Human-readable error message
+            original_error: The error that triggered the rollback
+            rollback_errors: Errors encountered during rollback
+        """
+        context: dict[str, Any] = {
+            "original_error": str(original_error),
+            "rollback_error_count": len(rollback_errors),
+            "rollback_errors": [str(e) for e in rollback_errors],
+        }
+        super().__init__(message, context)
+        self.original_error = original_error
+        self.rollback_errors = rollback_errors
+
+
 # Deployment and Orchestration Errors
 
 
@@ -361,6 +391,7 @@ __all__ = [
     "MissingCredentialError",
     "MissingDependencyError",
     # Package
+    "PackageMoveRollbackError",
     "PackageNotFoundError",
     # Policy
     "PolicyError",

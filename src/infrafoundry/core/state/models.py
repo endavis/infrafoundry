@@ -1,5 +1,6 @@
 """Database models for state management."""
 
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -148,6 +149,37 @@ class DeploymentEvent(Base):
 
     # Relationships
     deployment = relationship("Deployment", back_populates="events")
+
+
+class EnvironmentSyncStatus(StrEnum):
+    """Sync status between filesystem and state database for an environment."""
+
+    OK = "ok"
+    FS_ONLY = "fs_only"
+    DB_ONLY = "db_only"
+
+
+@dataclass
+class EnvironmentStatus:
+    """Status of an environment across filesystem and state database.
+
+    Attributes:
+        name: Environment name
+        in_filesystem: Whether the environment exists on the filesystem
+        in_state_db: Whether the environment exists in the state database
+        resource_count: Number of resources tracked in the state database
+        sync_status: Sync status between filesystem and state database
+        description: Environment description from settings (if available)
+        providers: List of providers configured in the environment
+    """
+
+    name: str
+    in_filesystem: bool
+    in_state_db: bool
+    resource_count: int
+    sync_status: EnvironmentSyncStatus
+    description: str = ""
+    providers: list[str] = field(default_factory=list)
 
 
 class DeploymentLock(Base):

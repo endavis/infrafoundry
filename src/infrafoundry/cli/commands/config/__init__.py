@@ -2,6 +2,7 @@
 
 import click
 
+from .check import check
 from .diff import diff
 from .envs import envs
 from .init import init
@@ -18,6 +19,7 @@ def config() -> None:
 
 
 # Register all subcommands
+config.add_command(check)
 config.add_command(envs)
 config.add_command(diff)
 config.add_command(init)

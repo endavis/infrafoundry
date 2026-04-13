@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from sqlalchemy import distinct
 from sqlalchemy.orm import Session, sessionmaker
 
 from infrafoundry.core.state.models import Resource, ResourceDependency, ResourceState
@@ -145,6 +146,28 @@ class ResourceRepository:
             resources = query.order_by(Resource.created_at.desc()).all()
             session.expunge_all()
             return resources
+
+    def list_environments(self) -> list[str]:
+        """List distinct environment names from tracked resources.
+
+        Returns:
+            Sorted list of unique environment names
+        """
+        with self.SessionLocal() as session:
+            rows = session.query(distinct(Resource.environment)).all()
+            return sorted(row[0] for row in rows)
+
+    def count_by_environment(self, environment: str) -> int:
+        """Count resources in a given environment.
+
+        Args:
+            environment: Environment name
+
+        Returns:
+            Number of resources tracked for the environment
+        """
+        with self.SessionLocal() as session:
+            return session.query(Resource).filter_by(environment=environment).count()
 
     def get_by_name(self, environment: str, provider: str, name: str) -> Resource | None:
         """Get a resource by its unique identifiers.
