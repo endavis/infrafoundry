@@ -18,14 +18,20 @@
 ## Quick Start
 
 ```bash
+# Check system dependencies
+foundry doctor
+
+# Check config repo health
+foundry config doctor
+
+# Validate against provider APIs
+foundry infra doctor --env dev
+
 # List environments
 infra envs
 
-# Validate + plan
-infra validate --env dev --check-api --check-refs
+# Plan + apply
 infra plan --env dev
-
-# Apply/destroy
 infra apply --env dev
 infra destroy --env dev --auto-approve
 ```
@@ -43,16 +49,17 @@ infra destroy --env dev --auto-approve
 
 ## Commands and Examples
 
+- **Health Checks (doctor commands)**
+  - `foundry doctor [--format text|json]` — check system dependencies (Terraform, OpenTofu, Ansible, SOPS, Age).
+  - `foundry config doctor [--format text|json] [--deep]` — check config repo health: config repo structure, environments, state backend, SOPS keys, state/filesystem consistency, blueprint validation.
+  - `foundry infra doctor --env <env> [--resource <name>]... [--verbose]` — validate infrastructure against provider APIs (connectivity, nodes, storage, networks, templates, etc.).
 - **Initialization**
   - `infra init` — create state DB (SQLite by default).
 - **Blueprints**
   - `infra new list` — list blueprints.
   - `infra new create <blueprint> <path>` — scaffold from blueprint.
-  - `infra blueprint validate --blueprint/-b <name> [--format text|json]` — validate a blueprint's templates against declared defaults using Jinja2 static analysis; repeatable.
-  - `infra blueprint validate --all [--format text|json]` — validate all available blueprints.
 - **Environment introspection**
   - `infra envs` — list environments with sync status (OK/FS-ONLY/DB-ONLY) showing consistency between filesystem and state database.
-  - `infra check [--format text|json] [--deep]` — validate consistency between filesystem environments and state database; exits with code 1 on divergence.
   - `infra list --env <env> [--provider ... --type ...]` — list resources from YAML.
   - `infra resources [--env ... --provider ... --type ... --state ...]` — list tracked resources from state DB.
   - `infra status --env <env>` — show deployment status.
@@ -77,7 +84,7 @@ infra destroy --env dev --auto-approve
 - **State Management**
   - `infra state backup [--output-dir <dir>] [--include-generated]` — create timestamped backup of state database and optionally the generated/ directory.
 - **Validation and Drift**
-  - `infra validate --env <env> [--check-api] [--check-refs]`
+  - `infra doctor --env <env> [--resource <name>]... [--verbose]` — pre-flight validation against provider APIs.
   - `infra drift --env <env>`
 - **Policies**
   - `infra policies check --env <env> [--enforce]`
@@ -100,7 +107,7 @@ infra destroy --env dev --auto-approve
 
 ## Validation and Checks
 
-- Prefer `infra validate --env <env> --check-api --check-refs` before `plan`/`apply`.
+- Prefer `infra doctor --env <env>` before `plan`/`apply` to catch configuration errors early.
 - Use `--strict-mode` to treat missing secrets/snippets as errors.
 - Inspect generated files under `generated/` if behavior is unexpected.
 
@@ -191,16 +198,16 @@ infra destroy --env dev --auto-approve
   # List only last 5 rollback points
   infra rollback-points --env prod --limit 5
   ```
-- **Check environment consistency:**
+- **Check configuration health:**
   ```bash
-  # Quick consistency check
-  infra check
+  # Full config repo health check
+  config doctor
 
   # Detailed check with resource counts per environment
-  infra check --deep
+  config doctor --deep
 
   # JSON output for scripting or CI pipelines
-  infra check --format json
+  config doctor --format json
   ```
 - **Policy enforcement in CI:**
   ```bash
@@ -246,7 +253,7 @@ infra destroy --env dev --auto-approve
 - **Symptom:** Missing configs. **Fix:** Set `--config-dir` or `INFRAFOUNDRY_CONFIG_REPO`; ensure `envs/{env}` exists.
 - **Symptom:** Commands fail due to missing secrets/snippets. **Fix:** Enable `--strict-mode` to surface early, or allow missing during development; ensure SOPS keys are available.
 - **Symptom:** Unexpected resource lists. **Fix:** Use `infra list` (YAML view) vs `infra resources` (state DB view) to differentiate declared vs tracked resources.
-- **Symptom:** `infra envs` shows FS-ONLY or DB-ONLY for some environments. **Fix:** Run `infra check --deep` for a detailed consistency report. FS-ONLY means the environment directory exists but is not tracked in the state database (run `infra plan` to populate). DB-ONLY means the state database has records for an environment whose config directory has been removed.
+- **Symptom:** `infra envs` shows FS-ONLY or DB-ONLY for some environments. **Fix:** Run `config doctor --deep` for a detailed consistency report. FS-ONLY means the environment directory exists but is not tracked in the state database (run `infra plan` to populate). DB-ONLY means the state database has records for an environment whose config directory has been removed.
 - **Symptom:** Rollback fails with "deployment not found". **Fix:** Use `infra history` or `infra rollback-points --env <env>` to verify deployment ID exists and has rollback data available.
 - **Symptom:** State backup skips database file. **Fix:** Ensure using SQLite backend (default); PostgreSQL and other remote databases cannot be backed up via file copy.
 - **Symptom:** `diff` shows no differences but configs look different. **Fix:** Check if provider filtering is hiding changes; remove `--provider` flag to see all differences.

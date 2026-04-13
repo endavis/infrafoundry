@@ -1,4 +1,4 @@
-"""Validate infrastructure configuration command."""
+"""Infra doctor command - Validate infrastructure against provider APIs."""
 
 import sys
 
@@ -9,7 +9,7 @@ from infrafoundry.core.orchestrator import Orchestrator
 from ...decorators import with_orchestrator
 
 
-@click.command()
+@click.command("doctor")
 @click.option("--env", "-e", required=True, help="Environment name")
 @click.option(
     "--resource",
@@ -25,7 +25,7 @@ from ...decorators import with_orchestrator
     help="Show detailed validation output including passing checks",
 )
 @with_orchestrator("Validation failed")
-def validate(
+def doctor(
     _ctx: click.Context,
     orchestrator: Orchestrator,
     env: str,
@@ -51,13 +51,13 @@ def validate(
     Examples:
 
         # Validate entire environment
-        infra validate --env test
+        infra doctor --env test
 
         # Validate specific resources
-        infra validate --env test --resource vm-01 --resource vm-02
+        infra doctor --env test --resource vm-01 --resource vm-02
 
         # Show detailed output with all passing checks
-        infra validate --env test --verbose
+        infra doctor --env test --verbose
     """
     resource_filter = list(resource) if resource else None
 
