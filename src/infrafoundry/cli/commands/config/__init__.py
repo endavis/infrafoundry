@@ -2,6 +2,8 @@
 
 import click
 
+from ..proxmox.export_proxmox import export_proxmox as export_cmd
+from ..schema import schema
 from .check import check
 from .diff import diff
 from .envs import envs
@@ -14,7 +16,7 @@ from .validate import validate
 
 @click.group()
 def config() -> None:
-    """Configuration management (envs, diff, validate, etc.)."""
+    """Configuration management (envs, diff, validate, schema, export, etc.)."""
     pass
 
 
@@ -22,7 +24,9 @@ def config() -> None:
 config.add_command(check)
 config.add_command(envs)
 config.add_command(diff)
+config.add_command(export_cmd, name="export")
 config.add_command(init)
+config.add_command(schema)
 config.add_command(show)
 config.add_command(validate)
 config.add_command(new)
