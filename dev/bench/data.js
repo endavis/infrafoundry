@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776104249704,
+  "lastUpdate": 1776113424370,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5642,6 +5642,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009609045643051534",
             "extra": "mean: 136.02073569364418 usec\nrounds: 2429"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "94e90c8c17e2f1e5ef3da69c5821812ffb30be5c",
+          "message": "chore(deps): bump rich from 14.3.3 to 15.0.0 (merges PR #582)\n\nBumps [rich](https://github.com/Textualize/rich) from 14.3.3 to 15.0.0.\n- [Release notes](https://github.com/Textualize/rich/releases)\n- [Changelog](https://github.com/Textualize/rich/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/Textualize/rich/compare/v14.3.3...v15.0.0)\n\n---\nupdated-dependencies:\n- dependency-name: rich\n  dependency-version: 15.0.0\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-13T21:49:42+01:00",
+          "tree_id": "ba085e896f7cce5b2a02fcab6e7eac115969de9d",
+          "url": "https://github.com/endavis/infrafoundry/commit/94e90c8c17e2f1e5ef3da69c5821812ffb30be5c"
+        },
+        "date": 1776113423662,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7599.316443097794,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010325679154425053",
+            "extra": "mean: 131.59078286682833 usec\nrounds: 3537"
           }
         ]
       }
