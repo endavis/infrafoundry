@@ -34,7 +34,7 @@ The PyInfra runner executes Python-based deploys for post-provision configuratio
    ```
 2. Apply:
    ```bash
-   infra apply --env dev
+   foundry infra apply --env dev
    ```
    Inventory and deploy scripts are generated under `generated/{env}/pyinfra/{provider}/` and executed.
 
@@ -47,9 +47,9 @@ The PyInfra runner executes Python-based deploys for post-provision configuratio
 
 ## Validation and Checks
 
-- Validate configs: `infra validate --env <env> --check-api --check-refs`.
+- Validate configs: `foundry infra doctor --env <env>`.
 - Ensure SSH connectivity and credentials from `settings.yaml`/`provider_ssh`.
-- Optionally dry-run via `infra plan --env <env>` to see generation without execution.
+- Optionally dry-run via `foundry infra plan --env <env>` to see generation without execution.
 
 ## Examples
 

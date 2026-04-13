@@ -28,8 +28,8 @@ InfraFoundry uses SSH for Proxmox tasks that lack API support (image extraction,
    ```
 2. Run with validation:
    ```bash
-   infra validate --env dev --check-api
-   infra apply --env dev
+   foundry infra doctor --env dev
+   foundry infra apply --env dev
    ```
 3. CI: write the key to disk and set `TF_VAR_proxmox_ssh_key_path`.
 
@@ -47,7 +47,7 @@ InfraFoundry uses SSH for Proxmox tasks that lack API support (image extraction,
 ## Validation and Checks
 
 - Test connectivity manually: `ssh -v root@pve1 "hostname"`.
-- Run `infra validate --env <env> --check-api` to confirm SSH-based operations can proceed.
+- Run `foundry infra doctor --env <env>` to confirm SSH-based operations can proceed.
 - Ensure keys are readable (`chmod 600`) and loaded into ssh-agent when used.
 
 ## Examples

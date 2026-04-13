@@ -7,7 +7,7 @@ InfraFoundry provides an automated migration from legacy ISC DHCP configs to Kea
 ## Audience and Prerequisites
 
 - **Audience:** Operators migrating OPNsense DHCP from ISC to Kea.
-- **Prereqs:** OPNsense access, `infra migrate` available, and target config repo to receive generated YAML.
+- **Prereqs:** OPNsense access, `foundry config migrate` available, and target config repo to receive generated YAML.
 
 ## When to Use This
 
@@ -19,13 +19,13 @@ InfraFoundry provides an automated migration from legacy ISC DHCP configs to Kea
 
 ```bash
 # Migrate all interfaces
-infra migrate --env prod --provider opnsense --component isc-to-kea
+foundry config migrate --env prod --provider opnsense --component isc-to-kea
 
 # Migrate selected interfaces
-infra migrate --env prod --provider opnsense --component isc-to-kea -i lan -i opt1
+foundry config migrate --env prod --provider opnsense --component isc-to-kea -i lan -i opt1
 
 # Dry-run preview
-infra migrate --env prod --provider opnsense --component isc-to-kea --dry-run
+foundry config migrate --env prod --provider opnsense --component isc-to-kea --dry-run
 ```
 
 ## Configuration Details
@@ -40,14 +40,14 @@ infra migrate --env prod --provider opnsense --component isc-to-kea --dry-run
 ## Validation and Checks
 
 - Review generated YAML before apply; ensure networks, gateways, and reservations align with desired state.
-- Run `infra validate --env <env> --check-refs` after adding migrated resources.
+- Run `foundry infra doctor --env <env>` after adding migrated resources.
 - Keep backups of original ISC configs (`/var/dhcpd/etc/dhcpd.conf`, `/var/dhcpd/etc/dhcpdv6.conf`).
 
 ## Examples
 
 - **Custom output path:**
   ```bash
-  infra migrate --env prod --provider opnsense --component isc-to-kea -o custom/path/dhcp-config.yaml
+  foundry config migrate --env prod --provider opnsense --component isc-to-kea -o custom/path/dhcp-config.yaml
   ```
 - **Generated resource snippet:**
   ```yaml
@@ -78,7 +78,7 @@ infra migrate --env prod --provider opnsense --component isc-to-kea --dry-run
 
 - **Symptom:** Missing interface migration. **Fix:** Specify interfaces with `-i`; confirm interface names match OPNsense.
 - **Symptom:** Incorrect reservations. **Fix:** Verify MAC/IP in generated YAML against source config; adjust before apply.
-- **Symptom:** Apply errors post-migration. **Fix:** Validate references/networks and rerun `infra validate --check-refs`; ensure Kea services are reachable.
+- **Symptom:** Apply errors post-migration. **Fix:** Validate references/networks and rerun `foundry infra doctor --env <env>`; ensure Kea services are reachable.
 
 ---
 

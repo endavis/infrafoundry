@@ -19,9 +19,9 @@ The Orchestrator is a thin coordinator that wires providers, runners, policy che
 
 1. Run a workflow to see orchestration in action:
    ```bash
-   infra plan --env dev
-   infra apply --env dev
-   infra destroy --env dev
+   foundry infra plan --env dev
+   foundry infra apply --env dev
+   foundry infra destroy --env dev
    ```
 2. Inspect generated artifacts and events to verify order and outputs.
 
@@ -245,8 +245,8 @@ sequenceDiagram
 
 ## Validation and Checks
 
-- Use `infra validate --env <env> --check-api --check-refs` before workflows.
-- Check state updates with `infra history`/`infra status`.
+- Use `foundry infra doctor --env <env>` before workflows.
+- Check state updates with `foundry infra history`/`foundry infra status`.
 - Review event emissions (notifications/logs) to ensure hooks fire.
 
 ## Examples

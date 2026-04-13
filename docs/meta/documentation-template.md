@@ -35,7 +35,7 @@ Short, action-oriented name (e.g., “Validation and Pre-Flight Checks”).
 
 ## Validation and Checks
 
-- How to validate configs or runs (e.g., `infra validate --env <env> --check-api --check-refs`).
+- How to validate configs or runs (e.g., `foundry infra doctor --env <env>`).
 - Typical outputs and what pass/fail looks like.
 
 ## Examples

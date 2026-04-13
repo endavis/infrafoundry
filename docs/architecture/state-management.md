@@ -19,8 +19,8 @@ InfraFoundry manages three artifacts: Terraform state, the InfraFoundry state da
 
 1. Use default local state for dev:
    ```bash
-   infra plan --env dev
-   infra apply --env dev
+   foundry infra plan --env dev
+   foundry infra apply --env dev
    ```
    Terraform state is in `generated/{env}/terraform/{provider}/.terraform/terraform.tfstate`; InfraFoundry state is `~/.infrafoundry/state.db`.
 2. Configure remote backends (example S3 + DynamoDB locking):
@@ -95,12 +95,12 @@ InfraFoundry tracks deployments and resources through well-defined state transit
 
 ```bash
 # View deployment status and history
-infra history --env prod
-infra status --env dev
+foundry infra history --env prod
+foundry infra status --env dev
 
 # View resource states from database
-infra resources --env prod --state ACTIVE
-infra resources --env prod --state ERROR
+foundry state resources --env prod --state ACTIVE
+foundry state resources --env prod --state ERROR
 ```
 
 ## Backend Configuration
@@ -228,7 +228,7 @@ InfraFoundry automatically detects backend configuration changes and triggers re
 
 1. **Change Detection:** Compares `backend.tf` with `.terraform/terraform.tfstate`
 2. **Automatic Reconfiguration:** Runs `terraform init -reconfigure` when backend type changes
-3. **Manual Migration:** Use `infra backend migrate --env <env>` to migrate state between backends
+3. **Manual Migration:** Use `foundry state backend migrate --env <env>` to migrate state between backends
 
 ### State Locking
 
@@ -250,7 +250,7 @@ correctness; one does not replace the other.
 **Verifying Locking:**
 ```bash
 # Backend validation shows locking status
-infra backend validate --env prod
+foundry state backend validate --env prod
 
 # Check generated backend.tf
 cat generated/prod/terraform/proxmox/backend.tf
@@ -339,7 +339,7 @@ for the full rationale and trade-offs.
   foundry config envs
 
   # Detailed consistency check (exits 1 on divergence)
-  foundry config check --deep
+  foundry config doctor --deep
   ```
   `FS-ONLY` means an environment directory exists on disk but has no state DB records. `DB-ONLY` means the state DB tracks an environment whose config directory is missing.
 - Inspect Terraform state:
@@ -350,11 +350,11 @@ for the full rationale and trade-offs.
   ```
 - Inspect InfraFoundry state/history:
   ```bash
-  infra history
-  infra history --env prod
-  infra status --env dev
+  foundry infra history
+  foundry infra history --env prod
+  foundry infra status --env dev
   ```
-- Verify backend configuration by ensuring state files/DB entries update after `infra plan/apply`.
+- Verify backend configuration by ensuring state files/DB entries update after `foundry infra plan`/`foundry infra apply`.
 
 ## Examples
 
@@ -399,23 +399,23 @@ for the full rationale and trade-offs.
       dynamodb_table: terraform-locks
       encrypt: true
   ```
-  Then run `infra plan --env prod` to generate backend.tf.
+  Then run `foundry infra plan --env prod` to generate backend.tf.
 
 - **Migrate from local to S3 backend:**
   ```bash
   # 1. Add backend config to settings.yaml (as shown above)
   # 2. Run plan to generate backend.tf
-  infra plan --env prod
+  foundry infra plan --env prod
 
   # 3. Terraform will prompt to migrate state
   # Or use manual migration command
-  infra backend migrate --env prod --from local --to s3
+  foundry state backend migrate --env prod --from local --to s3
   ```
 
 - **Validate backend configuration:**
   ```bash
   # Check backend configuration and locking support
-  infra backend validate --env prod
+  foundry state backend validate --env prod
 
   # View generated backend.tf
   cat generated/prod/terraform/proxmox/backend.tf
@@ -425,7 +425,7 @@ for the full rationale and trade-offs.
   ```bash
   # Override default ~/.infrafoundry location
   export INFRAFOUNDRY_STATE_HOME=/mnt/shared/infrafoundry-state
-  infra init
+  foundry state init
   # State will be created at /mnt/shared/infrafoundry-state/state.db
 
   # Useful for shared network storage or custom backup locations
@@ -442,16 +442,16 @@ for the full rationale and trade-offs.
 
 - **Symptom:** State collisions or locks. **Fix:** Use remote backend with locking (S3 + DynamoDB) and avoid sharing local state directories.
 - **Symptom:** Missing history entries. **Fix:** Confirm InfraFoundry state backend is reachable (SQLite file present or PostgreSQL DSN correct); check `INFRAFOUNDRY_STATE_HOME` if using custom location.
-- **Symptom:** Drift between YAML and deployed infra. **Fix:** Re-run `infra plan --env <env>` and inspect generated configs and Terraform state; import existing resources if needed.
+- **Symptom:** Drift between YAML and deployed infra. **Fix:** Re-run `foundry infra plan --env <env>` and inspect generated configs and Terraform state; import existing resources if needed.
 - **Symptom:** Permission errors on state paths. **Fix:** Check filesystem permissions for `generated/` and state database location (default `~/.infrafoundry/state.db` or custom via `INFRAFOUNDRY_STATE_HOME`); ensure CI containers persist writable paths.
-- **Symptom:** State database not found after setting custom location. **Fix:** Ensure `INFRAFOUNDRY_STATE_HOME` is set in environment and directory exists with write permissions; run `infra init` to create state database in custom location.
-- **Symptom:** Resources stuck in ERROR state. **Fix:** Review deployment logs to identify cause; manually fix underlying issue (network, credentials, provider API); re-run `infra apply` to resume from ERROR state.
+- **Symptom:** State database not found after setting custom location. **Fix:** Ensure `INFRAFOUNDRY_STATE_HOME` is set in environment and directory exists with write permissions; run `foundry state init` to create state database in custom location.
+- **Symptom:** Resources stuck in ERROR state. **Fix:** Review deployment logs to identify cause; manually fix underlying issue (network, credentials, provider API); re-run `foundry infra apply` to resume from ERROR state.
 - **Symptom:** Deployment status shows IN_PROGRESS but no activity. **Fix:** Check if process was killed or terminated; deployment may need manual intervention to move to FAILED or COMPLETED state in database.
-- **Symptom:** Backend configuration invalid error. **Fix:** Run `infra backend validate --env <env>` to check configuration; ensure all required fields for backend type are present in `settings.yaml`.
+- **Symptom:** Backend configuration invalid error. **Fix:** Run `foundry state backend validate --env <env>` to check configuration; ensure all required fields for backend type are present in `settings.yaml`.
 - **Symptom:** Terraform fails to initialize with backend error. **Fix:** Verify credentials for backend (AWS credentials for S3, GCP credentials for GCS, etc.); check network connectivity to backend service; ensure backend resources exist (S3 bucket, DynamoDB table, etc.).
 - **Symptom:** State locking timeout. **Fix:** Check if another process holds the lock; verify DynamoDB table exists for S3 backend; ensure locking is supported for backend type; manually break lock if process crashed: `cd generated/{env}/terraform/{provider} && terraform force-unlock <lock-id>`.
-- **Symptom:** Backend reconfiguration loop. **Fix:** Check if backend configuration in `settings.yaml` matches generated `backend.tf`; remove `.terraform/` directory and re-run `infra plan --env <env>`; verify no conflicting backend configurations.
-- **Symptom:** State migration fails between backends. **Fix:** Use `infra backend migrate --env <env> --from <old> --to <new>` with `--auto-approve` for non-interactive migration; ensure both old and new backends are accessible; backup state before migration.
+- **Symptom:** Backend reconfiguration loop. **Fix:** Check if backend configuration in `settings.yaml` matches generated `backend.tf`; remove `.terraform/` directory and re-run `foundry infra plan --env <env>`; verify no conflicting backend configurations.
+- **Symptom:** State migration fails between backends. **Fix:** Use `foundry state backend migrate --env <env> --from <old> --to <new>` with `--auto-approve` for non-interactive migration; ensure both old and new backends are accessible; backup state before migration.
 
 ---
 

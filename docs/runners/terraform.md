@@ -18,8 +18,8 @@ The Terraform runner provisions infrastructure from YAML by rendering `.tf` file
 ## Quick Start
 
 ```bash
-infra plan --env dev
-infra apply --env dev
+foundry infra plan --env dev
+foundry infra apply --env dev
 ```
 
 ## Configuration Details
@@ -33,7 +33,7 @@ infra apply --env dev
 
 - Validate configs and references before running:
   ```bash
-  infra validate --env dev --check-api --check-refs
+  foundry infra doctor --env dev
   ```
 - Inspect generated files for debugging:
   ```bash
@@ -70,7 +70,7 @@ infra apply --env dev
 
 ## Troubleshooting
 
-- **Symptom:** Terraform errors on apply. **Fix:** Inspect generated `.tf` files; rerun `infra validate --check-api --check-refs`. Check that provider credentials in `settings.yaml` are correct — they are passed as `TF_VAR_*` env vars.
+- **Symptom:** Terraform errors on apply. **Fix:** Inspect generated `.tf` files; rerun `foundry infra doctor --env <env>`. Check that provider credentials in `settings.yaml` are correct — they are passed as `TF_VAR_*` env vars.
 - **Symptom:** State conflicts. **Fix:** Configure remote backend with locking (e.g., S3 + DynamoDB) and avoid sharing local state dirs.
 - **Symptom:** Missing credentials. **Fix:** Ensure `settings.yaml` contains provider credentials and is decrypted. Credentials are mapped to `TF_VAR_*` env vars automatically via each provider's `_CREDENTIAL_ENV_MAPPING`.
 

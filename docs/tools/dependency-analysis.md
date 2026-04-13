@@ -6,7 +6,7 @@ The Dependency Analysis tool visualizes and analyzes dependencies between infras
 ## Usage
 
 ```bash
-infra dependencies --env dev
+foundry infra analyze dependencies --env dev
 ```
 
 ## Features

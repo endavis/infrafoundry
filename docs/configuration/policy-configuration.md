@@ -36,8 +36,8 @@ InfraFoundry’s policy engine enforces rules before deployment. Policies can bl
    ```
 2. Check policies:
    ```bash
-   infra policies check --env dev
-   infra policies check --env prod --enforce
+   foundry infra plan --env dev --enforce-policies
+   foundry infra plan --env prod --enforce-policies
    ```
 
 ## Configuration Details
@@ -63,8 +63,8 @@ InfraFoundry’s policy engine enforces rules before deployment. Policies can bl
 
 ## Validation and Checks
 
-- Run `infra policies check --env <env>` to report violations.
-- Use `--enforce` to exit non-zero on `error`-level violations.
+- Run `foundry policy list` to list available policies.
+- Run `foundry infra plan --env <env> --enforce-policies` to enforce policies during planning (blocks on violations).
 - Combine with CI to block merges when policies fail.
 
 ## Examples

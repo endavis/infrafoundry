@@ -29,8 +29,8 @@ Keep InfraFoundry framework code and infrastructure configs in distinct reposito
    ```
 3. Run commands:
    ```bash
-   infra validate --env dev --check-api --check-refs
-   infra plan --env dev
+   foundry infra doctor --env dev
+   foundry infra plan --env dev
    ```
 
 ## Configuration Details
@@ -56,11 +56,11 @@ Keep InfraFoundry framework code and infrastructure configs in distinct reposito
 
 - Confirm the config path resolution by running:
   ```bash
-  infra envs --config-dir /path/to/config
+  foundry config envs --config-dir /path/to/config
   ```
 - Validate before plan/apply:
   ```bash
-  infra validate --env dev --check-api --check-refs
+  foundry infra doctor --env dev
   ```
 - Ensure secrets are encrypted and keys are git-ignored.
 
@@ -75,7 +75,7 @@ Keep InfraFoundry framework code and infrastructure configs in distinct reposito
   ```bash
   INFRAFOUNDRY_CONFIG_REPO=../my-infra-config infra plan --env prod
   # or
-  infra --config-dir ../my-infra-config apply --env prod
+  foundry --config-dir ../my-infra-config apply --env prod
   ```
 - **Per-env SOPS rules (config repo `.sops.yaml`):**
   ```yaml

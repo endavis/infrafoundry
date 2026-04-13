@@ -390,7 +390,7 @@
 
 5. **Config Tools**
    - Add `infra init env --from <existing>` scaffolding
-   - Add `infra diff --env dev prod` comparison
+   - Add `foundry config diff --env-a dev --env-b prod` comparison
    - Standardize on single variable syntax
 
 6. **Shell Completion**

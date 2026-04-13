@@ -2,12 +2,12 @@
 
 ## Overview
 
-InfraFoundry validation catches configuration, reference, and connectivity issues **before** `infra plan` or `infra apply` to keep deployments safe and predictable.
+InfraFoundry provides a three-tier validation system to catch configuration, reference, and connectivity issues **before** `foundry infra plan` or `foundry infra apply`, keeping deployments safe and predictable.
 
 ## Audience and Prerequisites
 
 - **Audience:** Operators and CI pipelines running plan/apply workflows.
-- **Prereqs:** Config repo available, `uv run infra` installed, provider credentials and network access for targeted environments.
+- **Prerequisites:** Config repo available, `foundry` installed via `uv`, provider credentials and network access for targeted environments.
 
 ## When to Use This
 
@@ -15,41 +15,46 @@ InfraFoundry validation catches configuration, reference, and connectivity issue
 - After editing settings, resources, or secrets to ensure structural integrity.
 - In CI to block merges when validation fails.
 
+## Three-Tier Doctor System
+
+InfraFoundry validation is organized into three levels, each checking a different scope:
+
+| Level | Command | What It Checks |
+|-------|---------|----------------|
+| **System** | `foundry doctor` | Binary dependencies (Terraform, OpenTofu, Ansible, SOPS, Age) |
+| **Config** | `foundry config doctor [--deep]` | Config repo structure, environments, state backend, SOPS keys, state/filesystem consistency, blueprint validation |
+| **Infrastructure** | `foundry infra doctor --env <env>` | Provider API connectivity, nodes/hosts, storage pools, network bridges, templates, resource IDs, MAC conflicts |
+
 ## Quick Start
 
 ```bash
-infra validate --env dev
-infra validate --env prod --check-api --check-refs
+# Check system dependencies
+foundry doctor
+
+# Check config repo health
+foundry config doctor --deep
+
+# Validate against provider APIs
+foundry infra doctor --env dev
+foundry infra doctor --env dev --resource vm-01 --resource vm-02
+foundry infra doctor --env dev --verbose
 ```
 
-- `--check-api` validates provider endpoints and credentials.
-- `--check-refs` validates referenced templates, networks, aliases, namespaces, and other dependencies.
+## Additional Validation Commands
 
-## Configuration Details
+Beyond the doctor commands, InfraFoundry offers additional validation tools:
 
-- **Command:** `infra validate --env <env> [--check-api] [--check-refs]`
-- **Environment discovery:** Uses `--env` with `--config-dir` or `INFRAFOUNDRY_CONFIG_REPO`.
-- **Severity levels:** `ERROR` (blocks), `WARNING` (review), `INFO` (informational).
-- **Always checked:** YAML syntax, environment structure (`settings.yaml`, resource files), supported provider/resource types, provider registration, required fields.
-- **API checks:** Proxmox (endpoint/token/node), OPNsense (endpoint/key/secret/firewall), Kubernetes (kubeconfig/cluster/namespace).
-- **Reference checks:** Templates, networks/bridges/storage (Proxmox); aliases/VLANs/interfaces (OPNsense); namespaces/configmaps/secrets (Kubernetes).
-
-## Validation and Checks
-
-- Run baseline checks with `infra validate --env <env>`.
-- Add `--check-api` to surface credential or connectivity issues early.
-- Add `--check-refs` to ensure referenced resources exist before plan/apply.
-- Output summarizes per-provider checks and reports blocking `ERROR` entries.
+- **`foundry infra test --env <env>`** -- Run infrastructure tests against configurations (duplicate names, missing references, configuration problems).
+- **`foundry infra security --env <env>`** -- Scan generated Terraform/Ansible for security issues using Checkov.
+- **`foundry infra analyze dependencies --env <env>`** -- Verify dependency graph is acyclic and references resolve.
 
 ## Examples
 
-- **Basic validation:**
+- **Pre-deployment validation:**
   ```bash
-  infra validate --env dev
-  ```
-- **Pre-deployment validation with external checks:**
-  ```bash
-  infra validate --env prod --check-api --check-refs
+  foundry config doctor --deep
+  foundry infra doctor --env prod
+  foundry infra test --env prod
   ```
 - **CI usage (GitHub Actions excerpt):**
   ```yaml
@@ -58,18 +63,9 @@ infra validate --env prod --check-api --check-refs
       runs-on: ubuntu-latest
       steps:
         - uses: actions/checkout@v4
-        - run: infra validate --env prod --check-api --check-refs
-  ```
-- **Provider extension (custom connectivity check):**
-  ```python
-  class MyProvider(ProviderBase):
-      def validate_connectivity(self, env_config: dict[str, Any], report: ValidationReport) -> None:
-          api_url = env_config["provider_settings"]["myprovider"]["api_url"]
-          response = requests.get(f"{api_url}/health")
-          passed = response.status_code == 200
-          level = ValidationLevel.INFO if passed else ValidationLevel.ERROR
-          message = "Connected" if passed else f"API returned {response.status_code}"
-          report.add_check("myprovider_connectivity", passed=passed, message=message, level=level)
+        - run: foundry config doctor --deep
+        - run: foundry infra doctor --env prod
+        - run: foundry infra test --env prod
   ```
 
 ## Related Documentation
@@ -81,13 +77,13 @@ infra validate --env prod --check-api --check-refs
 
 ## Troubleshooting
 
-- **Symptom:** Missing templates/networks. **Fix:** Create the resource in the provider or update the reference; rerun with `--check-refs`.
-- **Symptom:** API check failures. **Fix:** Verify endpoints, tokens, kubeconfig, and network reachability; test with provider CLIs.
+- **Symptom:** Missing templates/networks in doctor output. **Fix:** Create the resource in the provider or update the configuration reference; rerun `foundry infra doctor --env <env>`.
+- **Symptom:** Doctor reports API failures. **Fix:** Verify endpoints, tokens, kubeconfig, and network reachability; test with provider CLIs.
 - **Symptom:** Unknown resource/provider. **Fix:** Confirm resource type spelling and provider availability in the current framework version.
 
 ---
 
-Last updated: 2025-12-23 14:12 GMT
+Last updated: 2026-04-13 GMT
 
 
 ---

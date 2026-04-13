@@ -7,7 +7,7 @@ InfraFoundry environments are defined entirely in YAML: `settings.yaml` for envi
 ## Audience and Prerequisites
 
 - **Audience:** Config repo maintainers and operators creating or updating environments.
-- **Prereqs:** Config repo path (`--config-dir` or `INFRAFOUNDRY_CONFIG_REPO`), `sops`/`age` for secrets, `uv run infra` installed, and provider credentials.
+- **Prereqs:** Config repo path (`--config-dir` or `INFRAFOUNDRY_CONFIG_REPO`), `sops`/`age` for secrets, `foundry` installed, and provider credentials.
 
 ## When to Use This
 
@@ -24,8 +24,8 @@ InfraFoundry environments are defined entirely in YAML: `settings.yaml` for envi
 3. Encrypt secrets in `settings.yaml` with SOPS/age.
 4. Validate and plan:
    ```bash
-   infra validate --env dev --check-api --check-refs
-   infra plan --env dev
+   foundry infra doctor --env dev
+   foundry infra plan --env dev
    ```
 
 ## Configuration Details
@@ -43,7 +43,7 @@ InfraFoundry environments are defined entirely in YAML: `settings.yaml` for envi
 
 ## Validation and Checks
 
-- Run `infra validate --env <env>` for structure and type checks; add `--check-api --check-refs` to verify connectivity and referenced resources.
+- Run `foundry infra doctor --env <env>` for structure and type checks; add `--check-api --check-refs` to verify connectivity and referenced resources.
 - Confirm provider discovery by checking per-provider sections in validation output.
 - Inspect generated tfvars under `generated/{env}/terraform/{provider}/` to confirm SSH overrides and credentials.
 
@@ -100,9 +100,9 @@ InfraFoundry environments are defined entirely in YAML: `settings.yaml` for envi
   ```
 - **Secrets workflow:**
   ```bash
-  infra secrets init
-  infra secrets encrypt envs/dev/settings.yaml
-  infra secrets decrypt envs/dev/settings.yaml
+  foundry secrets init
+  foundry secrets encrypt envs/dev/settings.yaml
+  foundry secrets decrypt envs/dev/settings.yaml
   ```
 
 ## Related Documentation
@@ -116,7 +116,7 @@ InfraFoundry environments are defined entirely in YAML: `settings.yaml` for envi
 ## Troubleshooting
 
 - **Symptom:** Providers not detected. **Fix:** Ensure resource files include `provider` keys and live under `resources/` or provider directories.
-- **Symptom:** SSH operations fail in Proxmox. **Fix:** Verify `ssh`/`provider_ssh` entries and key paths; rerun `infra validate --check-api`.
+- **Symptom:** SSH operations fail in Proxmox. **Fix:** Verify `ssh`/`provider_ssh` entries and key paths; rerun `foundry infra doctor --env <env>`.
 - **Symptom:** Secrets not decrypted. **Fix:** Confirm SOPS/age keys are available and `settings.yaml` is encrypted with the expected rules.
 
 ---

@@ -61,13 +61,13 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
   Validation failed: Invalid YAML in proxmox/vm.yaml
 
   Suggestions:
-    - Run 'foundry config validate --env <env>' to see validation errors
+    - Run 'foundry config doctor --deep' to check configuration health
     - Check YAML syntax (indentation, colons, quotes)
     - Ensure required fields are present
 ```
 
 **Solutions:**
-1. Validate your configuration: `foundry config validate --env <env>`
+1. Validate your configuration: `foundry config doctor --deep`
 2. Check YAML indentation (use spaces, not tabs)
 3. Verify required fields are present
 
@@ -227,10 +227,9 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 **Cause:** The state database is inconsistent with actual resources.
 
 **Solutions:**
-1. Run `foundry config check --deep` to identify environment-level divergence
-2. Run `foundry infra drift --env <env>` to detect resource-level drift
-3. Consider `foundry state reset` (use with caution)
-4. Check for concurrent modifications
+1. Run `foundry config doctor --deep` to identify environment-level divergence
+2. Run `foundry infra drift detect --env <env>` to detect resource-level drift
+3. Check for concurrent modifications
 
 ---
 
@@ -240,7 +239,7 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 
 **Solutions:**
 1. Check the error message for both the original failure and rollback errors
-2. Run `foundry config check --deep` to assess environment consistency
+2. Run `foundry config doctor --deep` to assess environment consistency
 3. Manually verify package state in both source and destination environments
 4. Use `foundry infra deployed --env <env>` to check resource tracking
 
@@ -327,7 +326,7 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 **Solutions:**
 1. Review validation errors in the output
 2. Check resource configuration against schema
-3. Run `foundry config validate` for detailed validation
+3. Run `foundry config doctor --deep` for detailed validation
 
 ---
 
@@ -349,7 +348,7 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 **Solutions:**
 1. Check referenced resources exist
 2. Verify resource names match exactly (case-sensitive)
-3. Review dependency graph with `foundry analyze dependencies`
+3. Review dependency graph with `foundry infra analyze dependencies --env <env>`
 
 ---
 
@@ -371,7 +370,7 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 **Cause:** Resources have circular dependencies that cannot be resolved.
 
 **Solutions:**
-1. Run `foundry analyze graph --env <env>` to visualize dependencies
+1. Run `foundry infra analyze graph --env <env> --format mermaid` to visualize dependencies
 2. Break circular dependency by restructuring resources
 3. Use explicit dependency ordering if needed
 
@@ -556,7 +555,7 @@ foundry --debug infra plan --env dev
 Some commands support `--verbose` for additional output:
 
 ```bash
-foundry config validate --env dev --verbose
+foundry infra doctor --env dev --verbose
 ```
 
 ### Checking Logs

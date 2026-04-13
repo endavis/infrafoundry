@@ -50,7 +50,7 @@ InfraFoundry can align OPNsense DHCP static mappings with Proxmox VMs so VMs use
    ```
 3. Apply:
    ```bash
-   infra apply --env homelab
+   foundry infra apply --env homelab
    ```
 
 ## Configuration Details
@@ -62,7 +62,7 @@ InfraFoundry can align OPNsense DHCP static mappings with Proxmox VMs so VMs use
 
 ## Validation and Checks
 
-- Run `infra validate --env <env> --check-api --check-refs` to confirm OPNsense aliases/interfaces and Proxmox templates/bridges exist.
+- Run `foundry infra doctor --env <env>` to confirm OPNsense aliases/interfaces and Proxmox templates/bridges exist.
 - Verify MAC format is colon-separated and unique per VM.
 - After apply, confirm DHCP leases in OPNsense and VM IP assignment in Proxmox.
 
@@ -70,12 +70,12 @@ InfraFoundry can align OPNsense DHCP static mappings with Proxmox VMs so VMs use
 
 - **Apply with validation:**
   ```bash
-  infra validate --env homelab --check-api --check-refs
-  infra apply --env homelab
+  foundry infra doctor --env homelab
+  foundry infra apply --env homelab
   ```
 - **Destroy if you need to recreate mappings/VMs:**
   ```bash
-  infra destroy --env homelab
+  foundry infra destroy --env homelab
   ```
 
 ## Related Documentation
