@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776092632071,
+  "lastUpdate": 1776097686900,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5518,6 +5518,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009190163727005835",
             "extra": "mean: 134.62606134971313 usec\nrounds: 2282"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5d60ecce1e42eb0147697dac5bf2b6521dcf89c3",
+          "message": "refactor: unify health checks under three-tier doctor commands (merges PR #603, addresses #599)\n\nBREAKING CHANGE: Removed commands: `config check`, `config validate`,\n`blueprint validate`, and the `blueprint` command group. Use `config doctor`,\n`config doctor --deep`, and `infra doctor --env <env>` instead.",
+          "timestamp": "2026-04-13T17:27:20+01:00",
+          "tree_id": "810991a59178e5e019c7e467eddcb81ec44c6446",
+          "url": "https://github.com/endavis/infrafoundry/commit/5d60ecce1e42eb0147697dac5bf2b6521dcf89c3"
+        },
+        "date": 1776097685647,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8117.735508038549,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003283344154338258",
+            "extra": "mean: 123.18706356098382 usec\nrounds: 2297"
           }
         ]
       }
