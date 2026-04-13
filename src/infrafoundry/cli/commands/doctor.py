@@ -1,168 +1,14 @@
-"""Doctor command - Check InfraFoundry setup and dependencies."""
-
-import os
-import shutil
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+"""Doctor command - Check InfraFoundry system dependencies."""
 
 import click
-from rich.console import Console
-from rich.table import Table
 
-from ..output import output_data
-
-console = Console()
-
-
-@dataclass
-class CheckResult:
-    """Result of a health check."""
-
-    name: str
-    status: str  # "ok", "warning", "error"
-    message: str
-    suggestion: str = ""
-
-
-def _check_dependency(name: str, command: str, suggestion: str) -> CheckResult:
-    """Check if a command-line dependency is available."""
-    path = shutil.which(command)
-    if path:
-        return CheckResult(
-            name=name,
-            status="ok",
-            message=f"Found at {path}",
-        )
-    return CheckResult(
-        name=name,
-        status="error",
-        message="Not found",
-        suggestion=suggestion,
-    )
-
-
-def _check_config_repo(config_dir: Path | None) -> CheckResult:
-    """Check if configuration repository is set and valid."""
-    if config_dir:
-        if config_dir.exists():
-            envs_dir = config_dir / "envs"
-            if envs_dir.exists():
-                return CheckResult(
-                    name="Config Repository",
-                    status="ok",
-                    message=str(config_dir),
-                )
-            return CheckResult(
-                name="Config Repository",
-                status="warning",
-                message=f"{config_dir} exists but missing envs/ directory",
-                suggestion="Create envs/ directory with environment configurations",
-            )
-        return CheckResult(
-            name="Config Repository",
-            status="error",
-            message=f"{config_dir} does not exist",
-            suggestion="Check the path or create the directory",
-        )
-
-    env_value = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
-    if env_value:
-        return _check_config_repo(Path(env_value))
-
-    return CheckResult(
-        name="Config Repository",
-        status="warning",
-        message="Not configured",
-        suggestion="Set INFRAFOUNDRY_CONFIG_REPO or use --config-dir",
-    )
-
-
-def _check_environments(config_dir: Path | None) -> CheckResult:
-    """Check available environments."""
-    from infrafoundry.core.config import ConfigManager
-
-    try:
-        if config_dir:
-            config_manager = ConfigManager(base_dir=config_dir / "envs")
-        elif config_repo := os.getenv("INFRAFOUNDRY_CONFIG_REPO"):
-            config_manager = ConfigManager(base_dir=Path(config_repo) / "envs")
-        else:
-            return CheckResult(
-                name="Environments",
-                status="warning",
-                message="Cannot check - config repo not set",
-                suggestion="Configure INFRAFOUNDRY_CONFIG_REPO first",
-            )
-
-        environments = config_manager.list_environments()
-        if environments:
-            return CheckResult(
-                name="Environments",
-                status="ok",
-                message=f"{len(environments)} found: {', '.join(environments)}",
-            )
-        return CheckResult(
-            name="Environments",
-            status="warning",
-            message="No environments found",
-            suggestion="Create environment directories in envs/",
-        )
-    except Exception as e:
-        return CheckResult(
-            name="Environments",
-            status="error",
-            message=f"Error: {e}",
-            suggestion="Check configuration directory structure",
-        )
-
-
-def _check_state_backend() -> CheckResult:
-    """Check state backend configuration."""
-    from infrafoundry.core.state.state_manager import StateManager
-
-    try:
-        StateManager()
-        return CheckResult(
-            name="State Backend",
-            status="ok",
-            message="SQLite backend initialized",
-        )
-    except Exception as e:
-        return CheckResult(
-            name="State Backend",
-            status="warning",
-            message=f"Not initialized: {e}",
-            suggestion="Run 'infra state init' to initialize state backend",
-        )
-
-
-def _check_sops_keys() -> CheckResult:
-    """Check if SOPS/age keys are configured."""
-    # Check for age key file
-    age_key_file = Path.home() / ".config" / "sops" / "age" / "keys.txt"
-    if age_key_file.exists():
-        return CheckResult(
-            name="SOPS/Age Keys",
-            status="ok",
-            message=f"Found at {age_key_file}",
-        )
-
-    # Check SOPS_AGE_KEY_FILE env var
-    sops_key_file = os.getenv("SOPS_AGE_KEY_FILE")
-    if sops_key_file and Path(sops_key_file).exists():
-        return CheckResult(
-            name="SOPS/Age Keys",
-            status="ok",
-            message=f"Found via SOPS_AGE_KEY_FILE: {sops_key_file}",
-        )
-
-    return CheckResult(
-        name="SOPS/Age Keys",
-        status="warning",
-        message="Not found",
-        suggestion="Run 'age-keygen' and configure SOPS_AGE_KEY_FILE",
-    )
+from .doctor_utils import (
+    CheckResult,
+    check_dependency,
+    console,
+    render_check_results_json,
+    render_check_results_text,
+)
 
 
 @click.command()
@@ -175,128 +21,59 @@ def _check_sops_keys() -> CheckResult:
 )
 @click.pass_context
 def doctor(ctx: click.Context, output_format: str) -> None:
-    """Check InfraFoundry setup and dependencies.
+    """Check system dependencies for InfraFoundry.
 
-    Validates that all required tools are installed and properly configured.
+    Validates that all required CLI tools (Terraform, OpenTofu, Ansible,
+    SOPS, Age) are installed and available on the PATH.
+
+    Use 'config doctor' for configuration-level checks and
+    'infra doctor' for provider API validation.
     """
-    config_dir = ctx.obj.get("config_dir")
-
     results: list[CheckResult] = []
 
-    # Check dependencies
     if output_format == "text":
         console.print()
         console.print("[bold cyan]InfraFoundry Doctor[/bold cyan]")
         console.print()
-        console.print("[bold]Checking dependencies...[/bold]")
+        console.print("[bold]Checking system dependencies...[/bold]")
 
     results.append(
-        _check_dependency(
+        check_dependency(
             "Terraform",
             "terraform",
             "Install from https://terraform.io/downloads",
         )
     )
     results.append(
-        _check_dependency(
+        check_dependency(
             "OpenTofu",
             "tofu",
             "Install from https://opentofu.org/docs/intro/install/",
         )
     )
     results.append(
-        _check_dependency(
+        check_dependency(
             "Ansible",
             "ansible",
             "Install with: pip install ansible",
         )
     )
     results.append(
-        _check_dependency(
+        check_dependency(
             "SOPS",
             "sops",
             "Install from https://github.com/getsops/sops",
         )
     )
     results.append(
-        _check_dependency(
+        check_dependency(
             "Age",
             "age",
             "Install from https://github.com/FiloSottile/age",
         )
     )
 
-    # Check configuration
-    if output_format == "text":
-        console.print("[bold]Checking configuration...[/bold]")
-
-    results.append(_check_config_repo(config_dir))
-    results.append(_check_environments(config_dir))
-    results.append(_check_state_backend())
-    results.append(_check_sops_keys())
-
-    # Count errors and warnings
-    errors = sum(1 for r in results if r.status == "error")
-    warnings = sum(1 for r in results if r.status == "warning")
-
     if output_format == "json":
-        # Build JSON output
-        check_data: list[dict[str, Any]] = []
-        for result in results:
-            check_dict: dict[str, Any] = {
-                "name": result.name,
-                "status": result.status,
-                "message": result.message,
-            }
-            if result.suggestion:
-                check_dict["suggestion"] = result.suggestion
-            check_data.append(check_dict)
-
-        output_data(
-            {
-                "checks": check_data,
-                "summary": {
-                    "total": len(results),
-                    "errors": errors,
-                    "warnings": warnings,
-                    "ok": len(results) - errors - warnings,
-                },
-            },
-            output_format,
-        )
+        render_check_results_json(results)
     else:
-        # Display results as table
-        console.print()
-        table = Table(title="Health Check Results", show_header=True)
-        table.add_column("Check", style="cyan")
-        table.add_column("Status")
-        table.add_column("Details")
-
-        status_icons = {
-            "ok": "[green]OK[/green]",
-            "warning": "[yellow]WARN[/yellow]",
-            "error": "[red]FAIL[/red]",
-        }
-
-        for result in results:
-            status_display = status_icons.get(result.status, result.status)
-            details = result.message
-            if result.suggestion:
-                details += f"\n[dim]{result.suggestion}[/dim]"
-            table.add_row(result.name, status_display, details)
-
-        console.print(table)
-        console.print()
-
-        # Summary
-        if errors > 0:
-            console.print(f"[red]Found {errors} error(s) and {warnings} warning(s)[/red]")
-            console.print("[dim]Fix errors before using InfraFoundry[/dim]")
-        elif warnings > 0:
-            console.print(f"[yellow]Found {warnings} warning(s)[/yellow]")
-            console.print("[dim]InfraFoundry should work but some features may be limited[/dim]")
-        else:
-            console.print("[green]All checks passed![/green]")
-            console.print("[dim]InfraFoundry is ready to use[/dim]")
-
-        console.print()
+        render_check_results_text(results)

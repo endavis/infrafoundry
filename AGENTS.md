@@ -139,9 +139,12 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 ## CLI & Operations
 
 Key commands (`foundry` via `uv run foundry ...`):
+- `doctor` – check system dependencies (Terraform, OpenTofu, Ansible, SOPS, Age)
+- `config doctor [--deep]` – check config repo health (structure, state, SOPS, consistency, blueprints)
 - `config envs` – list configured environments
 - `config export --env <name> --output <dir> [--provider proxmox]` – export provider config to YAML
 - `config schema export` – export JSON schemas for IDE autocomplete
+- `infra doctor --env <name>` – validate infrastructure against provider APIs
 - `infra plan --env <name>` – generate files only (use `--dry-run` when applicable)
 - `infra apply --env <name>` – generate and execute Terraform/Ansible
 - `infra destroy --env <name>` – tear down infrastructure
