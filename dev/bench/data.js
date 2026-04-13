@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776100368888,
+  "lastUpdate": 1776103954974,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5580,6 +5580,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000029045480393304774",
             "extra": "mean: 145.03930167582268 usec\nrounds: 2506"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b282afdb688c403be2545f99726a058abf95773f",
+          "message": "chore(deps): bump actions/github-script from 8 to 9 (merges PR #580)\n\nBumps [actions/github-script](https://github.com/actions/github-script) from 8 to 9.\n- [Release notes](https://github.com/actions/github-script/releases)\n- [Commits](https://github.com/actions/github-script/compare/v8...v9)\n\n---\nupdated-dependencies:\n- dependency-name: actions/github-script\n  dependency-version: '9'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-13T19:11:23+01:00",
+          "tree_id": "15c30e59e1cc6dc4ebfa676e76d9f2d0819dd53c",
+          "url": "https://github.com/endavis/infrafoundry/commit/b282afdb688c403be2545f99726a058abf95773f"
+        },
+        "date": 1776103953921,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7414.670185421272,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009577591373398708",
+            "extra": "mean: 134.86776552330008 usec\nrounds: 2303"
           }
         ]
       }
