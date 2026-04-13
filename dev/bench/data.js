@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776097686900,
+  "lastUpdate": 1776100368888,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5549,6 +5549,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003283344154338258",
             "extra": "mean: 123.18706356098382 usec\nrounds: 2297"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5909c117a614f7fedb87a440999100884bb0e3a1",
+          "message": "docs: document CLI command hierarchy and domain model (merges PR #604, addresses #601)",
+          "timestamp": "2026-04-13T18:12:04+01:00",
+          "tree_id": "5a91d5b209ece584bc8082c62e5bbc063c16d8cd",
+          "url": "https://github.com/endavis/infrafoundry/commit/5909c117a614f7fedb87a440999100884bb0e3a1"
+        },
+        "date": 1776100367756,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6894.682947626842,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000029045480393304774",
+            "extra": "mean: 145.03930167582268 usec\nrounds: 2506"
           }
         ]
       }
