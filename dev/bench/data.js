@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776084468675,
+  "lastUpdate": 1776086600200,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5456,6 +5456,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006926799441040374",
             "extra": "mean: 103.1967620137706 usec\nrounds: 2185"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "adc35a12e515aa8c1fb3f0c1aff025ec0972c9d2",
+          "message": "feat: add base schema helpers for common blueprint resource patterns (merges PR #598, addresses #572)",
+          "timestamp": "2026-04-13T14:22:40+01:00",
+          "tree_id": "53d620f907ee7dd7c741d5f27d1934fdf9924a99",
+          "url": "https://github.com/endavis/infrafoundry/commit/adc35a12e515aa8c1fb3f0c1aff025ec0972c9d2"
+        },
+        "date": 1776086599528,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7376.157193677984,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010375001517359643",
+            "extra": "mean: 135.57194806763175 usec\nrounds: 2484"
           }
         ]
       }
