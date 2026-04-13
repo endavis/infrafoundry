@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776103954974,
+  "lastUpdate": 1776104249704,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5611,6 +5611,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009577591373398708",
             "extra": "mean: 134.86776552330008 usec\nrounds: 2303"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a806379fa7bebdf5811d3a0a31cbcfb0cec9bb9c",
+          "message": "chore(deps): bump the dev-dependencies group across 1 directory with 3 updates (merges PR #581)\n\nchore(deps): bump the dev-dependencies group with 3 updates\n\nBumps the dev-dependencies group with 3 updates: [mypy](https://github.com/python/mypy), [pytest](https://github.com/pytest-dev/pytest) and [ruff](https://github.com/astral-sh/ruff).\n\n\nUpdates `mypy` from 1.20.0 to 1.20.1\n- [Changelog](https://github.com/python/mypy/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/python/mypy/compare/v1.20.0...v1.20.1)\n\nUpdates `pytest` from 9.0.2 to 9.0.3\n- [Release notes](https://github.com/pytest-dev/pytest/releases)\n- [Changelog](https://github.com/pytest-dev/pytest/blob/main/CHANGELOG.rst)\n- [Commits](https://github.com/pytest-dev/pytest/compare/9.0.2...9.0.3)\n\nUpdates `ruff` from 0.15.9 to 0.15.10\n- [Release notes](https://github.com/astral-sh/ruff/releases)\n- [Changelog](https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/astral-sh/ruff/compare/0.15.9...0.15.10)\n\n---\nupdated-dependencies:\n- dependency-name: mypy\n  dependency-version: 1.20.1\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: dev-dependencies\n- dependency-name: pytest\n  dependency-version: 9.0.3\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: dev-dependencies\n- dependency-name: ruff\n  dependency-version: 0.15.10\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: dev-dependencies\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-13T19:16:47+01:00",
+          "tree_id": "1067ad9d59e3b98ab149d0c78b4716755d5cbc9f",
+          "url": "https://github.com/endavis/infrafoundry/commit/a806379fa7bebdf5811d3a0a31cbcfb0cec9bb9c"
+        },
+        "date": 1776104249064,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7351.820256672284,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009609045643051534",
+            "extra": "mean: 136.02073569364418 usec\nrounds: 2429"
           }
         ]
       }
