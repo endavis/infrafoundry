@@ -11,6 +11,11 @@ from infrafoundry.core.config.backend_config import (
     TerraformCloudBackendConfig,
 )
 from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
+from infrafoundry.core.config.blueprint_validator import (
+    BlueprintValidationResult,
+    BlueprintValidator,
+    ProviderValidationResult,
+)
 from infrafoundry.core.config.config_manager import ConfigManager
 from infrafoundry.core.config.inventory_generator import InventoryGenerator
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool, PackageManifest, SSHConfig
@@ -24,6 +29,8 @@ __all__ = [
     "BackendConfig",
     "BackendType",
     "BlueprintResolver",
+    "BlueprintValidationResult",
+    "BlueprintValidator",
     "ConfigManager",
     "EnvironmentConfig",
     "GCSBackendConfig",
@@ -34,6 +41,7 @@ __all__ = [
     "PackageManifest",
     "PostgresBackendConfig",
     "ProviderCentricLoader",
+    "ProviderValidationResult",
     "ResourceCentricLoader",
     "S3BackendConfig",
     "SSHConfig",
