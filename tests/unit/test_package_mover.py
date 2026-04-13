@@ -1,5 +1,6 @@
 """Unit tests for PackageMover."""
 
+import shutil
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,7 @@ import yaml
 from infrafoundry.core.exceptions import (
     ConfigurationError,
     EnvironmentNotFoundError,
+    PackageMoveRollbackError,
     PackageNotFoundError,
 )
 from infrafoundry.core.package_mover import PackageMover
@@ -498,3 +500,124 @@ class TestExtractResourceNames:
         names = mover._extract_resource_names(pkg, manifest)
         assert "web-01" in names
         assert "db-01" in names
+
+
+class TestExecuteRollback:
+    """Tests for PackageMover.execute rollback behaviour."""
+
+    def test_rollback_on_state_db_failure_preserves_source(
+        self, mover: PackageMover, config_dir: Path, mock_terraform_runner: MagicMock
+    ) -> None:
+        """On state DB failure, source directory is preserved and target is cleaned up."""
+        pkg = _create_package(config_dir / "envs", "prod", "my-cluster", provider_subdir="proxmox")
+        (config_dir / "envs" / "staging").mkdir(parents=True)
+        mock_terraform_runner.state_list.return_value = []
+
+        # Make _update_state_db raise
+        with (
+            patch.object(mover, "_update_state_db", side_effect=RuntimeError("DB connection lost")),
+            pytest.raises(RuntimeError, match="DB connection lost"),
+        ):
+            mover.execute("prod", "my-cluster", "staging")
+
+        # Source should still exist (rollback restored it from target copy)
+        assert pkg.exists()
+        # Target should be cleaned up
+        assert not (config_dir / "envs" / "staging" / "my-cluster").exists()
+
+    def test_rollback_on_terraform_state_rm_failure(
+        self,
+        mover: PackageMover,
+        config_dir: Path,
+        generated_dir: Path,
+        mock_terraform_runner: MagicMock,
+    ) -> None:
+        """On terraform state_rm failure (exception), config copy is undone."""
+        pkg = _create_package(
+            config_dir / "envs",
+            "prod",
+            "my-cluster",
+            provider_subdir="proxmox",
+            resources=["vm.yaml"],
+        )
+        _create_resource_file(pkg, "vm.yaml", [{"name": "web-01"}])
+        (config_dir / "envs" / "staging").mkdir(parents=True)
+
+        source_tf = generated_dir / "prod" / "terraform" / "proxmox"
+        source_tf.mkdir(parents=True)
+        (source_tf / "terraform.tfstate").write_text('{"version": 4}')
+
+        mock_terraform_runner.state_list.return_value = ["proxmox_virtual_environment_vm.web_01"]
+        mock_terraform_runner.state_rm.side_effect = RuntimeError("state rm exploded")
+
+        with pytest.raises(RuntimeError, match="state rm exploded"):
+            mover.execute("prod", "my-cluster", "staging")
+
+        # Source directory should be preserved
+        assert pkg.exists()
+        # Target directory should be cleaned up
+        assert not (config_dir / "envs" / "staging" / "my-cluster").exists()
+
+    def test_rollback_error_raises_package_move_rollback_error(
+        self, mover: PackageMover, config_dir: Path, mock_terraform_runner: MagicMock
+    ) -> None:
+        """PackageMoveRollbackError raised when undo also fails."""
+        _create_package(config_dir / "envs", "prod", "my-cluster", provider_subdir="proxmox")
+        (config_dir / "envs" / "staging").mkdir(parents=True)
+        mock_terraform_runner.state_list.return_value = []
+
+        # Make _update_state_db raise to trigger rollback
+        with patch.object(mover, "_update_state_db", side_effect=RuntimeError("DB fail")):
+            # Make shutil.rmtree fail during rollback (target cleanup)
+            original_rmtree = shutil.rmtree
+
+            def rmtree_that_fails_on_target(path, *args, **kwargs):
+                if "staging" in str(path) and "my-cluster" in str(path):
+                    raise OSError("Cannot remove target during rollback")
+                return original_rmtree(path, *args, **kwargs)
+
+            with patch(
+                "infrafoundry.core.package_mover.shutil.rmtree",
+                side_effect=rmtree_that_fails_on_target,
+            ):
+                with pytest.raises(PackageMoveRollbackError) as exc_info:
+                    mover.execute("prod", "my-cluster", "staging")
+
+                assert exc_info.value.original_error is not None
+                assert len(exc_info.value.rollback_errors) > 0
+
+    def test_happy_path_unchanged(
+        self, mover: PackageMover, config_dir: Path, mock_terraform_runner: MagicMock
+    ) -> None:
+        """Happy path still works with rollback machinery in place."""
+        pkg = _create_package(config_dir / "envs", "prod", "my-cluster", provider_subdir="proxmox")
+        (config_dir / "envs" / "staging").mkdir(parents=True)
+        mock_terraform_runner.state_list.return_value = []
+
+        with patch.object(mover, "_update_state_db", return_value=True):
+            result = mover.execute("prod", "my-cluster", "staging")
+
+        assert result["dry_run"] is False
+        assert not pkg.exists()
+        assert (config_dir / "envs" / "staging" / "my-cluster" / "infrafoundry.yml").exists()
+
+    def test_state_manager_injection(
+        self, config_dir: Path, generated_dir: Path, mock_terraform_runner: MagicMock
+    ) -> None:
+        """state_manager kwarg is used instead of creating a default."""
+        mock_state_mgr = MagicMock()
+        mock_state_mgr.get_resources.return_value = []
+        mover = PackageMover(
+            config_dir=config_dir,
+            generated_dir=generated_dir,
+            terraform_runner=mock_terraform_runner,
+            state_manager=mock_state_mgr,
+        )
+        _create_package(config_dir / "envs", "prod", "my-cluster", provider_subdir="proxmox")
+        (config_dir / "envs" / "staging").mkdir(parents=True)
+        mock_terraform_runner.state_list.return_value = []
+
+        mover.execute("prod", "my-cluster", "staging")
+
+        mock_state_mgr.initialize.assert_called()
+        mock_state_mgr.get_resources.assert_called_once()

@@ -333,6 +333,15 @@ for the full rationale and trade-offs.
 
 ## Validation and Checks
 
+- **Filesystem / state DB consistency:**
+  ```bash
+  # List environments with sync status (OK, FS-ONLY, DB-ONLY)
+  foundry config envs
+
+  # Detailed consistency check (exits 1 on divergence)
+  foundry config check --deep
+  ```
+  `FS-ONLY` means an environment directory exists on disk but has no state DB records. `DB-ONLY` means the state DB tracks an environment whose config directory is missing.
 - Inspect Terraform state:
   ```bash
   cd generated/dev/terraform/proxmox

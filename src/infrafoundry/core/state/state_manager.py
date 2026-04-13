@@ -187,6 +187,31 @@ class StateManager(BaseManager):
         """
         self.deployments.log_event(deployment_id, event_type, message, resource_name, metadata)
 
+    # Environment listing - unions both repositories
+    def list_environments(self) -> list[str]:
+        """List all distinct environment names from both deployments and resources.
+
+        Returns a sorted union of environments found in the deployment history
+        and resource tracking tables.
+
+        Returns:
+            Sorted list of unique environment names
+        """
+        deployment_envs = set(self.deployments.list_environments())
+        resource_envs = set(self.resources.list_environments())
+        return sorted(deployment_envs | resource_envs)
+
+    def count_resources(self, environment: str) -> int:
+        """Count tracked resources for an environment.
+
+        Args:
+            environment: Environment name
+
+        Returns:
+            Number of resources tracked in the database
+        """
+        return self.resources.count_by_environment(environment)
+
     # Resource operations - delegate to ResourceRepository
     def track_resource(
         self,

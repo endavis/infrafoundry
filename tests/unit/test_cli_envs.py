@@ -8,6 +8,9 @@ from click.testing import CliRunner
 from infrafoundry.cli.main import main
 from infrafoundry.core.config import ConfigManager, EnvironmentConfig
 
+# All tests must mock the state DB helper to avoid hitting the real DB
+_DB_MOCK = "infrafoundry.cli.commands.config.envs._get_state_db_environments"
+
 
 @pytest.fixture
 def cli_runner():
@@ -34,10 +37,15 @@ def test_envs_list_environments(cli_runner, mock_config_manager):
     mock_env2.providers = ["proxmox", "opnsense", "kubernetes"]
 
     mock_config_manager.list_environments.return_value = ["test", "prod"]
-    mock_config_manager.load_environment.side_effect = [mock_env1, mock_env2]
+    env_map = {"test": mock_env1, "prod": mock_env2}
+    mock_config_manager.load_environment.side_effect = lambda name: env_map[name]
 
-    with patch(
-        "infrafoundry.cli.commands.config.envs.ConfigManager", return_value=mock_config_manager
+    with (
+        patch(
+            "infrafoundry.cli.commands.config.envs.ConfigManager",
+            return_value=mock_config_manager,
+        ),
+        patch(_DB_MOCK, return_value=([], {}, True)),
     ):
         result = cli_runner.invoke(main, ["config", "envs"])
 
@@ -52,8 +60,12 @@ def test_envs_no_environments(cli_runner, mock_config_manager):
     """Test envs command when no environments are found."""
     mock_config_manager.list_environments.return_value = []
 
-    with patch(
-        "infrafoundry.cli.commands.config.envs.ConfigManager", return_value=mock_config_manager
+    with (
+        patch(
+            "infrafoundry.cli.commands.config.envs.ConfigManager",
+            return_value=mock_config_manager,
+        ),
+        patch(_DB_MOCK, return_value=([], {}, True)),
     ):
         result = cli_runner.invoke(main, ["config", "envs"])
 
@@ -69,8 +81,12 @@ def test_envs_with_config_dir(cli_runner, mock_config_manager, tmp_path):
     mock_env.providers = ["proxmox"]
     mock_config_manager.load_environment.return_value = mock_env
 
-    with patch(
-        "infrafoundry.cli.commands.config.envs.ConfigManager", return_value=mock_config_manager
+    with (
+        patch(
+            "infrafoundry.cli.commands.config.envs.ConfigManager",
+            return_value=mock_config_manager,
+        ),
+        patch(_DB_MOCK, return_value=([], {}, True)),
     ):
         result = cli_runner.invoke(
             main,
@@ -90,8 +106,12 @@ def test_envs_no_description(cli_runner, mock_config_manager):
     mock_config_manager.list_environments.return_value = ["test"]
     mock_config_manager.load_environment.return_value = mock_env
 
-    with patch(
-        "infrafoundry.cli.commands.config.envs.ConfigManager", return_value=mock_config_manager
+    with (
+        patch(
+            "infrafoundry.cli.commands.config.envs.ConfigManager",
+            return_value=mock_config_manager,
+        ),
+        patch(_DB_MOCK, return_value=([], {}, True)),
     ):
         result = cli_runner.invoke(main, ["config", "envs"])
 

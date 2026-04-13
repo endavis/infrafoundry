@@ -49,7 +49,8 @@ infra destroy --env dev --auto-approve
   - `infra new list` — list blueprints.
   - `infra new create <blueprint> <path>` — scaffold from blueprint.
 - **Environment introspection**
-  - `infra envs` — list environments.
+  - `infra envs` — list environments with sync status (OK/FS-ONLY/DB-ONLY) showing consistency between filesystem and state database.
+  - `infra check [--format text|json] [--deep]` — validate consistency between filesystem environments and state database; exits with code 1 on divergence.
   - `infra list --env <env> [--provider ... --type ...]` — list resources from YAML.
   - `infra resources [--env ... --provider ... --type ... --state ...]` — list tracked resources from state DB.
   - `infra status --env <env>` — show deployment status.
@@ -183,6 +184,17 @@ infra destroy --env dev --auto-approve
   # List only last 5 rollback points
   infra rollback-points --env prod --limit 5
   ```
+- **Check environment consistency:**
+  ```bash
+  # Quick consistency check
+  infra check
+
+  # Detailed check with resource counts per environment
+  infra check --deep
+
+  # JSON output for scripting or CI pipelines
+  infra check --format json
+  ```
 - **Policy enforcement in CI:**
   ```bash
   infra policies check --env prod --enforce
@@ -227,6 +239,7 @@ infra destroy --env dev --auto-approve
 - **Symptom:** Missing configs. **Fix:** Set `--config-dir` or `INFRAFOUNDRY_CONFIG_REPO`; ensure `envs/{env}` exists.
 - **Symptom:** Commands fail due to missing secrets/snippets. **Fix:** Enable `--strict-mode` to surface early, or allow missing during development; ensure SOPS keys are available.
 - **Symptom:** Unexpected resource lists. **Fix:** Use `infra list` (YAML view) vs `infra resources` (state DB view) to differentiate declared vs tracked resources.
+- **Symptom:** `infra envs` shows FS-ONLY or DB-ONLY for some environments. **Fix:** Run `infra check --deep` for a detailed consistency report. FS-ONLY means the environment directory exists but is not tracked in the state database (run `infra plan` to populate). DB-ONLY means the state database has records for an environment whose config directory has been removed.
 - **Symptom:** Rollback fails with "deployment not found". **Fix:** Use `infra history` or `infra rollback-points --env <env>` to verify deployment ID exists and has rollback data available.
 - **Symptom:** State backup skips database file. **Fix:** Ensure using SQLite backend (default); PostgreSQL and other remote databases cannot be backed up via file copy.
 - **Symptom:** `diff` shows no differences but configs look different. **Fix:** Check if provider filtering is hiding changes; remove `--provider` flag to see all differences.
@@ -236,7 +249,7 @@ infra destroy --env dev --auto-approve
 
 ---
 
-Last updated: 2026-04-06 GMT
+Last updated: 2026-04-13 GMT
 
 
 ---

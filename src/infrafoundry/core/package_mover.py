@@ -2,13 +2,15 @@
 
 Handles relocating a package's configuration directory, copying terraform
 state, removing moved resources from the source state, and updating the
-InfraFoundry state database.
+InfraFoundry state database.  All mutating steps maintain a rollback stack
+so partial failures leave the filesystem and state DB in a consistent state.
 """
 
 from __future__ import annotations
 
 import logging
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +22,7 @@ from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.exceptions import (
     ConfigurationError,
     EnvironmentNotFoundError,
+    PackageMoveRollbackError,
     PackageNotFoundError,
 )
 from infrafoundry.core.runners.terraform_runner import TerraformRunner
@@ -33,7 +36,9 @@ class PackageMover:
     """Moves a package between environments safely.
 
     Orchestrates the full move: config directory relocation, terraform
-    state copy + selective removal, and state DB updates.
+    state copy + selective removal, and state DB updates.  Each mutating
+    step pushes an undo callable onto a rollback stack so failures at any
+    point can be reversed.
     """
 
     def __init__(
@@ -41,6 +46,7 @@ class PackageMover:
         config_dir: Path,
         generated_dir: Path,
         terraform_runner: TerraformRunner | None = None,
+        state_manager: Any | None = None,
     ) -> None:
         """Initialize package mover.
 
@@ -49,10 +55,14 @@ class PackageMover:
             generated_dir: Path to generated/ directory
             terraform_runner: Optional terraform runner instance.
                 Creates a default one if not provided.
+            state_manager: Optional StateManager for dependency injection.
+                When None, a default instance is created during state DB
+                updates.
         """
         self.config_dir = config_dir
         self.generated_dir = generated_dir
         self._terraform_runner = terraform_runner or TerraformRunner()
+        self._state_manager = state_manager
 
     @property
     def envs_dir(self) -> Path:
@@ -224,7 +234,10 @@ class PackageMover:
         create_env: bool = False,
         dry_run: bool = False,
     ) -> dict[str, Any]:
-        """Execute the full package move.
+        """Execute the full package move with rollback support.
+
+        Each mutating step pushes an undo callable onto a rollback stack.
+        If any step fails, all completed steps are reversed in LIFO order.
 
         Args:
             source_env: Source environment name
@@ -241,6 +254,8 @@ class PackageMover:
             EnvironmentNotFoundError: If the target env does not exist
                 and create_env is False
             ConfigurationError: If the target already contains the package
+            PackageMoveRollbackError: If the move fails and rollback also
+                encounters errors
         """
         actions: list[str] = []
 
@@ -347,57 +362,140 @@ class PackageMover:
                 "state_addresses": addresses_by_provider,
             }
 
-        # --- Execute ---
+        # --- Execute with rollback support ---
+        rollback_stack: list[Callable[[], None]] = []
+        rollback_errors: list[Exception] = []
 
-        # Move config directory
-        shutil.copytree(source_path, target_package_dir)
+        try:
+            # Step 1: Copy config directory
+            shutil.copytree(source_path, target_package_dir)
+            rollback_stack.append(lambda: shutil.rmtree(target_package_dir))
 
-        # Add provider field to manifest if needed
-        if needs_provider_field:
-            self._add_provider_to_manifest(target_package_dir / MANIFEST_FILENAME, provider_name)
+            # Step 2: Add provider field to manifest if needed
+            if needs_provider_field:
+                original_manifest_bytes = (target_package_dir / MANIFEST_FILENAME).read_bytes()
+                self._add_provider_to_manifest(
+                    target_package_dir / MANIFEST_FILENAME, provider_name
+                )
 
-        # Copy terraform state for each provider
-        for prov in providers_to_copy:
-            src_tf = self.generated_dir / source_env / "terraform" / prov
-            tgt_tf = self.generated_dir / target_env / "terraform" / prov
-            tgt_tf.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_tf / "terraform.tfstate", tgt_tf / "terraform.tfstate")
+                def _undo_manifest() -> None:
+                    (target_package_dir / MANIFEST_FILENAME).write_bytes(original_manifest_bytes)
 
-            backup = src_tf / "terraform.tfstate.backup"
-            if backup.exists():
-                shutil.copy2(backup, tgt_tf / "terraform.tfstate.backup")
+                rollback_stack.append(_undo_manifest)
 
-            # Copy .terraform directory for provider plugins
-            src_dot_tf = src_tf / ".terraform"
-            tgt_dot_tf = tgt_tf / ".terraform"
-            if src_dot_tf.exists() and not tgt_dot_tf.exists():
-                shutil.copytree(src_dot_tf, tgt_dot_tf)
+            # Step 3: Copy terraform state for each provider
+            copied_state_files: list[Path] = []
+            copied_dirs: list[Path] = []
+            for prov in providers_to_copy:
+                src_tf = self.generated_dir / source_env / "terraform" / prov
+                tgt_tf = self.generated_dir / target_env / "terraform" / prov
+                tgt_tf.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_tf / "terraform.tfstate", tgt_tf / "terraform.tfstate")
+                copied_state_files.append(tgt_tf / "terraform.tfstate")
 
-        # Remove resources from source terraform state (all providers)
-        rm_results: list[dict[str, Any]] = []
-        for prov, addrs in sorted(addresses_by_provider.items()):
-            src_tf = self.generated_dir / source_env / "terraform" / prov
-            for addr in addrs:
-                success = self._terraform_runner.state_rm(src_tf, addr)
-                rm_results.append({"provider": prov, "address": addr, "success": success})
+                backup = src_tf / "terraform.tfstate.backup"
+                if backup.exists():
+                    shutil.copy2(backup, tgt_tf / "terraform.tfstate.backup")
+                    copied_state_files.append(tgt_tf / "terraform.tfstate.backup")
 
-        # Update state DB
-        db_updated = self._update_state_db(source_env, target_env, provider_name, package_name)
+                # Copy .terraform directory for provider plugins
+                src_dot_tf = src_tf / ".terraform"
+                tgt_dot_tf = tgt_tf / ".terraform"
+                if src_dot_tf.exists() and not tgt_dot_tf.exists():
+                    shutil.copytree(src_dot_tf, tgt_dot_tf)
+                    copied_dirs.append(tgt_dot_tf)
 
-        # Remove source config directory
-        shutil.rmtree(source_path)
+            def _undo_state_copy() -> None:
+                for f in copied_state_files:
+                    f.unlink(missing_ok=True)
+                for d in copied_dirs:
+                    if d.exists():
+                        shutil.rmtree(d)
 
-        return {
-            "dry_run": False,
-            "actions": actions,
-            "source_path": str(source_path),
-            "target_path": str(target_package_dir),
-            "provider": provider_name,
-            "state_addresses": addresses_by_provider,
-            "state_rm_results": rm_results,
-            "state_rm_count": total_addresses,
-            "state_db_updated": db_updated,
-        }
+            rollback_stack.append(_undo_state_copy)
+
+            # Step 4: Remove resources from source terraform state (all providers)
+            rm_results: list[dict[str, Any]] = []
+            state_backups: dict[str, bytes] = {}
+            for prov, addrs in sorted(addresses_by_provider.items()):
+                src_tf = self.generated_dir / source_env / "terraform" / prov
+                state_file = src_tf / "terraform.tfstate"
+                if state_file.exists():
+                    state_backups[prov] = state_file.read_bytes()
+                for addr in addrs:
+                    success = self._terraform_runner.state_rm(src_tf, addr)
+                    rm_results.append({"provider": prov, "address": addr, "success": success})
+
+            def _undo_state_rm() -> None:
+                for prov_name, backup_bytes in state_backups.items():
+                    backup_path = (
+                        self.generated_dir
+                        / source_env
+                        / "terraform"
+                        / prov_name
+                        / "terraform.tfstate"
+                    )
+                    backup_path.write_bytes(backup_bytes)
+
+            rollback_stack.append(_undo_state_rm)
+
+            # Step 5: Update state DB
+            db_updated = self._update_state_db(source_env, target_env, provider_name, package_name)
+
+            def _undo_state_db() -> None:
+                self._update_state_db(target_env, source_env, provider_name, package_name)
+
+            rollback_stack.append(_undo_state_db)
+
+            # Step 6: Remove source config directory
+            source_backup_bytes: dict[str, bytes] = {}
+            self._backup_dir_contents(source_path, source_backup_bytes)
+            shutil.rmtree(source_path)
+
+            # If we get here, everything succeeded - clear rollback stack
+            rollback_stack.clear()
+
+            return {
+                "dry_run": False,
+                "actions": actions,
+                "source_path": str(source_path),
+                "target_path": str(target_package_dir),
+                "provider": provider_name,
+                "state_addresses": addresses_by_provider,
+                "state_rm_results": rm_results,
+                "state_rm_count": total_addresses,
+                "state_db_updated": db_updated,
+            }
+
+        except Exception as original_error:
+            logger.error("Package move failed, initiating rollback: %s", original_error)
+            # Execute rollback in LIFO order
+            for undo in reversed(rollback_stack):
+                try:
+                    undo()
+                except Exception as rollback_err:
+                    logger.error("Rollback step failed: %s", rollback_err)
+                    rollback_errors.append(rollback_err)
+
+            if rollback_errors:
+                raise PackageMoveRollbackError(
+                    f"Package move failed and rollback had {len(rollback_errors)} error(s)",
+                    original_error=original_error,
+                    rollback_errors=rollback_errors,
+                ) from original_error
+            raise
+
+    @staticmethod
+    def _backup_dir_contents(path: Path, store: dict[str, bytes]) -> None:
+        """Recursively read all file contents in a directory for backup.
+
+        Args:
+            path: Directory to back up
+            store: Dict to populate with relative_path -> bytes
+        """
+        for child in path.rglob("*"):
+            if child.is_file():
+                store[str(child.relative_to(path))] = child.read_bytes()
 
     def _parse_manifest(self, manifest_path: Path) -> PackageManifest:
         """Parse an infrafoundry.yml manifest file.
@@ -513,7 +611,7 @@ class PackageMover:
         """Update resource records in the InfraFoundry state DB.
 
         Moves resources belonging to the package from source to target
-        environment. Silently skips if the state DB is not available.
+        environment. Raises on failure instead of silently returning False.
 
         Args:
             source_env: Source environment name
@@ -522,12 +620,13 @@ class PackageMover:
             package_name: Package name (used for logging)
 
         Returns:
-            True if resources were updated, False if skipped
+            True if resources were updated, False if no resources found
+
+        Raises:
+            RuntimeError: If the state DB update fails
         """
         try:
-            from infrafoundry.core.state.state_manager import StateManager
-
-            state_mgr = StateManager()
+            state_mgr = self._get_state_manager()
             state_mgr.initialize()
 
             resources = state_mgr.get_resources(environment=source_env, provider=provider_name)
@@ -556,5 +655,18 @@ class PackageMover:
             return False
 
         except Exception as e:
-            logger.debug("State DB update skipped: %s", e)
-            return False
+            logger.error("State DB update failed: %s", e)
+            raise RuntimeError(f"State DB update failed: {e}") from e
+
+    def _get_state_manager(self) -> Any:
+        """Get or create a StateManager instance.
+
+        Returns:
+            StateManager instance
+        """
+        if self._state_manager is not None:
+            return self._state_manager
+
+        from infrafoundry.core.state.state_manager import StateManager
+
+        return StateManager()
