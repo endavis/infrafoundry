@@ -115,28 +115,28 @@ jobs:
 
       - name: Validate configuration
         run: |
-          infra envs
+          foundry config envs
           echo "Deploying to: ${{ github.event.inputs.environment || 'dev' }}"
 
       - name: Plan infrastructure
         if: github.event.inputs.action != 'apply' && github.event.inputs.action != 'destroy'
         run: |
-          infra plan --env ${{ github.event.inputs.environment || 'dev' }}
+          foundry infra plan --env ${{ github.event.inputs.environment || 'dev' }}
 
       - name: Apply infrastructure
         if: github.event.inputs.action == 'apply'
         run: |
-          infra apply --env ${{ github.event.inputs.environment || 'dev' }} --auto-approve
+          foundry infra apply --env ${{ github.event.inputs.environment || 'dev' }} --auto-approve
 
       - name: Destroy infrastructure
         if: github.event.inputs.action == 'destroy'
         run: |
-          infra destroy --env ${{ github.event.inputs.environment || 'dev' }} --auto-approve
+          foundry infra destroy --env ${{ github.event.inputs.environment || 'dev' }} --auto-approve
 
       - name: Show status
         if: always()
         run: |
-          infra status --env ${{ github.event.inputs.environment || 'dev' }} || true
+          foundry infra status --env ${{ github.event.inputs.environment || 'dev' }} || true
 
       - name: Upload generated files
         if: always()
@@ -209,7 +209,7 @@ validate:
   stage: validate
   <<: *setup
   script:
-    - infra envs
+    - foundry config envs
     - echo "Configuration validated"
   only:
     - merge_requests

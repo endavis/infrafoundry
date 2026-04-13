@@ -139,21 +139,56 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 ## CLI & Operations
 
 Key commands (`foundry` via `uv run foundry ...`):
+
+**Top-level:**
 - `doctor` – check system dependencies (Terraform, OpenTofu, Ansible, SOPS, Age)
+- `completion <bash|zsh|fish|uninstall>` – manage shell completion
+
+**Config group (`config`):**
 - `config doctor [--deep]` – check config repo health (structure, state, SOPS, consistency, blueprints)
-- `config envs` – list configured environments
-- `config export --env <name> --output <dir> [--provider proxmox]` – export provider config to YAML
-- `config schema export` – export JSON schemas for IDE autocomplete
+- `config envs` – list configured environments with sync status
+- `config diff --env-a <a> --env-b <b>` – compare two environments
+- `config show --env <name>` – show resolved configuration
+- `config init <name>` – initialize a new environment
+- `config new create <blueprint> <dir>` – create infrastructure from blueprints
+- `config migrate --env <name> --provider <p> --component <c>` – migrate existing infra to config
+- `config export --env <name> --output <dir>` – export provider config to YAML
+- `config schema <export|list|show>` – JSON schemas for IDE autocomplete
+
+**Infra group (`infra`):**
 - `infra doctor --env <name>` – validate infrastructure against provider APIs
 - `infra plan --env <name>` – generate files only (use `--dry-run` when applicable)
 - `infra apply --env <name>` – generate and execute Terraform/Ansible
 - `infra destroy --env <name>` – tear down infrastructure
-- `infra drift --env <name>` – detect drift
-- `infra history --env <name>` – inspect past deployments
-- `infra analyze dependencies --env <name>` – show dependency graph
-- `infra analyze impact --env <name> --resource <name>` – analyze change impact
-- `state audit list` – view audit trail
-- `secrets <init|encrypt|decrypt>` – manage SOPS secrets
+- `infra drift <detect|remediate|history>` – detect and remediate drift
+- `infra deployed --env <name>` – show deployment status and resources
+- `infra history [--env <name>]` – inspect past deployments
+- `infra list --env <name>` – list configured packages in an environment
+- `infra move-package --env <src> --package <pkg> --to-env <dst>` – move package between environments
+- `infra analyze <dependencies|impact|graph>` – dependency analysis and visualization
+- `infra rollback <list|to>` – rollback to previous deployment state
+- `infra security --env <name>` – scan for security issues (Checkov)
+- `infra test --env <name>` – run infrastructure tests
+- `infra status --env <name>` – show infrastructure status
+- `infra reset --env <name> --provider <p> --component <c>` – reset provider component
+- `infra unlock [--env <name> | --list]` – manage deployment locks
+
+**State group (`state`):**
+- `state init` – initialize state database
+- `state list --env <name>` – list resources in an environment
+- `state resources` – list tracked infrastructure resources
+- `state backup` – backup state database
+- `state backend <validate|migrate>` – manage Terraform backend configuration
+- `state audit <list|export|verify>` – view and export audit trail
+
+**Secrets group (`secrets`):**
+- `secrets init` – initialize age encryption key
+- `secrets encrypt <file>` – encrypt a file with SOPS
+- `secrets decrypt <file>` – decrypt and display a SOPS-encrypted file
+- `secrets rotate --env <name>` – rotate encryption keys
+
+**Policy group (`policy`):**
+- `policy list` – list available infrastructure policies
 
 Generated artifacts should be reviewed (and optionally validated with native Terraform/Ansible tools) from the `generated/` directory hierarchy.
 

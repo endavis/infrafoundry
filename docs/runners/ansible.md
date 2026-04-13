@@ -32,7 +32,7 @@ The Ansible runner configures provisioned resources by generating inventory and 
    ```
 2. Run:
    ```bash
-   infra apply --env dev
+   foundry infra apply --env dev
    ```
    Ansible inventory/playbook is generated and executed after provisioning.
 
@@ -45,7 +45,7 @@ The Ansible runner configures provisioned resources by generating inventory and 
 
 ## Validation and Checks
 
-- Validate configs: `infra validate --env <env> --check-api --check-refs`.
+- Validate configs: `foundry infra doctor --env <env>`.
 - Ensure SSH connectivity for hosts produced by Terraform.
 - Use Ansible syntax/lint checks locally if needed.
 

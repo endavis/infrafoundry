@@ -24,8 +24,8 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
    ```
 3. Validate and plan:
    ```bash
-   infra validate --env dev --check-api
-   infra plan --env dev
+   foundry infra doctor --env dev
+   foundry infra plan --env dev
    ```
 
 ## Configuration Details
@@ -104,7 +104,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
 
 ## Validation and Checks
 
-- Run `infra validate --env <env> --check-api` to confirm structure and credentials.
+- Run `foundry infra doctor --env <env>` to confirm structure and credentials.
 - Inspect generated `.tf` files to verify provider configuration and variables:
   ```bash
   cat generated/dev/terraform/proxmox/variables.tf
@@ -223,11 +223,11 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
 
 ## Troubleshooting
 
-- **Symptom:** Missing credential values at Terraform runtime. **Fix:** Ensure fields exist in `settings.yaml` under `provider_settings` and rerun `infra plan`. Credentials are mapped to `TF_VAR_*` env vars via each provider's `_CREDENTIAL_ENV_MAPPING`.
+- **Symptom:** Missing credential values at Terraform runtime. **Fix:** Ensure fields exist in `settings.yaml` under `provider_settings` and rerun `foundry infra plan`. Credentials are mapped to `TF_VAR_*` env vars via each provider's `_CREDENTIAL_ENV_MAPPING`.
 - **Symptom:** SSH fails during Proxmox operations. **Fix:** Verify `ssh`/`provider_ssh` entries and key paths; re-validate with `--check-api`.
 - **Symptom:** Secrets exposed in git. **Fix:** Encrypt `settings.yaml` with SOPS/age and confirm ignore rules include keys.
 - **Symptom:** Provider not loading despite having resources defined. **Fix:** Check `providers` list in `settings.yaml`; if specified, only listed providers will be enabled.
-- **Symptom:** Backend configuration validation fails. **Fix:** Run `infra backend validate --env <env>` for detailed error messages; ensure all required fields for the backend type are present (e.g., `bucket` and `region` for S3).
+- **Symptom:** Backend configuration validation fails. **Fix:** Run `foundry state backend validate --env <env>` for detailed error messages; ensure all required fields for the backend type are present (e.g., `bucket` and `region` for S3).
 - **Symptom:** Terraform init fails with backend error. **Fix:** Verify backend resources exist (S3 bucket, DynamoDB table, GCS bucket, etc.); check credentials/permissions for accessing backend; confirm network connectivity to backend service.
 - **Symptom:** No backend.tf generated. **Fix:** Ensure `backend` field exists in `settings.yaml`; local backend type does not generate backend.tf (this is expected behavior); verify backend type is not `local`.
 

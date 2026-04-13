@@ -27,7 +27,7 @@ This example shows a GitLab CI pipeline configuration for running InfraFoundry l
 
 ## Validation and Checks
 
-- Ensure `infra validate --env <env>` runs before apply.
+- Ensure `foundry infra doctor --env <env>` runs before apply.
 - Include coverage/lint jobs similar to GitHub Actions if desired.
 
 ## Examples
@@ -41,12 +41,12 @@ This example shows a GitLab CI pipeline configuration for running InfraFoundry l
   validate:
     stage: validate
     script:
-      - uv run infra validate --env dev --check-api --check-refs
+      - uv run foundry infra doctor --env dev
 
   apply:
     stage: apply
     script:
-      - uv run infra apply --env dev --auto-approve
+      - uv run foundry infra apply --env dev --auto-approve
     when: manual
   ```
 

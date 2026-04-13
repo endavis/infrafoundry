@@ -6,7 +6,7 @@ The Proxmox Config Exporter allows you to extract existing Proxmox cluster confi
 ## Usage
 
 ```bash
-infra export-proxmox --api-url https://proxmox.example.com --token-id ... --token-secret ... --output-dir ./envs/imported
+foundry config export --env prod --output ./envs/imported --provider proxmox
 ```
 
 ## Features

@@ -37,29 +37,29 @@ InfraFoundry drift detection supports runners that implement the `DriftDetectabl
 
 ```bash
 # Detect drift in all providers for an environment
-infra drift detect --env dev
+foundry infra drift detect --env dev
 
 # Detect drift for a specific provider
-infra drift detect --env dev --provider proxmox
+foundry infra drift detect --env dev --provider proxmox
 
 # Verbose output showing detailed changes
-infra drift detect --env dev --verbose
+foundry infra drift detect --env dev --verbose
 
 # Output results as JSON
-infra drift detect --env dev --format json
+foundry infra drift detect --env dev --format json
 ```
 
 ### View Drift Information
 
 ```bash
 # Show drift summary for environment
-infra drift status --env dev
+foundry infra drift status --env dev
 
 # Show drift for specific provider
-infra drift status --env dev --provider opnsense
+foundry infra drift status --env dev --provider opnsense
 
 # Show historical drift detection results
-infra drift history --env dev --limit 10
+foundry infra drift history --env dev --limit 10
 ```
 
 ## Understanding Drift Results
@@ -152,18 +152,18 @@ Always check for drift before applying changes:
 
 ```bash
 # Check for drift
-infra drift detect --env prod
+foundry infra drift detect --env prod
 
 # If no drift, apply changes
-infra apply --env prod
+foundry infra apply --env prod
 
 # If drift exists, review and decide:
 # Option 1: Accept drift and apply anyway
-infra apply --env prod --accept-drift
+foundry infra apply --env prod --accept-drift
 
 # Option 2: Remediate drift first
-infra drift remediate --env prod --auto-approve
-infra apply --env prod
+foundry infra drift remediate --env prod --auto-approve
+foundry infra apply --env prod
 ```
 
 ### CI/CD Integration
@@ -208,7 +208,7 @@ drift-check:
 **Cause:** Provider has never been applied or state file is missing
 
 **Solutions:**
-1. Run `infra apply --env <env>` first to create state
+1. Run `foundry infra apply --env <env>` first to create state
 2. Verify state file exists in `generated/{env}/{runner}/{provider}/`
 3. Check state backend configuration if using remote state
 
@@ -239,11 +239,11 @@ drift-check:
 **Solutions:**
 ```bash
 # Force state refresh before drift detection
-infra drift detect --env dev --refresh
+foundry infra drift detect --env dev --refresh
 
 # Or manually refresh state first
-infra state refresh --env dev
-infra drift detect --env dev
+foundry state list --env dev
+foundry infra drift detect --env dev
 ```
 
 ## Best Practices
@@ -299,13 +299,13 @@ Drift detection is the first step in drift remediation:
 
 ```bash
 # Step 1: Detect drift
-infra drift detect --env dev
+foundry infra drift detect --env dev
 
 # Step 2: Review drift
-infra drift status --env dev
+foundry infra drift status --env dev
 
 # Step 3: Remediate if within thresholds
-infra drift remediate --env dev --auto-approve
+foundry infra drift remediate --env dev --auto-approve
 ```
 
 See [Drift Remediation Guide](drift-remediation.md) for automated remediation.

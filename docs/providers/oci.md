@@ -198,28 +198,28 @@ The OCI provider validates:
 - **References**: Subnet-to-VCN and instance-to-subnet cross-references
 
 ```bash
-infra validate --env prod
+foundry infra doctor --env prod
 ```
 
 ## Usage
 
 ```bash
 # Generate Terraform files
-infra plan --env prod
+foundry infra plan --env prod
 
 # Validate configuration and API connectivity
-infra validate --env prod
+foundry infra doctor --env prod
 
 # Apply infrastructure
-infra apply --env prod
+foundry infra apply --env prod
 
 # Destroy infrastructure
-infra destroy --env prod
+foundry infra destroy --env prod
 ```
 
 ## Generated Files
 
-After `infra plan`, the generated directory contains:
+After `foundry infra plan`, the generated directory contains:
 
 ```
 generated/prod/terraform/oci/

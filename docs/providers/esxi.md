@@ -273,7 +273,7 @@ The ESXi provider validates:
 - **OVF deployments**: Required fields (`host`, `ovf_source`, `disk_store`, `network_map`), non-empty network mappings, and `mac_map` key/format validation
 
 ```bash
-infra validate --env prod
+foundry infra doctor --env prod
 ```
 
 ## Config Export
@@ -293,21 +293,21 @@ The exporter connects to ESXi hosts and runs `esxcli` and `vim-cmd` commands to 
 
 ```bash
 # Generate Terraform files
-infra plan --env prod
+foundry infra plan --env prod
 
 # Validate configuration and host connectivity
-infra validate --env prod
+foundry infra doctor --env prod
 
 # Apply infrastructure
-infra apply --env prod
+foundry infra apply --env prod
 
 # Destroy infrastructure
-infra destroy --env prod
+foundry infra destroy --env prod
 ```
 
 ## Generated Files
 
-After `infra plan`, the generated directory contains:
+After `foundry infra plan`, the generated directory contains:
 
 ```
 generated/prod/terraform/esxi/

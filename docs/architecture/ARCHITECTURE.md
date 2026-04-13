@@ -19,14 +19,14 @@ InfraFoundry’s architecture combines pluggable providers, template-driven code
 
 1. Generate + apply to see the flow in action:
    ```bash
-   infra validate --env dev --check-api --check-refs
-   infra plan --env dev
-   infra apply --env dev
+   foundry infra doctor --env dev
+   foundry infra plan --env dev
+   foundry infra apply --env dev
    ```
 2. Inspect state and history:
    ```bash
-   infra history --env dev
-   infra status --env dev
+   foundry infra history --env dev
+   foundry infra status --env dev
    ```
 
 ## Architecture Details
@@ -40,8 +40,8 @@ InfraFoundry’s architecture combines pluggable providers, template-driven code
 
 ## Validation and Checks
 
-- Use `infra validate --env <env> --check-api --check-refs` to ensure configs, providers, and references are resolvable.
-- Check state usage by running `infra history`/`infra status`; verify DB connectivity if using PostgreSQL.
+- Use `foundry infra doctor --env <env>` to ensure configs, providers, and references are resolvable.
+- Check state usage by running `foundry infra history`/`foundry infra status`; verify DB connectivity if using PostgreSQL.
 - Review generated outputs before apply to confirm graph/order is correct.
 
 ## Examples
@@ -71,7 +71,7 @@ InfraFoundry’s architecture combines pluggable providers, template-driven code
 
 - **Symptom:** State/history missing. **Fix:** Confirm SQLite file exists or PostgreSQL DSN is reachable; check permissions.
 - **Symptom:** Events not firing. **Fix:** Ensure subscribers are registered and event types match; enable debug logging.
-- **Symptom:** Ordering issues. **Fix:** Review dependency graph output (`infra graph`) and provider reference definitions; validate configs with `--check-refs`.
+- **Symptom:** Ordering issues. **Fix:** Review dependency graph output (`foundry infra analyze graph`) and provider reference definitions; validate configs with `--check-refs`.
 
 ---
 

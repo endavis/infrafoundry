@@ -33,8 +33,8 @@ Age keys secure SOPS-encrypted secrets in InfraFoundry. This guide outlines how 
    ```
 4. Run InfraFoundry commands; the correct key is picked up by `--env`:
    ```bash
-   infra plan --env dev
-   infra apply --env prod
+   foundry infra plan --env dev
+   foundry infra apply --env prod
    ```
 
 ## Configuration Details
@@ -51,7 +51,7 @@ Age keys secure SOPS-encrypted secrets in InfraFoundry. This guide outlines how 
   ```bash
   sops --decrypt envs/dev/proxmox.yaml >/dev/null
   ```
-- Verify InfraFoundry picks the right key by running `infra plan --env <env>` and checking for missing key errors.
+- Verify InfraFoundry picks the right key by running `foundry infra plan --env <env>` and checking for missing key errors.
 
 ## Examples
 
@@ -71,7 +71,7 @@ Age keys secure SOPS-encrypted secrets in InfraFoundry. This guide outlines how 
   │       └── *.yaml
   └── .sops.yaml
   ```
-- **Automatic key selection:** `infra plan --env dev` uses `envs/dev/age.key`; `infra apply --env prod` uses `envs/prod/age.key`.
+- **Automatic key selection:** `foundry infra plan --env dev` uses `envs/dev/age.key`; `foundry infra apply --env prod` uses `envs/prod/age.key`.
 - **Distribution options:** Vault, AWS Secrets Manager, Azure Key Vault, 1Password/Bitwarden (preferred for audit and rotation).
 
 ## Related Documentation

@@ -147,7 +147,7 @@ Edit `envs/oci-k3s/oci/instances.yaml`:
 ### 3. Encrypt Settings
 
 ```bash
-infra secrets init --env oci-k3s
+foundry secrets init --env oci-k3s
 sops --encrypt --in-place envs/oci-k3s/settings.yaml
 ```
 
@@ -155,10 +155,10 @@ sops --encrypt --in-place envs/oci-k3s/settings.yaml
 
 ```bash
 # Generate and review Terraform
-infra plan --env oci-k3s
+foundry infra plan --env oci-k3s
 
 # Create infrastructure and install K3s
-infra apply --env oci-k3s
+foundry infra apply --env oci-k3s
 ```
 
 ### 5. Access Your Cluster
@@ -181,10 +181,10 @@ kubectl get pods -A
 TAILSCALE_API_KEY=tskey-api-xxx ./scripts/cleanup-tailscale.sh
 
 # 2. Destroy infrastructure
-infra destroy --env oci-k3s
+foundry infra destroy --env oci-k3s
 
 # 3. (Optional) Recreate
-infra apply --env oci-k3s
+foundry infra apply --env oci-k3s
 ```
 
 Get your API key from: https://login.tailscale.com/admin/settings/keys
@@ -280,7 +280,7 @@ ssh ubuntu@<node> 'sudo iptables -L INPUT -n | grep 8472'
 
 **Fix:** Re-run Ansible to apply iptables rules:
 ```bash
-infra apply --env oci-k3s --ansible-only
+foundry infra apply --env oci-k3s --ansible-only
 ```
 
 ### kubectl logs/exec Returns 502 Bad Gateway

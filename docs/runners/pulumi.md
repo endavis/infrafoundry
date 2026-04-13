@@ -23,8 +23,8 @@ The Pulumi runner provisions infrastructure from YAML by generating Pulumi progr
 export INFRA_ENABLE_EXPERIMENTAL=1
 
 # Run standard workflows
-infra plan --env dev
-infra apply --env dev
+foundry infra plan --env dev
+foundry infra apply --env dev
 ```
 
 ## Configuration Details
@@ -51,7 +51,7 @@ This makes it functionally equivalent to TerraformRunner in terms of capabilitie
 
 - Validate configs before running:
   ```bash
-  infra validate --env dev --check-api --check-refs
+  foundry infra doctor --env dev
   ```
 - Inspect generated files for debugging:
   ```bash

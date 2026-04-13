@@ -7,7 +7,7 @@ Blueprints are template projects that scaffold new InfraFoundry configuration re
 ## Audience and Prerequisites
 
 - **Audience:** Operators and platform teams standardizing configuration patterns.
-- **Prereqs:** InfraFoundry installed (`uv run infra`), access to built-in or custom blueprints, and a target directory to create into.
+- **Prereqs:** InfraFoundry installed (`foundry`), access to built-in or custom blueprints, and a target directory to create into.
 
 ## When to Use This
 
@@ -18,13 +18,12 @@ Blueprints are template projects that scaffold new InfraFoundry configuration re
 ## Quick Start
 
 ```bash
-infra new list
-infra new create basic-vm ./my-new-vm
+foundry config new create basic-vm ./my-new-vm
 ```
 
 ## Configuration Details
 
-- **Command:** `infra new create <blueprint-name> <target-directory>`.
+- **Command:** `foundry config new create <blueprint-name> <target-directory>`.
 - **Built-in location:** `src/infrafoundry/blueprints/`.
 - **Blueprint contents:** `blueprint.yaml` metadata + template files (copied as-is). Future versions may add Jinja2 templating.
 - **Metadata (`blueprint.yaml`):**
@@ -40,14 +39,13 @@ infra new create basic-vm ./my-new-vm
 
 ## Validation and Checks
 
-- List available blueprints to confirm discovery: `infra new list`.
-- After creation, run `infra validate --env <env>` within the generated repo to ensure configs are sound.
+- After creation, run `foundry infra doctor --env <env>` within the generated repo to ensure configs are sound.
 
 ## Examples
 
 - **Instantiate a VM blueprint:**
   ```bash
-  infra new create basic-vm ./my-new-vm
+  foundry config new create basic-vm ./my-new-vm
   ```
 - **Example structure:**
   ```
@@ -65,7 +63,7 @@ infra new create basic-vm ./my-new-vm
 
 ## Troubleshooting
 
-- **Symptom:** Blueprint not found. **Fix:** Check name from `infra new list`; verify custom blueprints are placed in the expected directory.
+- **Symptom:** Blueprint not found. **Fix:** Verify the blueprint name matches a directory under `src/infrafoundry/blueprints/`; verify custom blueprints are placed in the expected directory.
 - **Symptom:** Generated files missing. **Fix:** Ensure `blueprint.yaml` lists files if selective inclusion is used; otherwise include all files in the blueprint directory.
 
 ---

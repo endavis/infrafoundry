@@ -745,21 +745,21 @@ runner.apply(provider, stack_name="my-custom-stack")
 ### Plan Changes
 
 ```bash
-infra plan --env prod
+foundry infra plan --env prod
 # Creates CloudFormation change sets for each provider
 ```
 
 ### Apply Changes
 
 ```bash
-infra apply --env prod --auto-approve
+foundry infra apply --env prod --auto-approve
 # Deploys CloudFormation stacks
 ```
 
 ### Destroy Infrastructure
 
 ```bash
-infra destroy --env dev --auto-approve
+foundry infra destroy --env dev --auto-approve
 # Deletes CloudFormation stacks
 ```
 

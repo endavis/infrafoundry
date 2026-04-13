@@ -45,7 +45,7 @@ runner_priorities:
 
 - Confirm priorities with `runner_priorities` in `settings.yaml`.
 - Inspect generated runner outputs for order and content.
-- Validate resources before run: `infra validate --env <env> --check-refs`.
+- Validate resources before run: `foundry infra doctor --env <env>`.
 
 ## Examples
 

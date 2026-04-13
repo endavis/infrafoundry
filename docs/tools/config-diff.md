@@ -6,7 +6,7 @@ The Config Diff tool allows you to compare infrastructure configurations between
 ## Usage
 
 ```bash
-infra diff --env prod --compare-with dev
+foundry config diff --env-a prod --env-b dev
 ```
 
 ## Features

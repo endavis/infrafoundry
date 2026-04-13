@@ -7,7 +7,7 @@ InfraFoundry automatically loads credentials for the environment you target with
 ## Audience and Prerequisites
 
 - **Audience:** Config repo maintainers and operators deploying to multiple environments.
-- **Prereqs:** Config repo with `envs/{env}`, `sops` + `age` installed, per-environment age keys (git-ignored), and `uv run infra` available.
+- **Prereqs:** Config repo with `envs/{env}`, `sops` + `age` installed, per-environment age keys (git-ignored), and `foundry` available.
 
 ## When to Use This
 
@@ -40,13 +40,13 @@ InfraFoundry automatically loads credentials for the environment you target with
    ```
 4. Run commands; InfraFoundry picks credentials for the specified env:
    ```bash
-   infra plan --env dev
-   infra apply --env prod
+   foundry infra plan --env dev
+   foundry infra apply --env prod
    ```
 
 ## Configuration Details
 
-- **Automatic loading:** `infra ... --env <env>` decrypts `envs/{env}/settings.yaml`, extracts `provider_settings`, and maps credentials to `TF_VAR_*` environment variables via each provider's `_CREDENTIAL_ENV_MAPPING`. For example, `PROXMOX_API_URL` is mapped to `TF_VAR_proxmox_api_url`. No `.tfvars` files are written to disk.
+- **Automatic loading:** `foundry infra ... --env <env>` decrypts `envs/{env}/settings.yaml`, extracts `provider_settings`, and maps credentials to `TF_VAR_*` environment variables via each provider's `_CREDENTIAL_ENV_MAPPING`. For example, `PROXMOX_API_URL` is mapped to `TF_VAR_proxmox_api_url`. No `.tfvars` files are written to disk.
 - **Recommended structure:**
   ```
   config-repo/
@@ -72,7 +72,7 @@ InfraFoundry automatically loads credentials for the environment you target with
 
 - Ensure keys are ignored: `git status --ignored | grep age.key` should show ignored paths only.
 - Confirm encryption works: `sops --decrypt envs/dev/settings.yaml >/dev/null`.
-- Run `infra validate --env <env> --check-api` to confirm credentials work against provider endpoints.
+- Run `foundry infra doctor --env <env>` to confirm credentials work against provider endpoints.
 
 ## Examples
 
@@ -94,7 +94,7 @@ InfraFoundry automatically loads credentials for the environment you target with
   ```bash
   SOPS_AGE_KEY_FILE=envs/prod/age.key infra plan --env prod
   ```
-- **Credential rotation:** Update `settings.yaml`, re-encrypt with SOPS, and rerun `infra validate --check-api`.
+- **Credential rotation:** Update `settings.yaml`, re-encrypt with SOPS, and rerun `foundry infra doctor --env <env>`.
 
 ## Related Documentation
 

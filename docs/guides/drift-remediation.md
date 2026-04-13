@@ -66,23 +66,23 @@ drift_remediation:
 
 ```bash
 # Detect drift without remediation
-infra drift detect --env dev
+foundry infra drift detect --env dev
 ```
 
 ### Remediate Drift
 
 ```bash
 # Dry-run: detect and show what would be remediated
-infra drift remediate --env dev --dry-run
+foundry infra drift remediate --env dev --dry-run
 
 # Auto-remediate if within configured thresholds
-infra drift remediate --env dev --auto-approve
+foundry infra drift remediate --env dev --auto-approve
 
 # Override max changes threshold for this run
-infra drift remediate --env dev --auto-approve --max-changes 10
+foundry infra drift remediate --env dev --auto-approve --max-changes 10
 
 # Set custom thresholds for different operations
-infra drift remediate --env dev --auto-approve \
+foundry infra drift remediate --env dev --auto-approve \
   --max-add 5 \
   --max-change 3 \
   --max-destroy 0
@@ -92,13 +92,13 @@ infra drift remediate --env dev --auto-approve \
 
 ```bash
 # Show last 10 remediation entries
-infra drift history
+foundry infra drift history
 
 # Show last 20 entries for dev environment
-infra drift history --env dev --limit 20
+foundry infra drift history --env dev --limit 20
 
 # Show all recent remediation attempts
-infra drift history --limit 50
+foundry infra drift history --limit 50
 ```
 
 ## Safety Features
@@ -141,7 +141,7 @@ All remediation actions are tracked in `.drift_history/` with:
 Always test with `--dry-run` first:
 ```bash
 # See what would be remediated without applying
-infra drift remediate --env dev --dry-run --auto-approve
+foundry infra drift remediate --env dev --dry-run --auto-approve
 ```
 
 ### Event Notifications
@@ -199,26 +199,26 @@ Use cron or systemd timers to run periodic checks:
 
 1. Run drift detection:
    ```bash
-   infra drift detect --env prod
+   foundry infra drift detect --env prod
    ```
 
 2. If drift found, simulate remediation:
    ```bash
-   infra drift remediate --env prod --dry-run --auto-approve
+   foundry infra drift remediate --env prod --dry-run --auto-approve
    ```
 
 3. Review the decision and apply if safe:
    ```bash
    # If within thresholds, apply
-   infra drift remediate --env prod --auto-approve
+   foundry infra drift remediate --env prod --auto-approve
 
    # Or manually apply
-   infra apply --env prod
+   foundry infra apply --env prod
    ```
 
 4. Check history:
    ```bash
-   infra drift history --env prod --limit 5
+   foundry infra drift history --env prod --limit 5
    ```
 
 ## Troubleshooting
@@ -244,11 +244,11 @@ Use cron or systemd timers to run periodic checks:
 1. Review the drift to ensure it's expected
 2. Increase thresholds if appropriate:
    ```bash
-   infra drift remediate --env dev --auto-approve --max-changes 15
+   foundry infra drift remediate --env dev --auto-approve --max-changes 15
    ```
 3. Or manually apply:
    ```bash
-   infra apply --env dev
+   foundry infra apply --env dev
    ```
 
 ### Issue: Won't remediate destroy operations
@@ -262,14 +262,14 @@ Use cron or systemd timers to run periodic checks:
 2. Review the resources being destroyed
 3. Manually apply if safe:
    ```bash
-   infra apply --env dev
+   foundry infra apply --env dev
    ```
 4. Only increase `max_to_destroy` if you're certain it's safe
 
 ### Issue: No history files created
 
 **Symptoms:**
-- `infra drift history` shows no entries
+- `foundry infra drift history` shows no entries
 - No files in `.drift_history/`
 
 **Solutions:**
@@ -323,7 +323,7 @@ Use different thresholds for different environments:
 Regularly review remediation history:
 ```bash
 # Weekly review
-infra drift history --limit 50 > weekly_drift_report.txt
+foundry infra drift history --limit 50 > weekly_drift_report.txt
 ```
 
 ### 5. Combine with Notifications
@@ -359,7 +359,7 @@ Always keep `max_to_destroy: 0` unless you have a very specific use case.
 
 Regularly audit what's being auto-applied:
 ```bash
-infra drift history --env prod --limit 100
+foundry infra drift history --env prod --limit 100
 ```
 
 ### 3. Use Dry-Run in Production
@@ -378,7 +378,7 @@ drift_remediation:
 Use resource filters if you only want to auto-remediate specific resources:
 ```bash
 # Only remediate specific resource types (future enhancement)
-infra drift remediate --env dev --auto-approve --resources vm-*
+foundry infra drift remediate --env dev --auto-approve --resources vm-*
 ```
 
 ## Related Documentation
