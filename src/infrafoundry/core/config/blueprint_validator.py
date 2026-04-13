@@ -15,7 +15,7 @@ from typing import Any
 import jinja2
 import jinja2.meta
 
-from infrafoundry.core.config.filters import generate_mac
+from infrafoundry.core.config.filters import create_jinja2_env
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +77,7 @@ class BlueprintValidator:
     def __init__(self, resolved_blueprint: dict[str, Any]) -> None:
         self._blueprint = resolved_blueprint
         self._blueprint_dir: Path = resolved_blueprint["blueprint_dir"]
-        self._env = jinja2.Environment()  # nosec B701 - parsing only, no rendering
-        self._env.filters["generate_mac"] = generate_mac
+        self._env = create_jinja2_env()
 
     # ------------------------------------------------------------------
     # Public API

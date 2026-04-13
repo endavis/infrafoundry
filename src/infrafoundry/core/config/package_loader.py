@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 import jinja2
 import yaml
 
-from infrafoundry.core.config.filters import generate_mac
+from infrafoundry.core.config.filters import create_jinja2_env
 from infrafoundry.core.config.inventory_generator import InventoryGenerator
 from infrafoundry.core.config.manifest_utils import extract_inventory_block
 from infrafoundry.core.config.models import PackageManifest
@@ -280,8 +280,7 @@ class PackageLoader:
 
             events_json = json.dumps(manifest.events)
             try:
-                events_env = jinja2.Environment(undefined=jinja2.Undefined)  # nosec B701 - rendering JSON, not HTML
-                events_env.filters["generate_mac"] = generate_mac
+                events_env = create_jinja2_env(undefined=jinja2.Undefined)
                 events_template = events_env.from_string(events_json)
                 rendered_events_json = events_template.render(**manifest.variables)
                 manifest.events = json.loads(rendered_events_json)
@@ -393,8 +392,7 @@ class PackageLoader:
 
         # Render Jinja2 template with StrictUndefined
         try:
-            env = jinja2.Environment(undefined=jinja2.StrictUndefined)  # nosec B701 - rendering YAML, not HTML
-            env.filters["generate_mac"] = generate_mac
+            env = create_jinja2_env(undefined=jinja2.StrictUndefined)
             template = env.from_string(content)
             rendered = template.render(**variables)
         except jinja2.UndefinedError as e:
