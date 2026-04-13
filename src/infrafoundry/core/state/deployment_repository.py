@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy import distinct
 from sqlalchemy.orm import Session, sessionmaker
 
 from infrafoundry.core.state.models import Deployment, DeploymentEvent, DeploymentStatus
@@ -149,6 +150,16 @@ class DeploymentRepository:
             deployments = query.all()
             session.expunge_all()
             return deployments
+
+    def list_environments(self) -> list[str]:
+        """List distinct environment names from deployment history.
+
+        Returns:
+            Sorted list of unique environment names
+        """
+        with self.SessionLocal() as session:
+            rows = session.query(distinct(Deployment.environment)).all()
+            return sorted(row[0] for row in rows)
 
     def get_by_id(self, deployment_id: int) -> Deployment | None:
         """Get deployment by ID.

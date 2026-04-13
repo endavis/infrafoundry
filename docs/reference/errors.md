@@ -227,9 +227,22 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 **Cause:** The state database is inconsistent with actual resources.
 
 **Solutions:**
-1. Run `foundry infra drift --env <env>` to detect drift
-2. Consider `foundry state reset` (use with caution)
-3. Check for concurrent modifications
+1. Run `foundry config check --deep` to identify environment-level divergence
+2. Run `foundry infra drift --env <env>` to detect resource-level drift
+3. Consider `foundry state reset` (use with caution)
+4. Check for concurrent modifications
+
+---
+
+### IF-STATE-005: Package Move Rollback Failed
+
+**Cause:** A package move between environments failed and the rollback also encountered errors, potentially leaving state in an inconsistent condition.
+
+**Solutions:**
+1. Check the error message for both the original failure and rollback errors
+2. Run `foundry config check --deep` to assess environment consistency
+3. Manually verify package state in both source and destination environments
+4. Use `foundry infra deployed --env <env>` to check resource tracking
 
 ---
 
