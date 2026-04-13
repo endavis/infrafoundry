@@ -114,7 +114,7 @@ def envs(ctx: click.Context, output_format: str) -> None:
                     env_config = config_manager.load_environment(env_name)
                     entry["description"] = env_config.description or ""
                     entry["providers"] = env_config.providers
-                except Exception:
+                except Exception:  # nosec B110 - graceful degradation for missing/corrupt config
                     pass
 
             env_data.append(entry)
