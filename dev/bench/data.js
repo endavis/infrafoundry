@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776077287586,
+  "lastUpdate": 1776080709813,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5394,6 +5394,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010800654357605622",
             "extra": "mean: 136.0341173299777 usec\nrounds: 2412"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c46ceb840dde3ee16208d95f19c2f8124220028f",
+          "message": "fix: enforce state DB and filesystem consistency (merges PR #594, addresses #592)\n\n* fix: enforce state DB and filesystem consistency\n\n* fix: add nosec B110 for bandit try-except-pass check",
+          "timestamp": "2026-04-13T12:44:32+01:00",
+          "tree_id": "2a630234a63d19503536bbc091f3ad896df397fe",
+          "url": "https://github.com/endavis/infrafoundry/commit/c46ceb840dde3ee16208d95f19c2f8124220028f"
+        },
+        "date": 1776080708754,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7359.554473904134,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010419036013739625",
+            "extra": "mean: 135.8777903670458 usec\nrounds: 2533"
           }
         ]
       }
