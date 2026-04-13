@@ -55,3 +55,8 @@ See [Package Loader](../architecture/package-loader.md) for implementation detai
 - Still need N resource file sets for N providers (but shared defaults, scripts, and events are deduplicated)
 
 These are acceptable tradeoffs. The real duplication today is in the non-resource parts (scripts, ansible, defaults, events) which this design fully deduplicates.
+
+## Related Issues
+
+- [#507](https://github.com/endavis/infrafoundry/issues/507): Original multi-provider blueprint design
+- [#571](https://github.com/endavis/infrafoundry/issues/571): Blueprint schema validation across providers (Phase 3 — mitigates the "no schema validation across providers" consequence above)

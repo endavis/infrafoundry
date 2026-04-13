@@ -48,6 +48,8 @@ infra destroy --env dev --auto-approve
 - **Blueprints**
   - `infra new list` — list blueprints.
   - `infra new create <blueprint> <path>` — scaffold from blueprint.
+  - `infra blueprint validate --blueprint/-b <name> [--format text|json]` — validate a blueprint's templates against declared defaults using Jinja2 static analysis; repeatable.
+  - `infra blueprint validate --all [--format text|json]` — validate all available blueprints.
 - **Environment introspection**
   - `infra envs` — list environments with sync status (OK/FS-ONLY/DB-ONLY) showing consistency between filesystem and state database.
   - `infra check [--format text|json] [--deep]` — validate consistency between filesystem environments and state database; exits with code 1 on divergence.
