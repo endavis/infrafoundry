@@ -2,6 +2,7 @@
 
 import click
 
+from ..analyze import analyze
 from .apply import apply
 from .deployed import deployed
 from .destroy import destroy
@@ -20,11 +21,12 @@ from .unlock import unlock
 
 @click.group()
 def infra() -> None:
-    """Infrastructure operations (plan, apply, destroy, drift, etc.)."""
+    """Infrastructure operations (plan, apply, destroy, drift, analyze, etc.)."""
     pass
 
 
 # Register all subcommands
+infra.add_command(analyze)
 infra.add_command(plan)
 infra.add_command(apply)
 infra.add_command(deployed)

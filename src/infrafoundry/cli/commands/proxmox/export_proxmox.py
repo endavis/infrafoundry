@@ -12,7 +12,14 @@ from infrafoundry.providers.proxmox.exporter import ProxmoxConfigExporter
 from ...utils import console, raise_cli_error
 
 
-@click.command(name="export-proxmox")
+@click.command(name="export")
+@click.option(
+    "--provider",
+    "-p",
+    type=click.Choice(["proxmox"], case_sensitive=False),
+    default="proxmox",
+    help="Provider to export from (default: proxmox)",
+)
 @click.option("--env", "-e", required=True, help="Environment name to use for credentials")
 @click.option(
     "--output",
@@ -21,21 +28,22 @@ from ...utils import console, raise_cli_error
     required=True,
     help="Output directory for exported YAML",
 )
-@click.option("--node", help="Optional node filter")
+@click.option("--node", help="Optional node filter (proxmox only)")
 @click.option(
     "--resource-type",
     type=click.Choice(["vm", "network", "storage"], case_sensitive=False),
-    help="Optional resource type filter",
+    help="Optional resource type filter (proxmox only)",
 )
 @click.pass_context
 def export_proxmox(
     ctx: click.Context,
+    provider: str,
     env: str,
     output: Path,
     node: str | None,
     resource_type: str | None,
 ) -> None:
-    """Export Proxmox configuration to InfraFoundry YAML."""
+    """Export provider configuration to InfraFoundry YAML."""
     try:
         config_repo = ctx.obj.get("config_dir")
         config_manager = ConfigManager(base_dir=config_repo / "envs" if config_repo else None)

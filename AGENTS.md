@@ -138,14 +138,19 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 
 ## CLI & Operations
 
-Key commands (`infra` via `uv run infra ...`):
-- `infra envs` – list configured environments
+Key commands (`foundry` via `uv run foundry ...`):
+- `config envs` – list configured environments
+- `config export --env <name> --output <dir> [--provider proxmox]` – export provider config to YAML
+- `config schema export` – export JSON schemas for IDE autocomplete
 - `infra plan --env <name>` – generate files only (use `--dry-run` when applicable)
 - `infra apply --env <name>` – generate and execute Terraform/Ansible
 - `infra destroy --env <name>` – tear down infrastructure
 - `infra drift --env <name>` – detect drift
 - `infra history --env <name>` – inspect past deployments
-- `infra secrets <init|encrypt|decrypt>` – manage SOPS secrets
+- `infra analyze dependencies --env <name>` – show dependency graph
+- `infra analyze impact --env <name> --resource <name>` – analyze change impact
+- `state audit list` – view audit trail
+- `secrets <init|encrypt|decrypt>` – manage SOPS secrets
 
 Generated artifacts should be reviewed (and optionally validated with native Terraform/Ansible tools) from the `generated/` directory hierarchy.
 
