@@ -51,6 +51,7 @@ def sample_resources():
     r1.resource_type = "vm"
     r1.state = ResourceState.ACTIVE
     r1.config = {"ip_address": "192.168.10.206", "target_node": "pve1"}
+    r1.updated_at = datetime(2026, 4, 12, 14, 30, 0)
 
     r2 = Mock()
     r2.name = "ontap-node01"
@@ -58,6 +59,7 @@ def sample_resources():
     r2.resource_type = "vm"
     r2.state = ResourceState.ACTIVE
     r2.config = {"ip_address": "192.168.10.203", "target_node": "pve1"}
+    r2.updated_at = datetime(2026, 4, 11, 9, 15, 0)
 
     r3 = Mock()
     r3.name = "dhcp-aiqum"
@@ -65,6 +67,7 @@ def sample_resources():
     r3.resource_type = "dhcp"
     r3.state = ResourceState.ACTIVE
     r3.config = {}
+    r3.updated_at = datetime(2026, 4, 12, 14, 30, 0)
 
     return [r1, r2, r3]
 
@@ -89,6 +92,8 @@ def test_deployed_shows_deployment_info(
     assert "192.168.10.206" in result.output
     assert "pve1" in result.output
     assert "dhcp-aiqum" in result.output
+    assert "2026-04-12 14:30" in result.output
+    assert "2026-04-11 09:15" in result.output
 
     mock_orchestrator.state_manager.get_deployment_history.assert_called_once_with(
         environment="prod",
@@ -144,6 +149,8 @@ def test_deployed_json_output(cli_runner, mock_orchestrator, sample_deployment, 
     assert "opnsense" in data["resources"]
     assert len(data["resources"]["proxmox"]) == 2
     assert len(data["resources"]["opnsense"]) == 1
+    assert data["resources"]["proxmox"][0]["updated"] == "2026-04-12 14:30"
+    assert data["resources"]["opnsense"][0]["updated"] == "2026-04-12 14:30"
 
 
 def test_deployed_json_no_deployments(cli_runner, mock_orchestrator):
@@ -172,6 +179,7 @@ def test_deployed_missing_ip_and_node(cli_runner, mock_orchestrator, sample_depl
     resource.resource_type = "dns"
     resource.state = ResourceState.ACTIVE
     resource.config = {"zone": "example.com"}
+    resource.updated_at = datetime(2026, 4, 10, 8, 0, 0)
 
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployment]
     mock_orchestrator.state_manager.get_resources.return_value = [resource]
@@ -181,6 +189,7 @@ def test_deployed_missing_ip_and_node(cli_runner, mock_orchestrator, sample_depl
 
     assert result.exit_code == 0, f"Exit code {result.exit_code}. Output: {result.output}"
     assert "some-service" in result.output
+    assert "2026-04-10 08:00" in result.output
     # Em dash used for missing fields
     assert "\u2014" in result.output
 
@@ -193,6 +202,7 @@ def test_deployed_null_config(cli_runner, mock_orchestrator, sample_deployment):
     resource.resource_type = "vm"
     resource.state = ResourceState.ACTIVE
     resource.config = None
+    resource.updated_at = None
 
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployment]
     mock_orchestrator.state_manager.get_resources.return_value = [resource]
@@ -202,6 +212,8 @@ def test_deployed_null_config(cli_runner, mock_orchestrator, sample_deployment):
 
     assert result.exit_code == 0, f"Exit code {result.exit_code}. Output: {result.output}"
     assert "orphan" in result.output
+    # Em dash for missing updated_at
+    assert "\u2014" in result.output
 
 
 def test_deployed_state_error(cli_runner, mock_orchestrator):
@@ -236,6 +248,7 @@ def test_deployed_alternative_ip_keys(cli_runner, mock_orchestrator, sample_depl
     r1.resource_type = "server"
     r1.state = ResourceState.ACTIVE
     r1.config = {"address": "10.0.0.5", "node": "node3"}
+    r1.updated_at = datetime(2026, 4, 13, 12, 0, 0)
 
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployment]
     mock_orchestrator.state_manager.get_resources.return_value = [r1]

@@ -1,6 +1,7 @@
 """Show deployment status and resources for an environment."""
 
 from collections import defaultdict
+from datetime import datetime
 from typing import Any
 
 import click
@@ -22,6 +23,9 @@ _NODE_KEYS = ("target_node", "node")
 # Placeholder for missing values
 _MISSING = "\u2014"
 
+# Display format for timestamps
+_TIME_FMT = "%Y-%m-%d %H:%M"
+
 
 def _extract_field(config: dict[str, Any] | None, keys: tuple[str, ...]) -> str:
     """Extract the first matching key from a resource config dict.
@@ -42,6 +46,20 @@ def _extract_field(config: dict[str, Any] | None, keys: tuple[str, ...]) -> str:
     return _MISSING
 
 
+def _format_timestamp(ts: datetime | None) -> str:
+    """Format a datetime for display, returning the placeholder when absent.
+
+    Args:
+        ts: Optional datetime instance.
+
+    Returns:
+        Formatted timestamp string or the em-dash placeholder.
+    """
+    if ts is None:
+        return _MISSING
+    return ts.strftime(_TIME_FMT)
+
+
 def _build_resource_entry(resource: Resource) -> dict[str, str]:
     """Build a display-ready dict for a single resource.
 
@@ -49,7 +67,7 @@ def _build_resource_entry(resource: Resource) -> dict[str, str]:
         resource: A tracked Resource object.
 
     Returns:
-        Dict with name, ip, node, and state fields.
+        Dict with name, ip, node, state, and updated fields.
     """
     state_str = resource.state.value if hasattr(resource.state, "value") else str(resource.state)
     return {
@@ -58,6 +76,7 @@ def _build_resource_entry(resource: Resource) -> dict[str, str]:
         "ip": _extract_field(resource.config, _IP_KEYS),
         "node": _extract_field(resource.config, _NODE_KEYS),
         "state": state_str,
+        "updated": _format_timestamp(resource.updated_at),
     }
 
 
@@ -181,8 +200,8 @@ def _output_text(
     if deployments:
         dep = deployments[0]
         status_str = dep.status.value if hasattr(dep.status, "value") else str(dep.status)
-        started = dep.started_at.strftime("%Y-%m-%d %H:%M") if dep.started_at else _MISSING
-        completed = dep.completed_at.strftime("%Y-%m-%d %H:%M") if dep.completed_at else _MISSING
+        started = dep.started_at.strftime(_TIME_FMT) if dep.started_at else _MISSING
+        completed = dep.completed_at.strftime(_TIME_FMT) if dep.completed_at else _MISSING
         user = dep.user or "unknown"
 
         console.info("Last deployment:")
@@ -207,4 +226,5 @@ def _output_text(
             ip = entry["ip"]
             node = entry["node"]
             state = entry["state"]
-            console.info(f"    {name:<20s} {ip:<16s} {node:<8s} {state}")
+            updated = entry["updated"]
+            console.info(f"    {name:<20s} {ip:<16s} {node:<8s} {state:<10s} {updated}")
