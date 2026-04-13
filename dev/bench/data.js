@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776080709813,
+  "lastUpdate": 1776084468675,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5425,6 +5425,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010419036013739625",
             "extra": "mean: 135.8777903670458 usec\nrounds: 2533"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "07be109bc551f363a079059a6210c9ffc23906d1",
+          "message": "feat: add blueprint schema validation across providers (merges PR #597, addresses #571)",
+          "timestamp": "2026-04-13T13:47:14+01:00",
+          "tree_id": "a7ce98c4f6d2e5330540114b5828103ba9bd0ee6",
+          "url": "https://github.com/endavis/infrafoundry/commit/07be109bc551f363a079059a6210c9ffc23906d1"
+        },
+        "date": 1776084468171,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9690.226519573935,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006926799441040374",
+            "extra": "mean: 103.1967620137706 usec\nrounds: 2185"
           }
         ]
       }
