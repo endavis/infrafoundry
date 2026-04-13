@@ -671,6 +671,63 @@ class TerraformRunner(BaseRunner):
                     break
         return still_present
 
+    def state_list(self, working_dir: Path) -> list[str]:
+        """List all resource addresses in terraform state.
+
+        Runs ``terraform state list`` in the given directory and returns
+        the resource addresses. Returns an empty list if no state file
+        exists or the command fails.
+
+        Args:
+            working_dir: Terraform working directory containing state
+
+        Returns:
+            List of terraform resource addresses
+        """
+        state_file = working_dir / "terraform.tfstate"
+        if not state_file.exists():
+            return []
+
+        try:
+            result = subprocess.run(  # nosec B603
+                [self.tool_path, "state", "list"],
+                cwd=working_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            addresses = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            return addresses
+        except subprocess.CalledProcessError as e:
+            logger.warning("terraform state list failed in %s: %s", working_dir, e.stderr)
+            return []
+
+    def state_rm(self, working_dir: Path, address: str) -> bool:
+        """Remove a resource from terraform state without destroying it.
+
+        Runs ``terraform state rm <address>`` in the given directory.
+
+        Args:
+            working_dir: Terraform working directory containing state
+            address: Terraform resource address to remove
+
+        Returns:
+            True if the resource was successfully removed
+        """
+        try:
+            subprocess.run(  # nosec B603
+                [self.tool_path, "state", "rm", address],
+                cwd=working_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            logger.info("Removed %s from terraform state in %s", address, working_dir)
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.warning("terraform state rm %s failed in %s: %s", address, working_dir, e.stderr)
+            return False
+
     def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
         """Extract Terraform resource IDs from state.
 
