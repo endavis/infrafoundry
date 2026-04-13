@@ -146,6 +146,36 @@ vm:
 - Resource type is derived from the filename (same as regular provider resources)
 - Both singular (`vm`) and plural (`vms`) keys are supported
 
+### Custom Filters
+
+InfraFoundry registers the following custom Jinja2 filters for use in resource
+templates. All filters are available in both package resource templates and
+blueprint validation.
+
+| Filter | Input | Output | Description |
+|:-------|:------|:-------|:------------|
+| `generate_mac` | string | `02:xx:xx:xx:xx:xx` | Deterministic locally-administered MAC from a string (SHA-256 based). |
+| `to_mib` | number (GB) | int (MiB) | Convert gigabytes to mebibytes (e.g., `8` -> `8192`). |
+| `to_gib` | number (MiB) | float (GiB) | Convert mebibytes to gibibytes (e.g., `8192` -> `8.0`). |
+| `to_gb` | number (MiB) | float (GiB) | Alias for `to_gib`. |
+| `bool_to_tf` | any | `"true"` / `"false"` | Convert a value to a Terraform boolean string. |
+| `cidr_ip` | CIDR string | string | Extract IP from CIDR notation (e.g., `"10.0.0.1/24"` -> `"10.0.0.1"`). |
+| `cidr_prefix` | CIDR string | string | Extract prefix length from CIDR notation (e.g., `"10.0.0.1/24"` -> `"24"`). |
+
+**Usage in templates:**
+
+```yaml
+vm:
+  - name: {{ cluster_name }}-node1
+    cores: {{ server_cores }}
+    memory: {{ server_memory_gb | to_mib }}
+    network:
+      - bridge: {{ mgmt_network }}
+        macaddr: {{ cluster_name ~ "-node1" | generate_mac }}
+        ip: {{ mgmt_cidr | cidr_ip }}
+    start_on_create: {{ auto_start | bool_to_tf }}
+```
+
 ## Per-Package Secrets
 
 Packages can include a `secrets.yaml` file alongside the manifest. This file holds
