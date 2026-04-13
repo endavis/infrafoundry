@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776012569559,
+  "lastUpdate": 1776074724436,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5332,6 +5332,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000025414384101943947",
             "extra": "mean: 115.11344519328557 usec\nrounds: 2226"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7b072b368ed8ec03e3efc537ab63e1c64d21f07c",
+          "message": "feat: add infra move-package command to migrate packages between environments (merges PR #579, addresses #576)\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-13T11:04:43+01:00",
+          "tree_id": "cfa7e8b195793e4e57a803ed2c4425fd5fbcd3e2",
+          "url": "https://github.com/endavis/infrafoundry/commit/7b072b368ed8ec03e3efc537ab63e1c64d21f07c"
+        },
+        "date": 1776074723473,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9645.551201785085,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006920882075907541",
+            "extra": "mean: 103.67473865204633 usec\nrounds: 2181"
           }
         ]
       }
