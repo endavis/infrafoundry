@@ -56,7 +56,7 @@ jobs:
 
       - name: Report breaking changes
         if: always()
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           HAS_BREAKING: ${{ steps.griffe.outputs.has_breaking }}
           GRIFFE_OUTPUT: ${{ steps.griffe.outputs.details }}
