@@ -231,6 +231,66 @@ class TestMultiProviderValidation:
 
 
 # ------------------------------------------------------------------
+# inputs:-schema tests
+# ------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestInputsSchemaValidation:
+    """Tests covering the new ``input_names``-based validation path."""
+
+    def test_required_input_without_default_is_accepted(self, tmp_path):
+        """A declared input without a ``default:`` is not flagged as undefined."""
+        _write_template(tmp_path, "vm.yaml", "name: {{ vm_name }}\ncores: {{ cores }}")
+        resolved = _make_resolved(
+            tmp_path,
+            defaults={"cores": 2},  # only defaults-backed
+            resources=["vm.yaml"],
+        )
+        # The resolver normally populates ``input_names``; simulate that here.
+        resolved["input_names"] = frozenset({"vm_name", "cores"})
+        result = BlueprintValidator(resolved).validate()
+        assert not result.has_errors
+
+    def test_truly_undefined_variable_is_still_flagged(self, tmp_path):
+        """Typos / vars not declared as inputs must still error."""
+        _write_template(tmp_path, "vm.yaml", "name: {{ vm_nmae }}")
+        resolved = _make_resolved(tmp_path, defaults={}, resources=["vm.yaml"])
+        resolved["input_names"] = frozenset({"vm_name"})
+        result = BlueprintValidator(resolved).validate()
+        assert result.has_errors
+        # New error message wording.
+        assert any("not declared in inputs" in e for e in result.providers[0].errors)
+
+    def test_provider_scoped_input_not_visible_to_sibling(self, tmp_path):
+        """A variable declared only for provider A is undefined for provider B."""
+        _write_template(tmp_path, "providers/a/vm.yaml", "name: {{ only_in_a }}")
+        _write_template(tmp_path, "providers/b/vm.yaml", "name: {{ only_in_a }}")
+        resolved = _make_resolved(
+            tmp_path,
+            defaults={},
+            providers={
+                "a": {
+                    "defaults": {},
+                    "input_names": frozenset({"only_in_a"}),
+                    "resources": ["providers/a/vm.yaml"],
+                },
+                "b": {
+                    "defaults": {},
+                    "input_names": frozenset(),
+                    "resources": ["providers/b/vm.yaml"],
+                },
+            },
+        )
+        resolved["input_names"] = frozenset()
+        result = BlueprintValidator(resolved).validate()
+        a_result = next(p for p in result.providers if p.provider == "a")
+        b_result = next(p for p in result.providers if p.provider == "b")
+        assert a_result.errors == []
+        assert any("only_in_a" in e for e in b_result.errors)
+
+
+# ------------------------------------------------------------------
 # Custom filter tests
 # ------------------------------------------------------------------
 
@@ -272,9 +332,10 @@ class TestRealBlueprints:
     def test_aiqum_blueprint_no_errors(self):
         """Real aiqum blueprint should have zero validation errors.
 
-        The aiqum blueprint is single-provider and all template vars
-        should be covered by defaults (except per-instance vars like
-        vm_name, vmid, target_node, etc. supplied by packages).
+        All template variables (including per-instance ones like ``vm_name``,
+        ``vmid``, ``target_node``) are now declared in the blueprint's
+        ``inputs:`` section, so static analysis should report no undefined
+        variables.
         """
         resolver = self._get_real_resolver()
         if not resolver.exists("aiqum"):
@@ -283,30 +344,18 @@ class TestRealBlueprints:
         resolved = resolver.resolve("aiqum")
         result = BlueprintValidator(resolved).validate()
 
-        # Document expected undefined vars (per-instance, supplied by packages)
         assert not result.is_multi_provider
-        # These should NOT be errors — they are intentional.
-        # But since they're per-instance vars not in defaults, they will
-        # be reported. This test documents the expected behaviour.
         prov = result.providers[0]
-        expected_undefined = {
-            "vm_name",
-            "vmid",
-            "target_node",
-            "disk_storage",
-            "ip_address",
-            "dhcp_subnet",
-        }
-        actual_undefined_vars = {e.split("'")[1] for e in prov.errors if "Undefined variable" in e}
-        # All actual undefined vars should be in the expected set
-        assert actual_undefined_vars == expected_undefined
+        assert prov.errors == [], f"Unexpected undefined variables: {prov.errors}"
+        # Required per-instance inputs should appear in the declared set.
+        for required in ("vm_name", "vmid", "target_node", "ip_address", "dhcp_subnet"):
+            assert required in prov.defaults
 
     def test_k3s_cluster_blueprint_validation(self):
-        """Real k3s-cluster blueprint documents expected undefined vars.
+        """Real k3s-cluster blueprint validates cleanly post-migration.
 
-        The k3s-cluster blueprint is multi-provider. Per-instance variables
-        (server_name, agents, image, etc.) are supplied by packages and
-        will appear as undefined in static analysis.
+        Top-level and per-provider ``inputs:`` should cover every template
+        variable, producing no undefined-variable errors.
         """
         resolver = self._get_real_resolver()
         if not resolver.exists("k3s-cluster"):
@@ -318,16 +367,28 @@ class TestRealBlueprints:
         assert result.is_multi_provider
         assert len(result.providers) == 2
 
-        # Both providers will have undefined vars (per-instance values)
         proxmox = next(p for p in result.providers if p.provider == "proxmox")
         oci = next(p for p in result.providers if p.provider == "oci")
 
-        # Proxmox should reference per-instance vars not in defaults
-        proxmox_undefined = {e.split("'")[1] for e in proxmox.errors if "Undefined variable" in e}
-        assert "server_name" in proxmox_undefined
-        assert "agents" in proxmox_undefined
+        assert proxmox.errors == [], f"proxmox errors: {proxmox.errors}"
+        assert oci.errors == [], f"oci errors: {oci.errors}"
 
-        # OCI should reference per-instance vars not in defaults
-        oci_undefined = {e.split("'")[1] for e in oci.errors if "Undefined variable" in e}
-        assert "image" in oci_undefined
-        assert "ssh_public_key" in oci_undefined
+        # Proxmox-scoped required inputs should be declared for that provider.
+        for required in ("server_name", "agents", "server_mac", "server_ip"):
+            assert required in proxmox.defaults
+
+        # OCI-scoped required inputs should be declared for that provider.
+        for required in ("image", "ssh_public_key"):
+            assert required in oci.defaults
+
+    def test_all_real_blueprints_validate(self):
+        """Every blueprint shipped in the framework should validate cleanly."""
+        resolver = self._get_real_resolver()
+        for name in resolver.list_blueprints():
+            resolved = resolver.resolve(name)
+            result = BlueprintValidator(resolved).validate()
+            for provider in result.providers:
+                assert provider.errors == [], (
+                    f"Blueprint '{name}' provider '{provider.provider}' has "
+                    f"undefined variables: {provider.errors}"
+                )
