@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776163360293,
+  "lastUpdate": 1776163787336,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5828,6 +5828,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009821283911036121",
             "extra": "mean: 135.1433148531586 usec\nrounds: 2417"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "017892989530ed5fe0fac975d94dd8590b637d83",
+          "message": "chore(deps): bump commitizen from 4.13.9 to 4.13.10 (merges PR #588)\n\nBumps [commitizen](https://github.com/commitizen-tools/commitizen) from 4.13.9 to 4.13.10.\n- [Release notes](https://github.com/commitizen-tools/commitizen/releases)\n- [Changelog](https://github.com/commitizen-tools/commitizen/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/commitizen-tools/commitizen/compare/v4.13.9...v4.13.10)\n\n---\nupdated-dependencies:\n- dependency-name: commitizen\n  dependency-version: 4.13.10\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-14T11:49:13+01:00",
+          "tree_id": "4e4640d4855d4ef993af57e3870a1398ecb5c407",
+          "url": "https://github.com/endavis/infrafoundry/commit/017892989530ed5fe0fac975d94dd8590b637d83"
+        },
+        "date": 1776163786877,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7375.518301823941,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009894311726065573",
+            "extra": "mean: 135.5836917593579 usec\nrounds: 2245"
           }
         ]
       }
