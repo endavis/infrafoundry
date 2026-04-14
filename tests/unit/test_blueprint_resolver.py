@@ -160,6 +160,159 @@ class TestBlueprintResolverResolve:
 
 
 @pytest.mark.unit
+class TestBlueprintResolverInputs:
+    """Tests for the ``inputs:`` schema parsing in ``resolve``."""
+
+    def test_inputs_with_defaults_synthesises_defaults_dict(self, temp_dir):
+        """Inputs carrying ``default:`` populate the synthesised ``defaults``."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        resolver = _make_resolver(envs_dir)
+
+        manifest = {
+            "name": "bp",
+            "inputs": [
+                {"name": "required_var", "description": "no default"},
+                {"name": "cores", "default": 4},
+                {"name": "bridge", "default": "vmbr0"},
+            ],
+        }
+        _create_blueprint(envs_dir, "bp", manifest)
+
+        result = resolver.resolve("bp")
+
+        # Synthesised defaults only contain entries that had ``default:``.
+        assert result["defaults"] == {"cores": 4, "bridge": "vmbr0"}
+        # ``input_names`` contains every declared input (required + optional).
+        assert result["input_names"] == frozenset({"required_var", "cores", "bridge"})
+
+    def test_inputs_in_provider_block(self, temp_dir):
+        """Per-provider ``inputs:`` are parsed and exposed."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        resolver = _make_resolver(envs_dir)
+
+        manifest = {
+            "name": "bp",
+            "inputs": [{"name": "cluster_name", "default": "demo"}],
+            "providers": {
+                "proxmox": {
+                    "inputs": [
+                        {"name": "server_name"},
+                        {"name": "cores", "default": 2},
+                    ],
+                    "resources": ["providers/proxmox/vm.yaml"],
+                },
+            },
+        }
+        _create_blueprint(envs_dir, "bp", manifest)
+
+        result = resolver.resolve("bp")
+
+        assert result["input_names"] == frozenset({"cluster_name"})
+        proxmox = result["providers"]["proxmox"]
+        assert proxmox["defaults"] == {"cores": 2}
+        assert proxmox["input_names"] == frozenset({"server_name", "cores"})
+
+    def test_both_inputs_and_defaults_raises(self, temp_dir):
+        """Declaring both sections at the top level is a hard error."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        resolver = _make_resolver(envs_dir)
+
+        manifest = {
+            "name": "bp",
+            "defaults": {"cores": 2},
+            "inputs": [{"name": "cores", "default": 4}],
+        }
+        _create_blueprint(envs_dir, "bp", manifest)
+
+        with pytest.raises(InvalidConfigurationError, match="both 'inputs:' and 'defaults:'"):
+            resolver.resolve("bp")
+
+    def test_both_inputs_and_defaults_in_provider_raises(self, temp_dir):
+        """Declaring both sections inside a provider block is a hard error."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        resolver = _make_resolver(envs_dir)
+
+        manifest = {
+            "name": "bp",
+            "providers": {
+                "proxmox": {
+                    "defaults": {"cores": 2},
+                    "inputs": [{"name": "cores", "default": 4}],
+                    "resources": [],
+                },
+            },
+        }
+        _create_blueprint(envs_dir, "bp", manifest)
+
+        with pytest.raises(InvalidConfigurationError, match="provider 'proxmox'"):
+            resolver.resolve("bp")
+
+    def test_input_entry_missing_name_raises(self, temp_dir):
+        """An input entry without a ``name`` key is rejected."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        resolver = _make_resolver(envs_dir)
+
+        manifest = {
+            "name": "bp",
+            "inputs": [{"description": "missing name"}],
+        }
+        _create_blueprint(envs_dir, "bp", manifest)
+
+        with pytest.raises(InvalidConfigurationError, match="missing 'name'"):
+            resolver.resolve("bp")
+
+    def test_input_entry_unknown_key_raises(self, temp_dir):
+        """Unknown keys in an input entry are rejected."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        resolver = _make_resolver(envs_dir)
+
+        manifest = {
+            "name": "bp",
+            "inputs": [{"name": "foo", "defualt": 1}],  # codespell:ignore defualt
+        }
+        _create_blueprint(envs_dir, "bp", manifest)
+
+        with pytest.raises(InvalidConfigurationError, match="unknown keys"):
+            resolver.resolve("bp")
+
+    def test_input_section_must_be_list(self, temp_dir):
+        """``inputs:`` must be a list of entries."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        resolver = _make_resolver(envs_dir)
+
+        manifest = {"name": "bp", "inputs": {"cores": 2}}
+        _create_blueprint(envs_dir, "bp", manifest)
+
+        with pytest.raises(InvalidConfigurationError, match="non-list 'inputs:'"):
+            resolver.resolve("bp")
+
+    def test_duplicate_input_name_raises(self, temp_dir):
+        """Declaring the same input twice is rejected."""
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        resolver = _make_resolver(envs_dir)
+
+        manifest = {
+            "name": "bp",
+            "inputs": [
+                {"name": "cores", "default": 2},
+                {"name": "cores", "default": 4},
+            ],
+        }
+        _create_blueprint(envs_dir, "bp", manifest)
+
+        with pytest.raises(InvalidConfigurationError, match="more than once"):
+            resolver.resolve("bp")
+
+
+@pytest.mark.unit
 class TestBlueprintResolverExists:
     """Tests for BlueprintResolver.exists."""
 

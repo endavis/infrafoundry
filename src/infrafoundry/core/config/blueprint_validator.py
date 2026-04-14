@@ -102,10 +102,9 @@ class BlueprintValidator:
     def _validate_single_provider(self) -> BlueprintValidationResult:
         """Validate a single-provider (flat) blueprint."""
         resources: list[str] = self._blueprint.get("resources", [])
-        global_defaults = self._blueprint.get("defaults", {})
 
         template_vars = self._collect_provider_vars(resources, self._blueprint_dir)
-        defaults_keys = frozenset(global_defaults.keys())
+        defaults_keys = self._resolve_input_names(self._blueprint)
 
         errors = self._find_undefined_vars(template_vars, defaults_keys)
 
@@ -130,7 +129,7 @@ class BlueprintValidator:
         self, providers_block: dict[str, Any]
     ) -> BlueprintValidationResult:
         """Validate a multi-provider blueprint."""
-        global_defaults = self._blueprint.get("defaults", {})
+        global_input_names = self._resolve_input_names(self._blueprint)
         provider_results: list[ProviderValidationResult] = []
 
         # Collect vars per provider first for asymmetry detection
@@ -138,10 +137,10 @@ class BlueprintValidator:
 
         for provider_name, provider_block in providers_block.items():
             resources: list[str] = provider_block.get("resources", [])
-            provider_defaults = provider_block.get("defaults", {})
+            provider_input_names = self._resolve_input_names(provider_block)
 
             template_vars = self._collect_provider_vars(resources, self._blueprint_dir)
-            all_defaults = frozenset(global_defaults.keys()) | frozenset(provider_defaults.keys())
+            all_defaults = global_input_names | provider_input_names
 
             errors = self._find_undefined_vars(template_vars, all_defaults)
             provider_var_map[provider_name] = template_vars
@@ -156,7 +155,7 @@ class BlueprintValidator:
             )
 
         # Detect asymmetric variable usage across providers
-        self._detect_asymmetric_vars(provider_results, provider_var_map, global_defaults)
+        self._detect_asymmetric_vars(provider_results, provider_var_map, global_input_names)
 
         return BlueprintValidationResult(
             blueprint_name=self._blueprint["name"],
@@ -222,19 +221,38 @@ class BlueprintValidator:
             Sorted list of error messages for undefined variables.
         """
         undefined = template_vars - defaults_keys
-        return sorted(
-            f"Undefined variable: '{var}' (not in any defaults layer)" for var in undefined
-        )
+        return sorted(f"Undefined variable: '{var}' (not declared in inputs)" for var in undefined)
+
+    @staticmethod
+    def _resolve_input_names(block: dict[str, Any]) -> frozenset[str]:
+        """Return the declared input names for a resolved block.
+
+        Prefers the resolver-populated ``input_names`` frozenset; falls back
+        to ``defaults.keys()`` for legacy / test fixtures that build blocks
+        without going through the resolver.
+
+        Args:
+            block: Either the full resolved blueprint dict or a single
+                provider block within ``providers``.
+
+        Returns:
+            Frozenset of variable names considered declared for this block.
+        """
+        names = block.get("input_names")
+        if isinstance(names, frozenset):
+            return names
+        defaults = block.get("defaults") or {}
+        return frozenset(defaults.keys())
 
     @staticmethod
     def _detect_asymmetric_vars(
         provider_results: list[ProviderValidationResult],
         provider_var_map: dict[str, frozenset[str]],
-        global_defaults: dict[str, Any],
+        global_input_names: frozenset[str],
     ) -> None:
         """Detect variables used by some providers but not all.
 
-        Only considers variables that come from global defaults (shared across
+        Only considers variables that come from global inputs (shared across
         providers). Provider-specific variables are expected to differ.
 
         Modifies provider results in place by appending warnings.
@@ -242,12 +260,12 @@ class BlueprintValidator:
         Args:
             provider_results: Per-provider results to append warnings to.
             provider_var_map: Mapping of provider name to template variables.
-            global_defaults: The blueprint's top-level defaults dict.
+            global_input_names: The blueprint's top-level declared input names.
         """
         if len(provider_var_map) < 2:
             return
 
-        global_keys = frozenset(global_defaults.keys())
+        global_keys = global_input_names
         all_provider_names = list(provider_var_map.keys())
 
         # For each global default, check if it's used asymmetrically

@@ -61,3 +61,11 @@ These are acceptable tradeoffs. The real duplication today is in the non-resourc
 - [#507](https://github.com/endavis/infrafoundry/issues/507): Original multi-provider blueprint design
 - [#571](https://github.com/endavis/infrafoundry/issues/571): Blueprint schema validation across providers (Phase 3 — mitigates the "no schema validation across providers" consequence above)
 - [#572](https://github.com/endavis/infrafoundry/issues/572): Base schema helpers (centralized Jinja2 filter factory for blueprint templates)
+
+## Superseded schema details
+
+The `defaults:` section at both the top level and per-provider scope described
+above was replaced by `inputs:` in [ADR-0004](0004-inputs-single-blueprint-variable-section.md)
+(issue [#607](https://github.com/endavis/infrafoundry/issues/607)). The
+top-level-plus-per-provider scoping model introduced here is preserved; only
+the section name and per-entry shape changed.

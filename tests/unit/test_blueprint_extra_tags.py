@@ -128,18 +128,19 @@ class TestBlueprintDefaultsIncludeExtraTags:
         ],
     )
     def test_extra_tags_in_defaults(self, blueprint):
-        """Blueprint defaults must include extra_tags with an empty list default."""
+        """Blueprint inputs must declare extra_tags with an empty list default."""
         blueprint_path = BLUEPRINTS_DIR / blueprint / "blueprint.yaml"
         data = yaml.safe_load(blueprint_path.read_text())
-        # Multi-provider blueprints store extra_tags under providers.<name>.defaults
+        # Multi-provider blueprints store extra_tags under providers.<name>.inputs
         if "providers" in data and "proxmox" in data.get("providers", {}):
-            defaults = data["providers"]["proxmox"].get("defaults", {})
+            inputs = data["providers"]["proxmox"].get("inputs", [])
         else:
-            defaults = data.get("defaults", {})
-        assert "extra_tags" in defaults, (
-            f"{blueprint}/blueprint.yaml missing extra_tags in defaults"
+            inputs = data.get("inputs", [])
+        by_name = {entry["name"]: entry for entry in inputs if "name" in entry}
+        assert "extra_tags" in by_name, (
+            f"{blueprint}/blueprint.yaml missing extra_tags input declaration"
         )
-        assert defaults["extra_tags"] == []
+        assert by_name["extra_tags"].get("default") == []
 
 
 @pytest.mark.unit
