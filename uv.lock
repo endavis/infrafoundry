@@ -1039,7 +1039,7 @@ requires-dist = [
     { name = "rich", specifier = ">=15.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.10" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
-    { name = "types-boto3", marker = "extra == 'dev'", specifier = ">=1.35.0" },
+    { name = "types-boto3", marker = "extra == 'dev'", specifier = ">=1.42.89" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.33.0.20260408" },
     { name = "vulture", marker = "extra == 'dev'", specifier = ">=2.0" },
@@ -2889,15 +2889,15 @@ wheels = [
 
 [[package]]
 name = "types-boto3"
-version = "1.42.78"
+version = "1.42.89"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore-stubs" },
     { name = "types-s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/89/ca/d6bf0c7816f7d9d38196c60579172ffcf68b07123e3968f7468c218ae316/types_boto3-1.42.78.tar.gz", hash = "sha256:132e0dc52a718f858f8a79436422848c4efe1c89e87d748784aecef3d1f69965", size = 102016, upload-time = "2026-03-27T19:35:45.324Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/7e/d6f80d04551e9a35cef72a5fbd51632f6d23ab90284361de4ec24f66f372/types_boto3-1.42.89.tar.gz", hash = "sha256:a6324906b70bd429e19d9d00078b4117df65b8e16fb79db177769e257d7d4805", size = 102973, upload-time = "2026-04-13T19:52:06.774Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/68/52ff5bab810f89ed873abad375c3aa98161f79042ef5007bde7cc7bee3f3/types_boto3-1.42.78-py3-none-any.whl", hash = "sha256:fe1576d3a518422534ff8372cf0fcaf9856eec3fa096d31a72d2d6ca62e0b956", size = 70062, upload-time = "2026-03-27T19:35:37.828Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/ca/7be4914d8885341ec69647ad6b8c5bd3fc1b571ec60151d4991211d35e28/types_boto3-1.42.89-py3-none-any.whl", hash = "sha256:d16f9929e85e1f9b81215641210fad489e090c588b8b1917644cac24a63ebd85", size = 70564, upload-time = "2026-04-13T19:52:02.734Z" },
 ]
 
 [[package]]
