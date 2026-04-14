@@ -2,21 +2,39 @@ name: ubuntu-template
 description: "Ubuntu 24.04 LTS cloud image Proxmox VM template"
 version: "1.0.0"
 
-defaults:
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: storage
+    description: "Proxmox storage pool for the template disk and cloud-init"
+  - name: target_node
+    description: "Proxmox node to create the template on"
+  - name: vmid
+    description: "Proxmox VM ID for the template"
+    type: integer
+
   # --- Recipe constants (rarely overridden) ---
-  image_url: "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"
-  image_filename: "ubuntu-24.04-server-cloudimg-amd64.qcow2"
-  ciuser: ubuntu
-  cores: 2
-  memory: 2048
-  disk_size: 32
-  bridge: vmbr0
+  - name: image_url
+    default: "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"
+  - name: image_filename
+    default: "ubuntu-24.04-server-cloudimg-amd64.qcow2"
+  - name: ciuser
+    default: ubuntu
+  - name: cores
+    default: 2
+  - name: memory
+    default: 2048
+  - name: disk_size
+    default: 32
+  - name: bridge
+    default: vmbr0
 
   # --- Per-instance overrides (typical) ---
-  template_name: ubuntu-template
+  - name: template_name
+    default: ubuntu-template
 
   # Extra Proxmox tags appended to the blueprint's default tags
-  extra_tags: []
+  - name: extra_tags
+    default: []
 
 resources:
   - template.yaml

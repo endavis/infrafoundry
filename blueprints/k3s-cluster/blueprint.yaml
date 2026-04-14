@@ -2,43 +2,83 @@ name: k3s-cluster
 description: "k3s Kubernetes cluster — multi-provider (Proxmox or OCI)"
 version: "1.0.0"
 
-defaults:
-  # --- Shared cluster identity ---
-  cluster_name: k3s-cluster
-  k3s_version: ""                              # empty = latest
-  k3s_server_args: ""                          # e.g. "--disable traefik"
+inputs:
+  # --- Shared cluster identity (top-level, required for every provider) ---
+  - name: cluster_name
+    description: "Shared cluster identifier used across providers"
+    default: k3s-cluster
+  - name: k3s_version
+    description: "k3s release to install (empty = latest)"
+    default: ""
+  - name: k3s_server_args
+    description: 'Extra k3s server install flags, e.g. "--disable traefik"'
+    default: ""
 
 providers:
   # =====================================================================
   # Proxmox — Rocky 9 VMs (1 server + N agents)
   # =====================================================================
   proxmox:
-    defaults:
+    inputs:
+      # --- Required per-instance inputs ---
+      - name: server_name
+        description: "Hostname / Proxmox VM name for the k3s server"
+      - name: server_vmid
+        description: "Proxmox VM ID for the server"
+        type: integer
+      - name: server_target
+        description: "Proxmox node to deploy the server onto"
+      - name: server_ip
+        description: "Static IPv4 address for the server (DHCP reservation)"
+      - name: server_mac
+        description: "MAC address for the server's network interface"
+      - name: agents
+        description: "List of k3s agent definitions (name/vmid/target_node/mac/ip)"
+        type: list
+      - name: dhcp_subnet
+        description: "OPNsense DHCP subnet identifier used for reservations"
+
       # --- Template ---
-      template_vmid: 901          # Standard rocky9-template vmid
-      template_node: pve1         # Proxmox node hosting the template
+      - name: template_vmid
+        description: "Standard rocky9-template vmid"
+        default: 901
+      - name: template_node
+        description: "Proxmox node hosting the template"
+        default: pve1
 
       # --- VM hardware ---
-      cores: 2
-      memory: 4096                # MiB
-      disk_size: 56               # GiB
-      disk_storage: local-lvm
+      - name: cores
+        default: 2
+      - name: memory
+        description: "Memory (MiB)"
+        default: 4096
+      - name: disk_size
+        description: "Disk size (GiB)"
+        default: 56
+      - name: disk_storage
+        default: local-lvm
 
       # --- Network ---
-      bridge: vmbr0
-      vlan_tag: 10
+      - name: bridge
+        default: vmbr0
+      - name: vlan_tag
+        default: 10
 
       # --- SSH access ---
-      jumphost: ""
+      - name: jumphost
+        default: ""
 
-      # --- k3s installer flags ---
-      k3s_server_args: "--disable traefik --disable servicelb"
+      # --- k3s installer flags (proxmox override of top-level default) ---
+      - name: k3s_server_args
+        default: "--disable traefik --disable servicelb"
 
       # --- Local kubeconfig destination directory ---
-      kubeconfig_dir: "~/.kube"
+      - name: kubeconfig_dir
+        default: "~/.kube"
 
       # Extra Proxmox tags appended to the blueprint's default tags
-      extra_tags: []
+      - name: extra_tags
+        default: []
 
     resources:
       - providers/proxmox/vm.yaml
@@ -59,45 +99,72 @@ providers:
   # OCI — ARM Always-Free-Tier (1 control + N workers) with Tailscale
   # =====================================================================
   oci:
-    defaults:
-      control_name: k3s-control
+    inputs:
+      # --- Required per-instance inputs ---
+      - name: image
+        description: "OCI compute image OCID for cluster instances"
+      - name: ssh_public_key
+        description: "SSH public key material injected into instances"
+
+      - name: control_name
+        default: k3s-control
 
       # --- OCI instance sizing ---
-      instance_shape: "VM.Standard.A1.Flex"
-      control_ocpus: 2
-      control_memory_gb: 8
-      control_boot_volume_gb: 50
-      worker_boot_volume_gb: 50
+      - name: instance_shape
+        default: "VM.Standard.A1.Flex"
+      - name: control_ocpus
+        default: 2
+      - name: control_memory_gb
+        default: 8
+      - name: control_boot_volume_gb
+        default: 50
+      - name: worker_boot_volume_gb
+        default: 50
 
-      workers:
-        - name: k3s-worker-0
-          ocpus: 1
-          memory_gb: 8
-        - name: k3s-worker-1
-          ocpus: 1
-          memory_gb: 8
+      - name: workers
+        default:
+          - name: k3s-worker-0
+            ocpus: 1
+            memory_gb: 8
+          - name: k3s-worker-1
+            ocpus: 1
+            memory_gb: 8
 
       # --- Network ---
-      vcn_name: k3s-vcn
-      vcn_cidr: "10.0.0.0/16"
-      vcn_dns_label: k3svcn
-      control_subnet_name: k3s-control-subnet
-      control_subnet_cidr: "10.0.0.0/24"
-      control_subnet_dns_label: ctrl
-      worker_subnet_name: k3s-worker-subnet
-      worker_subnet_cidr: "10.0.1.0/24"
-      worker_subnet_dns_label: work
+      - name: vcn_name
+        default: k3s-vcn
+      - name: vcn_cidr
+        default: "10.0.0.0/16"
+      - name: vcn_dns_label
+        default: k3svcn
+      - name: control_subnet_name
+        default: k3s-control-subnet
+      - name: control_subnet_cidr
+        default: "10.0.0.0/24"
+      - name: control_subnet_dns_label
+        default: ctrl
+      - name: worker_subnet_name
+        default: k3s-worker-subnet
+      - name: worker_subnet_cidr
+        default: "10.0.1.0/24"
+      - name: worker_subnet_dns_label
+        default: work
 
       # --- Tailscale ---
-      tailnet: ""
-      ts_tags: []
-      extra_freeform_tags: {}
+      - name: tailnet
+        default: ""
+      - name: ts_tags
+        default: []
+      - name: extra_freeform_tags
+        default: {}
 
       # --- k3s OCI-specific ---
-      k3s_oci_firewall_fix: true
+      - name: k3s_oci_firewall_fix
+        default: true
 
       # --- Local kubeconfig destination ---
-      kubeconfig_local_path: "~/.kube/{{ cluster_name }}.yaml"
+      - name: kubeconfig_local_path
+        default: "~/.kube/{{ cluster_name }}.yaml"
 
     resources:
       - providers/oci/network.yaml

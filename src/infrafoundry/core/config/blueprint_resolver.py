@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 BLUEPRINT_MANIFEST = "blueprint.yaml"
 
+# Allowed keys in an ``inputs:`` entry.
+_ALLOWED_INPUT_KEYS = frozenset({"name", "description", "type", "default"})
+
 
 class BlueprintResolver:
     """Resolves blueprint references for infrastructure packages.
@@ -83,18 +86,54 @@ class BlueprintResolver:
         data, inventory_raw = self._load_manifest(manifest_path)
         self._validate_manifest(data, manifest_path)
 
+        # Parse top-level inputs: (authoritative) and synthesize defaults dict.
+        top_inputs_raw = data.get("inputs")
+        top_defaults, top_input_names = self._parse_inputs_section(
+            top_inputs_raw,
+            data.get("defaults"),
+            manifest_path,
+            scope=f"blueprint '{blueprint_name}'",
+        )
+
+        # Parse per-provider inputs (if any).
+        providers_block: dict[str, Any] | None = data.get("providers")
+        normalised_providers: dict[str, Any] | None = None
+        if providers_block is not None:
+            if not isinstance(providers_block, dict):
+                raise InvalidConfigurationError(
+                    f"Blueprint manifest 'providers:' must be a mapping: {manifest_path}"
+                )
+            normalised_providers = {}
+            for provider_name, provider_block in providers_block.items():
+                if not isinstance(provider_block, dict):
+                    raise InvalidConfigurationError(
+                        f"Provider '{provider_name}' block must be a mapping "
+                        f"in blueprint '{blueprint_name}': {manifest_path}"
+                    )
+                provider_defaults, provider_input_names = self._parse_inputs_section(
+                    provider_block.get("inputs"),
+                    provider_block.get("defaults"),
+                    manifest_path,
+                    scope=f"blueprint '{blueprint_name}' provider '{provider_name}'",
+                )
+                new_block = dict(provider_block)
+                new_block["defaults"] = provider_defaults
+                new_block["input_names"] = provider_input_names
+                normalised_providers[provider_name] = new_block
+
         # Normalise optional fields
         result: dict[str, Any] = {
             "name": data["name"],
             "description": data.get("description"),
             "version": data.get("version"),
-            "defaults": data.get("defaults", {}),
+            "defaults": top_defaults,
+            "input_names": top_input_names,
             "resources": data.get("resources", []),
             "events": data.get("events", {}),
             "inventory": data.get("inventory"),
             "inventory_raw": inventory_raw,
             "blueprint_dir": blueprint_dir,
-            "providers": data.get("providers"),
+            "providers": normalised_providers,
         }
 
         logger.debug(
@@ -209,6 +248,99 @@ class BlueprintResolver:
 
         result: dict[str, Any] = data
         return result, inventory_raw
+
+    @staticmethod
+    def _parse_inputs_section(
+        inputs_raw: Any,
+        defaults_raw: Any,
+        manifest_path: Path,
+        scope: str,
+    ) -> tuple[dict[str, Any], frozenset[str]]:
+        """Parse an ``inputs:`` list and synthesize a ``defaults`` dict.
+
+        Enforces the "clean cutover" rule that a manifest scope (blueprint
+        root or a single provider block) cannot declare both ``inputs:`` and
+        the legacy ``defaults:`` section. When ``inputs:`` is absent and
+        ``defaults:`` is present, falls back to the legacy behaviour so
+        migrations can roll out incrementally at the sub-block level.
+
+        Args:
+            inputs_raw: Value of the ``inputs:`` key (may be ``None``).
+            defaults_raw: Value of the legacy ``defaults:`` key (may be
+                ``None``).
+            manifest_path: Path to the manifest, used in error messages.
+            scope: Human-readable scope for error messages, e.g.
+                ``"blueprint 'aiqum'"`` or
+                ``"blueprint 'k3s-cluster' provider 'proxmox'"``.
+
+        Returns:
+            Tuple of ``(defaults_dict, input_names)``. ``defaults_dict`` is
+            synthesised from input entries that carry a ``default:`` key
+            (preserving declaration order) so downstream callers that read
+            ``blueprint["defaults"]`` keep working unchanged. ``input_names``
+            is the frozenset of declared input names (required + optional).
+
+        Raises:
+            InvalidConfigurationError: If both ``inputs:`` and ``defaults:``
+                are present, if ``inputs:`` is not a list of mappings, if
+                any entry is missing ``name``, or if any entry contains
+                unknown keys.
+        """
+        if inputs_raw is not None and defaults_raw is not None:
+            raise InvalidConfigurationError(
+                f"{scope} declares both 'inputs:' and 'defaults:' in "
+                f"{manifest_path}. Use 'inputs:' only — 'defaults:' has "
+                "been removed from the blueprint schema."
+            )
+
+        if inputs_raw is None:
+            # Legacy path: no inputs declared. Use defaults dict verbatim
+            # and derive input_names from its keys so validation still
+            # works for sub-blocks that haven't been migrated.
+            legacy_defaults = defaults_raw if isinstance(defaults_raw, dict) else {}
+            return dict(legacy_defaults), frozenset(legacy_defaults.keys())
+
+        if not isinstance(inputs_raw, list):
+            raise InvalidConfigurationError(
+                f"{scope} has a non-list 'inputs:' value in {manifest_path}; "
+                "expected a list of input entries."
+            )
+
+        defaults: dict[str, Any] = {}
+        names: list[str] = []
+        for idx, entry in enumerate(inputs_raw):
+            if not isinstance(entry, dict):
+                raise InvalidConfigurationError(
+                    f"{scope} has a non-mapping input entry at index {idx} "
+                    f"in {manifest_path}; each input must be a mapping with "
+                    "at least a 'name' key."
+                )
+            if "name" not in entry:
+                raise InvalidConfigurationError(
+                    f"{scope} has an input entry missing 'name' at index {idx} in {manifest_path}."
+                )
+            name = entry["name"]
+            if not isinstance(name, str) or not name:
+                raise InvalidConfigurationError(
+                    f"{scope} has a non-string or empty 'name' at input "
+                    f"index {idx} in {manifest_path}."
+                )
+            unknown = set(entry.keys()) - _ALLOWED_INPUT_KEYS
+            if unknown:
+                raise InvalidConfigurationError(
+                    f"{scope} input '{name}' has unknown keys "
+                    f"{sorted(unknown)} in {manifest_path}; allowed keys are "
+                    f"{sorted(_ALLOWED_INPUT_KEYS)}."
+                )
+            if name in names:
+                raise InvalidConfigurationError(
+                    f"{scope} declares input '{name}' more than once in {manifest_path}."
+                )
+            names.append(name)
+            if "default" in entry:
+                defaults[name] = entry["default"]
+
+        return defaults, frozenset(names)
 
     @staticmethod
     def _validate_manifest(data: dict[str, Any], manifest_path: Path) -> None:

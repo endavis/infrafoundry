@@ -2,78 +2,134 @@ name: ontap-cluster
 description: "NetApp ONTAP Simulator 2-node cluster on Proxmox"
 version: "1.0.0"
 
-defaults:
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: cluster_name
+    description: "Name of the ONTAP cluster"
+  - name: cluster_mgmt_ip
+    description: "Cluster management IP (DHCP reservation)"
+  - name: data_lif1_ip
+    description: "Data LIF 1 IP address (DHCP reservation)"
+  - name: data_lif2_ip
+    description: "Data LIF 2 IP address (DHCP reservation)"
+  - name: node01_name
+    description: "Hostname and Proxmox VM name for node 1"
+  - name: node01_vmid
+    description: "Proxmox VM ID for node 1"
+    type: integer
+  - name: node01_target
+    description: "Proxmox node to deploy node 1 onto"
+  - name: node01_mgmt_ip
+    description: "Management IP for node 1 (DHCP reservation)"
+  - name: node02_name
+    description: "Hostname and Proxmox VM name for node 2"
+  - name: node02_vmid
+    description: "Proxmox VM ID for node 2"
+    type: integer
+  - name: node02_target
+    description: "Proxmox node to deploy node 2 onto"
+  - name: node02_mgmt_ip
+    description: "Management IP for node 2 (DHCP reservation)"
+
   # --- VM Configuration ---
-  disk_storage: nas01
-  ova_source: "/mnt/pve/infra/appliances/ontap/9.18.1/vsim-netapp-DOT9.18.1-cm_nodar.ova"
+  - name: disk_storage
+    default: nas01
+  - name: ova_source
+    default: "/mnt/pve/infra/appliances/ontap/9.18.1/vsim-netapp-DOT9.18.1-cm_nodar.ova"
 
   # --- Network ---
-  bridge: vmbr0
-  mgmt_vlan: 10
+  - name: bridge
+    default: vmbr0
+  - name: mgmt_vlan
+    default: 10
 
   # --- MAC Addresses (optional — set for DHCP reservations) ---
-  node01_mgmt_mac: ""
-  node01_data_mac: ""
-  node02_mgmt_mac: ""
-  node02_data_mac: ""
+  - name: node01_mgmt_mac
+    default: ""
+  - name: node01_data_mac
+    default: ""
+  - name: node02_mgmt_mac
+    default: ""
+  - name: node02_data_mac
+    default: ""
 
   # --- Node 02 Identity (standard ONTAP simulator defaults) ---
-  node02_serial_number: "4034389-06-2"
-  node02_sysid: "4034389062"
+  - name: node02_serial_number
+    default: "4034389-06-2"
+  - name: node02_sysid
+    default: "4034389062"
 
   # --- Netmasks/Gateways ---
-  cluster_mgmt_mask: "255.255.255.0"
-  node_mgmt_mask: "255.255.255.0"
+  - name: cluster_mgmt_mask
+    default: "255.255.255.0"
+  - name: node_mgmt_mask
+    default: "255.255.255.0"
 
   # --- Licenses (standard ONTAP simulator keys) ---
-  ontap_cluster_base_license: SMKQROWJNQYQSDAAAAAAAAAAAAAA
-  ontap_licenses:
-    # Node 1 (Serial 4082368507)
-    - YVUCRRRRYVHXCFABGAAAAAAAAAAA   # CIFS
-    - WKQGSRRRYVHXCFABGAAAAAAAAAAA   # FCP
-    - SOHOURRRYVHXCFABGAAAAAAAAAAA   # FlexClone
-    - KQSRRRRRYVHXCFABGAAAAAAAAAAA   # iSCSI
-    - MBXNQRRRYVHXCFABGAAAAAAAAAAA   # NFS
-    - GUJZTRRRYVHXCFABGAAAAAAAAAAA   # SnapMirror
-    - UZLKTRRRYVHXCFABGAAAAAAAAAAA   # SnapRestore
-    - EJFDVRRRYVHXCFABGAAAAAAAAAAA   # SnapVault
-    # Node 2 (Serial 4034389062)
-    - MHEYKUNFXMSMUCEZFAAAAAAAAAAA   # CIFS
-    - KWZBMUNFXMSMUCEZFAAAAAAAAAAA   # FCP
-    - GARJOUNFXMSMUCEZFAAAAAAAAAAA   # FlexClone
-    - YBCNLUNFXMSMUCEZFAAAAAAAAAAA   # iSCSI
-    - ANGJKUNFXMSMUCEZFAAAAAAAAAAA   # NFS
-    - UFTUNUNFXMSMUCEZFAAAAAAAAAAA   # SnapMirror
-    - ILVFNUNFXMSMUCEZFAAAAAAAAAAA   # SnapRestore
-    - SUOYOUNFXMSMUCEZFAAAAAAAAAAA   # SnapVault
+  - name: ontap_cluster_base_license
+    default: SMKQROWJNQYQSDAAAAAAAAAAAAAA
+  - name: ontap_licenses
+    default:
+      # Node 1 (Serial 4082368507)
+      - YVUCRRRRYVHXCFABGAAAAAAAAAAA   # CIFS
+      - WKQGSRRRYVHXCFABGAAAAAAAAAAA   # FCP
+      - SOHOURRRYVHXCFABGAAAAAAAAAAA   # FlexClone
+      - KQSRRRRRYVHXCFABGAAAAAAAAAAA   # iSCSI
+      - MBXNQRRRYVHXCFABGAAAAAAAAAAA   # NFS
+      - GUJZTRRRYVHXCFABGAAAAAAAAAAA   # SnapMirror
+      - UZLKTRRRYVHXCFABGAAAAAAAAAAA   # SnapRestore
+      - EJFDVRRRYVHXCFABGAAAAAAAAAAA   # SnapVault
+      # Node 2 (Serial 4034389062)
+      - MHEYKUNFXMSMUCEZFAAAAAAAAAAA   # CIFS
+      - KWZBMUNFXMSMUCEZFAAAAAAAAAAA   # FCP
+      - GARJOUNFXMSMUCEZFAAAAAAAAAAA   # FlexClone
+      - YBCNLUNFXMSMUCEZFAAAAAAAAAAA   # iSCSI
+      - ANGJKUNFXMSMUCEZFAAAAAAAAAAA   # NFS
+      - UFTUNUNFXMSMUCEZFAAAAAAAAAAA   # SnapMirror
+      - ILVFNUNFXMSMUCEZFAAAAAAAAAAA   # SnapRestore
+      - SUOYOUNFXMSMUCEZFAAAAAAAAAAA   # SnapVault
 
   # --- Post-Cluster: SVM ---
-  svm_name: svm_data
-  data_lif_mask: "255.255.255.0"
+  - name: svm_name
+    default: svm_data
+  - name: data_lif_mask
+    default: "255.255.255.0"
 
   # --- CIFS Server (workgroup mode) ---
-  cifs_server_name: ""
-  cifs_workgroup: WORKGROUP
+  - name: cifs_server_name
+    default: ""
+  - name: cifs_workgroup
+    default: WORKGROUP
 
   # --- NFS Export Policy ---
-  nfs_export_policy: ""
-  nfs_client_match: ""
+  - name: nfs_export_policy
+    default: ""
+  - name: nfs_client_match
+    default: ""
 
   # --- Volumes ---
-  nfs_vol_name: ""
-  nfs_vol_aggregate: ""
-  nfs_vol_size: 1
-  cifs_vol_name: ""
-  cifs_vol_aggregate: ""
-  cifs_vol_size: 1
+  - name: nfs_vol_name
+    default: ""
+  - name: nfs_vol_aggregate
+    default: ""
+  - name: nfs_vol_size
+    default: 1
+  - name: cifs_vol_name
+    default: ""
+  - name: cifs_vol_aggregate
+    default: ""
+  - name: cifs_vol_size
+    default: 1
 
   # --- DHCP ---
   # MAC addresses use generate_mac filter for deterministic uniqueness.
   # Override in package infrafoundry.yml if you need specific MACs.
-  dhcp_subnet: opt1-infrastructure
+  - name: dhcp_subnet
+    default: opt1-infrastructure
 
   # Extra Proxmox tags appended to the blueprint's default tags
-  extra_tags: []
+  - name: extra_tags
+    default: []
 
 resources:
   - vm.yaml

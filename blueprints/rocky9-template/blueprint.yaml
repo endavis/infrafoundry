@@ -2,21 +2,39 @@ name: rocky9-template
 description: "Rocky Linux 9 GenericCloud Proxmox VM template"
 version: "1.0.0"
 
-defaults:
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: storage
+    description: "Proxmox storage pool for the template disk and cloud-init"
+  - name: target_node
+    description: "Proxmox node to create the template on"
+  - name: vmid
+    description: "Proxmox VM ID for the template"
+    type: integer
+
   # --- Recipe constants (rarely overridden) ---
-  image_url: "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
-  image_filename: "Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
-  ciuser: rocky
-  cores: 2
-  memory: 2048
-  disk_size: 32
-  bridge: vmbr0
+  - name: image_url
+    default: "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+  - name: image_filename
+    default: "Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+  - name: ciuser
+    default: rocky
+  - name: cores
+    default: 2
+  - name: memory
+    default: 2048
+  - name: disk_size
+    default: 32
+  - name: bridge
+    default: vmbr0
 
   # --- Per-instance overrides (typical) ---
-  template_name: rocky9-template
+  - name: template_name
+    default: rocky9-template
 
   # Extra Proxmox tags appended to the blueprint's default tags
-  extra_tags: []
+  - name: extra_tags
+    default: []
 
 resources:
   - template.yaml

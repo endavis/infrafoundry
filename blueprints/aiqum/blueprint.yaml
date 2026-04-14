@@ -2,38 +2,77 @@ name: aiqum
 description: "NetApp Active IQ Unified Manager on Rocky 9 (Proxmox VM)"
 version: "1.0.0"
 
-defaults:
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: vm_name
+    description: "Hostname and Proxmox VM name for the AIQUM VM"
+  - name: vmid
+    description: "Proxmox VM ID"
+    type: integer
+  - name: target_node
+    description: "Proxmox node to deploy the AIQUM VM onto"
+  - name: disk_storage
+    description: "Proxmox storage pool for the AIQUM VM disk"
+  - name: ip_address
+    description: "Static IPv4 address for the AIQUM VM (DHCP reservation)"
+  - name: dhcp_subnet
+    description: "OPNsense DHCP subnet identifier used for the reservation"
+
   # --- VM hardware ---
-  template_vmid: 901          # Standard rocky9-template vmid
-  template_node: pve1         # Proxmox node hosting the template
-  cores: 4
-  memory: 12288               # AIQUM minimum recommendation (12 GiB)
-  disk_size: 150              # AIQUM minimum (~100 GB+)
+  - name: template_vmid
+    description: "Standard rocky9-template vmid"
+    default: 901
+  - name: template_node
+    description: "Proxmox node hosting the template"
+    default: pve1
+  - name: cores
+    default: 4
+  - name: memory
+    description: "AIQUM minimum recommendation (12 GiB)"
+    default: 12288
+  - name: disk_size
+    description: "AIQUM minimum (~100 GB+)"
+    default: 150
 
   # --- Network ---
-  bridge: vmbr0
-  vlan_tag: 10
-  mac_address: ""             # Empty: Proxmox auto-assigns
+  - name: bridge
+    default: vmbr0
+  - name: vlan_tag
+    default: 10
+  - name: mac_address
+    description: "Empty: Proxmox auto-assigns"
+    default: ""
 
   # --- SSH access ---
-  jumphost: ""                # Empty: direct SSH. Set to e.g. "ansible@jump.example.com"
-  ssh_user: ansible
+  - name: jumphost
+    description: 'Empty: direct SSH. Set to e.g. "ansible@jump.example.com"'
+    default: ""
+  - name: ssh_user
+    default: ansible
 
   # --- AIQUM ---
-  aiqum_url_base: ""            # URL base for AIQUM install files (e.g. http://web.example.com/aiqum)
-  aiqum_admin_user: umadmin
+  - name: aiqum_url_base
+    description: "URL base for AIQUM install files (e.g. http://web.example.com/aiqum)"
+    default: ""
+  - name: aiqum_admin_user
+    default: umadmin
 
   # --- SMTP ---
-  smtp_port: 587
+  - name: smtp_port
+    default: 587
 
   # --- Alerting ---
-  aiqum_alert_email: ""           # Empty: skip alerting. Set to receive storage alerts.
+  - name: aiqum_alert_email
+    description: "Empty: skip alerting. Set to receive storage alerts."
+    default: ""
 
   # --- ONTAP integration ---
-  ontap_admin_user: admin
+  - name: ontap_admin_user
+    default: admin
 
   # Extra Proxmox tags appended to the blueprint's default tags
-  extra_tags: []
+  - name: extra_tags
+    default: []
 
 resources:
   - vm.yaml
