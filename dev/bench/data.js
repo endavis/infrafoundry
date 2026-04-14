@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776164090242,
+  "lastUpdate": 1776164375023,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5890,6 +5890,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009435090208521244",
             "extra": "mean: 138.6683754030691 usec\nrounds: 2171"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e735e978b760e0dea3ec108c653dca30c900b92d",
+          "message": "chore(deps): bump types-boto3 from 1.42.78 to 1.42.88 (merges PR #590)\n\nBumps [types-boto3](https://github.com/youtype/mypy_boto3_builder) from 1.42.78 to 1.42.88.\n- [Release notes](https://github.com/youtype/mypy_boto3_builder/releases)\n- [Commits](https://github.com/youtype/mypy_boto3_builder/commits)\n\n---\nupdated-dependencies:\n- dependency-name: types-boto3\n  dependency-version: 1.42.88\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-14T11:59:01+01:00",
+          "tree_id": "ca29718d2c700b6366de386a6a12d6ac69ef6f1e",
+          "url": "https://github.com/endavis/infrafoundry/commit/e735e978b760e0dea3ec108c653dca30c900b92d"
+        },
+        "date": 1776164374623,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8321.517880388825,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002505673454713974",
+            "extra": "mean: 120.17038410224204 usec\nrounds: 1799"
           }
         ]
       }
