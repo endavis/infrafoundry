@@ -3,6 +3,7 @@
 from click.testing import CliRunner
 
 from infrafoundry.cli import main as cli
+from infrafoundry.cli.commands import doctor as doctor_module
 from infrafoundry.cli.commands.doctor_utils import CheckResult, check_dependency
 
 
@@ -124,6 +125,64 @@ class TestCheckDependency:
         assert result.status == "error"
         assert result.message == "Not found"
         assert result.suggestion == "Install nonexistent"
+
+
+class TestIacToolAlternatives:
+    """Tests that Terraform and OpenTofu are treated as alternatives."""
+
+    def _which_stub(self, installed: set[str]):
+        def _which(cmd: str) -> str | None:
+            return f"/usr/bin/{cmd}" if cmd in installed else None
+
+        return _which
+
+    def test_both_installed_both_ok(self, monkeypatch):
+        monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"terraform", "tofu"}))
+        results = {r.name: r for r in doctor_module._check_iac_tools()}
+        assert results["Terraform"].status == "ok"
+        assert results["OpenTofu"].status == "ok"
+
+    def test_only_terraform_opentofu_is_warning(self, monkeypatch):
+        monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"terraform"}))
+        results = {r.name: r for r in doctor_module._check_iac_tools()}
+        assert results["Terraform"].status == "ok"
+        assert results["OpenTofu"].status == "warning"
+        assert "optional" in results["OpenTofu"].message.lower()
+
+    def test_only_opentofu_terraform_is_warning(self, monkeypatch):
+        monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"tofu"}))
+        results = {r.name: r for r in doctor_module._check_iac_tools()}
+        assert results["OpenTofu"].status == "ok"
+        assert results["Terraform"].status == "warning"
+        assert "optional" in results["Terraform"].message.lower()
+
+    def test_neither_installed_both_error(self, monkeypatch):
+        monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub(set()))
+        results = {r.name: r for r in doctor_module._check_iac_tools()}
+        assert results["Terraform"].status == "error"
+        assert results["OpenTofu"].status == "error"
+
+    def test_doctor_exits_zero_when_only_terraform_installed(self, monkeypatch):
+        """Doctor should exit 0 when a supported IaC tool is installed."""
+        installed = {"terraform", "ansible", "sops", "age"}
+        monkeypatch.setattr(
+            doctor_module.shutil,
+            "which",
+            lambda cmd: f"/usr/bin/{cmd}" if cmd in installed else None,
+        )
+        # doctor_utils.check_dependency also calls shutil.which directly
+        from infrafoundry.cli.commands import doctor_utils
+
+        monkeypatch.setattr(
+            doctor_utils.shutil,
+            "which",
+            lambda cmd: f"/usr/bin/{cmd}" if cmd in installed else None,
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["doctor"])
+        assert result.exit_code == 0
+        assert "OpenTofu" in result.output
 
 
 class TestCheckResultDataclass:
