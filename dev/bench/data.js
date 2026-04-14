@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776113424370,
+  "lastUpdate": 1776156978910,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5673,6 +5673,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010325679154425053",
             "extra": "mean: 131.59078286682833 usec\nrounds: 3537"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5e5c8a6839ccd4364f4850048f76bee9644e6ee3",
+          "message": "chore(deps): update hatchling requirement from >=1.24 to >=1.29.0 (merges PR #583)\n\nUpdates the requirements on [hatchling](https://github.com/pypa/hatch) to permit the latest version.\n- [Release notes](https://github.com/pypa/hatch/releases)\n- [Commits](https://github.com/pypa/hatch/compare/hatchling-v1.24.0...hatchling-v1.29.0)\n\n---\nupdated-dependencies:\n- dependency-name: hatchling\n  dependency-version: 1.29.0\n  dependency-type: direct:development\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-14T09:55:41+01:00",
+          "tree_id": "af00074e6f03266dd1ca4806775d0ea5e18934eb",
+          "url": "https://github.com/endavis/infrafoundry/commit/5e5c8a6839ccd4364f4850048f76bee9644e6ee3"
+        },
+        "date": 1776156977985,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9702.180185612044,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004243970775855958",
+            "extra": "mean: 103.06961743330238 usec\nrounds: 2065"
           }
         ]
       }
