@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776161992352,
+  "lastUpdate": 1776162553639,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5735,6 +5735,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009820072427848657",
             "extra": "mean: 135.02054423263434 usec\nrounds: 2306"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1b6faa60c937e7e7f6c387d34f13e8591fb7a565",
+          "message": "chore(deps): bump types-requests from 2.33.0.20260402 to 2.33.0.20260408 (merges PR #585)\n\nBumps [types-requests](https://github.com/python/typeshed) from 2.33.0.20260402 to 2.33.0.20260408.\n- [Commits](https://github.com/python/typeshed/commits)\n\n---\nupdated-dependencies:\n- dependency-name: types-requests\n  dependency-version: 2.33.0.20260408\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-04-14T11:28:29+01:00",
+          "tree_id": "5b27a169856b59f138de763e861a8d80ddea3aa3",
+          "url": "https://github.com/endavis/infrafoundry/commit/1b6faa60c937e7e7f6c387d34f13e8591fb7a565"
+        },
+        "date": 1776162552995,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6468.510387245646,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003238676263963208",
+            "extra": "mean: 154.59509842818844 usec\nrounds: 2418"
           }
         ]
       }
