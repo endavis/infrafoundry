@@ -13,41 +13,46 @@ from .doctor_utils import (
 )
 
 
-def _check_iac_tools() -> list[CheckResult]:
-    """Check for Terraform and OpenTofu as alternative IaC runners.
+def _check_iac_tool() -> CheckResult:
+    """Check that at least one supported IaC runner is installed.
 
-    Only one is required. If at least one is installed, the missing one is
-    reported as a warning (optional alternative). If neither is installed,
-    both are reported as errors.
+    Terraform and OpenTofu are alternatives — only one is required. If both
+    are installed, the result notes both paths. If neither is installed, the
+    check fails with install instructions for both.
 
     Returns:
-        Check results for Terraform followed by OpenTofu.
+        A single ``CheckResult`` summarizing IaC tool availability.
     """
     tf_path = shutil.which("terraform")
     tofu_path = shutil.which("tofu")
-    has_any = bool(tf_path or tofu_path)
 
-    def _result(name: str, path: str | None, install_url: str) -> CheckResult:
-        if path:
-            return CheckResult(name=name, status="ok", message=f"Found at {path}")
-        if has_any:
-            return CheckResult(
-                name=name,
-                status="warning",
-                message="Not found (optional alternative)",
-                suggestion=f"Optional; install from {install_url} if you prefer it",
-            )
+    if tf_path and tofu_path:
         return CheckResult(
-            name=name,
-            status="error",
-            message="Not found",
-            suggestion=f"Install from {install_url}",
+            name="IaC Tool",
+            status="ok",
+            message=f"Terraform: {tf_path}; OpenTofu: {tofu_path}",
         )
-
-    return [
-        _result("Terraform", tf_path, "https://terraform.io/downloads"),
-        _result("OpenTofu", tofu_path, "https://opentofu.org/docs/intro/install/"),
-    ]
+    if tf_path:
+        return CheckResult(
+            name="IaC Tool",
+            status="ok",
+            message=f"Terraform found at {tf_path}",
+        )
+    if tofu_path:
+        return CheckResult(
+            name="IaC Tool",
+            status="ok",
+            message=f"OpenTofu found at {tofu_path}",
+        )
+    return CheckResult(
+        name="IaC Tool",
+        status="error",
+        message="Neither Terraform nor OpenTofu found",
+        suggestion=(
+            "Install one of: Terraform (https://terraform.io/downloads) "
+            "or OpenTofu (https://opentofu.org/docs/intro/install/)"
+        ),
+    )
 
 
 @click.command()
@@ -62,8 +67,9 @@ def _check_iac_tools() -> list[CheckResult]:
 def doctor(ctx: click.Context, output_format: str) -> None:
     """Check system dependencies for InfraFoundry.
 
-    Validates that all required CLI tools (Terraform, OpenTofu, Ansible,
-    SOPS, Age) are installed and available on the PATH.
+    Validates that all required CLI tools are installed and available on the
+    PATH: an IaC tool (Terraform or OpenTofu — either works), Ansible, SOPS,
+    and Age.
 
     Use 'config doctor' for configuration-level checks and
     'infra doctor' for provider API validation.
@@ -76,7 +82,7 @@ def doctor(ctx: click.Context, output_format: str) -> None:
         console.print()
         console.print("[bold]Checking system dependencies...[/bold]")
 
-    results.extend(_check_iac_tools())
+    results.append(_check_iac_tool())
     results.append(
         check_dependency(
             "Ansible",

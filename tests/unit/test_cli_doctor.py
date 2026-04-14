@@ -67,7 +67,7 @@ class TestDoctorCommand:
         result = runner.invoke(cli, ["doctor"])
 
         assert result.exit_code == 0
-        assert "Terraform" in result.output
+        assert "IaC Tool" in result.output
         assert "Ansible" in result.output
         assert "SOPS" in result.output
         assert "Age" in result.output
@@ -89,7 +89,7 @@ class TestDoctorCommand:
         assert "checks" in data
         assert "summary" in data
         check_names = {c["name"] for c in data["checks"]}
-        assert "Terraform" in check_names
+        assert "IaC Tool" in check_names
         assert "Ansible" in check_names
         # Config-level checks should not be in system doctor
         assert "Config Repository" not in check_names
@@ -136,34 +136,36 @@ class TestIacToolAlternatives:
 
         return _which
 
-    def test_both_installed_both_ok(self, monkeypatch):
+    def test_both_installed_ok(self, monkeypatch):
         monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"terraform", "tofu"}))
-        results = {r.name: r for r in doctor_module._check_iac_tools()}
-        assert results["Terraform"].status == "ok"
-        assert results["OpenTofu"].status == "ok"
+        result = doctor_module._check_iac_tool()
+        assert result.name == "IaC Tool"
+        assert result.status == "ok"
+        assert "Terraform" in result.message
+        assert "OpenTofu" in result.message
 
-    def test_only_terraform_opentofu_is_warning(self, monkeypatch):
+    def test_only_terraform_ok(self, monkeypatch):
         monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"terraform"}))
-        results = {r.name: r for r in doctor_module._check_iac_tools()}
-        assert results["Terraform"].status == "ok"
-        assert results["OpenTofu"].status == "warning"
-        assert "optional" in results["OpenTofu"].message.lower()
+        result = doctor_module._check_iac_tool()
+        assert result.status == "ok"
+        assert "Terraform" in result.message
 
-    def test_only_opentofu_terraform_is_warning(self, monkeypatch):
+    def test_only_opentofu_ok(self, monkeypatch):
         monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"tofu"}))
-        results = {r.name: r for r in doctor_module._check_iac_tools()}
-        assert results["OpenTofu"].status == "ok"
-        assert results["Terraform"].status == "warning"
-        assert "optional" in results["Terraform"].message.lower()
+        result = doctor_module._check_iac_tool()
+        assert result.status == "ok"
+        assert "OpenTofu" in result.message
 
-    def test_neither_installed_both_error(self, monkeypatch):
+    def test_neither_installed_error(self, monkeypatch):
         monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub(set()))
-        results = {r.name: r for r in doctor_module._check_iac_tools()}
-        assert results["Terraform"].status == "error"
-        assert results["OpenTofu"].status == "error"
+        result = doctor_module._check_iac_tool()
+        assert result.status == "error"
+        assert "Neither" in result.message
+        assert "Terraform" in result.suggestion
+        assert "OpenTofu" in result.suggestion
 
-    def test_doctor_exits_zero_when_only_terraform_installed(self, monkeypatch):
-        """Doctor should exit 0 when a supported IaC tool is installed."""
+    def test_doctor_exits_zero_with_only_terraform_and_no_warnings(self, monkeypatch):
+        """Doctor should exit 0 and show no warnings when only Terraform is installed."""
         installed = {"terraform", "ansible", "sops", "age"}
         monkeypatch.setattr(
             doctor_module.shutil,
@@ -182,7 +184,9 @@ class TestIacToolAlternatives:
         runner = CliRunner()
         result = runner.invoke(cli, ["doctor"])
         assert result.exit_code == 0
-        assert "OpenTofu" in result.output
+        assert "IaC Tool" in result.output
+        assert "WARN" not in result.output
+        assert "FAIL" not in result.output
 
 
 class TestCheckResultDataclass:
