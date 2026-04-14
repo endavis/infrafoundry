@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776166879682,
+  "lastUpdate": 1776189526702,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5952,6 +5952,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000012454011482220475",
             "extra": "mean: 136.50078792805647 usec\nrounds: 2452"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c2d8d604ae7382a86907899511bd7d3af8885ac4",
+          "message": "feat: add inputs section to blueprint schema for required user variables (merges PR #608, addresses #607)\n\nReplaces the legacy defaults: section in blueprint manifests with a unified\ninputs: list that declares every variable a blueprint reads. Each entry\ncarries a name and optional description, type, and default. Presence of\ndefault: marks the input as optional; absence marks it as required.\n\nThis lets the blueprint validator distinguish intentional required inputs\nfrom typos and makes config doctor --deep produce actionable signal\n(Blueprint check goes from FAIL with 33 errors to WARN with 1 pre-existing\nasymmetric-variable warning that is out of scope).\n\nPre-release clean cutover: no backwards-compatibility shim; declaring\nboth inputs: and defaults: in the same scope is a hard error at resolve\ntime. BlueprintResolver continues to populate a synthetic defaults dict\nfrom inputs-that-have-default so package_loader.py merge order is\npreserved unchanged.\n\nTop-level-plus-per-provider scoping from ADR-0003 is preserved; only the\nsection name and per-entry shape changed. ADR-0003 now cross-references\nADR-0004.\n\nAddresses #607",
+          "timestamp": "2026-04-14T18:58:12+01:00",
+          "tree_id": "0ccf1d2598209f5095a07280e51d42d08fa5765a",
+          "url": "https://github.com/endavis/infrafoundry/commit/c2d8d604ae7382a86907899511bd7d3af8885ac4"
+        },
+        "date": 1776189526114,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9743.214399491757,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004131354379299201",
+            "extra": "mean: 102.63553268951608 usec\nrounds: 2692"
           }
         ]
       }
