@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776164375023,
+  "lastUpdate": 1776166879682,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5921,6 +5921,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002505673454713974",
             "extra": "mean: 120.17038410224204 usec\nrounds: 1799"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ddd0f36f5bb75b469f9a0d693f7a7a39b83135a6",
+          "message": "fix: treat Terraform and OpenTofu as alternative IaC runners in doctor (merges PR #606, addresses #605)\n\n* fix: treat Terraform and OpenTofu as alternative IaC runners in doctor\n\nPreviously `foundry doctor` reported OpenTofu as a hard FAIL when only\nTerraform was installed (and vice versa), even though they are alternative\nrunners and only one is required. This caused the command to exit non-zero\non otherwise healthy systems.\n\nNow if at least one of the two is installed, the missing alternative is\nreported as a warning. Only when neither is installed do both report as\nerrors.\n\nAddresses #605\n\n* refactor: collapse IaC tool check into a single row\n\nPer review, do not warn when one of Terraform/OpenTofu is missing — a single\ninstalled runner satisfies the requirement. Replace the two separate rows\nwith a single 'IaC Tool' check that:\n\n- reports ok with the path(s) when at least one is installed\n- reports error only when neither is installed\n\nAddresses #605",
+          "timestamp": "2026-04-14T12:40:40+01:00",
+          "tree_id": "c9f117eeb49bca710f5f62a52308abfbc04cecd7",
+          "url": "https://github.com/endavis/infrafoundry/commit/ddd0f36f5bb75b469f9a0d693f7a7a39b83135a6"
+        },
+        "date": 1776166879000,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7325.965037850593,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000012454011482220475",
+            "extra": "mean: 136.50078792805647 usec\nrounds: 2452"
           }
         ]
       }
