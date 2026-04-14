@@ -1,5 +1,7 @@
 """Doctor command - Check InfraFoundry system dependencies."""
 
+import shutil
+
 import click
 
 from .doctor_utils import (
@@ -9,6 +11,48 @@ from .doctor_utils import (
     render_check_results_json,
     render_check_results_text,
 )
+
+
+def _check_iac_tool() -> CheckResult:
+    """Check that at least one supported IaC runner is installed.
+
+    Terraform and OpenTofu are alternatives — only one is required. If both
+    are installed, the result notes both paths. If neither is installed, the
+    check fails with install instructions for both.
+
+    Returns:
+        A single ``CheckResult`` summarizing IaC tool availability.
+    """
+    tf_path = shutil.which("terraform")
+    tofu_path = shutil.which("tofu")
+
+    if tf_path and tofu_path:
+        return CheckResult(
+            name="IaC Tool",
+            status="ok",
+            message=f"Terraform: {tf_path}; OpenTofu: {tofu_path}",
+        )
+    if tf_path:
+        return CheckResult(
+            name="IaC Tool",
+            status="ok",
+            message=f"Terraform found at {tf_path}",
+        )
+    if tofu_path:
+        return CheckResult(
+            name="IaC Tool",
+            status="ok",
+            message=f"OpenTofu found at {tofu_path}",
+        )
+    return CheckResult(
+        name="IaC Tool",
+        status="error",
+        message="Neither Terraform nor OpenTofu found",
+        suggestion=(
+            "Install one of: Terraform (https://terraform.io/downloads) "
+            "or OpenTofu (https://opentofu.org/docs/intro/install/)"
+        ),
+    )
 
 
 @click.command()
@@ -23,8 +67,9 @@ from .doctor_utils import (
 def doctor(ctx: click.Context, output_format: str) -> None:
     """Check system dependencies for InfraFoundry.
 
-    Validates that all required CLI tools (Terraform, OpenTofu, Ansible,
-    SOPS, Age) are installed and available on the PATH.
+    Validates that all required CLI tools are installed and available on the
+    PATH: an IaC tool (Terraform or OpenTofu — either works), Ansible, SOPS,
+    and Age.
 
     Use 'config doctor' for configuration-level checks and
     'infra doctor' for provider API validation.
@@ -37,20 +82,7 @@ def doctor(ctx: click.Context, output_format: str) -> None:
         console.print()
         console.print("[bold]Checking system dependencies...[/bold]")
 
-    results.append(
-        check_dependency(
-            "Terraform",
-            "terraform",
-            "Install from https://terraform.io/downloads",
-        )
-    )
-    results.append(
-        check_dependency(
-            "OpenTofu",
-            "tofu",
-            "Install from https://opentofu.org/docs/intro/install/",
-        )
-    )
+    results.append(_check_iac_tool())
     results.append(
         check_dependency(
             "Ansible",
