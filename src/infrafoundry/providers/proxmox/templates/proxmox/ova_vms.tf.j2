@@ -4,13 +4,22 @@
 # OVA VM: {{ vm.config.name }}
 resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
   triggers_replace = {
-    vmid       = "{{ vm.config.vmid }}"
-    ova_source = "{{ vm.config.ova_source }}"
-    disk_bus   = "{{ vm.config.disk_bus | default('ide') }}"
-    name       = "{{ vm.config.name }}"
-    ssh_cmd    = local.ssh_cmd
-    ssh_user   = var.proxmox_ssh_user
-    ssh_target = "{{ ssh_target }}"
+    vmid         = "{{ vm.config.vmid }}"
+    ova_source   = "{{ vm.config.ova_source }}"
+    disk_bus     = "{{ vm.config.disk_bus | default('ide') }}"
+    name         = "{{ vm.config.name }}"
+    ssh_cmd      = local.ssh_cmd
+    ssh_user     = var.proxmox_ssh_user
+    ssh_target   = "{{ ssh_target }}"
+    memory       = "{{ vm.config.memory | default(2048) }}"
+    cores        = "{{ vm.config.cores | default(2) }}"
+    cpu_type     = "{{ vm.config.cpu_type | default('host') }}"
+    disk_storage = "{{ vm.config.disk_storage | default('local-lvm') }}"
+    network      = "{{ vm.config.network | default([]) | tojson | replace('"', '\\"') }}"
+    serial       = "{{ vm.config.serial | default(false) | string | lower }}"
+    boot_order   = "{{ vm.config.boot_order | default([]) | tojson | replace('"', '\\"') }}"
+    onboot       = "{{ vm.config.onboot | default(false) | string | lower }}"
+    tags         = "{{ vm.config.tags | default([]) | tojson | replace('"', '\\"') }}"
   }
 
   # Phase 1: Extract OVA to temp directory on Proxmox host (skip if VMDKs exist)
