@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776189526702,
+  "lastUpdate": 1776256199074,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5983,6 +5983,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004131354379299201",
             "extra": "mean: 102.63553268951608 usec\nrounds: 2692"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ecf56bfc550f35de3ad061ff32d971948ae64829",
+          "message": "fix: resolve terraform_secrets references during infra doctor (merges PR #611, addresses #609)\n\nThe validation orchestrator was dumping EnvironmentConfig to a dict via\nmodel_dump() before dispatching to provider validators. The helper at\ncore/validation_helpers/terraform_secrets_validator.py reads the env's\ndecrypted secrets via getattr(env_config, \"secrets\", None), which on a\ndict returns None unconditionally — so every terraform_secrets reference\nwas flagged as missing regardless of what was in envs/{env}/secrets.yaml.\n\nPass EnvironmentConfig through the validator chain unchanged and switch\nvalidator internals from dict to attribute access. Exporters and the\ninfra test runner (also on EnvironmentData) are left alone.\n\nAddresses #609",
+          "timestamp": "2026-04-15T13:29:23+01:00",
+          "tree_id": "dd264e7b78ce9998ace056f16b5268e77dbc88c2",
+          "url": "https://github.com/endavis/infrafoundry/commit/ecf56bfc550f35de3ad061ff32d971948ae64829"
+        },
+        "date": 1776256198524,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7235.610487335488,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010321933239403251",
+            "extra": "mean: 138.20533896211015 usec\nrounds: 2428"
           }
         ]
       }
