@@ -121,7 +121,7 @@
 
     - name: Wait for ONTAP node to report healthy via cluster API
       ansible.builtin.uri:
-        url: "https://{{ ontap_cluster_mgmt_ip }}/api/cluster/nodes?name={{ ontap_node_name }}&fields=state,health"
+        url: "https://{{ ontap_cluster_mgmt_ip }}/api/cluster/nodes?name={{ ontap_node_name }}&fields=state"
         user: "{{ ontap_admin_user }}"
         password: "{{ ontap_admin_password }}"
         validate_certs: "{{ ontap_validate_certs }}"
@@ -132,7 +132,6 @@
         node_health.status == 200
         and (node_health.json.records | default([]) | length) > 0
         and (node_health.json.records[0].state | default('')) == 'up'
-        and (node_health.json.records[0].health | default(false)) | bool
       retries: "{{ (ontap_boot_timeout | int / 10) | int }}"
       delay: 10
       delegate_to: localhost

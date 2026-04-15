@@ -10,13 +10,26 @@ log_file -noappend /tmp/ontap-console-restore-{{ ontap_vmid }}-${timestamp}.log
 set timeout {{ ontap_loader_timeout }}
 spawn socat STDIO,rawer UNIX-CONNECT:/var/run/qemu-server/{{ ontap_vmid }}.serial0
 
-# Wait for the boot intercept prompt
+# Poke the serial line. If the VM has already parked at the halt prompt
+# before we attached, the firmware won't redraw it for us — a keystroke
+# is the only way to see it.
+send "\r"
+
+# After `system node halt` the ONTAP Simulator parks at a firmware-level
+# "Please press any key to reboot" prompt (SRM_F_POWEROFF_VM behavior);
+# it does NOT drop directly to VLOADER. Send a key to trigger the reboot,
+# then intercept the boot prompt that follows and land at VLOADER from
+# there.
 expect {
+  "Please press any key to reboot" {
+    send "\r"
+    exp_continue
+  }
   "Hit*to boot immediately, or any other key for command prompt." {
     send " "
   }
   "VLOADER>" {
-    # Already at VLOADER prompt
+    # Already at VLOADER prompt (e.g. manual recovery)
   }
   timeout {
     puts "ERROR: Timed out waiting for boot prompt"

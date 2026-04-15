@@ -81,6 +81,23 @@ class TestConsoleRestoreTemplate:
         """The expect script honours the configured loader timeout."""
         assert "set timeout 300" in rendered
 
+    def test_handles_halt_reboot_prompt(self, rendered: str) -> None:
+        """After `system node halt` the simulator parks at a firmware-level
+        'Please press any key to reboot' prompt (SRM_F_POWEROFF_VM). The
+        script must match it and send a key so the VM reboots into VLOADER.
+        """
+        assert "Please press any key to reboot" in rendered
+        assert "exp_continue" in rendered
+
+    def test_pokes_serial_before_waiting(self, rendered: str) -> None:
+        """The script must write to the serial line before expecting, so a
+        VM that parked at the halt prompt before we attached still gets
+        its prompt redrawn."""
+        spawn_idx = rendered.index("spawn socat")
+        first_expect_idx = rendered.index("expect {")
+        between = rendered[spawn_idx:first_expect_idx]
+        assert 'send "\\r"' in between or 'send "\\r"' in between
+
 
 class TestConsoleRestoreBlueprintInput:
     """Verify ``ontap_restore_console`` is declared on the blueprint."""
