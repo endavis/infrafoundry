@@ -261,7 +261,7 @@ def _parse_env_dump(path: Path) -> dict[str, str]:
 
 @pytest.mark.unit
 class TestScriptHandlerInventoryInjection:
-    """Tests for INFRAFOUNDRY_INVENTORY injection from _package_dir."""
+    """Tests for INFRAFOUNDRY_INVENTORY / INFRAFOUNDRY_PACKAGE_DIR injection from _package_dir."""
 
     def test_injects_inventory_env_when_package_dir_has_generated_inventory(self, tmp_path: Path):
         """INFRAFOUNDRY_INVENTORY is set when _package_dir contains .generated-inventory.yml."""
@@ -326,6 +326,45 @@ class TestScriptHandlerInventoryInjection:
 
         env = _parse_env_dump(out_file)
         assert "INFRAFOUNDRY_INVENTORY" not in env
+
+    def test_injects_package_dir_env_when_package_dir_configured(self, tmp_path: Path):
+        """INFRAFOUNDRY_PACKAGE_DIR is set to the configured _package_dir."""
+        script_rel, out_file = _make_dump_env_script(tmp_path, "dump-pkg-dir.sh")
+
+        pkg_dir = tmp_path / "envs" / "dev" / "proxmox" / "some-pkg"
+        pkg_dir.mkdir(parents=True, exist_ok=True)
+
+        handler = ScriptHandler(
+            {"script": str(script_rel), "_package_dir": str(pkg_dir)},
+            config_base_dir=tmp_path,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+        assert result.success, result.reason
+
+        env = _parse_env_dump(out_file)
+        assert env.get("INFRAFOUNDRY_PACKAGE_DIR") == str(pkg_dir)
+
+    def test_does_not_inject_package_dir_when_not_configured(self, tmp_path: Path):
+        """INFRAFOUNDRY_PACKAGE_DIR is unset when config has no _package_dir."""
+        script_rel, out_file = _make_dump_env_script(tmp_path, "dump-no-pkg-dir.sh")
+
+        handler = ScriptHandler(
+            {"script": str(script_rel)},
+            config_base_dir=tmp_path,
+        )
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+        )
+        result = handler.execute(context)
+        assert result.success, result.reason
+
+        env = _parse_env_dump(out_file)
+        assert "INFRAFOUNDRY_PACKAGE_DIR" not in env
 
 
 def _make_script(tmp_path: Path, name: str, content: str) -> Path:

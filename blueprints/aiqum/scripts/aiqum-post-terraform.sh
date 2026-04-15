@@ -8,6 +8,7 @@
 # for the AIQUM VM only exists there.
 #
 # Package variables (including secrets) are injected by InfraFoundry as:
+#   INFRAFOUNDRY_PACKAGE_DIR   - required: path to the consuming env package dir
 #   INFRAFOUNDRY_PACKAGE_VARS  - JSON string of all package variables
 #   INFRAFOUNDRY_VAR_<key>     - Individual variables
 #
@@ -20,8 +21,12 @@ set -euo pipefail
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
+# SCRIPT_DIR points at this blueprint's scripts/ dir; it is the right source
+# for sibling helpers (aiqum-install-remote.sh, aiqum-initial-setup.py).
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PACKAGE_DIR="$(dirname "$SCRIPT_DIR")"
+# PACKAGE_DIR must come from the framework — deriving it from $(dirname "$0")
+# resolves to the blueprint dir, which is wrong for a consuming package.
+PACKAGE_DIR="${INFRAFOUNDRY_PACKAGE_DIR:?required: run via foundry, not directly}"
 
 # Read variables from INFRAFOUNDRY_PACKAGE_VARS or fall back to infrafoundry.yml
 if [ -n "${INFRAFOUNDRY_PACKAGE_VARS:-}" ]; then

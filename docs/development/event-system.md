@@ -82,6 +82,7 @@ events:
 | `INFRAFOUNDRY_RUNNER` | `context.runner` is set |
 | `INFRAFOUNDRY_PHASE` | `data.phase` is set (`plan`, `apply`, or `destroy`) |
 | `INFRAFOUNDRY_CONFIG_DIR` | Always |
+| `INFRAFOUNDRY_PACKAGE_DIR` | Handler is dispatched from a package context (always set when the handler comes from a package or its consumed blueprint). Absolute path to the consuming env package directory (e.g., `envs/prod/proxmox/ontap-cluster/`). Use this — not `$(dirname "$0")` — to locate runtime artifacts. |
 | `INFRAFOUNDRY_DEPLOYMENT_ID` | `context.deployment_id` is set |
 | `INFRAFOUNDRY_TARGET_RESOURCES` | `-r` filter is active (comma-separated list) |
 | `INFRAFOUNDRY_INVENTORY` | Package has an `inventory:` block and a `.generated-inventory.yml` exists in the package directory |
@@ -226,6 +227,7 @@ Scripts and playbooks receive resource context via environment variables:
 | `INFRAFOUNDRY_PACKAGE` | Package name |
 | `INFRAFOUNDRY_ENV` | Environment name |
 | `INFRAFOUNDRY_CONFIG_DIR` | Path to environment config directory |
+| `INFRAFOUNDRY_PACKAGE_DIR` | Absolute path to the consuming env package directory (e.g., `envs/prod/proxmox/ontap-cluster/`). Set when the handler is dispatched from a package context (always set when the handler comes from a package or its consumed blueprint). Use this — not `$(dirname "$0")` — to locate runtime artifacts. |
 | `INFRAFOUNDRY_VAR_<key>` | Individual package variable (uppercase key) |
 | `INFRAFOUNDRY_PACKAGE_VARS` | JSON dict of all merged package variables |
 | `INFRAFOUNDRY_INVENTORY` | Absolute path to the package's `.generated-inventory.yml` (set only when the package defines an `inventory:` block) |
