@@ -40,6 +40,8 @@ class ScriptHandler(BaseHandler):
         INFRAFOUNDRY_RUNNER: Runner name (if applicable, e.g., "terraform")
         INFRAFOUNDRY_PHASE: Workflow phase (if applicable, e.g., "plan", "apply", "destroy")
         INFRAFOUNDRY_CONFIG_DIR: Path to environment config directory
+        INFRAFOUNDRY_PACKAGE_DIR: Path to consuming env package directory (if applicable)
+        INFRAFOUNDRY_BLUEPRINT_DIR: Path to blueprint directory (if dispatched from blueprint)
         INFRAFOUNDRY_PACKAGE_VARS: JSON string of all package variables (if available)
         INFRAFOUNDRY_VAR_<key>: Individual package variable values (if available)
 
@@ -133,8 +135,14 @@ class ScriptHandler(BaseHandler):
         if blueprint_dir_str:
             env["INFRAFOUNDRY_BLUEPRINT_DIR"] = blueprint_dir_str
 
-        # Inject inventory path if a generated inventory exists
+        # Inject package dir so blueprint scripts can locate consumer-side
+        # artifacts (e.g., generated inventory) without deriving them from
+        # $(dirname "$0"), which resolves to the blueprint dir.
         package_dir = self.config.get("_package_dir")
+        if package_dir:
+            env["INFRAFOUNDRY_PACKAGE_DIR"] = str(package_dir)
+
+        # Inject inventory path if a generated inventory exists
         if package_dir:
             inventory_path = Path(package_dir) / ".generated-inventory.yml"
             if inventory_path.exists():

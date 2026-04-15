@@ -9,17 +9,22 @@
 # The script only generates a dynamic inventory (host mappings).
 #
 # Environment variables (injected by ScriptHandler):
-#   INFRAFOUNDRY_PACKAGE_VARS - JSON string of all package variables (including secrets)
-#   INFRAFOUNDRY_VAR_<key>    - Individual package variables
-#   INFRAFOUNDRY_EVENT        - event type (e.g., "resource_created")
-#   INFRAFOUNDRY_ENV          - environment name (e.g., "prod")
-#   INFRAFOUNDRY_CONFIG_DIR   - path to envs/<env>/
+#   INFRAFOUNDRY_PACKAGE_DIR   - required: path to the consuming env package dir
+#   INFRAFOUNDRY_BLUEPRINT_DIR - required: path to this blueprint dir
+#   INFRAFOUNDRY_PACKAGE_VARS  - JSON string of all package variables (including secrets)
+#   INFRAFOUNDRY_VAR_<key>     - Individual package variables
+#   INFRAFOUNDRY_EVENT         - event type (e.g., "resource_created")
+#   INFRAFOUNDRY_ENV           - environment name (e.g., "prod")
+#   INFRAFOUNDRY_CONFIG_DIR    - path to envs/<env>/
 
 set -euo pipefail
 
-# Script lives in ontap-cluster/scripts/, so package dir is one level up
-PACKAGE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PLAYBOOK="${PACKAGE_DIR}/ontap-lab-playbook.yml"
+# Required env vars (injected by the framework's ScriptHandler).
+# Running manually without these is intentionally unsupported — the script
+# has no sensible way to guess the consumer's package dir.
+PACKAGE_DIR="${INFRAFOUNDRY_PACKAGE_DIR:?required: run via foundry, not directly}"
+BLUEPRINT_DIR="${INFRAFOUNDRY_BLUEPRINT_DIR:?required: run via foundry, not directly}"
+PLAYBOOK="${BLUEPRINT_DIR}/ontap-lab-playbook.yml"
 
 # Verify required files exist
 if [ ! -f "$PLAYBOOK" ]; then
@@ -97,5 +102,5 @@ with open(sys.argv[2], 'w') as f:
 " "${PACKAGE_DIR}/infrafoundry.yml" "$INVENTORY"
 
 echo "Running ONTAP lab cluster setup playbook..."
-cd "$PACKAGE_DIR"
+cd "$BLUEPRINT_DIR"
 ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -v
