@@ -5,10 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any, cast
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import APIError, ConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.tailscale import TailscaleSchemaError, process_tailscale_config
-from infrafoundry.core.types import EnvironmentData, OCIProviderSettings
+from infrafoundry.core.types import OCIProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import (
     BaseAPIValidator,
@@ -32,7 +33,7 @@ class OCIValidator:
     - Image OCID validation via OCI API
     """
 
-    def __init__(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+    def __init__(self, env_config: EnvironmentConfig, report: ValidationReport) -> None:
         """Initialize OCI validator.
 
         Args:

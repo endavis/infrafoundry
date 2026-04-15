@@ -10,6 +10,7 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.kubernetes.validators.crd_validator import CRDValidator
+from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
@@ -21,10 +22,10 @@ def validation_report():
 @pytest.fixture
 def api_validator(validation_report):
     """Create a BaseAPIValidator instance."""
-    env_config = {
-        "name": "test-env",
-        "provider_settings": {"kubernetes": {}},
-    }
+    env_config = make_env_config(
+        name="test-env",
+        provider_settings={"kubernetes": {}},
+    )
     return BaseAPIValidator("kubernetes", env_config, validation_report)
 
 

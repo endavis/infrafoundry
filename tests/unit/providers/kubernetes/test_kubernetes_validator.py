@@ -18,19 +18,20 @@ from infrafoundry.providers.kubernetes.validators import (
     KubeconfigValidator,
     NamespaceValidator,
 )
+from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
 def mock_env_config():
     """Create a mock environment config."""
-    return {
-        "name": "test-env",
-        "provider_settings": {
+    return make_env_config(
+        name="test-env",
+        provider_settings={
             "kubernetes": {
                 "kubeconfig_path": "/path/to/kubeconfig",
             }
         },
-    }
+    )
 
 
 @pytest.fixture
@@ -109,10 +110,10 @@ class TestKubernetesValidatorConnectivity:
 
     def test_validate_connectivity_no_kubeconfig_path_with_default(self, validation_report):
         """Test validation when no kubeconfig path specified but default exists."""
-        env_config = {
-            "name": "test-env",
-            "provider_settings": {"kubernetes": {}},
-        }
+        env_config = make_env_config(
+            name="test-env",
+            provider_settings={"kubernetes": {}},
+        )
 
         with patch.object(Path, "exists", return_value=True):
             validator = KubernetesValidator(env_config, validation_report)
@@ -123,10 +124,10 @@ class TestKubernetesValidatorConnectivity:
 
     def test_validate_connectivity_no_kubeconfig_path_no_default(self, validation_report):
         """Test validation when no kubeconfig path and no default."""
-        env_config = {
-            "name": "test-env",
-            "provider_settings": {"kubernetes": {}},
-        }
+        env_config = make_env_config(
+            name="test-env",
+            provider_settings={"kubernetes": {}},
+        )
 
         with patch.object(Path, "exists", return_value=False):
             validator = KubernetesValidator(env_config, validation_report)
@@ -148,15 +149,15 @@ class TestKubernetesValidatorConnectivity:
 
     def test_validate_connectivity_passes_context_override(self, validation_report):
         """Test that context override from settings is passed through."""
-        env_config = {
-            "name": "test-env",
-            "provider_settings": {
+        env_config = make_env_config(
+            name="test-env",
+            provider_settings={
                 "kubernetes": {
                     "kubeconfig_path": "/path/to/kubeconfig",
                     "context": "my-context",
                 }
             },
-        }
+        )
         validator = KubernetesValidator(env_config, validation_report)
         validator.kubeconfig_validator.validate = MagicMock()
         validator.validate_connectivity()

@@ -17,20 +17,21 @@ from infrafoundry.providers.proxmox.validators import (
     TemplateValidator,
     VMIDValidator,
 )
+from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
 def env_config():
     """Create a valid environment config."""
-    return {
-        "provider_settings": {
+    return make_env_config(
+        provider_settings={
             "proxmox": {
                 "api_url": "https://pve.example.com:8006/api2/json",
                 "api_token": "user@pam!token=secret",
                 "node": "pve1",
             }
-        }
-    }
+        },
+    )
 
 
 @pytest.fixture
@@ -74,15 +75,15 @@ class TestValidateConnectivity:
 
     def test_no_api_token_reports_error(self, report):
         """Reports error when no API token is available."""
-        env_config = {
-            "provider_settings": {
+        env_config = make_env_config(
+            provider_settings={
                 "proxmox": {
                     "api_url": "https://pve.example.com:8006/api2/json",
                     "node": "pve1",
                     # No api_token, api_token_id, or api_token_secret
                 }
-            }
-        }
+            },
+        )
         validator = ProxmoxValidator(env_config, report)
         validator.api_validator.get_credentials = MagicMock(
             return_value={"api_url": "https://pve.example.com:8006/api2/json", "node": "pve1"}
@@ -138,15 +139,15 @@ class TestValidateReferences:
 
     def test_no_client_returns_early(self, report):
         """Returns early when client can't be created."""
-        env_config = {
-            "provider_settings": {
+        env_config = make_env_config(
+            provider_settings={
                 "proxmox": {
                     "api_url": "https://pve.example.com:8006/api2/json",
                     "node": "pve1",
                     # No token
                 }
-            }
-        }
+            },
+        )
         validator = ProxmoxValidator(env_config, report)
 
         validator.validate_references([])

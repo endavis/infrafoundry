@@ -12,6 +12,7 @@ from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.kubernetes.validators.kubeconfig_validator import (
     KubeconfigValidator,
 )
+from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
@@ -23,10 +24,10 @@ def validation_report():
 @pytest.fixture
 def api_validator(validation_report):
     """Create a BaseAPIValidator instance."""
-    env_config = {
-        "name": "test-env",
-        "provider_settings": {"kubernetes": {"kubeconfig_path": "/path/to/kubeconfig"}},
-    }
+    env_config = make_env_config(
+        name="test-env",
+        provider_settings={"kubernetes": {"kubeconfig_path": "/path/to/kubeconfig"}},
+    )
     return BaseAPIValidator("kubernetes", env_config, validation_report)
 
 
