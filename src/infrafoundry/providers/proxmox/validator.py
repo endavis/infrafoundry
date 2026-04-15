@@ -7,10 +7,11 @@ from typing import Any, TypedDict, cast
 
 import urllib3
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.tailscale import TailscaleSchemaError, process_tailscale_config
-from infrafoundry.core.types import EnvironmentData, ProxmoxProviderSettings
+from infrafoundry.core.types import ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import (
     BaseAPIValidator,
@@ -62,7 +63,7 @@ class ProxmoxValidator:
     - MAC address conflicts
     """
 
-    def __init__(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+    def __init__(self, env_config: EnvironmentConfig, report: ValidationReport) -> None:
         """Initialize Proxmox validator.
 
         Args:

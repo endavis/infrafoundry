@@ -9,9 +9,10 @@ from typing import Any, TypedDict, cast
 
 import urllib3
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import ReferenceValidationError
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.types import EnvironmentData, OPNsenseProviderSettings
+from infrafoundry.core.types import OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense.validators import (
@@ -51,7 +52,7 @@ class OPNsenseValidator:
     - DHCP configuration validity
     """
 
-    def __init__(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+    def __init__(self, env_config: EnvironmentConfig, report: ValidationReport) -> None:
         """Initialize OPNsense validator.
 
         Args:

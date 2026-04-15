@@ -12,8 +12,7 @@ inject empty values for sensitive variables.
 
 from __future__ import annotations
 
-from typing import Any
-
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
@@ -22,7 +21,7 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 def validate_terraform_secrets_references(
     provider_name: str,
     resources: list[ResourceConfig],
-    env_config: Any,
+    env_config: EnvironmentConfig,
     report: ValidationReport,
 ) -> None:
     """Validate ``terraform_secrets`` references on each resource.

@@ -13,13 +13,14 @@ from infrafoundry.providers.oci.validators import (
     ImageValidator,
     NetworkValidator,
 )
+from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
 def env_config():
     """Create a mock environment config."""
-    return {
-        "provider_settings": {
+    return make_env_config(
+        provider_settings={
             "oci": {
                 "tenancy_ocid": "ocid1.tenancy.oc1..example",
                 "user_ocid": "ocid1.user.oc1..example",
@@ -28,8 +29,8 @@ def env_config():
                 "region": "us-ashburn-1",
                 "compartment_ocid": "ocid1.compartment.oc1..example",
             }
-        }
-    }
+        },
+    )
 
 
 @pytest.fixture
@@ -240,8 +241,8 @@ class TestValidateAPIReferences:
 
     def test_skipped_when_no_compartment_ocid(self, report):
         """API validation skipped when compartment_ocid is missing."""
-        env_config = {
-            "provider_settings": {
+        env_config = make_env_config(
+            provider_settings={
                 "oci": {
                     "tenancy_ocid": "ocid1.tenancy.oc1..example",
                     "user_ocid": "ocid1.user.oc1..example",
@@ -250,8 +251,8 @@ class TestValidateAPIReferences:
                     "region": "us-ashburn-1",
                     # No compartment_ocid
                 }
-            }
-        }
+            },
+        )
         validator = OCIValidator(env_config, report)
 
         # Should not attempt to create client
@@ -261,8 +262,8 @@ class TestValidateAPIReferences:
 
     def test_skipped_when_no_region(self, report):
         """API validation skipped when region is missing."""
-        env_config = {
-            "provider_settings": {
+        env_config = make_env_config(
+            provider_settings={
                 "oci": {
                     "tenancy_ocid": "ocid1.tenancy.oc1..example",
                     "user_ocid": "ocid1.user.oc1..example",
@@ -271,8 +272,8 @@ class TestValidateAPIReferences:
                     "compartment_ocid": "ocid1.compartment.oc1..example",
                     # No region
                 }
-            }
-        }
+            },
+        )
         validator = OCIValidator(env_config, report)
 
         with patch.object(validator, "_create_client") as mock_create:
@@ -372,7 +373,7 @@ class TestValidateConnectivity:
 
     def test_missing_credentials(self, report):
         """Test connectivity validation with missing credentials."""
-        env_config = {"provider_settings": {"oci": {}}}
+        env_config = make_env_config(provider_settings={"oci": {}})
         validator = OCIValidator(env_config, report)
 
         validator.validate_connectivity()
