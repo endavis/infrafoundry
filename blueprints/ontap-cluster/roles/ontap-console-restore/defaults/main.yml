@@ -1,0 +1,46 @@
+---
+# ONTAP Console Restore — Default Variables
+#
+# Reverses the serial-primary console redirection set during initial
+# setup (see ontap-serial-setup) so the Proxmox noVNC console becomes
+# usable again after the cluster is healthy.
+#
+# Halts the node cleanly via ONTAP CLI (HA-aware), waits at the
+# VLOADER prompt, sets `console=vidconsole,comconsole`, and boots.
+
+# Toggle the whole role on/off. When false, the role becomes a no-op.
+# Wired through from the blueprint input `ontap_restore_console`.
+ontap_restore_console: true
+
+# Proxmox VM ID of the ONTAP node to restore.
+ontap_vmid: 220
+
+# ONTAP cluster connection (delegated to localhost for the halt step
+# and the post-boot health poll). The cluster mgmt IP and password
+# come from the consuming playbook; admin user and cert validation
+# match the conventions used by the ontap-post-cluster role.
+ontap_cluster_mgmt_ip: ""
+ontap_admin_user: "admin"
+ontap_admin_password: ""
+ontap_validate_certs: false
+
+# Per-node ONTAP node name (e.g. "ontap-cluster-01"). Used for the
+# `system node halt -node <name>` command and the cluster health poll.
+ontap_node_name: ""
+
+# Overall ceiling (seconds) for the wrapper expect script: covers the
+# halt -> reach VLOADER -> set console -> boot_ontap sequence. The
+# halt itself is initiated separately via the ONTAP API; this timeout
+# bounds the time spent waiting for the wrapper PID to exit.
+ontap_console_restore_timeout: 900
+
+# Timeout (seconds) inside the expect script for reaching the VLOADER
+# prompt after halt. Five minutes covers the slowest observed case
+# (graceful HA-aware shutdown on a busy simulator).
+ontap_loader_timeout: 300
+
+# Timeout (seconds) for the post-boot cluster API health poll. The
+# simulator typically takes 4–6 minutes from `boot_ontap` to a
+# `state: up` record in /api/cluster/nodes, so 10 minutes is a
+# comfortable headroom.
+ontap_boot_timeout: 600

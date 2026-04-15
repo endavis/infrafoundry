@@ -131,6 +131,12 @@ inputs:
   - name: extra_tags
     default: []
 
+  # --- Post-setup behavior ---
+  - name: ontap_restore_console
+    description: "Restore Proxmox noVNC console (video primary) after cluster setup completes"
+    type: boolean
+    default: true
+
 resources:
   - vm.yaml
   - dhcp.yaml

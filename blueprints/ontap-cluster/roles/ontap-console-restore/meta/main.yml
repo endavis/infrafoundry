@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  role_name: ontap-console-restore
+  author: InfraFoundry
+  description: Restore Proxmox noVNC video console as primary on ONTAP Simulator nodes after cluster setup completes
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+dependencies: []

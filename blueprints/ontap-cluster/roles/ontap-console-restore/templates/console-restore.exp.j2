@@ -1,0 +1,48 @@
+#!/usr/bin/expect -f
+# ONTAP Console Restore — Expect Script
+# After a clean halt, intercepts the boot prompt, drops to VLOADER,
+# flips the console default back to video primary, and boots ONTAP.
+# No SYSID/serial mutation here — this script only edits the console
+# environment variable.
+
+set timestamp [clock format [clock seconds] -format "%Y%m%d-%H%M%S"]
+log_file -noappend /tmp/ontap-console-restore-{{ ontap_vmid }}-${timestamp}.log
+set timeout {{ ontap_loader_timeout }}
+spawn socat STDIO,rawer UNIX-CONNECT:/var/run/qemu-server/{{ ontap_vmid }}.serial0
+
+# Wait for the boot intercept prompt
+expect {
+  "Hit*to boot immediately, or any other key for command prompt." {
+    send " "
+  }
+  "VLOADER>" {
+    # Already at VLOADER prompt
+  }
+  timeout {
+    puts "ERROR: Timed out waiting for boot prompt"
+    exit 1
+  }
+}
+
+# Flip console back to video primary (reverses the serial-primary
+# setting applied by ontap-serial-setup so noVNC becomes usable again).
+expect "VLOADER>"
+send "set console=vidconsole,comconsole\r"
+
+expect "VLOADER>"
+send "boot_ontap\r"
+
+# Wait briefly to confirm boot started, then exit. The full boot is
+# tracked by the cluster API health poll in tasks/main.yml — no need
+# to drive ONTAP further over the serial link here.
+set timeout 30
+expect {
+  -glob "*BOOT*NetApp*" {
+    puts "\nONTAP boot started"
+  }
+  timeout {
+    puts "\nWARNING: Did not see boot banner, continuing anyway"
+  }
+}
+
+exit 0

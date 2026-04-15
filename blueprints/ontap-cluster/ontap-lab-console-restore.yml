@@ -1,0 +1,41 @@
+---
+# ONTAP Simulator Lab — Console Restore Playbook
+#
+# Reverses the serial-primary console redirection set during initial
+# setup so the Proxmox noVNC console becomes usable again. Runs AFTER
+# the cluster is healthy (ontap-lab-cluster-setup.yml).
+#
+# Plays run sequentially, one node at a time, because the role halts
+# the node — halting both at once would crash the cluster.
+#
+# All variables are read from INFRAFOUNDRY_VAR_* environment variables
+# set by the InfraFoundry framework (includes merged secrets).
+#
+# Opt-out by setting `ontap_restore_console: false` in the package
+# variables (or env: INFRAFOUNDRY_VAR_ontap_restore_console=false).
+
+- name: Restore Proxmox noVNC console on ONTAP node 01
+  hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_target') }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: ontap-console-restore
+      vars:
+        ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_vmid') }}"
+        ontap_node_name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_name') }}"
+        ontap_cluster_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}"
+        ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
+        ontap_restore_console: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_restore_console') | default('true', true) | bool }}"
+
+- name: Restore Proxmox noVNC console on ONTAP node 02
+  hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_target') }}"
+  gather_facts: false
+  become: true
+  roles:
+    - role: ontap-console-restore
+      vars:
+        ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_vmid') }}"
+        ontap_node_name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_name') }}"
+        ontap_cluster_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}"
+        ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
+        ontap_restore_console: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_restore_console') | default('true', true) | bool }}"
