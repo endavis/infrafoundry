@@ -1,10 +1,12 @@
 ---
 # ONTAP Simulator Lab — Full Orchestration Playbook
 #
-# Runs both serial setup and cluster setup in sequence.
+# Runs serial setup, cluster setup, and console restore in sequence.
 # For selective runs, use the individual playbooks:
-#   - ontap-lab-serial-setup.yml  (first boot only — sets sysid on node 02)
-#   - ontap-lab-cluster-setup.yml (cluster create, join, post-config)
+#   - ontap-lab-serial-setup.yml    (first boot only — sets sysid on node 02)
+#   - ontap-lab-cluster-setup.yml   (cluster create, join, post-config)
+#   - ontap-lab-console-restore.yml (revert noVNC to video primary; opt-out
+#                                    via ontap_restore_console=false)
 #
 # Usage (automated — all variables from infrafoundry.yml):
 #   Triggered by ontap-post-terraform.sh event handler
@@ -18,3 +20,6 @@
 
 - name: Cluster setup
   ansible.builtin.import_playbook: ontap-lab-cluster-setup.yml
+
+- name: Console restore
+  ansible.builtin.import_playbook: ontap-lab-console-restore.yml
