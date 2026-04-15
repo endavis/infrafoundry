@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776256199074,
+  "lastUpdate": 1776271331653,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6014,6 +6014,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010321933239403251",
             "extra": "mean: 138.20533896211015 usec\nrounds: 2428"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8e5115a009145b9c51f54b376a83fbef04235ef9",
+          "message": "fix: inject INFRAFOUNDRY_PACKAGE_DIR into blueprint script env (merges PR #613, addresses #612)\n\nBlueprint scripts derived PACKAGE_DIR from $(dirname \"$0\")/.., which\nresolves to the blueprint dir (scripts live inside the blueprint) —\nnot the consumer env package dir. The ontap-cluster post-terraform\nscript wrote .generated-inventory.yml into the blueprint every apply,\npolluting the framework checkout; concurrent consumers would collide.\n\nThe ScriptHandler already tracks _package_dir alongside _blueprint_dir;\nexpose it as INFRAFOUNDRY_PACKAGE_DIR. Both ontap-cluster and aiqum\nscripts now require the env var explicitly (fail-fast :? guard) and\nroute runtime artifacts to the consumer, not the blueprint.\n\nAddresses #612",
+          "timestamp": "2026-04-15T17:41:23+01:00",
+          "tree_id": "cabec5bbe91f7db24d3baeb2fffedf25a5b41a77",
+          "url": "https://github.com/endavis/infrafoundry/commit/8e5115a009145b9c51f54b376a83fbef04235ef9"
+        },
+        "date": 1776271329937,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7334.370687120955,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010368024014602503",
+            "extra": "mean: 136.34434945536432 usec\nrounds: 2295"
           }
         ]
       }
