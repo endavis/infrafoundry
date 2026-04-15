@@ -7,6 +7,7 @@ import pytest
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.proxmox import ProxmoxProvider
+from tests.helpers.env import make_env_config
 
 
 class TestProxmoxValidation:
@@ -24,20 +25,20 @@ class TestProxmoxValidation:
     @pytest.fixture
     def env_config(self):
         """Sample environment configuration."""
-        return {
-            "provider_settings": {
+        return make_env_config(
+            provider_settings={
                 "proxmox": {
                     "api_url": "https://pve01.example.com:8006",
                     "api_token": "PVEAPIToken=root@pam!test=12345678-1234-1234-1234-123456789abc",
                     "node": "pve01",
                 }
-            }
-        }
+            },
+        )
 
     def test_validate_connectivity_missing_credentials(self, proxmox_provider):
         """Test validation fails when credentials are missing."""
         report = ValidationReport()
-        env_config = {"provider_settings": {"proxmox": {}}}
+        env_config = make_env_config(provider_settings={"proxmox": {}})
 
         proxmox_provider.validate_connectivity(env_config, report)
 
@@ -201,7 +202,7 @@ class TestProxmoxValidation:
     def test_validate_references_no_credentials(self, proxmox_provider):
         """Test reference validation skips when no credentials."""
         report = ValidationReport()
-        env_config = {"provider_settings": {"proxmox": {}}}
+        env_config = make_env_config(provider_settings={"proxmox": {}})
         resources = [
             ResourceConfig(
                 provider="proxmox",

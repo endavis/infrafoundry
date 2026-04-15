@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 
@@ -24,7 +24,7 @@ class EsxiValidator:
     - Portgroup reference validation (VMs reference existing portgroups)
     """
 
-    def __init__(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+    def __init__(self, env_config: EnvironmentConfig, report: ValidationReport) -> None:
         """Initialize ESXi validator.
 
         Args:

@@ -8,8 +8,8 @@ import logging
 import traceback
 from typing import Any
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import APIError, InfraFoundryError, ValidationError
-from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers.connectivity_validator import ConnectivityValidator
 from infrafoundry.core.validation_helpers.credential_validator import CredentialValidator
@@ -60,7 +60,7 @@ class BaseProviderValidator:
     def __init__(
         self,
         provider_name: str,
-        env_config: EnvironmentData,
+        env_config: EnvironmentConfig,
         report: ValidationReport,
     ) -> None:
         """Initialize provider validator with specialized validators.

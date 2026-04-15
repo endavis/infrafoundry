@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Any
 
-from infrafoundry.core.types import EnvironmentData
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class CredentialValidator:
     def __init__(
         self,
         provider_name: str,
-        env_config: EnvironmentData,
+        env_config: EnvironmentConfig,
         report: ValidationReport,
     ) -> None:
         """Initialize credential validator.
@@ -49,8 +49,7 @@ class CredentialValidator:
         self.provider_name = provider_name
         self.env_config = env_config
         self.report = report
-        provider_settings = env_config.get("provider_settings", {})
-        self.provider_settings = provider_settings.get(provider_name, {})
+        self.provider_settings = env_config.provider_settings.get(provider_name, {})
 
     def validate_credentials(
         self,

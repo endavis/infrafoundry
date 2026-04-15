@@ -6,6 +6,7 @@ import pytest
 
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseProviderValidator, ResourceValidator
+from tests.helpers.env import make_env_config
 
 
 class TestBaseProviderValidator:
@@ -14,15 +15,15 @@ class TestBaseProviderValidator:
     @pytest.fixture
     def env_config(self):
         """Sample environment configuration."""
-        return {
-            "provider_settings": {
+        return make_env_config(
+            provider_settings={
                 "test_provider": {
                     "api_url": "https://api.example.com",
                     "api_key": "test-key",
                     "api_secret": "test-secret",
                 }
-            }
-        }
+            },
+        )
 
     @pytest.fixture
     def report(self):
@@ -43,7 +44,7 @@ class TestBaseProviderValidator:
         assert validator.provider_name == "test_provider"
         assert validator.env_config == env_config
         assert validator.report == report
-        assert validator.provider_settings == env_config["provider_settings"]["test_provider"]
+        assert validator.provider_settings == env_config.provider_settings["test_provider"]
 
     def test_validate_credentials_success(self, validator, report):
         """Test successful credential validation."""

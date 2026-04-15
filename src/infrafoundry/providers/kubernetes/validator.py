@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import cast
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.types import EnvironmentData, KubernetesProviderSettings
+from infrafoundry.core.types import KubernetesProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.kubernetes.validators import (
@@ -24,7 +25,7 @@ class KubernetesValidator:
     run; API-based checks only run when connectivity is established.
     """
 
-    def __init__(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+    def __init__(self, env_config: EnvironmentConfig, report: ValidationReport) -> None:
         """Initialize Kubernetes validator.
 
         Args:

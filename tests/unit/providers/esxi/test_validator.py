@@ -8,6 +8,7 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.esxi.validator import EsxiValidator
+from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
@@ -16,12 +17,12 @@ def report():
     return MagicMock(spec=ValidationReport)
 
 
-def _make_env_config(hosts: dict | None = None) -> dict:
-    """Create an environment config dict."""
+def _make_env_config(hosts: dict | None = None):
+    """Create an ``EnvironmentConfig`` populated with ESXi provider settings."""
     esxi_settings: dict = {}
     if hosts is not None:
         esxi_settings["hosts"] = hosts
-    return {"provider_settings": {"esxi": esxi_settings}}
+    return make_env_config(provider_settings={"esxi": esxi_settings})
 
 
 class TestComposition:

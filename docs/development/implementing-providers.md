@@ -75,7 +75,7 @@ Providers can override these optional methods to add advanced functionality:
 
 ```python
 def validate_connectivity(
-    self, env_config: EnvironmentData, report: ValidationReport
+    self, env_config: EnvironmentConfig, report: ValidationReport
 ) -> None:
     """Validate connectivity to provider API.
 
@@ -121,7 +121,7 @@ def validate_connectivity(self, env_config, report):
 def validate_references(
     self,
     resources: list[ResourceConfig],
-    env_config: EnvironmentData,
+    env_config: EnvironmentConfig,
     report: ValidationReport
 ) -> None:
     """Validate that referenced resources exist in the provider.

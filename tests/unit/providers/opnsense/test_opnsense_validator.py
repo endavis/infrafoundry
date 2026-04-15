@@ -15,20 +15,21 @@ from infrafoundry.providers.opnsense.validators import (
     UnboundValidator,
     VLANValidator,
 )
+from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
 def env_config():
     """Create a valid environment config."""
-    return {
-        "provider_settings": {
+    return make_env_config(
+        provider_settings={
             "opnsense": {
                 "api_url": "https://opnsense.example.com",
                 "api_key": "test-key",
                 "api_secret": "test-secret",
             }
-        }
-    }
+        },
+    )
 
 
 @pytest.fixture

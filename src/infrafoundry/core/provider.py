@@ -6,8 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.hooks.models import HooksConfig
-from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 
 
@@ -154,7 +154,9 @@ class ProviderBase(ABC):
         """
         pass
 
-    def validate_connectivity(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+    def validate_connectivity(
+        self, env_config: EnvironmentConfig, report: ValidationReport
+    ) -> None:
         """Validate connectivity to provider API.
 
         Optional method for providers to implement API connectivity checks.
@@ -168,7 +170,10 @@ class ProviderBase(ABC):
         return None
 
     def validate_references(
-        self, resources: list[ResourceConfig], env_config: EnvironmentData, report: ValidationReport
+        self,
+        resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
     ) -> None:
         """Validate that referenced resources exist in the provider.
 

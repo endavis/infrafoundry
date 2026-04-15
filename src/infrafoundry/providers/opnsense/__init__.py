@@ -5,13 +5,13 @@ import logging
 from pathlib import Path
 from typing import Any, ClassVar, override
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
 )
-from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 
 from .validator import OPNsenseValidator
@@ -620,7 +620,9 @@ class OPNsenseProvider(
         }
 
     @override
-    def validate_connectivity(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+    def validate_connectivity(
+        self, env_config: EnvironmentConfig, report: ValidationReport
+    ) -> None:
         """Validate connectivity to OPNsense API."""
         validator = OPNsenseValidator(env_config, report)
         validator.validate_connectivity()
@@ -629,7 +631,7 @@ class OPNsenseProvider(
     def validate_references(
         self,
         resources: list[ResourceConfig],
-        env_config: EnvironmentData,
+        env_config: EnvironmentConfig,
         report: ValidationReport,
     ) -> None:
         """Validate that referenced OPNsense resources exist."""

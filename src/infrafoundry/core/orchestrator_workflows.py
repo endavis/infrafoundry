@@ -29,7 +29,6 @@ from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManage
 from infrafoundry.core.types import (
     ApplyDeploymentMetadata,
     DestroyDeploymentMetadata,
-    EnvironmentData,
     PlanDeploymentMetadata,
     ResourceOutcome,
     RollbackData,
@@ -188,7 +187,6 @@ class ValidationOrchestrator:
             self.console.print(f"[red]✗ Environment '{env_name}' not found[/red]")
             return {}
 
-        env_data = cast(EnvironmentData, env_config.model_dump())
         all_resources, resources_by_provider = self._load_resources(env_name)
 
         # Convert to set for O(1) lookups
@@ -219,7 +217,7 @@ class ValidationOrchestrator:
             report = ValidationReport()
             self.console.print(f"[bold]Validating {provider_name}...[/bold]")
 
-            self._run_validation_checks(provider, env_data, resources, report)
+            self._run_validation_checks(provider, env_config, resources, report)
 
             summary = report.get_summary()
             passed = not report.has_errors()
@@ -242,19 +240,19 @@ class ValidationOrchestrator:
     def _run_validation_checks(
         self,
         provider: ProviderBase,
-        env_data: EnvironmentData,
+        env_config: EnvironmentConfig,
         resources: list[ResourceConfig],
         report: ValidationReport,
     ) -> None:
         """Invoke provider validation hooks with error protection."""
         try:
-            provider.validate_connectivity(env_data, report)
+            provider.validate_connectivity(env_config, report)
         except Exception as exc:
             self.console.print(f"[red]✗ Connectivity validation failed: {exc}[/red]")
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
 
         try:
-            provider.validate_references(resources, env_data, report)
+            provider.validate_references(resources, env_config, report)
         except Exception as exc:
             self.console.print(f"[red]✗ Reference validation failed: {exc}[/red]")
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback

@@ -5,13 +5,13 @@ import logging
 from pathlib import Path
 from typing import Any, override
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
 )
-from infrafoundry.core.types import EnvironmentData
 from infrafoundry.core.validation import ValidationReport
 
 from .validator import EsxiValidator
@@ -65,14 +65,19 @@ class EsxiProvider(
         return all(field in config for field in required_fields)
 
     @override
-    def validate_connectivity(self, env_config: EnvironmentData, report: ValidationReport) -> None:
+    def validate_connectivity(
+        self, env_config: EnvironmentConfig, report: ValidationReport
+    ) -> None:
         """Validate connectivity to ESXi hosts."""
         validator = EsxiValidator(env_config, report)
         validator.validate_connectivity()
 
     @override
     def validate_references(
-        self, resources: list[ResourceConfig], env_config: EnvironmentData, report: ValidationReport
+        self,
+        resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
     ) -> None:
         """Validate that referenced ESXi resources exist."""
         validator = EsxiValidator(env_config, report)
