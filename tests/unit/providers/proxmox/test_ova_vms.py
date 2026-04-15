@@ -88,25 +88,25 @@ class TestOVADiskImport:
         """Default disk bus should be ide."""
         vms = [_make_ova_vm()]
         content = _render_ova_vms(provider, vms)
-        assert 'disk_bus   = "ide"' in content
+        assert 'disk_bus     = "ide"' in content
 
     def test_sata_disk_bus(self, provider):
         """SATA disk bus should render correctly."""
         vms = [_make_ova_vm(disk_bus="sata")]
         content = _render_ova_vms(provider, vms)
-        assert 'disk_bus   = "sata"' in content
+        assert 'disk_bus     = "sata"' in content
 
     def test_scsi_disk_bus(self, provider):
         """SCSI disk bus should render correctly."""
         vms = [_make_ova_vm(disk_bus="scsi")]
         content = _render_ova_vms(provider, vms)
-        assert 'disk_bus   = "scsi"' in content
+        assert 'disk_bus     = "scsi"' in content
 
     def test_virtio_disk_bus(self, provider):
         """Virtio disk bus should render correctly."""
         vms = [_make_ova_vm(disk_bus="virtio")]
         content = _render_ova_vms(provider, vms)
-        assert 'disk_bus   = "virtio"' in content
+        assert 'disk_bus     = "virtio"' in content
 
     def test_disk_bus_in_attach_command(self, provider):
         """Disk bus should be used in the qm set attach command via triggers."""
@@ -269,7 +269,7 @@ class TestOVADefaults:
         # Default CPU type
         assert "--cpu host" in content
         # Default disk bus
-        assert 'disk_bus   = "ide"' in content
+        assert 'disk_bus     = "ide"' in content
         # Default storage
         assert "local-lvm" in content
         # Should have terraform_data resource
@@ -319,8 +319,8 @@ class TestOVADefaults:
         blocks = content.split("# OVA VM:")
         vm_a_block = next(b for b in blocks if "vm-a" in b)
         vm_b_block = next(b for b in blocks if "vm-b" in b)
-        assert 'ssh_target = "pve01"' in vm_a_block
-        assert 'ssh_target = "pve02"' in vm_b_block
+        assert 'ssh_target   = "pve01"' in vm_a_block
+        assert 'ssh_target   = "pve02"' in vm_b_block
 
 
 class TestOVAVMRouting:
@@ -368,33 +368,33 @@ class TestOVATriggers:
         """Triggers should include vmid."""
         vms = [_make_ova_vm(vmid=950)]
         content = _render_ova_vms(provider, vms)
-        assert 'vmid       = "950"' in content
+        assert 'vmid         = "950"' in content
 
     def test_triggers_include_ova_source(self, provider):
         """Triggers should include ova_source."""
         vms = [_make_ova_vm(ova_source="/path/to/app.ova")]
         content = _render_ova_vms(provider, vms)
-        assert 'ova_source = "/path/to/app.ova"' in content
+        assert 'ova_source   = "/path/to/app.ova"' in content
 
     def test_triggers_include_disk_bus(self, provider):
         """Triggers should include disk_bus."""
         vms = [_make_ova_vm(disk_bus="scsi")]
         content = _render_ova_vms(provider, vms)
-        assert 'disk_bus   = "scsi"' in content
+        assert 'disk_bus     = "scsi"' in content
 
     def test_triggers_include_name(self, provider):
         """Triggers should include name."""
         vms = [_make_ova_vm(name="my-vm")]
         content = _render_ova_vms(provider, vms)
-        assert 'name       = "my-vm"' in content
+        assert 'name         = "my-vm"' in content
 
     def test_triggers_include_ssh_fields(self, provider):
         """Triggers should include ssh_cmd, ssh_user, and ssh_target for destroy provisioner."""
         vms = [_make_ova_vm()]
         content = _render_ova_vms(provider, vms)
-        assert "ssh_cmd    = local.ssh_cmd" in content
-        assert "ssh_user   = var.proxmox_ssh_user" in content
-        assert 'ssh_target = "pve01"' in content
+        assert "ssh_cmd      = local.ssh_cmd" in content
+        assert "ssh_user     = var.proxmox_ssh_user" in content
+        assert 'ssh_target   = "pve01"' in content
 
     def test_destroy_uses_self_ssh_references(self, provider):
         """Destroy provisioner must use self.triggers_replace for SSH, not local/var."""
@@ -407,3 +407,97 @@ class TestOVATriggers:
         assert "${self.triggers_replace.ssh_cmd}" in destroy_section
         assert "${self.triggers_replace.ssh_user}" in destroy_section
         assert "${self.triggers_replace.ssh_target}" in destroy_section
+
+    def _triggers_block(self, content: str) -> str:
+        """Extract just the triggers_replace block from rendered template.
+
+        Scopes assertions to the triggers block so values that also render in
+        provisioner bodies (network, tags, etc.) don't produce false positives.
+        """
+        start = content.find("triggers_replace")
+        assert start != -1, "triggers_replace block not found"
+        end = content.find("}", start)
+        assert end != -1, "triggers_replace closing brace not found"
+        return content[start:end]
+
+    def test_triggers_include_memory(self, provider):
+        """Triggers should include memory so changes force replacement."""
+        vms = [_make_ova_vm(memory=4096)]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert 'memory       = "4096"' in block
+
+    def test_triggers_include_cores(self, provider):
+        """Triggers should include cores so changes force replacement."""
+        vms = [_make_ova_vm(cores=8)]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert 'cores        = "8"' in block
+
+    def test_triggers_include_cpu_type(self, provider):
+        """Triggers should include cpu_type so changes force replacement."""
+        vms = [_make_ova_vm(cpu_type="x86-64-v2-AES")]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert 'cpu_type     = "x86-64-v2-AES"' in block
+
+    def test_triggers_include_disk_storage(self, provider):
+        """Triggers should include disk_storage so changes force replacement."""
+        vms = [_make_ova_vm(disk_storage="share01")]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert 'disk_storage = "share01"' in block
+
+    def test_triggers_include_network(self, provider):
+        """Triggers should include network list in JSON form."""
+        vms = [_make_ova_vm(network=[{"model": "virtio", "bridge": "vmbr1", "tag": 110}])]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        # JSON form appears in triggers, with quotes escaped for HCL
+        assert "network" in block
+        assert '\\"bridge\\": \\"vmbr1\\"' in block
+        assert '\\"model\\": \\"virtio\\"' in block
+        assert '\\"tag\\": 110' in block
+
+    def test_triggers_include_serial_true(self, provider):
+        """Triggers should include serial=true when enabled."""
+        vms = [_make_ova_vm(serial=True)]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert 'serial       = "true"' in block
+
+    def test_triggers_include_serial_false_default(self, provider):
+        """Triggers should include serial=false by default."""
+        vms = [_make_ova_vm()]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert 'serial       = "false"' in block
+
+    def test_triggers_include_boot_order(self, provider):
+        """Triggers should include boot_order list in JSON form."""
+        vms = [_make_ova_vm(boot_order=["ide0", "net0"])]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert "boot_order" in block
+        assert '\\"ide0\\"' in block
+        assert '\\"net0\\"' in block
+
+    def test_triggers_include_onboot_true(self, provider):
+        """Triggers should include onboot=true when enabled."""
+        vms = [_make_ova_vm(onboot=True)]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert 'onboot       = "true"' in block
+
+    def test_triggers_include_tags(self, provider):
+        """Triggers should include tags list in JSON form."""
+        vms = [_make_ova_vm(tags=["homelab", "test"])]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert "tags" in block
+        assert '\\"homelab\\"' in block
+        assert '\\"test\\"' in block
+
+    def test_triggers_use_defaults_when_unset(self, provider):
+        """Triggers should render defaults when config fields are absent."""
+        vms = [_make_ova_vm()]
+        block = self._triggers_block(_render_ova_vms(provider, vms))
+        assert 'memory       = "2048"' in block
+        assert 'cores        = "2"' in block
+        assert 'cpu_type     = "host"' in block
+        assert 'disk_storage = "local-lvm"' in block
+        assert 'network      = "[]"' in block
+        assert 'serial       = "false"' in block
+        assert 'boot_order   = "[]"' in block
+        assert 'onboot       = "false"' in block
+        assert 'tags         = "[]"' in block
