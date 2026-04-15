@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776271331653,
+  "lastUpdate": 1776273652172,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6045,6 +6045,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010368024014602503",
             "extra": "mean: 136.34434945536432 usec\nrounds: 2295"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ffb62a949e91d260edb7adf21a95af954b5bae11",
+          "message": "fix: include all rendered fields in proxmox OVA triggers_replace (merges PR #614, addresses #610)\n\nThe ova_vms.tf.j2 template rendered memory, cores, cpu_type, disk_storage,\nnetwork, serial, boot_order, onboot, and tags into the qm create/qm set\nprovisioners but kept them OUT of triggers_replace. Editing any of those\nin the package config was a silent no-op — the plan reported 0 changes\neven though the config differed.\n\nExtend triggers_replace to cover every rendered field. Field-per-key (not\na hashed blob) so plan diffs remain readable. List values use\n`| tojson | replace` to stay HCL-safe inside the string map; bools use\n`| string | lower` for true/false.\n\nNote: existing deployments will see a one-time replace on next apply\nbecause the stored state was built against the old 7-key trigger map.\nThat's inherent to the fix — it means Terraform can now observe changes\nit previously missed.\n\nAddresses #610",
+          "timestamp": "2026-04-15T18:20:14+01:00",
+          "tree_id": "14f05e1574260ca2f3fbb83241387288ffa0be41",
+          "url": "https://github.com/endavis/infrafoundry/commit/ffb62a949e91d260edb7adf21a95af954b5bae11"
+        },
+        "date": 1776273651499,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8312.811176605428,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000028935359516324507",
+            "extra": "mean: 120.29624861614556 usec\nrounds: 2168"
           }
         ]
       }
