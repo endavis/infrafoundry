@@ -1,0 +1,139 @@
+---
+# ONTAP Console Restore — Tasks
+#
+# Reverses the serial-primary console setup applied by ontap-serial-setup
+# so the Proxmox noVNC console is usable again after the cluster is
+# healthy. Sequence per node:
+#
+#   1. Stage an expect-wrapper script on the Proxmox host that listens
+#      on the VM's serial socket and waits for the boot intercept.
+#   2. Halt the node cleanly via ONTAP CLI (HA-aware) — delegated to
+#      localhost against the cluster management API.
+#   3. As ONTAP halts and POSTs back to the loader, the wrapper script
+#      catches the prompt, sets `console=vidconsole,comconsole`, and
+#      issues `boot_ontap`.
+#   4. Wait for the wrapper to exit, fetch its log, clean up tmp files.
+#   5. Poll the cluster API until the node reports `state: up` so the
+#      next node's restore can proceed safely.
+
+- name: Restore Proxmox noVNC console on ONTAP node
+  when: ontap_restore_console | bool
+  block:
+    - name: Deploy console-restore expect script
+      ansible.builtin.template:
+        src: console-restore.exp.j2
+        dest: "/tmp/ontap-console-restore-{{ ontap_vmid }}.exp"
+        mode: "0755"
+
+    - name: Deploy wrapper script that waits for socket then runs expect
+      ansible.builtin.copy:
+        dest: "/tmp/ontap-console-restore-{{ ontap_vmid }}-wrapper.sh"
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          # Wait for serial socket to appear, then immediately run expect
+          SOCKET="/var/run/qemu-server/{{ ontap_vmid }}.serial0"
+          TIMEOUT=30
+          ELAPSED=0
+          while [ ! -S "$SOCKET" ]; do
+            sleep 0.5
+            ELAPSED=$((ELAPSED + 1))
+            if [ $ELAPSED -ge $((TIMEOUT * 2)) ]; then
+              echo "ERROR: Serial socket not found after ${TIMEOUT}s"
+              exit 1
+            fi
+          done
+          exec /tmp/ontap-console-restore-{{ ontap_vmid }}.exp
+
+    - name: Launch wrapper script in background (catches VLOADER on next boot)
+      ansible.builtin.shell: |
+        nohup /tmp/ontap-console-restore-{{ ontap_vmid }}-wrapper.sh > /tmp/ontap-console-restore-wrapper-{{ ontap_vmid }}.out 2>&1 &
+        echo $!
+      register: wrapper_bg
+      changed_when: true
+
+    - name: Halt ONTAP node cleanly via cluster API (HA-aware)
+      netapp.ontap.na_ontap_command:
+        hostname: "{{ ontap_cluster_mgmt_ip }}"
+        username: "{{ ontap_admin_user }}"
+        password: "{{ ontap_admin_password }}"
+        https: true
+        validate_certs: "{{ ontap_validate_certs }}"
+        command:
+          - "system"
+          - "node"
+          - "halt"
+          - "-node"
+          - "{{ ontap_node_name }}"
+          - "-inhibit-takeover"
+          - "true"
+          - "-skip-lif-migration-before-shutdown"
+          - "true"
+          - "-ignore-quorum-warnings"
+          - "true"
+        privilege: admin
+      delegate_to: localhost
+      connection: local
+      become: false
+
+    - name: Wait for console-restore expect script to complete
+      ansible.builtin.shell: |
+        TIMEOUT={{ ontap_console_restore_timeout | int }}
+        ELAPSED=0
+        while kill -0 {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null; do
+          sleep 5
+          ELAPSED=$((ELAPSED + 5))
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            kill {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null || true
+            echo "ERROR: Console-restore script timed out after ${TIMEOUT}s"
+            cat /tmp/ontap-console-restore-wrapper-{{ ontap_vmid }}.out 2>/dev/null
+            exit 1
+          fi
+        done
+        # Process already exited — check output for errors
+        cat /tmp/ontap-console-restore-wrapper-{{ ontap_vmid }}.out 2>/dev/null
+        if grep -q "ERROR:" /tmp/ontap-console-restore-wrapper-{{ ontap_vmid }}.out 2>/dev/null; then
+          exit 1
+        fi
+        exit 0
+      register: console_restore
+      changed_when: true
+
+    - name: Find expect log
+      ansible.builtin.find:
+        paths: /tmp
+        patterns: "ontap-console-restore-{{ ontap_vmid }}-*.log"
+      register: console_restore_logs
+
+    - name: Fetch expect log
+      ansible.builtin.fetch:
+        src: "{{ item.path }}"
+        dest: "logs/{{ item.path | basename }}"
+        flat: true
+      loop: "{{ console_restore_logs.files }}"
+      ignore_errors: true
+
+    - name: Clean up expect script and log
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ ['/tmp/ontap-console-restore-' + ontap_vmid | string + '.exp', '/tmp/ontap-console-restore-' + ontap_vmid | string + '-wrapper.sh', '/tmp/ontap-console-restore-wrapper-' + ontap_vmid | string + '.out'] + console_restore_logs.files | map(attribute='path') | list }}"
+
+    - name: Wait for ONTAP node to report healthy via cluster API
+      ansible.builtin.uri:
+        url: "https://{{ ontap_cluster_mgmt_ip }}/api/cluster/nodes?name={{ ontap_node_name }}&fields=state"
+        user: "{{ ontap_admin_user }}"
+        password: "{{ ontap_admin_password }}"
+        validate_certs: "{{ ontap_validate_certs }}"
+        force_basic_auth: true
+        return_content: true
+      register: node_health
+      until: >-
+        node_health.status == 200
+        and (node_health.json.records | default([]) | length) > 0
+        and (node_health.json.records[0].state | default('')) == 'up'
+      retries: "{{ (ontap_boot_timeout | int / 10) | int }}"
+      delay: 10
+      delegate_to: localhost
+      connection: local
+      become: false
