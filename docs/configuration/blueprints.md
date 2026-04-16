@@ -127,6 +127,69 @@ inputs:
     default: 4096
 ```
 
+## Shared Resource Templates
+
+Multi-provider blueprints can use a single shared resource file with Jinja2
+provider conditionals instead of maintaining separate files per provider. The
+`provider` variable is automatically injected into the template rendering
+context, giving templates access to the effective provider name.
+
+### Pattern
+
+Use the resource-centric format (`resources:` key) in shared files so each
+provider block can declare its own resource type:
+
+```yaml
+# shared.yaml — one file, multiple providers (resource-centric format)
+resources:
+{% if provider == "proxmox" %}
+  - provider: proxmox
+    type: vm
+    name: {{ vm_name }}-node
+    config:
+      cores: {{ cores }}
+      memory: {{ memory_gb | to_mib }}
+{% elif provider == "oci" %}
+  - provider: oci
+    type: instance
+    name: {{ vm_name }}-node
+    config:
+      shape: VM.Standard.E4.Flex
+      ocpus: {{ cores }}
+      memory_in_gbs: {{ memory_gb }}
+{% endif %}
+```
+
+Reference the shared file from both provider blocks in `blueprint.yaml`:
+
+```yaml
+name: k3s-cluster
+defaults:
+  vm_name: k3s
+  cores: 2
+  memory_gb: 8
+providers:
+  proxmox:
+    resources:
+      - shared.yaml
+  oci:
+    resources:
+      - shared.yaml
+```
+
+### Guidance
+
+- **Use shared files** when the resource count is small and the conditional
+  logic is simple (a few `{% if %}`/`{% elif %}` blocks).
+- **Use separate per-provider files** when schemas differ significantly or
+  the template would become hard to read. This is the recommended default
+  for most multi-provider blueprints.
+- The `provider` variable is also available in event handler templates and
+  in non-blueprint packages.
+- If a user-defined variable named `provider` already exists in the
+  manifest's `variables`, the user value takes precedence over the
+  injected value.
+
 ## Validation and Checks
 
 - After creation, run `foundry infra doctor --env <env>` within the generated repo to ensure configs are sound.
