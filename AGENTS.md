@@ -149,7 +149,7 @@ Key commands (`foundry` via `uv run foundry ...`):
 - `config envs` – list configured environments with sync status
 - `config diff --env-a <a> --env-b <b>` – compare two environments
 - `config show --env <name>` – show resolved configuration
-- `config init <name>` – initialize a new environment
+- `config create <name>` – create a new environment
 - `config new create <blueprint> <dir>` – create infrastructure from blueprints
 - `config migrate --env <name> --provider <p> --component <c>` – migrate existing infra to config
 - `config export --env <name> --output <dir>` – export provider config to YAML

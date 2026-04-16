@@ -1,9 +1,10 @@
 """Tests for the shared SOPS decryption utility and SopsSecretProvider."""
 
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from infrafoundry.core.config.sops import load_yaml_with_sops
+from infrafoundry.core.config.sops import load_yaml_with_sops, save_yaml_with_sops
 from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 
 
@@ -83,6 +84,83 @@ class TestLoadYamlWithSops:
             result = load_yaml_with_sops(yaml_file)
 
         assert result == {}
+
+
+class TestSaveYamlWithSops:
+    """Tests for save_yaml_with_sops function."""
+
+    def test_save_yaml_with_sops_no_encrypt(self, tmp_path: Path) -> None:
+        """Plain YAML is written without calling sops when encrypt is False."""
+        yaml_file = tmp_path / "output.yaml"
+        data = {"name": "staging", "description": "Staging env"}
+
+        with patch("infrafoundry.core.config.sops.subprocess.run") as mock_run:
+            save_yaml_with_sops(yaml_file, data)
+
+        mock_run.assert_not_called()
+        assert yaml_file.exists()
+        content = yaml_file.read_text()
+        assert "name: staging" in content
+        assert "description: Staging env" in content
+
+    def test_save_yaml_with_sops_with_encrypt(self, tmp_path: Path) -> None:
+        """SOPS encrypt is called when encrypt is True."""
+        yaml_file = tmp_path / "output.yaml"
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        data = {"name": "staging", "providers": ["proxmox"]}
+
+        mock_result = type("Result", (), {"stdout": "", "returncode": 0})()
+
+        with patch(
+            "infrafoundry.core.config.sops.subprocess.run", return_value=mock_result
+        ) as mock_run:
+            save_yaml_with_sops(yaml_file, data, encrypt=True, config_dir=config_dir)
+
+        mock_run.assert_called_once_with(
+            ["sops", "--encrypt", "--in-place", str(yaml_file)],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=str(config_dir),
+        )
+        # File should exist (written before encrypt call)
+        assert yaml_file.exists()
+
+    def test_save_yaml_with_sops_encrypt_failure(self, tmp_path: Path) -> None:
+        """CalledProcessError is raised when sops encryption fails."""
+        yaml_file = tmp_path / "output.yaml"
+        data = {"name": "staging"}
+
+        with patch(
+            "infrafoundry.core.config.sops.subprocess.run",
+            side_effect=subprocess.CalledProcessError(1, "sops", stderr="encryption failed"),
+        ):
+            try:
+                save_yaml_with_sops(yaml_file, data, encrypt=True)
+                raise AssertionError("Expected CalledProcessError")
+            except subprocess.CalledProcessError:
+                pass
+
+    def test_save_yaml_with_sops_encrypt_no_config_dir(self, tmp_path: Path) -> None:
+        """SOPS encrypt passes cwd=None when config_dir is not provided."""
+        yaml_file = tmp_path / "output.yaml"
+        data = {"name": "staging"}
+
+        mock_result = type("Result", (), {"stdout": "", "returncode": 0})()
+
+        with patch(
+            "infrafoundry.core.config.sops.subprocess.run", return_value=mock_result
+        ) as mock_run:
+            save_yaml_with_sops(yaml_file, data, encrypt=True)
+
+        mock_run.assert_called_once_with(
+            ["sops", "--encrypt", "--in-place", str(yaml_file)],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=None,
+        )
 
 
 class TestSopsSecretProvider:

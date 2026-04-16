@@ -1,4 +1,4 @@
-"""Unit tests for config init and show CLI commands."""
+"""Unit tests for config create and show CLI commands."""
 
 from __future__ import annotations
 
@@ -52,18 +52,18 @@ def temp_config_dir(tmp_path):
     return config_dir
 
 
-class TestConfigInit:
-    """Tests for config init command."""
+class TestConfigCreate:
+    """Tests for config create command."""
 
-    def test_init_creates_minimal_environment(self, cli_runner, tmp_path):
-        """Test init creates minimal environment structure."""
+    def test_create_creates_minimal_environment(self, cli_runner, tmp_path):
+        """Test create creates minimal environment structure."""
         config_dir = tmp_path / "config"
         envs_dir = config_dir / "envs"
         envs_dir.mkdir(parents=True)
 
         result = cli_runner.invoke(
             main,
-            ["--config-dir", str(config_dir), "config", "init", "staging"],
+            ["--config-dir", str(config_dir), "config", "create", "staging"],
         )
 
         assert result.exit_code == 0
@@ -80,8 +80,8 @@ class TestConfigInit:
             settings = yaml.safe_load(f)
         assert settings["name"] == "staging"
 
-    def test_init_with_description(self, cli_runner, tmp_path):
-        """Test init with custom description."""
+    def test_create_with_description(self, cli_runner, tmp_path):
+        """Test create with custom description."""
         config_dir = tmp_path / "config"
         envs_dir = config_dir / "envs"
         envs_dir.mkdir(parents=True)
@@ -92,7 +92,7 @@ class TestConfigInit:
                 "--config-dir",
                 str(config_dir),
                 "config",
-                "init",
+                "create",
                 "prod",
                 "-d",
                 "Production environment",
@@ -105,15 +105,15 @@ class TestConfigInit:
             settings = yaml.safe_load(f)
         assert settings["description"] == "Production environment"
 
-    def test_init_from_existing_environment(self, cli_runner, temp_config_dir):
-        """Test init --from scaffolds from existing environment."""
+    def test_create_from_existing_environment(self, cli_runner, temp_config_dir):
+        """Test create --from scaffolds from existing environment."""
         result = cli_runner.invoke(
             main,
             [
                 "--config-dir",
                 str(temp_config_dir),
                 "config",
-                "init",
+                "create",
                 "staging",
                 "--from",
                 "dev",
@@ -135,15 +135,15 @@ class TestConfigInit:
             settings = yaml.safe_load(f)
         assert settings["name"] == "staging"
 
-    def test_init_from_nonexistent_environment(self, cli_runner, temp_config_dir):
-        """Test init --from with nonexistent source fails."""
+    def test_create_from_nonexistent_environment(self, cli_runner, temp_config_dir):
+        """Test create --from with nonexistent source fails."""
         result = cli_runner.invoke(
             main,
             [
                 "--config-dir",
                 str(temp_config_dir),
                 "config",
-                "init",
+                "create",
                 "staging",
                 "--from",
                 "nonexistent",
@@ -153,25 +153,25 @@ class TestConfigInit:
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
-    def test_init_existing_environment_fails_without_force(self, cli_runner, temp_config_dir):
-        """Test init fails if environment exists without --force."""
+    def test_create_existing_environment_fails_without_force(self, cli_runner, temp_config_dir):
+        """Test create fails if environment exists without --force."""
         result = cli_runner.invoke(
             main,
-            ["--config-dir", str(temp_config_dir), "config", "init", "dev"],
+            ["--config-dir", str(temp_config_dir), "config", "create", "dev"],
         )
 
         assert result.exit_code != 0
         assert "already exists" in result.output
 
-    def test_init_existing_environment_with_force(self, cli_runner, temp_config_dir):
-        """Test init --force overwrites existing environment."""
+    def test_create_existing_environment_with_force(self, cli_runner, temp_config_dir):
+        """Test create --force overwrites existing environment."""
         result = cli_runner.invoke(
             main,
             [
                 "--config-dir",
                 str(temp_config_dir),
                 "config",
-                "init",
+                "create",
                 "dev",
                 "--force",
                 "-d",
@@ -186,17 +186,93 @@ class TestConfigInit:
             settings = yaml.safe_load(f)
         assert settings["description"] == "Recreated dev"
 
-    def test_init_without_config_dir(self, cli_runner, monkeypatch):
-        """Test init fails without config directory."""
+    def test_create_without_config_dir(self, cli_runner, monkeypatch):
+        """Test create fails without config directory."""
         # Clear the env var to ensure no config dir is set
         monkeypatch.delenv("INFRAFOUNDRY_CONFIG_REPO", raising=False)
 
         with cli_runner.isolated_filesystem():
-            result = cli_runner.invoke(main, ["config", "init", "test-env-no-config"])
+            result = cli_runner.invoke(main, ["config", "create", "test-env-no-config"])
 
             # Should fail because no config dir is set
             assert result.exit_code != 0
             assert "Config directory not set" in result.output or "config" in result.output.lower()
+
+    def test_create_from_sops_encrypted_settings(self, cli_runner, tmp_path):
+        """Test create --from handles SOPS-encrypted settings.yaml."""
+        config_dir = tmp_path / "config"
+        envs_dir = config_dir / "envs"
+
+        # Create source environment with SOPS-encrypted settings
+        dev_dir = envs_dir / "dev"
+        dev_dir.mkdir(parents=True)
+
+        sops_content = (
+            "name: ENC[AES256_GCM,data:abc123]\n"
+            "description: ENC[AES256_GCM,data:dev-desc]\n"
+            "providers:\n"
+            "- proxmox\n"
+            "sops:\n"
+            "    version: 3.7.3\n"
+        )
+        (dev_dir / "settings.yaml").write_text(sops_content)
+
+        decrypted_yaml = "name: dev\ndescription: Development environment\nproviders:\n- proxmox\n"
+        mock_decrypt = type("Result", (), {"stdout": decrypted_yaml, "returncode": 0})()
+        mock_encrypt = type("Result", (), {"stdout": "", "returncode": 0})()
+
+        def mock_run(cmd, **kwargs):
+            if "--decrypt" in cmd:
+                return mock_decrypt
+            if "--encrypt" in cmd:
+                return mock_encrypt
+            raise AssertionError(f"Unexpected sops command: {cmd}")
+
+        from unittest.mock import patch
+
+        with patch("infrafoundry.core.config.sops.subprocess.run", side_effect=mock_run):
+            result = cli_runner.invoke(
+                main,
+                [
+                    "--config-dir",
+                    str(config_dir),
+                    "config",
+                    "create",
+                    "staging",
+                    "--from",
+                    "dev",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert "Environment 'staging' created from 'dev'" in result.output
+
+    def test_create_from_unencrypted_settings_unchanged(self, cli_runner, temp_config_dir):
+        """Test create --from with unencrypted settings works without SOPS calls."""
+        from unittest.mock import patch
+
+        with patch("infrafoundry.core.config.sops.subprocess.run") as mock_run:
+            result = cli_runner.invoke(
+                main,
+                [
+                    "--config-dir",
+                    str(temp_config_dir),
+                    "config",
+                    "create",
+                    "staging",
+                    "--from",
+                    "dev",
+                ],
+            )
+
+        assert result.exit_code == 0
+        # SOPS subprocess should not be called for unencrypted files
+        mock_run.assert_not_called()
+
+        # Verify settings were updated correctly
+        with open(temp_config_dir / "envs" / "staging" / "settings.yaml") as f:
+            settings = yaml.safe_load(f)
+        assert settings["name"] == "staging"
 
 
 class TestConfigShow:
@@ -361,25 +437,25 @@ class TestConfigShow:
         assert "No resources found" in result.output
 
 
-class TestConfigInitShowIntegration:
-    """Integration tests for init and show commands working together."""
+class TestConfigCreateShowIntegration:
+    """Integration tests for create and show commands working together."""
 
-    def test_init_then_show(self, cli_runner, temp_config_dir):
-        """Test creating environment with init then viewing with show."""
+    def test_create_then_show(self, cli_runner, temp_config_dir):
+        """Test creating environment with create then viewing with show."""
         # Create new environment from dev
-        init_result = cli_runner.invoke(
+        create_result = cli_runner.invoke(
             main,
             [
                 "--config-dir",
                 str(temp_config_dir),
                 "config",
-                "init",
+                "create",
                 "staging",
                 "--from",
                 "dev",
             ],
         )
-        assert init_result.exit_code == 0
+        assert create_result.exit_code == 0
 
         # Show the new environment
         show_result = cli_runner.invoke(
