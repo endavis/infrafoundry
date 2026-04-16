@@ -268,7 +268,9 @@ class PackageLoader:
         resources: list[ResourceConfig] = []
         for resource_file in manifest.resources:
             resource_path = self._resolve_package_file(resource_file, package_dir, blueprint_dir)
-            data = self._render_resource_file(resource_path, manifest.variables)
+            data = self._render_resource_file(
+                resource_path, manifest.variables, provider=effective_provider
+            )
             parsed = self._parse_resources_from_data(data, resource_file, effective_provider)
             resources.extend(parsed)
 
@@ -282,7 +284,10 @@ class PackageLoader:
             try:
                 events_env = create_jinja2_env(undefined=jinja2.Undefined)
                 events_template = events_env.from_string(events_json)
-                rendered_events_json = events_template.render(**manifest.variables)
+                events_context = dict(manifest.variables)
+                if effective_provider and "provider" not in events_context:
+                    events_context["provider"] = effective_provider
+                rendered_events_json = events_template.render(**events_context)
                 manifest.events = json.loads(rendered_events_json)
             except (jinja2.TemplateError, json.JSONDecodeError) as e:
                 logger.warning("Failed to render event templates: %s", e)
@@ -370,13 +375,20 @@ class PackageLoader:
         return manifest
 
     def _render_resource_file(
-        self, resource_path: Path, variables: dict[str, Any]
+        self,
+        resource_path: Path,
+        variables: dict[str, Any],
+        *,
+        provider: str | None = None,
     ) -> dict[str, Any]:
         """Read a resource template file, render with Jinja2, and parse as YAML.
 
         Args:
             resource_path: Path to the resource template file
             variables: Variables to substitute in the template
+            provider: Optional provider name injected as a built-in template
+                variable.  Does not overwrite a user-defined ``provider``
+                key already present in *variables*.
 
         Returns:
             Parsed YAML data as a dictionary
@@ -390,11 +402,16 @@ class PackageLoader:
 
         content = resource_path.read_text()
 
+        # Build render context: user variables + injected provider
+        render_context = dict(variables)
+        if provider is not None and "provider" not in render_context:
+            render_context["provider"] = provider
+
         # Render Jinja2 template with StrictUndefined
         try:
             env = create_jinja2_env(undefined=jinja2.StrictUndefined)
             template = env.from_string(content)
-            rendered = template.render(**variables)
+            rendered = template.render(**render_context)
         except jinja2.UndefinedError as e:
             raise InvalidConfigurationError(f"Undefined variable in {resource_path}: {e}") from e
         except jinja2.TemplateSyntaxError as e:
