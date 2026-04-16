@@ -1,4 +1,4 @@
-"""Init command to scaffold new environments."""
+"""Create command to scaffold new environments."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import click
 import yaml
 
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.config.sops import load_yaml_with_sops, save_yaml_with_sops
 from infrafoundry.core.exceptions import EnvironmentNotFoundError
 
 from ...output import BULLET
@@ -20,14 +21,21 @@ def _copy_environment(
     target_dir: Path,
     new_env_name: str,
     description: str | None,
+    *,
+    config_dir: Path | None = None,
 ) -> None:
     """Copy environment directory and update settings.
+
+    Handles SOPS-encrypted settings.yaml files transparently: if the source
+    settings were encrypted, the target settings are re-encrypted after
+    modification.
 
     Args:
         source_dir: Source environment directory
         target_dir: Target environment directory
         new_env_name: Name for the new environment
         description: Optional description for the new environment
+        config_dir: Config repo root for .sops.yaml discovery
     """
     # Copy the entire directory
     shutil.copytree(source_dir, target_dir)
@@ -35,8 +43,11 @@ def _copy_environment(
     # Update settings.yaml with new environment info
     settings_file = target_dir / "settings.yaml"
     if settings_file.exists():
-        with open(settings_file) as f:
-            settings = yaml.safe_load(f) or {}
+        # Detect SOPS encryption before decrypting
+        raw = settings_file.read_text()
+        was_encrypted = "sops:" in raw and "ENC[AES256_GCM," in raw
+
+        settings = load_yaml_with_sops(settings_file)
 
         # Update environment-specific settings
         settings["name"] = new_env_name
@@ -45,8 +56,7 @@ def _copy_environment(
         elif "description" in settings:
             settings["description"] = "Environment scaffolded from source"
 
-        with open(settings_file, "w") as f:
-            yaml.safe_dump(settings, f, default_flow_style=False, sort_keys=False)
+        save_yaml_with_sops(settings_file, settings, encrypt=was_encrypted, config_dir=config_dir)
 
 
 def _create_minimal_environment(target_dir: Path, env_name: str, description: str | None) -> None:
@@ -109,28 +119,29 @@ def _create_minimal_environment(target_dir: Path, env_name: str, description: st
     help="Overwrite existing environment directory",
 )
 @click.pass_context
-def init(
+def create(
     ctx: click.Context,
     env_name: str,
     from_env: str | None,
     description: str | None,
     force: bool,
 ) -> None:
-    """Initialize a new environment.
+    """Create a new environment.
 
     Creates a new environment directory structure. Use --from to scaffold
     from an existing environment (copies configs and customizes for new env).
+    SOPS-encrypted settings.yaml files are handled transparently.
 
     Examples:
 
         # Create minimal new environment
-        foundry config init staging
+        foundry config create staging
 
         # Scaffold from existing environment
-        foundry config init staging --from dev
+        foundry config create staging --from dev
 
         # With description
-        foundry config init prod --from staging -d "Production environment"
+        foundry config create prod --from staging -d "Production environment"
     """
     config_dir = ctx.obj.get("config_dir")
 
@@ -165,7 +176,7 @@ def init(
             source_dir = envs_dir / from_env
             console.info(f"Scaffolding '{env_name}' from '{from_env}'...")
 
-            _copy_environment(source_dir, target_dir, env_name, description)
+            _copy_environment(source_dir, target_dir, env_name, description, config_dir=config_dir)
 
             console.success(f"Environment '{env_name}' created from '{from_env}'")
             console.info(f"  Location: {target_dir}")

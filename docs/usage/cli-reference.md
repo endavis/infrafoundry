@@ -41,7 +41,7 @@ InfraFoundry commands are organized into five domain groups plus two top-level u
 | List environments | `foundry config envs` |
 | Compare two environments | `foundry config diff --env-a dev --env-b prod` |
 | Show resolved config | `foundry config show --env <env>` |
-| Create a new environment | `foundry config init <name>` |
+| Create a new environment | `foundry config create <name>` |
 | Create from a blueprint | `foundry config new create <blueprint> <dir>` |
 | Export provider config to YAML | `foundry config export --env <env> --output <dir>` |
 | Generate JSON schemas for IDE | `foundry config schema export` |
@@ -177,14 +177,15 @@ foundry config show --env dev --settings-only
 
 **Options:** `-e/--env TEXT` (required), `-p/--provider TEXT`, `-t/--resource-type TEXT`, `-r/--resource TEXT`, `--format [table|yaml|json]`, `--settings-only`
 
-### `config init`
+### `config create`
 
-Initialize a new environment. Optionally scaffold from an existing environment.
+Create a new environment. Optionally scaffold from an existing environment.
+SOPS-encrypted settings.yaml files are handled transparently.
 
 ```bash
-foundry config init staging
-foundry config init staging --from dev
-foundry config init prod --from staging -d "Production environment"
+foundry config create staging
+foundry config create staging --from dev
+foundry config create prod --from staging -d "Production environment"
 ```
 
 **Options:** `--from TEXT`, `-d/--description TEXT`, `-f/--force`
