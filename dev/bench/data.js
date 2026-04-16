@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776273652172,
+  "lastUpdate": 1776297604002,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6076,6 +6076,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000028935359516324507",
             "extra": "mean: 120.29624861614556 usec\nrounds: 2168"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9d20ef011ea28a449386c8534079d7bec921d13f",
+          "message": "fix: restore ontap-cluster noVNC console after setup (merges PR #615, addresses #596)\n\n* fix: restore ontap-cluster noVNC console after setup\n\nThe cluster setup automation sets `console=comconsole,vidconsole` at the\nVLOADER prompt so the expect scripts can drive ONTAP over the Proxmox\nserial socket. This VLOADER env is persistent and was never reversed,\nso after setup the Proxmox noVNC console showed no usable output\n(video secondary).\n\nAdd an `ontap-console-restore` role that runs after cluster setup:\nhalt each node cleanly via `system node halt -inhibit-takeover true\n-skip-lif-migration-before-shutdown true -ignore-quorum-warnings true`,\ncatch VLOADER on the serial socket, send `set console=vidconsole,comconsole`\n+ `boot_ontap`, then poll the cluster API until the node is healthy.\nNodes are processed sequentially to keep the 2-node cluster alive.\n\nOn by default; opt out with `ontap_restore_console: false`.\n\nAddresses #596\n\n* fix: handle halt-reboot prompt and drop invalid health field\n\nLive testing on the prod ontap-cluster surfaced three issues in the\ninitial implementation:\n\n1. `system node halt` on the ONTAP simulator parks at a firmware-level\n   \"Please press any key to reboot\" prompt (SRM_F_POWEROFF_VM) rather\n   than dropping directly to VLOADER. The expect script was waiting\n   for \"VLOADER>\" forever. Add a matcher for the halt-reboot prompt\n   that sends a key and continues via exp_continue; the existing\n   boot-prompt matcher then catches the subsequent reboot.\n\n2. If the VM parks at the halt prompt *before* the expect listener\n   attaches (as happens when the halt is fast), the serial line\n   doesn't redraw the prompt for us. Poke the line with a CR\n   immediately after spawning socat so the firmware re-emits it.\n\n3. The health poll queried `fields=state,health`, but the\n   /api/cluster/nodes endpoint does not expose a `health` field and\n   returns HTTP 400 for that query. Drop `health` from both the URL\n   and the `until:` condition; `state=up` is the health signal.\n\nManually rescued node01 and ran the updated role through\nansible-playbook against node02 on the live cluster — both noVNC\nconsoles now show the login prompt instead of blank/serial-redirected\noutput.\n\nAddresses #596",
+          "timestamp": "2026-04-16T00:59:25+01:00",
+          "tree_id": "bd867019f5f17b68d372eea4b402ee1428c92e02",
+          "url": "https://github.com/endavis/infrafoundry/commit/9d20ef011ea28a449386c8534079d7bec921d13f"
+        },
+        "date": 1776297603181,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7247.385951195115,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010036080130503485",
+            "extra": "mean: 137.98078462139816 usec\nrounds: 2484"
           }
         ]
       }
