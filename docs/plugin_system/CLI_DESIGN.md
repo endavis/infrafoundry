@@ -835,7 +835,7 @@ $ foundry plugins list
 $ foundry proxmox info
 
 # Configures provider
-$ foundry config init
+$ foundry config create
 $ export PROXMOX_TOKEN=xxx
 
 # Uses provider
