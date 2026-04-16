@@ -146,6 +146,43 @@ vm:
 - Resource type is derived from the filename (same as regular provider resources)
 - Both singular (`vm`) and plural (`vms`) keys are supported
 
+### Built-in Template Variables
+
+In addition to user-defined variables from `infrafoundry.yml`, the following
+variables are automatically injected into the Jinja2 rendering context:
+
+| Variable   | Type   | Description |
+|:-----------|:-------|:------------|
+| `provider` | string | The effective provider name for the package (e.g., `proxmox`, `oci`). Determined from the manifest's `provider` field or the parent directory name. |
+
+The `provider` variable is available in both resource templates and event
+handler configurations. If a user-defined variable named `provider` already
+exists in the manifest's `variables`, the user value takes precedence.
+
+**Usage in templates:**
+
+```yaml
+vm:
+  - name: {{ cluster_name }}-node1
+    description: "Deployed on {{ provider }}"
+```
+
+Or with conditionals for multi-provider blueprints (using the resource-centric
+format so each branch can declare its own resource type):
+
+```yaml
+resources:
+{% if provider == "proxmox" %}
+  - provider: proxmox
+    type: vm
+    name: {{ vm_name }}-node
+{% elif provider == "oci" %}
+  - provider: oci
+    type: instance
+    name: {{ vm_name }}-node
+{% endif %}
+```
+
 ### Custom Filters
 
 InfraFoundry registers the following custom Jinja2 filters for use in resource

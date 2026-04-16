@@ -258,6 +258,35 @@ class TestRenderResourceFile:
         data = loader._render_resource_file(resource_path, {})
         assert data == {}
 
+    def test_render_resource_provider_variable_available(self, temp_dir):
+        """Provider kwarg is available as {{ provider }} in templates."""
+        loader = PackageLoader(temp_dir)
+        resource_path = temp_dir / "vm.yaml"
+        resource_path.write_text("vm:\n  - name: node-{{ provider }}\n")
+
+        data = loader._render_resource_file(resource_path, {}, provider="proxmox")
+        assert data["vm"][0]["name"] == "node-proxmox"
+
+    def test_render_resource_provider_not_injected_when_none(self, temp_dir):
+        """Default provider=None does not inject a provider variable."""
+        loader = PackageLoader(temp_dir)
+        resource_path = temp_dir / "vm.yaml"
+        resource_path.write_text("vm:\n  - name: simple-node\n")
+
+        data = loader._render_resource_file(resource_path, {})
+        assert data["vm"][0]["name"] == "simple-node"
+
+    def test_render_resource_provider_does_not_clobber_user_variable(self, temp_dir):
+        """User-defined 'provider' in variables takes precedence over injected value."""
+        loader = PackageLoader(temp_dir)
+        resource_path = temp_dir / "vm.yaml"
+        resource_path.write_text("vm:\n  - name: node-{{ provider }}\n")
+
+        data = loader._render_resource_file(
+            resource_path, {"provider": "user-defined"}, provider="proxmox"
+        )
+        assert data["vm"][0]["name"] == "node-user-defined"
+
 
 @pytest.mark.unit
 class TestParseResourcesFromData:

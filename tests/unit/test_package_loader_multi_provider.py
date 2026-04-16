@@ -742,3 +742,132 @@ class TestMultiProviderBlueprint:
         assert len(resources) == 1
         assert resources[0].name == "node-01"
         assert variables["vm_name"] == "node"
+
+
+@pytest.mark.unit
+class TestProviderTemplateVariable:
+    """Tests for the injected ``provider`` template variable."""
+
+    def test_shared_resource_with_provider_conditional(self, temp_dir):
+        """Single shared resource file uses provider conditionals for different providers.
+
+        Uses the resource-centric format (``resources:`` key) because the
+        provider-centric format derives the resource type from the filename,
+        which cannot vary per provider.
+        """
+        resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+
+        shared_resource = (
+            "resources:\n"
+            "{% if provider == 'proxmox' %}\n"
+            "  - provider: proxmox\n"
+            "    type: vm\n"
+            "    name: {{ vm_name }}-proxmox\n"
+            "    config:\n"
+            "      cores: 4\n"
+            "{% elif provider == 'oci' %}\n"
+            "  - provider: oci\n"
+            "    type: instance\n"
+            "    name: {{ vm_name }}-oci\n"
+            "    config:\n"
+            "      shape: VM.Standard.E4.Flex\n"
+            "{% endif %}\n"
+        )
+        _create_blueprint(
+            temp_dir,
+            "shared-bp",
+            {
+                "name": "shared-bp",
+                "defaults": {"vm_name": "node"},
+                "providers": {
+                    "proxmox": {"resources": ["shared.yaml"]},
+                    "oci": {"resources": ["shared.yaml"]},
+                },
+            },
+            {"shared.yaml": shared_resource},
+        )
+
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+
+        # Load as proxmox
+        pkg_dir_px = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "shared-pkg",
+            {"name": "shared-pkg", "blueprint": "shared-bp"},
+        )
+        resources_px, _, _ = loader.load_package(pkg_dir_px, "proxmox", "dev")
+
+        assert len(resources_px) == 1
+        assert resources_px[0].name == "node-proxmox"
+        assert resources_px[0].type == "vm"
+        assert resources_px[0].provider == "proxmox"
+
+        # Load as oci
+        pkg_dir_oci = _create_package(
+            temp_dir,
+            "dev",
+            "oci",
+            "shared-pkg-oci",
+            {"name": "shared-pkg-oci", "blueprint": "shared-bp"},
+        )
+        resources_oci, _, _ = loader.load_package(pkg_dir_oci, "oci", "dev")
+
+        assert len(resources_oci) == 1
+        assert resources_oci[0].name == "node-oci"
+        assert resources_oci[0].type == "instance"
+        assert resources_oci[0].provider == "oci"
+
+    def test_provider_variable_in_plain_package(self, temp_dir):
+        """Non-blueprint package can use {{ provider }} in resource templates."""
+        loader = PackageLoader(temp_dir)
+        manifest = {
+            "name": "plain-pkg",
+            "variables": {"vm_name": "web"},
+            "resources": ["vm.yaml"],
+        }
+        resource_content = "vm:\n  - name: {{ vm_name }}-{{ provider }}\n"
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "plain-pkg",
+            manifest,
+            {"vm.yaml": resource_content},
+        )
+
+        resources, _, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert len(resources) == 1
+        assert resources[0].name == "web-proxmox"
+
+    def test_provider_available_in_events_template(self, temp_dir):
+        """Event handler config can reference {{ provider }}."""
+        loader = PackageLoader(temp_dir)
+        manifest = {
+            "name": "events-provider-pkg",
+            "variables": {"vm_name": "web"},
+            "events": {
+                "AFTER_APPLY": [
+                    {
+                        "type": "script",
+                        "script": "scripts/setup.sh",
+                        "description": "setup for {{ provider }}",
+                    }
+                ],
+            },
+        }
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "events-provider-pkg",
+            manifest,
+            {"scripts/setup.sh": "#!/bin/bash\necho setup\n"},
+        )
+
+        _, events, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+
+        assert events["AFTER_APPLY"][0]["description"] == "setup for proxmox"

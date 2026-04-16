@@ -61,6 +61,7 @@ These are acceptable tradeoffs. The real duplication today is in the non-resourc
 - [#507](https://github.com/endavis/infrafoundry/issues/507): Original multi-provider blueprint design
 - [#571](https://github.com/endavis/infrafoundry/issues/571): Blueprint schema validation across providers (Phase 3 — mitigates the "no schema validation across providers" consequence above)
 - [#572](https://github.com/endavis/infrafoundry/issues/572): Base schema helpers (centralized Jinja2 filter factory for blueprint templates)
+- [#573](https://github.com/endavis/infrafoundry/issues/573): Single resource file for multi-provider blueprints (injects `provider` variable into template context)
 
 ## Superseded schema details
 
