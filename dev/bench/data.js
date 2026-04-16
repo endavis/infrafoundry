@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776351160862,
+  "lastUpdate": 1776358517865,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6138,6 +6138,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007872922149609606",
             "extra": "mean: 103.5536723810605 usec\nrounds: 2100"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e65b3a70adc98a8a69208844f73253e02b41e905",
+          "message": "feat: rename config init to config create with SOPS support (merges PR #617, addresses #577)",
+          "timestamp": "2026-04-16T17:54:41+01:00",
+          "tree_id": "20f6699ef296499909cac896342a1bacb357efae",
+          "url": "https://github.com/endavis/infrafoundry/commit/e65b3a70adc98a8a69208844f73253e02b41e905"
+        },
+        "date": 1776358516735,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7323.693913576205,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009701989269895257",
+            "extra": "mean: 136.5431176945097 usec\nrounds: 2481"
           }
         ]
       }
