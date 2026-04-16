@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776297604002,
+  "lastUpdate": 1776351160862,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6107,6 +6107,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010036080130503485",
             "extra": "mean: 137.98078462139816 usec\nrounds: 2484"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2dbd78244bad062619bf9662fcde371cab23a4c6",
+          "message": "feat: inject provider variable into package template context (merges PR #616, addresses #573)",
+          "timestamp": "2026-04-16T15:51:56+01:00",
+          "tree_id": "6a122a0ff7dd60f5da2f38c9bce9957f0493fa93",
+          "url": "https://github.com/endavis/infrafoundry/commit/2dbd78244bad062619bf9662fcde371cab23a4c6"
+        },
+        "date": 1776351159546,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9656.827971490613,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007872922149609606",
+            "extra": "mean: 103.5536723810605 usec\nrounds: 2100"
           }
         ]
       }
