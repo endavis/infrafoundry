@@ -1,16 +1,20 @@
 # service-vm Blueprint
 
 Reusable blueprint for lightweight infrastructure service VMs. It clones a
-Proxmox template, creates an OPNsense DHCP reservation, and (optionally)
-attaches a Proxmox NFS storage mount. Typical consumers are bastion hosts,
-log aggregators, internal web servers, CI runners, or any "single VM plus
-DHCP" deployment.
+Proxmox template and creates an OPNsense DHCP reservation. Typical
+consumers are bastion hosts, log aggregators, internal web servers, CI
+runners, or any "single VM plus DHCP" deployment.
 
 This sits one tier above the framework-bundled `basic-vm` blueprint
-(`src/infrafoundry/core/blueprints/basic-vm/`): it adds a DHCP reservation,
-optional NFS mount, cloud-init snippet wiring, and multi-instance safety.
-Use `basic-vm` when you just want a throwaway template scaffold; use
+(`src/infrafoundry/core/blueprints/basic-vm/`): it adds a DHCP
+reservation, cloud-init snippet wiring, and multi-instance safety. Use
+`basic-vm` when you just want a throwaway template scaffold; use
 `service-vm` when you want a reusable, DHCP-integrated service node.
+
+> **Guest-level NFS mounts** belong in a cloud-init snippet on the VM
+> (see `packages/nginx-nfs` in the example config). **Proxmox-level NFS
+> storage pools** are cluster-wide resources and should live in a
+> dedicated storage package, not inside per-VM blueprints like this one.
 
 ## Usage
 
@@ -75,17 +79,12 @@ foundry infra apply --env <env> --package my-service
 | `extra_cloud_init_vars`  | `{}`                           | Extra cloud-init vars merged with the `HOSTNAME` entry |
 | `tags`                   | `[]`                           | Proxmox tags applied to the VM                         |
 | `dhcp_description`       | `""` (falls back to `vm_name`) | Description written on the DHCP reservation            |
-| `nfs_server`             | `""` (no NFS resource created) | NFS server address                                     |
-| `nfs_export`             | `""`                           | Export path on the NFS server                          |
-| `nfs_content`            | `["snippets", "images"]`       | Proxmox storage content types for the NFS mount        |
-| `nfs_mount`              | `""` (falls back to `vm_name`) | Proxmox storage mount name for the NFS resource        |
 
 ## Prerequisites
 
 - A cloud-init-capable template (e.g. `rocky9-template` VMID `901` or
   `ubuntu-template` VMID `900`) exists on `template_node`.
 - The OPNsense Kea subnet referenced by `dhcp_subnet` is defined.
-- If `nfs_server` is set, the NFS share is reachable from `target_node`.
 
 ## What gets created
 
@@ -96,10 +95,6 @@ foundry infra apply --env <env> --package my-service
 - **DHCP reservation** (`opnsense.kea_reservation`, name `{{ vm_name }}`):
   binds `ip_address` to `mac_address` on the `dhcp_subnet`, with
   `hostname = {{ vm_name }}` and description falling back to `vm_name`.
-- **NFS storage (optional)** (`proxmox.storage`, name `{{ vm_name }}-nfs`):
-  only emitted when `nfs_server` is set. Mount name defaults to
-  `{{ vm_name }}` (override via `nfs_mount`) so multiple instances don't
-  collide.
 
 All resource names are templated so this blueprint is safe to instantiate
 multiple times in the same environment (regression guard for #511).

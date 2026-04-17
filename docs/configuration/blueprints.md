@@ -206,7 +206,7 @@ resources:
     type: storage
     name: "{{ vm_name }}-nfs"
     config:
-      type: nfs
+      backend: nfs
       server: "{{ nfs_server }}"
       export: "{{ nfs_export }}"
 {% else %}
@@ -224,8 +224,6 @@ inputs:
     description: "NFS server address. Empty: no NFS storage resource is created."
     default: ""
 ```
-
-Reference blueprint: `blueprints/service-vm/storage.yaml`.
 
 ## Validation and Checks
 
