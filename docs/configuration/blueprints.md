@@ -190,6 +190,43 @@ providers:
   manifest's `variables`, the user value takes precedence over the
   injected value.
 
+## Optional Resources (File-Level Gating)
+
+A blueprint resource file may conditionally emit nothing when an input is
+unset, so packages that don't need the resource produce no output instead of
+carrying an empty placeholder. Wrap the file's `resources:` block in a
+top-level Jinja2 `{% if %}` and provide an explicit `resources: []` in the
+`{% else %}` branch so the file always yields a valid resource-centric
+document.
+
+```yaml
+{% if nfs_server %}
+resources:
+  - provider: proxmox
+    type: storage
+    name: "{{ vm_name }}-nfs"
+    config:
+      type: nfs
+      server: "{{ nfs_server }}"
+      export: "{{ nfs_export }}"
+{% else %}
+resources: []
+{% endif %}
+```
+
+This pattern pairs naturally with an optional input that defaults to an empty
+string or list. Declare the gating input in `inputs:` and leave the default
+empty so packages that don't need the resource can stay silent:
+
+```yaml
+inputs:
+  - name: nfs_server
+    description: "NFS server address. Empty: no NFS storage resource is created."
+    default: ""
+```
+
+Reference blueprint: `blueprints/service-vm/storage.yaml`.
+
 ## Validation and Checks
 
 - After creation, run `foundry infra doctor --env <env>` within the generated repo to ensure configs are sound.

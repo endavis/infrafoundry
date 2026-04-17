@@ -1,0 +1,14 @@
+{#- Service VM DHCP reservation — opnsense kea_reservation in a proxmox-providered
+   package directory. Resource-centric format because the reservation provider
+   differs from the package directory provider. Outer name is templated for
+   multi-instance safety. -#}
+resources:
+  - provider: opnsense
+    type: kea_reservation
+    name: "{{ vm_name }}"
+    config:
+      subnet_ref: "{{ dhcp_subnet }}"
+      hw_address: "{{ mac_address | lower }}"
+      ip_address: "{{ ip_address }}"
+      hostname: "{{ vm_name }}"
+      description: "{{ dhcp_description or vm_name }}"
