@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776358517865,
+  "lastUpdate": 1776428635222,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6169,6 +6169,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009701989269895257",
             "extra": "mean: 136.5431176945097 usec\nrounds: 2481"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ce0cac88bdd6c7357aec4dc37a971b96f1a1aa71",
+          "message": "refactor: extract service-vm blueprint and convert prod infra-web (merges PR #620, addresses #618)\n\nAddresses #618\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-17T13:23:21+01:00",
+          "tree_id": "f6b32e10378ecbc61f434bc320d2f0a7b21a190e",
+          "url": "https://github.com/endavis/infrafoundry/commit/ce0cac88bdd6c7357aec4dc37a971b96f1a1aa71"
+        },
+        "date": 1776428634813,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9684.639073213308,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007043066076311207",
+            "extra": "mean: 103.25630025448184 usec\nrounds: 1965"
           }
         ]
       }
