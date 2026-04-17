@@ -1,0 +1,30 @@
+{#- Service VM — shorthand vms: format (proxmox provider, vm type inferred).
+   Multi-instance safe: outer name is templated. -#}
+vms:
+  - name: "{{ vm_name }}"
+    vmid: {{ vmid }}
+    target_node: "{{ target_node }}"
+    clone:
+      vm_id: {{ template_vmid }}
+      node_name: "{{ template_node }}"
+    cores: {{ cores }}
+    memory: {{ memory }}
+    agent: {{ agent }}
+    disk:
+      storage: "{{ disk_storage }}"
+      size: {{ disk_size }}
+    network:
+      - bridge: "{{ bridge }}"
+        tag: {{ vlan_tag }}
+        macaddr: "{{ mac_address }}"
+    cloud_init_snippets:
+{% for snippet in cloud_init_snippets %}
+      - {{ snippet }}
+{% endfor %}
+    cloud_init_vars:
+      HOSTNAME: "{{ vm_name }}"
+{% for key, value in extra_cloud_init_vars.items() %}
+      {{ key }}: {{ value | tojson }}
+{% endfor %}
+    tags: {{ tags | tojson }}
+    onboot: {{ onboot }}
