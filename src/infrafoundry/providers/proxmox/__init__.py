@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, ClassVar, override
 
 from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.exceptions import SchemaValidationError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
     CloudInitMixin,
@@ -13,9 +14,14 @@ from infrafoundry.core.provider_mixins import (
     TerraformGeneratorMixin,
     sanitize_secret_ref_to_tf_var,
 )
-from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation import ValidationLevel, ValidationReport
 
 from .validator import ProxmoxValidator
+from .validators import (
+    ContainerConfigValidator,
+    StorageConfigValidator,
+    VMConfigValidator,
+)
 
 
 class ProxmoxProvider(
@@ -91,6 +97,11 @@ class ProxmoxProvider(
         """Generate Terraform configuration for Proxmox resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
 
+        # Field-level schema validation catches malformed configs (e.g., using
+        # ``type:`` instead of ``backend:`` for storage) before template
+        # rendering silently drops the resource. See issue #621.
+        self._validate_resource_configs(resources_by_type)
+
         # Pre-process VMs FIRST so any ``tailscale:`` blocks auto-populate
         # ``terraform_secrets`` on the resource. This must happen before
         # ``collect_terraform_secret_refs`` runs so the variables.tf
@@ -147,6 +158,39 @@ class ProxmoxProvider(
 
         # Generate outputs
         self.render_outputs_terraform(resources_by_type)
+
+    def _validate_resource_configs(
+        self, resources_by_type: dict[str, list[ResourceConfig]]
+    ) -> None:
+        """Run field-level config validation on storage, VM, and container resources.
+
+        Collects ERROR-level findings from the three ``*ConfigValidator`` classes and
+        raises ``SchemaValidationError`` with a multi-line summary if any are present.
+        WARNING-level findings (e.g., CIFS without ``username``) are collected but do
+        not block generation.
+
+        Args:
+            resources_by_type: Resources grouped by type, as returned by
+                ``prepare_terraform_generation``.
+
+        Raises:
+            SchemaValidationError: If one or more resources have ERROR-level
+                validation findings. The message lists every failing check by
+                name and description.
+        """
+        report = ValidationReport()
+        StorageConfigValidator(report).validate(resources_by_type.get("storage", []))
+        VMConfigValidator(report).validate(resources_by_type.get("vm", []))
+        ContainerConfigValidator(report).validate(resources_by_type.get("container", []))
+
+        if report.has_errors():
+            error_lines = [
+                f"  - [{r.check_name}] {r.message}"
+                for r in report.results
+                if not r.passed and r.level == ValidationLevel.ERROR
+            ]
+            message = "Proxmox resource configuration validation failed:\n" + "\n".join(error_lines)
+            raise SchemaValidationError(message)
 
     def _preprocess_vms_for_secrets(self, vms: list[ResourceConfig]) -> list[ResourceConfig]:
         """Pre-process VMs so tailscale: blocks auto-populate terraform_secrets.
