@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776439707120,
+  "lastUpdate": 1776464015669,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6231,6 +6231,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000021005048865998317",
             "extra": "mean: 142.0319541595351 usec\nrounds: 2356"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8c9d42b16caab2a408e54dc6334d78e47ec93bc3",
+          "message": "fix: remove cluster-level NFS storage from service-vm blueprint (merges PR #624, addresses #622)\n\nAddresses #622\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-17T23:12:58+01:00",
+          "tree_id": "ad7476266810c0ed106e62e3799893744a5ac61f",
+          "url": "https://github.com/endavis/infrafoundry/commit/8c9d42b16caab2a408e54dc6334d78e47ec93bc3"
+        },
+        "date": 1776464014897,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9282.914600721964,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016125156397616983",
+            "extra": "mean: 107.72478720446557 usec\nrounds: 2157"
           }
         ]
       }
