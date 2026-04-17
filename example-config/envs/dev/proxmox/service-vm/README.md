@@ -1,8 +1,7 @@
 # service-vm (example consumer)
 
 Example thin-instantiation of the `service-vm` blueprint. Deploys a single
-infrastructure VM on Proxmox, a matching OPNsense DHCP reservation, and no
-NFS mount (the default).
+infrastructure VM on Proxmox and a matching OPNsense DHCP reservation.
 
 The deployment logic lives in `blueprints/service-vm/`. This package only
 supplies per-instance values.
@@ -21,6 +20,8 @@ foundry infra apply --env dev --package service-vm
   `ip_address`, `dhcp_subnet`).
 - A few common optional overrides (`cloud_init_snippets`, `tags`,
   `dhcp_description`).
-- `nfs_server` is left at its empty default, so no `proxmox.storage`
-  resource is emitted. To add an NFS mount, set `nfs_server` and
-  `nfs_export` in `variables:`.
+
+Guest-level NFS mounts are handled by cloud-init snippets on the VM (see
+`packages/nginx-nfs` for an example). Cluster-level Proxmox NFS storage
+pools are a separate concern and belong in a dedicated storage package,
+not in per-VM blueprints like `service-vm`.

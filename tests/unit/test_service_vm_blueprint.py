@@ -20,6 +20,7 @@ import pytest
 
 from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
 from infrafoundry.core.config.package_loader import PackageLoader
+from infrafoundry.providers.proxmox import ProxmoxProvider
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE_ENVS = REPO_ROOT / "example-config" / "envs"
@@ -61,10 +62,6 @@ def test_service_vm_example_package_loads_blueprint(loader: PackageLoader) -> No
     assert variables["vlan_tag"] == 10
     assert variables["agent"] is True
     assert variables["onboot"] is True
-    assert variables["nfs_server"] == ""
-    assert variables["nfs_export"] == ""
-    assert variables["nfs_content"] == ["snippets", "images"]
-    assert variables["nfs_mount"] == ""
 
 
 def test_service_vm_renders_vm_and_dhcp_resources(loader: PackageLoader) -> None:
@@ -147,94 +144,18 @@ def test_service_vm_dhcp_config_uses_merged_values(loader: PackageLoader) -> Non
     assert config["description"] == "Infrastructure web server (example)"
 
 
-def test_service_vm_with_nfs_renders_storage_resource(tmp_path: Path) -> None:
-    """When nfs_server is set the proxmox storage resource is emitted, named
-    ``{{ vm_name }}-nfs`` for multi-instance safety."""
-    envs = tmp_path / "envs"
-    pkg = envs / "test" / "proxmox" / "svc"
-    pkg.mkdir(parents=True)
-
-    (pkg / "infrafoundry.yml").write_text(
-        textwrap.dedent(
-            """\
-            name: svc
-            description: "Service VM with NFS"
-            blueprint: service-vm
-            variables:
-              vm_name: svc
-              vmid: 211
-              target_node: pve1
-              mac_address: "AA:BB:CC:DD:EE:FF"
-              ip_address: "192.168.10.61"
-              dhcp_subnet: opt1-infrastructure
-              nfs_server: "192.168.10.50"
-              nfs_export: "/export/infra"
-            """
-        )
+def test_service_vm_does_not_emit_storage_resource(loader: PackageLoader) -> None:
+    """The service-vm blueprint owns only VM + DHCP. Cluster-level storage
+    pools belong in a dedicated storage package, not in per-VM blueprints,
+    so the rendered resource set must never contain a ``proxmox.storage``
+    entry regardless of package variables (regression guard for #622).
+    """
+    resources, _events, _variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
     )
 
-    resolver = BlueprintResolver(envs)
-    pkg_loader = PackageLoader(envs, blueprint_resolver=resolver)
-
-    resources, _events, _variables = pkg_loader.load_package(
-        pkg, provider="proxmox", env_name="test"
-    )
-
-    assert len(resources) == 3
-    types_by_provider = {(r.provider, r.type) for r in resources}
-    assert ("proxmox", "vm") in types_by_provider
-    assert ("opnsense", "kea_reservation") in types_by_provider
-    assert ("proxmox", "storage") in types_by_provider
-
-    storage = next(r for r in resources if r.provider == "proxmox" and r.type == "storage")
-    assert storage.name == "svc-nfs"
-    assert storage.config["type"] == "nfs"
-    assert storage.config["server"] == "192.168.10.50"
-    assert storage.config["export"] == "/export/infra"
-    assert storage.config["content"] == ["snippets", "images"]
-    # Mount uses vm_name so multiple instances don't collide on the Proxmox host
-    assert storage.config["mount"] == "svc"
-
-
-def test_service_vm_nfs_mount_override(tmp_path: Path) -> None:
-    """Setting ``nfs_mount`` overrides the default ``vm_name`` mount name
-    without affecting the templated storage resource name."""
-    envs = tmp_path / "envs"
-    pkg = envs / "test" / "proxmox" / "svc"
-    pkg.mkdir(parents=True)
-
-    (pkg / "infrafoundry.yml").write_text(
-        textwrap.dedent(
-            """\
-            name: svc
-            description: "Service VM with NFS mount override"
-            blueprint: service-vm
-            variables:
-              vm_name: infra-web
-              vmid: 212
-              target_node: pve1
-              mac_address: "AA:BB:CC:DD:EE:FF"
-              ip_address: "192.168.10.62"
-              dhcp_subnet: opt1-infrastructure
-              nfs_server: "192.168.10.50"
-              nfs_export: "/export/infra"
-              nfs_mount: infra
-            """
-        )
-    )
-
-    resolver = BlueprintResolver(envs)
-    pkg_loader = PackageLoader(envs, blueprint_resolver=resolver)
-
-    resources, _events, _variables = pkg_loader.load_package(
-        pkg, provider="proxmox", env_name="test"
-    )
-
-    storage = next(r for r in resources if r.provider == "proxmox" and r.type == "storage")
-    # Framework resource identifier still templated for multi-instance safety
-    assert storage.name == "infra-web-nfs"
-    # Mount is the override value, not the vm_name fallback
-    assert storage.config["mount"] == "infra"
+    types = {(r.provider, r.type) for r in resources}
+    assert ("proxmox", "storage") not in types
 
 
 def test_service_vm_blueprint_supports_multiple_instances(tmp_path: Path) -> None:
@@ -263,8 +184,6 @@ def test_service_vm_blueprint_supports_multiple_instances(tmp_path: Path) -> Non
               mac_address: "AA:AA:AA:AA:AA:01"
               ip_address: "192.168.10.71"
               dhcp_subnet: subnet-a
-              nfs_server: "192.168.10.50"
-              nfs_export: "/export/a"
             """
         )
     )
@@ -281,8 +200,6 @@ def test_service_vm_blueprint_supports_multiple_instances(tmp_path: Path) -> Non
               mac_address: "BB:BB:BB:BB:BB:02"
               ip_address: "192.168.10.72"
               dhcp_subnet: subnet-b
-              nfs_server: "192.168.10.51"
-              nfs_export: "/export/b"
             """
         )
     )
@@ -293,8 +210,8 @@ def test_service_vm_blueprint_supports_multiple_instances(tmp_path: Path) -> Non
     resources_a, _events_a, _ = pkg_loader.load_package(pkg_a, provider="proxmox", env_name="test")
     resources_b, _events_b, _ = pkg_loader.load_package(pkg_b, provider="proxmox", env_name="test")
 
-    assert len(resources_a) == 3
-    assert len(resources_b) == 3
+    assert len(resources_a) == 2
+    assert len(resources_b) == 2
 
     # VM resources have distinct templated identifiers
     vm_a = next(r for r in resources_a if r.type == "vm")
@@ -316,12 +233,69 @@ def test_service_vm_blueprint_supports_multiple_instances(tmp_path: Path) -> Non
     assert dhcp_a.config["subnet_ref"] == "subnet-a"
     assert dhcp_b.config["subnet_ref"] == "subnet-b"
 
-    # Storage mounts are distinct per instance
-    storage_a = next(r for r in resources_a if r.type == "storage")
-    storage_b = next(r for r in resources_b if r.type == "storage")
-    assert storage_a.name == "svc-a-nfs"
-    assert storage_b.name == "svc-b-nfs"
-    assert storage_a.config["server"] == "192.168.10.50"
-    assert storage_b.config["server"] == "192.168.10.51"
-    assert storage_a.config["mount"] == "svc-a"
-    assert storage_b.config["mount"] == "svc-b"
+
+def test_service_vm_config_passes_proxmox_validation(tmp_path: Path) -> None:
+    """End-to-end regression guard for issue #622.
+
+    Loads the service-vm blueprint and runs the rendered proxmox VM
+    resource through ``ProxmoxProvider.generate_terraform``, which invokes
+    ``VMConfigValidator`` / ``StorageConfigValidator`` (wired in by #621).
+    If the blueprint ever re-introduces a bad schema — either on the VM
+    itself or by smuggling back a non-cluster-level storage resource —
+    this test fails.
+
+    Also asserts that the service-vm blueprint never renders a
+    ``proxmox.storage`` resource: Proxmox storage pools are cluster-wide
+    concerns and belong in a dedicated storage package, not in per-VM
+    blueprints.
+    """
+    envs = tmp_path / "envs"
+    pkg = envs / "test" / "proxmox" / "svc"
+    pkg.mkdir(parents=True)
+
+    (pkg / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: svc
+            description: "Service VM for validator e2e test"
+            blueprint: service-vm
+            variables:
+              vm_name: svc
+              vmid: 213
+              target_node: pve1
+              mac_address: "AA:BB:CC:DD:EE:FF"
+              ip_address: "192.168.10.63"
+              dhcp_subnet: opt1-infrastructure
+            """
+        )
+    )
+
+    resolver = BlueprintResolver(envs)
+    pkg_loader = PackageLoader(envs, blueprint_resolver=resolver)
+
+    resources, _events, _variables = pkg_loader.load_package(
+        pkg, provider="proxmox", env_name="test"
+    )
+
+    # Provider fixture pattern mirrors tests/unit/providers/proxmox/test_storage_support.py
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    provider = ProxmoxProvider(config_dir, output_dir)
+    provider.set_environment("test")
+
+    proxmox_resources = [r for r in resources if r.provider == "proxmox"]
+
+    # Blueprint must not smuggle in cluster-wide concerns as per-VM resources.
+    assert all(r.type != "storage" for r in proxmox_resources)
+
+    # Must NOT raise SchemaValidationError.
+    provider.generate_terraform(proxmox_resources)
+
+    # The rendered storage.tf (always present, provider emits it per env)
+    # must be empty of actual resource blocks, because the blueprint emits
+    # no storage resources.
+    storage_tf_candidates = list(tmp_path.rglob("storage.tf"))
+    for candidate in storage_tf_candidates:
+        assert "proxmox_virtual_environment_storage" not in candidate.read_text()
