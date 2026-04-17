@@ -74,23 +74,6 @@ inputs:
     description: "DHCP reservation description (falls back to vm_name when empty)"
     default: ""
 
-  # --- Optional NFS storage mount ---
-  - name: nfs_server
-    description: "NFS server address. Empty: no NFS storage resource is created."
-    default: ""
-  - name: nfs_export
-    description: "NFS export path on the server (used when nfs_server is set)"
-    default: ""
-  - name: nfs_content
-    description: "Proxmox storage content types for the NFS mount"
-    default:
-      - snippets
-      - images
-  - name: nfs_mount
-    description: "Proxmox mount name for the NFS storage. Empty: falls back to vm_name."
-    default: ""
-
 resources:
   - vm.yaml
   - dhcp.yaml
-  - storage.yaml

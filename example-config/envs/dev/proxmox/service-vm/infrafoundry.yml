@@ -1,8 +1,7 @@
 # Service VM — example consumer of the service-vm blueprint.
 #
-# All deployment logic (VM definition, DHCP reservation, optional NFS mount)
-# lives in blueprints/service-vm/. This file only supplies the per-instance
-# values.
+# All deployment logic (VM definition, DHCP reservation) lives in
+# blueprints/service-vm/. This file only supplies the per-instance values.
 #
 # See blueprints/service-vm/README.md for the full variable reference.
 #
