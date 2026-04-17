@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776428635222,
+  "lastUpdate": 1776439707120,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6200,6 +6200,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007043066076311207",
             "extra": "mean: 103.25630025448184 usec\nrounds: 1965"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "af87811a8ddf641e50bdebae94948bc853989a54",
+          "message": "fix: wire proxmox config validators into generate_terraform (merges PR #623, addresses #621)\n\nAddresses #621\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-17T16:27:47+01:00",
+          "tree_id": "4349882c1e038ee9669c61e2bf5cdf72b287e356",
+          "url": "https://github.com/endavis/infrafoundry/commit/af87811a8ddf641e50bdebae94948bc853989a54"
+        },
+        "date": 1776439705901,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7040.66916432598,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000021005048865998317",
+            "extra": "mean: 142.0319541595351 usec\nrounds: 2356"
           }
         ]
       }
