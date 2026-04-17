@@ -1,0 +1,33 @@
+# Service VM — example consumer of the service-vm blueprint.
+#
+# All deployment logic (VM definition, DHCP reservation, optional NFS mount)
+# lives in blueprints/service-vm/. This file only supplies the per-instance
+# values.
+#
+# See blueprints/service-vm/README.md for the full variable reference.
+#
+# Run: foundry infra apply --env dev --package service-vm
+
+name: service-vm
+description: "Example infrastructure service VM"
+blueprint: service-vm
+
+variables:
+  # --- Required per-instance values ---
+  vm_name: infra-web
+  vmid: 210
+  target_node: pve1
+  mac_address: "BC:24:11:F8:F4:7D"
+  ip_address: "192.168.10.60"
+  dhcp_subnet: opt1-infrastructure
+
+  # --- Optional overrides ---
+  cloud_init_snippets:
+    - system/hostname
+    - users/ansible
+    - network/dhcp
+    - packages/qemu-agent
+  tags:
+    - infra
+    - web
+  dhcp_description: "Infrastructure web server (example)"

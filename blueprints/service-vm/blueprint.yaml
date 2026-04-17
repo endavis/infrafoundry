@@ -1,0 +1,96 @@
+name: service-vm
+description: "Lightweight service VM (template clone + DHCP reservation + optional NFS mount)"
+version: "1.0.0"
+
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: vm_name
+    description: "Hostname and Proxmox VM name"
+  - name: vmid
+    description: "Proxmox VM ID"
+    type: integer
+  - name: target_node
+    description: "Proxmox node to deploy the VM onto"
+  - name: mac_address
+    description: "VM NIC MAC address (lowercased for DHCP reservation)"
+  - name: ip_address
+    description: "Static IPv4 address for the VM (DHCP reservation)"
+  - name: dhcp_subnet
+    description: "OPNsense DHCP subnet identifier used for the reservation"
+
+  # --- VM hardware ---
+  - name: template_vmid
+    description: "Source template VMID to clone from"
+    type: integer
+    default: 900
+  - name: template_node
+    description: "Proxmox node hosting the template"
+    default: pve1
+  - name: cores
+    type: integer
+    default: 2
+  - name: memory
+    description: "Memory in MiB"
+    type: integer
+    default: 2048
+  - name: disk_storage
+    description: "Proxmox storage pool for the VM disk"
+    default: local-lvm
+  - name: disk_size
+    description: "Disk size in GiB"
+    type: integer
+    default: 32
+
+  # --- Network ---
+  - name: bridge
+    default: vmbr0
+  - name: vlan_tag
+    type: integer
+    default: 10
+
+  # --- VM behaviour ---
+  - name: agent
+    description: "Enable the qemu-guest-agent integration"
+    type: boolean
+    default: true
+  - name: onboot
+    description: "Start the VM automatically when the host boots"
+    type: boolean
+    default: true
+
+  # --- Cloud-init ---
+  - name: cloud_init_snippets
+    description: "List of cloud-init snippet names to attach to the VM"
+    default: []
+  - name: extra_cloud_init_vars
+    description: "Additional cloud-init variables merged on top of HOSTNAME"
+    default: {}
+
+  # --- Tags & DHCP description ---
+  - name: tags
+    description: "Proxmox tags applied to the VM"
+    default: []
+  - name: dhcp_description
+    description: "DHCP reservation description (falls back to vm_name when empty)"
+    default: ""
+
+  # --- Optional NFS storage mount ---
+  - name: nfs_server
+    description: "NFS server address. Empty: no NFS storage resource is created."
+    default: ""
+  - name: nfs_export
+    description: "NFS export path on the server (used when nfs_server is set)"
+    default: ""
+  - name: nfs_content
+    description: "Proxmox storage content types for the NFS mount"
+    default:
+      - snippets
+      - images
+  - name: nfs_mount
+    description: "Proxmox mount name for the NFS storage. Empty: falls back to vm_name."
+    default: ""
+
+resources:
+  - vm.yaml
+  - dhcp.yaml
+  - storage.yaml
