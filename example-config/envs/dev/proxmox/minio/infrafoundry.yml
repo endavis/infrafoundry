@@ -1,0 +1,23 @@
+# MinIO Object Storage — example consumer of the minio blueprint.
+#
+# All deployment logic (operator/tenant Helm releases, namespace, credentials
+# secret, NodePort Service) lives in blueprints/minio/. This file only supplies
+# the per-instance values.
+#
+# See blueprints/minio/README.md for the full variable reference.
+#
+# Run: foundry infra apply --env dev --package minio
+
+name: minio
+description: "MinIO distributed object storage (example)"
+provider: proxmox
+blueprint: minio
+
+variables:
+  # --- Required ---
+  tenant_name: example
+  minio_root_password: "CHANGE_ME"
+
+  # --- Smaller footprint for dev ---
+  tenant_servers: 2
+  tenant_volume_size: "5Gi"

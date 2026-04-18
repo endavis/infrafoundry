@@ -1,0 +1,61 @@
+name: minio
+description: "MinIO distributed object storage on k3s (operator + tenant)"
+version: "1.0.0"
+
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: tenant_name
+    description: "Tenant identifier (used as the tenant Helm release name and in templated resource names)"
+  - name: minio_root_password
+    description: "MinIO root password (SOPS-encrypted in secrets.yaml)"
+
+  # --- MinIO Operator ---
+  - name: operator_namespace
+    default: minio-operator
+  - name: operator_chart_version
+    description: "MinIO Operator/Tenant Helm chart version"
+    default: "6.0.4"
+
+  # --- MinIO Tenant ---
+  - name: tenant_namespace
+    default: minio-tenant
+  - name: tenant_servers
+    description: "Number of MinIO servers in the pool (distributed mode requires >= 4)"
+    type: integer
+    default: 4
+  - name: tenant_volumes_per_server
+    type: integer
+    default: 1
+  - name: tenant_volume_size
+    description: "PersistentVolume size per server (e.g. 25Gi)"
+    default: "25Gi"
+  - name: tenant_storage_class
+    default: local-path
+
+  # --- MinIO Access ---
+  - name: minio_root_user
+    default: minioadmin
+
+  # --- Resource Limits ---
+  - name: minio_cpu_request
+    default: "250m"
+  - name: minio_memory_request
+    default: "512Mi"
+  - name: minio_cpu_limit
+    default: "1"
+  - name: minio_memory_limit
+    default: "2Gi"
+
+  # --- NodePort Access ---
+  - name: api_node_port
+    description: "NodePort for the MinIO S3 API (port 9000)"
+    type: integer
+    default: 30900
+  - name: console_node_port
+    description: "NodePort for the MinIO web console (port 9090)"
+    type: integer
+    default: 30909
+
+resources:
+  - operator.yaml
+  - tenant.yaml

@@ -1,0 +1,99 @@
+# MinIO Tenant resources (namespace, credentials secret, tenant Helm release,
+# NodePort Service). All outer resource names are templated on tenant_name so
+# multiple tenants can coexist on the same cluster (multi-instance safety per
+# the #511 regression pattern).
+resources:
+  # --- Tenant Namespace ---
+  # Created separately so the credentials secret can be placed before the
+  # tenant Helm release.
+  - provider: kubernetes
+    type: namespaces
+    name: "{{ tenant_name }}-ns"
+    config:
+      name: "{{ tenant_namespace }}"
+
+  # --- MinIO Credentials Secret ---
+  - provider: kubernetes
+    type: secrets
+    name: "{{ tenant_name }}-env-configuration"
+    config:
+      namespace: "{{ tenant_namespace }}"
+      string_data:
+        config.env: "export MINIO_ROOT_USER={{ minio_root_user }}\\nexport MINIO_ROOT_PASSWORD={{ minio_root_password }}\\n"
+
+  # --- MinIO Tenant (Helm) ---
+  # depends_on operator (for CRDs) and the credentials secret.
+  - provider: kubernetes
+    type: helm_releases
+    name: "{{ tenant_name }}"
+    config:
+      chart: tenant
+      repository: https://operator.min.io
+      version: "{{ operator_chart_version }}"
+      namespace: "{{ tenant_namespace }}"
+      wait: true
+      timeout: 600
+      depends_on:
+        - helm_release.minio_operator
+        - kubernetes_secret.{{ (tenant_name ~ "-env-configuration") | replace("-", "_") }}
+      set:
+        - name: tenant.name
+          value: "{{ tenant_name }}"
+        - name: tenant.pools[0].name
+          value: pool-0
+        - name: tenant.pools[0].servers
+          value: "{{ tenant_servers }}"
+        - name: tenant.pools[0].volumesPerServer
+          value: "{{ tenant_volumes_per_server }}"
+        - name: tenant.pools[0].size
+          value: "{{ tenant_volume_size }}"
+        - name: tenant.pools[0].storageClassName
+          value: "{{ tenant_storage_class }}"
+        - name: tenant.pools[0].resources.requests.cpu
+          value: "{{ minio_cpu_request }}"
+        - name: tenant.pools[0].resources.requests.memory
+          value: "{{ minio_memory_request }}"
+        - name: tenant.pools[0].resources.limits.cpu
+          value: "{{ minio_cpu_limit }}"
+        - name: tenant.pools[0].resources.limits.memory
+          value: "{{ minio_memory_limit }}"
+        - name: tenant.pools[0].nodeSelector.minio
+          value: "true"
+          type: string
+        - name: tenant.configuration.name
+          value: "{{ tenant_name }}-env-configuration"
+        - name: tenant.configSecret.name
+          value: "{{ tenant_name }}-env-configuration"
+        - name: tenant.configSecret.existingSecret
+          value: "true"
+        - name: tenant.configSecret.accessKey
+          value: ""
+        - name: tenant.configSecret.secretKey
+          value: ""
+        - name: tenant.certificate.requestAutoCert
+          value: "false"
+
+  # --- NodePort Service for external access ---
+  - provider: kubernetes
+    type: manifests
+    name: "{{ tenant_name }}-external"
+    config:
+      manifest:
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: "{{ tenant_name }}-external"
+          namespace: "{{ tenant_namespace }}"
+        spec:
+          type: NodePort
+          selector:
+            v1.min.io/tenant: "{{ tenant_name }}"
+          ports:
+            - name: api
+              port: 9000
+              targetPort: 9000
+              nodePort: {{ api_node_port }}
+            - name: console
+              port: 9090
+              targetPort: 9090
+              nodePort: {{ console_node_port }}
