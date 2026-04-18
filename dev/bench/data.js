@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776464015669,
+  "lastUpdate": 1776534536277,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6262,6 +6262,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016125156397616983",
             "extra": "mean: 107.72478720446557 usec\nrounds: 2157"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a97d1ff7892b3537967e51868217277231b8a5d4",
+          "message": "refactor: extract minio blueprint and convert prod minio package (merges PR #625, addresses #619)\n\nAddresses #619",
+          "timestamp": "2026-04-18T18:48:16+01:00",
+          "tree_id": "fb6f9a74017bf22a01d6b3b0aef4c9f89ad419b9",
+          "url": "https://github.com/endavis/infrafoundry/commit/a97d1ff7892b3537967e51868217277231b8a5d4"
+        },
+        "date": 1776534535488,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6772.2258615416295,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002606232772742171",
+            "extra": "mean: 147.6619386956418 usec\nrounds: 2300"
           }
         ]
       }
