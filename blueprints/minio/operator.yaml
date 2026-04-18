@@ -1,0 +1,18 @@
+# MinIO Operator Helm release.
+#
+# Uses the generic resources: format (not the shorthand) because the resource
+# provider (kubernetes) differs from the package directory provider (proxmox)
+# in the current homelab consumer. One operator per cluster — the resource
+# name is literal, not templated.
+resources:
+  - provider: kubernetes
+    type: helm_releases
+    name: minio-operator
+    config:
+      chart: operator
+      repository: https://operator.min.io
+      version: "{{ operator_chart_version }}"
+      namespace: "{{ operator_namespace }}"
+      create_namespace: true
+      wait: true
+      timeout: 300
