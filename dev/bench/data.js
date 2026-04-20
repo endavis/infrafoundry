@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776710237823,
+  "lastUpdate": 1776710743078,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6324,6 +6324,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001833489003623186",
             "extra": "mean: 143.76635310599153 usec\nrounds: 2141"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4323c10ff7bd03015c34a11ce02de099054663b5",
+          "message": "feat: add provider CLI group and proxmox dump command (merges PR #636, addresses #626)\n\nfeat: add foundry provider CLI group and proxmox dump command\n\nIntroduces a top-level `foundry provider <name>` CLI group backed by the\npreviously-unused `ProviderMetadata.cli_registration` plugin hook and the\n`infrafoundry.providers` entry point group. Providers now own their CLI\ncode under `providers/<name>/cli/`.\n\nShips two Proxmox subcommands under the new group:\n- `foundry provider proxmox dump` (new) — raw JSON snapshot of a live PVE\n  cluster's API state via a curated endpoint list, per-call timeout,\n  inline failure capture, incremental atomic save.\n- `foundry provider proxmox export` (moved) — previously\n  `foundry config export --provider proxmox`.\n\nAlso loosens `ProviderPluginType.validate_plugin` required-method list\nto match `ProviderBase`'s real abstract surface. Adds ADR-0005 + Proxmox\nprovider guide; updates CLI reference, CLI_DESIGN supersede note, and\nCHANGELOG.\n\nBREAKING CHANGE: `foundry config export --provider proxmox` is removed.\nReplace with `foundry provider proxmox export` (drop the `--provider`\nflag; `--node`/`--resource-type` are unchanged). See ADR-0005.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-20T19:45:09+01:00",
+          "tree_id": "06479b3062cdd5c1a83f83c1c01fedd7ac8ea6ba",
+          "url": "https://github.com/endavis/infrafoundry/commit/4323c10ff7bd03015c34a11ce02de099054663b5"
+        },
+        "date": 1776710742532,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 5949.251280804228,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004358766789922453",
+            "extra": "mean: 168.08837831856022 usec\nrounds: 1808"
           }
         ]
       }
