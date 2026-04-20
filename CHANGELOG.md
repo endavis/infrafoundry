@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **CLI Error Handling**: Refactored error handling to use centralized error catalog. Removed `console` object and internal functions from `cli/decorators.py` (replaced by error catalog in `cli/errors.py`).
+- **CodeQL**: Migrated from GitHub's default setup to an in-repo advanced workflow at `.github/workflows/codeql.yml`. Fixes merges being blocked by the `code_scanning` ruleset rule when default setup doesn't emit a result (addresses #637).
 
 ### Removed
 - **`cli.decorators.console`**: Module-level `Console` object removed from `cli/decorators.py`. Use `cli.utils.console` instead if needed.
