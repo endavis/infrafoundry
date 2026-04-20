@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776534536277,
+  "lastUpdate": 1776710237823,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6293,6 +6293,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002606232772742171",
             "extra": "mean: 147.6619386956418 usec\nrounds: 2300"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b0adc01bb931df1c1cd45d08cb59c06d5d847c0f",
+          "message": "fix: port advanced-setup CodeQL workflow from pyproject-template (merges PR #638, addresses #637)\n\nReplaces GitHub's CodeQL default setup with an in-repo advanced-setup\nworkflow at .github/workflows/codeql.yml. Default setup was not emitting\na check-run on PRs, which caused the main ruleset's code_scanning rule\n(tool: CodeQL) to stay pending and block merges. Ported verbatim from\npyproject-template#433; the summary job is literally named CodeQL so the\nemitted check-run name matches the ruleset's required tool name.\n\nAddresses #637",
+          "timestamp": "2026-04-20T19:36:42+01:00",
+          "tree_id": "735a996c5f117884a94006b581f377fb4eb2a6fd",
+          "url": "https://github.com/endavis/infrafoundry/commit/b0adc01bb931df1c1cd45d08cb59c06d5d847c0f"
+        },
+        "date": 1776710237408,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6955.730450105745,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001833489003623186",
+            "extra": "mean: 143.76635310599153 usec\nrounds: 2141"
           }
         ]
       }
