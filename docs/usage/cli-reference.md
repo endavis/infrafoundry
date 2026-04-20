@@ -43,7 +43,8 @@ InfraFoundry commands are organized into five domain groups plus two top-level u
 | Show resolved config | `foundry config show --env <env>` |
 | Create a new environment | `foundry config create <name>` |
 | Create from a blueprint | `foundry config new create <blueprint> <dir>` |
-| Export provider config to YAML | `foundry config export --env <env> --output <dir>` |
+| Export Proxmox config to YAML | `foundry provider proxmox export --env <env> --output <dir>` |
+| Dump raw Proxmox API state | `foundry provider proxmox dump --env <env> --output <file>.json` |
 | Generate JSON schemas for IDE | `foundry config schema export` |
 | Migrate existing infra to config | `foundry config migrate --env <env> --provider opnsense --component <comp>` |
 | Plan changes | `foundry infra plan --env <env>` |
@@ -213,17 +214,6 @@ foundry config migrate --env prod --provider opnsense --component isc-to-kea --d
 
 **Options:** `-e/--env TEXT` (required), `-p/--provider [opnsense]` (required), `-c/--component [kea/dhcp|isc-to-kea]` (required), `-i/--interfaces TEXT` (repeatable), `-o/--output TEXT`, `--dry-run`
 
-### `config export`
-
-Export provider configuration to InfraFoundry YAML.
-
-```bash
-foundry config export --env prod --output ./exported --provider proxmox
-foundry config export --env prod --output ./exported --provider proxmox --node pve01 --resource-type vm
-```
-
-**Options:** `-e/--env TEXT` (required), `-o/--output DIRECTORY` (required), `-p/--provider [proxmox]`, `--node TEXT`, `--resource-type [vm|network|storage]`
-
 ### `config schema`
 
 Export JSON schemas for IDE autocomplete.
@@ -239,6 +229,52 @@ foundry config schema show resources --format yaml
 **Subcommands:** `export [--output PATH]`, `list`, `show <name> [--format json|yaml]`
 
 Available schemas: `settings`, `resources`, `backend`, `hooks`, `resource`.
+
+---
+
+## Provider Group (`foundry provider`)
+
+Provider-specific commands. Subcommands are registered dynamically by
+each provider package's plugin entry point (see
+[ADR 0005](../decisions/0005-provider-cli-extensibility.md)).
+
+!!! warning "Breaking change"
+    `foundry config export --provider proxmox` was removed. Use
+    `foundry provider proxmox export` instead.
+
+### `provider proxmox dump`
+
+Dump raw Proxmox cluster API state as a JSON snapshot. Captures
+everything the PVE API returns for cluster, access, pools, storage, every
+node, and every VM/container. Writes atomically and incrementally so an
+interrupted dump leaves valid JSON on disk. Per-call failures are
+captured inline as `{"__timeout__": true, "path": ...}` or
+`{"__error__": "...", "path": ...}`.
+
+```bash
+foundry provider proxmox dump --env prod --output pve-state.json
+foundry provider proxmox dump --env prod --output pve-state.json --timeout 60
+```
+
+**Options:** `-e/--env TEXT` (required), `-o/--output FILE` (required),
+`--timeout INTEGER` (default: 20).
+
+### `provider proxmox export`
+
+Export existing Proxmox VMs, bridge networks, and storage pools to
+InfraFoundry YAML. Useful when adopting an existing cluster.
+
+```bash
+foundry provider proxmox export --env prod --output ./exported
+foundry provider proxmox export --env prod --output ./exported --node pve01
+foundry provider proxmox export --env prod --output ./exported --resource-type vm
+```
+
+**Options:** `-e/--env TEXT` (required), `-o/--output DIRECTORY`
+(required), `--node TEXT`, `--resource-type [vm|network|storage]`.
+
+See [the Proxmox provider guide](../providers/proxmox.md) for the
+dump-vs-export decision tree and credential setup.
 
 ---
 
@@ -652,15 +688,20 @@ foundry
 |   +-- envs [--format text|json]
 |   +-- diff --env-a <env1> --env-b <env2> [-p provider] [-v]
 |   +-- show -e <env> [-p provider] [-t type] [-r resource] [--format] [--settings-only]
-|   +-- init <name> [--from <env>] [-d desc] [-f]
+|   +-- create <name> [--from <env>] [-d desc] [-f]
 |   +-- new
 |   |   +-- create <blueprint> <target-dir>
 |   +-- migrate -e <env> -p <provider> -c <component> [-i interfaces] [--dry-run]
-|   +-- export -e <env> -o <dir> [-p provider] [--node] [--resource-type]
 |   +-- schema
 |       +-- export [-o path]
 |       +-- list
 |       +-- show <name> [--format json|yaml]
++-- provider
+|   +-- <provider-name>        (discovered via infrafoundry.providers entry points)
+|       +-- ...                (subcommands contributed by each provider)
+|   +-- proxmox
+|       +-- dump -e <env> -o <file.json> [--timeout <seconds>]
+|       +-- export -e <env> -o <dir> [--node] [--resource-type]
 +-- infra
 |   +-- doctor -e <env> [-r resource] [-v]
 |   +-- plan -e <env> [--dry-run] [-r resource] [-p package] [--enforce-policies]
@@ -726,7 +767,7 @@ foundry
 - **Symptom:** `config diff` shows no differences but configs look different. **Fix:** Check if provider filtering is hiding changes; remove `--provider` flag to see all differences.
 - **Symptom:** `infra analyze` shows unexpected results. **Fix:** Ensure resources are loaded from YAML; check `get_dependencies()` implementation in provider.
 - **Symptom:** `infra reset` fails or doesn't clean properly. **Fix:** Verify provider and component names are correct; currently only supports OPNsense Kea components (kea/dhcpv4, kea/dhcpv6, kea/dhcp).
-- **Symptom:** `config export` fails to connect. **Fix:** Verify environment credentials in `settings.yaml`; ensure provider API is accessible and credentials have read permissions.
+- **Symptom:** `provider proxmox export` or `provider proxmox dump` fails to connect. **Fix:** Verify environment credentials in `settings.yaml`; ensure the PVE API is reachable and the token has read permissions. For a slow cluster, increase `--timeout` on `dump`.
 
 ---
 

@@ -298,6 +298,7 @@ from infrafoundry.cli.commands.config import config
 from infrafoundry.cli.commands.doctor import doctor
 from infrafoundry.cli.commands.infra import infra
 from infrafoundry.cli.commands.policy import policy
+from infrafoundry.cli.commands.provider import provider
 from infrafoundry.cli.commands.secrets import secrets
 from infrafoundry.cli.commands.state import state
 
@@ -308,6 +309,7 @@ foundry.add_command(config)
 foundry.add_command(state)
 foundry.add_command(secrets)
 foundry.add_command(policy)
+foundry.add_command(provider)
 
 # Alias for backwards compatibility during development
 main = foundry
