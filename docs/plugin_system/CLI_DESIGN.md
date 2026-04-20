@@ -2,8 +2,19 @@
 
 **Version:** 1.0
 **Date:** 2025-12-28
-**Status:** Design Phase
-**Related:** [Plugin System Design](./PLUGIN_SYSTEM_DESIGN.md)
+**Status:** Design Phase (partially superseded — see below)
+**Related:** [Plugin System Design](./PLUGIN_SYSTEM_DESIGN.md),
+[ADR-0005: Provider CLI extensibility](../decisions/0005-provider-cli-extensibility.md)
+
+!!! note "Superseded by ADR-0005"
+    This document sketches `foundry <provider>` (e.g. `foundry proxmox vm
+    list`) as the provider CLI surface. The implementation in
+    [ADR-0005](../decisions/0005-provider-cli-extensibility.md) chose
+    `foundry provider <name>` instead — so the real commands are
+    `foundry provider proxmox dump`, `foundry provider proxmox export`,
+    and so on. Treat `Entry: foundry <name>` and similar references below
+    as historical; they keep the generic top-level (`config`, `infra`,
+    `state`, ...) stable regardless of how many providers ship.
 
 ## Table of Contents
 

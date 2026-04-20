@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, ClassVar, override
+from typing import TYPE_CHECKING, Any, ClassVar, override
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import SchemaValidationError
@@ -22,6 +22,9 @@ from .validators import (
     StorageConfigValidator,
     VMConfigValidator,
 )
+
+if TYPE_CHECKING:
+    from infrafoundry.providers.plugin_type import ProviderMetadata
 
 
 class ProxmoxProvider(
@@ -542,3 +545,46 @@ class ProxmoxProvider(
             "storage": [],
             "trigger": [],
         }
+
+
+def register_cli(provider_group: Any) -> None:
+    """Attach Proxmox subcommands to the top-level ``foundry provider`` group.
+
+    Invoked at CLI startup by
+    :meth:`infrafoundry.providers.plugin_type.ProviderPluginType.register_cli`
+    after the provider's ``ProviderMetadata`` is loaded via entry points.
+
+    Args:
+        provider_group: The Click group created by ``register_cli`` for this
+            provider (named ``proxmox``). Proxmox's own subcommands are added
+            directly to it so the final shape is
+            ``foundry provider proxmox {dump,export}``.
+    """
+    # Import inside the function so that importing the package does not
+    # pull click/CLI code when only the provider class is needed.
+    from infrafoundry.providers.proxmox.cli import proxmox as proxmox_cli_group
+
+    for name, command in proxmox_cli_group.commands.items():
+        provider_group.add_command(command, name=name)
+
+
+def register() -> "ProviderMetadata":
+    """Return provider metadata for plugin discovery.
+
+    Referenced from the ``infrafoundry.providers`` entry point in
+    ``pyproject.toml``. The generic plugin discovery engine calls this to
+    obtain the provider class and its CLI registration hook.
+
+    Returns:
+        A ``ProviderMetadata`` describing the Proxmox provider.
+    """
+    from infrafoundry.providers.plugin_type import ProviderMetadata
+
+    return ProviderMetadata(
+        name="proxmox",
+        version="0.1.0",
+        description="Proxmox Virtual Environment provider",
+        provider_class=ProxmoxProvider,
+        resource_types=["vm", "container", "template", "network", "storage", "trigger"],
+        cli_registration=register_cli,
+    )

@@ -1,4 +1,4 @@
-"""Unit tests for the 'export-proxmox' CLI command."""
+"""Unit tests for the Proxmox provider 'export' CLI command."""
 
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 from click.testing import CliRunner
 
-from infrafoundry.cli.commands.proxmox.export_proxmox import export_proxmox
+from infrafoundry.providers.proxmox.cli.export import export_proxmox
 
 
 @pytest.fixture
@@ -51,11 +51,11 @@ def test_export_proxmox_success(cli_runner, tmp_path, mock_config_manager, mock_
 
     with (
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager",
+            "infrafoundry.providers.proxmox.cli.export.ConfigManager",
             return_value=mock_config_manager,
         ),
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ProxmoxConfigExporter",
+            "infrafoundry.providers.proxmox.cli.export.ProxmoxConfigExporter",
             return_value=mock_exporter,
         ),
     ):
@@ -82,11 +82,11 @@ def test_export_proxmox_with_node_filter(cli_runner, tmp_path, mock_config_manag
 
     with (
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager",
+            "infrafoundry.providers.proxmox.cli.export.ConfigManager",
             return_value=mock_config_manager,
         ),
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ProxmoxConfigExporter",
+            "infrafoundry.providers.proxmox.cli.export.ProxmoxConfigExporter",
             return_value=mock_exporter,
         ),
     ):
@@ -108,11 +108,11 @@ def test_export_proxmox_with_resource_type_filter(
 
     with (
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager",
+            "infrafoundry.providers.proxmox.cli.export.ConfigManager",
             return_value=mock_config_manager,
         ),
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ProxmoxConfigExporter",
+            "infrafoundry.providers.proxmox.cli.export.ProxmoxConfigExporter",
             return_value=mock_exporter,
         ),
     ):
@@ -132,11 +132,11 @@ def test_export_proxmox_with_both_filters(cli_runner, tmp_path, mock_config_mana
 
     with (
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager",
+            "infrafoundry.providers.proxmox.cli.export.ConfigManager",
             return_value=mock_config_manager,
         ),
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ProxmoxConfigExporter",
+            "infrafoundry.providers.proxmox.cli.export.ProxmoxConfigExporter",
             return_value=mock_exporter,
         ),
     ):
@@ -194,11 +194,11 @@ def test_export_proxmox_creates_output_directory(
 
     with (
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager",
+            "infrafoundry.providers.proxmox.cli.export.ConfigManager",
             return_value=mock_config_manager,
         ),
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ProxmoxConfigExporter",
+            "infrafoundry.providers.proxmox.cli.export.ProxmoxConfigExporter",
             return_value=mock_exporter,
         ),
     ):
@@ -221,11 +221,11 @@ def test_export_proxmox_handles_exporter_error(cli_runner, tmp_path, mock_config
 
     with (
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager",
+            "infrafoundry.providers.proxmox.cli.export.ConfigManager",
             return_value=mock_config_manager,
         ),
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ProxmoxConfigExporter",
+            "infrafoundry.providers.proxmox.cli.export.ProxmoxConfigExporter",
             return_value=mock_exporter,
         ),
     ):
@@ -247,7 +247,7 @@ def test_export_proxmox_handles_config_load_error(cli_runner, tmp_path):
     mock_config_manager.load_environment.side_effect = Exception("Environment not found")
 
     with patch(
-        "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager",
+        "infrafoundry.providers.proxmox.cli.export.ConfigManager",
         return_value=mock_config_manager,
     ):
         result = cli_runner.invoke(
@@ -278,11 +278,11 @@ def test_export_proxmox_without_config_dir(cli_runner, tmp_path, mock_exporter):
 
     with (
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ConfigManager",
+            "infrafoundry.providers.proxmox.cli.export.ConfigManager",
             return_value=mock_config_manager,
         ),
         patch(
-            "infrafoundry.cli.commands.proxmox.export_proxmox.ProxmoxConfigExporter",
+            "infrafoundry.providers.proxmox.cli.export.ProxmoxConfigExporter",
             return_value=mock_exporter,
         ),
     ):

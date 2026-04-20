@@ -2,7 +2,6 @@
 
 import click
 
-from ..proxmox.export_proxmox import export_proxmox as export_cmd
 from ..schema import schema
 from .create import create
 from .diff import diff
@@ -15,7 +14,7 @@ from .show import show
 
 @click.group()
 def config() -> None:
-    """Configuration management (envs, diff, doctor, schema, export, etc.)."""
+    """Configuration management (envs, diff, doctor, schema, etc.)."""
     pass
 
 
@@ -23,7 +22,6 @@ def config() -> None:
 config.add_command(doctor)
 config.add_command(envs)
 config.add_command(diff)
-config.add_command(export_cmd, name="export")
 config.add_command(create)
 config.add_command(schema)
 config.add_command(show)

@@ -61,6 +61,9 @@ foundry = "infrafoundry.cli:foundry"
 provider = "infrafoundry.providers.plugin_type:ProviderPluginType"
 secret_backend = "infrafoundry.secrets.plugin_type:SecretBackendPluginType"
 
+[project.entry-points."infrafoundry.providers"]
+proxmox = "infrafoundry.providers.proxmox:register"
+
 [project.entry-points."infrafoundry.secrets"]
 env = "infrafoundry.secrets.backends.env:register"
 file = "infrafoundry.secrets.backends.file:register"

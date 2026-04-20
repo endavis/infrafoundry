@@ -3,23 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import click
 
+from infrafoundry.cli.utils import console, raise_cli_error
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.types import EnvironmentData
 from infrafoundry.providers.proxmox.exporter import ProxmoxConfigExporter
-
-from ...utils import console, raise_cli_error
 
 
 @click.command(name="export")
-@click.option(
-    "--provider",
-    "-p",
-    type=click.Choice(["proxmox"], case_sensitive=False),
-    default="proxmox",
-    help="Provider to export from (default: proxmox)",
-)
 @click.option("--env", "-e", required=True, help="Environment name to use for credentials")
 @click.option(
     "--output",
@@ -28,28 +22,27 @@ from ...utils import console, raise_cli_error
     required=True,
     help="Output directory for exported YAML",
 )
-@click.option("--node", help="Optional node filter (proxmox only)")
+@click.option("--node", help="Optional node filter")
 @click.option(
     "--resource-type",
     type=click.Choice(["vm", "network", "storage"], case_sensitive=False),
-    help="Optional resource type filter (proxmox only)",
+    help="Optional resource type filter",
 )
 @click.pass_context
 def export_proxmox(
     ctx: click.Context,
-    provider: str,
     env: str,
     output: Path,
     node: str | None,
     resource_type: str | None,
 ) -> None:
-    """Export provider configuration to InfraFoundry YAML."""
+    """Export Proxmox configuration to InfraFoundry YAML."""
     try:
         config_repo = ctx.obj.get("config_dir")
         config_manager = ConfigManager(base_dir=config_repo / "envs" if config_repo else None)
-        env_config = config_manager.load_environment(env).model_dump()
+        env_config = cast(EnvironmentData, config_manager.load_environment(env).model_dump())
 
-        exporter = ProxmoxConfigExporter(env_config)  # type: ignore[arg-type]
+        exporter = ProxmoxConfigExporter(env_config)
         result = exporter.export(node_filter=node, resource_filter=resource_type)
 
         output.mkdir(parents=True, exist_ok=True)

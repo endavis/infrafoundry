@@ -196,14 +196,12 @@ class ProviderPluginType:
 
         provider_class = metadata.implementation
 
-        # Check required methods
+        # Check required methods (must match ProviderBase's abstract surface).
         required_methods = [
-            "create",
-            "read",
-            "update",
-            "delete",
-            "list_resources",
             "validate_config",
+            "generate_terraform",
+            "generate_ansible",
+            "get_resource_types",
         ]
 
         for method in required_methods:
