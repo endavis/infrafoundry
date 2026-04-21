@@ -26,6 +26,10 @@ This section provides comprehensive guides for developing and extending InfraFou
 - **[Event System](event-system.md)** - Documentation of the internal event system for orchestration
 - **[Credential Loader System](credential-loader-system.md)** - How the credential loading system works
 
+## Writing Blueprint Scripts
+
+- **[Blueprint Script Portability](blueprint-script-portability.md)** - Portability contract for event-handler and target-VM scripts: tools you may assume, how to handle the rest, and why `jq` is not recommended
+
 ## See Also
 
 - [Architecture Overview](../architecture/overview.md) - High-level system architecture
