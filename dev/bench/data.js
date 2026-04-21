@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776792478281,
+  "lastUpdate": 1776793655641,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6479,6 +6479,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006903972113328372",
             "extra": "mean: 103.3136897532091 usec\nrounds: 2108"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "85de919a5d7925d941e6814a416fceb53f2c8e17",
+          "message": "docs: document Rocky 9 target and tool assumptions in aiqum-install-remote.sh (merges PR #650, addresses #649)\n\ndoc: document Rocky 9 target and tool assumptions in aiqum-install-remote.sh\n\nExpand the previous 5-line header block into a structured note covering\nwhere this script runs, how it's invoked, what env vars it requires,\nwhat target-OS tools it assumes, and what it installs.\n\nUnlike the blueprint event-handler scripts fixed in #646/#648, this\nscript is uploaded to the blueprint-controlled Rocky 9 VM and runs\nthere; distro-specific tooling (yum, firewalld, rpm) is appropriate and\nintentional. The header now says so explicitly so future readers don't\nhave to reverse-engineer the assumption from the first 20 lines.\n\nComments only — no behavior change.",
+          "timestamp": "2026-04-21T18:46:57+01:00",
+          "tree_id": "4856b99b15d3631323db70ff151d2e52f9e5b4e1",
+          "url": "https://github.com/endavis/infrafoundry/commit/85de919a5d7925d941e6814a416fceb53f2c8e17"
+        },
+        "date": 1776793654842,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7231.257050546442,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010014802837043517",
+            "extra": "mean: 138.28854278170536 usec\nrounds: 2279"
           }
         ]
       }
