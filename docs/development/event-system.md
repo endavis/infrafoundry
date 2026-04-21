@@ -86,6 +86,7 @@ events:
 | `INFRAFOUNDRY_DEPLOYMENT_ID` | `context.deployment_id` is set |
 | `INFRAFOUNDRY_TARGET_RESOURCES` | `-r` filter is active (comma-separated list) |
 | `INFRAFOUNDRY_INVENTORY` | Package has an `inventory:` block and a `.generated-inventory.yml` exists in the package directory |
+| `INFRAFOUNDRY_WARNINGS_FILE` | An `infra apply` is in progress. Scripts may append non-fatal warnings as JSONL records (`{"source":"x","message":"y"}`); the framework renders a summary panel at the end of apply. On jumphost reexec, the file lives under the remote tmp dir and is scp'd back automatically. |
 
 **Example (deprecated):** Run a script on `RUNNER_COMPLETED` (use resource lifecycle events instead):
 
@@ -231,6 +232,7 @@ Scripts and playbooks receive resource context via environment variables:
 | `INFRAFOUNDRY_VAR_<key>` | Individual package variable (uppercase key) |
 | `INFRAFOUNDRY_PACKAGE_VARS` | JSON dict of all merged package variables |
 | `INFRAFOUNDRY_INVENTORY` | Absolute path to the package's `.generated-inventory.yml` (set only when the package defines an `inventory:` block) |
+| `INFRAFOUNDRY_WARNINGS_FILE` | Per-apply JSONL warnings file (set during `infra apply`). Scripts may append records of the form `{"source":"x","message":"y"}`; the framework groups them by source and renders a summary panel at the end of apply. |
 
 ### Deprecation notice
 

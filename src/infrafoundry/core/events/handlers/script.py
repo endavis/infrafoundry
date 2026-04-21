@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
 import os
 import re
 import subprocess  # nosec B404 - required for running user scripts
+import tempfile
 import threading
 import time
 import uuid
@@ -22,7 +24,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _build_remote_bash(remote_dir: str, script_name: str) -> str:
+def _build_remote_bash(
+    remote_dir: str,
+    script_name: str,
+    warnings_file: str | None = None,
+) -> str:
     """Build the remote bash invocation used by jumphost reexec.
 
     The wrapper:
@@ -38,19 +44,38 @@ def _build_remote_bash(remote_dir: str, script_name: str) -> str:
       with newlines/tabs/equals-signs intact.
     - Sets ``INFRAFOUNDRY_ON_JUMPHOST=1`` so blueprint shell helpers that
       implement their own reexec self-deactivate.
+    - When ``warnings_file`` is provided, seeds that file on the remote
+      side (``: > <path>``) and exports ``INFRAFOUNDRY_WARNINGS_FILE`` so
+      the remote script can append JSONL records that the orchestrator
+      later scp's back and folds into the local summary.
 
     Args:
         remote_dir: Absolute path of the rsynced script directory on the
             jumphost.
         script_name: Basename of the script to execute.
+        warnings_file: Optional absolute path on the jumphost where remote
+            code should append non-fatal warning JSONL records. When
+            ``None``, no warnings plumbing is emitted (keeps existing
+            callers that don't collect warnings simple).
 
     Returns:
         A single bash command string to pass to ``ssh``.
     """
+    if warnings_file:
+        # Seed the file first so scp-back always finds something to copy,
+        # and export INFRAFOUNDRY_WARNINGS_FILE for the inner script (and
+        # any nested subprocesses) to pick up.
+        warnings_setup = (
+            f': > "{warnings_file}"; export INFRAFOUNDRY_WARNINGS_FILE="{warnings_file}"; '
+        )
+    else:
+        warnings_setup = ""
+
     return (
         "command -v python3 >/dev/null 2>&1 || { "
         'echo "infrafoundry: python3 is required on the jumphost '
         'to expand INFRAFOUNDRY_VAR_* env vars" >&2; exit 127; }; '
+        f"{warnings_setup}"
         'INFRAFOUNDRY_ON_JUMPHOST=1 INFRAFOUNDRY_PACKAGE_VARS="$(cat)"; '
         "export INFRAFOUNDRY_ON_JUMPHOST INFRAFOUNDRY_PACKAGE_VARS; "
         'while IFS= read -r -d "" entry; do '
@@ -92,6 +117,12 @@ class ScriptHandler(BaseHandler):
         INFRAFOUNDRY_BLUEPRINT_DIR: Path to blueprint directory (if dispatched from blueprint)
         INFRAFOUNDRY_PACKAGE_VARS: JSON string of all package variables (if available)
         INFRAFOUNDRY_VAR_<key>: Individual package variable values (if available)
+        INFRAFOUNDRY_WARNINGS_FILE: Path to the per-apply JSONL warnings file
+            (forwarded from the current process; on jumphost reexec the remote
+            wrapper points this at a file under the remote tmp dir and the
+            contents are scp'd back into the orchestrator's warnings summary).
+            Scripts can append non-fatal warnings as one JSON object per line:
+            ``echo '{"source":"x","message":"y"}' >> "$INFRAFOUNDRY_WARNINGS_FILE"``.
 
     Example config:
         type: script
@@ -342,6 +373,15 @@ class ScriptHandler(BaseHandler):
             f"{script_dir}/",
             f"{jumphost}:{remote_dir}/",
         ]
+        # Warnings collection: if the orchestrator has set up a local
+        # warnings file, point the remote wrapper at a file under
+        # `remote_dir` so any JSONL records the remote script appends can
+        # be scp'd back and folded into the local summary. If the local
+        # env var is unset, skip the plumbing entirely so unrelated
+        # callers don't pay for it.
+        local_warnings_path = env.get("INFRAFOUNDRY_WARNINGS_FILE")
+        remote_warnings_path = f"{remote_dir}/warnings.jsonl" if local_warnings_path else None
+
         # Parity with _execute_locally: re-export each scalar package variable
         # as INFRAFOUNDRY_VAR_<key> on the remote side so scripts using the
         # documented contract work under `set -u`. Object/array values are
@@ -349,7 +389,9 @@ class ScriptHandler(BaseHandler):
         # round-trip as shell scalars. Uses null-delimited output from python3
         # so values containing newlines, tabs, or equals signs are safe.
         # Requires python3 on the jumphost (checked by the wrapper itself).
-        remote_bash = _build_remote_bash(remote_dir, script_path.name)
+        remote_bash = _build_remote_bash(
+            remote_dir, script_path.name, warnings_file=remote_warnings_path
+        )
         ssh_run_cmd = ["ssh", *ssh_opts, jumphost, remote_bash]
         cleanup_cmd = ["ssh", *ssh_opts, jumphost, f"rm -rf {remote_dir}"]
 
@@ -488,6 +530,17 @@ class ScriptHandler(BaseHandler):
                 handler_name=self.name,
             )
         finally:
+            # Pull any warnings emitted by the remote script back onto the
+            # operator's host and append them to the local warnings file.
+            # Best-effort: scp/read failures are non-fatal — we still
+            # clean up the remote dir below.
+            if local_warnings_path and remote_warnings_path:
+                self._fetch_remote_warnings(
+                    jumphost,
+                    ssh_opts,
+                    remote_warnings_path,
+                    Path(local_warnings_path),
+                )
             self._cleanup_remote(cleanup_cmd)
 
     def _cleanup_remote(self, cleanup_cmd: list[str]) -> None:
@@ -511,6 +564,85 @@ class ScriptHandler(BaseHandler):
                 )
         except (OSError, subprocess.TimeoutExpired) as e:
             logger.warning("Remote cleanup failed (ignored): %s", e)
+
+    def _fetch_remote_warnings(
+        self,
+        jumphost: str,
+        ssh_opts: list[str],
+        remote_warnings_path: str,
+        local_warnings_path: Path,
+    ) -> None:
+        """Copy the remote warnings file back and append it to the local one.
+
+        Uses ``scp`` (rather than ``ssh cat``) so stderr from the remote
+        shell cannot mix into the data stream. Failure — missing file,
+        empty file, ssh error — is non-fatal: the warnings collector is
+        supplemental and must not break an otherwise-successful apply.
+
+        Args:
+            jumphost: SSH destination.
+            ssh_opts: Shared ssh options (e.g. ``-o StrictHostKeyChecking=no``).
+            remote_warnings_path: Absolute path on the jumphost.
+            local_warnings_path: The orchestrator's local warnings file to
+                append the remote content to.
+        """
+        with tempfile.NamedTemporaryFile(  # nosec B108 - managed lifecycle
+            mode="wb",
+            suffix=".jsonl",
+            prefix="infrafoundry-remote-warnings-",
+            delete=False,
+        ) as staging:
+            staging_path = Path(staging.name)
+        try:
+            scp_cmd = [
+                "scp",
+                *ssh_opts,
+                f"{jumphost}:{remote_warnings_path}",
+                str(staging_path),
+            ]
+            try:
+                result = subprocess.run(  # nosec B603
+                    scp_cmd,
+                    capture_output=True,
+                    timeout=60,
+                )
+            except (OSError, subprocess.TimeoutExpired) as e:
+                logger.debug("scp of remote warnings file failed (ignored): %s", e)
+                return
+            if result.returncode != 0:
+                logger.debug(
+                    "scp of remote warnings file returned %d (ignored): %s",
+                    result.returncode,
+                    result.stderr.decode(errors="replace").strip() if result.stderr else "",
+                )
+                return
+            try:
+                remote_content = staging_path.read_bytes()
+            except OSError as e:
+                logger.debug("reading staged remote warnings failed (ignored): %s", e)
+                return
+            if not remote_content:
+                return
+            try:
+                with open(local_warnings_path, "ab") as fh:
+                    # Hold the lock for the duration of the append so we
+                    # don't interleave with any other thread/process
+                    # appending to the same file via emit_warning().
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+                    try:
+                        fh.write(remote_content)
+                        if not remote_content.endswith(b"\n"):
+                            fh.write(b"\n")
+                        fh.flush()
+                    finally:
+                        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            except OSError as e:
+                logger.debug("appending remote warnings locally failed (ignored): %s", e)
+        finally:
+            try:
+                staging_path.unlink(missing_ok=True)
+            except OSError as e:
+                logger.debug("removing staged remote warnings failed (ignored): %s", e)
 
     def _read_stream(
         self,
