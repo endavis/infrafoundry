@@ -7,12 +7,13 @@
 #
 # Variable cardinality: the agent count is derived from the agents: list in
 # the package manifest. The script reads INFRAFOUNDRY_PACKAGE_VARS (JSON-
-# serialized full variable dict) via jq to iterate the list, so the same
-# script handles 0, 1, or N agents without modification.
+# serialized full variable dict) via python3 + stdlib json to iterate the
+# list, so the same script handles 0, 1, or N agents without modification.
 #
-# Requirements on the InfraFoundry host:
-#   - jq
+# Portability contract (runs on InfraFoundry host or jumphost):
 #   - bash 4+ (mapfile / readarray)
+#   - python3 (stdlib only — json)
+#   - standard GNU coreutils + ssh/scp
 #
 # Environment variables (injected by ScriptHandler):
 #   INFRAFOUNDRY_VAR_<key>     - Individual package variables
@@ -31,9 +32,11 @@ CLUSTER_NAME="${INFRAFOUNDRY_VAR_cluster_name}"
 KUBECONFIG_DIR=$(eval echo "${INFRAFOUNDRY_VAR_kubeconfig_dir}")
 KUBECONFIG_LOCAL="${KUBECONFIG_DIR}/${CLUSTER_NAME}.yaml"
 
-# --- Read agents list from the JSON-serialized package vars via jq ---
-mapfile -t AGENT_NAMES < <(echo "${INFRAFOUNDRY_PACKAGE_VARS}" | jq -r '.agents[].name')
-mapfile -t AGENT_IPS   < <(echo "${INFRAFOUNDRY_PACKAGE_VARS}" | jq -r '.agents[].ip')
+# --- Read agents list from the JSON-serialized package vars via python3 ---
+mapfile -t AGENT_NAMES < <(python3 -c 'import json,sys
+for a in json.load(sys.stdin).get("agents",[]): print(a["name"])' <<< "${INFRAFOUNDRY_PACKAGE_VARS}")
+mapfile -t AGENT_IPS   < <(python3 -c 'import json,sys
+for a in json.load(sys.stdin).get("agents",[]): print(a["ip"])' <<< "${INFRAFOUNDRY_PACKAGE_VARS}")
 
 # Expected total node count = 1 server + N agents
 EXPECTED_NODES=$(( ${#AGENT_IPS[@]} + 1 ))
