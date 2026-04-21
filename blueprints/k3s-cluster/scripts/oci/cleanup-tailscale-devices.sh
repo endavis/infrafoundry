@@ -26,9 +26,12 @@ DEVICES=$(curl -s \
     -H "Authorization: Bearer $TAILSCALE_API_KEY" \
     "https://api.tailscale.com/api/v2/tailnet/-/devices")
 
-# Filter devices that match our k3s cluster naming pattern
-# Adjust the pattern based on your naming convention
-DEVICE_IDS=$(echo "$DEVICES" | jq -r '.devices[] | select(.hostname | test("^k3s-")) | .id')
+# Filter devices that match our k3s cluster naming pattern (literal prefix match).
+# To use a different pattern, adjust the prefix in the python snippet below
+# (or swap `startswith` for `re.match` for full regex semantics).
+DEVICE_IDS=$(python3 -c 'import json,sys
+for d in json.load(sys.stdin).get("devices",[]):
+    if d.get("hostname","").startswith("k3s-"): print(d["id"])' <<< "$DEVICES")
 
 if [ -z "$DEVICE_IDS" ]; then
     echo "No matching Tailscale devices found for cleanup"
@@ -39,7 +42,10 @@ REMOVED=0
 FAILED=0
 
 for DEVICE_ID in $DEVICE_IDS; do
-    HOSTNAME=$(echo "$DEVICES" | jq -r ".devices[] | select(.id == \"$DEVICE_ID\") | .hostname")
+    HOSTNAME=$(python3 -c 'import json,sys
+target=sys.argv[1]
+for d in json.load(sys.stdin).get("devices",[]):
+    if d.get("id")==target: print(d["hostname"])' "$DEVICE_ID" <<< "$DEVICES")
     echo "Removing device: $HOSTNAME ($DEVICE_ID)"
 
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
