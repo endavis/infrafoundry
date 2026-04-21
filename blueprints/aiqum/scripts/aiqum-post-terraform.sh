@@ -28,24 +28,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # resolves to the blueprint dir, which is wrong for a consuming package.
 PACKAGE_DIR="${INFRAFOUNDRY_PACKAGE_DIR:?required: run via foundry, not directly}"
 
-# Read variables from INFRAFOUNDRY_PACKAGE_VARS or fall back to infrafoundry.yml
-if [ -n "${INFRAFOUNDRY_PACKAGE_VARS:-}" ]; then
-    eval "$(python3 -c "
+# Read variables from INFRAFOUNDRY_PACKAGE_VARS (JSON, set by framework).
+if [ -z "${INFRAFOUNDRY_PACKAGE_VARS:-}" ]; then
+    echo "ERROR: INFRAFOUNDRY_PACKAGE_VARS is not set — run via 'foundry infra apply', not directly" >&2
+    exit 1
+fi
+eval "$(python3 -c "
 import json, os
 v = json.loads(os.environ['INFRAFOUNDRY_PACKAGE_VARS'])
 for k, val in v.items():
     print(f'{k}={val}')
 ")"
-else
-    eval "$(python3 -c "
-import sys, yaml
-with open('${PACKAGE_DIR}/infrafoundry.yml') as f:
-    data = yaml.safe_load(f)
-v = data.get('variables', {})
-for k, val in v.items():
-    print(f'{k}={val}')
-")"
-fi
 
 JUMPHOST="${jumphost:-}"
 SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
