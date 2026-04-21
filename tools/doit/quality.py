@@ -69,10 +69,33 @@ def task_maintainability() -> dict[str, Any]:
     }
 
 
+def task_lint_blueprints() -> dict[str, Any]:
+    """Lint blueprint scripts for portability contract violations.
+
+    Enforces docs/development/blueprint-script-portability.md by scanning
+    blueprints/**/*.sh for tools (currently `jq`, `yq`) that are
+    not-recommended on remote hosts. See the docs page for the exemption
+    marker if a violation is justified.
+    """
+    return {
+        "actions": ["uv run python tools/lint_blueprint_portability.py"],
+        "title": title_with_actions,
+        "verbosity": 0,
+    }
+
+
 def task_check() -> dict[str, Any]:
     """Run all checks (format, lint, type check, security, spelling, test)."""
     return {
         "actions": [success_message],
-        "task_dep": ["format_check", "lint", "type_check", "security", "spell_check", "test"],
+        "task_dep": [
+            "format_check",
+            "lint",
+            "lint_blueprints",
+            "type_check",
+            "security",
+            "spell_check",
+            "test",
+        ],
         "title": title_with_actions,
     }
