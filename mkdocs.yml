@@ -116,6 +116,7 @@ nav:
     - Runner Protocol Reference: development/runner-protocol-quick-reference.md
     - Manager Patterns: development/manager-patterns.md
     - Event System: development/event-system.md
+    - Blueprint Script Portability: development/blueprint-script-portability.md
     - Credential Loader: development/credential-loader-system.md
     - Coding Standards: development/coding-standards.md
     - CI/CD Testing: development/ci-cd-testing.md
