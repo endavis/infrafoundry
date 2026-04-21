@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776801944023,
+  "lastUpdate": 1776806191054,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6665,6 +6665,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013289684075696177",
             "extra": "mean: 141.94522518774707 usec\nrounds: 2398"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b6506a2015b24dd2bc6ce4768b67cef4ca04b382",
+          "message": "feat: collect non-fatal warnings during apply and render a summary panel (merges PR #666, addresses #661)\n\nAdds a lightweight framework-level mechanism for non-fatal warnings\nduring `infra apply`:\n\n- New `INFRAFOUNDRY_WARNINGS_FILE` env var, set per-deployment by\n  `Orchestrator.apply()` to a JSONL temp file that anyone (Python\n  framework code, shell event handlers, blueprint scripts running on a\n  jumphost) can append to.\n- New `src/infrafoundry/core/warnings.py` with `emit_warning`,\n  `read_warnings`, and `render_warnings_panel` helpers. `emit_warning`\n  uses `fcntl.flock(LOCK_EX)` so parallel-apply ThreadPool workers\n  don't interleave messages that exceed PIPE_BUF (4KB).\n- `Orchestrator.apply()` reads the file in its `finally` block and\n  renders a yellow-bordered `rich.Panel` titled `⚠ Warnings (N)` on\n  both the success and failure paths, then unlinks and restores the\n  prior env-var value.\n- `ScriptHandler._execute_on_jumphost` + `_build_remote_bash` forward\n  the env var to the jumphost and scp the remote warnings file back\n  after the remote script completes. Local execution needed no change\n  -- existing `env = os.environ.copy()` already propagates.\n\nTest coverage: 19 new tests including a 50-thread x 5KB concurrent-\nappend isolation test that proves flock prevents interleaving, and\nend-to-end success/failure-path/env-restore coverage for the\norchestrator integration.\n\nThis is the plumbing for future handlers that need to surface\nabnormalities without aborting or burying them mid-log. First consumer\nlands in #655 sub-PR 4 (sysctl warn-and-continue).",
+          "timestamp": "2026-04-21T22:15:59+01:00",
+          "tree_id": "75a4ed384d6243c7b9043fd79c0b8a2c27931c46",
+          "url": "https://github.com/endavis/infrafoundry/commit/b6506a2015b24dd2bc6ce4768b67cef4ca04b382"
+        },
+        "date": 1776806190404,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8344.704097443038,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002772410612296559",
+            "extra": "mean: 119.8364841128899 usec\nrounds: 2801"
           }
         ]
       }
