@@ -131,13 +131,22 @@ remote_cmd_long "${ip_address}" "chmod +x /tmp/aiqum-install-remote.sh && AIQUM_
 echo "  AIQUM RPM installed successfully"
 
 # --- Phase 3: Wait for AIQUM web UI ---
+# Capture curl's stderr so a wait-loop timeout can dump the actual
+# error (connection refused, TLS handshake fail, etc.) instead of just
+# "not available after Ns".
+CURL_ERR=$(mktemp)
+trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR" "$CURL_ERR"' EXIT
 echo ""
 log "--- Phase 3: Waiting for AIQUM web UI ---"
 MAX_WAIT=600
 ELAPSED=0
-while ! curl -sk -o /dev/null -w "%{http_code}" "https://${ip_address}/" 2>/dev/null | grep -q "200\|302\|401"; do
+while ! curl -skS -o /dev/null -w "%{http_code}" "https://${ip_address}/" 2>"$CURL_ERR" | grep -q "200\|302\|401"; do
     if [ $ELAPSED -ge $MAX_WAIT ]; then
         echo "ERROR: AIQUM web UI not available after ${MAX_WAIT}s"
+        if [ -s "$CURL_ERR" ]; then
+            echo "  Last curl error:" >&2
+            sed 's/^/    /' "$CURL_ERR" >&2
+        fi
         exit 1
     fi
     echo "  Waiting for AIQUM web UI... (${ELAPSED}s)"
@@ -163,13 +172,18 @@ echo "  Client certificate regenerated"
 echo "  Restarting AIQUM services..."
 remote_cmd "${ip_address}" "sudo systemctl restart ocie ocieau"
 
-# Wait for web UI to come back
+# Wait for web UI to come back. Reuses $CURL_ERR from Phase 3 so the
+# timeout path can surface curl's actual error.
 echo "  Waiting for AIQUM web UI to restart..."
 sleep 15
 ELAPSED=0
-while ! curl -sk -o /dev/null -w "%{http_code}" "https://${ip_address}/" 2>/dev/null | grep -q "200\|302\|401"; do
+while ! curl -skS -o /dev/null -w "%{http_code}" "https://${ip_address}/" 2>"$CURL_ERR" | grep -q "200\|302\|401"; do
     if [ $ELAPSED -ge 300 ]; then
         echo "ERROR: AIQUM web UI not available after restart"
+        if [ -s "$CURL_ERR" ]; then
+            echo "  Last curl error:" >&2
+            sed 's/^/    /' "$CURL_ERR" >&2
+        fi
         exit 1
     fi
     sleep 10
