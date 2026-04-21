@@ -32,23 +32,26 @@ if [ ! -f "$PLAYBOOK" ]; then
     exit 1
 fi
 
-# Generate Ansible inventory from package variables
+if ! command -v ansible-playbook >/dev/null 2>&1; then
+    echo "ERROR: ansible-playbook is required but was not found on PATH" >&2
+    echo "Install ansible and ensure ansible-playbook is on PATH (on the jumphost if jumphost is set in the package)" >&2
+    exit 127
+fi
+
+if [ -z "${INFRAFOUNDRY_PACKAGE_VARS:-}" ]; then
+    echo "ERROR: INFRAFOUNDRY_PACKAGE_VARS is not set — run via 'foundry infra apply', not directly" >&2
+    exit 1
+fi
+
+# Generate Ansible inventory from package variables (JSON — ansible accepts
+# JSON inventories natively, so stdlib json is enough; no PyYAML needed).
 echo "Generating Ansible inventory from environment variables..."
-INVENTORY="${PACKAGE_DIR}/.generated-inventory.yml"
+INVENTORY="${PACKAGE_DIR}/.generated-inventory.json"
 
 python3 -c "
-import json, os, sys, yaml
+import json, os, sys
 
-# Read variables from INFRAFOUNDRY_PACKAGE_VARS env var (set by framework)
-vars_json = os.environ.get('INFRAFOUNDRY_PACKAGE_VARS')
-if vars_json:
-    v = json.loads(vars_json)
-else:
-    # Fallback: read from infrafoundry.yml directly (for manual runs)
-    print('Warning: INFRAFOUNDRY_PACKAGE_VARS not set, reading from infrafoundry.yml')
-    with open(sys.argv[1]) as f:
-        data = yaml.safe_load(f)
-    v = data.get('variables', {})
+v = json.loads(os.environ['INFRAFOUNDRY_PACKAGE_VARS'])
 
 # Build host lookup from target names
 host_lookup = {}
@@ -97,9 +100,9 @@ inventory = {
     },
 }
 
-with open(sys.argv[2], 'w') as f:
-    yaml.dump(inventory, f, default_flow_style=False)
-" "${PACKAGE_DIR}/infrafoundry.yml" "$INVENTORY"
+with open(sys.argv[1], 'w') as f:
+    json.dump(inventory, f, indent=2)
+" "$INVENTORY"
 
 echo "Running ONTAP lab cluster setup playbook..."
 cd "$BLUEPRINT_DIR"
