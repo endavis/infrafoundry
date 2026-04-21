@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776794392412,
+  "lastUpdate": 1776795125871,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6541,6 +6541,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011973419333020188",
             "extra": "mean: 137.53084039235523 usec\nrounds: 2243"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "44c7cda5a05290651b75be5a2ee0f5642f410cbf",
+          "message": "chore: enforce blueprint script portability contract via doit lint (merges PR #654, addresses #653)\n\nAdd a CI lint that scans blueprints/**/*.sh for tools called out as\nnot-recommended in docs/development/blueprint-script-portability.md\n(currently jq and yq). Without mechanical enforcement, future blueprint\nauthors could reintroduce the same silent-failure pattern that caused\n#641, #645, and #647.\n\nThe lint:\n- Walks blueprints/**/*.sh and scans non-comment lines for \\bjq\\b /\n  \\byq\\b. Comment-only lines are ignored so headers and prose can\n  freely discuss the tools.\n- Honors a per-line exemption marker for justified uses, either inline\n  on the violating line or on the line immediately above:\n      # SCRIPT_PORTABILITY_EXEMPT: <tool>: <reason>\n  Adjacency requirement is intentional -- a marker far above can drift\n  away from what it justifies.\n- Exits 1 with file:line:tool reports + pointer to the docs and\n  exemption pattern; exits 0 when clean.\n\nWires `lint_blueprints` into the standard `doit check` aggregate so\nthe gate fails on regression. 12 new unit tests cover the detection\ncore, exemption handling, comment-skip rule, word-boundary correctness,\nand a sanity check that the live blueprints/ tree (cleaned up by\nPRs #646 / #648 / #650) lints clean.\n\nCloses the portability audit tracked in #643.",
+          "timestamp": "2026-04-21T19:11:29+01:00",
+          "tree_id": "bd94b8b78c4d16860c68c253f0e3662f155655b3",
+          "url": "https://github.com/endavis/infrafoundry/commit/44c7cda5a05290651b75be5a2ee0f5642f410cbf"
+        },
+        "date": 1776795125287,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9819.02225518565,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006576405555584327",
+            "extra": "mean: 101.84313407293452 usec\nrounds: 2163"
           }
         ]
       }
