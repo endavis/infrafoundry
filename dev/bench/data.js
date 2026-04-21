@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776788230386,
+  "lastUpdate": 1776790836426,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6417,6 +6417,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008642573877241005",
             "extra": "mean: 138.8473093643995 usec\nrounds: 2990"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dc67f12d13fcdac7a53d2059153b7ff91c418779",
+          "message": "fix: drop jq dependency from k3s-cluster blueprint scripts (merges PR #646, addresses #645)\n\njq is not in the base install of Debian/Ubuntu, Rocky/RHEL, Alpine, or\nmost cloud images. When the framework rsyncs an event-handler script to\na jumphost without jq, the pipe silently emits zero entries and the\nouter bash continues, producing a misconfigured cluster. Same class of\nfailure as #641 but at the blueprint layer.\n\nSwap all three scripts' jq invocations for `python3 -c` using the stdlib\njson module -- python3 is already required by the framework's jumphost\nwrapper (see PR #642), so no new runtime dependency. Per-item `print`\npreserves jq's zero-length output semantics for empty lists.\n\nAlso add a `command -v ansible-playbook` presence check to the OCI k3s\nvariant so a missing interpreter fails fast with a clear error instead\nof degrading into a confusing later failure.\n\nUpdates each script header with an explicit portability contract.",
+          "timestamp": "2026-04-21T18:00:01+01:00",
+          "tree_id": "7ad8c0cc25e5e6e0f2a89cb6f817966e25093663",
+          "url": "https://github.com/endavis/infrafoundry/commit/dc67f12d13fcdac7a53d2059153b7ff91c418779"
+        },
+        "date": 1776790835898,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9165.063938318393,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001770127366410948",
+            "extra": "mean: 109.1099862183264 usec\nrounds: 1814"
           }
         ]
       }
