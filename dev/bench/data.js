@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776793655641,
+  "lastUpdate": 1776794392412,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6510,6 +6510,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010014802837043517",
             "extra": "mean: 138.28854278170536 usec\nrounds: 2279"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2b2fcec079e31406deb4c12367ec3c5ea8309944",
+          "message": "docs: add blueprint script portability contract (merges PR #652, addresses #651)\n\ndoc: add blueprint script portability contract\n\nCodify what tools blueprint event-handler and target-VM scripts may\nassume on the remote hosts they run on. This captures the policy that\ndrove PRs #642, #646, #648, and #650 into a written reference so\nfuture blueprint authors have something to read and the upcoming CI\nlint has something to enforce.\n\nHighlights:\n- Three execution contexts (orchestration host, jumphost reexec,\n  target VM scp+ssh) with concrete in-tree examples.\n- A portable baseline for contexts 1-2: bash 4+, python3 stdlib only,\n  GNU coreutils, ssh/scp/rsync/curl.\n- Explicit \"jq is not recommended anywhere\" guidance with a jq->python3\n  equivalence table. jq is not in the base install of Debian/Ubuntu,\n  Rocky/RHEL, Alpine, most cloud images, or most minimal containers.\n- Presence-check pattern for tools outside the baseline: command -v\n  with exit 127 and a clear error message (exemplars in the OCI k3s\n  and ontap scripts).\n- Target-VM scripts are exempt from the baseline but must document\n  their OS and tool assumptions (exemplar: aiqum-install-remote.sh).\n- Author checklist to self-review against before PR submission.\n\nAlso updates docs/development/README.md and mkdocs.yml nav to surface\nthe new page.",
+          "timestamp": "2026-04-21T18:59:18+01:00",
+          "tree_id": "8aab9d0e31b6f0bbb079475919e565d05a732ed3",
+          "url": "https://github.com/endavis/infrafoundry/commit/2b2fcec079e31406deb4c12367ec3c5ea8309944"
+        },
+        "date": 1776794391864,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7271.096411155108,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011973419333020188",
+            "extra": "mean: 137.53084039235523 usec\nrounds: 2243"
           }
         ]
       }
