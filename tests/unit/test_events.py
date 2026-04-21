@@ -793,7 +793,7 @@ class TestScriptHandlerJumphostReexec:
         assert "StrictHostKeyChecking=no" in cmd
         assert "ansible@jump" in cmd
         # The last arg is the remote bash command string
-        assert cmd[-1].startswith("INFRAFOUNDRY_ON_JUMPHOST=1")
+        assert "INFRAFOUNDRY_ON_JUMPHOST=1" in cmd[-1]
         assert "bash /tmp/infrafoundry-" in cmd[-1]
 
     def test_jumphost_stripped_from_forwarded_json(self, tmp_path: Path):
@@ -1105,18 +1105,21 @@ class TestScriptHandlerJumphostReexec:
 
         remote_bash = mock_popen.call_args[0][0][-1]
         assert "INFRAFOUNDRY_VAR_$k" in remote_bash
-        assert "jq -j 'to_entries[]" in remote_bash
-        assert "\\u0000" in remote_bash
+        assert "python3 -c '" in remote_bash
+        assert "command -v python3" in remote_bash
+        assert "\\0" in remote_bash
+        # Regression for #641: must not silently depend on jq.
+        assert "jq " not in remote_bash
 
     def test_remote_wrapper_sets_var_env_via_real_shell(self, tmp_path: Path):
-        """End-to-end: running the remote wrapper under bash+jq populates INFRAFOUNDRY_VAR_<key>.
+        """End-to-end: the wrapper under bash+python3 populates INFRAFOUNDRY_VAR_<key>.
 
-        Executes the generated remote bash string against a local bash+jq so
-        the shell-level re-export loop is exercised for real, not merely
+        Executes the generated remote bash string against a local bash+python3
+        so the shell-level re-export loop is exercised for real, not merely
         asserted against the string.
         """
-        if shutil.which("jq") is None or shutil.which("bash") is None:
-            pytest.skip("requires jq and bash")
+        if shutil.which("python3") is None or shutil.which("bash") is None:
+            pytest.skip("requires python3 and bash")
 
         remote_dir = tmp_path
         script = remote_dir / "dump.sh"
@@ -1149,3 +1152,35 @@ class TestScriptHandlerJumphostReexec:
         assert "num=3" in proc.stdout
         # Full JSON remains available (incl. the array value that scalars skip).
         assert '"agents"' in proc.stdout
+
+    def test_remote_wrapper_fails_fast_without_python3(self, tmp_path: Path):
+        """Regression for #641: wrapper fails fast with a clear error when python3 is absent.
+
+        Previously (PR #640) the wrapper silently depended on ``jq`` — when
+        missing, the subshell emitted ``jq: command not found`` but the outer
+        bash kept going and the inner script surfaced an unbound-variable
+        error that didn't point at the real cause.
+        """
+        bash_path = shutil.which("bash")
+        if bash_path is None:
+            pytest.skip("requires bash")
+
+        script = tmp_path / "dump.sh"
+        script.write_text("#!/bin/bash\necho unreachable\n")
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+
+        remote_bash = _build_remote_bash(str(tmp_path), "dump.sh")
+        # Use absolute path to bash and clear PATH so the wrapper's
+        # `command -v python3` check cannot find python3.
+        proc = subprocess.run(  # nosec B603
+            [bash_path, "-c", remote_bash],
+            input="{}",
+            capture_output=True,
+            text=True,
+            env={"PATH": ""},
+            timeout=10,
+        )
+
+        assert proc.returncode == 127
+        assert "python3 is required" in proc.stderr
+        assert "unreachable" not in proc.stdout
