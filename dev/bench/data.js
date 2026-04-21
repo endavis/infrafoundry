@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776710743078,
+  "lastUpdate": 1776779918466,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6355,6 +6355,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00004358766789922453",
             "extra": "mean: 168.08837831856022 usec\nrounds: 1808"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3b2465bda65f26cb0c3b9fc6170bce2a88f331ff",
+          "message": "fix: forward INFRAFOUNDRY_VAR_* env vars on jumphost reexec (merges PR #640, addresses #639)\n\nThe ScriptHandler jumphost path only forwarded INFRAFOUNDRY_PACKAGE_VARS\n(JSON) to the remote bash invocation, breaking scripts that consume the\ndocumented INFRAFOUNDRY_VAR_<key> contract under `set -u`. Extract the\nremote bash builder and have it parse the JSON blob via jq on the remote\nside, re-exporting each scalar entry as INFRAFOUNDRY_VAR_<key> before\nexecing the target script. Values are null-delimited so newlines, tabs,\nand equals signs round-trip safely. Requires jq on the jumphost.\n\nAddresses #639",
+          "timestamp": "2026-04-21T14:58:02+01:00",
+          "tree_id": "6e354be65ca03a3d9620c2adfa539f463af60c09",
+          "url": "https://github.com/endavis/infrafoundry/commit/3b2465bda65f26cb0c3b9fc6170bce2a88f331ff"
+        },
+        "date": 1776779917319,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9689.42588717502,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005599083881575796",
+            "extra": "mean: 103.20528911043179 usec\nrounds: 2608"
           }
         ]
       }
