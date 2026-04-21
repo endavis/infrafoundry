@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776790836426,
+  "lastUpdate": 1776792478281,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6448,6 +6448,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001770127366410948",
             "extra": "mean: 109.1099862183264 usec\nrounds: 1814"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ed4fe448581d5e3fafc4b5fa345b4e258cc41b3f",
+          "message": "fix: drop PyYAML dependency from ontap and aiqum event-handler scripts (merges PR #648, addresses #647)\n\nPyYAML is not in the base install of Debian/Ubuntu, so on a minimal\njumphost the inline `import yaml` aborts with ModuleNotFoundError before\nthe script can do any useful work. Same class of portability failure as\nthe jq dependency fixed in #645, just with a different missing package.\n\nontap-post-terraform.sh:\n- Drop the yaml-fallback that read infrafoundry.yml via yaml.safe_load\n  (it was broken under jumphost reexec anyway -- the framework only\n  rsyncs the blueprint script dir, not the consuming package dir)\n- Emit the ansible inventory as JSON via stdlib json.dump instead of\n  yaml.dump. Ansible accepts JSON inventories natively via file\n  extension auto-detection; verified with `ansible-inventory --list`\n- Rename the inventory file `.generated-inventory.yml` to `.json` so\n  ansible picks the JSON parser\n- Require INFRAFOUNDRY_PACKAGE_VARS and fail fast with a clear error\n- Add `command -v ansible-playbook` presence check with exit 127,\n  consistent with the guard added in PR #646 for the OCI k3s variant\n\naiqum-post-terraform.sh:\n- Drop the `else` branch that imported `yaml` and read infrafoundry.yml\n  (same jumphost-reexec-broken fallback as ontap)\n- Require INFRAFOUNDRY_PACKAGE_VARS and fail fast with a clear error",
+          "timestamp": "2026-04-21T18:27:22+01:00",
+          "tree_id": "3baffc1f1cb6a6533bfa1658bdd1c63399438039",
+          "url": "https://github.com/endavis/infrafoundry/commit/ed4fe448581d5e3fafc4b5fa345b4e258cc41b3f"
+        },
+        "date": 1776792477750,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9679.259373939243,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006903972113328372",
+            "extra": "mean: 103.3136897532091 usec\nrounds: 2108"
           }
         ]
       }
