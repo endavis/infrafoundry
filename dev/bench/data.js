@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776798685584,
+  "lastUpdate": 1776800327855,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6603,6 +6603,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010040891776228336",
             "extra": "mean: 140.80911235973906 usec\nrounds: 2403"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a81f1b9c74e9a269c53abd36be84633ffd2aa9bc",
+          "message": "fix: surface kubectl failures in proxmox k3s wait loops (sub-PR 2 of #655) (merges PR #663, addresses #662)\n\nfix: surface kubectl failures in proxmox k3s wait loops\n\nTwo kubectl wait loops in proxmox k3s-post-terraform.sh silenced\nkubectl's stderr/output, hiding the actual cause when the wait timed\nout. Same class of failure as #658 (which covered the SSH wait loops)\n-- sub-PR 2 of the audit in #655 (covers findings #2 and #3).\n\nPhase 3 (wait for server API): redirect each probe's combined output\nto a tmpfile; on 180s timeout, dump the last attempt before exit 1.\n\nPhase 5 (poll for nodes Ready): the previous code passed the kubectl\npipeline to the remote shell with `2>/dev/null` baked in, so kubectl's\nstderr was discarded on the remote side before it could ever cross the\nssh boundary. Split the remote call so kubectl output and the\n` Ready `-counting grep are handled on the local side, with stdout\ncaptured to one tmpfile and stderr to another. On timeout, dump the\nlast kubectl stderr in addition to the existing `kubectl get nodes`\nrecap (which is now also redirected to stderr).\n\nLatent bug fix while in there: the original Phase 5 used\n`grep -c ... || echo 0`, which produces multi-line output `0\\n0` on\nzero matches because `grep -c` outputs `0` AND exits 1, triggering\nthe `|| echo 0` fallback. The buggy variable always silently failed\nthe subsequent `[ \"$READY_COUNT\" -ge ... ]` test with \"integer\nexpression expected\", but bash's `if` swallowed the test failure under\n`set -e` and just treated it as not-ready, masking the issue. New code\nuses `|| true` which keeps grep's clean `0` output without appending.",
+          "timestamp": "2026-04-21T20:38:05+01:00",
+          "tree_id": "849f1433e13b9b026a304b381c3ee4a46506ac9f",
+          "url": "https://github.com/endavis/infrafoundry/commit/a81f1b9c74e9a269c53abd36be84633ffd2aa9bc"
+        },
+        "date": 1776800326705,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6725.008800838207,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002787496700155326",
+            "extra": "mean: 148.6986901601318 usec\nrounds: 2185"
           }
         ]
       }
