@@ -1184,3 +1184,58 @@ class TestScriptHandlerJumphostReexec:
         assert proc.returncode == 127
         assert "python3 is required" in proc.stderr
         assert "unreachable" not in proc.stdout
+
+    def test_remote_bash_exports_warnings_file(self, tmp_path: Path):
+        """When a warnings_file is provided, the wrapper seeds and exports it.
+
+        Regression for #661: the jumphost path must propagate
+        INFRAFOUNDRY_WARNINGS_FILE to remote scripts so they can emit
+        warnings the orchestrator can later scp back and summarize.
+        """
+        warnings_path = "/tmp/infrafoundry-abcd/warnings.jsonl"  # nosec B108
+        remote_bash = _build_remote_bash(str(tmp_path), "dump.sh", warnings_file=warnings_path)
+
+        # Seed: `: > "<path>"` creates/truncates so scp-back always finds it.
+        assert f': > "{warnings_path}"' in remote_bash
+        # Export: downstream processes inherit the env var.
+        assert f'export INFRAFOUNDRY_WARNINGS_FILE="{warnings_path}"' in remote_bash
+        # Without the arg, the wrapper must not emit the warnings plumbing.
+        plain = _build_remote_bash(str(tmp_path), "dump.sh")
+        assert "INFRAFOUNDRY_WARNINGS_FILE" not in plain
+
+    def test_remote_wrapper_appends_to_warnings_file_on_disk(self, tmp_path: Path):
+        """End-to-end: inner script appends to $INFRAFOUNDRY_WARNINGS_FILE on disk.
+
+        Runs the real bash+python3 wrapper and asserts that a warning
+        appended inside the inner script lands on disk at the expected
+        path, exercising the seed+export plumbing.
+        """
+        if shutil.which("python3") is None or shutil.which("bash") is None:
+            pytest.skip("requires python3 and bash")
+
+        remote_dir = tmp_path
+        warnings_path = tmp_path / "warnings.jsonl"
+        script = remote_dir / "emit.sh"
+        script.write_text(
+            "#!/bin/bash\nset -u\n"
+            'echo \'{"source":"remote","message":"hello"}\' '
+            '>> "$INFRAFOUNDRY_WARNINGS_FILE"\n'
+        )
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+
+        remote_bash = _build_remote_bash(
+            str(remote_dir), "emit.sh", warnings_file=str(warnings_path)
+        )
+        proc = subprocess.run(  # nosec B603
+            ["bash", "-c", remote_bash],
+            input=json.dumps({}),  # no package vars
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        assert proc.returncode == 0, f"stderr: {proc.stderr}"
+        assert warnings_path.exists()
+        content = warnings_path.read_text(encoding="utf-8")
+        assert '"source":"remote"' in content
+        assert '"message":"hello"' in content

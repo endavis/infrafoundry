@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 import traceback
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, cast
 
 from rich.console import Console
 from rich.table import Table
 
+from infrafoundry.core import warnings as infra_warnings
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.drift_detector import DriftDetector
@@ -825,6 +829,22 @@ class ApplyOrchestrator(HookExecutionMixin):
         env_config = self._load_environment(env_name) if self._load_environment else None
         self._load_event_config(env_config)
 
+        # Set up a per-deployment warnings collection file. Event handlers
+        # (local subprocess, jumphost reexec) inherit the env var so they
+        # can append JSONL records. The file is read + rendered + unlinked
+        # in the `finally` below so the summary prints on both the success
+        # and failure paths.
+        warnings_tmp = tempfile.NamedTemporaryFile(  # noqa: SIM115 - managed lifecycle; nosec B108
+            mode="w",
+            suffix=".jsonl",
+            prefix=f"infrafoundry-warnings-{deployment_id}-",
+            delete=False,
+        )
+        warnings_path = Path(warnings_tmp.name)
+        warnings_tmp.close()
+        prior_warnings_env = os.environ.get(infra_warnings.ENV_VAR)
+        os.environ[infra_warnings.ENV_VAR] = str(warnings_path)
+
         try:
             self._print_header("Applying", env_name, resource_filter, "bold green")
             all_resources, resources_by_provider = self._load_resources(env_name)
@@ -896,6 +916,23 @@ class ApplyOrchestrator(HookExecutionMixin):
             )
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
             raise
+        finally:
+            # Render the warnings summary (even on the failure path), then
+            # clean up the temp file and restore the prior env var for
+            # nesting safety (tests, library callers).
+            try:
+                collected = infra_warnings.read_warnings(warnings_path)
+                infra_warnings.render_warnings_panel(collected, self.console)
+            except Exception:
+                logger.exception("failed to render warnings summary")
+            try:
+                warnings_path.unlink(missing_ok=True)
+            except OSError as exc:
+                logger.debug("failed to unlink warnings file %s: %s", warnings_path, exc)
+            if prior_warnings_env is None:
+                os.environ.pop(infra_warnings.ENV_VAR, None)
+            else:
+                os.environ[infra_warnings.ENV_VAR] = prior_warnings_env
 
         return results
 

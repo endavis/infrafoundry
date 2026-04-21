@@ -94,6 +94,35 @@ Exemplars in the codebase:
 - **Tool check:** `blueprints/ontap-cluster/scripts/ontap-post-terraform.sh` (`ansible-playbook` guard, added in PR #648).
 - **Env-var check:** `blueprints/aiqum/scripts/aiqum-post-terraform.sh` (required `INFRAFOUNDRY_PACKAGE_VARS`, added in PR #648).
 
+## Non-fatal warnings
+
+During `infra apply`, the framework exports `INFRAFOUNDRY_WARNINGS_FILE` with a
+path to a per-deployment JSONL file. Blueprint scripts running in any context
+(operator host, jumphost, or target VM via `ssh` with the env var forwarded)
+may append records of the form `{"source":"<handler>","message":"<text>"}` to
+that file; the framework reads and renders them in a yellow-bordered summary
+panel at the end of apply. On jumphost reexec, the remote wrapper seeds a file
+under the remote tmp dir and the orchestrator `scp`'s the contents back before
+cleanup, so remote warnings surface the same way local ones do.
+
+Use this for abnormalities that are non-fatal but worth the operator seeing —
+e.g. "sysctl reported errors but the params we care about did get set",
+"kubeconfig copied with one warning". **Do not put credentials or raw secret
+material into warning messages** — the file lives unencrypted in `/tmp` for
+the duration of the apply and is printed to the console.
+
+Simple append from a blueprint script (no tools beyond the portable baseline):
+
+```bash
+if [ -n "${INFRAFOUNDRY_WARNINGS_FILE:-}" ]; then
+    printf '%s\n' '{"source":"my-handler","message":"sysctl net.core.somaxconn not applied"}' \
+        >> "$INFRAFOUNDRY_WARNINGS_FILE"
+fi
+```
+
+The env var is only set during `infra apply`; guarding with `${…:-}` keeps
+scripts portable to other phases and to manual invocation.
+
 ## Target-VM scripts: the exemption
 
 Scripts that are uploaded to and executed on a blueprint-controlled target VM (context 3) are exempt from the portable baseline. Those scripts may assume any tool that the blueprint's VM template provides — `yum`, `apt`, `firewall-cmd`, `rpm`, distro-specific init systems, etc.

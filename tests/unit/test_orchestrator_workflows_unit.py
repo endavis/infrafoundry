@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -1040,3 +1041,191 @@ def test_environment_config_default_empty_events():
     """EnvironmentConfig defaults to empty dict for events."""
     config = EnvironmentConfig(name="test")
     assert config.events == {}
+
+
+# ---------------------------------------------------------------------------
+# Warnings collector integration (#661)
+# ---------------------------------------------------------------------------
+
+
+def _apply_orchestrator_with_hooks(
+    load_resources_hook,
+    apply_serial_hook=None,
+):
+    """Build an ApplyOrchestrator whose load_resources callback runs a hook.
+
+    This lets individual tests inject assertions / side-effects at the
+    point where INFRAFOUNDRY_WARNINGS_FILE is already set but apply has
+    not yet returned.
+    """
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 42
+    event_manager = MagicMock()
+    console = MagicMock()
+
+    default_resources = ([_resource("vm1")], {"proxmox": [_resource("vm1")]})
+
+    def load_resources(env: str):
+        load_resources_hook(env)
+        return default_resources
+
+    apply_serial = apply_serial_hook or MagicMock(return_value={"proxmox": {"success": True}})
+
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        load_resources,
+        apply_serial=apply_serial,
+        apply_parallel=MagicMock(),
+        get_current_user=lambda: "tester",
+    )
+    return orchestrator, console, state_manager
+
+
+def test_apply_renders_warnings_panel_when_warnings_present():
+    """A warning written mid-apply causes a Panel to be printed at the end."""
+    from rich.panel import Panel
+
+    from infrafoundry.core.warnings import ENV_VAR
+
+    def hook(_env: str) -> None:
+        # Simulate a handler emitting a warning into the file the
+        # orchestrator just set up.
+        path = Path(os.environ[ENV_VAR])
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write('{"source": "event:test", "message": "kubeconfig oddity"}\n')
+
+    orchestrator, console, _ = _apply_orchestrator_with_hooks(hook)
+
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+    )
+
+    # At least one console.print call must be a Panel whose title marks it
+    # as the warnings summary.
+    panel_calls = [
+        c for c in console.print.call_args_list if c.args and isinstance(c.args[0], Panel)
+    ]
+    assert len(panel_calls) == 1
+    panel = panel_calls[0].args[0]
+    assert "Warnings" in str(panel.title)
+    assert "1" in str(panel.title)
+    assert "kubeconfig oddity" in panel.renderable.plain
+    assert "event:test" in panel.renderable.plain
+
+
+def test_apply_no_panel_when_no_warnings():
+    """No warnings → no Panel is printed."""
+    from rich.panel import Panel
+
+    orchestrator, console, _ = _apply_orchestrator_with_hooks(lambda _env: None)
+
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+    )
+
+    panel_calls = [
+        c for c in console.print.call_args_list if c.args and isinstance(c.args[0], Panel)
+    ]
+    assert panel_calls == []
+
+
+def test_apply_renders_warnings_panel_on_failure_path():
+    """Warnings emitted before a failure still get summarized."""
+    from rich.panel import Panel
+
+    from infrafoundry.core.warnings import ENV_VAR
+
+    class _BoomError(RuntimeError):
+        pass
+
+    def hook(_env: str) -> None:
+        path = Path(os.environ[ENV_VAR])
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write('{"source": "event:pre-fail", "message": "half-applied"}\n')
+        raise _BoomError("synthetic failure")
+
+    orchestrator, console, state_manager = _apply_orchestrator_with_hooks(hook)
+
+    with pytest.raises(_BoomError):
+        orchestrator.apply(
+            env_name="dev",
+            resource_filter=None,
+            auto_approve=True,
+            parallel=False,
+            max_workers=1,
+        )
+
+    panel_calls = [
+        c for c in console.print.call_args_list if c.args and isinstance(c.args[0], Panel)
+    ]
+    assert len(panel_calls) == 1
+    panel = panel_calls[0].args[0]
+    assert "half-applied" in panel.renderable.plain
+    # And the deployment was marked failed before the re-raise.
+    state_manager.update_deployment_status.assert_any_call(
+        42, DeploymentStatus.FAILED, "synthetic failure"
+    )
+
+
+def test_apply_sets_and_restores_warnings_env_var(monkeypatch):
+    """INFRAFOUNDRY_WARNINGS_FILE is set during apply and restored after."""
+    from infrafoundry.core.warnings import ENV_VAR
+
+    monkeypatch.delenv(ENV_VAR, raising=False)
+
+    captured: dict[str, str | None] = {}
+
+    def hook(_env: str) -> None:
+        captured["mid_apply"] = os.environ.get(ENV_VAR)
+
+    orchestrator, _, _ = _apply_orchestrator_with_hooks(hook)
+
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+    )
+
+    # Mid-apply, the env var must be set and point at an existing path.
+    assert captured["mid_apply"] is not None
+    assert "infrafoundry-warnings-42-" in captured["mid_apply"]
+    # After apply returns, the env var was restored (not previously set).
+    assert ENV_VAR not in os.environ
+
+
+def test_apply_restores_prior_warnings_env_var(monkeypatch, tmp_path):
+    """A prior value of INFRAFOUNDRY_WARNINGS_FILE is restored after apply."""
+    from infrafoundry.core.warnings import ENV_VAR
+
+    prior = tmp_path / "outer.jsonl"
+    monkeypatch.setenv(ENV_VAR, str(prior))
+
+    captured: dict[str, str | None] = {}
+
+    def hook(_env: str) -> None:
+        captured["mid"] = os.environ.get(ENV_VAR)
+
+    orchestrator, _, _ = _apply_orchestrator_with_hooks(hook)
+
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+    )
+
+    assert captured["mid"] != str(prior)
+    assert os.environ.get(ENV_VAR) == str(prior)
