@@ -1,8 +1,49 @@
 #!/bin/bash
-# AIQUM RPM install script — runs on the AIQUM VM itself
+# AIQUM RPM install script — runs on the target AIQUM VM
 #
-# Installs all prerequisites identified by pre_install_check.sh,
-# then installs the AIQUM RPM.
+# This is **not** a framework event-handler script and does **not** follow the
+# jumphost portability contract used by `aiqum-post-terraform.sh`. It is
+# specifically Rocky 9 RPM-family tooling and is uploaded + executed on the
+# provisioned AIQUM VM itself.
+#
+# Runs on:
+#   The AIQUM Rocky 9 Proxmox VM (cloned from the `rocky9-template` blueprint).
+#   NOT the jumphost, NOT the InfraFoundry orchestration host.
+#
+# Invoked by:
+#   `aiqum-post-terraform.sh` via `remote_upload` (scp) + `remote_cmd_long`
+#   (ssh) in Phase 2 of the post-deploy flow. The caller runs as the
+#   non-root `ansible` user; this script uses `sudo` for privileged steps.
+#
+# Environment variables:
+#   AIQUM_URL_BASE  Required. Base URL hosting the AIQUM RPM and sibling
+#                   install scripts:
+#                     - netapp-um-9.18-el9.x86_64.rpm (~1.9 GB)
+#                     - pre_install_check.sh
+#                     - install7zip.sh
+#
+# Target OS tool assumptions (all present in the Rocky 9 base install
+# unless noted):
+#   - bash 4+
+#   - sudo
+#   - yum (RPM package manager)
+#   - curl
+#   - systemctl (systemd)
+#   - firewall-cmd (installed by step 5 if absent — firewalld is not in the
+#     minimal Rocky 9 base)
+#   - rpm
+#   - awk, ls (coreutils)
+#   `wget` is NOT assumed — step 1 installs it before use.
+#
+# Side effects (on the target VM):
+#   - Installs `wget` + `unzip`
+#   - Configures the EPEL and MySQL 8.4 Community yum repositories
+#   - Installs 7-Zip (via the hosted `install7zip.sh`)
+#   - Installs and enables `firewalld`; opens AIQUM ports
+#     (80, 443, 8080, 9443, 56072, 56080, 56443)
+#   - Downloads the AIQUM RPM (~1.9 GB) to `/tmp/aiqum-install/`
+#   - Runs `pre_install_check.sh`
+#   - Installs the `netapp-um-9.18-el9.x86_64.rpm` + ~225 dependencies
 set -euo pipefail
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
