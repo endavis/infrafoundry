@@ -214,12 +214,18 @@ remote_root_cmd "${SERVER_IP}" "
         --node-name ${SERVER_NAME}
 "
 
-# Wait for k3s server to be ready (kubectl as ansible user)
+# Wait for k3s server to be ready (kubectl as ansible user).
+# Capture combined output each iteration so the timeout path can dump
+# kubectl's actual error instead of a black-box "not ready after 180s".
+KUBECTL_ERR=$(mktemp)
+trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR" "$KUBECTL_ERR"' EXIT
 echo "  Waiting for k3s server to be ready..."
 ELAPSED=0
-while ! remote_kubectl "${SERVER_IP}" "kubectl get nodes" &>/dev/null; do
+while ! remote_kubectl "${SERVER_IP}" "kubectl get nodes" >"$KUBECTL_ERR" 2>&1; do
     if [ $ELAPSED -ge 180 ]; then
         echo "ERROR: k3s server not ready after 180s"
+        echo "  Last kubectl attempt:" >&2
+        sed 's/^/    /' "$KUBECTL_ERR" >&2
         exit 1
     fi
     sleep 5
@@ -259,17 +265,33 @@ done
 echo ""
 echo "--- Phase 5: Verifying cluster ---"
 
-# Wait for all nodes to be Ready
+# Wait for all nodes to be Ready. Split the kubectl call so stdout (the
+# count) and stderr (diagnostics) are separable on the local side; the
+# previous remote-side `2>/dev/null` discarded errors before they could
+# cross the ssh boundary, leaving the operator staring at "0/4 ready"
+# with no clue why.
+KUBECTL_OUT=$(mktemp)
+trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR" "$KUBECTL_ERR" "$KUBECTL_OUT"' EXIT
 echo "  Waiting for all ${EXPECTED_NODES} nodes to be Ready..."
 ELAPSED=0
 while true; do
-    READY_COUNT=$(remote_kubectl "${SERVER_IP}" "kubectl get nodes --no-headers 2>/dev/null | grep -c ' Ready ' || echo 0")
+    if remote_kubectl "${SERVER_IP}" "kubectl get nodes --no-headers" >"$KUBECTL_OUT" 2>"$KUBECTL_ERR"; then
+        # grep -c exits 1 with stdout '0' when there are zero matches; `|| true`
+        # keeps the assignment clean (the original `|| echo 0` produced '0\n0').
+        READY_COUNT=$(grep -c ' Ready ' "$KUBECTL_OUT" || true)
+    else
+        READY_COUNT=0
+    fi
     if [ "${READY_COUNT}" -ge "${EXPECTED_NODES}" ]; then
         break
     fi
     if [ $ELAPSED -ge 180 ]; then
         echo "ERROR: Not all nodes ready after 180s (${READY_COUNT}/${EXPECTED_NODES})"
-        remote_kubectl "${SERVER_IP}" "kubectl get nodes"
+        if [ -s "$KUBECTL_ERR" ]; then
+            echo "  Last kubectl error:" >&2
+            sed 's/^/    /' "$KUBECTL_ERR" >&2
+        fi
+        remote_kubectl "${SERVER_IP}" "kubectl get nodes" >&2 || true
         exit 1
     fi
     echo "  ${READY_COUNT}/${EXPECTED_NODES} nodes ready... (${ELAPSED}s)"
