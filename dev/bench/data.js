@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776795125871,
+  "lastUpdate": 1776798685584,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6572,6 +6572,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006576405555584327",
             "extra": "mean: 101.84313407293452 usec\nrounds: 2163"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6ecb63cbfa75cc2a0f5d0055558b34fdc4422ffe",
+          "message": "fix: surface ssh failures + add Phase 0 preflight in k3s and aiqum scripts (merges PR #659, addresses #658)\n\nThree blueprint event-handler scripts had a \"wait for SSH\" loop that\nsilenced the ssh probe's stderr via &>/dev/null, then exited with a\ngeneric \"not reachable after Ns\" message after a 5-10 minute timeout.\nThe actual cause -- ssh-agent missing keys, network unreachable, auth\nfailure, etc. -- was hidden, so the operator had to re-run the probe\nmanually to find out what went wrong. Hit in real use this week when an\nssh-agent on the jumphost had no keys loaded and 5 minutes of polling\nturned into a black-box timeout.\n\nTwo-part fix per script (proxmox k3s, oci k3s, aiqum):\n\n1. New \"Phase 0: Preflight\" before any other phase:\n   - `ssh-add -l` check: distinct error messages for \"no keys loaded\"\n     (rc=1, the failure mode hit this week) vs \"agent unreachable\"\n     (rc=2, SSH_AUTH_SOCK unset/broken).\n   - One-shot verbose ssh probe to the first target (SERVER_IP /\n     CONTROL_HOST / ip_address). Captures combined output to a tmpfile;\n     dumps to stderr indented on failure, then exits 1.\n\n2. Phase 1 wait loops now redirect each probe's output to a WAIT_ERR\n   tmpfile (overwritten each iteration). On MAX_WAIT timeout, dumps the\n   last attempt's output before exit 1, so the operator sees the actual\n   ssh-side error instead of just the timeout message.\n\nTrap-based cleanup of the tmpfiles on EXIT.\n\nThis is sub-PR 1 of the audit in #655 (findings #1, #4, #5). The other\nfive Category B findings under #655 will land in subsequent PRs.\n\nThe framework-level home for the preflight check is tracked in #657\n(extend `infra doctor` with package-aware jumphost preflight); this PR\nis the immediate per-script affordance that lands today.",
+          "timestamp": "2026-04-21T20:10:42+01:00",
+          "tree_id": "62d9c59da25a2929b6f89ad6c96f2b55eee7e337",
+          "url": "https://github.com/endavis/infrafoundry/commit/6ecb63cbfa75cc2a0f5d0055558b34fdc4422ffe"
+        },
+        "date": 1776798684178,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7101.813108836311,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010040891776228336",
+            "extra": "mean: 140.80911235973906 usec\nrounds: 2403"
           }
         ]
       }
