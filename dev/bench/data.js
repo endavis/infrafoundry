@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776800327855,
+  "lastUpdate": 1776801944023,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6634,6 +6634,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002787496700155326",
             "extra": "mean: 148.6986901601318 usec\nrounds: 2185"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5a7dd9e6d079f8b261418d35163897ffca299219",
+          "message": "fix: surface curl failures in aiqum web-UI wait loops (sub-PR 3 of #655) (merges PR #665, addresses #664)\n\nfix: surface curl failures in aiqum web-UI wait loops\n\nTwo curl wait loops in aiqum-post-terraform.sh silenced curl's stderr,\nhiding the actual cause when the wait timed out. Same class of failure\nas #658 (SSH waits) and #662 (kubectl waits) -- sub-PR 3 of the audit\nin #655 (covers findings #6 and #7).\n\nPhase 3 (wait for web UI after RPM install): redirect curl's stderr to\na tmpfile each iteration; on 600s timeout, dump the last error before\nexit 1.\n\nPhase 4 (wait for web UI to come back after cert-regen restart): same\nfix; reuses the tmpfile from Phase 3.\n\nLatent issue fix while in there: the original loops used `curl -sk`\nwhere `-s` (silent) suppresses both progress AND errors. Even with the\nnew `2>\"$CURL_ERR\"` redirect, the file would have stayed empty.\nSwitched to `-skS` so `-S` re-enables errors-only output without\nre-enabling progress chatter. Verified locally: pointing curl at\n192.0.2.1:443 (RFC 5737 TEST-NET-1, guaranteed unreachable) now\nproduces `curl: (28) Failed to connect ... Timeout was reached` in the\ntmpfile, where the previous code would have left it empty.",
+          "timestamp": "2026-04-21T21:05:06+01:00",
+          "tree_id": "f5862382db7ba3bef7b13ed40671af6c1ebd0861",
+          "url": "https://github.com/endavis/infrafoundry/commit/5a7dd9e6d079f8b261418d35163897ffca299219"
+        },
+        "date": 1776801943288,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7044.971034970196,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013289684075696177",
+            "extra": "mean: 141.94522518774707 usec\nrounds: 2398"
           }
         ]
       }
