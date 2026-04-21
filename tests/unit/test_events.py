@@ -1,6 +1,7 @@
 """Unit tests for EventManager and event handlers."""
 
 import json
+import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -11,7 +12,7 @@ import pytest
 from infrafoundry.core.events import Event, EventHandlerError, EventManager, EventType
 from infrafoundry.core.events.bus import UnifiedEventBus
 from infrafoundry.core.events.context import EventContext, EventResult
-from infrafoundry.core.events.handlers.script import ScriptHandler
+from infrafoundry.core.events.handlers.script import ScriptHandler, _build_remote_bash
 
 
 @pytest.mark.unit
@@ -1078,3 +1079,73 @@ class TestScriptHandlerJumphostReexec:
         # Local path signature: first arg list is [str(script)]
         assert mock_popen.call_args[0][0] == [str(script)]
         assert result.success
+
+    def test_remote_bash_contains_var_reexport(self, tmp_path: Path):
+        """Remote wrapper re-exports each package var as INFRAFOUNDRY_VAR_<key>.
+
+        Regression for #639: the jumphost path previously only forwarded
+        INFRAFOUNDRY_PACKAGE_VARS (JSON), breaking scripts that consume the
+        documented INFRAFOUNDRY_VAR_<key> contract under ``set -u``.
+        """
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh", server_ip="10.0.0.1", cluster_name="k3s")
+
+        run_result = MagicMock(returncode=0, stdout="", stderr="")
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                return_value=run_result,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ) as mock_popen,
+        ):
+            handler.execute(context)
+
+        remote_bash = mock_popen.call_args[0][0][-1]
+        assert "INFRAFOUNDRY_VAR_$k" in remote_bash
+        assert "jq -j 'to_entries[]" in remote_bash
+        assert "\\u0000" in remote_bash
+
+    def test_remote_wrapper_sets_var_env_via_real_shell(self, tmp_path: Path):
+        """End-to-end: running the remote wrapper under bash+jq populates INFRAFOUNDRY_VAR_<key>.
+
+        Executes the generated remote bash string against a local bash+jq so
+        the shell-level re-export loop is exercised for real, not merely
+        asserted against the string.
+        """
+        if shutil.which("jq") is None or shutil.which("bash") is None:
+            pytest.skip("requires jq and bash")
+
+        remote_dir = tmp_path
+        script = remote_dir / "dump.sh"
+        script.write_text(
+            '#!/bin/bash\nset -u\necho "ip=${INFRAFOUNDRY_VAR_server_ip}"\n'
+            'echo "name=${INFRAFOUNDRY_VAR_cluster_name}"\n'
+            'echo "num=${INFRAFOUNDRY_VAR_count}"\n'
+            'echo "pkg=${INFRAFOUNDRY_PACKAGE_VARS}"\n'
+        )
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+
+        remote_bash = _build_remote_bash(str(remote_dir), "dump.sh")
+        pkg_vars = {
+            "server_ip": "10.0.0.1",
+            "cluster_name": "k3s-test",
+            "count": 3,
+            "agents": [{"name": "a1"}],  # object/array — only in JSON blob
+        }
+        proc = subprocess.run(  # nosec B603
+            ["bash", "-c", remote_bash],
+            input=json.dumps(pkg_vars),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        assert proc.returncode == 0, f"stderr: {proc.stderr}"
+        assert "ip=10.0.0.1" in proc.stdout
+        assert "name=k3s-test" in proc.stdout
+        assert "num=3" in proc.stdout
+        # Full JSON remains available (incl. the array value that scalars skip).
+        assert '"agents"' in proc.stdout

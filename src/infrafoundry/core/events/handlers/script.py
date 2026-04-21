@@ -22,6 +22,44 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _build_remote_bash(remote_dir: str, script_name: str) -> str:
+    """Build the remote bash invocation used by jumphost reexec.
+
+    The wrapper:
+    - Reads the full package-vars JSON blob from stdin into
+      ``INFRAFOUNDRY_PACKAGE_VARS`` (no secrets on the ssh command line).
+    - Re-exports each scalar entry as ``INFRAFOUNDRY_VAR_<key>`` so remote
+      scripts see the same env var contract as local execution
+      (``script.py:528-531``). Null-delimited jq output keeps values with
+      newlines/tabs/equals-signs intact.
+    - Sets ``INFRAFOUNDRY_ON_JUMPHOST=1`` so blueprint shell helpers that
+      implement their own reexec self-deactivate.
+
+    Args:
+        remote_dir: Absolute path of the rsynced script directory on the
+            jumphost.
+        script_name: Basename of the script to execute.
+
+    Returns:
+        A single bash command string to pass to ``ssh``.
+    """
+    return (
+        'INFRAFOUNDRY_ON_JUMPHOST=1 INFRAFOUNDRY_PACKAGE_VARS="$(cat)"; '
+        "export INFRAFOUNDRY_ON_JUMPHOST INFRAFOUNDRY_PACKAGE_VARS; "
+        'while IFS= read -r -d "" entry; do '
+        'k="${entry%%=*}"; v="${entry#*=}"; '
+        'export "INFRAFOUNDRY_VAR_$k=$v"; '
+        "done < <("
+        'printf %s "$INFRAFOUNDRY_PACKAGE_VARS" | '
+        "jq -j 'to_entries[] "
+        '| select(.value | type != "object" and type != "array") '
+        '| "\\(.key)=\\(.value|tostring)\\u0000"'
+        "'"
+        "); "
+        f"bash {remote_dir}/{script_name}"
+    )
+
+
 class ScriptHandler(BaseHandler):
     """Handler that executes a shell script.
 
@@ -294,10 +332,14 @@ class ScriptHandler(BaseHandler):
             f"{script_dir}/",
             f"{jumphost}:{remote_dir}/",
         ]
-        remote_bash = (
-            f'INFRAFOUNDRY_ON_JUMPHOST=1 INFRAFOUNDRY_PACKAGE_VARS="$(cat)" '
-            f"bash {remote_dir}/{script_path.name}"
-        )
+        # Parity with _execute_locally: re-export each scalar package variable
+        # as INFRAFOUNDRY_VAR_<key> on the remote side so scripts using the
+        # documented contract work under `set -u`. Object/array values are
+        # only exposed via INFRAFOUNDRY_PACKAGE_VARS (JSON) since they can't
+        # round-trip as shell scalars. Uses null-delimited output from jq so
+        # values containing newlines, tabs, or equals signs are safe. Requires
+        # jq on the jumphost.
+        remote_bash = _build_remote_bash(remote_dir, script_path.name)
         ssh_run_cmd = ["ssh", *ssh_opts, jumphost, remote_bash]
         cleanup_cmd = ["ssh", *ssh_opts, jumphost, f"rm -rf {remote_dir}"]
 
