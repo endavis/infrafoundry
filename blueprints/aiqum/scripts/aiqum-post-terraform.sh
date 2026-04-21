@@ -63,14 +63,45 @@ else
     echo "Jumphost: (direct SSH)"
 fi
 
+# --- Phase 0: Preflight — catch obvious local SSH problems before the wait
+# loop. Loops that silently retry for minutes are confusing when ssh-agent has
+# no keys loaded or the first hop is fundamentally broken.
+echo ""
+log "--- Phase 0: Preflight checks ---"
+
+if ! ssh-add -l >/dev/null 2>&1; then
+    rc=$?
+    if [ $rc -eq 1 ]; then
+        echo "ERROR: ssh-agent on $(hostname) has no keys loaded" >&2
+        echo "       Load your key (e.g. 'ssh-add ~/.ssh/id_ed25519') and re-apply" >&2
+    else
+        echo "ERROR: cannot reach ssh-agent on $(hostname) (rc=$rc, SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-unset})" >&2
+    fi
+    exit 1
+fi
+echo "  ssh-agent: $(ssh-add -l | wc -l) key(s) loaded"
+
+PREFLIGHT_ERR=$(mktemp)
+trap 'rm -f "$PREFLIGHT_ERR"' EXIT
+if ! remote_cmd "${ip_address}" "echo ok" >"$PREFLIGHT_ERR" 2>&1; then
+    echo "ERROR: preflight ssh to ${vm_name} (${ip_address}) failed:" >&2
+    sed 's/^/    /' "$PREFLIGHT_ERR" >&2
+    exit 1
+fi
+echo "  ssh probe to ${vm_name} (${ip_address}): OK"
+
 # --- Phase 1: Wait for VM to be reachable ---
 echo ""
 log "--- Phase 1: Waiting for VM to be reachable ---"
 MAX_WAIT=300
 ELAPSED=0
-while ! remote_cmd "${ip_address}" "echo ready" &>/dev/null; do
+WAIT_ERR=$(mktemp)
+trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR"' EXIT
+while ! remote_cmd "${ip_address}" "echo ready" >"$WAIT_ERR" 2>&1; do
     if [ $ELAPSED -ge $MAX_WAIT ]; then
         echo "ERROR: VM not reachable after ${MAX_WAIT}s"
+        echo "  Last ssh attempt:" >&2
+        sed 's/^/    /' "$WAIT_ERR" >&2
         exit 1
     fi
     echo "  Waiting for SSH... (${ELAPSED}s)"

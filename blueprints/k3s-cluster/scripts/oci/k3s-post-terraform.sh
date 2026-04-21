@@ -127,18 +127,50 @@ echo "Inventory: ${INVENTORY_FILE}"
 echo "Roles:     ${ROLES_DIR}"
 echo "Playbook:  ${PLAYBOOK}"
 
+SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
+
+# --- Phase 0: Preflight — catch obvious local SSH problems before the wait
+# loop. Loops that silently retry for minutes are confusing when ssh-agent has
+# no keys loaded or the first hop is fundamentally broken.
+echo ""
+echo "--- Phase 0: Preflight checks ---"
+
+if ! ssh-add -l >/dev/null 2>&1; then
+    rc=$?
+    if [ ${rc} -eq 1 ]; then
+        echo "ERROR: ssh-agent on $(hostname) has no keys loaded" >&2
+        echo "       Load your key (e.g. 'ssh-add ~/.ssh/id_ed25519') and re-apply" >&2
+    else
+        echo "ERROR: cannot reach ssh-agent on $(hostname) (rc=${rc}, SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-unset})" >&2
+    fi
+    exit 1
+fi
+echo "  ssh-agent: $(ssh-add -l | wc -l) key(s) loaded"
+
+PREFLIGHT_ERR=$(mktemp)
+trap 'rm -f "$PREFLIGHT_ERR"' EXIT
+if ! ${SSH} "ubuntu@${CONTROL_HOST}" "echo ok" >"${PREFLIGHT_ERR}" 2>&1; then
+    echo "ERROR: preflight ssh to ${CONTROL_NAME} (${CONTROL_HOST}) failed:" >&2
+    sed 's/^/    /' "${PREFLIGHT_ERR}" >&2
+    exit 1
+fi
+echo "  ssh probe to ${CONTROL_NAME} (${CONTROL_HOST}): OK"
+
 # --- Phase 1: wait for SSH reachability on every host ---
 echo ""
 echo "--- Phase 1: waiting for SSH reachability ---"
-SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
 MAX_WAIT=600
+WAIT_ERR=$(mktemp)
+trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR"' EXIT
 
 wait_for_ssh() {
     local host="$1"
     local elapsed=0
-    while ! ${SSH} "ubuntu@${host}" "echo ready" &>/dev/null; do
+    while ! ${SSH} "ubuntu@${host}" "echo ready" >"${WAIT_ERR}" 2>&1; do
         if [ ${elapsed} -ge ${MAX_WAIT} ]; then
             echo "ERROR: ${host} not reachable after ${MAX_WAIT}s"
+            echo "  Last ssh attempt:" >&2
+            sed 's/^/    /' "${WAIT_ERR}" >&2
             return 1
         fi
         echo "  Waiting for ${host}... (${elapsed}s)"
