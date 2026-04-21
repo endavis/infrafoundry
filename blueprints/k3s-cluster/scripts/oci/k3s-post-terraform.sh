@@ -9,14 +9,14 @@
 #
 # Variable cardinality: the worker count is derived from the workers:
 # list in the package manifest. The script reads the JSON-serialized
-# variable dict via jq to iterate the list, so the same script handles
-# 0, 1, or N workers without modification.
+# variable dict via python3 + stdlib json to iterate the list, so the
+# same script handles 0, 1, or N workers without modification.
 #
-# Requirements on the InfraFoundry host:
-#   - jq
+# Portability contract (runs on InfraFoundry host or jumphost):
 #   - bash 4+
-#   - ansible-playbook (the shared k3s roles live in
-#     ${INFRAFOUNDRY_CONFIG_DIR}/roles)
+#   - python3 (stdlib only — json)
+#   - ansible-playbook (checked at startup — the shared k3s roles live
+#     in ${INFRAFOUNDRY_CONFIG_DIR}/roles)
 #
 # Environment variables (injected by ScriptHandler):
 #   INFRAFOUNDRY_VAR_<key>     - Individual package variables
@@ -41,8 +41,9 @@ K3S_OCI_FIREWALL_FIX="${INFRAFOUNDRY_VAR_k3s_oci_firewall_fix:-true}"
 K3S_VCN_CIDR="${INFRAFOUNDRY_VAR_vcn_cidr:-10.0.0.0/16}"
 KUBECONFIG_LOCAL=$(eval echo "${INFRAFOUNDRY_VAR_kubeconfig_local_path}")
 
-# --- Read worker list from the JSON-serialized package vars via jq ---
-mapfile -t WORKER_NAMES < <(echo "${INFRAFOUNDRY_PACKAGE_VARS}" | jq -r '.workers[].name')
+# --- Read worker list from the JSON-serialized package vars via python3 ---
+mapfile -t WORKER_NAMES < <(python3 -c 'import json,sys
+for w in json.load(sys.stdin).get("workers",[]): print(w["name"])' <<< "${INFRAFOUNDRY_PACKAGE_VARS}")
 
 # --- Paths ---
 BLUEPRINT_DIR="${INFRAFOUNDRY_BLUEPRINT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -61,6 +62,12 @@ fi
 if [ ! -f "${PLAYBOOK}" ]; then
     echo "ERROR: Playbook not found: ${PLAYBOOK}"
     exit 1
+fi
+
+if ! command -v ansible-playbook >/dev/null 2>&1; then
+    echo "ERROR: ansible-playbook is required but was not found on PATH" >&2
+    echo "Install ansible and ensure ansible-playbook is on PATH (on the jumphost if jumphost is set in the package)" >&2
+    exit 127
 fi
 
 # --- Compute ansible_host values (FQDN on the tailnet if provided) ---
