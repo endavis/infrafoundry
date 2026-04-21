@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776779918466,
+  "lastUpdate": 1776788230386,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6386,6 +6386,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005599083881575796",
             "extra": "mean: 103.20528911043179 usec\nrounds: 2608"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6a66fa70aa631e7ee582a10c2750511a69eca3a1",
+          "message": "fix: use python3 instead of jq in jumphost reexec wrapper (merges PR #642, addresses #641)\n\nPR #640 introduced a silent dependency on jq on the jumphost. When jq\nis missing the process substitution emits `jq: command not found` to\nstderr but bash keeps going, and the inner script fails later with an\nunbound-variable error that doesn't point at the real cause -- the\nexact failure mode #639 was supposed to eliminate.\n\nReplace jq with python3, which is a hard ansible requirement and is\npresent in the base install of every modern Linux distro, and add a\n`command -v python3` presence check at the top of the wrapper so a\nmissing interpreter fails fast with a clear, actionable error.",
+          "timestamp": "2026-04-21T17:16:31+01:00",
+          "tree_id": "c967190c7ba4c6558b6e2ff59badb8a99e87268a",
+          "url": "https://github.com/endavis/infrafoundry/commit/6a66fa70aa631e7ee582a10c2750511a69eca3a1"
+        },
+        "date": 1776788229567,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7202.156128035133,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008642573877241005",
+            "extra": "mean: 138.8473093643995 usec\nrounds: 2990"
           }
         ]
       }
