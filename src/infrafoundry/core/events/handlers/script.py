@@ -26,12 +26,16 @@ def _build_remote_bash(remote_dir: str, script_name: str) -> str:
     """Build the remote bash invocation used by jumphost reexec.
 
     The wrapper:
+    - Fails fast if ``python3`` is missing on the jumphost. Python 3 is a
+      hard requirement for ansible and is present in the base install of
+      every modern Linux distro, making it strictly more portable than
+      ``jq`` (which is not installed by default on Debian/Ubuntu).
     - Reads the full package-vars JSON blob from stdin into
       ``INFRAFOUNDRY_PACKAGE_VARS`` (no secrets on the ssh command line).
     - Re-exports each scalar entry as ``INFRAFOUNDRY_VAR_<key>`` so remote
       scripts see the same env var contract as local execution
-      (``script.py:528-531``). Null-delimited jq output keeps values with
-      newlines/tabs/equals-signs intact.
+      (``script.py:528-531``). Null-delimited python output keeps values
+      with newlines/tabs/equals-signs intact.
     - Sets ``INFRAFOUNDRY_ON_JUMPHOST=1`` so blueprint shell helpers that
       implement their own reexec self-deactivate.
 
@@ -44,6 +48,9 @@ def _build_remote_bash(remote_dir: str, script_name: str) -> str:
         A single bash command string to pass to ``ssh``.
     """
     return (
+        "command -v python3 >/dev/null 2>&1 || { "
+        'echo "infrafoundry: python3 is required on the jumphost '
+        'to expand INFRAFOUNDRY_VAR_* env vars" >&2; exit 127; }; '
         'INFRAFOUNDRY_ON_JUMPHOST=1 INFRAFOUNDRY_PACKAGE_VARS="$(cat)"; '
         "export INFRAFOUNDRY_ON_JUMPHOST INFRAFOUNDRY_PACKAGE_VARS; "
         'while IFS= read -r -d "" entry; do '
@@ -51,9 +58,12 @@ def _build_remote_bash(remote_dir: str, script_name: str) -> str:
         'export "INFRAFOUNDRY_VAR_$k=$v"; '
         "done < <("
         'printf %s "$INFRAFOUNDRY_PACKAGE_VARS" | '
-        "jq -j 'to_entries[] "
-        '| select(.value | type != "object" and type != "array") '
-        '| "\\(.key)=\\(.value|tostring)\\u0000"'
+        "python3 -c '"
+        "import json,sys;"
+        "d=json.load(sys.stdin);"
+        '[sys.stdout.buffer.write(f"{k}={v}\\0".encode()) '
+        "for k,v in d.items() "
+        "if not isinstance(v,(dict,list))]"
         "'"
         "); "
         f"bash {remote_dir}/{script_name}"
@@ -336,9 +346,9 @@ class ScriptHandler(BaseHandler):
         # as INFRAFOUNDRY_VAR_<key> on the remote side so scripts using the
         # documented contract work under `set -u`. Object/array values are
         # only exposed via INFRAFOUNDRY_PACKAGE_VARS (JSON) since they can't
-        # round-trip as shell scalars. Uses null-delimited output from jq so
-        # values containing newlines, tabs, or equals signs are safe. Requires
-        # jq on the jumphost.
+        # round-trip as shell scalars. Uses null-delimited output from python3
+        # so values containing newlines, tabs, or equals signs are safe.
+        # Requires python3 on the jumphost (checked by the wrapper itself).
         remote_bash = _build_remote_bash(remote_dir, script_path.name)
         ssh_run_cmd = ["ssh", *ssh_opts, jumphost, remote_bash]
         cleanup_cmd = ["ssh", *ssh_opts, jumphost, f"rm -rf {remote_dir}"]
