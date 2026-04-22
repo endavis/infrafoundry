@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776806191054,
+  "lastUpdate": 1776855314152,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6696,6 +6696,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002772410612296559",
             "extra": "mean: 119.8364841128899 usec\nrounds: 2801"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5384b0e8df1dbe07358a0ab5b6d8ac53872b67bc",
+          "message": "fix: surface sysctl failures in k3s node prep (sub-PR 4 of #655) (merges PR #668, addresses #667)\n\nThe per-node prep loop in blueprints/k3s-cluster/scripts/proxmox/\nk3s-post-terraform.sh silenced both stdout and stderr of `sysctl --system`\nwith `> /dev/null 2>&1`. This hid two distinct failure modes -- final\nfinding (#8) from the stdio-swallowing audit in #655.\n\nFix: capture output, verify the three required params are 1 in memory\nafter, decide fatal-vs-warn based on that authoritative check. If the\nparams didn't apply, exit 1 with the sysctl output + observed values\nto stderr (fatal -- inconsistent state must not proceed to k3s install).\nIf they did apply but `sysctl --system` still exited non-zero (unrelated\nentries in /etc/sysctl.d/), emit a non-fatal warning via the\nINFRAFOUNDRY_WARNINGS_FILE framework from PR #666 -- operator sees it\nin the end-of-apply summary panel.\n\nUses python3 stdlib for JSON escaping of the sysctl output (which may\ncontain quotes, newlines, backslashes). No jq or third-party packages.",
+          "timestamp": "2026-04-22T11:54:40+01:00",
+          "tree_id": "e9ebc5d469a4ed24089e59d0f2833bb765329bb2",
+          "url": "https://github.com/endavis/infrafoundry/commit/5384b0e8df1dbe07358a0ab5b6d8ac53872b67bc"
+        },
+        "date": 1776855313560,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7317.980015406377,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009518296424679642",
+            "extra": "mean: 136.64973092229314 usec\nrounds: 2267"
           }
         ]
       }
