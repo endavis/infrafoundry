@@ -182,15 +182,43 @@ EOF
         modprobe overlay
     "
 
-    # Set required sysctl parameters
-    remote_root_cmd "${ip}" "
+    # Set required sysctl parameters. `sysctl --system` reads every file under
+    # /usr/lib/sysctl.d/, /etc/sysctl.d/, and /etc/sysctl.conf; unrelated
+    # entries can cause a non-zero exit even when our required params apply
+    # fine. Decide fatal-vs-warn by reading the params back in memory after —
+    # see docs/development/blueprint-script-portability.md#non-fatal-warnings.
+    SYSCTL_RC=0
+    SYSCTL_OUT=$(remote_root_cmd "${ip}" "
         cat > /etc/sysctl.d/k3s.conf <<EOF
 net.bridge.bridge-nf-call-iptables = 1
 net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward = 1
 EOF
-        sysctl --system > /dev/null 2>&1
-    "
+        sysctl --system 2>&1
+    ") || SYSCTL_RC=$?
+
+    # Authoritative check: the three required params must be 1 in memory.
+    OBSERVED=$(remote_root_cmd "${ip}" "sysctl -n net.bridge.bridge-nf-call-iptables net.bridge.bridge-nf-call-ip6tables net.ipv4.ip_forward" 2>&1 || true)
+    if [ "$(printf '%s\n' "$OBSERVED" | grep -c '^1$' || true)" -ne 3 ]; then
+        echo "ERROR: k3s-required sysctl params did not apply on ${name} (${ip})" >&2
+        echo "  sysctl --system output:" >&2
+        printf '%s\n' "$SYSCTL_OUT" | sed 's/^/    /' >&2
+        echo "  Observed values (expected three lines of '1'):" >&2
+        printf '%s\n' "$OBSERVED" | sed 's/^/    /' >&2
+        exit 1
+    fi
+
+    # Required params applied. Non-zero exit from sysctl --system here means
+    # unrelated entries in /etc/sysctl.d/ — surface as a non-fatal warning so
+    # the operator sees it in the end-of-apply summary (PR #666).
+    if [ "$SYSCTL_RC" -ne 0 ] && [ -n "${INFRAFOUNDRY_WARNINGS_FILE:-}" ]; then
+        python3 -c 'import json,sys
+name = sys.argv[1]
+out = sys.stdin.read().strip()
+msg = "sysctl --system exited non-zero on " + name + " but all k3s-required params applied. Output:\n" + out
+print(json.dumps({"source": "k3s-post-terraform:sysctl", "message": msg}))
+' "${name}" <<<"$SYSCTL_OUT" >> "$INFRAFOUNDRY_WARNINGS_FILE"
+    fi
 
     # Disable firewalld (k3s manages its own iptables rules)
     remote_root_cmd "${ip}" "systemctl disable --now firewalld 2>/dev/null || true"
