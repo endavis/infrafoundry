@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776858625484,
+  "lastUpdate": 1776862665039,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6758,6 +6758,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00004041287063590116",
             "extra": "mean: 157.2902071579159 usec\nrounds: 2375"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0f9b96052683c54c36dd682941c5bf04972e7e57",
+          "message": "feat: add outputs declaration to script handler for jumphost pullback (merges PR #671, addresses #660)\n\nScript event handlers gain an optional `outputs:` field that declares\nartifact files produced on the execution host and must be copied back to\nthe operator's workstation. Each entry maps a rendered `source` path on\nthe execution host to a rendered `dest` path on the operator. Transport\ndispatches by context: shutil.copy2 for local execution, one scp per\nentry for jumphost execution. Both values are Jinja2-rendered against\nthe package variables at execute time and must resolve to absolute\npaths. Pull-back runs only on script success; failure modes surface as\nnon-fatal warnings via INFRAFOUNDRY_WARNINGS_FILE.\n\nToday every blueprint that emits an operator-consumable artifact\n(kubeconfigs, CA certs, deploy reports) from a jumphost has to glue in\nits own scp back to the operator because `~/...` on the jumphost\nexpands against the jumphost's home, not the operator's. The new\nfield makes that the framework's job, keeps the declaration in the\nmanifest where it's discoverable, and keeps the script portable between\nlocal and jumphost execution.\n\nScope: framework primitive + ADR-0006 + docs + tests only. Migrating\nthe k3s-cluster blueprint's Phase-6 kubeconfig pullback off its ad-hoc\nscp glue is tracked separately.\n\nAddresses #660",
+          "timestamp": "2026-04-22T13:57:04+01:00",
+          "tree_id": "910895555f7dff75a6a7c375d83ab346bb9d9fe4",
+          "url": "https://github.com/endavis/infrafoundry/commit/0f9b96052683c54c36dd682941c5bf04972e7e57"
+        },
+        "date": 1776862664269,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7375.029633447657,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009370573516938522",
+            "extra": "mean: 135.59267551478612 usec\nrounds: 2185"
           }
         ]
       }
