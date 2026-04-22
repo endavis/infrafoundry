@@ -135,6 +135,75 @@ tools the blueprint script itself needs. SSH must be reachable from the
 operator's host using the value of `jumphost` as a destination (e.g.
 `ansible@jump.example.com` or an alias defined in `~/.ssh/config`).
 
+### Declaring script outputs
+
+Blueprint event-handler scripts often produce artifact files the operator
+needs on their workstation — a rendered kubeconfig, a CA cert, a deploy
+report. When the script runs on a jumphost via the framework's reexec
+path, those artifacts land on the jumphost, not on the operator's host,
+because `~/…` expands against the jumphost's home directory. The `outputs:`
+field on the script handler tells the framework which files to pull back
+after a successful run.
+
+```yaml
+events:
+  on_create:
+    - type: script
+      script: scripts/proxmox/k3s-post-terraform.sh
+      outputs:
+        - source: "/tmp/k3s-{{ cluster_name }}/kubeconfig.yaml"
+          dest:   "{{ kubeconfig_local_path }}"
+```
+
+Local execution — the same declaration works for packages that don't set
+`jumphost`; the framework uses `shutil.copy2` instead of `scp`:
+
+```yaml
+events:
+  after_apply:
+    - type: script
+      script: scripts/render-report.sh
+      outputs:
+        - source: "/tmp/report-{{ environment }}.txt"
+          dest:   "~/reports/{{ environment }}.txt"
+```
+
+Contract:
+
+- `outputs:` is optional. Missing or empty means no pull-back (backwards
+  compatible).
+- Each entry is a mapping with two required string keys:
+  - `source`: path on the **execution host** (the jumphost during
+    reexec, the operator's host for local execution).
+  - `dest`: path on the **operator's workstation**.
+- Both values are Jinja2-rendered against the package variables. The
+  same filter set the blueprint resolver uses is available.
+- Both rendered paths must be absolute (start with `/` or `~`). A
+  non-absolute value emits a warning and skips that entry without
+  failing the handler. `~` is expanded on the operator side; on a
+  jumphost source it is expanded by the remote shell via `scp`.
+- Pull-back runs **only when the script succeeds** (exit code 0).
+  Failed runs skip outputs processing entirely so partial artifacts
+  don't leak to the operator.
+- Transport:
+  - Local execution: `shutil.copy2(source, dest)`; when `source == dest`
+    the copy is a no-op.
+  - Jumphost execution: one `scp` per entry, run between the remote
+    warnings fetch and the remote tmp-dir cleanup so the source file
+    still exists when `scp` runs.
+- Parent directories of `dest` are created with `mkdir -p` automatically.
+- Failure modes — missing source after success, non-zero scp, permission
+  errors — are **non-fatal**. Each failure appends a warning to
+  `INFRAFOUNDRY_WARNINGS_FILE` under the source tag
+  `script_handler_outputs`, which surfaces in the apply summary panel.
+- Permissions beyond what `scp` / `shutil.copy2` preserve are the
+  script's responsibility (e.g. if the kubeconfig needs `chmod 600` on
+  the operator host, the script that produced it should `chmod 600` it
+  before `ScriptHandler` ships it back).
+
+See [ADR-0006](../decisions/0006-explicit-script-handler-output-declarations.md)
+for the design rationale and the alternatives that were considered.
+
 ### Real-Time Output Streaming
 
 Script handlers stream stdout and stderr to the console in real-time, line by line, instead of buffering all output until the script completes. This is essential for long-running handlers (e.g., Ansible playbooks) where the user needs to see progress.
