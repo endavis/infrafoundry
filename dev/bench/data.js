@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776855314152,
+  "lastUpdate": 1776858625484,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6727,6 +6727,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009518296424679642",
             "extra": "mean: 136.64973092229314 usec\nrounds: 2267"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6c3924d93ed516b3a30f3cb48795785aee66550c",
+          "message": "refactor: rewrite aiqum-initial-setup.py to use stdlib only (drop requests, PyYAML) (merges PR #669, addresses #644)\n\n* refactor: rewrite aiqum-initial-setup.py to use stdlib only\n\nDrop the `requests` and `PyYAML` dependencies in favor of stdlib\n`urllib.request` + `json` + `ssl` + `base64`. Adds an inline\n`AIQUMClient` (Basic auth + permissive SSL for AIQUM's self-signed\nFEW cert). `load_config()` now reads `INFRAFOUNDRY_PACKAGE_VARS`\nexclusively and fails fast when unset.\n\nFixes ModuleNotFoundError on minimal jumphosts where pip packages\naren't installed system-wide. Aligns this script with the portable\nbaseline contract in docs/development/blueprint-script-portability.md.\n\nCLI and env-var interface unchanged; callers need no updates.\nAdds TestStdlibOnly as a regression guard (AST-walk every import).\n\n* fix: avoid logging option names in save_option failure path\n\nCodeQL py/clear-text-logging-sensitive-data (alert 32) flagged the\nfailure log at save_option:299 because `name` flows from a dict whose\nkeys include \"mail.smtp.password\", so CodeQL taints the variable even\nthough only the name (not the value) was ever logged.\n\nDrop the option name from the failure log; print only the HTTP status.\nThe wizard's Step-N progress messages retain enough context for the\noperator to know which step failed.\n\nPre-existing issue in the pre-refactor script too; CodeQL surfaces it\nnow because the file is in the changed set for #644.",
+          "timestamp": "2026-04-22T12:49:45+01:00",
+          "tree_id": "be4031e384650cfc03cb407fea81f45a3e7b68fc",
+          "url": "https://github.com/endavis/infrafoundry/commit/6c3924d93ed516b3a30f3cb48795785aee66550c"
+        },
+        "date": 1776858624512,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6357.6748868797795,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004041287063590116",
+            "extra": "mean: 157.2902071579159 usec\nrounds: 2375"
           }
         ]
       }
