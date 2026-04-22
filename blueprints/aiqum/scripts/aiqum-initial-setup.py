@@ -295,8 +295,12 @@ def save_option(client: AIQUMClient, name: str, value: str | int | bool) -> bool
     )
     if code in (200, 201, 204):
         return True
-    # Avoid logging response body -- may contain sensitive data
-    print(f"    Failed to set {name}: {code}")
+    # Log only the HTTP status, not the option name. Names like
+    # "mail.smtp.password" trip CodeQL's py/clear-text-logging-sensitive-data
+    # because `name` flows from a dict whose values include credentials. The
+    # option VALUE is never logged. The wizard's Step-N progress messages
+    # tell the operator which step failed.
+    print(f"    Failed to save option (HTTP {code})")
     return False
 
 
