@@ -1239,3 +1239,508 @@ class TestScriptHandlerJumphostReexec:
         content = warnings_path.read_text(encoding="utf-8")
         assert '"source":"remote"' in content
         assert '"message":"hello"' in content
+
+
+@pytest.mark.unit
+class TestScriptHandlerOutputs:
+    """Tests for the ``outputs:`` pull-back affordance on ScriptHandler (#660).
+
+    Declared ``outputs`` let blueprint authors tell the framework which
+    artifact files a script produces and where the operator wants them
+    to land. Local execution uses ``shutil.copy2``; jumphost execution
+    uses ``scp``. All pull-back failures are non-fatal warnings.
+    """
+
+    def _handler(
+        self,
+        tmp_path: Path,
+        outputs: list[dict[str, str]] | None = None,
+        script_content: str = "#!/bin/bash\necho hi\n",
+    ) -> tuple[ScriptHandler, Path]:
+        """Build a ScriptHandler with optional ``outputs`` config."""
+        env_dir = tmp_path / "envs" / "dev"
+        env_dir.mkdir(parents=True, exist_ok=True)
+        script = env_dir / "run.sh"
+        script.write_text(script_content)
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+        config: dict = {"script": "run.sh"}
+        if outputs is not None:
+            config["outputs"] = outputs
+        handler = ScriptHandler(config, config_base_dir=tmp_path)
+        return handler, script
+
+    def _context(self, **vars: object) -> EventContext:
+        return EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+            package_variables=dict(vars),
+        )
+
+    # -- Validation -----------------------------------------------------
+
+    def test_validate_config_accepts_absent_outputs(self, tmp_path: Path):
+        """Missing ``outputs`` field is valid (back-compat default)."""
+        handler, _ = self._handler(tmp_path)
+        assert handler.validate_config() == []
+
+    def test_validate_config_accepts_empty_outputs_list(self, tmp_path: Path):
+        """Empty ``outputs: []`` is valid."""
+        handler, _ = self._handler(tmp_path, outputs=[])
+        assert handler.validate_config() == []
+
+    def test_validate_config_rejects_non_list_outputs(self, tmp_path: Path):
+        """``outputs`` as a non-list produces a validation error."""
+        env_dir = tmp_path / "envs" / "dev"
+        env_dir.mkdir(parents=True, exist_ok=True)
+        script = env_dir / "run.sh"
+        script.write_text("#!/bin/bash\n")
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+        handler = ScriptHandler(
+            {"script": "run.sh", "outputs": "not-a-list"},
+            config_base_dir=tmp_path,
+        )
+        errors = handler.validate_config()
+        assert any("outputs must be a list" in e for e in errors)
+
+    def test_validate_config_rejects_entry_missing_source(self, tmp_path: Path):
+        """An entry without ``source`` is invalid."""
+        handler, _ = self._handler(tmp_path, outputs=[{"dest": "/tmp/x"}])
+        errors = handler.validate_config()
+        assert any("source" in e for e in errors)
+
+    def test_validate_config_rejects_entry_missing_dest(self, tmp_path: Path):
+        """An entry without ``dest`` is invalid."""
+        handler, _ = self._handler(tmp_path, outputs=[{"source": "/tmp/x"}])
+        errors = handler.validate_config()
+        assert any("dest" in e for e in errors)
+
+    def test_validate_config_rejects_non_mapping_entry(self, tmp_path: Path):
+        """A list entry that isn't a mapping is invalid."""
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=["just-a-string"],  # type: ignore[list-item]
+        )
+        errors = handler.validate_config()
+        assert any("outputs[0]" in e and "mapping" in e for e in errors)
+
+    # -- Absent / empty are no-ops --------------------------------------
+
+    def test_outputs_absent_is_noop(self, tmp_path: Path):
+        """With no ``outputs`` config, no copy/scp happens."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context()
+        with patch("infrafoundry.core.events.handlers.script.shutil.copy2") as mock_copy:
+            result = handler.execute(context)
+        assert result.success
+        assert mock_copy.call_count == 0
+
+    def test_outputs_empty_list_is_noop(self, tmp_path: Path):
+        """``outputs: []`` behaves identically to absent."""
+        handler, _ = self._handler(tmp_path, outputs=[])
+        context = self._context()
+        with patch("infrafoundry.core.events.handlers.script.shutil.copy2") as mock_copy:
+            result = handler.execute(context)
+        assert result.success
+        assert mock_copy.call_count == 0
+
+    # -- Local execution paths ------------------------------------------
+
+    def test_local_copies_source_to_dest(self, tmp_path: Path):
+        """On success, source is copied to dest with different paths."""
+        src = tmp_path / "src.txt"
+        src.write_text("hello world")
+        dst = tmp_path / "out" / "dst.txt"
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": str(src), "dest": str(dst)}],
+            script_content="#!/bin/bash\necho ok\n",
+        )
+        result = handler.execute(self._context())
+        assert result.success
+        assert dst.exists()
+        assert dst.read_text() == "hello world"
+
+    def test_local_same_path_is_noop(self, tmp_path: Path):
+        """When source == dest, no copy is attempted."""
+        both = tmp_path / "file.txt"
+        both.write_text("unchanged")
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": str(both), "dest": str(both)}],
+        )
+        with patch("infrafoundry.core.events.handlers.script.shutil.copy2") as mock_copy:
+            result = handler.execute(self._context())
+        assert result.success
+        assert mock_copy.call_count == 0
+        # File is unmodified.
+        assert both.read_text() == "unchanged"
+
+    def test_local_missing_source_warns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        """Missing source after success: warning emitted, handler still succeeds."""
+        warnings_file = tmp_path / "warnings.jsonl"
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
+        missing = tmp_path / "does-not-exist.txt"
+        dst = tmp_path / "dst.txt"
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": str(missing), "dest": str(dst)}],
+        )
+        result = handler.execute(self._context())
+        assert result.success
+        assert not dst.exists()
+        assert warnings_file.exists()
+        content = warnings_file.read_text()
+        assert "output source not found" in content
+        assert "script_handler_outputs" in content
+
+    def test_local_relative_path_warns_and_skips(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Non-absolute rendered paths warn and skip the entry."""
+        warnings_file = tmp_path / "warnings.jsonl"
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
+        # dest is a bare relative name; source is absolute.
+        src = tmp_path / "src.txt"
+        src.write_text("x")
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": str(src), "dest": "foo-relative"}],
+        )
+        with patch("infrafoundry.core.events.handlers.script.shutil.copy2") as mock_copy:
+            result = handler.execute(self._context())
+        assert result.success
+        assert mock_copy.call_count == 0
+        assert warnings_file.exists()
+        assert "dest must be an absolute path" in warnings_file.read_text()
+
+    def test_local_template_vars_rendered(self, tmp_path: Path):
+        """Jinja2 templates in source/dest resolve against package vars."""
+        src = tmp_path / "k3s-prod.yaml"
+        src.write_text("# kubeconfig")
+        dst = tmp_path / "prod.yaml"
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[
+                {
+                    "source": str(tmp_path) + "/k3s-{{ cluster_name }}.yaml",
+                    "dest": str(tmp_path) + "/{{ cluster_name }}.yaml",
+                }
+            ],
+        )
+        result = handler.execute(self._context(cluster_name="prod"))
+        assert result.success
+        assert dst.exists()
+        assert dst.read_text() == "# kubeconfig"
+
+    def test_local_creates_dest_parent_dir(self, tmp_path: Path):
+        """Nonexistent dest parent dir is created automatically."""
+        src = tmp_path / "src.txt"
+        src.write_text("payload")
+        dst = tmp_path / "nested" / "deeper" / "dst.txt"
+        assert not dst.parent.exists()
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": str(src), "dest": str(dst)}],
+        )
+        result = handler.execute(self._context())
+        assert result.success
+        assert dst.exists()
+        assert dst.read_text() == "payload"
+
+    def test_local_outputs_skipped_on_script_failure(self, tmp_path: Path):
+        """Non-zero script exit skips outputs processing entirely."""
+        src = tmp_path / "src.txt"
+        src.write_text("payload")
+        dst = tmp_path / "dst.txt"
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": str(src), "dest": str(dst)}],
+            script_content="#!/bin/bash\nexit 1\n",
+        )
+        result = handler.execute(self._context())
+        assert result.success is False
+        assert not dst.exists()
+
+    # -- Jumphost (scp) paths -------------------------------------------
+
+    def _jumphost_run_ok(self, scp_calls: list[list[str]] | None = None):
+        """Build a subprocess.run side effect that records scp invocations."""
+
+        def side_effect(cmd, *_args, **_kwargs):
+            if cmd[0] == "scp" and scp_calls is not None:
+                scp_calls.append(list(cmd))
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        return side_effect
+
+    def test_remote_scp_invoked_on_success(self, tmp_path: Path):
+        """A successful remote run triggers one scp per output."""
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "/tmp/remote/out.txt", "dest": str(tmp_path / "out.txt")}],
+        )
+        context = self._context(jumphost="jump@host")
+        scp_calls: list[list[str]] = []
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=self._jumphost_run_ok(scp_calls),
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ),
+        ):
+            result = handler.execute(context)
+        assert result.success
+        assert len(scp_calls) == 1
+        scp_cmd = scp_calls[0]
+        assert scp_cmd[0] == "scp"
+        assert "jump@host:/tmp/remote/out.txt" in scp_cmd
+        assert str(tmp_path / "out.txt") in scp_cmd
+
+    def test_remote_scp_skipped_on_script_failure(self, tmp_path: Path):
+        """A failed remote run skips scp entirely."""
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "/tmp/remote/out.txt", "dest": str(tmp_path / "out.txt")}],
+        )
+        context = self._context(jumphost="jump@host")
+        scp_calls: list[list[str]] = []
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=self._jumphost_run_ok(scp_calls),
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=7),
+            ),
+        ):
+            result = handler.execute(context)
+        assert result.success is False
+        assert scp_calls == []
+
+    def test_remote_scp_failure_warns_but_handler_succeeds(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A non-zero scp returncode surfaces as a warning, not a handler failure."""
+        warnings_file = tmp_path / "warnings.jsonl"
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "/tmp/remote/out.txt", "dest": str(tmp_path / "out.txt")}],
+        )
+        context = self._context(jumphost="jump@host")
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            if cmd[0] == "scp":
+                return MagicMock(returncode=1, stdout=b"", stderr=b"no such file")
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ),
+        ):
+            result = handler.execute(context)
+
+        assert result.success
+        assert warnings_file.exists()
+        content = warnings_file.read_text()
+        assert "scp of output" in content
+        assert "no such file" in content
+
+    def test_remote_multiple_outputs_all_attempted(self, tmp_path: Path):
+        """Multiple outputs: one failure does not skip subsequent entries."""
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[
+                {"source": "/tmp/remote/first.txt", "dest": str(tmp_path / "first.txt")},
+                {"source": "/tmp/remote/second.txt", "dest": str(tmp_path / "second.txt")},
+            ],
+        )
+        context = self._context(jumphost="jump@host")
+        scp_calls: list[list[str]] = []
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            if cmd[0] == "scp":
+                scp_calls.append(list(cmd))
+                # First scp fails, second succeeds.
+                if "first.txt" in cmd[-2]:
+                    return MagicMock(returncode=1, stdout=b"", stderr=b"err")
+                return MagicMock(returncode=0, stdout=b"", stderr=b"")
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ),
+        ):
+            result = handler.execute(context)
+
+        assert result.success
+        # Filter out any scp from the unrelated warnings-collector plumbing
+        # (only present when INFRAFOUNDRY_WARNINGS_FILE is set); the outputs
+        # pull-back uses /tmp/remote/* sources.
+        output_scps = [c for c in scp_calls if "/tmp/remote/" in c[-2]]
+        assert len(output_scps) == 2
+        assert any("first.txt" in c[-2] for c in output_scps)
+        assert any("second.txt" in c[-2] for c in output_scps)
+
+    def test_remote_cleanup_runs_after_outputs_processing(self, tmp_path: Path):
+        """Remote cleanup (rm -rf) always fires after scp attempts."""
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "/tmp/remote/out.txt", "dest": str(tmp_path / "out.txt")}],
+        )
+        context = self._context(jumphost="jump@host")
+        order: list[str] = []
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            if cmd[0] == "scp":
+                order.append("scp")
+                # Make scp fail so we also verify cleanup still runs after a
+                # non-fatal pull-back error.
+                return MagicMock(returncode=1, stdout=b"", stderr=b"boom")
+            if cmd[0] == "ssh" and "rm -rf" in cmd[-1]:
+                order.append("cleanup")
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ),
+        ):
+            result = handler.execute(context)
+
+        assert result.success
+        # scp must run before the remote cleanup so the remote tmp dir
+        # still contains the artifact when scp executes.
+        assert order == ["scp", "cleanup"]
+
+    def test_remote_ssh_opts_forwarded_to_scp(self, tmp_path: Path):
+        """scp inherits the same StrictHostKeyChecking=no used by the handler."""
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "/tmp/remote/out.txt", "dest": str(tmp_path / "out.txt")}],
+        )
+        context = self._context(jumphost="jump@host")
+        scp_calls: list[list[str]] = []
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=self._jumphost_run_ok(scp_calls),
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ),
+        ):
+            handler.execute(context)
+        assert len(scp_calls) == 1
+        assert "-o" in scp_calls[0]
+        assert "StrictHostKeyChecking=no" in scp_calls[0]
+
+    # -- Extra error-handling paths -------------------------------------
+
+    def test_local_template_error_warns_and_skips(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A malformed Jinja2 template surfaces a warning and skips the entry."""
+        warnings_file = tmp_path / "warnings.jsonl"
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
+        # Unclosed expression -> jinja2.TemplateSyntaxError.
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "/tmp/{{ broken", "dest": str(tmp_path / "x.txt")}],
+        )
+        with patch("infrafoundry.core.events.handlers.script.shutil.copy2") as mock_copy:
+            result = handler.execute(self._context())
+        assert result.success
+        assert mock_copy.call_count == 0
+        assert warnings_file.exists()
+        assert "failed to render output template" in warnings_file.read_text()
+
+    def test_local_source_relative_warns_and_skips(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """A non-absolute rendered source also triggers a warning."""
+        warnings_file = tmp_path / "warnings.jsonl"
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "relative.txt", "dest": str(tmp_path / "x.txt")}],
+        )
+        with patch("infrafoundry.core.events.handlers.script.shutil.copy2") as mock_copy:
+            result = handler.execute(self._context())
+        assert result.success
+        assert mock_copy.call_count == 0
+        assert "source must be an absolute path" in warnings_file.read_text()
+
+    def test_local_copy_oserror_warns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        """A raising ``shutil.copy2`` surfaces as a warning (not a failure)."""
+        warnings_file = tmp_path / "warnings.jsonl"
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
+        src = tmp_path / "src.txt"
+        src.write_text("hi")
+        dst = tmp_path / "dst.txt"
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": str(src), "dest": str(dst)}],
+        )
+        with patch(
+            "infrafoundry.core.events.handlers.script.shutil.copy2",
+            side_effect=PermissionError("denied"),
+        ):
+            result = handler.execute(self._context())
+        assert result.success
+        content = warnings_file.read_text()
+        assert "failed to copy" in content
+
+    def test_remote_scp_oserror_warns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        """An ``OSError`` from ``subprocess.run`` during scp is also a warning."""
+        warnings_file = tmp_path / "warnings.jsonl"
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "/tmp/remote/out.txt", "dest": str(tmp_path / "out.txt")}],
+        )
+        context = self._context(jumphost="jump@host")
+
+        def run_side_effect(cmd, *_args, **_kwargs):
+            if cmd[0] == "scp":
+                raise OSError("scp binary missing")
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ),
+        ):
+            result = handler.execute(context)
+
+        assert result.success
+        content = warnings_file.read_text()
+        assert "scp of output" in content
+        assert "scp binary missing" in content

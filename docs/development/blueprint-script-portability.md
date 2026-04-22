@@ -123,6 +123,38 @@ fi
 The env var is only set during `infra apply`; guarding with `${…:-}` keeps
 scripts portable to other phases and to manual invocation.
 
+## Outputs: pulling artifacts back to the operator
+
+Blueprint scripts that produce operator-consumable artifacts — a
+kubeconfig, a CA cert, a deploy report — must not hardcode paths on the
+operator's workstation (e.g. `~/.kube/config`). When the script runs on a
+jumphost (context 2), `~/` expands against the jumphost user's home, so
+the file lands there and never reaches the operator.
+
+Instead, write the artifact to a predictable path on the **execution
+host** (typically under `/tmp/`) and declare it in the script handler's
+`outputs:` list:
+
+```yaml
+# blueprint.yaml or package blueprint reference
+events:
+  on_create:
+    - type: script
+      script: scripts/proxmox/k3s-post-terraform.sh
+      outputs:
+        - source: "/tmp/k3s-{{ cluster_name }}/kubeconfig.yaml"
+          dest:   "{{ kubeconfig_local_path }}"
+```
+
+The framework renders both paths against the package variables, then
+copies (`shutil.copy2`) or `scp`'s (one `scp` per entry, when a jumphost
+is set) the rendered source to the rendered dest after the script
+reports success. All pull-back failures are non-fatal warnings, so
+missing or conditional outputs don't fail the handler.
+
+See [Event System → Declaring script outputs](event-system.md#declaring-script-outputs)
+for the full schema and semantics.
+
 ## Target-VM scripts: the exemption
 
 Scripts that are uploaded to and executed on a blueprint-controlled target VM (context 3) are exempt from the portable baseline. Those scripts may assume any tool that the blueprint's VM template provides — `yum`, `apt`, `firewall-cmd`, `rpm`, distro-specific init systems, etc.
