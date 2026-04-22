@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess  # nosec B404 - required for running user scripts
 import tempfile
 import threading
@@ -15,8 +16,12 @@ import uuid
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, override
 
+import jinja2
+
+from infrafoundry.core.config.filters import create_jinja2_env
 from infrafoundry.core.events.context import EventContext, EventResult
 from infrafoundry.core.events.handlers.base import BaseHandler
+from infrafoundry.core.warnings import emit_warning
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -104,6 +109,17 @@ class ScriptHandler(BaseHandler):
         timeout: Maximum execution time in seconds (default: 300)
         continue_on_error: If True, don't abort on failure (default: False)
         description: Optional description for logging
+        outputs: Optional list of artifact files the script produces, to be
+            pulled back to the operator's workstation after a successful run.
+            Each entry is ``{source: <path>, dest: <path>}``. Both fields are
+            Jinja2-rendered against the package variables, and both must
+            resolve to absolute paths (``/...`` or ``~/...``). During jumphost
+            reexec the ``source`` is scp'd from the jumphost; during local
+            execution it is copied with ``shutil.copy2``. All pull-back
+            failures (missing source, scp error, permission denied) are
+            non-fatal and logged as warnings via
+            ``INFRAFOUNDRY_WARNINGS_FILE``. See
+            ``docs/development/event-system.md`` for details.
 
     Environment variables injected:
         INFRAFOUNDRY_ENV: Environment name
@@ -130,6 +146,15 @@ class ScriptHandler(BaseHandler):
         timeout: 60
         env:
           SLACK_CHANNEL: "#infra"
+
+    Example with outputs (jumphost-executed blueprint writes a kubeconfig
+    on the jumphost; framework scp's it back to the operator)::
+
+        type: script
+        script: scripts/proxmox/k3s-post-terraform.sh
+        outputs:
+          - source: "/tmp/k3s-{{ cluster_name }}/kubeconfig.yaml"
+            dest:   "{{ kubeconfig_local_path }}"
     """
 
     # Pattern to match {{ secrets.key }} or {{ secrets.key.subkey }}
@@ -166,6 +191,26 @@ class ScriptHandler(BaseHandler):
         timeout = self.config.get("timeout", 300)
         if not isinstance(timeout, int) or timeout < 1 or timeout > 14400:
             errors.append("Timeout must be an integer between 1 and 14400")
+
+        # Structural validation of optional outputs: list of dicts each with
+        # string ``source`` and ``dest`` keys. The absolute-path check is
+        # deferred to execute-time since the values may be Jinja2-templated
+        # and need the runtime package variables to resolve.
+        outputs = self.config.get("outputs")
+        if outputs is not None:
+            if not isinstance(outputs, list):
+                errors.append("outputs must be a list")
+            else:
+                for idx, entry in enumerate(outputs):
+                    if not isinstance(entry, dict):
+                        errors.append(f"outputs[{idx}] must be a mapping")
+                        continue
+                    source = entry.get("source")
+                    dest = entry.get("dest")
+                    if not isinstance(source, str) or not source:
+                        errors.append(f"outputs[{idx}] requires a non-empty 'source' string")
+                    if not isinstance(dest, str) or not dest:
+                        errors.append(f"outputs[{idx}] requires a non-empty 'dest' string")
 
         return errors
 
@@ -233,13 +278,14 @@ class ScriptHandler(BaseHandler):
         jumphost = str((context.package_variables or {}).get("jumphost", "")).strip()
         if jumphost and not os.environ.get("INFRAFOUNDRY_ON_JUMPHOST"):
             return self._execute_on_jumphost(script_path, env, context, jumphost)
-        return self._execute_locally(script_path, working_dir, env)
+        return self._execute_locally(script_path, working_dir, env, context)
 
     def _execute_locally(
         self,
         script_path: Path,
         working_dir: Path,
         env: dict[str, str],
+        context: EventContext,
     ) -> EventResult:
         """Execute the script on the local host with real-time streaming.
 
@@ -247,6 +293,9 @@ class ScriptHandler(BaseHandler):
             script_path: Absolute path to the script to run
             working_dir: Working directory for the subprocess
             env: Environment variables for the subprocess
+            context: Event context; forwarded to ``_process_outputs`` so
+                declared ``outputs`` can be rendered against package
+                variables on successful completion.
 
         Returns:
             EventResult with captured stdout/stderr and exit status
@@ -301,6 +350,10 @@ class ScriptHandler(BaseHandler):
             duration = time.monotonic() - start_time
 
             success = process.returncode == 0
+            if success:
+                outputs = self.config.get("outputs") or []
+                if outputs:
+                    self._process_outputs(outputs, context)
             return EventResult(
                 success=success,
                 abort=not success and not self.config.get("continue_on_error", False),
@@ -456,6 +509,7 @@ class ScriptHandler(BaseHandler):
         # Step 3: run the script remotely with streaming output.
         stdout_lines: list[str] = []
         stderr_lines: list[str] = []
+        success = False
         try:
             try:
                 process = subprocess.Popen(  # nosec B603
@@ -541,6 +595,19 @@ class ScriptHandler(BaseHandler):
                     remote_warnings_path,
                     Path(local_warnings_path),
                 )
+            # Pull declared outputs back from the jumphost. Gated on
+            # ``success`` so failed runs don't ship partial artifacts; run
+            # before cleanup so the remote tmp dir still exists. All scp
+            # failures are non-fatal and surface as warnings.
+            if success:
+                outputs = self.config.get("outputs") or []
+                if outputs:
+                    self._process_outputs(
+                        outputs,
+                        context,
+                        jumphost=jumphost,
+                        ssh_opts=ssh_opts,
+                    )
             self._cleanup_remote(cleanup_cmd)
 
     def _cleanup_remote(self, cleanup_cmd: list[str]) -> None:
@@ -643,6 +710,169 @@ class ScriptHandler(BaseHandler):
                 staging_path.unlink(missing_ok=True)
             except OSError as e:
                 logger.debug("removing staged remote warnings failed (ignored): %s", e)
+
+    def _process_outputs(
+        self,
+        outputs: list[dict[str, Any]],
+        context: EventContext,
+        *,
+        jumphost: str | None = None,
+        ssh_opts: list[str] | None = None,
+    ) -> None:
+        """Copy declared script outputs back to the operator's workstation.
+
+        Runs after a script handler reports success. Each entry's ``source``
+        and ``dest`` are Jinja2-rendered against the package variables, both
+        must resolve to absolute paths, and the destination's parent
+        directory is created before the copy. When ``jumphost`` is provided
+        the transport is ``scp`` (one invocation per entry); otherwise the
+        copy is local (``shutil.copy2``). All failure modes — template
+        errors, non-absolute paths, missing sources, scp non-zero, permission
+        issues — are non-fatal: they emit a warning via
+        :func:`infrafoundry.core.warnings.emit_warning` and the loop
+        continues to the next entry.
+
+        Args:
+            outputs: The validated (possibly empty) ``outputs`` list from the
+                handler config.
+            context: The event context; ``package_variables`` is used as the
+                Jinja2 template context.
+            jumphost: SSH destination when the script ran on a jumphost.
+                ``None`` for local execution.
+            ssh_opts: Shared ssh options (e.g.
+                ``["-o", "StrictHostKeyChecking=no"]``). Only used when
+                ``jumphost`` is set.
+        """
+        if not outputs:
+            return
+
+        template_env = create_jinja2_env(undefined=jinja2.Undefined)
+        template_context = dict(context.package_variables or {})
+
+        for entry in outputs:
+            raw_source = entry.get("source", "")
+            raw_dest = entry.get("dest", "")
+            try:
+                rendered_source = template_env.from_string(raw_source).render(**template_context)
+                rendered_dest = template_env.from_string(raw_dest).render(**template_context)
+            except jinja2.TemplateError as exc:
+                message = (
+                    f"failed to render output template "
+                    f"(source={raw_source!r}, dest={raw_dest!r}): {exc}"
+                )
+                logger.debug(message)
+                emit_warning("script_handler_outputs", message)
+                continue
+
+            if not self._is_absolute_output_path(rendered_source):
+                message = f"output source must be an absolute path (got {rendered_source!r})"
+                logger.debug(message)
+                emit_warning("script_handler_outputs", message)
+                continue
+            if not self._is_absolute_output_path(rendered_dest):
+                message = f"output dest must be an absolute path (got {rendered_dest!r})"
+                logger.debug(message)
+                emit_warning("script_handler_outputs", message)
+                continue
+
+            # Expand ~ on the operator-side dest only. ``source`` is either
+            # local (also operator-side, where expanding ~ is also fine) or
+            # on the jumphost, in which case ``scp`` will expand ~ against
+            # the remote user's home for us.
+            local_dest = Path(rendered_dest).expanduser()
+            try:
+                local_dest.parent.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                message = f"failed to create parent directory for {local_dest}: {exc}"
+                logger.debug(message)
+                emit_warning("script_handler_outputs", message)
+                continue
+
+            if jumphost is None:
+                self._process_output_local(rendered_source, local_dest)
+            else:
+                self._process_output_remote(
+                    jumphost,
+                    ssh_opts or [],
+                    rendered_source,
+                    local_dest,
+                )
+
+    @staticmethod
+    def _is_absolute_output_path(value: str) -> bool:
+        """Return True if ``value`` looks like an absolute path for outputs.
+
+        Absolute paths start with ``/``; ``~``-prefixed paths (``~`` alone,
+        ``~/...``) are also accepted because they're resolvable either by
+        :py:meth:`pathlib.Path.expanduser` on the operator side or by the
+        remote shell when handed to ``scp``.
+        """
+        return value.startswith("/") or value.startswith("~")
+
+    def _process_output_local(self, source: str, dest: Path) -> None:
+        """Copy a single declared output between two local paths.
+
+        Args:
+            source: Rendered source path (absolute; ``~`` accepted).
+            dest: Rendered destination path, already ``expanduser``'d.
+        """
+        source_path = Path(source).expanduser()
+        if source_path == dest:
+            logger.debug("output source == dest (%s); skipping local copy", dest)
+            return
+        if not source_path.exists():
+            message = f"output source not found: {source_path}"
+            logger.debug(message)
+            emit_warning("script_handler_outputs", message)
+            return
+        try:
+            shutil.copy2(source_path, dest)
+        except OSError as exc:
+            message = f"failed to copy {source_path} -> {dest}: {exc}"
+            logger.debug(message)
+            emit_warning("script_handler_outputs", message)
+
+    def _process_output_remote(
+        self,
+        jumphost: str,
+        ssh_opts: list[str],
+        source: str,
+        dest: Path,
+    ) -> None:
+        """Fetch a single declared output from the jumphost via ``scp``.
+
+        Args:
+            jumphost: SSH destination (``user@host`` or alias).
+            ssh_opts: Shared ssh options reused from the parent handler.
+            source: Absolute path on the jumphost. May contain ``~``, which
+                the remote shell expands.
+            dest: Destination path on the operator's workstation, already
+                ``expanduser``'d and with its parent created.
+        """
+        scp_cmd = [
+            "scp",
+            *ssh_opts,
+            f"{jumphost}:{source}",
+            str(dest),
+        ]
+        try:
+            result = subprocess.run(  # nosec B603
+                scp_cmd,
+                capture_output=True,
+                timeout=60,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            message = f"scp of output {source} -> {dest} failed: {exc}"
+            logger.debug(message)
+            emit_warning("script_handler_outputs", message)
+            return
+        if result.returncode != 0:
+            stderr_text = result.stderr.decode(errors="replace").strip() if result.stderr else ""
+            message = (
+                f"scp of output {source} -> {dest} returned {result.returncode}: {stderr_text}"
+            )
+            logger.debug(message)
+            emit_warning("script_handler_outputs", message)
 
     def _read_stream(
         self,
