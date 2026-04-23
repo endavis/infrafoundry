@@ -40,7 +40,7 @@ from settings import (  # noqa: E402
     get_template_commits_since,
     get_template_latest_commit,
 )
-from utils import Colors, Logger, prompt, prompt_confirm, validate_package_name  # noqa: E402
+from utils import Colors, Logger, prompt, validate_package_name  # noqa: E402
 
 # Import cleanup utilities (optional - may not exist if already cleaned)
 try:
@@ -307,27 +307,9 @@ def run_action(
         return 1
 
 
-def _copy_template_adrs(template_dir: Path, project_dir: Path) -> int:
-    """Copy template ADR files (9*.md) into the project's decisions directory.
-
-    Args:
-        template_dir: Path to docs/template/decisions/ in the cloned project.
-        project_dir: Path to docs/decisions/ in the cloned project.
-
-    Returns:
-        Number of files copied.
-    """
-    import shutil
-
-    copied = 0
-    for adr_file in sorted(template_dir.glob("9*.md")):
-        shutil.copy2(adr_file, project_dir / adr_file.name)
-        copied += 1
-    return copied
-
-
 def action_create_project(manager: SettingsManager, dry_run: bool, *, yes: bool = False) -> int:
     """Create a new project from the template."""
+    del yes  # Kept for action_* signature uniformity; no confirmation prompts remain.
     Logger.header("Creating New Project from Template")
 
     settings = manager.settings
@@ -379,23 +361,6 @@ def action_create_project(manager: SettingsManager, dry_run: bool, *, yes: bool 
         # Clone and configure locally BEFORE branch protection
         setup.clone_repository()
 
-        # Offer to copy template ADRs into project decisions
-        template_adrs_dir = Path.cwd() / "docs" / "template" / "decisions"
-        project_adrs_dir = Path.cwd() / "docs" / "decisions"
-        # When yes=True, skip prompt and default to False (don't copy ADRs)
-        should_copy_adrs = (
-            not yes
-            and template_adrs_dir.exists()
-            and project_adrs_dir.exists()
-            and prompt_confirm(
-                "Include template ADRs in project decisions directory?",
-                default=False,
-            )
-        )
-        if should_copy_adrs:
-            count = _copy_template_adrs(template_adrs_dir, project_adrs_dir)
-            Logger.info(f"Copied {count} template ADR(s) to docs/decisions/")
-
         setup.configure_placeholders()
         setup.setup_development_environment()
 
@@ -430,11 +395,12 @@ def action_create_project(manager: SettingsManager, dry_run: bool, *, yes: bool 
             )
             subprocess.run(["git", "push"], cwd=project_dir, check=True)
 
-        # Now configure branch protection and other GitHub settings
+        # Now configure branch protection and other GitHub settings.
+        # CodeQL scanning is NOT set up here: it runs from the committed
+        # .github/workflows/codeql.yml workflow that was cloned with the repo.
         setup.configure_branch_protection()
         setup.replicate_labels()
         setup.enable_github_pages()
-        setup.configure_codeql()
 
         setup.print_manual_steps()
 
@@ -473,7 +439,7 @@ def action_check_updates(manager: SettingsManager, dry_run: bool) -> int:
         template_dir = Path("tmp/extracted/pyproject-template-main")
         if template_dir.exists():
             commit_file = template_dir / ".template_commit"
-            commit_file.write_text(f"{latest[0]}\n{latest[1]}\n")
+            commit_file.write_text(f"{latest[0]}\n{latest[1]}\n", encoding="utf-8")
             print()
             Logger.info("After reviewing changes, use option [5] to mark as synced.")
 
@@ -524,7 +490,6 @@ def action_repo_settings(manager: SettingsManager, dry_run: bool) -> int:
         Logger.info("  - Branch protection rulesets")
         Logger.info("  - Labels")
         Logger.info("  - GitHub Pages")
-        Logger.info("  - CodeQL code scanning")
         return 0
 
     # Import repo_settings module for repository configuration
@@ -567,7 +532,7 @@ def action_mark_synced(manager: SettingsManager, dry_run: bool, *, yes: bool = F
         return 1
 
     # Read commit info from the reviewed template
-    lines = commit_file.read_text().strip().split("\n")
+    lines = commit_file.read_text(encoding="utf-8").strip().split("\n")
     if len(lines) < 2:
         Logger.error("Invalid commit file format")
         return 1
