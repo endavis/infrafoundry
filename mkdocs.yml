@@ -121,6 +121,7 @@ nav:
     - Coding Standards: development/coding-standards.md
     - CI/CD Testing: development/ci-cd-testing.md
     - Release & Automation: development/release-and-automation.md
+    - pyproject-template Divergences: development/pyproject-template-divergences.md
     - Implementing Secret Providers: development/implementing-secret-providers.md
     - Secrets Handling: development/security/secrets-handling.md
 
