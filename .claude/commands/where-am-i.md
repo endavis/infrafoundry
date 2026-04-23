@@ -30,7 +30,7 @@ Based on the branch name, determine the workflow state:
    ```
 3. Check for a plan comment:
    ```bash
-   gh api repos/{owner}/{repo}/issues/<number>/comments --jq '.[].body' | grep "## Implementation Plan for"
+   gh api repos/{owner}/{repo}/issues/<number>/comments --jq '.[].body' | grep -E "^#+ Implementation Plan for"
    ```
 4. Check for uncommitted changes:
    ```bash

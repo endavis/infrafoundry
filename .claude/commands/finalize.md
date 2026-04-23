@@ -59,7 +59,8 @@ Use the Task tool with `subagent_type: "general-purpose"` and provide it with th
 
 5. **Draft the PR description** and write it to a temp file:
    - Read `.github/pull_request_template.md` for structure
-   - Write the PR body to `/tmp/pr-body.md`
+   - Run `mkdir -p tmp/agents/claude` to ensure the directory exists
+   - Write the PR body to `tmp/agents/claude/pr-body-issue-<n>.md`
    - The body MUST include `Addresses #<issue-number>`
 
 6. **Return** a summary of:
@@ -67,7 +68,7 @@ Use the Task tool with `subagent_type: "general-purpose"` and provide it with th
    - ADR changes made (if any)
    - Suggested commit message following conventional format: `<type>: <subject>`
    - Suggested PR title following conventional format: `<type>: <subject>`
-   - Path to the PR body file (`/tmp/pr-body.md`)
+   - Path to the PR body file (`tmp/agents/claude/pr-body-issue-<n>.md`)
 
 ### Step 3: Commit and create PR
 
@@ -78,7 +79,8 @@ After the agent returns, in the main context:
 3. **Only after user confirms:**
    - Stage files: `git add <specific files>` (include all changed files from implementation and review/fix cycle)
    - Commit with the approved message
-   - Create PR: `doit pr --title="<type>: <subject>" --body-file=/tmp/pr-body.md`
+   - Create PR: `doit pr --title="<type>: <subject>" --body-file=tmp/agents/claude/pr-body-issue-<n>.md`
+   - Delete the temp file: `rm tmp/agents/claude/pr-body-issue-<n>.md`
 4. **Report** the PR URL to the user
 
 **IMPORTANT:** Do NOT commit or create the PR without explicit user confirmation.

@@ -18,7 +18,7 @@ gh issue view $ARGUMENTS --json number,title,state,labels
 ### Step 2: Check for existing plans
 
 ```bash
-gh issue view $ARGUMENTS --json comments --jq '.comments[].body' | grep -l "## Implementation Plan for"
+gh issue view $ARGUMENTS --json comments --jq '.comments[].body' | grep -lE "^#+ Implementation Plan for"
 ```
 
 - If plan comments already exist, warn the user:
