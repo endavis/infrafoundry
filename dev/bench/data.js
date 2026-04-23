@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776971220206,
+  "lastUpdate": 1776973683599,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6944,6 +6944,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006718503801652311",
             "extra": "mean: 103.72966307539718 usec\nrounds: 2042"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "965c40b15257ad8ce6877b4a5d64478d6dcf4f45",
+          "message": "chore: sync remaining doit tooling and hook updates from pyproject-template (merges PR #686, addresses #683)",
+          "timestamp": "2026-04-23T20:47:22+01:00",
+          "tree_id": "e34ae6e7728566505af6350d599696cf9d47c67a",
+          "url": "https://github.com/endavis/infrafoundry/commit/965c40b15257ad8ce6877b4a5d64478d6dcf4f45"
+        },
+        "date": 1776973682633,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7262.56939466147,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010760049005139075",
+            "extra": "mean: 137.69231599151047 usec\nrounds: 2345"
           }
         ]
       }
