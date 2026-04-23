@@ -24,6 +24,7 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 - **NEVER implement based on a question.** Wait for explicit "Do it" or "Proceed".
 - **Stop & Verify:** If the user says "Stop", "Wait", "Hold on", "Cancel", "Wrong", or "No", immediately halt and ask for clarification.
 - **Summary Before Commit:** At the end of any implementation (docs, fix, feature, chore, etc.), summarize what was changed for the user before committing and wait for the user's explicit instruction to commit the changes.
+- **Failing Tests:** Never modify a test to make it pass. Stop, explain *why* the test broke (what behavior changed, what the test was asserting), and discuss with the user whether the code or the test should change. A failing test is a signal, not a problem to silence.
 
 ### 2. Task Planning Protocol
 - **Plan First:** Before writing code, you MUST present a checklist:
@@ -58,6 +59,7 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 | **Committing** | `.github/CONTRIBUTING.md` (Commit Guidelines) | `<type>: <subject>` format. |
 | **New Dependency** | `.github/CONTRIBUTING.md` (Dependencies) | "Ask First" policy. |
 | **Creating Code** | `.claude/CLAUDE.md` (TodoWrite) | Plan -> Test -> Code loop. |
+| **Generating new code** | `docs/development/ai/architectural-conventions.md` | Layering rules and anti-patterns to avoid before writing code. |
 | **Architectural Decision** | `docs/decisions/README.md` | Check for related ADRs to update. |
 
 ### 6. Decision Framework
@@ -108,6 +110,9 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 | **Issue Templates** | `.github/ISSUE_TEMPLATE/*.yml` | Required fields for issues. |
 | **PR Template** | `.github/pull_request_template.md` | Required PR structure. |
 | **Claude Instructions** | `.claude/CLAUDE.md` | TodoWrite usage, workflows. |
+| **Architecture & Layering** | `docs/development/ai/architectural-conventions.md` | Imperative-form rules for AI agents. |
+| **Slash Commands & Workflows** | `docs/development/ai/slash-commands.md` | Reference for /plan-issue, /implement, /finalize, dual-agent workflow. |
+| **AI Agent Walkthrough** | `docs/development/ai/first-5-minutes.md` | Narrative onboarding for the AI agent workflow (plan → implement → review → PR → merge). |
 
 ## Repository & Architecture
 
@@ -318,6 +323,7 @@ The tool hierarchy (prefer higher over lower):
 | Create PRs | `doit pr` | `gh pr create` |
 | Merge PRs | `doit pr_merge` | `gh pr merge` |
 | Create ADRs | `doit adr` | Manual file creation |
+| Sync GitHub labels | `doit labels_sync` | `gh label create` / `gh label edit` manually |
 | Commit (interactive) | `doit commit` | `git commit` without format |
 | Install/add packages | `uv add <pkg>` | `pip install` |
 | Sync dependencies | `uv sync` | `pip install -r` |
@@ -327,8 +333,8 @@ The tool hierarchy (prefer higher over lower):
 | GitHub API queries | `gh api` | `curl` to GitHub API |
 | Build docs | `doit docs_build` | `mkdocs build` directly |
 | Serve docs locally | `doit docs_serve` | `mkdocs serve` directly |
-| Release (production) | `doit release` | Manual tag + push |
-| Release (pre-release) | `doit release_dev` | Manual tag + push |
+| Release | `doit release` | Manual changelog + PR |
+| Tag after release PR merge | `doit release_tag` | Manual tag + push |
 | Mutation testing | `doit mutate` | `mutmut` directly |
 | Generate SBOM | `doit sbom` | `cyclonedx-py` directly |
 
@@ -365,12 +371,7 @@ gh pr list --state open
 
 ### Dependabot PRs
 
-Patch- and minor-bump dependabot PRs are handled automatically by the
-`dependabot-automerge.yml` workflow (enables GitHub auto-merge and adds
-`ready-to-merge` once eligibility checks pass). The manual flow below
-applies only to PRs the workflow skips — major-version bumps, PRs the
-workflow labels with `automerge-blocked`, or sensitive-dependency
-updates listed in `.github/automerge-config.json`.
+Dependabot PRs that pass CI are now auto-merged by `.github/workflows/dependabot-automerge.yml`. The manual workflow below applies only to PRs the bot skips (major bumps, sensitive deps, or PRs labeled `automerge-blocked`). See [docs/development/dependabot-automerge.md](docs/development/dependabot-automerge.md) for details.
 
 When merging dependabot PRs that are behind `main`, **never** use the GitHub API `update-branch` endpoint or local rebase to update the branch. This strips the verified commit signatures from dependabot commits, which are required by branch protection rules.
 
@@ -384,6 +385,8 @@ Dependabot will rebase the branch and re-sign the commits, preserving verified s
 
 #### Dependabot PR merge workflow
 
+When merging dependabot PRs that are behind `main`, use this procedure:
+
 1. **Request rebase** via dependabot's own action (preserves signed commits):
    ```bash
    gh pr comment <number> --body "@dependabot rebase"
@@ -391,7 +394,10 @@ Dependabot will rebase the branch and re-sign the commits, preserving verified s
 
 2. **Wait for force-push** — poll until the PR's commit parent matches current `main` HEAD:
    ```bash
+   # Get current main HEAD
    main_sha=$(gh api repos/{owner}/{repo}/git/ref/heads/main --jq '.object.sha[0:7]')
+
+   # Poll PR commit parent until it matches
    gh api repos/{owner}/{repo}/pulls/<number>/commits --jq '.[0].parents[0].sha[0:7]'
    ```
    This takes 1–3 minutes. **Do not** request a second rebase until the first one lands.
@@ -420,6 +426,19 @@ AI agents with native file tools (Read, Grep, Glob, Edit, Write) **must** prefer
 
 Native tools provide better visibility, review capabilities, and error handling for the user.
 
+### AI Config Directories
+
+Each supported AI CLI has a dedicated config directory at the repo root:
+
+| CLI | Config Directory | Notes |
+| :--- | :--- | :--- |
+| Claude Code | `.claude/` | Commands, agents, settings. Primary source of slash commands. |
+| Gemini CLI | `.gemini/` | Commands and settings. Output-only commands (orchestrated by Claude). |
+| GitHub Copilot CLI | `.copilot/` | Config directory. Skills auto-discovered from `.claude/commands/`. Hook wired in `.github/hooks/copilot-hooks.json`. |
+| Codex CLI | `.codex/` | `config.toml` only (command approval policies). No slash commands. |
+
+Copilot CLI does **not** need a `commands/` subdirectory: it discovers skills from `.claude/commands/` automatically, so the full workflow (`/plan-issue`, `/implement`, `/finalize`, etc.) works out of the box.
+
 ### Temporary Files
 
 AI agents **must never** write temporary files to generic locations like `/tmp/`. Instead, use the project-scoped directory:
@@ -445,7 +464,7 @@ Where `<agent-type>` is one of: `claude`, `gemini`, `copilot`, `codex`, or the r
 - **No Speculation:** Don't read files you don't need.
 
 ## Critical Reminders
-- **Flow:** Issue (`doit issue`) -> Branch -> Commit -> PR (`doit pr`) -> Merge (`doit pr_merge`). NEVER commit to main.
+- **Flow:** Issue (`doit issue`) -> **`git checkout main && git pull`** -> Branch -> Commit -> PR (`doit pr`) -> Merge (`doit pr_merge`). NEVER commit to main. Pull `main` before branching — local `main` may be behind the remote (e.g., after dependabot PRs merged via the web UI). `doit pr` enforces this by aborting if the branch is behind `origin/main`; pass `--no-update-check` to override.
 - **Scope:** Never mix refactoring, features, and docs in one PR. Create separate branches.
 - **Verify:** Check file paths (`ls`) and branch (`git status`) before assuming they exist.
 - **Security:** NEVER bypass security checks (e.g., `--no-verify`, ignoring secrets).
@@ -453,13 +472,13 @@ Where `<agent-type>` is one of: `claude`, `gemini`, `copilot`, `codex`, or the r
 - **Integrity:** Respect architectural patterns (modularity) over "quick fixes".
 - **Local State:** Protect user config (e.g., `.envrc.local`, settings). Do not revert/delete without backup.
 - **Version:** Source of truth is Git tags. Never edit `pyproject.toml` version.
-- **Tests:** Creating code = Creating tests. No exceptions.
+- **Tests:** Creating code = Creating tests. No exceptions. Never modify a failing test to make it pass — stop, explain why it broke, and discuss with the user whether the code or the test should change.
 - **Commits:** One logical change per commit. Use conventional commits.
 - **Releases:** Never run `doit release` without explicit command.
-- **PRs:** Use `doit pr` to create PRs and `doit pr_merge` to merge with proper commit format. Issues are not automatically closed. Ask the user if they would like the related issue closed.
-- **The Merge Gate action:** is a manual action for the user to add to a PR. It requires the ready-to-merge label and should never be added by automation.
-- **Issues:** Use `doit issue --type=<type>` to create issues (types: feature, bug, refactor, doc, chore). Labels are auto-applied. Manually close after PR merge with comment "Addressed in PR #XXX". Issues are not closed automatically when PRs are merged.
-- **ADRs:** When implementing architectural decisions (typically `feat` or `refactor`, rarely `fix`), update related ADRs in `docs/decisions/` to add the issue link. Create new ADRs for significant decisions using `doit adr`. Every ADR must link to the documentation in `docs/` that describes the implementation. Doc and chore issues do not need ADRs. Issues with the `needs-adr` label require an ADR before the PR can be merged.
+- **PRs:** Use `doit pr` to create PRs and `doit pr_merge` to merge with proper commit format. Issues are not automatically closed. Ask the user if they would like the related issue closed — pass `--auto-close` to `doit pr_merge` to close linked issues in one step.
+- **The Merge Gate action:** is a manual action for the user to add to a PR. It requires the ready-to-merge label and should never be added by automation. Exception: the dependabot auto-merge workflow (`.github/workflows/dependabot-automerge.yml`) applies the `ready-to-merge` label to qualifying dependabot PRs only.
+- **Issues:** Use `doit issue --type=<type>` to create issues (types: feature, bug, refactor, docs, chore). Labels are auto-applied. Manually close after PR merge with comment "Addressed in PR #XXX". Issues are not closed automatically when PRs are merged.
+- **ADRs:** When implementing architectural decisions (typically `feat` or `refactor`, rarely `fix`), update related ADRs in `docs/decisions/` to add the issue link. Create new ADRs for significant decisions using `doit adr`. Every ADR must link to the documentation in `docs/` that describes the implementation. Docs and chore issues do not need ADRs. Issues with the `needs-adr` label require an ADR before the PR can be merged.
 
 ## Development Workflow
 
@@ -513,9 +532,9 @@ doit issue --type=bug --title="bug: crash on empty config" \
 doit issue --type=refactor --title="refactor: extract validation" \
   --body="## Current Code Issue\nDuplicated logic\n\n## Proposed Improvement\nExtract to mixin"
 
-# Documentation (requires: Documentation Type, Description)
-doit issue --type=doc --title="doc: add provider guide" \
-  --body="## Documentation Type\nNew guide or tutorial\n\n## Description\nAdd guide for creating custom providers"
+# Documentation (requires: Description)
+doit issue --type=docs --title="docs: add provider guide" \
+  --body="## Description\nAdd guide for creating custom providers"
 
 # Chore (requires: Description)
 doit issue --type=chore --title="chore: update dependencies" \
@@ -528,10 +547,13 @@ doit pr --title="feat: add caching" --body="## Summary\nAdded caching support\n\
 doit pr --title="fix: handle null" --body-file=pr.md
 ```
 
+`doit pr` auto-pushes the current branch to `origin` if it has no upstream. Pass `--no-push` to skip the auto-push (the task aborts instead).
+
 #### PR Merge
 ```bash
-doit pr_merge                    # Merge PR for current branch
-doit pr_merge --pr=123           # Merge specific PR
+doit pr_merge                        # Merge PR for current branch
+doit pr_merge --pr=123               # Merge specific PR
+doit pr_merge --pr=123 --auto-close  # Also close linked issues after merge
 ```
 
 #### ADR Creation

@@ -1,4 +1,4 @@
-# Contributing to Package Name
+# Contributing to InfraFoundry
 
 Thank you for your interest in contributing to this project! We welcome contributions from everyone.
 
@@ -42,8 +42,8 @@ This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDU
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/package_name.git
-cd package_name
+git clone https://github.com/YOUR_USERNAME/infrafoundry.git
+cd infrafoundry
 
 # Set up direnv
 direnv allow
@@ -104,6 +104,12 @@ We welcome many types of contributions:
 - **Docstrings:** Google-style for all public APIs
 - **Type hints:** Required for all public functions/methods
 - **Naming:** `snake_case` for functions/variables, `PascalCase` for classes
+- **File I/O:** Always pass `encoding="utf-8"` to `Path.read_text()`,
+  `Path.write_text()`, text-mode `open()`, and `tempfile.NamedTemporaryFile()`.
+  Omitting the kwarg falls back to `locale.getpreferredencoding()`, which is
+  `cp1252` on Windows and breaks silently on non-ASCII content. Binary-mode
+  calls (`"rb"`, `"wb"`, `"ab"`) and `tarfile.open(...)` do not take an
+  encoding kwarg. Enforced by ruff's `PLW1514` rule.
 
 ### Type Hints
 
@@ -170,7 +176,7 @@ import click
 import pytest
 
 # Local
-from package_name import module
+from infrafoundry import module
 ```
 
 ## Testing Guidelines
@@ -366,10 +372,6 @@ If your repository requires PR approvals (branch protection → "Require approva
 
 The label and approval are independent checks - both must pass. The label serves as an explicit final confirmation after review and CI are complete.
 
-**Dependabot PRs:**
-
-Patch- and minor-bump dependabot PRs are auto-labeled `ready-to-merge` and have GitHub auto-merge enabled by the `dependabot-automerge.yml` workflow (subject to the sensitive-dependency blocklist and blocking labels in `.github/automerge-config.json`). The manual flow above only applies to major-version bumps or PRs labeled `automerge-blocked` / `do-not-merge`.
-
 ### After Merge
 
 - Delete your branch
@@ -388,7 +390,7 @@ This project uses **semantic versioning** derived automatically from git tags vi
 
 - **No manual version editing** - Version is determined by git tags
 - **Tag format:** `v<major>.<minor>.<patch>` (e.g., `v1.2.3`)
-- **Pre-release format:** `v<version>-<type><n>` (e.g., `v1.2.3-alpha0`, `v1.2.3-beta1`, `v1.2.3-rc0`)
+- **Pre-release format:** PEP440 `v<version><type><n>` (e.g., `v1.2.3a0`, `v1.2.3b1`, `v1.2.3rc0`, `v1.2.3.dev0`) — emitted by commitizen via `doit release --prerelease=...`
 
 Version bumping is handled by [commitizen](https://commitizen-tools.github.io/commitizen/) based on conventional commit history:
 
@@ -398,110 +400,78 @@ Version bumping is handled by [commitizen](https://commitizen-tools.github.io/co
 | `feat:` | Minor (1.0.0 → 1.1.0) |
 | `BREAKING CHANGE:` | Major (1.0.0 → 2.0.0) |
 
-### Pre-Release Workflow (TestPyPI)
+### Release Workflow
 
-Use pre-releases to test packages before official release:
-
-```bash
-# Create alpha release (default)
-doit release_dev
-
-# Create beta release
-doit release_dev --type=beta
-
-# Create release candidate
-doit release_dev --type=rc
-```
-
-**What `doit release_dev` does:**
-
-1. Verifies you're on the `main` branch
-2. Checks for uncommitted changes
-3. Pulls latest changes from remote
-4. Runs all checks (`doit check`)
-5. Bumps version with commitizen (e.g., `1.0.0` → `1.0.1-alpha0`)
-6. Updates CHANGELOG.md
-7. Creates git tag and pushes to GitHub
-8. **Triggers:** `.github/workflows/testpypi.yml`
-9. **Publishes to:** [TestPyPI](https://test.pypi.org/)
-
-**Testing from TestPyPI:**
+All releases — production and pre-release — go through a pull request.
+`doit release` opens the release PR; a reviewer merges it; `doit release_tag`
+then tags `main` and triggers the publish workflow. Direct-to-`main` release
+commands are not supported.
 
 ```bash
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ package-name
+# Step 1: open a release PR
+doit release                       # auto-detect next version from commits
+doit release --increment=major     # force MAJOR (1.0.0 → 2.0.0)
+doit release --increment=minor     # force MINOR
+doit release --increment=patch     # force PATCH
+doit release --prerelease=alpha    # open a pre-release PR (1.0.0 → 1.0.1a0)
+doit release --prerelease=beta
+doit release --prerelease=rc
+
+# --> reviewer merges the PR --
+
+# Step 2: tag main and trigger publish
+git checkout main
+git pull
+doit release_tag
 ```
 
-### Production Release Workflow (PyPI)
-
-There are two ways to release: **direct** (requires bypass permissions) or **PR-based** (works with branch protection).
-
-#### Option A: Direct Release (requires bypass permissions)
-
-```bash
-# Auto-detect version bump from commits
-doit release
-
-# Force a specific version bump
-doit release --increment=major    # 1.0.0 → 2.0.0
-doit release --increment=minor    # 1.0.0 → 1.1.0
-doit release --increment=patch    # 1.0.0 → 1.0.1
-```
+`--increment` and `--prerelease` can be combined to force a pre-release of a
+specific bump type (e.g. `--prerelease=alpha --increment=minor` → `1.1.0a0`).
+See [issue #475](https://github.com/endavis/pyproject-template/issues/475).
 
 **What `doit release` does:**
 
-1. Verifies you're on the `main` branch
-2. Checks for uncommitted changes
+1. Verifies you're on `main` with a clean working tree
+2. Validates `--prerelease` (must be empty, `alpha`, `beta`, or `rc`)
 3. Pulls latest changes from remote
 4. Validates merge commit format (governance check)
 5. Validates issue links in commits
 6. Runs all checks (`doit check`)
-7. Bumps version with commitizen (merges pre-releases into final version)
-8. Updates CHANGELOG.md (consolidates pre-release entries)
-9. Creates git tag and pushes to GitHub
-10. **Triggers:** `.github/workflows/release.yml`
-11. **Publishes to:** TestPyPI first, then PyPI
-
-> **Note:** This method pushes directly to `main` and requires bypass permissions. See [Setting Up Release Permissions](#setting-up-release-permissions).
-
-#### Option B: PR-Based Release (works with branch protection)
-
-```bash
-# Step 1: Create release PR (auto-detect version)
-doit release_pr
-
-# Or force a specific version bump
-doit release_pr --increment=major
-
-# Step 2: After PR is merged, create the tag
-doit release_tag
-```
-
-**What `doit release_pr` does:**
-
-1. Verifies you're on the `main` branch
-2. Determines next version using commitizen (`cz bump --get-next`)
-3. Creates a `release/vX.Y.Z` branch
-4. Updates CHANGELOG.md
-5. Commits and pushes the branch
-6. Creates a pull request
+7. Determines the next version using commitizen (`cz bump --get-next`)
+8. Creates a `release/vX.Y.Z` branch and updates `CHANGELOG.md`
+9. Commits the changelog, pushes the branch, and opens PR `release: vX.Y.Z`
 
 **What `doit release_tag` does:**
 
-1. Finds the most recently merged release PR
-2. Extracts the version from the PR title
-3. Creates a git tag on `main`
-4. Pushes the tag (triggers release workflow)
+1. Verifies you're on `main`, pulls latest changes
+2. Finds the most recently merged `release: vX.Y.Z` PR
+3. Extracts the version from the PR title (falls back to the branch name)
+4. Creates the git tag `vX.Y.Z` on `main`
+5. Pushes the tag
+6. **Triggers:** `.github/workflows/release.yml` (production) or
+   `.github/workflows/testpypi.yml` (pre-release)
+7. **Publishes to:** TestPyPI first, then PyPI for production tags; TestPyPI
+   only for pre-release tags
+
+**Testing a pre-release from TestPyPI:**
+
+```bash
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ infrafoundry==1.0.1a0
+```
 
 ### Workflow Triggers
 
 | Workflow | Trigger | Destination |
 |----------|---------|-------------|
-| `testpypi.yml` | Tag matching `v*-[a-zA-Z]*` (e.g., `v1.0.0-alpha0`) | TestPyPI only |
+| `testpypi.yml` | PEP440 pre-release tags: `v*a[0-9]*`, `v*b[0-9]*`, `v*rc[0-9]*`, `v*.dev[0-9]*` (e.g., `v1.0.0a0`) | TestPyPI only |
 | `release.yml` | Tag matching `v[0-9]+.[0-9]+.[0-9]+` (e.g., `v1.0.0`) | TestPyPI → PyPI |
 
 ### Setting Up Release Permissions
 
-The release commands (`doit release`, `doit release_dev`) commit directly to `main` and push tags. If your repository has branch protection rules requiring pull requests, you'll need to configure a bypass for automated releases.
+`doit release_tag` pushes the version tag directly to `main`. If your branch
+protection rules cover tag pushes, configure a bypass for the tagging step.
+The release PR itself is reviewed and merged through the normal PR flow, so
+no bypass is required for the commit and changelog changes.
 
 #### Organization Repositories: GitHub App (Recommended)
 
@@ -518,6 +488,9 @@ Create a dedicated GitHub App that can bypass branch protection:
 4. Set **Repository Permissions:**
    - **Contents:** Read and write (to push commits/tags)
    - **Metadata:** Read-only (required)
+   - **Pull requests:** Write (required for the dependabot auto-merge
+     workflow to apply the `ready-to-merge` label via the App — see
+     [Dependabot Auto-merge → Required GitHub App configuration](../docs/development/dependabot-automerge.md#required-github-app-configuration))
 5. Click **Create GitHub App**
 6. Note the **App ID** displayed on the app page
 7. Scroll down → **Generate a private key** → saves a `.pem` file
@@ -548,7 +521,7 @@ In your repo **Settings** → **Secrets and variables** → **Actions**:
 ```yaml
 - name: Generate release token
   id: app-token
-  uses: actions/create-github-app-token@v1
+  uses: actions/create-github-app-token@v3
   with:
     app-id: ${{ vars.RELEASE_APP_ID }}
     private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -606,35 +579,30 @@ In your repo **Settings** → **Secrets and variables** → **Actions**:
     fetch-depth: 0
 ```
 
-#### Alternative: Release via Pull Request
-
-If you prefer not to configure bypass permissions, use the PR-based release workflow described in [Option B: PR-Based Release](#option-b-pr-based-release-works-with-branch-protection):
-
-```bash
-# Step 1: Create release PR
-doit release_pr
-
-# Step 2: After PR is merged, create the tag
-doit release_tag
-```
-
 ### Release Checklist
 
-Before running a release:
+Before opening a release PR:
 
 - [ ] All CI checks pass on `main`
 - [ ] CHANGELOG.md is up to date (or will be auto-generated)
-- [ ] No uncommitted changes
+- [ ] No uncommitted changes on your working tree
 - [ ] You have push access to the repository
 - [ ] PyPI/TestPyPI environments are configured in GitHub
+
+After the release PR is merged:
+
+- [ ] `git checkout main && git pull`
+- [ ] `doit release_tag`
+- [ ] Monitor the publish workflow in GitHub Actions
+- [ ] Verify the new version on TestPyPI (pre-release) or PyPI (production)
 
 ### Typical Release Cycle
 
 1. **Development:** Features merged to `main` via PRs
-2. **Alpha testing:** `doit release_dev --type=alpha` → Test on TestPyPI
-3. **Beta testing:** `doit release_dev --type=beta` → Wider testing
-4. **Release candidate:** `doit release_dev --type=rc` → Final testing
-5. **Production:** `doit release` → Publish to PyPI
+2. **Alpha testing:** `doit release --prerelease=alpha` → merge PR → `doit release_tag` → Test on TestPyPI
+3. **Beta testing:** `doit release --prerelease=beta` → merge PR → `doit release_tag` → Wider testing
+4. **Release candidate:** `doit release --prerelease=rc` → merge PR → `doit release_tag` → Final testing
+5. **Production:** `doit release` → merge PR → `doit release_tag` → Publish to PyPI
 
 ### Troubleshooting
 
@@ -706,12 +674,12 @@ Every code change must be linked to a GitHub Issue. This ensures:
 doit issue --type=feature    # For new features
 doit issue --type=bug        # For bugs and defects
 doit issue --type=refactor   # For code refactoring
-doit issue --type=doc        # For documentation
+doit issue --type=docs       # For documentation
 doit issue --type=chore      # For maintenance tasks
 
 # Non-interactive: For AI agents or scripts
 doit issue --type=feature --title="Add export" --body-file=issue.md
-doit issue --type=doc --title="Add guide" --body="## Description\n..."
+doit issue --type=docs --title="Add guide" --body="## Description\n..."
 ```
 
 **Or use gh CLI directly:**
@@ -723,7 +691,7 @@ gh issue create --title "<description>" --label "enhancement" --body "..."
 - `feature` → `enhancement, needs-triage`
 - `bug` → `bug, needs-triage`
 - `refactor` → `refactor, needs-triage`
-- `doc` → `documentation, needs-triage`
+- `docs` → `documentation, needs-triage`
 - `chore` → `chore, needs-triage`
 
 **Required fields ensure complete information** - Fill all fields to provide context.
@@ -801,11 +769,6 @@ Features:
 **Merge commit format:**
 ```
 <type>: <subject> (merges PR #XX, addresses #YY)
-```
-
-**When PR is docs-only or doesn't complete the issue:**
-```
-<type>: <subject> (merges PR #XX)
 ```
 
 **Examples - Correct:**
@@ -917,7 +880,7 @@ ADRs provide context for why decisions were made, helping future contributors un
 
 ```bash
 # Add upstream remote (one-time setup)
-git remote add upstream https://github.com/original-owner/package_name.git
+git remote add upstream https://github.com/original-owner/infrafoundry.git
 
 # Fetch and merge upstream changes
 git checkout main
@@ -931,7 +894,7 @@ git push origin main
 If you have questions:
 
 1. Check the [README.md](README.md) and [AGENTS.md](AGENTS.md)
-2. Search existing [Issues](https://github.com/username/package_name/issues)
+2. Search existing [Issues](https://github.com/endavis/infrafoundry/issues)
 3. Open a new issue with the "question" label
 4. Join our discussions (if available)
 

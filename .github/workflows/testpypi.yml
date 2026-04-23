@@ -2,9 +2,14 @@ name: Publish to TestPyPI
 
 on:
   workflow_dispatch:
+  # PEP440 pre-release tag patterns. commitizen (used by doit release) emits
+  # these forms, not semver-style v*-alpha.* tags. See pyproject-template#659.
   push:
     tags:
-      - "v*-[a-zA-Z]*"
+      - "v*a[0-9]*"       # alpha: v0.1.0a0
+      - "v*b[0-9]*"       # beta: v0.1.0b1
+      - "v*rc[0-9]*"      # rc: v0.1.0rc0
+      - "v*.dev[0-9]*"    # dev: v0.1.0.dev2
 
 permissions:
   contents: read
@@ -23,9 +28,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - id: pv
+        uses: ./.github/actions/python-versions
+
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ steps.pv.outputs.newest }}
 
       - uses: astral-sh/setup-uv@v7
         with:

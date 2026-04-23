@@ -57,8 +57,6 @@ BLOCKED_WORKFLOW_COMMANDS = {
         "AI can help prepare (update changelog, verify CI) but not execute releases."
     ),
     ("doit", "release_tag"): "Releases must be run manually by the user, not by AI agents.",
-    ("doit", "release_dev"): "Releases must be run manually by the user, not by AI agents.",
-    ("doit", "release_pr"): "Releases must be run manually by the user, not by AI agents.",
 }
 
 # Governance labels that require human approval - AI should never add these

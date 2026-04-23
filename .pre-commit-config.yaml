@@ -30,6 +30,12 @@ repos:
         stages: [commit-msg]
         args: [--strict]
 
+  # GitHub Actions workflow linting
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
   # Local hooks using project's installed tools via uv
   # This ensures version consistency with pyproject.toml
   - repo: local
