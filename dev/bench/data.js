@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776969389806,
+  "lastUpdate": 1776971220206,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6913,6 +6913,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000021190024329101558",
             "extra": "mean: 113.85320502284004 usec\nrounds: 2190"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6c090ee3ba24e53c8eab479e9fd9716b0ccd7463",
+          "message": "chore: sync AI agent config, commands, and docs from pyproject-template (merges PR #685, addresses #677)",
+          "timestamp": "2026-04-23T20:06:23+01:00",
+          "tree_id": "bdefaf3e433d0dd95807f92b212c507cdfbf397c",
+          "url": "https://github.com/endavis/infrafoundry/commit/6c090ee3ba24e53c8eab479e9fd9716b0ccd7463"
+        },
+        "date": 1776971219377,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9640.443922710301,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006718503801652311",
+            "extra": "mean: 103.72966307539718 usec\nrounds: 2042"
           }
         ]
       }
