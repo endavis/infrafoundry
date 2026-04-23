@@ -1039,7 +1039,7 @@ requires-dist = [
     { name = "rich", specifier = ">=15.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.10" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
-    { name = "types-boto3", marker = "extra == 'dev'", specifier = ">=1.42.89" },
+    { name = "types-boto3", marker = "extra == 'dev'", specifier = ">=1.42.94" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.33.0.20260408" },
     { name = "vulture", marker = "extra == 'dev'", specifier = ">=2.0" },
@@ -2893,15 +2893,15 @@ wheels = [
 
 [[package]]
 name = "types-boto3"
-version = "1.42.89"
+version = "1.42.94"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore-stubs" },
     { name = "types-s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/7e/d6f80d04551e9a35cef72a5fbd51632f6d23ab90284361de4ec24f66f372/types_boto3-1.42.89.tar.gz", hash = "sha256:a6324906b70bd429e19d9d00078b4117df65b8e16fb79db177769e257d7d4805", size = 102973, upload-time = "2026-04-13T19:52:06.774Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/28/02/81e1a6f5869db25a3f6e3a1c570cc8ff609869883310b2fe9929629953f2/types_boto3-1.42.94.tar.gz", hash = "sha256:0d47b32e7e76ec520a80e891706ec939434e2665ba172ef3950476d02f3ffc1b", size = 102979, upload-time = "2026-04-22T21:30:54.897Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f2/ca/7be4914d8885341ec69647ad6b8c5bd3fc1b571ec60151d4991211d35e28/types_boto3-1.42.89-py3-none-any.whl", hash = "sha256:d16f9929e85e1f9b81215641210fad489e090c588b8b1917644cac24a63ebd85", size = 70564, upload-time = "2026-04-13T19:52:02.734Z" },
+    { url = "https://files.pythonhosted.org/packages/14/81/55020b7b414751a9752c923ca27ab211e6b1cd4909bd1fa599413e716198/types_boto3-1.42.94-py3-none-any.whl", hash = "sha256:f6c9acd1c9c4e0fdd66a13fd6d206b30d8166c439b2e08a685ab5558ad55c721", size = 70565, upload-time = "2026-04-22T21:30:51.439Z" },
 ]
 
 [[package]]
