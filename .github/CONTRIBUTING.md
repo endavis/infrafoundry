@@ -366,6 +366,10 @@ If your repository requires PR approvals (branch protection → "Require approva
 
 The label and approval are independent checks - both must pass. The label serves as an explicit final confirmation after review and CI are complete.
 
+**Dependabot PRs:**
+
+Patch- and minor-bump dependabot PRs are auto-labeled `ready-to-merge` and have GitHub auto-merge enabled by the `dependabot-automerge.yml` workflow (subject to the sensitive-dependency blocklist and blocking labels in `.github/automerge-config.json`). The manual flow above only applies to major-version bumps or PRs labeled `automerge-blocked` / `do-not-merge`.
+
 ### After Merge
 
 - Delete your branch

@@ -129,3 +129,19 @@ customization a reviewer must verify survived the merge.
 When reviewing a sync PR that touches any of the above, scroll through the diff
 with the spot-check note in mind. If the customization is missing from the
 proposed change, the merge lost it — push back and ask for a rework.
+
+## 4. Temporarily deferred files
+
+Unlike the categories above, these files **will** be adopted — just not in the
+current sync phase. They are listed here so a reviewer opening this doc after
+Phase A does not assume they were skipped permanently. Remove each entry once
+the referenced follow-up phase lands.
+
+- `.github/workflows/ci-full-matrix.yml` and
+  `tests/test_ci_full_matrix_workflow.py` — deferred from Phase A to Phase E
+  of sync tracker #673. Upstream `ci-full-matrix.yml` calls
+  `./.github/workflows/ci.yml` with `with: full_matrix: true`, but our
+  `ci.yml` does not declare that `workflow_call` input. Phase E will add the
+  input (and switch the label-check logic to read from it), at which point
+  these two files can be adopted verbatim. Remove this note once Phase E
+  lands.
