@@ -391,7 +391,7 @@ class SettingsManager:
         }
 
         settings_path = self.root / SETTINGS_FILE
-        with settings_path.open("w") as f:
+        with settings_path.open("w", encoding="utf-8") as f:
             f.write(_toml_serialize(data))
 
         Logger.success(f"Settings saved to {SETTINGS_FILE}")

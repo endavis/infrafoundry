@@ -9,6 +9,7 @@ Optional: skip final confirmation with --yes.
 
 import argparse
 import shutil
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 
@@ -88,7 +89,7 @@ def guess_github_user(pyproject_data: dict[str, object]) -> str:
 def read_readme_title(readme_path: Path) -> str:
     if not readme_path.exists():
         return ""
-    for line in readme_path.read_text().splitlines():
+    for line in readme_path.read_text(encoding="utf-8").splitlines():
         if line.startswith("#"):
             return line.lstrip("#").strip()
     return ""
@@ -157,6 +158,78 @@ def require(value: str, label: str) -> str:
     raise SystemExit(
         f"❌ Missing required value for {label} (supply in pyproject.toml or via prompt)."
     )
+
+
+def _git_has_version_tag() -> bool:
+    """Return ``True`` if the current repo has at least one ``v*`` tag."""
+    result = subprocess.run(  # nosec B603 B607
+        ["git", "tag", "--list", "v*"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return bool(result.stdout.strip())
+
+
+def _git_root_commit() -> str | None:
+    """Return the root commit SHA of the current repo, or ``None`` if unavailable.
+
+    Returns ``None`` if not inside a git repo, the repo has no commits, or the
+    ``git rev-list`` call fails for any other reason.
+    """
+    result = subprocess.run(  # nosec B603 B607
+        ["git", "rev-list", "--max-parents=0", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return lines[0] if lines else None
+
+
+def seed_baseline_tag() -> None:
+    """Seed a ``v0.0.0`` tag on the root commit if no ``v*`` tag exists.
+
+    Gives commitizen an anchor to compute pre-release versions against. Without
+    it, ``doit release --prerelease=alpha`` refuses on a tagless repo (guard
+    from issue #448). Idempotent: skips if any ``v*`` tag already exists. Skips
+    silently (with a visible message) if not inside a git repo or if there are
+    no commits yet, so the user can run ``git init && git commit`` first and
+    seed manually with ``git tag v0.0.0 <root-commit>``.
+    """
+    if not Path(".git").exists():
+        Logger.info(
+            "Skipping v0.0.0 baseline tag: not a git repo yet (run `git init` "
+            "and commit first, then seed manually: "
+            "`git tag v0.0.0 <root-commit>`)"
+        )
+        return
+
+    if _git_has_version_tag():
+        Logger.info("Skipping v0.0.0 baseline tag: a v* tag already exists")
+        return
+
+    root = _git_root_commit()
+    if root is None:
+        Logger.info(
+            "Skipping v0.0.0 baseline tag: no commits yet "
+            "(seed manually after your first commit: `git tag v0.0.0 <root-commit>`)"
+        )
+        return
+
+    result = subprocess.run(  # nosec B603 B607
+        ["git", "tag", "v0.0.0", root],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        print(f"  ✓ Seeded baseline tag v0.0.0 on root commit {root[:7]}")
+        Logger.info("   → push with `git push origin v0.0.0` when ready")
+    else:
+        Logger.warning(f"Could not create v0.0.0 tag: {result.stderr.strip() or 'unknown error'}")
 
 
 def run_configure(
@@ -270,7 +343,22 @@ def run_configure(
     # Define replacements
     # IMPORTANT: Longer/Specific replacements must come before shorter substrings
     replacements = {
-        # URLs (Specific matches first)
+        # Marker tokens (unambiguous, used in prose files). These take
+        # priority because ``update_file()`` treats them as blind replaces
+        # regardless of surrounding context.
+        "__PACKAGE_NAME__": package_name,
+        "__PYPI_NAME__": pypi_name,
+        "__PROJECT_NAME__": project_name,
+        "__GH_OWNER__": github_user,
+        "__AUTHOR_NAME__": author_name,
+        "__AUTHOR_EMAIL__": author_email,
+        "__DESCRIPTION__": description,
+        "__REPO_URL__": f"https://github.com/{github_user}/{package_name}",
+        "__REPO_SLUG__": f"{github_user}/{package_name}",
+        # URLs (Specific matches first). Retained for runtime-critical files
+        # (pyproject.toml, workflows, LICENSE, mkdocs.yml, dodo.py, .envrc,
+        # .pre-commit-config.yaml) that keep literal placeholders, and for
+        # downstream consumer projects that have not yet migrated.
         "https://github.com/username/package_name": f"https://github.com/{github_user}/{package_name}",
         "https://github.com/original-owner/package_name": f"https://github.com/{github_user}/{package_name}",
         "https://codecov.io/gh/username/package_name": f"https://codecov.io/gh/{github_user}/{package_name}",
@@ -284,7 +372,9 @@ def run_configure(
         "package-name/": f"{pypi_name}/",
         # Repo name pattern (mkdocs.yml) - must come before general package_name
         "username/package_name": f"{github_user}/{package_name}",
-        # General Placeholders (Substrings)
+        # General Placeholders (Substrings). Python files receive
+        # word-boundary protection from ``update_file()`` so identifier
+        # substrings (e.g. ``validate_package_name``) survive.
         "package_name": package_name,
         "package-name": pypi_name,
         "Package Name": project_name,
@@ -355,11 +445,11 @@ def run_configure(
         print("  ✓ Updating test files")
         update_test_files(test_dir, package_name)
 
-    # Remove template tool tests (they're only for the template itself)
-    tool_tests_dir = Path("tests/pyproject_template")
-    if tool_tests_dir.exists():
-        print("  ✓ Removing template tool tests (tests/pyproject_template/)")
-        shutil.rmtree(tool_tests_dir)
+    # Remove template-only tests (they're only for the template itself)
+    template_tests_dir = Path("tests/template")
+    if template_tests_dir.exists():
+        print("  ✓ Removing template-only tests (tests/template/)")
+        shutil.rmtree(template_tests_dir)
 
     # Enable Dependabot if requested
     dependabot_example = Path(".github/dependabot.yml.example")
@@ -368,6 +458,11 @@ def run_configure(
         print("  ✓ Enabling Dependabot")
         shutil.copy(dependabot_example, dependabot_config)
 
+    # Seed v0.0.0 baseline tag so `doit release --prerelease=alpha` works on the
+    # first release (see issue #447). Idempotent and skipped gracefully when
+    # there is no git repo or no commits yet.
+    seed_baseline_tag()
+
     Logger.success("Configuration complete!")
     Logger.header("Next Steps")
     print("1. Review the changes: git diff")
@@ -375,7 +470,7 @@ def run_configure(
     print("3. Install dependencies: uv sync --all-extras --dev")
     print("4. Install pre-commit hooks: uv run doit pre_commit_install")
     print("5. Run tests: uv run pytest")
-    print("6. Cut a prerelease (if desired): uv run doit release_dev")
+    print("6. Cut a prerelease (if desired): uv run doit release --prerelease=alpha")
     print("7. Start coding!")
     print("━" * 60)
 
