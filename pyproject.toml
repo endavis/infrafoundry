@@ -69,7 +69,7 @@ env = "infrafoundry.secrets.backends.env:register"
 file = "infrafoundry.secrets.backends.file:register"
 
 [build-system]
-requires = ["hatchling>=1.29.0", "hatch-vcs>=0.4"]
+requires = ["hatchling>=1.29.0", "hatch-vcs>=0.5.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -90,6 +90,13 @@ target-version = "py312"
 extend-exclude = ["**/_version.py"]
 
 [tool.ruff.lint]
+# Enable preview mode but require rules to be listed by exact code so we can
+# opt into specific preview rules without pulling in every unstable preview
+# rule. (PLW1514, the UTF-8 file-I/O rule, is NOT enabled yet — enabling it
+# would flag 180+ existing call sites. Schedule a separate refactor to
+# encoding= every text-mode open/read_text/write_text call before opting in.)
+preview = true
+explicit-preview-rules = true
 select = [
     "E",    # pycodestyle errors
     "F",    # pyflakes
@@ -125,6 +132,9 @@ ignore = [
 "tools/pyproject_template/*.py" = [
     "ANN401",   # Any return type for dynamic GitHub API responses
     "RUF022",   # __all__ intentionally grouped by category, not sorted
+]
+"tests/benchmarks/*.py" = [
+    "ANN401",   # benchmark fixture has no py.typed
 ]
 
 [tool.ruff.format]

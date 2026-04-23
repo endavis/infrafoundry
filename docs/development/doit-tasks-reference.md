@@ -26,8 +26,8 @@ doit <task_name>
 | [Security](#security-tasks) | `security`, `audit`, `licenses`, `sbom` | Security scanning and SBOM |
 | [Documentation](#documentation-tasks) | `docs_serve`, `docs_build`, `docs_deploy`, `docs_toc` | Documentation management |
 | [Dependencies](#dependency-tasks) | `install`, `install_dev`, `update_deps` | Package management |
-| [GitHub Workflow](#github-workflow-tasks) | `issue`, `pr`, `pr_merge`, `adr` | Issue and PR management |
-| [Release](#release-tasks) | `release`, `release_dev` | Version and release management |
+| [GitHub Workflow](#github-workflow-tasks) | `issue`, `pr`, `pr_merge`, `adr`, `labels_sync`, `env_create`, `env_list`, `publish_setup` | Issue, PR, and environment management |
+| [Release](#release-tasks) | `release`, `release_tag`, `publish` | Version and release management |
 | [Setup](#setup-tasks) | `pre_commit_install`, `completions`, `install_direnv` | Development environment |
 | [Maintenance](#maintenance-tasks) | `cleanup` | Project cleanup |
 
@@ -327,7 +327,14 @@ Create an Architecture Decision Record.
 
 ```bash
 doit adr --title="Use Redis for caching" --body="## Status\nAccepted\n..."
+doit adr --title="Template-meta ADR" --template  # Creates a 9XXX-series template ADR
 ```
+
+**Options:**
+- `--title`: ADR title (required)
+- `--body`: ADR body (non-interactive)
+- `--body-file`: File containing ADR body
+- `--template`: Create a template-meta ADR (9XXX series) instead of a project-level ADR
 
 ---
 
@@ -341,14 +348,64 @@ Create a production release with full governance validation.
 doit release
 ```
 
-### `release_dev`
+### `release_tag`
 
-Create a pre-release for TestPyPI testing.
+Tag `main` after a release PR is merged.
 
 ```bash
-doit release_dev              # Alpha (default)
-doit release_dev --type=beta  # Beta
-doit release_dev --type=rc    # Release candidate
+doit release_tag
+```
+
+**What it does:**
+1. Verifies you are on `main` and pulls the latest changes.
+2. Finds the most recently merged `release: vX.Y.Z` PR.
+3. Extracts the version from the PR title (falls back to the branch name).
+4. Creates the git tag `vX.Y.Z` on `main` and pushes it.
+5. The tag push triggers `.github/workflows/release.yml` (production) or
+   `.github/workflows/testpypi.yml` (pre-release).
+
+**Pre-releases:** Open a pre-release PR with `doit release --prerelease=alpha`
+(or `beta` / `rc`). After merge, run `doit release_tag` — the PEP440 tag format
+(`v1.2.3a0`, `v1.2.3b0`, `v1.2.3rc0`, `v1.2.3.dev0`) is picked up by
+`testpypi.yml` and publishes to TestPyPI only.
+
+---
+
+## GitHub Environments
+
+### `labels_sync`
+
+Reconcile GitHub labels with `.github/labels.yml` (idempotent).
+
+```bash
+doit labels_sync --dry-run      # Preview changes
+doit labels_sync                # Create missing / update drift
+doit labels_sync --prune        # Also delete labels absent from the file
+```
+
+### `env_create`
+
+Create a GitHub environment by name (idempotent).
+
+```bash
+doit env_create --name=pypi
+doit env_create --name=testpypi
+```
+
+### `env_list`
+
+List GitHub environments for the current repository.
+
+```bash
+doit env_list
+```
+
+### `publish_setup`
+
+Bootstrap GitHub environments (`testpypi`, `pypi`) for PyPI trusted publishing.
+
+```bash
+doit publish_setup
 ```
 
 ---

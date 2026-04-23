@@ -17,9 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - id: pv
+        uses: ./.github/actions/python-versions
+
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          python-version: ${{ steps.pv.outputs.newest }}
 
       - uses: astral-sh/setup-uv@v7
         with:

@@ -23,9 +23,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - id: pv
+        uses: ./.github/actions/python-versions
+
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ steps.pv.outputs.newest }}
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -50,10 +53,24 @@ jobs:
       - name: Generate SBOM (XML)
         run: uv run cyclonedx-py environment --of XML -o dist/sbom.xml
 
+      # Split into two artifacts: ``dist`` for twine (wheels + sdist only)
+      # and ``sbom`` for the GitHub release. Mixing SBOM files into the
+      # publish artifact makes twine abort with InvalidDistribution. See
+      # pyproject-template#665.
       - uses: actions/upload-artifact@v7
         with:
           name: dist
-          path: dist
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sbom
+          path: |
+            dist/sbom.json
+            dist/sbom.xml
           if-no-files-found: error
 
   publish-testpypi:
@@ -116,7 +133,7 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: dist
+          name: sbom
           path: dist
 
       - name: Upload SBOM assets to GitHub release

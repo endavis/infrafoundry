@@ -76,6 +76,11 @@ jobs:
               return;
             }
 
+            if (pr.user.login === 'dependabot[bot]') {
+              console.log('✅ Dependabot PR - issue link not required');
+              return;
+            }
+
             // Check for issue reference in PR body or title
             const issuePatterns = [
               /addresses\s+#\d+/i,

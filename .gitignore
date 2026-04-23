@@ -26,6 +26,10 @@ MANIFEST
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+.pytype/
+.pyre/
+.dmypy.json
+dmypy.json
 .tox/
 .hypothesis/
 

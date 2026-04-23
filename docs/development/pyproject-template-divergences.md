@@ -136,27 +136,6 @@ proposed change, the merge lost it — push back and ask for a rework.
 ## 4. Temporarily deferred files
 
 Unlike the categories above, these files **will** be adopted — just not in the
-current sync phase. They are listed here so a reviewer opening this doc after
-Phase A does not assume they were skipped permanently. Remove each entry once
-the referenced follow-up phase lands.
-
-- `.github/workflows/ci-full-matrix.yml` and
-  `tests/test_ci_full_matrix_workflow.py` — deferred from Phase A to Phase E
-  of sync tracker #673. Upstream `ci-full-matrix.yml` calls
-  `./.github/workflows/ci.yml` with `with: full_matrix: true`, but our
-  `ci.yml` does not declare that `workflow_call` input. Phase E will add the
-  input (and switch the label-check logic to read from it), at which point
-  these two files can be adopted verbatim. Remove this note once Phase E
-  lands.
-- `tests/test_ci_workflow.py`, `tests/test_release_workflow.py`,
-  `tests/test_testpypi_workflow.py` — deferred from Phase C2 to Phase E of
-  sync tracker #673. These structural workflow tests were written upstream
-  against upstream's evolved workflow shapes: `ci.yml` with a `concurrency`
-  block and `workflow_call.inputs.full_matrix`; `release.yml` with a
-  separate `sbom` artifact upload; `testpypi.yml` with PEP440 tag-glob
-  triggers (`v*a[0-9]*` / `v*b[0-9]*` / `v*rc[0-9]*` / `v*.dev[0-9]*`
-  instead of `v*-[a-zA-Z]*`, fixing upstream #659). Our workflows still
-  carry the pre-divergence shapes; adopting the tests now fails 14 assertions.
-  Phase E will update the three workflow files to match upstream, at which
-  point these tests can be adopted verbatim. Remove this note once Phase E
-  lands.
+current sync phase. Sync-tracker #673 completed in Phase E (issue #678); no
+files are currently deferred. Future deferrals should be logged here with a
+pointer to the follow-up issue.
