@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776862665039,
+  "lastUpdate": 1776939055143,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6789,6 +6789,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009370573516938522",
             "extra": "mean: 135.59267551478612 usec\nrounds: 2185"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e61dffad92f38c908ca0bd29be6d85acae34d8dd",
+          "message": "chore: add pyproject-template divergence note (merges PR #680, addresses #679)",
+          "timestamp": "2026-04-23T11:10:21+01:00",
+          "tree_id": "b6f34ddd3b83246d1375d6be2cf70d50c875f8ca",
+          "url": "https://github.com/endavis/infrafoundry/commit/e61dffad92f38c908ca0bd29be6d85acae34d8dd"
+        },
+        "date": 1776939054534,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9654.575900342907,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006383573295829561",
+            "extra": "mean: 103.5778277909113 usec\nrounds: 2015"
           }
         ]
       }
