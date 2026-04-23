@@ -19,7 +19,7 @@ This command runs in the main conversation context (NOT in a subagent) so the us
 
 2. **Check for an existing plan comment:**
    ```bash
-   gh issue view $ARGUMENTS --json comments --jq '.comments[].body' | grep -l "## Implementation Plan for"
+   gh issue view $ARGUMENTS --json comments --jq '.comments[].body' | grep -lE "^#+ Implementation Plan for"
    ```
    - If a plan comment already exists, warn the user:
      > "Issue #$ARGUMENTS already has an implementation plan comment. Continuing will post a new one. Proceed?"

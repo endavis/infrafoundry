@@ -10,7 +10,17 @@
 default_policy = "untrusted"  # Prompt before running untrusted commands
 
 # =============================================================================
-# BLOCKED COMMANDS - These bypass security controls
+# PRE-TOOL-USE HOOK — Primary defense
+# =============================================================================
+# The shared hook script provides context-aware blocking (shlex tokenization,
+# protected-branch detection, chained-command scanning). The approval_policy
+# deny rules below act as a secondary (belt-and-suspenders) defense layer in
+# case the hook fails to load or Codex evaluates policies before hooks.
+[hooks]
+pre_tool_use = "python3 tools/hooks/ai/block-dangerous-commands.py"
+
+# =============================================================================
+# BLOCKED COMMANDS - Secondary defense (approval_policy deny rules)
 # =============================================================================
 
 # Block --admin flag (bypasses branch protection)
