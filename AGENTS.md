@@ -365,6 +365,13 @@ gh pr list --state open
 
 ### Dependabot PRs
 
+Patch- and minor-bump dependabot PRs are handled automatically by the
+`dependabot-automerge.yml` workflow (enables GitHub auto-merge and adds
+`ready-to-merge` once eligibility checks pass). The manual flow below
+applies only to PRs the workflow skips — major-version bumps, PRs the
+workflow labels with `automerge-blocked`, or sensitive-dependency
+updates listed in `.github/automerge-config.json`.
+
 When merging dependabot PRs that are behind `main`, **never** use the GitHub API `update-branch` endpoint or local rebase to update the branch. This strips the verified commit signatures from dependabot commits, which are required by branch protection rules.
 
 Instead, use dependabot's own rebase command:
