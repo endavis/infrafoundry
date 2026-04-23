@@ -11,6 +11,7 @@ import shutil
 import subprocess  # nosec B404 - subprocess is required for version checks
 import sys
 import tarfile
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -55,22 +56,56 @@ def get_install_dir() -> Path:
     return install_dir
 
 
+def _get_arch() -> str:
+    """Map platform.machine() output to a normalized architecture name.
+
+    Returns:
+        "amd64" for x86_64, "arm64" for aarch64, otherwise the raw machine
+        name lowercased (passthrough).
+    """
+    machine = platform.machine().lower()
+    if machine == "x86_64":
+        return "amd64"
+    if machine == "aarch64":
+        return "arm64"
+    return machine
+
+
+def _build_github_release_url(repo: str, version: str, asset_pattern: str) -> str:
+    """Build a GitHub release asset download URL.
+
+    Args:
+        repo: GitHub repository in "owner/name" format.
+        version: Release version (without leading 'v').
+        asset_pattern: Filename pattern with optional {version} placeholder.
+
+    Returns:
+        Fully constructed download URL.
+    """
+    asset_name = asset_pattern.format(version=version)
+    return f"https://github.com/{repo}/releases/download/v{version}/{asset_name}"
+
+
 def download_github_release_binary(
     repo: str, version: str, asset_pattern: str, dest_name: str
 ) -> Path:
     """Download a binary asset from a GitHub release.
 
+    Constructs the download URL from the repo, version, and asset pattern,
+    downloads the file to the user-local bin directory, and makes it
+    executable.
+
     Args:
         repo: GitHub repository in "owner/name" format.
         version: Release version (without leading 'v').
-        asset_pattern: Filename pattern with {version} placeholder.
-        dest_name: Name of the installed binary.
+        asset_pattern: Filename pattern with {version} placeholder
+            (e.g. "tool.linux-amd64" or "tool-v{version}-linux-amd64").
+        dest_name: Name of the installed binary (e.g. "tool").
 
     Returns:
         Path to the downloaded and installed binary.
     """
-    asset_name = asset_pattern.format(version=version)
-    url = f"https://github.com/{repo}/releases/download/v{version}/{asset_name}"
+    url = _build_github_release_url(repo, version, asset_pattern)
     install_dir = get_install_dir()
     dest_path = install_dir / dest_name
 
@@ -81,21 +116,138 @@ def download_github_release_binary(
     return dest_path
 
 
+def download_and_extract_archive(
+    url: str, extract_binaries: list[str], dest_dir: Path
+) -> list[Path]:
+    """Download an archive and extract specific binaries from it.
+
+    Supports `.tar.gz`/`.tgz` and `.zip` archives. Binaries are matched by
+    basename (any directory structure inside the archive is ignored).
+    Each extracted file is made executable (0o755).
+
+    Security:
+        - Tar archives use ``tarfile.data_filter`` (Python 3.12+) when
+          available to block path traversal, symlinks, etc.
+        - Zip archives use basename-only extraction with a defense-in-depth
+          zip-slip resolve check.
+
+    Args:
+        url: URL to download the archive from. Format is detected from
+            the URL extension.
+        extract_binaries: List of binary basenames to extract from the
+            archive (e.g. ``["age", "age-keygen"]``).
+        dest_dir: Directory to write extracted binaries into. Created if
+            it does not exist.
+
+    Returns:
+        List of Paths to the extracted binaries.
+
+    Raises:
+        ValueError: If the URL has an unsupported archive extension.
+        RuntimeError: If a requested binary is not found in the archive.
+    """
+    url_lower = url.lower()
+    if url_lower.endswith((".tar.gz", ".tgz")):
+        suffix = ".tar.gz"
+        archive_kind = "tar"
+    elif url_lower.endswith(".zip"):
+        suffix = ".zip"
+        archive_kind = "zip"
+    else:
+        raise ValueError(f"Unsupported archive extension: {url}")
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    wanted = set(extract_binaries)
+    extracted: dict[str, Path] = {}
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        temp_path = Path(tmp.name)
+    try:
+        print(f"Downloading {url}...")
+        urllib.request.urlretrieve(url, temp_path)  # nosec B310 - URL provided by trusted caller
+
+        if archive_kind == "tar":
+            with tarfile.open(temp_path, "r:gz") as tar:  # nosec B202 - data_filter set below when available
+                if hasattr(tarfile, "data_filter"):
+                    tar.extraction_filter = tarfile.data_filter
+                for member in tar.getmembers():
+                    if not member.isfile():
+                        continue
+                    basename = Path(member.name).name
+                    if basename not in wanted or basename in extracted:
+                        continue
+                    src = tar.extractfile(member)
+                    if src is None:
+                        continue
+                    out_path = dest_dir / basename
+                    with open(out_path, "wb") as out:
+                        shutil.copyfileobj(src, out)
+                    out_path.chmod(0o755)  # nosec B103 - executable bit required
+                    extracted[basename] = out_path
+        else:  # zip
+            with zipfile.ZipFile(temp_path) as zf:
+                for entry in zf.namelist():
+                    if entry.endswith("/"):
+                        continue
+                    basename = Path(entry).name
+                    if basename not in wanted or basename in extracted:
+                        continue
+                    out_path = dest_dir / basename
+                    # Defense in depth against zip-slip; basename-only
+                    # extraction already prevents traversal.
+                    resolved = out_path.resolve()
+                    if not str(resolved).startswith(str(dest_dir.resolve())):
+                        raise RuntimeError(f"Refusing to extract outside dest_dir: {entry}")
+                    data = zf.read(entry)
+                    out_path.write_bytes(data)
+                    out_path.chmod(0o755)  # nosec B103 - executable bit required
+                    extracted[basename] = out_path
+
+        missing = [b for b in extract_binaries if b not in extracted]
+        if missing:
+            raise RuntimeError(f"Binary {missing[0]} not found in archive")
+
+        return [extracted[b] for b in extract_binaries]
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
 def install_tool(
     name: str,
     repo: str,
     asset_patterns: dict[str, str],
     version_cmd: list[str] | None = None,
     post_install_message: str | None = None,
+    extract_binaries: list[str] | None = None,
+    url_template: str | None = None,
+    prefer_brew: bool = True,
 ) -> None:
     """Install a tool from GitHub releases if not already present.
+
+    Checks if the tool is already on PATH. If so, prints its version
+    and returns. Otherwise, downloads the latest release for the current
+    platform and installs it.
 
     Args:
         name: Tool name used for PATH lookup and as the binary dest name.
         repo: GitHub repository in "owner/name" format.
-        asset_patterns: Mapping of platform.system().lower() values to asset filename patterns.
-        version_cmd: Command list to run for checking installed version.
+        asset_patterns: Mapping of platform.system().lower() values
+            (e.g. "linux", "darwin") to asset filename patterns.
+            Patterns may include a {version} placeholder.
+        version_cmd: Command list to run for checking installed version
+            (e.g. ["tool", "--version"]). Defaults to [name, "--version"].
         post_install_message: Optional message printed after installation.
+        extract_binaries: Optional list of binary basenames to extract from
+            a downloaded archive (e.g. ``["age", "age-keygen"]``). When set,
+            the download is treated as an archive (`.tar.gz`/`.tgz`/`.zip`)
+            and binaries are extracted into the install dir.
+        url_template: Optional download URL template with ``{version}``,
+            ``{os}``, and ``{arch}`` placeholders. When set, this is used
+            instead of building a GitHub release URL from ``asset_patterns``.
+        prefer_brew: When True (the default), use ``brew install`` on macOS
+            instead of downloading. Set False to force download even on
+            macOS (useful for cross-platform consistency).
     """
     if version_cmd is None:
         version_cmd = [name, "--version"]
@@ -108,7 +260,7 @@ def install_tool(
             check=True,
         )
         version_output = result.stdout.strip() or result.stderr.strip()
-        print(f"\u2713 {name} already installed: {version_output}")
+        print(f"[OK] {name} already installed: {version_output}")
         return
 
     print(f"Installing {name}...")
@@ -116,20 +268,36 @@ def install_tool(
     print(f"Latest version: {version}")
 
     system = platform.system().lower()
-    if system == "darwin":
-        subprocess.run(["brew", "install", name], check=True)
-    elif system in asset_patterns:
-        download_github_release_binary(
-            repo=repo,
-            version=version,
-            asset_pattern=asset_patterns[system],
-            dest_name=name,
-        )
-    else:
-        print(f"Unsupported OS for {name}: {system}")
-        sys.exit(1)
 
-    print(f"\u2713 {name} installed.")
+    if system == "darwin" and prefer_brew and url_template is None:
+        subprocess.run(["brew", "install", name], check=True)
+    else:
+        if url_template is not None:
+            url = url_template.format(version=version, os=system, arch=_get_arch())
+        elif system in asset_patterns:
+            url = _build_github_release_url(repo, version, asset_patterns[system])
+        else:
+            print(f"Unsupported OS for {name}: {system}")
+            sys.exit(1)
+
+        if extract_binaries:
+            download_and_extract_archive(url, extract_binaries, get_install_dir())
+        else:
+            if url_template is not None:
+                install_dir = get_install_dir()
+                dest_path = install_dir / name
+                print(f"Downloading {url}...")
+                urllib.request.urlretrieve(url, dest_path)  # nosec B310 - URL from trusted caller template
+                dest_path.chmod(0o755)  # nosec B103 - executable bit required
+            else:
+                download_github_release_binary(
+                    repo=repo,
+                    version=version,
+                    asset_pattern=asset_patterns[system],
+                    dest_name=name,
+                )
+
+    print(f"[OK] {name} installed.")
     if post_install_message:
         print(post_install_message)
 
@@ -140,15 +308,28 @@ def create_install_task(
     asset_patterns: dict[str, str],
     version_cmd: list[str] | None = None,
     post_install_message: str | None = None,
+    extract_binaries: list[str] | None = None,
+    url_template: str | None = None,
+    prefer_brew: bool = True,
 ) -> dict[str, Any]:
     """Create a doit task dict for installing a tool from GitHub releases.
+
+    This is a factory function that returns a doit-compatible task
+    dictionary. The task's action calls install_tool with the provided
+    parameters.
 
     Args:
         name: Tool name used for PATH lookup and as the binary dest name.
         repo: GitHub repository in "owner/name" format.
         asset_patterns: Mapping of platform names to asset filename patterns.
-        version_cmd: Command list for version check.
+        version_cmd: Command list for version check. Defaults to [name, "--version"].
         post_install_message: Optional message printed after installation.
+        extract_binaries: Optional list of binary basenames to extract from
+            a downloaded archive. See :func:`install_tool`.
+        url_template: Optional download URL template with ``{version}``,
+            ``{os}``, ``{arch}`` placeholders. See :func:`install_tool`.
+        prefer_brew: Use brew on macOS when True (default). See
+            :func:`install_tool`.
 
     Returns:
         A doit task dictionary with actions and title.
@@ -161,6 +342,9 @@ def create_install_task(
             asset_patterns=asset_patterns,
             version_cmd=version_cmd,
             post_install_message=post_install_message,
+            extract_binaries=extract_binaries,
+            url_template=url_template,
+            prefer_brew=prefer_brew,
         )
 
     return {
@@ -178,7 +362,7 @@ def _install_age() -> None:
     """Install age encryption tool (requires tar extraction)."""
     if shutil.which("age"):
         result = subprocess.run(["age", "--version"], capture_output=True, text=True, check=True)
-        print(f"\u2713 age already installed: {result.stdout.strip()}")
+        print(f"✓ age already installed: {result.stdout.strip()}")
         return
 
     print("Installing age...")
@@ -189,26 +373,17 @@ def _install_age() -> None:
     if system == "darwin":
         subprocess.run(["brew", "install", "age"], check=True)
     elif system == "linux":
-        install_dir = get_install_dir()
-        tar_url = f"https://github.com/FiloSottile/age/releases/download/v{version}/age-v{version}-linux-amd64.tar.gz"
-        tar_path = Path("/tmp/age.tar.gz")  # nosec B108
-        print(f"Downloading {tar_url}...")
-        urllib.request.urlretrieve(tar_url, tar_path)  # nosec B310
-
-        with tarfile.open(tar_path, "r:gz") as tar:
-            tar.extractall("/tmp")  # nosec B202
-        for binary in ("age", "age-keygen"):
-            src = Path("/tmp/age") / binary
-            dest = install_dir / binary
-            shutil.move(str(src), str(dest))
-            dest.chmod(0o755)  # nosec B103
-        tar_path.unlink()
-        shutil.rmtree("/tmp/age", ignore_errors=True)
+        arch = _get_arch()
+        tar_url = (
+            f"https://github.com/FiloSottile/age/releases/download/"
+            f"v{version}/age-v{version}-linux-{arch}.tar.gz"
+        )
+        download_and_extract_archive(tar_url, ["age", "age-keygen"], get_install_dir())
     else:
         print(f"Unsupported OS: {system}")
         sys.exit(1)
 
-    print("\u2713 age installed.")
+    print("✓ age installed.")
 
 
 def _install_hashicorp_zip(
@@ -232,7 +407,7 @@ def _install_hashicorp_zip(
         try:
             current = json.loads(version_json)["terraform_version"]
             if current == version:
-                print(f"\u2713 {name} already up to date: {version}")
+                print(f"✓ {name} already up to date: {version}")
                 return
             print(f"Current: {current}, upgrading to: {version}")
         except Exception:
@@ -240,26 +415,16 @@ def _install_hashicorp_zip(
 
     print(f"Installing {name} {version}...")
     system = platform.system().lower()
-    machine = platform.machine().lower()
-    arch = "arm64" if machine in ("aarch64", "arm64") else "amd64"
+    arch = _get_arch()
     os_name = {"linux": "linux", "darwin": "darwin"}.get(system)
     if not os_name:
         print(f"Unsupported OS: {system}")
         sys.exit(1)
 
     url = url_template.format(version=version, os=os_name, arch=arch)
-    zip_path = Path(f"/tmp/{binary_name}.zip")  # nosec B108
+    download_and_extract_archive(url, [binary_name], get_install_dir())
 
-    print(f"Downloading {url}...")
-    urllib.request.urlretrieve(url, zip_path)  # nosec B310
-
-    install_dir = get_install_dir()
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        zf.extract(binary_name, install_dir)
-    (install_dir / binary_name).chmod(0o755)  # nosec B103
-    zip_path.unlink()
-
-    print(f"\u2713 {name} {version} installed.")
+    print(f"✓ {name} {version} installed.")
 
 
 def _install_terraform() -> None:

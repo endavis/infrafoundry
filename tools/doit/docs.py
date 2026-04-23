@@ -4,6 +4,8 @@ from typing import Any
 
 from doit.tools import title_with_actions
 
+from .base import optional_root_files
+
 
 def task_docs_serve() -> dict[str, Any]:
     """Serve documentation locally with live reload."""
@@ -32,7 +34,11 @@ def task_docs_deploy() -> dict[str, Any]:
 def task_spell_check() -> dict[str, Any]:
     """Check spelling in code and documentation."""
     return {
-        "actions": ["uv run codespell src/ tests/ tools/ docs/ README.md"],
+        "actions": [
+            "uv run codespell src/ tests/ tools/ docs/"
+            + optional_root_files("bootstrap.py")
+            + " README.md"
+        ],
         "title": title_with_actions,
         "verbosity": 0,
     }

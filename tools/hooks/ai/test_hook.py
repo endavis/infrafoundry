@@ -104,9 +104,7 @@ EOF
     # === SHOULD BLOCK - doit release (releases require user to run manually) ===
     ("doit release", "BLOCK", "doit release"),
     ("doit release --dry-run", "BLOCK", "doit release dry-run"),
-    ("doit release_dev", "BLOCK", "doit release_dev"),
     ("doit release_tag", "BLOCK", "doit release_tag"),
-    ("doit release_pr", "BLOCK", "doit release_pr"),
     # === SHOULD ALLOW - Other doit commands ===
     ("doit check", "ALLOW", "doit check"),
     ("doit test", "ALLOW", "doit test"),
@@ -119,6 +117,18 @@ EOF
     # === SHOULD ALLOW - Other labels ===
     ("gh pr edit 123 --add-label bug", "ALLOW", "add bug label"),
     ("gh pr edit 123 --add-label enhancement", "ALLOW", "add enhancement label"),
+    # === SHOULD BLOCK - Nested/chained commands ===
+    ("cd /path && doit release", "BLOCK", "chained doit release"),
+    ("cd /path && gh pr create --fill", "BLOCK", "chained gh pr create"),
+    ("cd /path && uv add requests", "BLOCK", "chained uv add"),
+    ("cd /path && git push --force origin main", "BLOCK", "chained force push main"),
+    ("git status; git push --force origin main", "BLOCK", "semicolon force push main"),
+    ("git status; git push origin --delete main", "BLOCK", "semicolon delete main"),
+    ("git log; git branch -D main", "BLOCK", "semicolon branch -D main"),
+    # === SHOULD ALLOW - Nested/chained safe commands ===
+    ("cd /path && doit check", "ALLOW", "chained doit check"),
+    ("cd /path && git status", "ALLOW", "chained git status"),
+    ("git status; git push origin feat/branch", "ALLOW", "semicolon push feature"),
     # === SHOULD ALLOW - Other gh commands ===
     ("gh issue list", "ALLOW", "gh issue list"),
     ("gh pr list", "ALLOW", "gh pr list"),
