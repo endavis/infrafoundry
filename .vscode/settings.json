@@ -29,6 +29,9 @@
   "ruff.enable": true,
   "ruff.organizeImports": true,
   "ruff.fixAll": true,
+  "ruff.lint.args": ["--config=pyproject.toml"],
+  "ruff.format.args": ["--config=pyproject.toml"],
+  "mypy-type-checker.args": ["--config-file=pyproject.toml"],
 
   // YAML Configuration
   "[yaml]": {
