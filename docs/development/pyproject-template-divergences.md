@@ -95,10 +95,10 @@ not to ask "should we sync this?" — there is nothing to sync from.
   `docs/development/credential-loader-system.md`,
   `docs/development/runner-protocol-quick-reference.md` — framework-specific
   developer guides.
-- InfraFoundry-authored ADRs under `docs/decisions/` and
-  `docs/architecture/decisions/` (files numbered `0001–0006` in each tree).
-  Upstream ships its own ADRs in the `9000-` series; those are adopted
-  separately.
+- InfraFoundry-authored ADRs under `docs/decisions/` (files numbered
+  `0001–0012`). Upstream ships its own ADRs in the `9000-` series under the
+  same directory; those are adopted verbatim. See ADR-9016 for the two-series
+  convention.
 
 Note: `tools/doit/quality.py` is an upstream file but contains an
 infrafoundry-specific task (`task_lint_blueprints()`). See category 3.
