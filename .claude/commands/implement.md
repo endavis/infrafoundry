@@ -4,9 +4,9 @@ Implement the plan for GitHub issue #$ARGUMENTS.
 
 ## Instructions
 
-**CRITICAL: Do NOT enter plan mode. Do NOT use EnterPlanMode. This command executes code directly — plan mode will block the implementation agent from writing files.**
+The implementation is delegated to a sub-agent (Task tool) so raw tool output stays out of the main conversation context. The agent does the coding; you receive the summary for user review.
 
-You MUST delegate the implementation to an agent (Task tool) to keep the main conversation context clean. The agent does all the coding. You receive the summary for user review.
+**Plan-mode trap:** parent plan-mode state propagates to the spawned sub-agent mid-execution and freezes it after its first non-readonly action (typically the first `Write`). Check your Claude Code status line before running — if it shows "plan mode", exit before invoking.
 
 ### Step 1: Validate preconditions
 
@@ -19,7 +19,7 @@ You MUST delegate the implementation to an agent (Task tool) to keep the main co
 2. **Verify a plan comment exists:**
    Fetch all comments and search for the plan header:
    ```bash
-   gh api repos/{owner}/{repo}/issues/$ARGUMENTS/comments --jq '.[].body' | grep "## Implementation Plan for"
+   gh api repos/{owner}/{repo}/issues/$ARGUMENTS/comments --jq '.[].body' | grep -E "^#+ Implementation Plan for"
    ```
    - If no plan comment is found, tell the user:
      > "No implementation plan found for issue #$ARGUMENTS. Run `/plan-issue $ARGUMENTS` first."
@@ -57,37 +57,15 @@ Only if not already on the correct branch:
    git checkout -b <type>/$ARGUMENTS-<short-description>
    ```
 
-### Step 3: Spawn an implementation agent
+### Step 3: Spawn the implementation subagent
 
-Use the Task tool with `subagent_type: "general-purpose"` and provide it with the issue number and branch name. The agent should:
+Use the Task tool with `subagent_type: "implement-worker"`. In the prompt, pass:
 
-1. **Read the project rules:**
-   - Read `AGENTS.md` — understand workflow, conventions, code style, testing guidelines
-   - Read `.claude/CLAUDE.md` — understand TodoWrite requirements
+- The issue number (so the subagent can fetch the plan).
+- The branch name (for context; the subagent will not switch branches).
+- Any issue-specific notes or scope clarifications.
 
-2. **Fetch the implementation plan:**
-   Retrieve all comments and find the one containing `## Implementation Plan for`:
-   ```bash
-   gh api repos/{owner}/{repo}/issues/$ARGUMENTS/comments --jq '.[] | select(.body | contains("## Implementation Plan for")) | .body'
-   ```
-   - If multiple plan comments exist, use the most recent one
-   - Parse the plan to extract the file list and test plan
-
-3. **Implement the plan:**
-   - Follow the plan step by step
-   - Create implementation files
-   - Create test files — this is MANDATORY, never skip tests
-   - Follow existing code patterns and conventions
-
-4. **Run validation:**
-   - Run: `doit check`
-   - If checks fail, fix the issues and re-run
-   - Do NOT give up after first failure — investigate and fix
-
-5. **Return a summary** of all changes made:
-   - Files created/modified with brief descriptions
-   - Test results (pass/fail counts)
-   - Any deviations from the plan and why
+The subagent carries its own system prompt covering project rules, plan fetch, implementation, and validation — this command does not repeat them. The subagent has `permissionMode: default`, which (per Claude Code's sub-agent precedence rules) should override parent plan mode for operations inside the subagent's context.
 
 ### Step 4: Present changes to user
 

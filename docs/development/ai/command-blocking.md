@@ -12,7 +12,7 @@ tags:
 
 # AI CLI Hooks
 
-The `tools/hooks/ai/` directory contains hooks for AI coding assistants (Claude Code, Gemini CLI).
+The `tools/hooks/ai/` directory contains hooks for AI coding assistants (Claude Code, Gemini CLI, Copilot CLI, Codex CLI).
 
 ## Block Dangerous Commands
 
@@ -42,6 +42,20 @@ The hook uses Python's `shlex` module to properly parse shell quoting:
 6. **Check** for merge commits on protected branches (linear history)
 7. **Block** (exit code 2) or **Allow** (exit code 0)
 
+#### Key Feature: Chained Command Detection
+
+The hook scans all token positions, so chained commands using `&&` or `;` are caught:
+
+```bash
+# BLOCKED - dangerous command after safe one
+git status; git push --force origin main
+cd /path && doit release
+
+# ALLOWED - all commands in the chain are safe
+cd /path && doit check
+git status; git push origin feat/branch
+```
+
 #### Key Feature: Quote-Aware Parsing
 
 The hook correctly distinguishes between:
@@ -64,7 +78,7 @@ EOF
 
 | File | Description |
 |------|-------------|
-| [`block-dangerous-commands.py`](../../../tools/hooks/ai/block-dangerous-commands.py) | The hook script (shared by Claude and Gemini) |
+| [`block-dangerous-commands.py`](../../../tools/hooks/ai/block-dangerous-commands.py) | The hook script (shared by Claude, Gemini, Copilot, and Codex) |
 | [`test_hook.py`](../../../tools/hooks/ai/test_hook.py) | Test suite to verify hook behavior |
 
 ### Configuration
@@ -96,6 +110,7 @@ EOF
 ```json
 {
   "hooks": {
+    "enabled" : true,
     "BeforeTool": [
       {
         "matcher": "run_shell_command",
@@ -111,9 +126,34 @@ EOF
 }
 ```
 
+#### Copilot CLI
+
+`.github/hooks/copilot-hooks.json`:
+```json
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "python3 ../../tools/hooks/ai/block-dangerous-commands.py",
+        "cwd": ".github/hooks",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}
+```
+
 #### Codex CLI
 
-Codex uses approval policies instead of hooks. See `.codex/config.toml` for deny rules.
+`.codex/config.toml`:
+```toml
+[hooks]
+pre_tool_use = "python3 tools/hooks/ai/block-dangerous-commands.py"
+```
+
+Codex also keeps `approval_policy` deny rules as a secondary defense layer. See `.codex/config.toml` for the full configuration.
 
 ### Testing
 

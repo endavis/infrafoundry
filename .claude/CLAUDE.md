@@ -37,7 +37,7 @@ When creating new code (functions, modules, commands, features), Claude MUST use
 - Any task involving writing new Python code
 
 **Example todo list for "create new CLI command":**
-- [ ] Create src/package_name/cli.py
+- [ ] Create src/__PACKAGE_NAME__/cli.py
 - [ ] Create tests/test_cli.py with comprehensive tests
 - [ ] Update pyproject.toml (if needed)
 - [ ] Run doit check to verify all tests pass
