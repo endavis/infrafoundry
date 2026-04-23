@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776944171585,
+  "lastUpdate": 1776963291447,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6851,6 +6851,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016154289793233526",
             "extra": "mean: 108.4050942919499 usec\nrounds: 2768"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9287b02d712a160748105ed5e408930d6ee5bfa6",
+          "message": "chore: unify ADR directories under docs/decisions (merges PR #682, addresses #675, #670)",
+          "timestamp": "2026-04-23T17:54:16+01:00",
+          "tree_id": "15689e8762dca21b09db06a1130a2c8107769dac",
+          "url": "https://github.com/endavis/infrafoundry/commit/9287b02d712a160748105ed5e408930d6ee5bfa6"
+        },
+        "date": 1776963290812,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7164.469155132963,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011005545539722523",
+            "extra": "mean: 139.5776823581623 usec\nrounds: 2273"
           }
         ]
       }
