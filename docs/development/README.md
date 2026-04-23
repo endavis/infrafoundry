@@ -30,6 +30,10 @@ This section provides comprehensive guides for developing and extending InfraFou
 
 - **[Blueprint Script Portability](blueprint-script-portability.md)** - Portability contract for event-handler and target-VM scripts: tools you may assume, how to handle the rest, and why `jq` is not recommended
 
+## Maintenance & Operations
+
+- [pyproject-template Divergences](pyproject-template-divergences.md) — files we intentionally do not sync from the upstream template.
+
 ## See Also
 
 - [Architecture Overview](../architecture/overview.md) - High-level system architecture
