@@ -32,7 +32,9 @@ def _get_next_adr_number() -> int:
     if not ADR_DIR.exists():
         return 1
 
-    pattern = re.compile(r"^(\d{4})-.*\.md$")
+    # Only match project ADRs (0xxx series); template-meta ADRs (9xxx) must
+    # not count toward next-number math. See ADR-9016.
+    pattern = re.compile(r"^(0\d{3})-.*\.md$")
     max_number = 0
 
     for file in ADR_DIR.iterdir():

@@ -84,4 +84,4 @@ Loose YAML resources (not inside a package directory) will:
 
 ## Documentation
 
-- [Infrastructure Packages](../../configuration/infrastructure-packages.md)
+- [Infrastructure Packages](../configuration/infrastructure-packages.md)

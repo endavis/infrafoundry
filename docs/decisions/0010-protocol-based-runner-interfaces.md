@@ -292,6 +292,7 @@ def get_runner_capabilities(runner: BaseRunner) -> list[str]:
 - **Python PEP 544:** [Protocol Classes](https://www.python.org/dev/peps/pep-0544/)
 - **Mypy Protocols:** [Protocol Type Documentation](https://mypy.readthedocs.io/en/stable/protocols.html)
 - **ISP (SOLID):** [Interface Segregation Principle](https://en.wikipedia.org/wiki/Interface_segregation_principle)
+- For historical Q&A around this decision, see [the runner protocol proposal archive](../architecture/runner-protocol-proposal-archive.md).
 
 ## Implementation Timeline
 

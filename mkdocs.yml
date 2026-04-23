@@ -90,12 +90,37 @@ nav:
     - Design Principles: architecture/principles.md
     - Principles Assessment: architecture/design-principles-assessment.md
     - Architectural Patterns: architecture/architectural-patterns.md
-    - Decision Records:
-      - Overview: architecture/decisions/README.md
-      - ADR-0001 Repository Pattern: architecture/decisions/0001-repository-pattern-for-state.md
-      - ADR-0002 Mixin Pattern: architecture/decisions/0002-mixin-pattern-for-providers.md
-      - ADR-0003 Granular Events: architecture/decisions/0003-granular-event-types.md
-      - ADR-0004 Protocol Runners: architecture/decisions/0004-protocol-based-runner-interfaces.md
+
+  - Decisions:
+    - Overview: decisions/README.md
+    - ADR-0001 Linux-only CI: decisions/0001-linux-only-ci-testing.md
+    - ADR-0002 State Locking: decisions/0002-state-locking.md
+    - ADR-0003 Multi-provider Blueprints: decisions/0003-multi-provider-blueprint-support.md
+    - ADR-0004 Blueprint Inputs Section: decisions/0004-inputs-single-blueprint-variable-section.md
+    - ADR-0005 Provider CLI Extensibility: decisions/0005-provider-cli-extensibility.md
+    - ADR-0006 Script Handler Outputs: decisions/0006-explicit-script-handler-output-declarations.md
+    - ADR-0007 Repository Pattern: decisions/0007-repository-pattern-for-state.md
+    - ADR-0008 Mixin Pattern: decisions/0008-mixin-pattern-for-providers.md
+    - ADR-0009 Granular Events: decisions/0009-granular-event-types.md
+    - ADR-0010 Protocol Runners: decisions/0010-protocol-based-runner-interfaces.md
+    - ADR-0011 Lifecycle Hooks: decisions/0011-environment-lifecycle-hooks.md
+    - ADR-0012 Packages as Resource Model: decisions/0012-packages-as-primary-resource-model.md
+    - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
+    - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
+    - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md
+    - ADR-9004 Auto-discover: decisions/9004-auto-discover-doit-tasks.md
+    - ADR-9005 AI Restrictions: decisions/9005-ai-agent-command-restrictions.md
+    - ADR-9006 Merge-gate: decisions/9006-merge-gate-workflow.md
+    - ADR-9007 mypy: decisions/9007-use-mypy-for-type-checking.md
+    - ADR-9008 PR workflow: decisions/9008-pr-based-development-workflow.md
+    - ADR-9009 pre-commit: decisions/9009-use-pre-commit-hooks-for-quality-gates.md
+    - ADR-9010 Conventional commits: decisions/9010-use-conventional-commits-format.md
+    - ADR-9011 pytest: decisions/9011-use-pytest-for-testing.md
+    - ADR-9012 mkdocs: decisions/9012-use-mkdocs-with-material-theme-for-documentation.md
+    - ADR-9013 Python versions: decisions/9013-python-version-support-policy.md
+    - ADR-9014 click CLI: decisions/9014-use-click-for-application-cli.md
+    - ADR-9015 install_tools: decisions/9015-install-tools-framework-archive-extraction-and-custom-urls.md
+    - ADR-9016 Unify ADRs: decisions/9016-unify-adr-directories.md
 
   - Providers:
     - ESXi: providers/esxi.md
