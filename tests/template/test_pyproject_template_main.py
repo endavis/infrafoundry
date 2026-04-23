@@ -392,7 +392,14 @@ class TestMainModule:
         assert result == 2  # Re-run configuration
 
     def test_get_recommended_action_outdated_template(self) -> None:
-        """Test recommended action when template is outdated."""
+        """Test recommended action when template is outdated.
+
+        The ``tmp/extracted/pyproject-template-main/.template_commit`` marker
+        is a filesystem-level signal the user has a populated template
+        snapshot to review. When present, ``get_recommended_action`` returns
+        ``5`` ("mark as synced") regardless of commit diffs. Patch
+        ``Path.exists`` to False so the commit-diff branch is exercised.
+        """
         from tools.pyproject_template.manage import get_recommended_action
 
         context = ProjectContext(has_git=True, has_pyproject=True)
@@ -408,13 +415,20 @@ class TestMainModule:
         )
         template_state = TemplateState(commit="oldcommit123", commit_date="2025-01-01")
 
-        result = get_recommended_action(
-            context, settings, template_state, ("newcommit456", "2025-01-15")
-        )
+        with patch("tools.pyproject_template.manage.Path") as mock_path:
+            mock_path.return_value.exists.return_value = False
+            result = get_recommended_action(
+                context, settings, template_state, ("newcommit456", "2025-01-15")
+            )
         assert result == 3  # Check for template updates
 
     def test_get_recommended_action_up_to_date(self) -> None:
-        """Test recommended action when everything is up to date."""
+        """Test recommended action when everything is up to date.
+
+        See ``test_get_recommended_action_outdated_template`` for why the
+        ``Path.exists`` patch is required — without it this test sees any
+        populated ``tmp/extracted/`` snapshot and returns ``5``.
+        """
         from tools.pyproject_template.manage import get_recommended_action
 
         context = ProjectContext(has_git=True, has_pyproject=True)
@@ -430,9 +444,11 @@ class TestMainModule:
         )
         template_state = TemplateState(commit="samecommit12", commit_date="2025-01-15")
 
-        result = get_recommended_action(
-            context, settings, template_state, ("samecommit12", "2025-01-15")
-        )
+        with patch("tools.pyproject_template.manage.Path") as mock_path:
+            mock_path.return_value.exists.return_value = False
+            result = get_recommended_action(
+                context, settings, template_state, ("samecommit12", "2025-01-15")
+            )
         assert result is None  # No recommendation, up to date
 
 

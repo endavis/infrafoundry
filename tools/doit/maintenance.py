@@ -62,7 +62,7 @@ def task_cleanup() -> dict[str, Any]:
         # Ensure .gitkeep exists
         gitkeep = os.path.join("tmp", ".gitkeep")
         if not os.path.exists(gitkeep):
-            open(gitkeep, "a").close()
+            open(gitkeep, "a", encoding="utf-8").close()
 
         # Recursive removal of Python cache
         console.print("[cyan]Removing Python cache files...[/cyan]")
@@ -145,7 +145,7 @@ def task_update_deps() -> dict[str, Any]:
         print()
         if check_result.returncode == 0:
             print("=" * 70)
-            print(" " * 20 + "✓ All checks passed!")
+            print(" " * 20 + "[OK] All checks passed!")
             print("=" * 70)
             print()
             print("Next steps:")
@@ -199,7 +199,7 @@ def task_completions() -> dict[str, Any]:
             text=True,
             check=True,
         )
-        with open("completions/doit.bash", "w") as f:
+        with open("completions/doit.bash", "w", encoding="utf-8") as f:
             f.write(bash_result.stdout)
         console.print("  [dim]Created completions/doit.bash[/dim]")
 
@@ -211,7 +211,7 @@ def task_completions() -> dict[str, Any]:
             text=True,
             check=True,
         )
-        with open("completions/doit.zsh", "w") as f:
+        with open("completions/doit.zsh", "w", encoding="utf-8") as f:
             f.write(zsh_result.stdout)
         console.print("  [dim]Created completions/doit.zsh[/dim]")
 
@@ -272,10 +272,10 @@ def task_completions_install() -> dict[str, Any]:
         # Install bash completion
         bashrc = os.path.join(home, ".bashrc")
         if os.path.exists(bashrc):
-            with open(bashrc) as f:
+            with open(bashrc, encoding="utf-8") as f:
                 content = f.read()
             if bash_completion not in content:
-                with open(bashrc, "a") as f:
+                with open(bashrc, "a", encoding="utf-8") as f:
                     f.write(bash_source_line)
                 installed.append(("Bash", bashrc))
                 console.print(f"[green]✓ Added to {bashrc}[/green]")
@@ -285,10 +285,10 @@ def task_completions_install() -> dict[str, Any]:
         # Install zsh completion
         zshrc = os.path.join(home, ".zshrc")
         if os.path.exists(zshrc):
-            with open(zshrc) as f:
+            with open(zshrc, encoding="utf-8") as f:
                 content = f.read()
             if zsh_completion not in content:
-                with open(zshrc, "a") as f:
+                with open(zshrc, "a", encoding="utf-8") as f:
                     f.write(zsh_source_line)
                 installed.append(("Zsh", zshrc))
                 console.print(f"[green]✓ Added to {zshrc}[/green]")
