@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776939055143,
+  "lastUpdate": 1776944171585,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6820,6 +6820,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006383573295829561",
             "extra": "mean: 103.5778277909113 usec\nrounds: 2015"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bf7b7375cc4b31df05cbb1935555c64781570210",
+          "message": "chore: adopt upstream dependabot automerge + labels (merges PR #681, addresses #674)",
+          "timestamp": "2026-04-23T12:35:34+01:00",
+          "tree_id": "511b0d95abf87f9db9db3f338a25569fdbabd6ce",
+          "url": "https://github.com/endavis/infrafoundry/commit/bf7b7375cc4b31df05cbb1935555c64781570210"
+        },
+        "date": 1776944170263,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9224.65873519617,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016154289793233526",
+            "extra": "mean: 108.4050942919499 usec\nrounds: 2768"
           }
         ]
       }
