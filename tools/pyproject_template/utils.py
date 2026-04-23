@@ -171,6 +171,18 @@ def get_git_config(key: str, default: str = "") -> str:
 
     Returns:
         The config value if found, otherwise the default value.
+
+    Notes:
+        The unscoped ``git config <key>`` lookup merges system, global, and
+        local config — but only when the current working directory is inside
+        a git repository. When called from outside any repo (e.g. the
+        bootstrap wizard running from ``~/src`` before the project checkout
+        exists), the unscoped call exits non-zero even for keys that are set
+        in ``~/.gitconfig``. This function retries with ``--global`` on
+        failure so that ``user.name`` and ``user.email`` resolve from the
+        user's global identity regardless of CWD (see #470). Keys that only
+        exist locally (e.g. ``remote.origin.url``) fail both calls and fall
+        through to ``default``, which is the correct behavior.
     """
     try:
         result = subprocess.run(
@@ -178,7 +190,19 @@ def get_git_config(key: str, default: str = "") -> str:
             capture_output=True,
             text=True,
         )
-        return result.stdout.strip() if result.returncode == 0 else default
+        if result.returncode == 0:
+            return result.stdout.strip()
+        # Unscoped lookup failed — retry with --global so that globally
+        # configured values (user.name, user.email) resolve even when the
+        # CWD is not inside a git repository.
+        global_result = subprocess.run(
+            ["git", "config", "--global", key],
+            capture_output=True,
+            text=True,
+        )
+        if global_result.returncode == 0:
+            return global_result.stdout.strip()
+        return default
     except (subprocess.SubprocessError, FileNotFoundError):
         return default
 
@@ -272,25 +296,75 @@ def get_first_author(pyproject_data: dict[str, Any]) -> tuple[str, str]:
     return author.get("name", ""), author.get("email", "")
 
 
+# Marker tokens follow the ``__FOO__`` convention used in prose files
+# (README, CHANGELOG, docs, .github prose, .claude/CLAUDE.md). They are always
+# replaced via a blind string substitution because the surrounding double
+# underscores make collisions with real code/prose structurally impossible.
+_MARKER_TOKENS: frozenset[str] = frozenset(
+    {
+        "__PACKAGE_NAME__",
+        "__PYPI_NAME__",
+        "__PROJECT_NAME__",
+        "__GH_OWNER__",
+        "__AUTHOR_NAME__",
+        "__AUTHOR_EMAIL__",
+        "__DESCRIPTION__",
+        "__REPO_URL__",
+        "__REPO_SLUG__",
+    }
+)
+
+# Literal placeholder tokens that must use word-boundary regex when applied to
+# Python source so that identifier substrings (e.g. ``validate_package_name``,
+# ``my_username``) are not accidentally rewritten. These are the tokens that
+# collide with natural identifier-like substrings. Multi-word tokens such as
+# ``Your Name`` do not need this guard because they cannot appear inside a
+# Python identifier.
+_IDENTIFIER_LITERALS: frozenset[str] = frozenset(
+    {
+        "package_name",
+        "package-name",
+        "username",
+    }
+)
+
+
 def update_file(filepath: Path, replacements: dict[str, str]) -> None:
     """Update file with string replacements.
 
-    Special handling for 'package_name': only replaces when NOT followed by
-    optional whitespace and '=' to preserve:
-    - Python keyword arguments: package_name="value"
-    - TOML keys: package_name = "value"
+    Three replacement modes are applied per ``(old, new)`` pair:
+
+    1. **Marker tokens** (``__FOO__``): blind string replace. Markers cannot
+       collide with real identifiers or prose, so no guarding is required.
+    2. **Identifier-like literals in Python source** (``.py`` files only):
+       word-boundary regex replace so that ``validate_package_name`` and
+       similar identifier substrings survive. The ``package_name`` literal
+       additionally preserves keyword-argument and TOML-key forms via the
+       ``(?!\\s*=)`` lookahead.
+    3. **Everything else**: blind string replace (current default behaviour).
+
+    Binary files are skipped silently.
     """
     if not filepath.exists():
         return
     try:
         content = filepath.read_text(encoding="utf-8")
+        is_python = filepath.suffix == ".py"
         for old, new in replacements.items():
-            if old == "package_name":
-                # Use regex to replace 'package_name' only when NOT followed by
-                # optional whitespace and '='. This preserves:
-                # - Python kwargs: package_name="value"
-                # - TOML keys: package_name = "value"
-                content = re.sub(r"package_name(?!\s*=)", new, content)
+            if old in _MARKER_TOKENS:
+                # Markers are unambiguous; blind replace.
+                content = content.replace(old, new)
+            elif is_python and old in _IDENTIFIER_LITERALS:
+                # Word-boundary regex protects identifier substrings such as
+                # ``validate_package_name`` or ``my_username`` from being
+                # rewritten when the bare token appears elsewhere.
+                if old == "package_name":
+                    # Additional guard preserves kwargs/TOML-keys:
+                    # ``package_name="value"`` and ``package_name = "value"``.
+                    pattern = r"\bpackage_name\b(?!\s*=)"
+                else:
+                    pattern = rf"\b{re.escape(old)}\b"
+                content = re.sub(pattern, new, content)
             else:
                 content = content.replace(old, new)
         filepath.write_text(content, encoding="utf-8")
