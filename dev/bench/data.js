@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776963291447,
+  "lastUpdate": 1776969389806,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6882,6 +6882,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011005545539722523",
             "extra": "mean: 139.5776823581623 usec\nrounds: 2273"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "60bdfc934cec96d6b196d0b6b05d70aa24422948",
+          "message": "chore: sync new pyproject_template tooling modules and ruff-fix hook (merges PR #684, addresses #676)",
+          "timestamp": "2026-04-23T19:35:45+01:00",
+          "tree_id": "9da7012242f640d8e03684b1c6bf31d4fefcb969",
+          "url": "https://github.com/endavis/infrafoundry/commit/60bdfc934cec96d6b196d0b6b05d70aa24422948"
+        },
+        "date": 1776969388542,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8783.239784944046,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000021190024329101558",
+            "extra": "mean: 113.85320502284004 usec\nrounds: 2190"
           }
         ]
       }
