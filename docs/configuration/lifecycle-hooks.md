@@ -260,7 +260,7 @@ chmod +x envs/prod/scripts/*.sh
 - [Notifications Configuration](notifications.md) - Built-in event notifications
 - [Secrets Management](per-environment-credentials.md) - Managing secrets for hooks
 - [Architecture: Event System](../development/event-system.md) - Understanding lifecycle events
-- [ADR-0005: Environment Lifecycle Hooks](../architecture/decisions/0005-environment-lifecycle-hooks.md)
+- [ADR-0011: Environment Lifecycle Hooks](../decisions/0011-environment-lifecycle-hooks.md)
 
 ## Troubleshooting
 

@@ -3,19 +3,22 @@
 ## Status
 <!-- Required -->
 
-[Proposed | Accepted | Deprecated | Superseded]
-
-## Context
-<!-- Required -->
-
-What is the issue that we're seeing that is motivating this decision or change?
+Accepted
 
 ## Decision
 <!-- Required -->
 
-What is the change that we're proposing and/or doing?
+Brief summary of what was decided.
 
-## Consequences
+## Rationale
 <!-- Required -->
 
-What becomes easier or more difficult to do because of this change?
+Why this decision was made.
+
+## Related Issues
+
+- Issue #XX: Description
+
+## Related Documentation
+
+- [Relevant Doc](../path/to/doc.md)

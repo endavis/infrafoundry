@@ -34,11 +34,13 @@ This index provides a structured overview of the available documentation.
 - **[Design Principles](architecture/principles.md)**: Core principles guiding the design of InfraFoundry.
 - **[Design Principles Assessment](architecture/design-principles-assessment.md)**: Evaluation of the architecture against the design principles.
 - **[Architectural Patterns](architecture/architectural-patterns.md)**: Common software patterns employed in the codebase.
-- **[Architecture Decision Records](architecture/decisions/README.md)**: Historical record of key architectural decisions.
-  - [ADR-0001: Repository Pattern for State](architecture/decisions/0001-repository-pattern-for-state.md)
-  - [ADR-0002: Mixin Pattern for Providers](architecture/decisions/0002-mixin-pattern-for-providers.md)
-  - [ADR-0003: Granular Event Types](architecture/decisions/0003-granular-event-types.md)
-  - [ADR-0004: Protocol-Based Runner Interfaces](architecture/decisions/0004-protocol-based-runner-interfaces.md)
+- **[Architecture Decision Records](decisions/README.md)**: Historical record of key architectural decisions.
+  - [ADR-0007: Repository Pattern for State](decisions/0007-repository-pattern-for-state.md)
+  - [ADR-0008: Mixin Pattern for Providers](decisions/0008-mixin-pattern-for-providers.md)
+  - [ADR-0009: Granular Event Types](decisions/0009-granular-event-types.md)
+  - [ADR-0010: Protocol-Based Runner Interfaces](decisions/0010-protocol-based-runner-interfaces.md)
+  - [ADR-0011: Environment Lifecycle Hooks](decisions/0011-environment-lifecycle-hooks.md)
+  - [ADR-0012: Packages as Primary Resource Model](decisions/0012-packages-as-primary-resource-model.md)
 
 ## Guides
 - **[ISC to Kea Migration](guides/isc-to-kea-migration.md)**: Walkthrough for migrating DHCP services from ISC to Kea.

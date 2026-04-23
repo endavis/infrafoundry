@@ -426,7 +426,7 @@ class MyProtocol(Protocol):
 - [Implementing Runners (Full Guide)](implementing-runners.md)
 - [Pluggable Runners Architecture](../architecture/pluggable-runners.md)
 - [Custom Runner Example](../examples/custom-runner-example.md)
-- [ADR-0004: Protocol-Based Runner Interfaces](../architecture/decisions/0004-protocol-based-runner-interfaces.md)
+- [ADR-0010: Protocol-Based Runner Interfaces](../decisions/0010-protocol-based-runner-interfaces.md)
 
 ---
 
