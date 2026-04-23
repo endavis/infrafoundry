@@ -125,6 +125,9 @@ customization a reviewer must verify survived the merge.
 | `mkdocs.yml` | Preserves the InfraFoundry nav tree (Providers, Runners, Configuration, etc.). |
 | `pyproject.toml` | Preserves project name, dependencies, CLI entry points, and mypy/ruff overrides specific to InfraFoundry. |
 | `tools/doit/quality.py` | Preserves `task_lint_blueprints()` and any sibling blueprint-specific tasks. |
+| `tools/doit/install_tools.py` | Preserves age/sops/terraform/opentofu installer tasks. |
+| `tools/doit/release.py` | Preserves infrafoundry-specific release automation (release-PR flow). |
+| `tools/doit/testing.py` | Preserves `--cov=infrafoundry` coverage target. |
 
 When reviewing a sync PR that touches any of the above, scroll through the diff
 with the spot-check note in mind. If the customization is missing from the
@@ -144,4 +147,16 @@ the referenced follow-up phase lands.
   `ci.yml` does not declare that `workflow_call` input. Phase E will add the
   input (and switch the label-check logic to read from it), at which point
   these two files can be adopted verbatim. Remove this note once Phase E
+  lands.
+- `tests/test_ci_workflow.py`, `tests/test_release_workflow.py`,
+  `tests/test_testpypi_workflow.py` — deferred from Phase C2 to Phase E of
+  sync tracker #673. These structural workflow tests were written upstream
+  against upstream's evolved workflow shapes: `ci.yml` with a `concurrency`
+  block and `workflow_call.inputs.full_matrix`; `release.yml` with a
+  separate `sbom` artifact upload; `testpypi.yml` with PEP440 tag-glob
+  triggers (`v*a[0-9]*` / `v*b[0-9]*` / `v*rc[0-9]*` / `v*.dev[0-9]*`
+  instead of `v*-[a-zA-Z]*`, fixing upstream #659). Our workflows still
+  carry the pre-divergence shapes; adopting the tests now fails 14 assertions.
+  Phase E will update the three workflow files to match upstream, at which
+  point these tests can be adopted verbatim. Remove this note once Phase E
   lands.

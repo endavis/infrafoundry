@@ -4,6 +4,8 @@ from typing import Any
 
 from doit.tools import title_with_actions
 
+from .base import optional_root_files
+
 
 def task_audit() -> dict[str, Any]:
     """Run security audit with pip-audit (requires security extras)."""
@@ -20,8 +22,9 @@ def task_security() -> dict[str, Any]:
     """Run security checks with bandit (requires security extras)."""
     return {
         "actions": [
-            "uv run bandit -c pyproject.toml -r src/ tools/ || "
-            "echo 'bandit not installed. Run: uv sync --extra security'"
+            "uv run bandit -c pyproject.toml -r src/ tools/"
+            + optional_root_files("bootstrap.py")
+            + " || echo 'bandit not installed. Run: uv sync --extra security'"
         ],
         "title": title_with_actions,
         "verbosity": 0,

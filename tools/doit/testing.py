@@ -6,16 +6,16 @@ from doit.tools import title_with_actions
 
 
 def task_test() -> dict[str, Any]:
-    """Run pytest."""
+    """Run pytest with parallel execution."""
     return {
-        "actions": ["uv run pytest -v"],
+        "actions": ["uv run pytest -n auto -v"],
         "title": title_with_actions,
         "verbosity": 0,
     }
 
 
 def task_coverage() -> dict[str, Any]:
-    """Run pytest with coverage."""
+    """Run pytest with coverage (note: parallel execution disabled for accurate coverage)."""
     return {
         "actions": [
             "uv run pytest "

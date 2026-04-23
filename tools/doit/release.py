@@ -32,7 +32,10 @@ def validate_merge_commits(console: "ConsoleType") -> bool:
             text=True,
         )
         last_tag = result.stdout.strip() if result.returncode == 0 else ""
-        range_spec = f"{last_tag}..HEAD" if last_tag else "HEAD"
+        # When no tag exists yet (first release), bound the walk to the last
+        # 10 commits — matches validate_issue_links below. Walking full HEAD
+        # can surface merges from unrelated pre-project history.
+        range_spec = f"{last_tag}..HEAD" if last_tag else "HEAD~10..HEAD"
 
         result = subprocess.run(
             ["git", "log", "--merges", "--pretty=format:%h %s", range_spec],
@@ -49,9 +52,11 @@ def validate_merge_commits(console: "ConsoleType") -> bool:
         console.print("[green]✓ No merge commits to validate.[/green]")
         return True
 
-    # Pattern: <type>: <subject> (merges PR #XX, addresses #YY) or (merges PR #XX)
+    # Pattern: <type>: <subject> (merges PR #XX, addresses #YY) or (merges PR #XX).
+    # `release` is an allowed type so release-PR merges (e.g. "release: v0.1.0a0
+    # (merges PR #652)") pass governance validation on the next release cut.
     merge_pattern = re.compile(
-        r"^[a-f0-9]+\s+(feat|fix|refactor|docs|test|chore|ci|perf):\s.+\s"
+        r"^[a-f0-9]+\s+(feat|fix|refactor|docs|test|chore|ci|perf|release):\s.+\s"
         r"\(merges PR #\d+(?:, addresses #\d+(?:, #\d+)*)?\)$"
     )
 
@@ -724,6 +729,12 @@ def task_release_tag() -> dict[str, Any]:
         # Find the most recently merged release PR
         console.print("\n[cyan]Finding merged release PR...[/cyan]")
         try:
+            # Match PRs whose head branch starts with ``release/`` — the naming
+            # convention ``doit release`` uses. Do NOT use a title-substring
+            # search that includes the literal "release" prefix plus a colon
+            # and space: GitHub's search parses the colon as a qualifier
+            # separator (like ``head:``, ``author:``) and returns zero
+            # results. See #657.
             result = subprocess.run(
                 [
                     "gh",
@@ -732,7 +743,7 @@ def task_release_tag() -> dict[str, Any]:
                     "--state",
                     "merged",
                     "--search",
-                    "release: v in:title",
+                    "head:release/",
                     "--limit",
                     "1",
                     "--json",
