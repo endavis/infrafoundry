@@ -1020,7 +1020,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'dev'", specifier = ">=1.0.4" },
     { name = "mutmut", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.20.2" },
-    { name = "opnsense-openapi", specifier = ">=0.1.0" },
+    { name = "opnsense-openapi", specifier = ">=0.3.0" },
     { name = "pip", marker = "extra == 'security'", specifier = ">=26.1" },
     { name = "pip-audit", marker = "extra == 'security'", specifier = ">=2.6" },
     { name = "pip-licenses", marker = "extra == 'security'", specifier = ">=4.0" },
@@ -1772,16 +1772,16 @@ wheels = [
 
 [[package]]
 name = "opnsense-openapi"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/83/d22cdda8e290f07f3cfcc78245cc028b7649b0b0a8901a0291062c2e59bd/opnsense_openapi-0.2.0.tar.gz", hash = "sha256:1a7b08ddbf5912d964b9572d587f6ce8d9e1cbdabbc2eb03dc382096135cee8c", size = 2159533, upload-time = "2026-02-11T16:57:22.515Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/ab/eeeacb290afd5f14c8ec625aeb2369d73d1cd99bd7b5a6dd780467b3b9b0/opnsense_openapi-0.3.0.tar.gz", hash = "sha256:f365e1b871514fdd7a7f05abc1835c89bb7d86b49f98827cea93e6bb52d82194", size = 2780253, upload-time = "2026-04-23T19:15:51.214Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/d2/f84376dd5764e99faeef7ee8d16c9cb2e4dfd5fd971342b835d5cceb8c26/opnsense_openapi-0.2.0-py3-none-any.whl", hash = "sha256:512bbf76ba511497abd57e00ee460409327883f6331a41a6a2682c302dd3e3ef", size = 2275282, upload-time = "2026-02-11T16:57:20.095Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/e1/cce11ab5efd31ea08ed0137f523130944db3f7d634599e116e6ccf0a3039/opnsense_openapi-0.3.0-py3-none-any.whl", hash = "sha256:1278e3bcdbf96e155965c58e502e362123426f164e30f638bc722012c82e1647", size = 2511943, upload-time = "2026-04-23T19:15:49.141Z" },
 ]
 
 [[package]]
