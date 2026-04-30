@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -46,18 +47,52 @@ from typing import Any
 import yaml
 from opnsense_openapi import OPNsenseClient
 
+
+def _warn_if_codegen_unavailable() -> None:
+    """Warn if ``openapi-python-client`` isn't on ``PATH``.
+
+    The typed ``.api`` surface in ``opnsense_openapi`` is auto-generated on
+    first use by shelling out to the ``openapi-python-client`` CLI. Without
+    it, ``client.api.<...>`` raises ``RuntimeError`` ("No OpenAPI spec found
+    for version ...") and the spike falls back to bare ``client.get/post``
+    for every operation. Capturing this as a clear warning at startup is
+    itself a finding for ADR-0014: a typed surface gated on an external CLI
+    binary is non-trivial to provision in production.
+    """
+    if shutil.which("openapi-python-client") is None:
+        sys.stderr.write(
+            "WARNING: openapi-python-client is not on PATH.\n"
+            "  The typed .api surface cannot be generated; the spike will\n"
+            "  fall back to bare client.get/post(...) for every operation.\n"
+            "  Install with: uv tool install openapi-python-client\n"
+            "  (See docs/development/opnsense-spike-vlan-findings.md)\n\n"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Constants — VLAN endpoint coordinates in the OPNsense REST API
 # ---------------------------------------------------------------------------
 
 VLAN_MODULE = "interfaces"
-VLAN_CONTROLLER = "vlansettings"
+# Live OPNsense 26.1.6_2 routes to ``/api/interfaces/vlan_settings/*`` (with
+# underscore). The bundled OpenAPI spec at opnsense-openapi 0.3.0 advertises
+# ``vlansettings`` (no underscore). The spec is wrong: the generator does
+# naive lowercasing of CamelCase, but OPNsense's URL routing converts
+# ``VlanSettingsController`` to snake_case. This is heterogeneous across
+# controllers — Kea uses ``dhcpv4``/``dhcpv6`` (no underscore) while
+# VlanSettings uses ``vlan_settings``. Fixing this in the upstream spec
+# generator is a hard problem (no universal rule); we use the verified-
+# correct live path here and capture the finding for ADR-0014.
+VLAN_CONTROLLER = "vlan_settings"
 
 # Typed-surface function names follow the generated client's snake_case naming
-# convention: ``api.interfaces.vlansettings_search_item``, etc. The spike
-# resolves these dynamically so we can fall back to ``client.get/post(...)``
-# if the typed surface doesn't expose a particular endpoint (e.g. when an
-# operationId is missing from the spec).
+# convention: ``api.interfaces.<controller>_<action>``. With the spec bug
+# above, the typed surface (when generated) would also point at the wrong
+# URL and 404. The spike's typed-surface probe in ``_typed_call`` absorbs
+# this — but that the typed path is non-functional against current 0.3.0
+# specs is itself a finding for ADR-0014. The names below match what the
+# generator currently emits; they will need to update to ``vlan_settings_*``
+# when the upstream spec is fixed.
 TYPED_FN_SEARCH = "vlansettings_search_item"
 TYPED_FN_ADD = "vlansettings_add_item"
 TYPED_FN_GET = "vlansettings_get_item"
@@ -95,6 +130,14 @@ class VlanConfig:
     The diff key ``(device, tag)`` is what makes a VLAN unique on an OPNsense
     box; the OPNsense-assigned ``uuid`` is opaque and the resource ``name``
     in the InfraFoundry YAML is operator-facing only.
+
+    ``lock`` is a meta-property — when ``True``, the spike treats the entry as
+    "observed but untouchable": the matching live resource is reported in the
+    plan but is never added, updated, or deleted. Useful for the partial-
+    migration case where the operator wants visibility of a resource (e.g.,
+    the WAN trunk) without IaC asserting authority over it. ADR-0014 will
+    decide whether the production contract should support locks at all, and
+    if so whether they should be granular (per-action) or boolean.
     """
 
     name: str
@@ -102,6 +145,7 @@ class VlanConfig:
     tag: int
     description: str
     priority: int
+    lock: bool = False
 
     @property
     def diff_key(self) -> tuple[str, int]:
@@ -147,6 +191,11 @@ class Diff:
     adds: list[VlanConfig] = field(default_factory=list)
     updates: list[tuple[LiveVlan, VlanConfig]] = field(default_factory=list)
     deletes: list[LiveVlan] = field(default_factory=list)
+    # Locked YAML entries paired with their live counterpart (or ``None`` if
+    # declared-but-missing). Always reported in the plan output, never acted
+    # on by ``apply``. Tracking these is itself the spike's safety
+    # affordance against silent footguns.
+    locked: list[tuple[VlanConfig, LiveVlan | None]] = field(default_factory=list)
 
     @property
     def is_empty(self) -> bool:
@@ -268,6 +317,11 @@ def load_vlans_from_yaml(path: Path) -> list[VlanConfig]:
         if not isinstance(description, str):
             raise ValueError(f"VLAN '{name}' description must be a string")
 
+        # ``lock`` is a top-level meta-property, not part of ``config``.
+        lock_raw = entry.get("lock", False)
+        if not isinstance(lock_raw, bool):
+            raise ValueError(f"VLAN '{name}' lock must be a boolean (true/false)")
+
         vlans.append(
             VlanConfig(
                 name=name,
@@ -275,6 +329,7 @@ def load_vlans_from_yaml(path: Path) -> list[VlanConfig]:
                 tag=tag,
                 description=description,
                 priority=priority,
+                lock=lock_raw,
             )
         )
 
@@ -307,10 +362,18 @@ def _typed_call(client: OPNsenseClient, function_name: str, **kwargs: Any) -> An
     """Invoke a typed-surface function, returning ``None`` if it isn't generated.
 
     The typed ``GeneratedAPI`` proxies ``__getattr__`` lazily, so attribute
-    access alone won't fail — the call only blows up when ``sync()``
-    eventually tries to ``importlib.import_module(...)`` the function. This
-    helper catches that ``AttributeError`` and signals the caller to fall
-    back to the raw ``client.get/post(...)`` path.
+    access alone won't fail — the call only blows up later. There are two
+    failure modes to absorb:
+
+    - ``AttributeError`` at ``sync()`` time when ``importlib.import_module(...)``
+      can't find the generated function module (typed surface partially
+      generated; rare).
+    - ``RuntimeError`` at ``client.api`` access time when no generated client
+      module exists for the detected version at all (e.g., the upstream
+      auto-generator couldn't run because ``openapi-python-client`` isn't on
+      ``PATH``, or the version has a security-patch suffix like ``26.1.6_2``
+      that doesn't match a generated module path). The spike falls back to
+      bare ``client.get/post(...)`` in either case.
 
     Returns:
         The function's return value, or ``None`` to indicate "not available".
@@ -319,15 +382,16 @@ def _typed_call(client: OPNsenseClient, function_name: str, **kwargs: Any) -> An
         module_proxy = client.api.interfaces  # type: ignore[no-any-return]
         function_proxy = getattr(module_proxy, function_name)
         return function_proxy.sync(**kwargs)
-    except AttributeError:
-        # Typed surface didn't expose this function — caller falls back.
+    except (AttributeError, RuntimeError):
+        # Typed surface didn't expose this function or no generated client
+        # for the running version — caller falls back to raw HTTP.
         return None
 
 
 def search_vlans(client: OPNsenseClient) -> list[LiveVlan]:
     """Fetch the live VLAN list, preferring the typed surface.
 
-    Falls back to ``client.post("interfaces", "vlansettings", "searchItem")``
+    Falls back to ``client.post("interfaces", "vlan_settings", "searchItem")``
     if the typed function isn't generated for the detected version.
     """
     response: Any = _typed_call(client, TYPED_FN_SEARCH)
@@ -405,36 +469,58 @@ def reconfigure(client: OPNsenseClient) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def compute_diff(desired: list[VlanConfig], current: list[LiveVlan]) -> Diff:
+def compute_diff(
+    desired: list[VlanConfig], current: list[LiveVlan], *, add_only: bool = False
+) -> Diff:
     """Compare desired YAML state to live state, keyed by ``(device, tag)``.
 
     Args:
         desired: VLANs the operator wants to exist.
         current: VLANs the OPNsense box currently has.
+        add_only: If ``True``, never emit deletes for live resources that
+            don't appear in ``desired``. Adds and updates still happen
+            normally. Useful for partial migrations where the YAML doesn't
+            yet describe everything on the box.
 
     Returns:
-        A ``Diff`` with adds/updates/deletes. ``updates`` carries the live
-        record alongside the desired record so the caller has the UUID.
+        A ``Diff`` with adds/updates/deletes plus a ``locked`` list of
+        observed-but-untouchable pairs. ``updates`` carries the live record
+        alongside the desired record so the caller has the UUID.
+
+    Locked entries (``VlanConfig.lock=True``) are skipped entirely — the
+    matching live record (if any) is recorded in ``Diff.locked`` and never
+    appears in ``adds``/``updates``/``deletes``. A locked-but-missing entry
+    (declared in YAML, no live counterpart) is still recorded so the plan
+    output can flag it.
     """
     desired_by_key: dict[tuple[str, int], VlanConfig] = {v.diff_key: v for v in desired}
     current_by_key: dict[tuple[str, int], LiveVlan] = {v.diff_key: v for v in current}
+    locked_keys: set[tuple[str, int]] = {v.diff_key for v in desired if v.lock}
 
     adds: list[VlanConfig] = []
     updates: list[tuple[LiveVlan, VlanConfig]] = []
     deletes: list[LiveVlan] = []
+    locked: list[tuple[VlanConfig, LiveVlan | None]] = []
 
     for key, want in desired_by_key.items():
         have = current_by_key.get(key)
+        if want.lock:
+            locked.append((want, have))
+            continue
         if have is None:
             adds.append(want)
         elif (have.description, have.priority) != (want.description, want.priority):
             updates.append((have, want))
 
-    for key, have in current_by_key.items():
-        if key not in desired_by_key:
-            deletes.append(have)
+    if not add_only:
+        for key, have in current_by_key.items():
+            if key in locked_keys:
+                # Already recorded above as locked; never emit a delete.
+                continue
+            if key not in desired_by_key:
+                deletes.append(have)
 
-    return Diff(adds=adds, updates=updates, deletes=deletes)
+    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked)
 
 
 # ---------------------------------------------------------------------------
@@ -448,11 +534,17 @@ def cmd_inspect(client: OPNsenseClient) -> int:
     print(f"Detected OPNsense version: {version}")
 
     endpoints: list[tuple[str, str, str]] = client.list_endpoints()
+    # Filter accepts both spellings: the bundled spec at opnsense-openapi 0.3.0
+    # uses "vlansettings" (no underscore) due to a generator bug; the live API
+    # uses "vlan_settings". Both substrings are matched so this works whether
+    # the spec is buggy or fixed upstream.
     vlan_endpoints: list[tuple[str, str, str]] = [
-        (path, method, summary) for path, method, summary in endpoints if "vlansettings" in path
+        (path, method, summary)
+        for path, method, summary in endpoints
+        if "vlansettings" in path or "vlan_settings" in path
     ]
     print(f"Total endpoints in matched spec: {len(endpoints)}")
-    print(f"VLAN endpoints (interfaces/vlansettings/*): {len(vlan_endpoints)}")
+    print(f"VLAN endpoints (interfaces/vlan_settings/*): {len(vlan_endpoints)}")
     for path, method, _ in vlan_endpoints:
         print(f"  {method:5s} {path}")
 
@@ -487,21 +579,23 @@ def cmd_list(client: OPNsenseClient) -> int:
     return 0
 
 
-def cmd_plan(client: OPNsenseClient, yaml_path: Path) -> int:
+def cmd_plan(client: OPNsenseClient, yaml_path: Path, *, add_only: bool = False) -> int:
     """Compute and print the diff between YAML and live state."""
     desired = load_vlans_from_yaml(yaml_path)
     current = search_vlans(client)
-    diff = compute_diff(desired, current)
-    _print_diff(diff)
+    diff = compute_diff(desired, current, add_only=add_only)
+    _print_diff(diff, add_only=add_only)
     return 0
 
 
-def cmd_apply(client: OPNsenseClient, yaml_path: Path, *, confirm: bool) -> int:
+def cmd_apply(
+    client: OPNsenseClient, yaml_path: Path, *, confirm: bool, add_only: bool = False
+) -> int:
     """Apply the diff. Without ``--confirm``, prints the plan and exits without mutating."""
     desired = load_vlans_from_yaml(yaml_path)
     current = search_vlans(client)
-    diff = compute_diff(desired, current)
-    _print_diff(diff)
+    diff = compute_diff(desired, current, add_only=add_only)
+    _print_diff(diff, add_only=add_only)
 
     if diff.is_empty:
         return 0
@@ -529,14 +623,15 @@ def cmd_apply(client: OPNsenseClient, yaml_path: Path, *, confirm: bool) -> int:
     return 0
 
 
-def _print_diff(diff: Diff) -> None:
+def _print_diff(diff: Diff, *, add_only: bool = False) -> None:
     """Render a Diff for the operator."""
-    if diff.is_empty:
+    if diff.is_empty and not diff.locked:
         print("No changes.")
         return
+    mode_suffix = " (add-only mode — deletes suppressed)" if add_only else ""
     print(
         f"Plan: {len(diff.adds)} to add, {len(diff.updates)} to update, "
-        f"{len(diff.deletes)} to delete."
+        f"{len(diff.deletes)} to delete, {len(diff.locked)} locked.{mode_suffix}"
     )
     for vlan in diff.adds:
         print(f"  + {vlan.device} tag={vlan.tag} desc={vlan.description!r} pcp={vlan.priority}")
@@ -549,6 +644,14 @@ def _print_diff(diff: Diff) -> None:
         )
     for live in diff.deletes:
         print(f"  - {live.device} tag={live.tag} desc={live.description!r} (uuid={live.uuid})")
+    for want, have in diff.locked:
+        if have is None:
+            print(f"  L {want.device} tag={want.tag} (locked, declared but not present on box)")
+        else:
+            print(
+                f"  L {have.device} tag={have.tag} (locked, uuid={have.uuid}) — "
+                "no action will be taken"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -571,6 +674,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     plan_parser = subparsers.add_parser("plan", help="Diff a YAML file against live state.")
     plan_parser.add_argument("yaml_path", type=Path, help="Path to VLAN YAML file.")
+    plan_parser.add_argument(
+        "--add-only",
+        action="store_true",
+        help=(
+            "Suppress deletes for live VLANs not in the YAML. Useful for partial "
+            "migrations where the YAML doesn't yet describe everything on the box."
+        ),
+    )
 
     apply_parser = subparsers.add_parser("apply", help="Apply a YAML file's diff to the box.")
     apply_parser.add_argument("yaml_path", type=Path, help="Path to VLAN YAML file.")
@@ -578,6 +689,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--confirm",
         action="store_true",
         help="Actually dispatch mutations. Without this flag, apply is a dry run.",
+    )
+    apply_parser.add_argument(
+        "--add-only",
+        action="store_true",
+        help=(
+            "Suppress deletes for live VLANs not in the YAML. Useful for partial "
+            "migrations where the YAML doesn't yet describe everything on the box."
+        ),
     )
 
     return parser
@@ -588,6 +707,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    _warn_if_codegen_unavailable()
+
     credentials = load_env_credentials()
     client = build_client(credentials)
 
@@ -597,9 +718,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "list":
             return cmd_list(client)
         if args.command == "plan":
-            return cmd_plan(client, args.yaml_path)
+            return cmd_plan(client, args.yaml_path, add_only=bool(args.add_only))
         if args.command == "apply":
-            return cmd_apply(client, args.yaml_path, confirm=bool(args.confirm))
+            return cmd_apply(
+                client,
+                args.yaml_path,
+                confirm=bool(args.confirm),
+                add_only=bool(args.add_only),
+            )
     finally:
         client.close()
 

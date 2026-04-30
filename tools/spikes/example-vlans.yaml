@@ -8,12 +8,28 @@
 # The 'name' field is operator-facing only; OPNsense never sees it.
 #
 # Target box: opnsense-a (staging), NOT prod. See tools/spikes/README.md.
+# Parent NIC `ixl1` matches opnsense-a's hardware (Intel X550, the LAN side).
+# Edit `device:` if your box uses different NIC names — run the `inspect`
+# subcommand or check the OPNsense UI for available interfaces.
+#
+# Optional top-level meta-property:
+#   lock: true   — IaC observes this resource but never adds/updates/deletes
+#                  it. Useful for partial migrations where the YAML doesn't
+#                  yet describe everything on the box (e.g. the WAN trunk).
+#                  Uncomment the block below and adjust device/tag to mirror
+#                  your live state if you want a worked example.
+#
+# - provider: opnsense
+#   type: vlan
+#   name: wan-trunk-observed
+#   lock: true
+#   config: {device: ixl0, tag: 4000, description: "", priority: 0}
 
 - provider: opnsense
   type: vlan
   name: spike-vlan-storage
   config:
-    device: igb1
+    device: ixl1
     tag: 4001
     description: "spike-test storage vlan"
     priority: 0
@@ -22,7 +38,7 @@
   type: vlan
   name: spike-vlan-iot
   config:
-    device: igb1
+    device: ixl1
     tag: 4002
     description: "spike-test iot vlan"
     priority: 3
@@ -31,7 +47,7 @@
   type: vlan
   name: spike-vlan-mgmt
   config:
-    device: igb1
+    device: ixl1
     tag: 4003
     description: "spike-test mgmt vlan"
     priority: 7

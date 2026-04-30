@@ -217,19 +217,60 @@ class TestLoadVlansFromYaml:
         with pytest.raises(ValueError, match="non-integer"):
             spike.load_vlans_from_yaml(path)
 
+    def test_lock_field_loads_when_present(self, tmp_path: Path) -> None:
+        path = tmp_path / "locked.yaml"
+        path.write_text(
+            """
+- provider: opnsense
+  type: vlan
+  name: wan-trunk
+  lock: true
+  config: {device: ixl0, tag: 4000, description: "", priority: 0}
+- provider: opnsense
+  type: vlan
+  name: storage
+  config: {device: igb1, tag: 100, description: storage, priority: 0}
+""",
+            encoding="utf-8",
+        )
+        vlans = spike.load_vlans_from_yaml(path)
+        assert len(vlans) == 2
+        wan = next(v for v in vlans if v.name == "wan-trunk")
+        storage = next(v for v in vlans if v.name == "storage")
+        assert wan.lock is True
+        assert storage.lock is False  # default
+
+    def test_lock_field_must_be_boolean(self, tmp_path: Path) -> None:
+        path = tmp_path / "bad-lock.yaml"
+        path.write_text(
+            """
+- provider: opnsense
+  type: vlan
+  name: v1
+  lock: "yes"
+  config: {device: igb0, tag: 10, description: a, priority: 0}
+""",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="lock must be a boolean"):
+            spike.load_vlans_from_yaml(path)
+
 
 # ---------------------------------------------------------------------------
 # Diff engine
 # ---------------------------------------------------------------------------
 
 
-def _vlan(device: str, tag: int, desc: str = "x", pcp: int = 0) -> spike.VlanConfig:
+def _vlan(
+    device: str, tag: int, desc: str = "x", pcp: int = 0, *, lock: bool = False
+) -> spike.VlanConfig:
     return spike.VlanConfig(
         name=f"vlan-{device}-{tag}",
         device=device,
         tag=tag,
         description=desc,
         priority=pcp,
+        lock=lock,
     )
 
 
@@ -315,6 +356,85 @@ class TestComputeDiff:
         assert diff.updates[0][0].uuid == "u2"
         assert diff.deletes[0].uuid == "u3"
 
+    def test_locked_yaml_entry_with_match_skipped_from_actions(self) -> None:
+        # WAN trunk on the box; declared in YAML with lock=True so IaC stays
+        # away — exactly the opnsense-a finding that motivated this feature.
+        desired = [_vlan("ixl0", 4000, desc="", lock=True)]
+        current = [_live("u1", "ixl0", 4000, desc="")]
+        diff = spike.compute_diff(desired, current)
+        assert diff.adds == []
+        assert diff.updates == []
+        assert diff.deletes == []
+        assert len(diff.locked) == 1
+        want, have = diff.locked[0]
+        assert want.lock is True
+        assert have is not None
+        assert have.uuid == "u1"
+
+    def test_locked_yaml_entry_without_match_recorded_as_missing(self) -> None:
+        desired = [_vlan("igb0", 100, lock=True)]
+        current: list[spike.LiveVlan] = []
+        diff = spike.compute_diff(desired, current)
+        assert diff.adds == []
+        assert diff.updates == []
+        assert diff.deletes == []
+        assert len(diff.locked) == 1
+        want, have = diff.locked[0]
+        assert want.lock is True
+        assert have is None
+
+    def test_locked_entry_protects_live_resource_from_delete(self) -> None:
+        # Even in fully-managed mode, locked entries never produce deletes.
+        desired = [
+            _vlan("ixl0", 4000, lock=True),  # observed-only
+            _vlan("igb1", 100, desc="new"),  # add
+        ]
+        current = [
+            _live("u1", "ixl0", 4000),
+            _live("u2", "igb0", 99),  # not in YAML, NOT locked → delete
+        ]
+        diff = spike.compute_diff(desired, current)
+        assert len(diff.adds) == 1
+        assert diff.adds[0].tag == 100
+        assert len(diff.deletes) == 1
+        assert diff.deletes[0].uuid == "u2"
+        assert len(diff.locked) == 1
+
+    def test_add_only_suppresses_deletes(self) -> None:
+        desired = [_vlan("igb1", 100)]
+        current = [
+            _live("u1", "ixl0", 4000),  # not in YAML — would normally be deleted
+            _live("u2", "igb0", 99),  # ditto
+        ]
+        diff = spike.compute_diff(desired, current, add_only=True)
+        assert len(diff.adds) == 1
+        assert len(diff.deletes) == 0  # ← suppressed by add_only
+        # add_only is orthogonal to locked: nothing here is locked.
+        assert diff.locked == []
+        assert not diff.is_empty  # the add is real work
+
+    def test_add_only_still_emits_updates(self) -> None:
+        # add_only suppresses deletes only; updates still happen.
+        desired = [_vlan("igb0", 10, desc="new")]
+        current = [_live("u1", "igb0", 10, desc="old")]
+        diff = spike.compute_diff(desired, current, add_only=True)
+        assert len(diff.updates) == 1
+        assert len(diff.deletes) == 0
+
+    def test_add_only_combined_with_lock(self) -> None:
+        desired = [
+            _vlan("ixl0", 4000, lock=True),
+            _vlan("igb1", 100, desc="new"),
+        ]
+        current = [
+            _live("u1", "ixl0", 4000),
+            _live("u2", "igb0", 99),  # would be deleted in fully-managed mode
+        ]
+        diff = spike.compute_diff(desired, current, add_only=True)
+        assert len(diff.adds) == 1
+        assert len(diff.deletes) == 0  # add_only suppresses
+        assert len(diff.locked) == 1
+
 
 # ---------------------------------------------------------------------------
 # Typed-surface fallback
@@ -345,7 +465,7 @@ class TestSearchVlansFallback:
         assert result[0].uuid == "u1"
         assert result[0].device == "igb0"
         assert result[0].tag == 10
-        client.post.assert_called_once_with("interfaces", "vlansettings", "searchItem")
+        client.post.assert_called_once_with("interfaces", "vlan_settings", "searchItem")
 
     def test_typed_search_used_when_available(self) -> None:
         client = MagicMock()
@@ -364,6 +484,32 @@ class TestSearchVlansFallback:
         assert result[0].priority == 3
         # Fallback must not have been used.
         client.post.assert_not_called()
+
+    def test_fallback_when_client_api_raises_runtime_error(self) -> None:
+        """``client.api`` raises ``RuntimeError`` when no generated client exists.
+
+        Reproduces the live-spike-run scenario where ``opnsense-python-client``
+        is not on ``PATH``: the typed surface can't be generated, and ``client.api``
+        access raises ``RuntimeError`` rather than ``AttributeError``. The fallback
+        path must absorb it.
+        """
+        client = MagicMock()
+        # Accessing ``client.api`` raises RuntimeError — the failure mode the
+        # operator hit when openapi-python-client wasn't installed.
+        type(client).api = property(
+            fget=lambda _: (_ for _ in ()).throw(
+                RuntimeError("No OpenAPI spec found for version 26.1.6_2")
+            )
+        )
+        client.post.return_value = {
+            "rows": [{"uuid": "u3", "if": "igb0", "tag": "5", "descr": "v5", "pcp": "0"}]
+        }
+
+        result = spike.search_vlans(client)
+
+        assert len(result) == 1
+        assert result[0].uuid == "u3"
+        client.post.assert_called_once_with("interfaces", "vlan_settings", "searchItem")
 
     def test_empty_response_returns_empty_list(self) -> None:
         client = MagicMock()
@@ -534,6 +680,31 @@ class TestBuildClient:
             verify_ssl=False,
             auto_detect_version=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# Codegen-availability warning — surfaces the typed-surface gating on a CLI
+# ---------------------------------------------------------------------------
+
+
+class TestWarnIfCodegenUnavailable:
+    """The spike warns operators if ``openapi-python-client`` isn't installed."""
+
+    def test_warns_when_cli_not_on_path(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with patch.object(spike.shutil, "which", return_value=None):
+            spike._warn_if_codegen_unavailable()
+        err = capsys.readouterr().err
+        assert "openapi-python-client is not on PATH" in err
+        assert "uv tool install openapi-python-client" in err
+
+    def test_silent_when_cli_present(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with patch.object(
+            spike.shutil, "which", return_value="/usr/local/bin/openapi-python-client"
+        ):
+            spike._warn_if_codegen_unavailable()
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        assert captured.out == ""
 
 
 # ---------------------------------------------------------------------------

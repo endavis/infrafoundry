@@ -9,7 +9,7 @@ Demonstrates end-to-end VLAN management against OPNsense via `opnsense_openapi`'
 ### Prerequisites
 
 1. An OPNsense box you don't mind reconfiguring. **Use `opnsense-a` (staging), NOT prod.**
-2. An API key/secret with permission for `interfaces/vlansettings/*`.
+2. An API key/secret with permission for `interfaces/vlan_settings/*` (the live URL — the bundled OpenAPI spec at `opnsense-openapi` 0.3.0 calls it `vlansettings`, but live OPNsense routes to `vlan_settings`; see findings doc for details).
 3. The `opnsense_openapi` package (already in `pyproject.toml`).
 
 ### Environment variables
@@ -50,6 +50,13 @@ uv run python tools/spikes/vlan_direct_api.py plan tools/spikes/example-vlans.ya
 # 4. Apply the diff. Without --confirm, this is a dry run identical to `plan`.
 uv run python tools/spikes/vlan_direct_api.py apply tools/spikes/example-vlans.yaml --confirm
 ```
+
+#### Safety flags
+
+- **`--add-only`** (on `plan` and `apply`) — suppresses deletes for live VLANs that aren't in the YAML. Use this on partial migrations where the YAML doesn't yet describe everything on the box. Adds and updates still happen.
+- **`lock: true`** at the resource level in YAML — observed but untouchable. The spike records the lock in the plan output and never adds/updates/deletes the matching live resource. Useful for things like the WAN trunk that you want IaC to be aware of but never touch. See `example-vlans.yaml` for the syntax.
+
+The two are orthogonal: locks travel with specific resources in YAML; `--add-only` is a session-level "trust me, don't sweep deletes."
 
 ### Round-trip test (the load-bearing acceptance criterion)
 
