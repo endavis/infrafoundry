@@ -47,15 +47,24 @@ ISC DHCP (`<dhcpd>`/`<dhcpdv6>`) is also out of scope going forward — Kea is t
 - **The deferred items are deliberately small and stable.** HA sync, OpenVPN, ACME, certs, and physical layer constructs (LAGG/bridge/GRE/etc.) change infrequently and are well-served by OPNsense's selective `config.xml` import. Putting them under IaC is a future option, not a prerequisite.
 - **The scope is bounded and incremental.** Each gap is its own component with a clear contract (template + validator + manager + tests + `config migrate` extractor). Issues can ship independently and the migration runbook absorbs each one as it lands.
 
-## Data model
+## Data model and apply mechanism
 
-YAML resource schemas mirror the [browningluke/opnsense](https://registry.terraform.io/providers/browningluke/opnsense/latest/docs) Terraform provider's resource arguments. New components follow the existing pattern: a Pydantic config model whose fields match the corresponding `opnsense_*` Terraform resource, rendered to `.tf` via Jinja2 (see `templates/opnsense/vlans.tf.j2` for the established shape).
+The apply mechanism is intentionally **not** decided in this ADR. The current OPNsense provider mixes paths:
 
-`config migrate` extractors read live state from the OPNsense REST API via the `opnsense_openapi` client and write YAML in that same schema. The round-trip property `extract → apply` must converge: dumping a configured box and applying the dump back produces no drift.
+- VLANs / aliases / firewall rules go through Terraform (the [browningluke/opnsense](https://registry.terraform.io/providers/browningluke/opnsense/latest/docs) provider) plus an Ansible playbook for the post-apply service reload (`templates/opnsense/playbook.yml.j2`).
+- Kea DHCP goes through a Python service calling the OPNsense REST API via the `opnsense_openapi` client — using bare `.request(method, endpoint, ...)` rather than the typed methods the package exposes.
 
-The XML `config.xml` format is not part of either path. It is used only for one-shot scoping (e.g., the inventory in [docs/development/opnsense-resource-coverage.md](../development/opnsense-resource-coverage.md)) and as a fallback discovery aid for resource types where no stable API endpoint exists. When XML is required for a fallback, that decision is made per-component and recorded in the component's issue.
+Both paths converge on the OPNsense REST API; neither uses XML `config.xml`. Whether new components extend the Terraform pattern, switch to a direct-API pattern that uses `opnsense_openapi`'s typed surface (Pydantic models generated from OPNsense's OpenAPI spec, no terraform/ansible binaries), or unify under a third pattern is a separate architectural choice with downstream effects on schema source, runner integration (`BaseRunner` vs. provider-internal apply), dependency footprint, and test surface.
+
+**Deferred to ADR-0014**, to be informed by a single-component spike. VLANs are the candidate: smallest existing surface (`device`, `tag`, `description`, `priority`), already partly implemented under the Terraform pattern, suitable for side-by-side comparison.
+
+The coverage list, out-of-scope list, and implementation order in this ADR stand independent of that decision — they describe **what** to manage, not **how**.
+
+The XML `config.xml` format is not part of any apply or migrate path. It is used only for one-shot scoping (as in [docs/development/opnsense-resource-coverage.md](../development/opnsense-resource-coverage.md)) and remains a per-component fallback only if no stable API endpoint exists for a resource type. That decision would be made per-component and recorded in its issue.
 
 ## Implementation order
+
+The apply mechanism each step uses follows ADR-0014. The first component built under that mechanism is the spike (VLANs) that informs ADR-0014; once that ADR lands, the remaining components ship under the chosen pattern in the order below.
 
 1. `interface_assignments` — gates everything that depends on physical NIC mapping.
 2. `nat_rules`.
