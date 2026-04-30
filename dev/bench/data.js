@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777575756770,
+  "lastUpdate": 1777576470690,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7099,6 +7099,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010103264826974453",
             "extra": "mean: 138.45152782870218 usec\nrounds: 2192"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "badc268b0ab3f3ad3010e63a9965ffa01019015c",
+          "message": "chore: scope OPNsense full-IaC migration with ADR-0013 and resource-coverage doc (merges PR #704, addresses #701)\n\n* chore: scope OPNsense full-IaC migration with ADR-0013 and resource-coverage doc\n\nReplacing the production OPNsense host with a same-spec successor surfaced\nthat only Kea DHCP is currently managed by the InfraFoundry OPNsense provider;\ninterface assignments, NAT, gateways, static routes, virtual IPs, and most of\nUnbound have no IaC coverage. Without closing the gap, every box-to-box\nmigration requires hand-editing config.xml on the target.\n\nThis PR is the scoping/architecture step for closing that gap. No code yet —\nfollow-up issues will land each component.\n\n- docs/decisions/0013-opnsense-full-iac-migration.md: ADR-0013. Defines the\n  in-scope new components (interface_assignments, nat_rules, gateways,\n  static_routes, virtual_ips, Unbound domain_override/host_alias/forward),\n  the tooling work (`config migrate` extractors), and the deliberately\n  out-of-scope set migrated via selective config.xml import (HA sync,\n  OpenVPN, certs/ACME, GRE/GIF/LAGG/bridge/PPP/wireless). Also fixes the\n  data model: YAML schemas mirror the browningluke/opnsense Terraform\n  provider's resource args; extractors read from the OPNsense REST API;\n  config.xml is not in the apply or migrate path.\n- docs/development/opnsense-resource-coverage.md: provider coverage matrix\n  mapping config.xml sections to InfraFoundry resource types, listed gaps,\n  and a generic box-to-box migration runbook template.\n- docs/development/README.md: link the new coverage doc under Core\n  Extension Points.\n\nAddresses #701\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* docs: defer OPNsense apply mechanism to ADR-0014\n\nThe original \"Data model\" section in ADR-0013 over-committed to the\nexisting Terraform pattern (YAML → Jinja2 .tf.j2 → terraform → the\nbrowningluke/opnsense provider, plus an Ansible playbook for service\nreload). Today's pipeline is a mix — Kea DHCP already calls the OPNsense\nREST API directly via opnsense_openapi (though using untyped .request()\nrather than the typed surface the package exposes).\n\nBefore filing the per-component issues, validate whether the new\ncomponents should follow the Terraform pattern or switch to a typed\ndirect-API pattern using opnsense_openapi (Pydantic models from the\nOPNsense OpenAPI spec, no terraform/ansible binaries). That choice\naffects schema source, runner integration, dependency footprint, and\ntest surface.\n\nRewrite the section to:\n\n- Describe today's mixed pipeline honestly.\n- Defer the apply-mechanism choice to ADR-0014, informed by a VLAN spike\n  (smallest existing surface, suitable for side-by-side comparison).\n- Note that the coverage and out-of-scope lists in this ADR stand\n  independent of that choice — they describe what to manage, not how.\n\nAdd a one-line forward reference at the top of the Implementation order\nsection pointing to ADR-0014 for the apply-mechanism decision.\n\nAddresses #701\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* docs: take ADR-0013 off hold; reference ADR-0014 for apply mechanism\n\nADR-0014 has landed (PR #708, merges commit 2036694). Update ADR-0013's\n\"Data model and apply mechanism\" section to reference ADR-0014 instead\nof marking the choice as deferred. Tighten the Implementation order\nintro to past tense (the spike has informed ADR-0014). Add cross-refs\nto issue #705, issue #707, the spike findings doc, and ADR-0014 in the\nRelated Issues / Related Documentation sections.\n\nNo changes to scope, out-of-scope set, or implementation order — those\nwere always independent of the apply-mechanism decision.\n\nAddresses #701\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-30T20:14:03+01:00",
+          "tree_id": "8aaaa774dac8c105bbede2a37ec37d2467455fef",
+          "url": "https://github.com/endavis/infrafoundry/commit/badc268b0ab3f3ad3010e63a9965ffa01019015c"
+        },
+        "date": 1777576470249,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7275.209535794745,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010461428577258984",
+            "extra": "mean: 137.45308572624637 usec\nrounds: 2403"
           }
         ]
       }
