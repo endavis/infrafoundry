@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777573071956,
+  "lastUpdate": 1777575756770,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7068,6 +7068,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001950418078049614",
             "extra": "mean: 143.94375264067912 usec\nrounds: 2272"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2036694360383afeb1cdf18a1ae2a11e58e98573",
+          "message": "docs: add ADR-0014 for OPNsense direct-API apply mechanism (merges PR #708, addresses #707)\n\nCodify the OPNsense direct-API apply mechanism as the path forward,\nclosing the apply-mechanism deferral from ADR-0013. Take explicit\npositions on the nine open questions enumerated in #707:\n\n1. Apply mechanism for new components: direct-API via opnsense_openapi.\n2. Schema source: Pydantic models with hand-typed dict fallback for #32-affected sites.\n3. Client surface: bare client.post/get fallback; typed .api surface deferred.\n4. Runner integration: new OPNsenseDirectRunner implementing ADR-0010 protocols.\n5. Default semantics: fully-managed; --add-only opt-in for cutover.\n6. Lock contract: top-level boolean lock: true.\n7. Plan-time validation: validate interface references against the live box.\n8. config migrate integration: per-component method, matches Kea DHCP pattern.\n9. Existing Terraform paths: phased migration (VLANs first).\n\nLoad-bearing evidence comes from the live VLAN spike (PR #706, commit\n584ac10) and its findings doc at docs/development/opnsense-spike-vlan-findings.md.\n\nNote: ADR-0014 links to ADR-0013, which lives on PR #704's branch and\nhas not merged to main yet. The link will 404 until PR #704 lands; this\nis expected and called out in the ADR's own decision #9.\n\nAddresses #707\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-30T20:01:54+01:00",
+          "tree_id": "984bb15bf51c588ee8cbdd69d62e21ce7123f2d2",
+          "url": "https://github.com/endavis/infrafoundry/commit/2036694360383afeb1cdf18a1ae2a11e58e98573"
+        },
+        "date": 1777575755541,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7222.744419528836,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010103264826974453",
+            "extra": "mean: 138.45152782870218 usec\nrounds: 2192"
           }
         ]
       }
