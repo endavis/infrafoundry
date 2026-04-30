@@ -49,22 +49,15 @@ ISC DHCP (`<dhcpd>`/`<dhcpdv6>`) is also out of scope going forward — Kea is t
 
 ## Data model and apply mechanism
 
-The apply mechanism is intentionally **not** decided in this ADR. The current OPNsense provider mixes paths:
+Decided in [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md): direct-API via `opnsense_openapi`. New components ship under that pattern; existing Terraform-based paths (`vlans`, `aliases`, `firewall_rules`, `unbound_host_override`, `kea_*`, `dhcp_static_maps`) migrate per-component in the order below, retiring the `templates/opnsense/playbook.yml.j2` Ansible service-reload step with the last one.
 
-- VLANs / aliases / firewall rules go through Terraform (the [browningluke/opnsense](https://registry.terraform.io/providers/browningluke/opnsense/latest/docs) provider) plus an Ansible playbook for the post-apply service reload (`templates/opnsense/playbook.yml.j2`).
-- Kea DHCP goes through a Python service calling the OPNsense REST API via the `opnsense_openapi` client — using bare `.request(method, endpoint, ...)` rather than the typed methods the package exposes.
-
-Both paths converge on the OPNsense REST API; neither uses XML `config.xml`. Whether new components extend the Terraform pattern, switch to a direct-API pattern that uses `opnsense_openapi`'s typed surface (Pydantic models generated from OPNsense's OpenAPI spec, no terraform/ansible binaries), or unify under a third pattern is a separate architectural choice with downstream effects on schema source, runner integration (`BaseRunner` vs. provider-internal apply), dependency footprint, and test surface.
-
-**Deferred to ADR-0014**, to be informed by a single-component spike. VLANs are the candidate: smallest existing surface (`device`, `tag`, `description`, `priority`), already partly implemented under the Terraform pattern, suitable for side-by-side comparison.
-
-The coverage list, out-of-scope list, and implementation order in this ADR stand independent of that decision — they describe **what** to manage, not **how**.
+ADR-0014 takes positions on schema source, client surface, runner integration (a new `OPNsenseDirectRunner(BaseRunner)` implementing the [ADR-0010](0010-protocol-based-runner-interfaces.md) protocols), default semantics (fully-managed with `--add-only` opt-in), the `lock: true` resource-level safety annotation, and plan-time validation of interface references. Refer to that ADR for the rationale and the open follow-ups.
 
 The XML `config.xml` format is not part of any apply or migrate path. It is used only for one-shot scoping (as in [docs/development/opnsense-resource-coverage.md](../development/opnsense-resource-coverage.md)) and remains a per-component fallback only if no stable API endpoint exists for a resource type. That decision would be made per-component and recorded in its issue.
 
 ## Implementation order
 
-The apply mechanism each step uses follows ADR-0014. The first component built under that mechanism is the spike (VLANs) that informs ADR-0014; once that ADR lands, the remaining components ship under the chosen pattern in the order below.
+Each step ships under the direct-API pattern codified in [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md). The VLAN spike (PR [#706](https://github.com/endavis/infrafoundry/pull/706), merged) seeds the VLAN component migration.
 
 1. `interface_assignments` — gates everything that depends on physical NIC mapping.
 2. `nat_rules`.
@@ -78,9 +71,13 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 
 ## Related Issues
 
-- Issue [#701](https://github.com/endavis/infrafoundry/issues/701): Scope OPNsense full-IaC migration (this ADR)
+- Issue [#701](https://github.com/endavis/infrafoundry/issues/701): Scope OPNsense full-IaC migration (this ADR).
+- Issue [#705](https://github.com/endavis/infrafoundry/issues/705): VLAN direct-API spike that informed ADR-0014 (closed; PR [#706](https://github.com/endavis/infrafoundry/pull/706) merged).
+- Issue [#707](https://github.com/endavis/infrafoundry/issues/707): ADR-0014 (closed; PR [#708](https://github.com/endavis/infrafoundry/pull/708) merged).
 
 ## Related Documentation
 
+- [ADR-0014: OPNsense Direct-API Apply Mechanism](0014-opnsense-direct-api-apply-mechanism.md) — codifies the apply mechanism this ADR's implementation phase uses.
 - [OPNsense Provider Resource Coverage](../development/opnsense-resource-coverage.md) — current support matrix, gap list, and the box-to-box migration runbook template.
+- [OPNsense Direct-API VLAN Spike Findings](../development/opnsense-spike-vlan-findings.md) — load-bearing evidence ADR-0014 cites.
 - [Implementing Providers](../development/implementing-providers.md) — pattern guide each new component will follow.
