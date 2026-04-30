@@ -5,7 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 import httpx
-from opnsense_openapi import OPNsenseClient as OpenAPIOPNsenseClient  # type: ignore[import-untyped]
+from opnsense_openapi import OPNsenseClient as OpenAPIOPNsenseClient
 
 if TYPE_CHECKING:  # pragma: no cover
     # opnsense-openapi lacks stubs; this keeps mypy satisfied without affecting runtime.
@@ -55,7 +55,7 @@ class OPNsenseClient:
             else:
                 response = self.client.post(module, controller, command, *extra, json=data or {})
 
-            return cast(dict[str, Any], response)
+            return response
 
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code if e.response else None
