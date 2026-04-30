@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776976757686,
+  "lastUpdate": 1777557303557,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7006,6 +7006,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006856781334728052",
             "extra": "mean: 103.59289403983709 usec\nrounds: 2114"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6ff0b1e16efcc970c3aa920b619263593bf3bad8",
+          "message": "fix: drop stale mypy suppressions in opnsense api_client (merges PR #703, addresses #702)\n\nopnsense-openapi 0.3.0 ships type information, so the\n`# type: ignore[import-untyped]` on the import and the `cast(dict[str,\nAny], ...)` on the request return are now no-ops. mypy reports\nunused-ignore and redundant-cast under `doit check`, blocking CI on\nevery branch that includes the 0.3.0 bump (#697).\n\nDrop both. The remaining `cast(list[dict[str, Any]], ...)` later in the\nsame file stays — mypy does not flag it.\n\nAddresses #702\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-30T14:54:20+01:00",
+          "tree_id": "0b2572534cd166b5ac57d551c1f2ff0617e5dc0b",
+          "url": "https://github.com/endavis/infrafoundry/commit/6ff0b1e16efcc970c3aa920b619263593bf3bad8"
+        },
+        "date": 1777557301157,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7379.644510651028,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009021487741726854",
+            "extra": "mean: 135.5078823318253 usec\nrounds: 2745"
           }
         ]
       }
