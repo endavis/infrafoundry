@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777557303557,
+  "lastUpdate": 1777573071956,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7037,6 +7037,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009021487741726854",
             "extra": "mean: 135.5078823318253 usec\nrounds: 2745"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "584ac10ad62b85275868d16cda72b9941c982672",
+          "message": "feat: add direct-API VLAN spike to inform ADR-0014 (merges PR #706, addresses #705)\n\n* feat: add direct-API VLAN spike to inform ADR-0014\n\nAdds an engineering spike under tools/spikes/ that demonstrates end-to-end\nVLAN management against OPNsense via opnsense_openapi's typed\n.api.<module>.<function> surface, with a client.get/post(...) fallback for\nendpoints the typed surface fails to expose.\n\nThe spike loads desired state from YAML, computes a diff against live box\nstate keyed by (device, tag), and applies changes only when --confirm is\npassed. Four subcommands: inspect (version + endpoint enumeration), list,\nplan, apply [--confirm].\n\nThis is exploratory tooling. The spike does NOT modify any production code\nunder src/infrafoundry/providers/opnsense/, does NOT introduce a new runner\nor provider component, and does NOT ship an ADR.\n\nIncludes 39 unit tests covering env-var loading, YAML parsing/validation,\nthe diff engine, the typed-surface fallback path, the dry-run guard, and\nthe main() finally-block client-close. No live box is contacted.\n\nPairs with docs/development/opnsense-spike-vlan-findings.md, an\nintentionally empty shell that the operator fills in after running the\nspike against opnsense-a (staging). ADR-0014 cites the completed findings\nand is authored as a follow-up PR.\n\nAlso adds an allow-list entry to .gitignore for tools/spikes/**/*.yaml so\nthe example-vlans.yaml fixture can be tracked. The repo-wide *.yaml\nexclusion is intended for user infra YAML; spike fixtures belong in source\ncontrol.\n\nAddresses #705\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* feat: complete VLAN spike with hardening, safety flags, and live-run findings\n\nSpike now runs cleanly end-to-end against opnsense-a (verified live):\n- inspect, list, plan, apply --confirm (add cycle), plan (round-trip\n  empty), apply --confirm (delete cycle), plan (round-trip empty)\n- Lock semantics preserved across both apply cycles; WAN VLAN never\n  touched\n\nHardening (forced by the live run):\n- Broaden _typed_call to catch RuntimeError, not just AttributeError —\n  the typed .api property raises RuntimeError when no generated client\n  exists (e.g. when openapi-python-client isn't on PATH)\n- Add _warn_if_codegen_unavailable() startup check with actionable\n  install instructions (uv tool install, NOT uv pip install)\n- VLAN_CONTROLLER renamed from \"vlansettings\" to \"vlan_settings\" — the\n  bundled spec is wrong (filed as endavis/opnsense-openapi#32); live\n  26.1.6_2 uses snake_case for this controller\n- Inspect filter accepts both spellings so it works whether the spec is\n  buggy or fixed upstream\n- Example YAML's device fixed from generic igb1 to actual ixl1\n  (matches opnsense-a's hardware)\n\nSafety flags (motivated by a near-disaster on the first plan run, which\nproposed deleting the WAN trunk):\n- VlanConfig.lock: bool field — observed-but-untouchable resource;\n  recorded in plan output, never added/updated/deleted\n- --add-only flag on plan/apply — suppresses deletes for live VLANs not\n  in YAML; orthogonal to lock; useful for partial migrations\n- Diff.locked field; _print_diff renders locked entries with their UUID\n- Tests cover both flags individually and combined\n\nDocumentation:\n- Filled in docs/development/opnsense-spike-vlan-findings.md with run\n  logs, round-trip evidence, friction points, LoC comparison, typed-\n  surface coverage matrix (none — codegen CLI not installed during the\n  run; fallback path covered everything), and a recommendation section\n- README adds a \"Safety flags\" subsection\n- Cite three upstream issues filed against endavis/opnsense-openapi:\n  #32 (controller name bug — blocker), #33 (misleading error), #34\n  (spec/version resolution refactor)\n\n50 spike tests passing (was 39).\n\nAddresses #705\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-04-30T19:17:25+01:00",
+          "tree_id": "0b63e4cde3bcfe8ea94dff7cbb25f25d03396adc",
+          "url": "https://github.com/endavis/infrafoundry/commit/584ac10ad62b85275868d16cda72b9941c982672"
+        },
+        "date": 1777573071523,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6947.158050660657,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001950418078049614",
+            "extra": "mean: 143.94375264067912 usec\nrounds: 2272"
           }
         ]
       }
