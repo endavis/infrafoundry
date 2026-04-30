@@ -13,6 +13,7 @@ This section provides comprehensive guides for developing and extending InfraFou
 ### Core Extension Points
 
 - **[Implementing Providers](implementing-providers.md)** - Guide for creating new infrastructure providers (Proxmox, OPNsense, etc.)
+- **[OPNsense Provider Resource Coverage](opnsense-resource-coverage.md)** - Which OPNsense resource types are managed by the provider, known gaps, and the box-to-box migration runbook template
 - **[Implementing Runners](implementing-runners.md)** - Comprehensive guide for creating custom infrastructure tool runners (Terraform, Ansible, etc.)
 - **[Implementing Secret Providers](implementing-secret-providers.md)** - Guide to adding new secret storage backends (Vaultwarden, AWS, Azure, etc.)
 
