@@ -55,11 +55,15 @@ ADR-0014 takes positions on schema source, client surface, runner integration (a
 
 The XML `config.xml` format is not part of any apply or migrate path. It is used only for one-shot scoping (as in [docs/development/opnsense-resource-coverage.md](../development/opnsense-resource-coverage.md)) and remains a per-component fallback only if no stable API endpoint exists for a resource type. That decision would be made per-component and recorded in its issue.
 
+**Per-component decisions recorded so far:**
+
+- `interface_assignments` (#711, 2026-05-02): no REST CRUD endpoint on OPNsense `26.1.6_2` (`/api/interfaces/overview/*` is read-only; the GUI uses legacy PHP form posts that ultimately edit `<interfaces>` in `config.xml`). Component ships read-only — `list` / `migrate` / validation work; `apply` / `destroy` are loud no-ops. The cutover runbook documents the manual GUI step. The XML-edit write path is a future concern.
+
 ## Implementation order
 
 Each step ships under the direct-API pattern codified in [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md). The VLAN spike (PR [#706](https://github.com/endavis/infrafoundry/pull/706), merged) seeds the VLAN component migration.
 
-1. `interface_assignments` — gates everything that depends on physical NIC mapping.
+1. `interface_assignments` — gates everything that depends on physical NIC mapping. *Read-only / migrate shipped in #711; write path deferred per the per-component decision recorded above.*
 2. `nat_rules`.
 3. `gateways` and `static_routes`.
 4. `virtual_ips`.
@@ -75,6 +79,7 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 - Issue [#705](https://github.com/endavis/infrafoundry/issues/705): VLAN direct-API spike that informed ADR-0014 (closed; PR [#706](https://github.com/endavis/infrafoundry/pull/706) merged).
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): ADR-0014 (closed; PR [#708](https://github.com/endavis/infrafoundry/pull/708) merged).
 - Issue [#709](https://github.com/endavis/infrafoundry/issues/709): VLAN component direct-API migration (`OPNsenseDirectRunner` seed).
+- Issue [#711](https://github.com/endavis/infrafoundry/issues/711): `interface_assignments` component (read-only / migrate; dispatch-table refactor).
 
 ## Related Documentation
 

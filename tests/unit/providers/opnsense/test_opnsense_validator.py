@@ -11,6 +11,7 @@ from infrafoundry.providers.opnsense.validator import OPNsenseValidator
 from infrafoundry.providers.opnsense.validators import (
     DHCPValidator,
     FirewallValidator,
+    InterfaceAssignmentValidator,
     ResourceNameValidator,
     UnboundValidator,
     VLANValidator,
@@ -58,6 +59,7 @@ class TestComposition:
         assert isinstance(validator.vlan_validator, VLANValidator)
         assert isinstance(validator.unbound_validator, UnboundValidator)
         assert isinstance(validator.resource_name_validator, ResourceNameValidator)
+        assert isinstance(validator.interface_assignment_validator, InterfaceAssignmentValidator)
 
 
 class TestValidateConnectivity:
@@ -190,6 +192,7 @@ class TestValidateReferences:
         validator.vlan_validator = MagicMock()
         validator.unbound_validator = MagicMock()
         validator.resource_name_validator = MagicMock()
+        validator.interface_assignment_validator = MagicMock()
 
         resources = [
             ResourceConfig(name="alias1", type="aliases", provider="opnsense", config={}),
@@ -202,6 +205,7 @@ class TestValidateReferences:
         validator.vlan_validator.validate.assert_called_once()
         validator.unbound_validator.validate.assert_called_once()
         validator.resource_name_validator.validate.assert_called_once()
+        validator.interface_assignment_validator.validate.assert_called_once()
 
     def test_exception_caught_gracefully(self, validator):
         """Exceptions during validation are caught and reported."""
@@ -281,6 +285,22 @@ class TestCollectResourceReferences:
 
         assert len(refs["unbound_host_overrides"]) == 1
 
+    def test_collects_interface_assignments(self, validator):
+        """Collects interface_assignment resources."""
+        resources = [
+            ResourceConfig(
+                name="lan",
+                type="interface_assignments",
+                provider="opnsense",
+                config={"device": "ixl1"},
+            ),
+        ]
+
+        refs = validator._collect_resource_references(resources)
+
+        assert len(refs["interface_assignments"]) == 1
+        assert "lan" in refs["interface_assignment_names"]
+
     def test_empty_resources(self, validator):
         """Returns empty collections for empty resources."""
         refs = validator._collect_resource_references([])
@@ -288,6 +308,8 @@ class TestCollectResourceReferences:
         assert len(refs["aliases"]) == 0
         assert len(refs["alias_names"]) == 0
         assert len(refs["vlans"]) == 0
+        assert len(refs["interface_assignments"]) == 0
+        assert len(refs["interface_assignment_names"]) == 0
 
 
 class TestGetExistingAliases:

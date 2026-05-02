@@ -2,6 +2,9 @@
 
 from infrafoundry.providers.opnsense.validators.dhcp_validator import DHCPValidator
 from infrafoundry.providers.opnsense.validators.firewall_validator import FirewallValidator
+from infrafoundry.providers.opnsense.validators.interface_assignment_validator import (
+    InterfaceAssignmentValidator,
+)
 from infrafoundry.providers.opnsense.validators.resource_name_validator import (
     ResourceNameValidator,
 )
@@ -11,6 +14,7 @@ from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValida
 __all__ = [
     "DHCPValidator",
     "FirewallValidator",
+    "InterfaceAssignmentValidator",
     "ResourceNameValidator",
     "UnboundValidator",
     "VLANValidator",
