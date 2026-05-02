@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777725356488,
+  "lastUpdate": 1777746366495,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7192,6 +7192,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002244193377309544",
             "extra": "mean: 118.14520833652864 usec\nrounds: 48"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2af2cdf7498cd7bf42ab55faca505ff981cf743b",
+          "message": "feat: spike OPNsense gist-based interface_assignments REST write API (merges PR #716, addresses #715)\n\nfeat: add gist-based REST interface_assignments write spike\n\nPivots from #714's rejected SSH+PHP-edit path to a server-side-validated\nREST write path. Forks szymczag's AssignSettingsController.php (BSD-2),\napplies the modern-OPNsense sessionClose() patch, and extends with\nsetItem/getItem/searchItem/IPv6/explicit-name. Live verification on\nopnsense-a (26.1.6_2) confirms all extended endpoints work; round-trip\nproperty holds across add/setItem/delete cycles. Auto-rollback is\nunavailable on this OPNsense version (/api/core/backup/* 404s) —\ndocumented as gate (1) for ADR-0014 amendment. No production code\ntouched; findings doc is the artifact for the upcoming amendment.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-02T19:25:42+01:00",
+          "tree_id": "8da69ec2a97b71ed0ccda40dc81f1f49994a3211",
+          "url": "https://github.com/endavis/infrafoundry/commit/2af2cdf7498cd7bf42ab55faca505ff981cf743b"
+        },
+        "date": 1777746366040,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9075.440948773019,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001875822586331102",
+            "extra": "mean: 110.1874835222412 usec\nrounds: 1942"
           }
         ]
       }
