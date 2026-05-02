@@ -76,7 +76,13 @@ class OPNsenseProvider(
 
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
-        """Generate Terraform configuration for OPNsense resources."""
+        """Generate Terraform configuration for OPNsense resources.
+
+        VLANs are intentionally not generated here — they are managed
+        directly via ``OPNsenseDirectRunner`` per ADR-0014. The runner is
+        registered with ``priority = -10`` so VLAN apply precedes terraform
+        planning of dependents like ``firewall_rules`` and ``dhcp_static_maps``.
+        """
         resources_by_type = self.prepare_terraform_generation(resources)
 
         # Generate backend configuration if remote backend is configured
@@ -88,9 +94,6 @@ class OPNsenseProvider(
         # Generate resources by type
         if "firewall_rules" in resources_by_type:
             self._generate_firewall_rules_terraform(resources_by_type["firewall_rules"])
-
-        if "vlans" in resources_by_type:
-            self._generate_vlans_terraform(resources_by_type["vlans"])
 
         if "aliases" in resources_by_type:
             self._generate_aliases_terraform(resources_by_type["aliases"])
@@ -126,13 +129,21 @@ class OPNsenseProvider(
             output_name="firewall_rules.tf",
         )
 
-    def _generate_vlans_terraform(self, vlans: list[ResourceConfig]) -> None:
-        """Generate Terraform for OPNsense VLANs."""
-        self.render_and_write_terraform(
-            "opnsense/vlans.tf.j2",
-            context={"vlans": vlans},
-            output_name="vlans.tf",
-        )
+    def generate_opnsense_direct(self, resources: list[ResourceConfig]) -> None:
+        """No-op generator hook for the direct-API runner (ADR-0014).
+
+        ``orchestrator_workflows.py`` requires ``generate_<tool_name>`` to
+        exist on the provider in order to dispatch a runner; the direct-API
+        runner reads YAML at runtime via the component manager, so this
+        method just satisfies the dispatch contract.
+
+        Args:
+            resources: All provider resources for the env (passed through
+                the orchestrator's regenerate-IaC-configs hook). Unused
+                here — the runner re-reads them via ConfigManager.
+        """
+        del resources  # consumed by the runner directly via ConfigManager
+        logger.debug("generate_opnsense_direct invoked; runner will read resources at apply time")
 
     def _generate_aliases_terraform(self, aliases: list[ResourceConfig]) -> None:
         """Generate Terraform for OPNsense aliases."""
@@ -593,13 +604,16 @@ class OPNsenseProvider(
 
     @override
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
-        """Map InfraFoundry resource types to terraform resource types."""
+        """Map InfraFoundry resource types to terraform resource types.
+
+        ``vlans`` is omitted here per ADR-0014 — VLANs are managed by
+        ``OPNsenseDirectRunner``, not terraform.
+        """
         return {
             "kea_reservation": ["opnsense_kea_reservation"],
             "kea_subnet": ["opnsense_kea_subnet"],
             "aliases": ["opnsense_firewall_alias"],
             "firewall_rules": ["opnsense_firewall_rule"],
-            "vlans": ["opnsense_vlan"],
             "dhcp_static_maps": ["opnsense_dhcpv4_static_map"],
             "unbound_host_override": ["opnsense_unbound_host_override"],
         }
@@ -682,6 +696,25 @@ class OPNsenseProvider(
 
         manager = KeaDHCPManager(self.config_dir)
         return manager.migrate(env_name, "opnsense")
+
+    def migrate_vlan(self, env_name: str) -> str:
+        """Migrate current VLAN configuration to InfraFoundry YAML.
+
+        Reads the live VLAN list from OPNsense via the direct-API path and
+        generates InfraFoundry-compatible YAML. Mirrors ``migrate_kea_dhcp``.
+        Not yet exposed via ``config migrate`` CLI — that wiring is a
+        follow-up to this PR.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            YAML configuration as a string
+        """
+        from .components.vlan import VlanManager
+
+        manager = VlanManager(self.config_dir)
+        return manager.migrate(env_name)
 
     def migrate_isc_to_kea(self, env_name: str, interfaces: list[str] | None = None) -> str:
         """Migrate ISC DHCP configuration to Kea DHCP format.

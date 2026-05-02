@@ -461,19 +461,19 @@ class TestOPNsenseTemplates:
         assert 'protocol = "tcp"' in content
         assert "Allow web traffic to web server" in content
 
-    def test_generate_vlan_terraform(
+    def test_generate_vlan_terraform_does_not_emit_tf(
         self, provider: OPNsenseProvider, vlan_resource: ResourceConfig
     ) -> None:
-        """Test VLAN Terraform generation."""
+        """VLANs are managed by OPNsenseDirectRunner per ADR-0014.
+
+        ``generate_terraform`` no longer emits a ``vlans.tf`` for VLAN
+        resources; the direct-API runner handles them at apply time. Verify
+        the file is absent.
+        """
         provider.generate_terraform([vlan_resource])
 
         vlans_tf = provider.terraform_dir / "vlans.tf"
-        assert vlans_tf.exists()
-
-        content = vlans_tf.read_text()
-        assert "vlan_100" in content
-        assert "tag" in content and "100" in content
-        assert "Web VLAN" in content
+        assert not vlans_tf.exists()
 
     def test_generate_alias_terraform(
         self, provider: OPNsenseProvider, alias_resource: ResourceConfig
@@ -909,7 +909,8 @@ class TestProviderResourceGrouping:
         provider.generate_terraform(resources)
 
         assert (provider.terraform_dir / "firewall_rules.tf").exists()
-        assert (provider.terraform_dir / "vlans.tf").exists()
+        # VLANs are managed by OPNsenseDirectRunner per ADR-0014 — no vlans.tf.
+        assert not (provider.terraform_dir / "vlans.tf").exists()
         assert (provider.terraform_dir / "aliases.tf").exists()
 
     def test_kubernetes_mixed_resource_types(self, tmp_path: Path) -> None:

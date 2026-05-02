@@ -40,6 +40,7 @@ def test_apply_with_confirmation(cli_runner, mock_orchestrator):
             package_filter=None,
             lock_timeout=0,
             lock_ttl=600,
+            add_only=False,
         )
 
 
@@ -70,6 +71,7 @@ def test_apply_with_auto_approve(cli_runner, mock_orchestrator):
             package_filter=None,
             lock_timeout=0,
             lock_ttl=600,
+            add_only=False,
         )
 
 
@@ -91,6 +93,7 @@ def test_apply_with_resource_filter(cli_runner, mock_orchestrator):
             package_filter=None,
             lock_timeout=0,
             lock_ttl=600,
+            add_only=False,
         )
 
 
@@ -121,6 +124,7 @@ def test_apply_with_parallel(cli_runner, mock_orchestrator):
             package_filter=None,
             lock_timeout=0,
             lock_ttl=600,
+            add_only=False,
         )
 
 

@@ -101,9 +101,9 @@ class TestProviderRegistryService:
         )
 
         # Verify registration calls
-        # We expect register to be called for TerraformRunner, OpenTofuRunner,
-        # AnsibleRunner, PyInfraRunner
-        assert mock_registry.register.call_count == 4
+        # We expect register to be called for OPNsenseDirectRunner, TerraformRunner,
+        # OpenTofuRunner, AnsibleRunner, PyInfraRunner
+        assert mock_registry.register.call_count == 5
 
     def test_register_experimental_runners(self, tmp_path):
         """Test that experimental runners are registered when enabled."""
@@ -118,9 +118,9 @@ class TestProviderRegistryService:
                 runner_registry_factory=factory,
             )
 
-        # We expect register to be called for TerraformRunner, OpenTofuRunner,
-        # AnsibleRunner, PyInfraRunner, PulumiRunner
-        assert mock_registry.register.call_count == 5
+        # We expect register to be called for OPNsenseDirectRunner, TerraformRunner,
+        # OpenTofuRunner, AnsibleRunner, PyInfraRunner, PulumiRunner
+        assert mock_registry.register.call_count == 6
 
     def test_both_iac_runners_registered(self, tmp_path, monkeypatch):
         """Test that both TerraformRunner and OpenTofuRunner are registered."""

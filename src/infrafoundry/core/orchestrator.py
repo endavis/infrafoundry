@@ -513,6 +513,7 @@ class Orchestrator:
         resource_filter: list[str] | None = None,
         enforce_policies: bool = False,
         package_filter: str | None = None,
+        add_only: bool = False,
     ) -> dict[str, Any]:
         """Plan infrastructure changes.
 
@@ -522,12 +523,20 @@ class Orchestrator:
             resource_filter: Optional list of resource names to target
             enforce_policies: If True, block on policy violations
             package_filter: Optional package name to restrict event handlers
+            add_only: If True, suppress deletes for live resources not
+                described in YAML. Honored by direct-API runners; other
+                runners accept and ignore.
 
         Returns:
             Dict with plan results per provider
         """
         return self.plan_orchestrator.plan(
-            env_name, dry_run, resource_filter, enforce_policies, package_filter
+            env_name,
+            dry_run,
+            resource_filter,
+            enforce_policies,
+            package_filter,
+            add_only=add_only,
         )
 
     def apply(
@@ -540,6 +549,7 @@ class Orchestrator:
         package_filter: str | None = None,
         lock_timeout: int = 0,
         lock_ttl: int = 600,
+        add_only: bool = False,
     ) -> dict[str, Any]:
         """Apply infrastructure changes.
 
@@ -555,6 +565,9 @@ class Orchestrator:
             lock_ttl: Lock TTL in seconds (default: 10 minutes). The lock is
                 extended automatically while the process runs, so this only
                 governs stale-lock recovery after a crash.
+            add_only: If True, suppress deletes for live resources not
+                described in YAML. Honored by direct-API runners; other
+                runners accept and ignore.
 
         Returns:
             Dict with apply results per provider
@@ -574,6 +587,7 @@ class Orchestrator:
                 dry_run=False,
                 resource_filter=resource_filter,
                 package_filter=package_filter,
+                add_only=add_only,
             )
             return self.apply_orchestrator.apply(
                 env_name=env_name,
@@ -582,6 +596,7 @@ class Orchestrator:
                 parallel=parallel,
                 max_workers=max_workers,
                 package_filter=package_filter,
+                add_only=add_only,
             )
 
     def _apply_providers_serial(
@@ -592,6 +607,8 @@ class Orchestrator:
         resource_filter: list[str] | None,
         auto_approve: bool,
         package_filter: str | None = None,
+        *,
+        add_only: bool = False,
     ) -> dict[str, Any]:
         """Apply providers sequentially."""
         # Load runner priorities, IaC tool, and provider order from environment config
@@ -612,6 +629,7 @@ class Orchestrator:
             resource_filter,
             auto_approve,
             package_filter=package_filter,
+            add_only=add_only,
         )
 
     def _apply_providers_parallel(
@@ -623,6 +641,8 @@ class Orchestrator:
         auto_approve: bool,
         max_workers: int,
         package_filter: str | None = None,
+        *,
+        add_only: bool = False,
     ) -> dict[str, Any]:
         """Apply providers in parallel."""
         # Load runner priorities, IaC tool, and provider order from environment config
@@ -644,6 +664,7 @@ class Orchestrator:
             auto_approve,
             max_workers,
             package_filter=package_filter,
+            add_only=add_only,
         )
 
     def _apply_single_provider(
