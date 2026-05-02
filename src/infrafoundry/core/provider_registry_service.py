@@ -11,6 +11,7 @@ from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import (
     AnsibleRunner,
     OpenTofuRunner,
+    OPNsenseDirectRunner,
     PulumiRunner,
     PyInfraRunner,
     RunnerRegistry,
@@ -59,7 +60,13 @@ class ProviderRegistryService:
         runner is selected at execution time based on the environment's
         ``iac_tool`` configuration, allowing different environments to use
         different tools.
+
+        ``OPNsenseDirectRunner`` is registered before ``TerraformRunner`` to
+        make the runner ordering explicit even though ``priority = -10`` is
+        the load-bearing guarantee that direct-API VLAN apply precedes
+        terraform planning of dependents (see ADR-0014 §4).
         """
+        self.runner_registry.register(OPNsenseDirectRunner)
         self.runner_registry.register(TerraformRunner)
         self.runner_registry.register(OpenTofuRunner)
         self.runner_registry.register(AnsibleRunner)

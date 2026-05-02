@@ -11,17 +11,6 @@ output "firewall_rules" {
 }
 {% endif %}
 
-{% if resources_by_type.get('vlans') %}
-output "vlans" {
-  description = "Configured VLANs"
-  value = {
-    {% for vlan in resources_by_type['vlans'] %}
-    "{{ vlan.config.name }}" = {{ vlan.config.tag }}
-    {% endfor %}
-  }
-}
-{% endif %}
-
 {% if resources_by_type.get('aliases') %}
 output "aliases" {
   description = "Created aliases"

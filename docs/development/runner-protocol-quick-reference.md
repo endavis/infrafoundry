@@ -24,6 +24,7 @@ from infrafoundry.core.protocols import (
 | **AnsibleRunner** | ✅ | ✅ | ❌ | ❌ | ❌ |
 | **PyInfraRunner** | ✅ | ✅ | ❌ | ❌ | ❌ |
 | **PulumiRunner** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **OPNsenseDirectRunner** | ✅ | ✅ | ✅ | ✅ | ❌ |
 
 ## Common Usage Patterns
 

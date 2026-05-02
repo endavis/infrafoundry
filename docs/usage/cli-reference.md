@@ -304,9 +304,12 @@ foundry infra plan --env dev --dry-run
 foundry infra plan --env dev --resource vm-01 --resource vm-02
 foundry infra plan --env dev --package ontap-cluster
 foundry infra plan --env dev --enforce-policies
+foundry infra plan --env dev --add-only
 ```
 
-**Options:** `-e/--env TEXT` (required), `--dry-run`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `--enforce-policies`
+**Options:** `-e/--env TEXT` (required), `--dry-run`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `--enforce-policies`, `--add-only`
+
+**`--add-only`:** Suppresses deletes for live resources not present in YAML, for direct-API runners that compute live-vs-desired diffs (currently `OPNsenseDirectRunner`). Useful for partial cutover migrations where IaC adopts a subset of existing resources before taking full ownership. Other runners ignore the flag.
 
 Note: `--resource` and `--package` are mutually exclusive.
 
@@ -320,9 +323,12 @@ foundry infra apply --env dev --auto-approve
 foundry infra apply --env dev --package ontap-cluster --auto-approve
 foundry infra apply --env dev --parallel --max-workers 8
 foundry infra apply --env dev --lock-timeout 300 --lock-ttl 1800
+foundry infra apply --env dev --add-only
 ```
 
-**Options:** `-e/--env TEXT` (required), `--auto-approve`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `--parallel`, `--max-workers INTEGER` (default: 4), `--lock-timeout INTEGER` (default: 0), `--lock-ttl INTEGER` (default: 600)
+**Options:** `-e/--env TEXT` (required), `--auto-approve`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `--parallel`, `--max-workers INTEGER` (default: 4), `--lock-timeout INTEGER` (default: 0), `--lock-ttl INTEGER` (default: 600), `--add-only`
+
+**`--add-only`:** Same semantics as `infra plan --add-only` — suppresses deletes for live resources missing from YAML during apply. Direct-API runners only.
 
 **Lock options:** `--lock-timeout` sets how long to wait for an existing lock before failing. `--lock-ttl` sets how long the lock is valid before considered stale (auto-extended every `ttl / 3` while running).
 

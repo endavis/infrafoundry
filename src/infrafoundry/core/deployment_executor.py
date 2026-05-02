@@ -143,6 +143,8 @@ class DeploymentExecutor:
         resource_filter: list[str] | None,
         auto_approve: bool,
         package_filter: str | None = None,
+        *,
+        add_only: bool = False,
     ) -> dict[str, Any]:
         """Apply providers sequentially.
 
@@ -153,6 +155,8 @@ class DeploymentExecutor:
             resource_filter: Optional list of resource names to target
             auto_approve: If True, skip confirmation prompts
             package_filter: Optional package name to restrict event handlers
+            add_only: If True, suppress deletes (forwarded to runners that
+                honor it; ignored by terraform/ansible/pyinfra).
 
         Returns:
             Dict with apply results per provider
@@ -200,6 +204,7 @@ class DeploymentExecutor:
                 auto_approve=auto_approve,
                 resource_filter=resource_filter,
                 package_filter=package_filter,
+                add_only=add_only,
             )
             results[provider_name] = result
 
@@ -252,6 +257,8 @@ class DeploymentExecutor:
         auto_approve: bool,
         max_workers: int,
         package_filter: str | None = None,
+        *,
+        add_only: bool = False,
     ) -> dict[str, Any]:
         """Apply providers in parallel, respecting provider execution order.
 
@@ -267,6 +274,8 @@ class DeploymentExecutor:
             auto_approve: If True, skip confirmation prompts
             max_workers: Maximum number of parallel workers
             package_filter: Optional package name to restrict event handlers
+            add_only: If True, suppress deletes (forwarded to runners that
+                honor it).
 
         Returns:
             Dict with apply results per provider
@@ -335,6 +344,7 @@ class DeploymentExecutor:
                         auto_approve=auto_approve,
                         resource_filter=resource_filter,
                         package_filter=package_filter,
+                        add_only=add_only,
                     )
                     future_to_provider[future] = provider_name
 
@@ -377,6 +387,8 @@ class DeploymentExecutor:
         auto_approve: bool,
         resource_filter: list[str] | None = None,
         package_filter: str | None = None,
+        *,
+        add_only: bool = False,
     ) -> dict[str, Any]:
         """Apply a single provider's resources.
 
@@ -398,6 +410,9 @@ class DeploymentExecutor:
             auto_approve: If True, skip confirmation prompts
             resource_filter: Optional list of resource names to target with -target
             package_filter: Optional package name to restrict event handlers
+            add_only: If True, suppress deletes (forwarded as ``add_only``
+                kwarg to ``runner.apply``). Honored by direct-API runners
+                only; other runners absorb the kwarg via ``**kwargs``.
 
         Returns:
             Dict with apply results including terraform outcomes
@@ -470,6 +485,7 @@ class DeploymentExecutor:
                     auto_approve=auto_approve,
                     target_resources=resource_filter if resource_filter else None,
                     parallelism=provider.terraform_parallelism,
+                    add_only=add_only,
                 )
                 runner_results[tool_name] = run_result
 

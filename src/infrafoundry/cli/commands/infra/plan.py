@@ -29,6 +29,16 @@ from ...utils import console
     is_flag=True,
     help="Enforce policy checks (block on violations)",
 )
+@click.option(
+    "--add-only",
+    is_flag=True,
+    help=(
+        "Suppress deletes for live resources not in YAML. Useful for partial "
+        "migrations where the YAML doesn't yet describe everything on the box. "
+        "Currently honored by OPNsense direct-API resources only; other "
+        "runners accept and ignore."
+    ),
+)
 @with_orchestrator("Plan failed")
 def plan(
     _ctx: click.Context,
@@ -38,6 +48,7 @@ def plan(
     resource: tuple[str, ...],
     package_name: str | None,
     enforce_policies: bool,
+    add_only: bool,
 ) -> None:
     """Plan infrastructure changes."""
     if package_name and resource:
@@ -56,6 +67,7 @@ def plan(
             resource_filter=resource_filter,
             enforce_policies=enforce_policies,
             package_filter=package_name,
+            add_only=add_only,
         )
 
     if dry_run:

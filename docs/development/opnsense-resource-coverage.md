@@ -10,7 +10,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 
 | Section in `config.xml` | InfraFoundry resource type | Status |
 | --- | --- | --- |
-| `<vlans>` | `vlans` | Supported |
+| `<vlans>` | `vlans` | Supported (direct-API via `OPNsenseDirectRunner`; ADR-0014, #709) |
 | `<OPNsense>/Firewall/Alias` | `aliases` | Supported |
 | `<filter>/rule` | `firewall_rules` | Supported |
 | `<OPNsense>/Kea` (DHCPv4 subnets) | `kea_subnet` | Supported |
@@ -55,6 +55,17 @@ This template assumes you are cutting over a current box (`OLD`) to a new box (`
 ### Same-spec follow-on migration
 
 If `NEW2` has identical NICs to `NEW`, step 2 (interface remap) is skipped. The full migration is: change endpoint → plan → apply.
+
+### One-time migration step for existing VLAN-managed environments
+
+Environments that previously used the terraform-based VLAN path (pre-#709) carry stale `opnsense_vlan.<name>` entries in their terraform state. The first apply after upgrading to the direct-API runner will see those entries as deletes. Run the following per-VLAN before the next apply:
+
+```bash
+cd generated/<env>/terraform/opnsense
+terraform state rm 'opnsense_vlan.<vlan_name_with_underscores>'
+```
+
+After the cleanup, terraform plan should show zero VLAN-related changes; the direct-API runner takes over cleanly.
 
 ## Closing the gaps
 
