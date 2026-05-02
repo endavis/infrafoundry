@@ -78,6 +78,7 @@ InfraFoundry runners execute generated configs (Terraform, Ansible, etc.). The r
   - **AnsibleRunner**: Implements 2 protocols (Plannable, Applyable) - no destroy, state, or drift support
   - **PyInfraRunner**: Implements 2 protocols (Plannable, Applyable)
   - **PulumiRunner**: Implements all 5 protocols (experimental, requires `INFRA_ENABLE_EXPERIMENTAL=1`)
+  - **OPNsenseDirectRunner**: Implements 4 protocols (Plannable, Applyable, Destroyable, StateAware) - direct-API runner for OPNsense components migrated under [ADR-0014](../decisions/0014-opnsense-direct-api-apply-mechanism.md). Does not call any external binary; availability gates on the `opnsense_openapi` Python package being importable. Runs at priority `-10` so direct-API resources resolve before terraform-managed ones in the same env.
 
 - **Type-Safe Results:**
 

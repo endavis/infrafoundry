@@ -396,6 +396,8 @@ class PlanOrchestrator(HookExecutionMixin):
         resource_filter: list[str] | None,
         enforce_policies: bool,
         package_filter: str | None = None,
+        *,
+        add_only: bool = False,
     ) -> dict[str, Any]:
         """Execute the plan workflow for the requested environment."""
         plan_metadata: PlanDeploymentMetadata = {"resource_filter": resource_filter}
@@ -527,6 +529,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                 runner_result = runner.plan(
                                     provider,
                                     target_resources=resource_filter if resource_filter else None,
+                                    add_only=add_only,
                                 )
                                 provider_results[f"{tool_name}_plan"] = runner_result
 
@@ -802,6 +805,8 @@ class ApplyOrchestrator(HookExecutionMixin):
         parallel: bool,
         max_workers: int,
         package_filter: str | None = None,
+        *,
+        add_only: bool = False,
     ) -> dict[str, Any]:
         """Apply infrastructure across providers."""
         apply_metadata: ApplyDeploymentMetadata = {
@@ -873,6 +878,7 @@ class ApplyOrchestrator(HookExecutionMixin):
                     auto_approve,
                     max_workers,
                     package_filter=package_filter,
+                    add_only=add_only,
                 )
             else:
                 results = self._apply_serial(
@@ -882,6 +888,7 @@ class ApplyOrchestrator(HookExecutionMixin):
                     resource_filter,
                     auto_approve,
                     package_filter=package_filter,
+                    add_only=add_only,
                 )
 
             # Execute resource-level after_apply hooks

@@ -74,6 +74,7 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 - Issue [#701](https://github.com/endavis/infrafoundry/issues/701): Scope OPNsense full-IaC migration (this ADR).
 - Issue [#705](https://github.com/endavis/infrafoundry/issues/705): VLAN direct-API spike that informed ADR-0014 (closed; PR [#706](https://github.com/endavis/infrafoundry/pull/706) merged).
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): ADR-0014 (closed; PR [#708](https://github.com/endavis/infrafoundry/pull/708) merged).
+- Issue [#709](https://github.com/endavis/infrafoundry/issues/709): VLAN component direct-API migration (`OPNsenseDirectRunner` seed).
 
 ## Related Documentation
 

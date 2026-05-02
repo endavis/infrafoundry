@@ -51,6 +51,16 @@ from ...utils import console
         "(default: 600)."
     ),
 )
+@click.option(
+    "--add-only",
+    is_flag=True,
+    help=(
+        "Suppress deletes for live resources not in YAML. Useful for partial "
+        "migrations where the YAML doesn't yet describe everything on the box. "
+        "Currently honored by OPNsense direct-API resources only; other "
+        "runners accept and ignore."
+    ),
+)
 @with_orchestrator("Apply failed")
 def apply(
     _ctx: click.Context,
@@ -63,6 +73,7 @@ def apply(
     max_workers: int,
     lock_timeout: int,
     lock_ttl: int,
+    add_only: bool,
 ) -> None:
     """Apply infrastructure changes."""
     if package_name and resource:
@@ -102,5 +113,6 @@ def apply(
             package_filter=package_name,
             lock_timeout=lock_timeout,
             lock_ttl=lock_ttl,
+            add_only=add_only,
         )
     console.success(f"Apply complete! ({timer.elapsed_str})")
