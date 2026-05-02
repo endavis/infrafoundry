@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777576470690,
+  "lastUpdate": 1777720188487,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7130,6 +7130,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010461428577258984",
             "extra": "mean: 137.45308572624637 usec\nrounds: 2403"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "918f8c4cd55c436c4a58e5db0515ab7525f78f5e",
+          "message": "feat: add OPNsenseDirectRunner and migrate VLAN to direct-API (merges PR #710, addresses #709)\n\nfeat: add OPNsenseDirectRunner and migrate VLAN component to direct-API\n\nVertical slice that ships OPNsenseDirectRunner together with its first\nproduction consumer (the VLAN component), retiring the terraform/\nbrowningluke pipeline for VLANs and seeding the apply path for the rest\nof the ADR-0013 component list.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-02T12:09:22+01:00",
+          "tree_id": "12139b5c16ca8e8be08853eddb75470c430db260",
+          "url": "https://github.com/endavis/infrafoundry/commit/918f8c4cd55c436c4a58e5db0515ab7525f78f5e"
+        },
+        "date": 1777720187613,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 5922.152220360051,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004912386883831614",
+            "extra": "mean: 168.8575306392923 usec\nrounds: 2252"
           }
         ]
       }
