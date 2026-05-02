@@ -145,6 +145,30 @@ class OPNsenseProvider(
         del resources  # consumed by the runner directly via ConfigManager
         logger.debug("generate_opnsense_direct invoked; runner will read resources at apply time")
 
+    def get_direct_api_resource_types(self) -> dict[str, type[Any]]:
+        """Map InfraFoundry resource type names to their direct-API component manager.
+
+        The ``OPNsenseDirectRunner`` iterates this dict to dispatch
+        plan/apply/destroy/get_resource_ids across every component that
+        opted into the direct-API path (ADR-0014). Adding a new entry
+        here is the only provider-side change required to wire a new
+        component into the runner.
+
+        Returns:
+            ``{resource_type_name: component_manager_class}`` mapping. The
+            value type is annotated as ``type[Any]`` to avoid a hard import
+            of ``BaseComponentManager`` at module-load time; the runner
+            knows the duck-typed surface (``plan``, ``apply``, ``destroy``,
+            ``get_resource_ids``) each manager must expose.
+        """
+        from .components.interface_assignment import InterfaceAssignmentManager
+        from .components.vlan import VlanManager
+
+        return {
+            "vlans": VlanManager,
+            "interface_assignments": InterfaceAssignmentManager,
+        }
+
     def _generate_aliases_terraform(self, aliases: list[ResourceConfig]) -> None:
         """Generate Terraform for OPNsense aliases."""
         self.render_and_write_terraform(
@@ -593,6 +617,7 @@ class OPNsenseProvider(
         return [
             "firewall_rules",
             "vlans",
+            "interface_assignments",
             "aliases",
             "dhcp_static_maps",
             "kea_subnet",
@@ -624,6 +649,7 @@ class OPNsenseProvider(
         return {
             "firewall_rules": ["aliases", "vlans"],
             "vlans": [],
+            "interface_assignments": ["vlans"],
             "aliases": [],
             "dhcp_static_maps": ["vlans"],
             "kea_subnet": ["vlans"],
@@ -714,6 +740,28 @@ class OPNsenseProvider(
         from .components.vlan import VlanManager
 
         manager = VlanManager(self.config_dir)
+        return manager.migrate(env_name)
+
+    def migrate_interface_assignment(self, env_name: str) -> str:
+        """Migrate current interface assignments to InfraFoundry YAML.
+
+        Reads the live interface assignment table from OPNsense via the
+        direct-API path and generates InfraFoundry-compatible YAML.
+        Mirrors ``migrate_vlan``. Apply/destroy for ``interface_assignments``
+        is a no-op on OPNsense `26.1.6_2` (no REST write endpoint), so
+        the YAML this method emits is intended for cutover dumps and
+        documentation. Not yet exposed via ``config migrate`` CLI — that
+        wiring is a follow-up.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            YAML configuration as a string
+        """
+        from .components.interface_assignment import InterfaceAssignmentManager
+
+        manager = InterfaceAssignmentManager(self.config_dir)
         return manager.migrate(env_name)
 
     def migrate_isc_to_kea(self, env_name: str, interfaces: list[str] | None = None) -> str:
