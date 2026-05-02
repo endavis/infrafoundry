@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777720188487,
+  "lastUpdate": 1777725356488,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7161,6 +7161,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00004912386883831614",
             "extra": "mean: 168.8575306392923 usec\nrounds: 2252"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5b4884e6afbd810ad923b6f9e0ad4dd2f95c34d4",
+          "message": "feat: add OPNsense interface_assignments (read-only) + dispatch table (merges PR #712, addresses #711)\n\nAdds interface_assignments as a read-only / migrate component and\nrefactors OPNsenseDirectRunner to dispatch via\nprovider.get_direct_api_resource_types(). Apply/destroy are loud\nno-ops because OPNsense 26.1.6_2 has no REST write API for interface\nassignments. Cutover runbook documents the manual GUI step. ADR-0013\nand ADR-0014 amended with the per-component decision and read-only\nconstraint.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-02T13:35:29+01:00",
+          "tree_id": "3ceb21e4737f752e522c3844007b92414bfd83ba",
+          "url": "https://github.com/endavis/infrafoundry/commit/5b4884e6afbd810ad923b6f9e0ad4dd2f95c34d4"
+        },
+        "date": 1777725355368,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8464.160452039388,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002244193377309544",
+            "extra": "mean: 118.14520833652864 usec\nrounds: 48"
           }
         ]
       }
