@@ -6,6 +6,12 @@ ADR-0010 runner protocols (``Plannable``, ``Applyable``, ``Destroyable``,
 ``StateAware``) by delegating to component managers under
 ``infrafoundry.providers.opnsense.components``.
 
+Components participate by declaring themselves in
+``OPNsenseProvider.get_direct_api_resource_types()`` — the runner iterates
+that dispatch table at plan/apply/destroy/get_resource_ids time. Adding a
+new direct-API component is a one-entry change in the provider; no runner
+edits are required.
+
 The runner deliberately runs at ``priority = -10`` so that direct-API resources
 (e.g., VLANs) are applied before any terraform-managed dependents
 (``firewall_rules``, ``dhcp_static_maps``) within the same provider. See
@@ -35,9 +41,12 @@ logger = logging.getLogger(__name__)
 class OPNsenseDirectRunner(BaseRunner):
     """Runner that drives OPNsense components via the direct-API path.
 
-    The runner is hardcoded for the components currently migrated to
-    direct-API (VLANs as of #709). When additional components migrate, extend
-    ``_dispatch_*`` methods to instantiate the relevant component manager.
+    The runner is dispatch-table driven: ``provider.get_direct_api_resource_types()``
+    returns ``{type_name: ComponentManager}`` and each public method
+    (``plan``/``apply``/``destroy``/``get_resource_ids``) iterates that
+    table, filters resources by type, and delegates to the manager. New
+    components opt in by adding a single entry to the provider's dispatch
+    table; no runner code changes required.
 
     The provider must expose ``generate_opnsense_direct(resources)`` (a no-op
     is fine — see ``OPNsenseProvider.generate_opnsense_direct``) so the
@@ -147,11 +156,37 @@ class OPNsenseDirectRunner(BaseRunner):
         return str(env_name)
 
     @staticmethod
+    def _filter_by_type(
+        resources: list[ResourceConfig],
+        type_name: str,
+        target_resources: list[str] | None,
+    ) -> list[ResourceConfig]:
+        """Pick out resources of a given type, optionally filtering by name.
+
+        Args:
+            resources: All provider resources for the current environment.
+            type_name: ``ResourceConfig.type`` to keep (e.g., ``"vlans"``).
+            target_resources: Optional name filter (CLI ``--resource``).
+
+        Returns:
+            Matching ResourceConfig entries the runner should act on.
+        """
+        filtered = [r for r in resources if r.type == type_name]
+        if target_resources:
+            target_set = set(target_resources)
+            filtered = [r for r in filtered if r.name in target_set]
+        return filtered
+
+    @staticmethod
     def _filter_vlans(
         resources: list[ResourceConfig],
         target_resources: list[str] | None,
     ) -> list[ResourceConfig]:
         """Pick out the VLAN resources, optionally filtering by name.
+
+        Thin compatibility wrapper around ``_filter_by_type`` retained
+        because existing callers and tests reach for the VLAN-specific
+        helper directly.
 
         Args:
             resources: All provider resources for the current environment.
@@ -160,11 +195,24 @@ class OPNsenseDirectRunner(BaseRunner):
         Returns:
             VLAN ResourceConfig entries the runner should act on.
         """
-        vlans = [r for r in resources if r.type == "vlans"]
-        if target_resources:
-            target_set = set(target_resources)
-            vlans = [v for v in vlans if v.name in target_set]
-        return vlans
+        return OPNsenseDirectRunner._filter_by_type(resources, "vlans", target_resources)
+
+    @staticmethod
+    def _resolve_dispatch_table(provider: ProviderBase) -> dict[str, type[Any]]:
+        """Return the provider's direct-API dispatch table or an empty dict.
+
+        Centralizes the ``getattr`` + callable check so each method body
+        stays readable. If the provider doesn't expose
+        ``get_direct_api_resource_types``, the runner treats it as having
+        no direct-API components — a safe default.
+        """
+        getter = getattr(provider, "get_direct_api_resource_types", None)
+        if not callable(getter):
+            return {}
+        table = getter()
+        if not isinstance(table, dict):
+            return {}
+        return table
 
     @staticmethod
     def _load_provider_resources(provider: ProviderBase) -> list[ResourceConfig]:
@@ -205,6 +253,12 @@ class OPNsenseDirectRunner(BaseRunner):
     def plan(self, provider: ProviderBase, **kwargs: Any) -> PlanResult:
         """Compute a diff between desired YAML state and live OPNsense state.
 
+        Iterates ``provider.get_direct_api_resource_types()`` and dispatches
+        each registered component manager's ``plan``. Aggregates per-type
+        results into a single ``PlanResult``: ``has_changes`` is True if any
+        component reports changes; ``changes_summary`` concatenates each
+        component's summary line.
+
         Args:
             provider: OPNsense provider instance (env must be set).
             **kwargs: Runner options:
@@ -216,44 +270,84 @@ class OPNsenseDirectRunner(BaseRunner):
         """
         if not self._supports_direct_api(provider):
             return PlanResult(success=True, has_changes=False, changes_summary="No changes")
+
+        dispatch_table = self._resolve_dispatch_table(provider)
+        if not dispatch_table:
+            return PlanResult(success=True, has_changes=False, changes_summary="No changes")
+
         env_name = self._resolve_env_name(provider)
         target_resources = kwargs.get("target_resources")
         add_only = bool(kwargs.get("add_only", False))
 
         resources = self._load_provider_resources(provider)
-        vlans = self._filter_vlans(resources, target_resources)
 
-        if not vlans:
+        any_changes = False
+        summary_parts: list[str] = []
+
+        for type_name, manager_cls in dispatch_table.items():
+            typed_resources = self._filter_by_type(resources, type_name, target_resources)
+            if not typed_resources:
+                continue
+
+            manager = manager_cls(provider.config_dir)
+            try:
+                diff = manager.plan(env_name, typed_resources, add_only=add_only)
+            except Exception as exc:
+                logger.exception("opnsense_direct %s plan failed", type_name)
+                return PlanResult(success=False, error=str(exc))
+
+            type_summary = self._format_plan_summary(type_name, diff, add_only=add_only)
+            summary_parts.append(type_summary)
+            self.console.print(f"  [dim]opnsense_direct: {type_summary}[/dim]")
+
+            if not diff.is_empty:
+                any_changes = True
+
+        if not summary_parts:
             self.console.print("  [dim]opnsense_direct: no direct-API resources to plan[/dim]")
             return PlanResult(success=True, has_changes=False, changes_summary="No changes")
 
-        from infrafoundry.providers.opnsense.components.vlan import VlanManager
+        return PlanResult(
+            success=True,
+            has_changes=any_changes,
+            changes_summary=" | ".join(summary_parts),
+        )
 
-        manager = VlanManager(provider.config_dir)
-        try:
-            diff = manager.plan(env_name, vlans, add_only=add_only)
-        except Exception as exc:
-            logger.exception("opnsense_direct VLAN plan failed")
-            return PlanResult(success=False, error=str(exc))
+    @staticmethod
+    def _format_plan_summary(type_name: str, diff: Any, *, add_only: bool) -> str:
+        """Render a one-line plan summary for a single component's diff.
 
+        Args:
+            type_name: Resource type name (e.g., ``"vlans"``).
+            diff: A ``Diff``-like object exposing ``adds``/``updates``/
+                ``deletes``/``locked`` lists. Read-only components may
+                supply additional attributes (e.g., ``read_only``,
+                ``message``) which are surfaced verbatim when present.
+            add_only: Whether the runner is in add-only mode.
+
+        Returns:
+            Human-readable summary line; downstream code joins these with
+            " | " for the aggregate ``PlanResult``.
+        """
+        if getattr(diff, "read_only", False):
+            note = getattr(diff, "message", "read-only")
+            return f"{type_name}: {note}"
         summary = (
-            f"Plan: {len(diff.adds)} to add, {len(diff.updates)} to update, "
+            f"{type_name}: {len(diff.adds)} to add, {len(diff.updates)} to update, "
             f"{len(diff.deletes)} to delete, {len(diff.locked)} locked."
         )
         if add_only:
             summary += " (add-only mode)"
-        self.console.print(f"  [dim]opnsense_direct: {summary}[/dim]")
-
-        return PlanResult(
-            success=True,
-            has_changes=not diff.is_empty,
-            changes_summary=summary,
-        )
+        return summary
 
     def apply(
         self, provider: ProviderBase, auto_approve: bool = True, **kwargs: Any
     ) -> ApplyResult:
         """Apply direct-API changes for managed components.
+
+        Iterates ``provider.get_direct_api_resource_types()`` and dispatches
+        each registered component manager's ``apply``. Aggregates counts
+        and ``resource_outcomes`` across types into a single ``ApplyResult``.
 
         Args:
             provider: OPNsense provider instance (env must be set).
@@ -267,65 +361,107 @@ class OPNsenseDirectRunner(BaseRunner):
             for downstream lifecycle event firing.
         """
         if not self._supports_direct_api(provider):
-            empty_other: ApplyResult = {
-                "success": True,
-                "resources_created": 0,
-                "resources_updated": 0,
-                "resources_deleted": 0,
-            }
-            empty_other["resource_outcomes"] = []  # type: ignore[typeddict-unknown-key]
-            return empty_other
+            return self._empty_apply_result()
+
+        dispatch_table = self._resolve_dispatch_table(provider)
+        if not dispatch_table:
+            return self._empty_apply_result()
+
         env_name = self._resolve_env_name(provider)
         target_resources = kwargs.get("target_resources")
         add_only = bool(kwargs.get("add_only", False))
 
         resources = self._load_provider_resources(provider)
-        vlans = self._filter_vlans(resources, target_resources)
 
-        if not vlans:
+        total_created = 0
+        total_updated = 0
+        total_deleted = 0
+        all_outcomes: list[ResourceOutcome] = []
+        any_dispatched = False
+
+        for type_name, manager_cls in dispatch_table.items():
+            typed_resources = self._filter_by_type(resources, type_name, target_resources)
+            if not typed_resources:
+                continue
+            any_dispatched = True
+
+            manager = manager_cls(provider.config_dir)
+            try:
+                result = manager.apply(
+                    env_name, typed_resources, auto_approve=auto_approve, add_only=add_only
+                )
+            except Exception as exc:
+                logger.exception("opnsense_direct %s apply failed", type_name)
+                return ApplyResult(success=False, error=str(exc))
+
+            created = int(result.get("resources_created", 0))
+            updated = int(result.get("resources_updated", 0))
+            deleted = int(result.get("resources_deleted", 0))
+            total_created += created
+            total_updated += updated
+            total_deleted += deleted
+            all_outcomes.extend(result.get("resource_outcomes", []))
+
+            self._log_apply_progress(type_name, result, created, updated, deleted)
+
+        if not any_dispatched:
             self.console.print("  [dim]opnsense_direct: no direct-API resources to apply[/dim]")
-            empty: ApplyResult = {
-                "success": True,
-                "resources_created": 0,
-                "resources_updated": 0,
-                "resources_deleted": 0,
-            }
-            empty["resource_outcomes"] = []  # type: ignore[typeddict-unknown-key]
-            return empty
-
-        from infrafoundry.providers.opnsense.components.vlan import VlanManager
-
-        manager = VlanManager(provider.config_dir)
-        try:
-            result = manager.apply(env_name, vlans, auto_approve=auto_approve, add_only=add_only)
-        except Exception as exc:
-            logger.exception("opnsense_direct VLAN apply failed")
-            return ApplyResult(success=False, error=str(exc))
-
-        outcomes: list[ResourceOutcome] = result.get("resource_outcomes", [])
-        self.console.print(
-            f"  [dim]opnsense_direct: applied "
-            f"{result.get('resources_created', 0)} adds, "
-            f"{result.get('resources_updated', 0)} updates, "
-            f"{result.get('resources_deleted', 0)} deletes[/dim]"
-        )
+            return self._empty_apply_result()
 
         applied: ApplyResult = {
             "success": True,
-            "resources_created": result.get("resources_created", 0),
-            "resources_updated": result.get("resources_updated", 0),
-            "resources_deleted": result.get("resources_deleted", 0),
+            "resources_created": total_created,
+            "resources_updated": total_updated,
+            "resources_deleted": total_deleted,
         }
-        applied["resource_outcomes"] = outcomes  # type: ignore[typeddict-unknown-key]
+        applied["resource_outcomes"] = all_outcomes  # type: ignore[typeddict-unknown-key]
         applied["resource_outcomes_summary"] = [  # type: ignore[typeddict-unknown-key]
-            o.to_dict() for o in outcomes
+            o.to_dict() for o in all_outcomes
         ]
         return applied
+
+    @staticmethod
+    def _empty_apply_result() -> ApplyResult:
+        """Build an ``ApplyResult`` with zero counts and an empty outcomes list."""
+        empty: ApplyResult = {
+            "success": True,
+            "resources_created": 0,
+            "resources_updated": 0,
+            "resources_deleted": 0,
+        }
+        empty["resource_outcomes"] = []  # type: ignore[typeddict-unknown-key]
+        return empty
+
+    def _log_apply_progress(
+        self,
+        type_name: str,
+        result: dict[str, Any],
+        created: int,
+        updated: int,
+        deleted: int,
+    ) -> None:
+        """Log per-type apply progress, surfacing read-only informational messages.
+
+        Read-only components (e.g., ``interface_assignments``) include a
+        ``message`` key in their result so the no-op is loud, not silent.
+        """
+        message = result.get("message")
+        if message:
+            self.console.print(f"  [dim]opnsense_direct: {type_name}: {message}[/dim]")
+            return
+        self.console.print(
+            f"  [dim]opnsense_direct: {type_name}: applied "
+            f"{created} adds, {updated} updates, {deleted} deletes[/dim]"
+        )
 
     def destroy(
         self, provider: ProviderBase, auto_approve: bool = True, **kwargs: Any
     ) -> DestroyResult:
         """Delete direct-API resources for managed components.
+
+        Iterates ``provider.get_direct_api_resource_types()`` and dispatches
+        each registered component manager's ``destroy``. Aggregates counts
+        across types.
 
         Args:
             provider: OPNsense provider instance (env must be set).
@@ -338,39 +474,56 @@ class OPNsenseDirectRunner(BaseRunner):
         """
         if not self._supports_direct_api(provider):
             return DestroyResult(success=True, resources_destroyed=0)
+
+        dispatch_table = self._resolve_dispatch_table(provider)
+        if not dispatch_table:
+            return DestroyResult(success=True, resources_destroyed=0)
+
         env_name = self._resolve_env_name(provider)
         target_resources = kwargs.get("target_resources")
 
         resources = self._load_provider_resources(provider)
-        vlans = self._filter_vlans(resources, target_resources)
 
-        if not vlans:
+        total_destroyed = 0
+        any_dispatched = False
+
+        for type_name, manager_cls in dispatch_table.items():
+            typed_resources = self._filter_by_type(resources, type_name, target_resources)
+            if not typed_resources:
+                continue
+            any_dispatched = True
+
+            manager = manager_cls(provider.config_dir)
+            try:
+                result = manager.destroy(env_name, typed_resources, auto_approve=auto_approve)
+            except Exception as exc:
+                logger.exception("opnsense_direct %s destroy failed", type_name)
+                return DestroyResult(success=False, error=str(exc))
+
+            destroyed = int(result.get("resources_destroyed", 0))
+            total_destroyed += destroyed
+
+            message = result.get("message")
+            if message:
+                self.console.print(f"  [dim]opnsense_direct: {type_name}: {message}[/dim]")
+            else:
+                self.console.print(
+                    f"  [dim]opnsense_direct: {type_name}: destroyed {destroyed} resources[/dim]"
+                )
+
+        if not any_dispatched:
             self.console.print("  [dim]opnsense_direct: no direct-API resources to destroy[/dim]")
             return DestroyResult(success=True, resources_destroyed=0)
 
-        from infrafoundry.providers.opnsense.components.vlan import VlanManager
-
-        manager = VlanManager(provider.config_dir)
-        try:
-            result = manager.destroy(env_name, vlans, auto_approve=auto_approve)
-        except Exception as exc:
-            logger.exception("opnsense_direct VLAN destroy failed")
-            return DestroyResult(success=False, error=str(exc))
-
-        self.console.print(
-            f"  [dim]opnsense_direct: destroyed "
-            f"{result.get('resources_destroyed', 0)} resources[/dim]"
-        )
-        return DestroyResult(
-            success=True,
-            resources_destroyed=int(result.get("resources_destroyed", 0)),
-        )
+        return DestroyResult(success=True, resources_destroyed=total_destroyed)
 
     def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
         """Return ``{resource_name: opnsense_uuid}`` for live direct-API resources.
 
-        Used by ``DeploymentExecutor`` (``deployment_executor.py:531-540``)
-        to persist UUIDs after a successful apply via ``StateManager``.
+        Iterates ``provider.get_direct_api_resource_types()`` and merges
+        each component's ``get_resource_ids`` mapping. Used by
+        ``DeploymentExecutor`` (``deployment_executor.py:531-540``) to
+        persist UUIDs after a successful apply via ``StateManager``.
 
         Args:
             provider: OPNsense provider instance (env must be set).
@@ -382,17 +535,27 @@ class OPNsenseDirectRunner(BaseRunner):
         """
         if not self._supports_direct_api(provider):
             return {}
+
+        dispatch_table = self._resolve_dispatch_table(provider)
+        if not dispatch_table:
+            return {}
+
         env_name = self._resolve_env_name(provider)
         resources = self._load_provider_resources(provider)
-        vlans = self._filter_vlans(resources, target_resources=None)
-        if not vlans:
-            return {}
 
-        from infrafoundry.providers.opnsense.components.vlan import VlanManager
+        merged: dict[str, str] = {}
+        for type_name, manager_cls in dispatch_table.items():
+            typed_resources = self._filter_by_type(resources, type_name, target_resources=None)
+            if not typed_resources:
+                continue
 
-        manager = VlanManager(provider.config_dir)
-        try:
-            return manager.get_resource_ids(env_name, vlans)
-        except Exception as exc:
-            logger.warning("opnsense_direct get_resource_ids failed: %s", exc)
-            return {}
+            manager = manager_cls(provider.config_dir)
+            try:
+                ids = manager.get_resource_ids(env_name, typed_resources)
+            except Exception as exc:
+                logger.warning("opnsense_direct %s get_resource_ids failed: %s", type_name, exc)
+                continue
+            if isinstance(ids, dict):
+                merged.update(ids)
+
+        return merged

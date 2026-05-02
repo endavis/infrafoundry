@@ -71,6 +71,8 @@ Granular locks (`lock: { delete: true, update: false }`) are deferred to a follo
 
 The `templates/opnsense/playbook.yml.j2` Ansible service-reload playbook retires once the last Terraform-based component is gone.
 
+> **Note (interface_assignments, #711):** OPNsense `26.1.6_2` exposes only a read-only API for interface assignments (`/api/interfaces/overview/*`); there is no REST CRUD surface and the GUI uses legacy PHP form posts that ultimately edit `<interfaces>` in `config.xml`. The component ships read-only — `list` / `migrate` / validation work; `apply` and `destroy` are loud no-ops. Operators perform interface assignment manually via the OPNsense GUI as a one-time step during cutover. The XML-edit write path is a future concern. See ADR-0013 §"Per-component decisions recorded so far".
+
 ## Rationale
 
 The VLAN spike supplied the load-bearing evidence:
@@ -97,6 +99,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 ## Related Issues
 
 - Issue [#709](https://github.com/endavis/infrafoundry/issues/709): feat: add `OPNsenseDirectRunner` and migrate VLAN component to direct-API (first implementation).
+- Issue [#711](https://github.com/endavis/infrafoundry/issues/711): feat: add OPNsense `interface_assignments` component (read-only / migrate; dispatch-table refactor).
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): chore: write ADR-0014 codifying OPNsense direct-API apply mechanism (this ADR).
 - Issue [#705](https://github.com/endavis/infrafoundry/issues/705): feat: spike direct-API VLAN component to inform ADR-0014 (closed; PR [#706](https://github.com/endavis/infrafoundry/pull/706) merged).
 - Issue [#701](https://github.com/endavis/infrafoundry/issues/701): the ADR-0013 work that deferred this decision (PR [#704](https://github.com/endavis/infrafoundry/pull/704)).
