@@ -18,6 +18,7 @@ from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense.validators import (
     DHCPValidator,
     FirewallValidator,
+    GatewayValidator,
     InterfaceAssignmentValidator,
     NATRuleValidator,
     ResourceNameValidator,
@@ -81,6 +82,7 @@ class OPNsenseValidator:
         self.resource_name_validator = ResourceNameValidator(report)
         self.interface_assignment_validator = InterfaceAssignmentValidator(report)
         self.nat_rule_validator = NATRuleValidator(report)
+        self.gateway_validator = GatewayValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -210,6 +212,11 @@ class OPNsenseValidator:
                 existing_interfaces,
                 existing_aliases,
             )
+            self.gateway_validator.validate(
+                resource_refs["gateways"],
+                resource_refs["interface_assignment_names"],
+                existing_interfaces,
+            )
             self.unbound_validator.validate(resource_refs["unbound_host_overrides"])
             self.resource_name_validator.validate(resources)
 
@@ -239,11 +246,13 @@ class OPNsenseValidator:
         unbound_host_overrides = [r for r in resources if r.type == "unbound_host_override"]
         interface_assignments = [r for r in resources if r.type == "interface_assignments"]
         nat_rules = [r for r in resources if r.type == "nat_rules"]
+        gateways = [r for r in resources if r.type == "gateways"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}
         interface_assignment_names = {a.name for a in interface_assignments}
         nat_rule_names = {r.name for r in nat_rules}
+        gateway_names = {g.name for g in gateways}
 
         return {
             "aliases": aliases,
@@ -257,6 +266,8 @@ class OPNsenseValidator:
             "interface_assignment_names": interface_assignment_names,
             "nat_rules": nat_rules,
             "nat_rule_names": nat_rule_names,
+            "gateways": gateways,
+            "gateway_names": gateway_names,
         }
 
     def _get_existing_aliases(

@@ -161,6 +161,7 @@ class OPNsenseProvider(
             knows the duck-typed surface (``plan``, ``apply``, ``destroy``,
             ``get_resource_ids``) each manager must expose.
         """
+        from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.nat_rule import NATRuleManager
         from .components.vlan import VlanManager
@@ -169,6 +170,7 @@ class OPNsenseProvider(
             "vlans": VlanManager,
             "interface_assignments": InterfaceAssignmentManager,
             "nat_rules": NATRuleManager,
+            "gateways": GatewayManager,
         }
 
     def _generate_aliases_terraform(self, aliases: list[ResourceConfig]) -> None:
@@ -628,6 +630,7 @@ class OPNsenseProvider(
             "kea_dhcp6_reservation",
             "unbound_host_override",
             "nat_rules",
+            "gateways",
         ]
 
     @override
@@ -661,6 +664,7 @@ class OPNsenseProvider(
             "kea_dhcp6_reservation": ["kea_dhcp6_subnet"],
             "unbound_host_override": [],
             "nat_rules": ["aliases", "interface_assignments"],
+            "gateways": ["interface_assignments"],
         }
 
     @override
@@ -788,6 +792,29 @@ class OPNsenseProvider(
         from .components.nat_rule import NATRuleManager
 
         manager = NATRuleManager(self.config_dir)
+        return manager.migrate(env_name)
+
+    def migrate_gateway(self, env_name: str) -> str:
+        """Migrate current gateways to InfraFoundry YAML.
+
+        Reads the live gateway list from OPNsense via the direct-API path
+        and generates InfraFoundry-compatible YAML. Mirrors ``migrate_vlan``,
+        ``migrate_interface_assignment``, and ``migrate_nat_rule``. Dynamic /
+        virtual gateways (those synthesized by OPNsense from interface DHCP
+        state — e.g., ``WAN_DHCP``, ``WAN_DHCP6``) are excluded from the
+        export — they're recreated from interface state on reconfigure and
+        shouldn't be in YAML. Not yet exposed via the ``config migrate``
+        CLI — that wiring is a follow-up (per ADR-0014 §8).
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            YAML configuration as a string
+        """
+        from .components.gateway import GatewayManager
+
+        manager = GatewayManager(self.config_dir)
         return manager.migrate(env_name)
 
     def migrate_isc_to_kea(self, env_name: str, interfaces: list[str] | None = None) -> str:
