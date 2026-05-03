@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777824472551,
+  "lastUpdate": 1777827235898,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7347,6 +7347,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003049254391093592",
             "extra": "mean: 152.34288699743752 usec\nrounds: 2115"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c125e2be8692bc5d6f8ed65ee4671e0b58a7534",
+          "message": "feat: add OPNsense gateways component (direct-API) (merges PR #729, addresses #721)\n\nAdds the OPNsense `gateways` direct-API component (ADR-0013 step #3),\nunblocking the opnsense.endavis.net -> opnsense-a cutover. Identity is\nthe natural-key `name` field (no description-suffix tag, divergent\nfrom nat_rules); mechanism is stock direct REST against\n`routing/settings/{searchGateway,addGateway,setGateway,delGateway,\nreconfigure}` -- the issue body's `routes/gateway/*` and\n`firewall/gateway/*` candidates were both wrong; correct path\nconfirmed via the bundled OPNsense OpenAPI spec for 26.1.6 and a\nlive probe against opnsense-a.\n\nIncludes service, component manager, validator, provider integration,\n117 unit tests, 5 opt-in integration tests, and ADR-0013 amendment\n+ resource coverage matrix updates.\n\nAddresses #721\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-03T17:53:28+01:00",
+          "tree_id": "243a8e145a752997fead41e5bcbe4e8dec090dd6",
+          "url": "https://github.com/endavis/infrafoundry/commit/7c125e2be8692bc5d6f8ed65ee4671e0b58a7534"
+        },
+        "date": 1777827234815,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6767.6007030025285,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000023644416591143295",
+            "extra": "mean: 147.76285479672845 usec\nrounds: 2679"
           }
         ]
       }
