@@ -20,7 +20,8 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/unboundplus/hosts/host` | `unbound_host_override` | Supported |
 | `<dhcpd>` (legacy ISC) | `dhcp_static_maps` | Supported (legacy; new deployments should use Kea) |
 | `<interfaces>` | `interface_assignments` | Read-only / migrate (direct-API; #711). Write-path mechanism decided in [ADR-0014 §"Per-component decisions"](../decisions/0014-opnsense-direct-api-apply-mechanism.md#per-component-decisions) (#717): server-side-validated REST via a forked OPNsense PHP controller (PR #716). Production conversion of `OPNsenseDirectRunner.apply()` is a separate follow-up; until it ships, logical-to-physical interface mapping remains a one-time manual GUI step during cutover. |
-| `<nat>/rule` and `<nat>/outbound/rule` | — | **Gap** |
+| `<nat>/outbound/rule` and `<nat>/onetoone/rule` | `nat_rules` (`kind: outbound` / `kind: one_to_one`) | Supported (outbound + 1:1, direct-API; #713). Identity is encoded as a **suffix** in the rule `description` — `<operator description> [infrafoundry:<name>]` — and every managed rule also carries the OPNsense `infrafoundry` category as a fleet-wide marker. Live rules without the suffix tag are unmanaged and ignored by the diff (do not edit a managed rule's description in the GUI — that breaks identity parsing). |
+| `<nat>/rule` (port forwards) | — | **Gap** pending a follow-up spike — `26.1.6_2` exposes no MVC REST endpoint for port forwards (`firewall/{redirect,forward,portforward,nat_forward,rdr}` all return 404). The gist-controller mechanism from #717 is the likely path. |
 | `<OPNsense>/Gateways` | — | **Gap** |
 | `<staticroutes>/route` | — | **Gap** |
 | `<virtualip>/vip` | — | **Gap** |
@@ -46,7 +47,7 @@ This template assumes you are cutting over a current box (`OLD`) to a new box (`
 1. **Extract**: run `foundry config migrate --env <env> --provider opnsense --component <type>` for every supported resource type on `OLD` to dump live state into YAML under `envs/<env>/opnsense/`.
 2. **Edit interface map**: in the YAML, remap physical NIC names (`igc0` → `ixl0`, etc.) and any VLAN parent interface references. This is the only manual edit if the new box has different NICs.
 3. **Out-of-IaC import**: on `NEW`, System → Configuration → Backups → Restore, choose "Restore area" and import only the sections from "out of IaC scope" above. **Do not** restore VLANs, filter, NAT, or DHCP — those come from IaC.
-4. **Manual GUI step — interface assignments** (one-time per cutover): on `NEW`, navigate to **Interfaces → Assignments** and bind each logical interface (LAN, WAN, OPT1, etc.) to the correct physical NIC or VLAN per the `interface_assignments` YAML in `envs/<env>/opnsense/`. The write-path mechanism is decided ([ADR-0014 §"Per-component decisions"](../decisions/0014-opnsense-direct-api-apply-mechanism.md#per-component-decisions), #717) but production conversion of `OPNsenseDirectRunner.apply()` is a separate follow-up; until it ships, the YAML is the source of truth and `foundry` reads-and-validates it but cannot apply it. Save and apply within the GUI before continuing.
+4. **Manual GUI step — interface assignments** (one-time per cutover): on `NEW`, navigate to **Interfaces → Assignments** and bind each logical interface (LAN, WAN, OPT1, etc.) to the correct physical NIC or VLAN per the `interface_assignments` YAML in `envs/<env>/opnsense/`. The write-path mechanism is decided ([ADR-0014 §"Per-component decisions"](../decisions/0014-opnsense-direct-api-apply-mechanism.md#per-component-decisions), #717) but production conversion of `OPNsenseDirectRunner.apply()` is a separate follow-up; until it ships, the YAML is the source of truth and `foundry` reads-and-validates it but cannot apply it. **Port forwards** also remain a manual GUI step until the follow-up spike ships — outbound and 1:1 NAT rules are managed by `nat_rules` (#713), but `Firewall → NAT → Port Forward` rules must be configured via the GUI on `NEW`. Save and apply within the GUI before continuing.
 5. **Switch endpoint**: update `provider_settings.opnsense.api_url` in `envs/<env>/settings.yaml` to point at `NEW`.
 6. **Plan**: `foundry infra plan --env <env>` and review the diff. The `interface_assignments` line will show "read-only / 0 changes" — that's expected; the manual step above is the current source of writes (the direct-API write path lands in a follow-up to #717). Expect a clean apply against the (mostly empty) `NEW` box for everything else.
 7. **Apply**: `foundry infra apply --env <env>`.
@@ -73,7 +74,7 @@ After the cleanup, terraform plan should show zero VLAN-related changes; the dir
 Each gap row in the matrix above corresponds to a planned feature issue. The implementation order in [ADR-0013](../decisions/0013-opnsense-full-iac-migration.md) is:
 
 1. `interface_assignments` (read-only / migrate shipped in #711; write-path mechanism decided in ADR-0014 amendment #717 via a forked PHP REST controller; production conversion of `OPNsenseDirectRunner.apply()` is a follow-up issue)
-2. `nat_rules`
+2. `nat_rules` — outbound + 1:1 ship in #713 (direct-API). Port forwards deferred to a follow-up spike — `26.1.6_2` exposes no MVC REST endpoint for them; the same gist-controller mechanism from #717 is the likely path.
 3. `gateways`, `static_routes`
 4. `virtual_ips`
 5. Unbound extensions (`domain_override`, `host_alias`, `forward`)

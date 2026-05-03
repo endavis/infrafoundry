@@ -162,11 +162,13 @@ class OPNsenseProvider(
             ``get_resource_ids``) each manager must expose.
         """
         from .components.interface_assignment import InterfaceAssignmentManager
+        from .components.nat_rule import NATRuleManager
         from .components.vlan import VlanManager
 
         return {
             "vlans": VlanManager,
             "interface_assignments": InterfaceAssignmentManager,
+            "nat_rules": NATRuleManager,
         }
 
     def _generate_aliases_terraform(self, aliases: list[ResourceConfig]) -> None:
@@ -625,6 +627,7 @@ class OPNsenseProvider(
             "kea_dhcp6_subnet",
             "kea_dhcp6_reservation",
             "unbound_host_override",
+            "nat_rules",
         ]
 
     @override
@@ -657,6 +660,7 @@ class OPNsenseProvider(
             "kea_dhcp6_subnet": ["vlans"],
             "kea_dhcp6_reservation": ["kea_dhcp6_subnet"],
             "unbound_host_override": [],
+            "nat_rules": ["aliases", "interface_assignments"],
         }
 
     @override
@@ -762,6 +766,28 @@ class OPNsenseProvider(
         from .components.interface_assignment import InterfaceAssignmentManager
 
         manager = InterfaceAssignmentManager(self.config_dir)
+        return manager.migrate(env_name)
+
+    def migrate_nat_rule(self, env_name: str) -> str:
+        """Migrate current NAT rules (outbound + 1:1) to InfraFoundry YAML.
+
+        Reads the live NAT rule list from OPNsense via the direct-API path
+        and generates InfraFoundry-compatible YAML. Mirrors ``migrate_vlan``
+        and ``migrate_interface_assignment``. Only managed rules (those
+        carrying the ``[infrafoundry:<name>]`` description prefix) are
+        emitted; unmanaged rules are intentionally left to the operator.
+        Port forwards are out of scope (see ADR-0013, #713). Not yet
+        exposed via the ``config migrate`` CLI — that wiring is a follow-up.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            YAML configuration as a string
+        """
+        from .components.nat_rule import NATRuleManager
+
+        manager = NATRuleManager(self.config_dir)
         return manager.migrate(env_name)
 
     def migrate_isc_to_kea(self, env_name: str, interfaces: list[str] | None = None) -> str:
