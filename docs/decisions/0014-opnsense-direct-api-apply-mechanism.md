@@ -1,7 +1,7 @@
 # ADR-0014: OPNsense Direct-API Apply Mechanism
 
 **Date:** 2026-04-30
-**Amended:** 2026-05-03 (#717, PR #XXX) — added second internal write path for resources with no native REST CRUD; records `interface_assignments` per-component decision
+**Amended:** 2026-05-03 (#717, PR #718) — added second internal write path for resources with no native REST CRUD; records `interface_assignments` per-component decision
 **Status:** Accepted
 
 ## Status
