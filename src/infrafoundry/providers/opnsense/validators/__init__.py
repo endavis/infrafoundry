@@ -5,6 +5,7 @@ from infrafoundry.providers.opnsense.validators.firewall_validator import Firewa
 from infrafoundry.providers.opnsense.validators.interface_assignment_validator import (
     InterfaceAssignmentValidator,
 )
+from infrafoundry.providers.opnsense.validators.nat_rule_validator import NATRuleValidator
 from infrafoundry.providers.opnsense.validators.resource_name_validator import (
     ResourceNameValidator,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "DHCPValidator",
     "FirewallValidator",
     "InterfaceAssignmentValidator",
+    "NATRuleValidator",
     "ResourceNameValidator",
     "UnboundValidator",
     "VLANValidator",
