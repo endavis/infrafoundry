@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777801000905,
+  "lastUpdate": 1777806390062,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7254,6 +7254,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002608984753762449",
             "extra": "mean: 115.9454945316356 usec\nrounds: 2103"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e71a9c9166ae20a3fb16bd55eeba969a6deef9c",
+          "message": "feat: add OPNsense nat_rules component (outbound + 1:1, direct-API) (merges PR #719, addresses #713)",
+          "timestamp": "2026-05-03T12:05:59+01:00",
+          "tree_id": "ffecd2da5bbff24797edfc74514ffa6738e29b7f",
+          "url": "https://github.com/endavis/infrafoundry/commit/4e71a9c9166ae20a3fb16bd55eeba969a6deef9c"
+        },
+        "date": 1777806388518,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9768.200422870746,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000041058500278042316",
+            "extra": "mean: 102.37300185391906 usec\nrounds: 2697"
           }
         ]
       }
