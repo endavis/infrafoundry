@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777746366495,
+  "lastUpdate": 1777801000905,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7223,6 +7223,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001875822586331102",
             "extra": "mean: 110.1874835222412 usec\nrounds: 1942"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a9826ee8b1402f1faf4a8f231582d036dc000400",
+          "message": "docs: amend ADR-0014 to record gist-based REST mechanism for interface_assignments (merges PR #718, addresses #717, #711, #709, #707)\n\n* docs: amend ADR-0014 to record gist-based REST mechanism for interface_assignments\n\n* docs: fill in PR number in ADR-0014 amendment header",
+          "timestamp": "2026-05-03T10:36:11+01:00",
+          "tree_id": "c8dd2e16cd00c8d461d964d30c523d46fe1b090f",
+          "url": "https://github.com/endavis/infrafoundry/commit/a9826ee8b1402f1faf4a8f231582d036dc000400"
+        },
+        "date": 1777800999763,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8624.742203563168,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002608984753762449",
+            "extra": "mean: 115.9454945316356 usec\nrounds: 2103"
           }
         ]
       }
