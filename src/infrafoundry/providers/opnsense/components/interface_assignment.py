@@ -1,94 +1,67 @@
-"""Interface-assignment component manager for OPNsense (ADR-0014, #711).
+"""Interface-assignment component manager for OPNsense (ADR-0014, #720).
 
-OPNsense `26.1.6_2` exposes interface assignments as **read-only** via
-``GET /api/interfaces/overview/interfacesInfo``; no REST write endpoint
-exists today (the GUI's "Interfaces → Assignments" page edits
-``config.xml`` via legacy PHP form posts). This manager mirrors the
-``VlanManager`` shape so the dispatch-table-driven runner can iterate
-both uniformly, but ``apply``/``destroy`` are loud no-op stubs that
-return zero counts and an explicit informational message.
+This manager mirrors the ``VlanManager`` shape: a thin orchestration
+layer that loads ``InterfaceAssignmentService`` from the environment
+and dispatches add/update/delete operations through the gist-derived
+PHP controller. The runner (``OPNsenseDirectRunner``) instantiates
+this manager once per plan/apply/destroy and delegates.
 
-Operators wire interface assignments via the OPNsense GUI as a one-time
-manual cutover step; ``infra plan`` surfaces the read-only state, and
-``foundry config migrate --component interface_assignment`` (provider
-method only — CLI wiring is a follow-up) extracts the live state into
-YAML.
+Apply flow:
 
-The runner forwards ``message`` from the apply result through to its
-human-readable output; the runner's plan-summary helper recognizes
-``Diff`` objects with ``read_only=True`` and surfaces ``message`` there
-too.
+1. ``apply()`` runs an SSH-credential pre-flight; missing credentials
+   raise ``RuntimeError`` with an actionable message **before** any
+   diff or REST call (no deep paramiko traceback).
+2. ``installer.ensure_installed()`` SCPs the controller PHP if its
+   on-box checksum doesn't match the local source. Idempotent —
+   subsequent calls fast-path via the checksum probe.
+3. The service ``compute_diff`` + ``apply_diff`` does the actual
+   CRUD against the controller's REST endpoints. Each REST call
+   triggers ``interface reconfigure all`` server-side via configd;
+   there is no end-of-batch reconfigure step (differs from VLAN's
+   pattern).
+
+Destroy flow honors ``lock: true`` per-resource — locked entries are
+skipped and reported under ``locked_skipped``.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+import os
 from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.types import ResourceOutcome
 
+from ..extensions.interface_assignments import installer
 from ..services.interface_assignment import (
+    Diff,
     InterfaceAssignmentService,
     LiveInterfaceAssignment,
+    find_lockout_conflicts,
     interface_assignment_configs_from_resources,
 )
 from .base import BaseComponentManager
 
 logger = logging.getLogger(__name__)
 
-_READ_ONLY_MESSAGE = (
-    "interface_assignments are read-only on this OPNsense version; "
-    "manual GUI configuration required (Interfaces → Assignments)"
+
+# Pre-flight credential check: SSH credentials are required for the
+# one-time controller install. Missing credentials must fail the
+# manager with a clear actionable message before any diff is computed.
+_SSH_PREFLIGHT_MESSAGE = (
+    "interface_assignments writes require SSH credentials for one-time "
+    "controller install; set OPNSENSE_SSH_HOST/KEY/USER (or rely on "
+    "OPNSENSE_API_URL + ssh-agent + ~/.ssh/config). "
+    "See src/infrafoundry/providers/opnsense/extensions/interface_assignments/PROVENANCE.md."
 )
 
 
-# ---------------------------------------------------------------------------
-# Read-only Diff shim
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class ReadOnlyDiff:
-    """Diff-shaped payload for a read-only component.
-
-    Mirrors the structural surface of ``services.vlan.Diff`` (so the
-    runner's plan-summary helper can iterate ``adds``/``updates``/
-    ``deletes``/``locked`` without special-casing). The ``read_only``
-    flag is the marker the runner checks; ``message`` is surfaced
-    verbatim in the plan output.
-
-    Attributes:
-        adds: Always empty for read-only components.
-        updates: Always empty.
-        deletes: Always empty.
-        locked: Always empty.
-        read_only: Marker set to True so the runner formats this diff
-            with the informational message rather than the count line.
-        message: Human-readable note shown alongside the type name.
-    """
-
-    adds: list[Any] = field(default_factory=list)
-    updates: list[Any] = field(default_factory=list)
-    deletes: list[Any] = field(default_factory=list)
-    locked: list[Any] = field(default_factory=list)
-    read_only: bool = True
-    message: str = _READ_ONLY_MESSAGE
-
-    @property
-    def is_empty(self) -> bool:
-        """Read-only diffs never represent pending work."""
-        return True
-
-
 class InterfaceAssignmentManager(BaseComponentManager):
-    """Manager for OPNsense interface-assignment operations (read-only).
+    """Manager for OPNsense interface-assignment operations (full CRUD).
 
     Public interface mirrors ``VlanManager`` so the runner's dispatch
-    table can call any registered manager uniformly. Write methods
-    (``apply``/``destroy``) return zero counts and an informational
-    ``message`` field; read methods (``plan``/``get_resource_ids``/
-    ``list``) hit the live API.
+    table can call any registered manager uniformly.
     """
 
     # ------------------------------------------------------------------
@@ -102,28 +75,27 @@ class InterfaceAssignmentManager(BaseComponentManager):
         *,
         add_only: bool = False,
         provider_name: str = "opnsense",
-    ) -> ReadOnlyDiff:
-        """Return a read-only diff with an informational message.
-
-        We don't validate ``resources`` against live state because writes
-        are no-op anyway — surfacing the read-only constraint is more
-        useful to the operator than reporting a delta they cannot apply.
-        The validator is the source of truth for cross-resource reference
-        checks; this method is purely informational at plan time.
+    ) -> Diff:
+        """Compute the add/update/delete diff for the given resources.
 
         Args:
-            env_name: Active environment name (unused — read-only).
-            resources: Interface-assignment ``ResourceConfig`` entries
-                (unused for now; reserved for future write path).
-            add_only: Reserved; ignored for read-only.
-            provider_name: Provider identifier.
+            env_name: Active environment name.
+            resources: ``interface_assignments`` ``ResourceConfig``
+                entries (filtered upstream).
+            add_only: If ``True``, suppress deletes for live entries
+                not in YAML.
+            provider_name: Provider identifier (defaults to
+                ``opnsense``).
 
         Returns:
-            ``ReadOnlyDiff`` with empty add/update/delete lists and the
-            read-only informational message.
+            ``Diff`` describing what apply would do.
         """
-        del env_name, resources, add_only, provider_name  # read-only no-op
-        return ReadOnlyDiff()
+        service = InterfaceAssignmentService.from_environment(
+            env_name, provider_name, self.config_dir
+        )
+        desired = interface_assignment_configs_from_resources(resources)
+        live = service.list()
+        return service.compute_diff(desired, live, add_only=add_only)
 
     def apply(
         self,
@@ -134,39 +106,83 @@ class InterfaceAssignmentManager(BaseComponentManager):
         add_only: bool = False,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
-        """Loud no-op apply.
+        """Apply the diff: add/update/delete assignments via the gist controller.
 
-        Logs an informational line and returns success with zero counts
-        plus a ``message`` field the runner surfaces verbatim. Accepts
-        every kwarg ``VlanManager.apply`` does so dispatch is uniform.
+        Pre-flight order:
+
+        1. SSH credential pre-flight (raises ``RuntimeError`` with
+           an actionable message if credentials are absent).
+        2. ``installer.ensure_installed()`` SCPs the PHP controller
+           if needed. Idempotent.
+        3. Compute the diff against live state.
+        4. Lockout pre-flight refuses application if a planned ``add``
+           would collide with an already-bound device.
+        5. Dispatch the diff via ``service.apply_diff``. First HTTP
+           400 stops further ops; the caller-visible ``message``
+           names what succeeded so manual continuation is possible.
 
         Args:
-            env_name: Active environment name (unused).
-            resources: Interface-assignment ``ResourceConfig`` entries.
-                Counted into the message; not otherwise touched.
-            auto_approve: Unused.
-            add_only: Unused.
-            provider_name: Provider identifier (unused).
+            env_name: Active environment name.
+            resources: ``interface_assignments`` ``ResourceConfig`` entries.
+            auto_approve: Currently a no-op; the diff engine itself
+                is the gate.
+            add_only: If ``True``, suppress deletes.
+            provider_name: Provider identifier (defaults to
+                ``opnsense``).
 
         Returns:
-            Dict with ``success=True``, zero counts, an empty
-            ``resource_outcomes`` list, and a ``message`` field the
-            runner surfaces.
+            Dict with ``success``, ``resources_created``,
+            ``resources_updated``, ``resources_deleted``,
+            ``resource_outcomes``, and an optional ``message`` field.
+
+        Raises:
+            RuntimeError: If SSH credentials needed for the controller
+                install are missing, or the installer / lockout
+                pre-flight fail.
         """
-        del env_name, auto_approve, add_only, provider_name  # read-only no-op
-        count = len(resources)
-        message = (
-            f"{_READ_ONLY_MESSAGE}; {count} assignment{'s' if count != 1 else ''} described in YAML"
+        del auto_approve  # diff engine is the gate; flag accepted for protocol shape
+
+        # Pre-flight 1: SSH credentials must be resolvable before we do
+        # anything else. Skipping this means a deep paramiko traceback
+        # surfaces from inside install_controller() at apply time.
+        self._preflight_ssh_credentials()
+
+        # Pre-flight 2: ensure the PHP controller is installed. Idempotent
+        # — fast-paths via checksum on every subsequent apply.
+        installer.ensure_installed()
+
+        service = InterfaceAssignmentService.from_environment(
+            env_name, provider_name, self.config_dir
         )
-        logger.info(message)
-        return {
-            "success": True,
-            "resources_created": 0,
-            "resources_updated": 0,
-            "resources_deleted": 0,
-            "resource_outcomes": [],
-            "message": message,
+        desired = interface_assignment_configs_from_resources(resources)
+        live = service.list()
+        diff = service.compute_diff(desired, live, add_only=add_only)
+
+        # Pre-flight 3: lockout check before mutating.
+        conflicts = find_lockout_conflicts(diff, live)
+        if conflicts:
+            joined = "; ".join(conflicts)
+            raise RuntimeError(f"interface_assignments lockout conflicts: {joined}")
+
+        outcomes = self._build_outcomes(diff)
+        apply_result = service.apply_diff(diff)
+
+        result: dict[str, Any] = {
+            "success": apply_result.succeeded,
+            "resources_created": apply_result.created,
+            "resources_updated": apply_result.updated,
+            "resources_deleted": apply_result.deleted,
+            "resource_outcomes": outcomes,
         }
+        if apply_result.failure_message is not None:
+            # Surface partial-success counts in the operator-facing
+            # message so manual continuation is possible.
+            result["message"] = (
+                f"{apply_result.failure_message}; partial success — "
+                f"created={apply_result.created} updated={apply_result.updated} "
+                f"deleted={apply_result.deleted}"
+            )
+        return result
 
     def destroy(
         self,
@@ -176,30 +192,58 @@ class InterfaceAssignmentManager(BaseComponentManager):
         auto_approve: bool = True,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
-        """Loud no-op destroy.
+        """Delete every assignment named in ``resources`` from the live OPNsense box.
+
+        Locked entries are honored: ``lock: true`` resources are
+        skipped and counted in the response under ``locked_skipped``.
 
         Args:
-            env_name: Active environment name (unused).
-            resources: Interface-assignment ``ResourceConfig`` entries
-                (counted into the message only).
-            auto_approve: Unused.
-            provider_name: Provider identifier (unused).
+            env_name: Active environment name.
+            resources: ``interface_assignments`` ``ResourceConfig``
+                entries to destroy.
+            auto_approve: Currently a no-op.
+            provider_name: Provider identifier (defaults to
+                ``opnsense``).
 
         Returns:
-            Dict with ``success=True``, ``resources_destroyed=0``, and
-            a ``message`` field the runner surfaces.
+            Dict with ``resources_destroyed`` and ``locked_skipped``
+            counts.
+
+        Raises:
+            RuntimeError: If SSH credentials needed for the controller
+                install are missing, or installer setup fails.
         """
-        del env_name, auto_approve, provider_name  # read-only no-op
-        count = len(resources)
-        message = (
-            f"{_READ_ONLY_MESSAGE}; {count} assignment"
-            f"{'s' if count != 1 else ''} listed in YAML; nothing destroyed"
+        del auto_approve
+
+        # Pre-flight (matches apply()): the controller must be present
+        # before we can dispatch delItem. Idempotent fast-path on
+        # repeat destroys.
+        self._preflight_ssh_credentials()
+        installer.ensure_installed()
+
+        service = InterfaceAssignmentService.from_environment(
+            env_name, provider_name, self.config_dir
         )
-        logger.info(message)
+        desired = interface_assignment_configs_from_resources(resources)
+        live = service.list()
+        live_by_key: dict[str, LiveInterfaceAssignment] = {v.diff_key: v for v in live}
+
+        deleted = 0
+        locked_skipped = 0
+        for cfg in desired:
+            if cfg.lock:
+                locked_skipped += 1
+                continue
+            existing = live_by_key.get(cfg.diff_key)
+            if existing is None:
+                continue
+            service.delete(existing.identifier)
+            deleted += 1
+
         return {
             "success": True,
-            "resources_destroyed": 0,
-            "message": message,
+            "resources_destroyed": deleted,
+            "locked_skipped": locked_skipped,
         }
 
     # ------------------------------------------------------------------
@@ -215,22 +259,20 @@ class InterfaceAssignmentManager(BaseComponentManager):
     ) -> dict[str, str]:
         """Return ``{resource_name: identifier}`` for live entries matching ``resources``.
 
-        For read-only resources the live ``identifier`` doubles as the
-        resource ID (it's both the operator-facing name and the
-        OPNsense-side primary key — there's no UUID layer for interface
-        assignments). State DB updates via this map.
-
-        Resources without a matching live record are simply omitted —
-        the state DB will skip updating those rows and they'll surface
-        as plan-time validation errors via the validator.
+        For interface assignments the live ``identifier`` doubles as
+        the resource ID — there's no UUID layer, the logical name is
+        the primary key on the box.
 
         Args:
             env_name: Active environment name.
-            resources: Interface-assignment ``ResourceConfig`` entries.
-            provider_name: Provider identifier (defaults to ``opnsense``).
+            resources: ``interface_assignments`` ``ResourceConfig``
+                entries.
+            provider_name: Provider identifier (defaults to
+                ``opnsense``).
 
         Returns:
-            Mapping of resource name to live identifier.
+            Mapping of resource name to live identifier. Resources
+            without a matching live record are omitted.
         """
         configs = interface_assignment_configs_from_resources(resources)
         if not configs:
@@ -242,6 +284,85 @@ class InterfaceAssignmentManager(BaseComponentManager):
         return {
             cfg.name: live_by_id[cfg.name].identifier for cfg in configs if cfg.name in live_by_id
         }
+
+    def migrate(self, env_name: str, *, provider_name: str = "opnsense") -> str:
+        """Export the current interface assignments to InfraFoundry YAML.
+
+        Args:
+            env_name: Active environment name.
+            provider_name: Provider identifier (defaults to ``opnsense``).
+
+        Returns:
+            YAML string containing the live assignments in
+            resource-centric form.
+        """
+        service = InterfaceAssignmentService.from_environment(
+            env_name, provider_name, self.config_dir
+        )
+        return service.export_to_yaml()
+
+    # ------------------------------------------------------------------
+    # Internal helpers (defined before ``list`` so list[...] annotations
+    # below resolve to the builtin)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _preflight_ssh_credentials() -> None:
+        """Verify SSH credentials are resolvable before invoking the installer.
+
+        Raises ``RuntimeError`` with an actionable message when neither
+        ``OPNSENSE_SSH_HOST`` nor ``OPNSENSE_API_URL`` is set, so the
+        operator gets a coherent failure mode instead of a deep
+        paramiko traceback at SCP time.
+        """
+        if os.environ.get("OPNSENSE_SSH_HOST") or os.environ.get("OPNSENSE_API_URL"):
+            return
+        raise RuntimeError(_SSH_PREFLIGHT_MESSAGE)
+
+    @staticmethod
+    def _build_outcomes(diff: Diff) -> list[ResourceOutcome]:
+        """Build ``ResourceOutcome`` entries for every operation in ``diff``.
+
+        Mirrors ``VlanManager._build_outcomes``: address shape is
+        ``opnsense_interface_assignment.{name}``; the deleted-by-IaC
+        path uses the live record's identifier (which doubles as
+        ``name`` for this component).
+        """
+        outcomes: list[ResourceOutcome] = []
+
+        for cfg in diff.adds:
+            outcomes.append(
+                ResourceOutcome(
+                    address=f"opnsense_interface_assignment.{cfg.name}",
+                    action="add",
+                    resource_name=cfg.name,
+                )
+            )
+
+        for _live, want in diff.updates:
+            outcomes.append(
+                ResourceOutcome(
+                    address=f"opnsense_interface_assignment.{want.name}",
+                    action="update",
+                    resource_name=want.name,
+                )
+            )
+
+        for live in diff.deletes:
+            outcomes.append(
+                ResourceOutcome(
+                    address=f"opnsense_interface_assignment.{live.identifier}",
+                    action="delete",
+                    resource_name=live.identifier,
+                )
+            )
+
+        return outcomes
+
+    # ------------------------------------------------------------------
+    # Read paths (defined last so ``list`` does not shadow the builtin
+    # in earlier annotations)
+    # ------------------------------------------------------------------
 
     def list(
         self, env_name: str, *, provider_name: str = "opnsense"
@@ -256,18 +377,3 @@ class InterfaceAssignmentManager(BaseComponentManager):
             env_name, provider_name, self.config_dir
         )
         return service.list()
-
-    def migrate(self, env_name: str, *, provider_name: str = "opnsense") -> str:
-        """Export the current interface assignments to InfraFoundry YAML.
-
-        Args:
-            env_name: Active environment name.
-            provider_name: Provider identifier (defaults to ``opnsense``).
-
-        Returns:
-            YAML string containing the live assignments in resource-centric form.
-        """
-        service = InterfaceAssignmentService.from_environment(
-            env_name, provider_name, self.config_dir
-        )
-        return service.export_to_yaml()

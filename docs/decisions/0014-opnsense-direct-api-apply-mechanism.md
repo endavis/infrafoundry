@@ -2,6 +2,7 @@
 
 **Date:** 2026-04-30
 **Amended:** 2026-05-03 (#717, PR #718) — added second internal write path for resources with no native REST CRUD; records `interface_assignments` per-component decision
+**Amended:** 2026-05-03 (#720, PR #N) — Gates (2) and (3) cleared; production conversion of `interface_assignments` from no-op to live complete (full CRUD via the in-tree `AssignSettingsController.php` fork at `src/infrafoundry/providers/opnsense/extensions/interface_assignments/`). Spike deleted.
 **Status:** Accepted
 
 ## Status
@@ -74,19 +75,19 @@ Granular locks (`lock: { delete: true, update: false }`) are deferred to a follo
 
 The `templates/opnsense/playbook.yml.j2` Ansible service-reload playbook retires once the last Terraform-based component is gone.
 
-> **Note (interface_assignments, #711, amended 2026-05-03):** OPNsense `26.1.6_2` exposes no REST CRUD for `<interfaces>`. The component shipped read-only in PR #712 (`list` / `migrate` / validation work; `apply` / `destroy` are loud no-ops). The write path is decided in this ADR's "Per-component decisions" section: server-side-validated REST via a forked, in-tree PHP controller (PR #716 spike). Production conversion (`OPNsenseDirectRunner.apply()` from no-op to live for this resource) is gated on the production conversion issue, which carries out gates (2) and (3) recorded above.
+> **Note (interface_assignments, #711, amended 2026-05-03):** OPNsense `26.1.6_2` exposes no REST CRUD for `<interfaces>`. The component shipped read-only in PR #712 (`list` / `migrate` / validation work; `apply` / `destroy` are loud no-ops). The write path is decided in this ADR's "Per-component decisions" section: server-side-validated REST via a forked, in-tree PHP controller (PR #716 spike). Production conversion (`OPNsenseDirectRunner.apply()` from no-op to live for this resource) was carried out in #720, which cleared gates (2) and (3) recorded above.
 
 ## Per-component decisions
 
 Each new write mechanism that diverges from §1's default (REST via `opnsense_openapi`) is recorded here.
 
-### `interface_assignments` (PR #716, 2026-05-02 spike; production conversion gated on this amendment)
+### `interface_assignments` (PR #716, 2026-05-02 spike; production conversion completed in #720, 2026-05-03)
 
 **Mechanism:** Server-side-validated REST via the forked `AssignSettingsController.php` controller installed at `/usr/local/opnsense/mvc/app/controllers/OPNsense/Interfaces/Api/`.
 
 - **Read side:** `interfaces/overview/interfacesInfo` (already in production from PR #712, no controller required).
 - **Write side:** `assign_settings/{addItem, setItem, getItem, searchItem, delItem}` against the installed controller.
-- **Fork location:** in-tree at `tools/spikes/interface_assignment_gist_rest/AssignSettingsController.php` for the spike phase; production conversion graduates it to `src/infrafoundry/providers/opnsense/extensions/...`.
+- **Fork location:** graduated in #720 to `src/infrafoundry/providers/opnsense/extensions/interface_assignments/AssignSettingsController.php`. The spike directory `tools/spikes/interface_assignment_gist_rest/` was deleted in the same PR. Provenance and security-review summary live alongside at `src/infrafoundry/providers/opnsense/extensions/interface_assignments/PROVENANCE.md`.
 - **Patches/extensions over the upstream gist:** `sessionClose()` removed (modern-OPNsense compatibility), IPv6 fields, `setItem` / `getItem` / `searchItem`, optional explicit `name: optN`, validation helpers. ~225 LoC net-new on top of ~345 LoC inherited from szymczag's BSD-2-Clause base.
 
 **Rollback strategy:** No transactional rollback (option (c) from the findings doc).
@@ -98,10 +99,10 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Option (a) is wishful** — no alternative snapshot endpoint surfaced during the spike's REST probe.
 - **Option (b) re-introduces SSH** into the safety path for rollback. The gist-based mechanism's premise was to remove SSH from the steady-state apply path; reusing it for rollback erodes that win. Rejected.
 
-**Preconditions for production conversion** (carried out by the production conversion issue, not this amendment):
+**Preconditions for production conversion** (cleared in #720, recorded here for the historical record):
 
-- **Gate (2):** Empirically confirm that an `addItem`/`setItem`/`delItem` REST call produces a new entry in System → Configuration → Backups (auto-snapshot) AND System → Log Files → System General (audit log). The PHP controller calls OPNsense's standard `Config::save()` write path, so both should fire — but production lift can't proceed without empirical confirmation.
-- **Gate (3):** Security review of the ~225 LoC of net-new PHP in the forked controller. Community-authored code deployed to root on production firewall infrastructure requires a deliberate review pass. BSD-2-Clause is compatible.
+- **Gate (2) — cleared in #720:** Empirically confirmed that an `addItem`/`setItem`/`delItem` REST call produces a new entry in System → Configuration → Backups (auto-snapshot) AND System → Log Files → System General (audit log). The PHP controller calls OPNsense's standard `Config::save()` write path; both fire. Operator-captured screenshots from the `opnsense-a` (26.1.6_2) live integration test live in PR #720's body.
+- **Gate (3) — cleared in #720:** Security review of the ~225 LoC of net-new PHP in the forked controller completed. Findings: no privilege-escalation, injection, or filesystem-write surface introduced beyond the upstream gist's own surface. Full write-up in [`src/infrafoundry/providers/opnsense/extensions/interface_assignments/PROVENANCE.md`](../../src/infrafoundry/providers/opnsense/extensions/interface_assignments/PROVENANCE.md) ("Security review summary"); the bullets are also quoted inline in PR #720's body. BSD-2-Clause is compatible.
 
 **Cross-reference:** [ADR-0013 §"Per-component decisions recorded so far"](0013-opnsense-full-iac-migration.md#per-component-decisions-recorded-so-far) updated to reflect this resolution. See also [`docs/development/opnsense-spike-interface-assignment-gist-findings.md`](../development/opnsense-spike-interface-assignment-gist-findings.md) for the load-bearing evidence.
 
@@ -140,7 +141,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Upstream [`endavis/opnsense-openapi#34`](https://github.com/endavis/opnsense-openapi/issues/34): refactor — stabilize generated-client module path across patch revisions; add closest-floor spec matching.
 - Issue [#715](https://github.com/endavis/infrafoundry/issues/715): feat: spike + extend OPNsense gist-based `interface_assignments` write API (closed; PR [#716](https://github.com/endavis/infrafoundry/pull/716) merged 2026-05-02). Load-bearing evidence for this amendment.
 - Issue [#717](https://github.com/endavis/infrafoundry/issues/717): chore: amend ADR-0014 to record gist-based REST mechanism for `interface_assignments` (this amendment).
-- Production conversion of `OPNsenseDirectRunner.apply()` for `interface_assignments` from no-op to live — to be filed after this amendment merges; carries out gates (2) and (3).
+- Issue [#720](https://github.com/endavis/infrafoundry/issues/720): feat: convert `OPNsenseDirectRunner.apply()` for `interface_assignments` from no-op to live. Carries out gates (2) and (3); recorded as cleared in the 2026-05-03 amendment line above and in the per-component decisions section.
 
 ## Related Documentation
 

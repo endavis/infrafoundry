@@ -1,11 +1,17 @@
 """Idempotent installer for the AssignSettingsController.php fork on OPNsense.
 
-This script SCPs the controller to the OPNsense MVC controllers directory,
-restarts the configd + php_fpm services so the MVC layer re-discovers the
-new controller, and verifies the on-box checksum matches the local file.
+This module SCPs the controller PHP to the OPNsense MVC controllers
+directory, restarts the configd + php_fpm services so the MVC layer
+re-discovers the new controller, and verifies the on-box checksum
+matches the local file.
 
-It is **idempotent**: re-running with no changes is a no-op (checksum match
-short-circuits the SCP+restart path).
+The public entry point is ``ensure_installed(target=None)``. It is
+**idempotent**: when the on-box file checksum matches the local source
+the call short-circuits to ``False`` (no SCP, no restart) — the typical
+case on every ``InterfaceAssignmentManager.apply()`` after the first
+deploy. On checksum mismatch (or first install) it SCPs the file,
+fixes permissions, restarts both daemons, and re-verifies before
+returning ``True``.
 
 Environment variable contract::
 
@@ -13,34 +19,26 @@ Environment variable contract::
     OPNSENSE_SSH_USER         — defaults to "root"
     OPNSENSE_SSH_PORT         — defaults to "22"
     OPNSENSE_SSH_KEY          — optional, path to the SSH private key.
-                                 If unset, ssh-agent and ~/.ssh/config provide
-                                 the identity. The script never prompts.
+                                 If unset, ssh-agent and ~/.ssh/config
+                                 provide the identity.
     OPNSENSE_INSTALL_PATH     — defaults to the canonical MVC path
 
-The shell utilities ``ssh`` and ``scp`` must be on ``PATH``; they are invoked
-via ``subprocess.run`` with ``shell=False`` and an explicit argument list.
+The shell utilities ``ssh`` and ``scp`` must be on ``PATH``; they are
+invoked via ``subprocess.run`` with ``shell=False`` and an explicit
+argument list (no command injection surface).
 
-Usage::
-
-    # Standalone install:
-    python tools/spikes/interface_assignment_gist_rest/install.py install
-
-    # Verify the on-box file checksum matches the local source:
-    python tools/spikes/interface_assignment_gist_rest/install.py verify
-
-This module is designed to be importable so the spike's ``inspect`` subcommand
-can call ``verify_installed_checksum()`` directly without shelling out to a
-separate script.
+Lifted from the spike at ``tools/spikes/interface_assignment_gist_rest/
+install.py``; the standalone ``argparse`` CLI was dropped because in
+production the installer is driven by ``InterfaceAssignmentManager.
+apply()`` (manager-level installer integration per #720 plan).
 """
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import os
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -53,37 +51,51 @@ CONTROLLER_FILENAME = "AssignSettingsController.php"
 
 @dataclass(frozen=True)
 class SshTarget:
-    """Connection details for the OPNsense box."""
+    """Connection details for the OPNsense box.
+
+    Attributes:
+        host: Hostname or IP of the OPNsense box.
+        user: SSH user (defaults to ``root``).
+        port: SSH port (defaults to ``22``).
+        key_path: Path to private key, or ``None`` to fall back to
+            ssh-agent / ``~/.ssh/config``.
+        install_path: Absolute path on the box where the controller
+            PHP file lives.
+    """
 
     host: str
     user: str
     port: int
-    key_path: Path | None  # None → rely on ssh-agent / ~/.ssh/config
+    key_path: Path | None
     install_path: str
 
     @property
     def remote(self) -> str:
-        """``user@host`` form for ``ssh``/``scp``."""
+        """Return ``user@host`` form for ``ssh``/``scp``."""
         return f"{self.user}@{self.host}"
 
 
 def load_ssh_target(env: dict[str, str] | None = None) -> SshTarget:
     """Read SSH connection details from environment variables.
 
-    ``OPNSENSE_SSH_HOST`` falls back to the host part of ``OPNSENSE_API_URL``
-    when unset — common case where a single env defines both REST and SSH
-    targets. ``OPNSENSE_SSH_KEY`` is optional; when unset, ssh-agent and
-    ``~/.ssh/config`` provide the identity.
+    ``OPNSENSE_SSH_HOST`` falls back to the host part of
+    ``OPNSENSE_API_URL`` when unset — common case where a single env
+    defines both REST and SSH targets. ``OPNSENSE_SSH_KEY`` is
+    optional; when unset, ssh-agent and ``~/.ssh/config`` provide the
+    identity.
 
     Args:
         env: Mapping to read from. Defaults to ``os.environ``.
+            Injectable for tests.
 
     Returns:
         A populated ``SshTarget``.
 
     Raises:
-        RuntimeError: If neither ``OPNSENSE_SSH_HOST`` nor ``OPNSENSE_API_URL``
-            is set, or if a supplied ``OPNSENSE_SSH_KEY`` path does not exist.
+        RuntimeError: If neither ``OPNSENSE_SSH_HOST`` nor
+            ``OPNSENSE_API_URL`` is set, the configured port is not an
+            integer, or a supplied ``OPNSENSE_SSH_KEY`` path does not
+            exist.
     """
     source: dict[str, str] = dict(os.environ if env is None else env)
 
@@ -126,7 +138,14 @@ def local_controller_path() -> Path:
 
 
 def compute_local_checksum(path: Path) -> str:
-    """SHA-256 of a local file, as a hex string."""
+    """Return the SHA-256 hex digest of a local file.
+
+    Args:
+        path: File whose contents to hash.
+
+    Returns:
+        Lowercase hex string with no separator characters.
+    """
     h = hashlib.sha256()
     with path.open("rb") as fh:
         for chunk in iter(lambda: fh.read(65536), b""):
@@ -137,8 +156,9 @@ def compute_local_checksum(path: Path) -> str:
 def _identity_args(target: SshTarget) -> list[str]:
     """Return ``["-i", "<path>"]`` when an explicit key is configured, else ``[]``.
 
-    With an empty list the system ssh client falls back to ssh-agent and
-    ``~/.ssh/config`` for the identity — the typical homelab setup.
+    With an empty list the system ssh client falls back to ssh-agent
+    and ``~/.ssh/config`` for the identity — the typical homelab
+    setup.
     """
     if target.key_path is None:
         return []
@@ -146,7 +166,7 @@ def _identity_args(target: SshTarget) -> list[str]:
 
 
 def _ssh_args(target: SshTarget) -> list[str]:
-    """Common ssh args for non-interactive use."""
+    """Return common ssh args for non-interactive use."""
     return [
         "ssh",
         *_identity_args(target),
@@ -177,9 +197,10 @@ def _scp_args(target: SshTarget, source_path: Path, remote_path: str) -> list[st
 
 
 def _run(argv: list[str], *, capture_output: bool = True) -> subprocess.CompletedProcess[str]:
-    """Wrapper around subprocess.run with consistent defaults.
+    """Wrap ``subprocess.run`` with consistent defaults.
 
-    ``shell=False`` always; argv is a list. Captures stdout/stderr by default.
+    ``shell=False`` always; argv is a list. Captures stdout/stderr by
+    default so callers can surface failure context.
     """
     return subprocess.run(
         argv,
@@ -192,14 +213,26 @@ def _run(argv: list[str], *, capture_output: bool = True) -> subprocess.Complete
 def fetch_remote_checksum(target: SshTarget) -> str | None:
     """Compute the SHA-256 checksum of the controller currently on the box.
 
-    Returns ``None`` if the file doesn't exist on the remote (i.e., never
-    installed). Raises if the SSH command itself fails for some other reason.
+    Returns ``None`` if the file doesn't exist on the remote (i.e.,
+    never installed). Raises if the SSH command itself fails for some
+    other reason.
 
-    OPNsense's default root shell is ``opnsense-shell`` (csh-derived), where
-    ``2>/dev/null`` is "Ambiguous output redirect." We avoid stderr redirection
-    entirely by guarding with ``test -f`` (portable across both shells); if
-    the file is missing the guard short-circuits and the chained ``echo
-    MISSING`` runs, otherwise ``sha256 -q`` produces the hash on stdout.
+    OPNsense's default root shell is ``opnsense-shell`` (csh-derived),
+    where ``2>/dev/null`` is "Ambiguous output redirect." We avoid
+    stderr redirection entirely by guarding with ``test -f`` (portable
+    across both shells); if the file is missing the guard
+    short-circuits and the chained ``echo MISSING`` runs, otherwise
+    ``sha256 -q`` produces the hash on stdout.
+
+    Args:
+        target: Connection details.
+
+    Returns:
+        Hex digest string when present, ``None`` when the controller
+        is missing on the remote.
+
+    Raises:
+        RuntimeError: If the SSH probe itself fails.
     """
     cmd = [
         *_ssh_args(target),
@@ -222,8 +255,8 @@ def verify_installed_checksum(target: SshTarget | None = None) -> tuple[bool, st
         target: Connection details. If ``None``, reads from env.
 
     Returns:
-        ``(matches, remote_sum, local_sum)``. ``matches`` is ``False`` if
-        the file is missing on the remote or differs from local.
+        ``(matches, remote_sum, local_sum)``. ``matches`` is ``False``
+        if the file is missing on the remote or differs from local.
     """
     if target is None:
         target = load_ssh_target()
@@ -236,14 +269,22 @@ def verify_installed_checksum(target: SshTarget | None = None) -> tuple[bool, st
 def install_controller(target: SshTarget | None = None, *, force: bool = False) -> bool:
     """SCP the controller, restart services, verify checksum.
 
+    Idempotent: a second call with no changes short-circuits via the
+    pre-install checksum probe.
+
     Args:
         target: Connection details. If ``None``, reads from env.
-        force: If True, re-install even when the on-box checksum already
-            matches. Useful for forcing a service restart.
+        force: If ``True``, re-install even when the on-box checksum
+            already matches. Useful for forcing a service restart.
 
     Returns:
-        ``True`` if the controller was (re)installed; ``False`` if it was
-        already current and no install was needed.
+        ``True`` if the controller was (re)installed; ``False`` if it
+        was already current and no install was needed.
+
+    Raises:
+        RuntimeError: If the local controller file is missing, SCP
+            fails, the chmod or service-restart commands fail, or the
+            post-install checksum does not match the source.
     """
     if target is None:
         target = load_ssh_target()
@@ -254,20 +295,10 @@ def install_controller(target: SshTarget | None = None, *, force: bool = False) 
 
     matches, remote_sum, local_sum = verify_installed_checksum(target)
     if matches and not force:
-        print(f"Controller already current on {target.host} (sha256 {local_sum[:12]}…). Skipping.")
         return False
-
-    if remote_sum is None:
-        print(f"Controller not present on {target.host}. Installing fresh.")
-    else:
-        print(
-            f"Controller checksum mismatch on {target.host} "
-            f"(remote {remote_sum[:12]}…, local {local_sum[:12]}…). Replacing."
-        )
 
     # Step 1: SCP the file.
     scp_cmd = _scp_args(target, local_path, target.install_path)
-    print(f"Running: {' '.join(scp_cmd)}")
     scp_result = _run(scp_cmd)
     if scp_result.returncode != 0:
         raise RuntimeError(
@@ -275,17 +306,17 @@ def install_controller(target: SshTarget | None = None, *, force: bool = False) 
             f"{scp_result.stderr.strip() or scp_result.stdout.strip()}"
         )
 
-    # Step 2: Permissions + ownership. OPNsense controllers run as root:wheel
-    # readable by the php_fpm pool; we set 0644 so the GUI's MVC autoloader
-    # can read them.
+    # Step 2: Permissions + ownership. OPNsense controllers run as
+    # root:wheel, readable by the php_fpm pool; we set 0644 so the
+    # GUI's MVC autoloader can read them.
     chmod_cmd = [*_ssh_args(target), f"chmod 0644 {target.install_path}"]
     chmod_result = _run(chmod_cmd)
     if chmod_result.returncode != 0:
         raise RuntimeError(f"chmod failed: {chmod_result.stderr.strip()}")
 
-    # Step 3: Restart configd + php_fpm so the MVC layer re-discovers the controller.
-    # OPNsense's `service` command works for both. We restart configd first;
-    # php_fpm second so any in-flight GUI request sees the new controller.
+    # Step 3: Restart configd + php_fpm so the MVC layer re-discovers
+    # the controller. We restart configd first; php_fpm second so any
+    # in-flight GUI request sees the new controller.
     for service_name in ("configd", "php_fpm"):
         restart_cmd = [*_ssh_args(target), f"service {service_name} restart"]
         rc = _run(restart_cmd)
@@ -294,7 +325,6 @@ def install_controller(target: SshTarget | None = None, *, force: bool = False) 
                 f"service {service_name} restart failed (rc={rc.returncode}): "
                 f"{rc.stderr.strip() or rc.stdout.strip()}"
             )
-        print(f"Restarted service: {service_name}")
 
     # Step 4: Verify post-install checksum.
     matches_after, remote_after, _ = verify_installed_checksum(target)
@@ -303,7 +333,9 @@ def install_controller(target: SshTarget | None = None, *, force: bool = False) 
             f"Post-install checksum mismatch on {target.host}: "
             f"remote {remote_after}, local {local_sum}. Install may have failed silently."
         )
-    print(f"Install verified on {target.host}: sha256 {local_sum[:12]}…")
+    # Read but ignore — kept so callers/tests can pattern-match the
+    # pre-install state if needed.
+    _ = remote_sum
     return True
 
 
@@ -317,46 +349,27 @@ def _ensure_ssh_tools_present() -> None:
         )
 
 
-def main(argv: list[str] | None = None) -> int:
-    """CLI entrypoint."""
-    parser = argparse.ArgumentParser(
-        prog="install_assign_settings_controller",
-        description="Install/verify the AssignSettingsController.php fork on OPNsense.",
-    )
-    sub = parser.add_subparsers(dest="command", required=True)
+def ensure_installed(target: SshTarget | None = None) -> bool:
+    """Ensure the AssignSettingsController.php fork is installed and current.
 
-    install_parser = sub.add_parser("install", help="SCP + service restart + verify.")
-    install_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Re-install even when the on-box checksum already matches.",
-    )
-    sub.add_parser("verify", help="Just compare the on-box checksum to the local source.")
+    Public entry point used by ``InterfaceAssignmentManager.apply()``
+    before any REST CRUD call. Fast-paths via checksum comparison so
+    repeat applies don't SCP or restart services unnecessarily.
 
-    args = parser.parse_args(argv)
+    Args:
+        target: Connection details. If ``None``, reads from env via
+            ``load_ssh_target``.
 
+    Returns:
+        ``True`` if a (re)install actually happened; ``False`` if the
+        on-box file was already current.
+
+    Raises:
+        RuntimeError: If ``ssh``/``scp`` are missing from ``PATH``,
+            credentials cannot be resolved, or any underlying SSH/SCP
+            command fails.
+    """
     _ensure_ssh_tools_present()
-
-    target = load_ssh_target()
-
-    if args.command == "install":
-        install_controller(target, force=bool(args.force))
-        return 0
-
-    if args.command == "verify":
-        matches, remote_sum, local_sum = verify_installed_checksum(target)
-        local_short = local_sum[:12]
-        if matches:
-            print(f"OK: on-box and local checksums match (sha256 {local_short}…).")
-            return 0
-        if remote_sum is None:
-            print(f"MISSING: controller not installed on {target.host}.")
-        else:
-            print(f"MISMATCH: remote {remote_sum[:12]}… vs local {local_short}…")
-        return 1
-
-    parser.error(f"Unknown command: {args.command}")  # NoReturn
-
-
-if __name__ == "__main__":  # pragma: no cover
-    sys.exit(main())
+    if target is None:
+        target = load_ssh_target()
+    return install_controller(target)
