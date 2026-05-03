@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777823221118,
+  "lastUpdate": 1777824472551,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7316,6 +7316,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000025885705938515073",
             "extra": "mean: 117.45494570136306 usec\nrounds: 2210"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "distinct": true,
+          "id": "f716ab7c77862f6b6cc5a724117972f6a7f57073",
+          "message": "feat: convert opnsense interface_assignments apply from no-op to live (merges PR #728, addresses #720)\n\n* feat: convert opnsense interface_assignments apply from no-op to live\n\nGraduates the gist-controller spike (PR #716, ADR-0014 amendment in\nPR #718) to production. Extends services/interface_assignment.py with\nfull CRUD + diff engine + typed config + live->typed projector. Replaces\nno-op apply/destroy stubs in components/interface_assignment.py with\nreal orchestration mirroring VlanManager. New extensions/ sub-package\nholds the forked PHP controller and an idempotent installer driven by\nthe manager (SSH only on first apply or checksum mismatch).\n\nCloses ADR-0014 amendment gates (2) auto-snapshot/audit-log mechanism\ninheritance and (3) ~225 LoC PHP security review (write-up in\nPROVENANCE.md). Gate (2) empirical screenshots are operator-captured\nbefore external review.\n\nSpike at tools/spikes/interface_assignment_gist_rest/ deleted in the\nsame PR per the issue body's scope decision.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* fix: suppress bandit B404 on opnsense installer subprocess import\n\nBandit flags B404 (import subprocess) at module load. CI runs bandit\nwithout the doit-task fallback that swallows non-zero exits, so the\nfinding broke `test (3.12)` and `test (3.14)`. Existing convention in\nsrc/ is `# nosec B404 - required for <reason>`; applied here for the\nSCP + SSH one-time controller install path.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-03T17:04:35+01:00",
+          "tree_id": "2d57b21ede8d2ad01cb2f1c4865be9cf9042a8d5",
+          "url": "https://github.com/endavis/infrafoundry/commit/f716ab7c77862f6b6cc5a724117972f6a7f57073"
+        },
+        "date": 1777824470963,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6564.139748886474,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003049254391093592",
+            "extra": "mean: 152.34288699743752 usec\nrounds: 2115"
           }
         ]
       }
