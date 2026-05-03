@@ -89,72 +89,10 @@ ADR-0014 is written after the findings doc lands.
 
 The spike adds VLANs with tags 4001-4003 on the example. Delete them via the OPNsense UI or by removing them from `example-vlans.yaml` and re-running `apply --confirm` when you're done.
 
-## `interface_assignment_gist_rest/` — gist-based REST `interface_assignments` write API (informs ADR-0014, #715)
+## `interface_assignment_gist_rest/` — graduated to production in #720
 
-Forks and extends [`szymczag`'s `AssignSettingsController.php`](https://gist.github.com/szymczag/df152a82e86aff67b984ed3786b027ba) (BSD-2-Clause) so writes to OPNsense `interface_assignments` go through a single, server-side-validated REST surface. Pivot from #714 (closed without merging — SSH+PHP `config.xml`-edit path had unacceptable safety properties). Pairs with [`docs/development/opnsense-spike-interface-assignment-gist-findings.md`](../../docs/development/opnsense-spike-interface-assignment-gist-findings.md).
-
-The spike installs a patched + extended copy of the gist's PHP controller on the OPNsense box, then drives it via REST. Server-side `Config::getInstance()->save()` rejects bad input loudly, fires the standard audit log, and triggers an auto-snapshot — three properties #714 couldn't deliver because it bypassed the save pipeline.
-
-### Prerequisites
-
-1. An OPNsense box you don't mind reconfiguring. **Use `opnsense-a` (staging), NOT prod.**
-2. SSH access to the box (root) — used for the install lifecycle only.
-3. A REST API key/secret with permission for `interfaces/overview/interfacesInfo`, `interfaces/assign_settings/*`, and `core/backup/{backups,revertBackup}`.
-
-### Environment variables
-
-In addition to the REST vars listed above for the VLAN spike, the install lifecycle needs SSH credentials:
-
-| Variable | Required | Purpose |
-| :--- | :--- | :--- |
-| `OPNSENSE_SSH_HOST` | yes (install/verify) | e.g. `opnsense-a.lan` |
-| `OPNSENSE_SSH_USER` | no | Defaults to `root` |
-| `OPNSENSE_SSH_PORT` | no | Defaults to `22` |
-| `OPNSENSE_SSH_KEY` | yes (install/verify) | Path to SSH private key |
-| `OPNSENSE_INSTALL_PATH` | no | Override the canonical MVC controller path |
-
-See [`tools/spikes/interface_assignment_gist_rest/README.md`](interface_assignment_gist_rest/README.md) for the full env-var contract and per-subcommand reference.
-
-### Quick start
-
-```bash
-SPIKE=tools/spikes/interface_assignment_gist_rest/interface_assignment_gist_rest.py
-FIXTURE=tools/spikes/interface_assignment_gist_rest/example-interface-assignments.yaml
-
-# 1. Install the PHP controller (idempotent).
-uv run python tools/spikes/interface_assignment_gist_rest/install.py install
-
-# 2. Sanity check.
-uv run python $SPIKE inspect
-
-# 3. Diff a YAML file against live state (no mutations).
-uv run python $SPIKE plan $FIXTURE
-
-# 4. Apply via REST. Without --confirm, this is a dry run.
-uv run python $SPIKE apply $FIXTURE --confirm
-```
-
-### Round-trip recipe
-
-Same shape as the VLAN spike's round-trip:
-
-```bash
-SPIKE=tools/spikes/interface_assignment_gist_rest/interface_assignment_gist_rest.py
-FIXTURE=tools/spikes/interface_assignment_gist_rest/example-interface-assignments.yaml
-
-uv run python $SPIKE apply $FIXTURE --confirm   # 1. apply
-uv run python $SPIKE plan $FIXTURE              # 2. must say "No changes."
-# 3. edit fixture (rebind device, add an entry, etc.)
-uv run python $SPIKE apply $FIXTURE --confirm   # 4. reconcile
-uv run python $SPIKE plan $FIXTURE              # 5. "No changes." again
-```
-
-### Cleanup
-
-The example fixture creates one entry on `igc0`. Remove it from the fixture and re-run `apply --confirm` when you're done. The PHP controller stays installed; remove it manually with:
-
-```bash
-ssh -i $OPNSENSE_SSH_KEY $OPNSENSE_SSH_USER@$OPNSENSE_SSH_HOST \
-  "rm /usr/local/opnsense/mvc/app/controllers/OPNsense/Interfaces/Api/AssignSettingsController.php && \
-   service php_fpm restart"
-```
+Deleted in PR for #720. The gist-based REST write path graduated from
+this spike directory to `src/infrafoundry/providers/opnsense/extensions/interface_assignments/`.
+The historical spike findings remain at
+[`docs/development/opnsense-spike-interface-assignment-gist-findings.md`](../../docs/development/opnsense-spike-interface-assignment-gist-findings.md);
+ADR-0014's per-component decisions section records the graduated mechanism.

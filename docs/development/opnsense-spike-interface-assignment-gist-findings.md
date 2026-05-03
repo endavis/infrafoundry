@@ -1,5 +1,16 @@
 # OPNsense Gist-based Interface-Assignment Spike — Findings
 
+> **Graduation note (2026-05-03, #720):** The mechanism documented below
+> graduated from spike to production in #720. The PHP controller and the
+> Python installer moved to
+> `src/infrafoundry/providers/opnsense/extensions/interface_assignments/`;
+> the spike directory `tools/spikes/interface_assignment_gist_rest/` and
+> its tests were deleted in the same PR. ADR-0014's "Per-component
+> decisions" section records the graduated location and the cleared
+> gates. Path references below to `tools/spikes/...` are kept verbatim
+> because they reflect the live-run audit trail at the time of the spike
+> (2026-05-02).
+
 > **Status:** Live run completed against `opnsense-a` (staging) on 2026-05-02. ADR-0014 amendment will cite this document. Two empirical findings from the run drove code changes that landed in this same PR: (a) the install script's env-loading was relaxed to derive `OPNSENSE_SSH_HOST` from `OPNSENSE_API_URL` and to make `OPNSENSE_SSH_KEY` optional (rely on ssh-agent / `~/.ssh/config`); (b) the remote-checksum command was rewritten to be csh-safe because OPNsense's root shell is `opnsense-shell` (csh-derived), where `2>/dev/null` is "Ambiguous output redirect."
 
 ## Why this document exists
