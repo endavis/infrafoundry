@@ -38,7 +38,7 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 - required for SCP + SSH to OPNsense for one-time controller install
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
