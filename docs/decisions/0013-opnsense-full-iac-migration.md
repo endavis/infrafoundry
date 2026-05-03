@@ -3,6 +3,7 @@
 **Date:** 2026-04-30
 **Amended:** 2026-05-03 (#717) — `interface_assignments` per-component decision updated; cross-reference to ADR-0014's new Per-component decisions section
 **Amended:** 2026-05-04 (#713) — `nat_rules` per-component decision recorded (outbound + 1:1 ship via direct REST; port forwards deferred to a follow-up spike)
+**Amended:** 2026-05-03 (#721) — `gateways` per-component decision recorded (direct REST against `routing/settings/*Gateway`; natural-key identity)
 **Status:** Accepted
 **Issue:** [#701](https://github.com/endavis/infrafoundry/issues/701)
 
@@ -61,6 +62,7 @@ The XML `config.xml` format is not part of any apply or migrate path. It is used
 
 - `interface_assignments` (#711, #715→PR #716, amended 2026-05-03 via #717): read-only / migrate shipped in PR #712 (`/api/interfaces/overview/*`). Write path adopts server-side-validated REST via the forked `AssignSettingsController.php` controller; the spike validated the mechanism end-to-end on `26.1.6_2`. See [ADR-0014 §"Per-component decisions"](0014-opnsense-direct-api-apply-mechanism.md#per-component-decisions) for the mechanism details, the rollback decision (option (c) — no transactional rollback; rely on per-call server-side validation + OPNsense auto-snapshot), and the gates remaining for production conversion.
 - `nat_rules` (#713, recorded 2026-05-04): **outbound** + **1:1** ship via direct REST against `firewall/source_nat/*` and `firewall/one_to_one/*`. Identity is encoded as a **suffix** in the `description` field — `<operator description> [infrafoundry:<name>]` — so the operator's free-form text leads in the OPNsense GUI display. Every managed rule also carries the OPNsense `infrafoundry` category as a fleet-wide marker (created on first apply, cached per service instance) so operators can filter "everything InfraFoundry manages" in the GUI. No state DB — ADR-0014 takes no position on state for direct-API resources. **Port forwards are out of scope** for this PR — a live probe (2026-05-03) of `26.1.6_2` confirmed `firewall/{redirect,forward,portforward,nat_forward,rdr}` all return 404 and the legacy `<nat>/<rule>` config.xml section is GUI-only. Port forwards become a follow-up spike-driven issue (same playbook as #714→#715→#716→#717 — the gist-controller mechanism from #717 is the likely path).
+- `gateways` (#721, recorded 2026-05-03): ships via direct REST against `routing/settings/{searchGateway, getGateway, addGateway, setGateway, delGateway, reconfigure}`. Identity is the **natural key** `name` — OPNsense enforces uniqueness server-side, so the operator-facing YAML `name` maps 1:1 to the live `name` field. **No description-suffix tag** and **no `infrafoundry` category bootstrap** (gateways have no categories). This is a deliberate divergence from `nat_rules`, which needed the description-suffix scheme because firewall rules have no stable name field. **Dynamic / virtual gateways** (those synthesized by OPNsense from interface DHCP state — e.g., `WAN_DHCP`, `WAN_DHCP6`) appear in `searchGateway` rows with `dynamic: true`/`virtual: true` and are silently filtered out of the diff entirely; they cannot be added/updated/deleted via the gateway controller and must not be listed in YAML. Cutover semantics same as VLAN: operator either lists every gateway in YAML or uses `--add-only` to suppress deletes during partial migration. Apply mechanism unchanged from ADR-0014 (stock direct-REST); no new ADR.
 
 ## Implementation order
 
@@ -68,7 +70,7 @@ Each step ships under the direct-API pattern codified in [ADR-0014](0014-opnsens
 
 1. `interface_assignments` — gates everything that depends on physical NIC mapping. *Read-only / migrate shipped in PR #712 (#711); write-path mechanism decided in ADR-0014 amendment (#717); production conversion gated on a follow-up issue that carries out gates (2) and (3).*
 2. `nat_rules` — outbound + 1:1 ship in #713 (direct-API). Port forwards deferred to a follow-up spike — `26.1.6_2` exposes no MVC REST endpoint for them; the same gist-controller mechanism from #717 is the likely path.
-3. `gateways` and `static_routes`.
+3. `gateways` (#721 — direct-API, natural-key identity) and `static_routes`.
 4. `virtual_ips`.
 5. Unbound extensions (`domain_override`, `host_alias`, `forward`).
 6. `config migrate` extractors for the full set, in any order once each component lands.
@@ -86,6 +88,7 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 - Issue [#715](https://github.com/endavis/infrafoundry/issues/715): gist-based `interface_assignments` write-API spike (closed; PR [#716](https://github.com/endavis/infrafoundry/pull/716) merged 2026-05-02).
 - Issue [#717](https://github.com/endavis/infrafoundry/issues/717): chore: amend ADR-0014 to record the gist-based REST mechanism for `interface_assignments`.
 - Issue [#713](https://github.com/endavis/infrafoundry/issues/713): feat: add OPNsense `nat_rules` component (outbound + 1:1).
+- Issue [#721](https://github.com/endavis/infrafoundry/issues/721): feat: add OPNsense `gateways` component (direct-API, natural-key identity).
 
 ## Related Documentation
 
