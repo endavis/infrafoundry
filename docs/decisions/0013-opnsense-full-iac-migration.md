@@ -1,6 +1,7 @@
 # ADR-0013: OPNsense Full-IaC Migration Coverage
 
 **Date:** 2026-04-30
+**Amended:** 2026-05-03 (#717) — `interface_assignments` per-component decision updated; cross-reference to ADR-0014's new Per-component decisions section
 **Status:** Accepted
 **Issue:** [#701](https://github.com/endavis/infrafoundry/issues/701)
 
@@ -55,15 +56,15 @@ ADR-0014 takes positions on schema source, client surface, runner integration (a
 
 The XML `config.xml` format is not part of any apply or migrate path. It is used only for one-shot scoping (as in [docs/development/opnsense-resource-coverage.md](../development/opnsense-resource-coverage.md)) and remains a per-component fallback only if no stable API endpoint exists for a resource type. That decision would be made per-component and recorded in its issue.
 
-**Per-component decisions recorded so far:**
+### Per-component decisions recorded so far
 
-- `interface_assignments` (#711, 2026-05-02): no REST CRUD endpoint on OPNsense `26.1.6_2` (`/api/interfaces/overview/*` is read-only; the GUI uses legacy PHP form posts that ultimately edit `<interfaces>` in `config.xml`). Component ships read-only — `list` / `migrate` / validation work; `apply` / `destroy` are loud no-ops. The cutover runbook documents the manual GUI step. The XML-edit write path is a future concern.
+- `interface_assignments` (#711, #715→PR #716, amended 2026-05-03 via #717): read-only / migrate shipped in PR #712 (`/api/interfaces/overview/*`). Write path adopts server-side-validated REST via the forked `AssignSettingsController.php` controller; the spike validated the mechanism end-to-end on `26.1.6_2`. See [ADR-0014 §"Per-component decisions"](0014-opnsense-direct-api-apply-mechanism.md#per-component-decisions) for the mechanism details, the rollback decision (option (c) — no transactional rollback; rely on per-call server-side validation + OPNsense auto-snapshot), and the gates remaining for production conversion.
 
 ## Implementation order
 
 Each step ships under the direct-API pattern codified in [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md). The VLAN spike (PR [#706](https://github.com/endavis/infrafoundry/pull/706), merged) seeds the VLAN component migration.
 
-1. `interface_assignments` — gates everything that depends on physical NIC mapping. *Read-only / migrate shipped in #711; write path deferred per the per-component decision recorded above.*
+1. `interface_assignments` — gates everything that depends on physical NIC mapping. *Read-only / migrate shipped in PR #712 (#711); write-path mechanism decided in ADR-0014 amendment (#717); production conversion gated on a follow-up issue that carries out gates (2) and (3).*
 2. `nat_rules`.
 3. `gateways` and `static_routes`.
 4. `virtual_ips`.
@@ -80,6 +81,8 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): ADR-0014 (closed; PR [#708](https://github.com/endavis/infrafoundry/pull/708) merged).
 - Issue [#709](https://github.com/endavis/infrafoundry/issues/709): VLAN component direct-API migration (`OPNsenseDirectRunner` seed).
 - Issue [#711](https://github.com/endavis/infrafoundry/issues/711): `interface_assignments` component (read-only / migrate; dispatch-table refactor).
+- Issue [#715](https://github.com/endavis/infrafoundry/issues/715): gist-based `interface_assignments` write-API spike (closed; PR [#716](https://github.com/endavis/infrafoundry/pull/716) merged 2026-05-02).
+- Issue [#717](https://github.com/endavis/infrafoundry/issues/717): chore: amend ADR-0014 to record the gist-based REST mechanism for `interface_assignments`.
 
 ## Related Documentation
 
