@@ -4,6 +4,7 @@
 **Amended:** 2026-05-03 (#717, PR #718) — added second internal write path for resources with no native REST CRUD; records `interface_assignments` per-component decision
 **Amended:** 2026-05-03 (#720, PR #N) — Gates (2) and (3) cleared; production conversion of `interface_assignments` from no-op to live complete (full CRUD via the in-tree `AssignSettingsController.php` fork at `src/infrafoundry/providers/opnsense/extensions/interface_assignments/`). Spike deleted.
 **Amended:** 2026-05-04 (#722) — `static_routes` per-component decision recorded (stock direct-REST against `routes/routes/*route`; natural-key identity tuple `(network, gateway)`)
+**Amended:** 2026-05-04 (#724) — `unbound_host_alias` and `unbound_forward` per-component decisions recorded (stock direct-REST against `unbound/settings/*`; natural-key identities; reconfigure via `unbound/service/reconfigure`; no controller fork)
 **Status:** Accepted
 
 ## Status
@@ -120,6 +121,30 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 **Rollback strategy:** Same as the rest of §1's default mechanism — rely on per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` (System → Configuration → Backups) is the residual safety net. No transactional rollback (option (c) from the `interface_assignments` rollback discussion applies fleet-wide for direct-REST mechanisms).
 
+### `unbound_host_alias` (#724, 2026-05-04)
+
+**Mechanism:** Stock direct-REST against the `unbound/settings/*HostAlias` controller — no controller fork required (this component falls under §1's default).
+
+- **Endpoints:** `POST unbound/settings/searchHostAlias` (list), `GET unbound/settings/getHostAlias/<uuid>` (full record under `{"alias": {...}}` envelope, with `host` rendered as a select option dict mapping parent override UUID to `{"value": "...", "selected": 0|1}`), `POST unbound/settings/addHostAlias` and `POST unbound/settings/setHostAlias/<uuid>` (body envelope `{"alias": {...}}`), `POST unbound/settings/delHostAlias/<uuid>`, `POST unbound/service/reconfigure` (verb shared across the entire Unbound module).
+- **Identity:** natural key tuple `(host_uuid, hostname)` at the wire — OPNsense keys aliases by parent host_override UUID and the alias hostname. The operator-facing YAML uses `(host_name, hostname)` where `host_name` is a managed `unbound_host_override` resource name *or* a live override identifier (`hostname` or `hostname.domain` form). The component manager resolves `host_name` → parent UUID at apply time by reading `searchHostOverride` rows; if no live override matches, `ReferenceValidationError` is raised at plan time.
+- **Wire schema:** `host` (parent override UUID), `hostname` (alias label), `domain` (parent override's domain), `enabled` (`"0"`/`"1"` string), `description` (free-form). The probe (live on `opnsense-a` running `26.1.6_2`, 2026-05-04) confirmed those five fields plus the auto-assigned `uuid` exhaust the schema.
+- **Cross-reference scope:** validator accepts both managed `unbound_host_override` resources declared in YAML *and* live overrides returned by `searchHostOverride`. Mirrors the static-route validator's gateway-acceptance pattern — operators can attach aliases to overrides that are still Terraform-managed (the existing `unbound_host_override` is currently Terraform-only) without first migrating them.
+- **No description-suffix tag** and **no `infrafoundry` category bootstrap** (Unbound resources have no category surface). The natural-key tuple is sufficient for identity.
+
+**Rollback strategy:** Same as the rest of §1's default mechanism — rely on per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. No transactional rollback.
+
+### `unbound_forward` (#724, 2026-05-04)
+
+**Mechanism:** Stock direct-REST against the `unbound/settings/*Forward` controller — no controller fork required (this component falls under §1's default).
+
+- **Endpoints:** `POST unbound/settings/searchForward` (list), `GET unbound/settings/getForward/<uuid>` (full record under `{"dot": {...}}` envelope — note: the envelope key is `dot` regardless of `type` value, empirically confirmed by probe), `POST unbound/settings/addForward` and `POST unbound/settings/setForward/<uuid>` (body envelope `{"dot": {...}}`), `POST unbound/settings/delForward/<uuid>`, `POST unbound/service/reconfigure`.
+- **Identity:** natural key tuple `(type, domain, server, port)`. Including `type` (forward / dot) in the key allows DoT and plain forwarders to coexist for the same domain/server/port — a common dual-resolver setup. The operator-facing YAML `name` is metadata only and never travels on the wire.
+- **Wire schema:** `type` (select: `forward` / `dot`), `domain` (empty = global forwarder; non-empty = per-domain forwarder, what the GUI calls "domain override"), `server` (IPv4 or IPv6 address), `port` (default `"53"`), `verify` (CN to verify when `type=dot`), `forward_tcp_upstream` (bool string), `forward_first` (bool string), `enabled` (bool string), `description`. Field names match the wire format verbatim (no YAML aliases): `verify` not `verify_cn`; `forward_tcp_upstream` not `forward_tls_upstream` — the original issue body's sketch was wrong; the live probe is the authority.
+- **Domain-override merge:** OPNsense merges what the GUI calls "Domain Override" and "Forwarder" into this single `Forward` resource — there is no separate `unbound_domain_override` REST surface. A `Forward` entry with `type=forward, domain="example.com"` is a domain forwarder; with `domain=""` it is a global forwarder. Recorded in ADR-0013's implementation order #5 amendment.
+- **No description-suffix tag** and **no `infrafoundry` category bootstrap`**.
+
+**Rollback strategy:** Same as the rest of §1's default mechanism.
+
 ## Rationale
 
 The VLAN spike supplied the load-bearing evidence:
@@ -157,6 +182,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#717](https://github.com/endavis/infrafoundry/issues/717): chore: amend ADR-0014 to record gist-based REST mechanism for `interface_assignments` (this amendment).
 - Issue [#720](https://github.com/endavis/infrafoundry/issues/720): feat: convert `OPNsenseDirectRunner.apply()` for `interface_assignments` from no-op to live. Carries out gates (2) and (3); recorded as cleared in the 2026-05-03 amendment line above and in the per-component decisions section.
 - Issue [#722](https://github.com/endavis/infrafoundry/issues/722): feat: add OPNsense `static_routes` component (direct-API, natural-key tuple identity).
+- Issue [#724](https://github.com/endavis/infrafoundry/issues/724): feat: add OPNsense Unbound extensions — `unbound_host_alias` and `unbound_forward` (direct-API; merges domain_override into forward per live probe).
 
 ## Related Documentation
 

@@ -23,6 +23,8 @@ from infrafoundry.providers.opnsense.validators import (
     NATRuleValidator,
     ResourceNameValidator,
     StaticRouteValidator,
+    UnboundForwardValidator,
+    UnboundHostAliasValidator,
     UnboundValidator,
     VLANValidator,
 )
@@ -85,6 +87,8 @@ class OPNsenseValidator:
         self.nat_rule_validator = NATRuleValidator(report)
         self.gateway_validator = GatewayValidator(report)
         self.static_route_validator = StaticRouteValidator(report)
+        self.unbound_host_alias_validator = UnboundHostAliasValidator(report)
+        self.unbound_forward_validator = UnboundForwardValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -190,6 +194,11 @@ class OPNsenseValidator:
             # Get existing gateway names (managed + dynamic) for static-route refs
             existing_gateways = self._get_existing_gateways(api_url, api_key, api_secret)
 
+            # Get existing Unbound host overrides (live names) for host-alias refs
+            existing_unbound_host_overrides = self._get_existing_unbound_host_overrides(
+                api_url, api_key, api_secret
+            )
+
             # Validate using specialized validators
             self.firewall_validator.validate(
                 resource_refs["firewall_rules"],
@@ -229,6 +238,12 @@ class OPNsenseValidator:
                 existing_gateways,
             )
             self.unbound_validator.validate(resource_refs["unbound_host_overrides"])
+            self.unbound_host_alias_validator.validate(
+                resource_refs["unbound_host_aliases"],
+                resource_refs["unbound_host_override_names"],
+                existing_unbound_host_overrides,
+            )
+            self.unbound_forward_validator.validate(resource_refs["unbound_forwards"])
             self.resource_name_validator.validate(resources)
 
         except Exception as exc:
@@ -255,6 +270,8 @@ class OPNsenseValidator:
         firewall_rules = [r for r in resources if r.type == "firewall_rules"]
         dhcp_maps = [r for r in resources if r.type == "dhcp_static_maps"]
         unbound_host_overrides = [r for r in resources if r.type == "unbound_host_override"]
+        unbound_host_aliases = [r for r in resources if r.type == "unbound_host_alias"]
+        unbound_forwards = [r for r in resources if r.type == "unbound_forward"]
         interface_assignments = [r for r in resources if r.type == "interface_assignments"]
         nat_rules = [r for r in resources if r.type == "nat_rules"]
         gateways = [r for r in resources if r.type == "gateways"]
@@ -266,6 +283,10 @@ class OPNsenseValidator:
         nat_rule_names = {r.name for r in nat_rules}
         gateway_names = {g.name for g in gateways}
         static_route_names = {r.name for r in static_routes}
+        # ``unbound_host_alias.host`` cross-refs the *name* of a managed
+        # ``unbound_host_override`` resource (the alias validator also
+        # accepts a live override name from ``searchHostOverride``).
+        unbound_host_override_names = {r.name for r in unbound_host_overrides}
 
         return {
             "aliases": aliases,
@@ -275,6 +296,9 @@ class OPNsenseValidator:
             "firewall_rules": firewall_rules,
             "dhcp_maps": dhcp_maps,
             "unbound_host_overrides": unbound_host_overrides,
+            "unbound_host_override_names": unbound_host_override_names,
+            "unbound_host_aliases": unbound_host_aliases,
+            "unbound_forwards": unbound_forwards,
             "interface_assignments": interface_assignments,
             "interface_assignment_names": interface_assignment_names,
             "nat_rules": nat_rules,
@@ -437,4 +461,46 @@ class OPNsenseValidator:
             name = row.get("name")
             if isinstance(name, str) and name:
                 names.add(name)
+        return names
+
+    def _get_existing_unbound_host_overrides(
+        self, api_url: str, api_key: str, api_secret: str
+    ) -> set[str]:
+        """Get the set of live Unbound host-override names from OPNsense API.
+
+        Returns a set with both ``hostname.domain`` and bare ``hostname``
+        forms so the ``unbound_host_alias`` validator can accept either
+        cross-reference shape (matches the resolver in
+        ``components/unbound_host_alias.py``).
+
+        Args:
+            api_url: OPNsense API base URL
+            api_key: API key
+            api_secret: API secret
+
+        Returns:
+            Set of host-override names; empty if the API call fails.
+        """
+        data = self.api_validator.fetch_json(
+            url=f"{api_url}/api/unbound/settings/searchHostOverride",
+            auth=(api_key, api_secret),
+            verify_ssl=False,
+            timeout=10,
+            method="POST",
+            check_name="opnsense_get_unbound_host_overrides",
+            error_message=("Could not retrieve existing Unbound host overrides (status {status})"),
+            error_level=ValidationLevel.WARNING,
+        )
+        if not data:
+            return set()
+        names: set[str] = set()
+        for row in data.get("rows", []):
+            if not isinstance(row, dict):
+                continue
+            hostname = row.get("hostname")
+            domain = row.get("domain")
+            if isinstance(hostname, str) and hostname:
+                names.add(hostname)
+                if isinstance(domain, str) and domain:
+                    names.add(f"{hostname}.{domain}")
         return names

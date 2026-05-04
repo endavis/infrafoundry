@@ -165,6 +165,8 @@ class OPNsenseProvider(
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.nat_rule import NATRuleManager
         from .components.static_route import StaticRouteManager
+        from .components.unbound_forward import UnboundForwardManager
+        from .components.unbound_host_alias import UnboundHostAliasManager
         from .components.vlan import VlanManager
 
         return {
@@ -173,6 +175,8 @@ class OPNsenseProvider(
             "nat_rules": NATRuleManager,
             "gateways": GatewayManager,
             "static_routes": StaticRouteManager,
+            "unbound_host_alias": UnboundHostAliasManager,
+            "unbound_forward": UnboundForwardManager,
         }
 
     def _generate_aliases_terraform(self, aliases: list[ResourceConfig]) -> None:
@@ -634,6 +638,8 @@ class OPNsenseProvider(
             "nat_rules",
             "gateways",
             "static_routes",
+            "unbound_host_alias",
+            "unbound_forward",
         ]
 
     @override
@@ -669,6 +675,8 @@ class OPNsenseProvider(
             "nat_rules": ["aliases", "interface_assignments"],
             "gateways": ["interface_assignments"],
             "static_routes": ["gateways"],
+            "unbound_host_alias": ["unbound_host_override"],
+            "unbound_forward": [],
         }
 
     @override
@@ -842,6 +850,57 @@ class OPNsenseProvider(
         from .components.static_route import StaticRouteManager
 
         manager = StaticRouteManager(self.config_dir)
+        return manager.migrate(env_name)
+
+    def migrate_unbound_host_alias(self, env_name: str) -> str:
+        """Migrate current Unbound host aliases to InfraFoundry YAML.
+
+        Reads the live host-alias list from OPNsense via the direct-API
+        path and generates InfraFoundry-compatible YAML. Mirrors
+        ``migrate_static_route`` and the other migrate-* methods. The
+        operator-facing ``name`` is synthesized from the
+        ``(parent_uuid, hostname)`` natural-key tuple — the operator can
+        rename freely after import, since identity is the tuple, not the
+        name. Cross-references to parent ``unbound_host_override`` are
+        emitted in ``hostname.domain`` form rather than as raw UUIDs.
+        Not yet exposed via the ``config migrate`` CLI — that wiring is
+        a follow-up (per ADR-0014 §8).
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            YAML configuration as a string
+        """
+        from .components.unbound_host_alias import UnboundHostAliasManager
+
+        manager = UnboundHostAliasManager(self.config_dir)
+        return manager.migrate(env_name)
+
+    def migrate_unbound_forward(self, env_name: str) -> str:
+        """Migrate current Unbound forwarders to InfraFoundry YAML.
+
+        Reads the live forward list from OPNsense via the direct-API path
+        and generates InfraFoundry-compatible YAML. Mirrors
+        ``migrate_static_route`` and the other migrate-* methods. The
+        operator-facing ``name`` is synthesized from the
+        ``(type, domain, server, port)`` natural-key tuple — the operator
+        can rename freely after import, since identity is the tuple, not
+        the name. Both DNS-over-TLS (``type=dot``) and plain forwards
+        (``type=forward``) are exported; an entry with ``domain=""`` is a
+        global forwarder while a non-empty domain is a domain-override.
+        Not yet exposed via the ``config migrate`` CLI — that wiring is
+        a follow-up (per ADR-0014 §8).
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            YAML configuration as a string
+        """
+        from .components.unbound_forward import UnboundForwardManager
+
+        manager = UnboundForwardManager(self.config_dir)
         return manager.migrate(env_name)
 
     def migrate_isc_to_kea(self, env_name: str, interfaces: list[str] | None = None) -> str:
