@@ -167,6 +167,7 @@ class OPNsenseProvider(
         from .components.static_route import StaticRouteManager
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
+        from .components.virtual_ip import VirtualIPManager
         from .components.vlan import VlanManager
 
         return {
@@ -175,6 +176,7 @@ class OPNsenseProvider(
             "nat_rules": NATRuleManager,
             "gateways": GatewayManager,
             "static_routes": StaticRouteManager,
+            "virtual_ips": VirtualIPManager,
             "unbound_host_alias": UnboundHostAliasManager,
             "unbound_forward": UnboundForwardManager,
         }
@@ -638,6 +640,7 @@ class OPNsenseProvider(
             "nat_rules",
             "gateways",
             "static_routes",
+            "virtual_ips",
             "unbound_host_alias",
             "unbound_forward",
         ]
@@ -675,6 +678,7 @@ class OPNsenseProvider(
             "nat_rules": ["aliases", "interface_assignments"],
             "gateways": ["interface_assignments"],
             "static_routes": ["gateways"],
+            "virtual_ips": ["interface_assignments"],
             "unbound_host_alias": ["unbound_host_override"],
             "unbound_forward": [],
         }
@@ -850,6 +854,33 @@ class OPNsenseProvider(
         from .components.static_route import StaticRouteManager
 
         manager = StaticRouteManager(self.config_dir)
+        return manager.migrate(env_name)
+
+    def migrate_virtual_ip(self, env_name: str) -> str:
+        """Migrate current virtual IPs (CARP / ipalias / proxyarp) to InfraFoundry YAML.
+
+        Reads the live virtual-IP list from OPNsense via the direct-API
+        path and generates InfraFoundry-compatible YAML. Mirrors
+        ``migrate_static_route`` and the other migrate-* methods. The
+        operator-facing ``name`` is synthesized from the
+        ``(interface, mode, address, vhid)`` natural-key tuple — the
+        operator can rename freely after import, since identity is the
+        tuple, not the name. CARP ``password`` is redacted (placeholder
+        ``secret://`` URI emitted) since OPNsense never returns
+        plaintext passwords on read; the operator must re-supply the
+        secret manually before re-applying. Not yet exposed via the
+        ``config migrate`` CLI — that wiring is a follow-up (per
+        ADR-0014 §8).
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            YAML configuration as a string
+        """
+        from .components.virtual_ip import VirtualIPManager
+
+        manager = VirtualIPManager(self.config_dir)
         return manager.migrate(env_name)
 
     def migrate_unbound_host_alias(self, env_name: str) -> str:
