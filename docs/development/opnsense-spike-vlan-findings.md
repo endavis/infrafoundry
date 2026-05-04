@@ -1,5 +1,7 @@
 # OPNsense Direct-API VLAN Spike — Findings
 
+> **Status:** historical. The spike file `tools/spikes/vlan_direct_api.py` was removed once all ADR-0013 components shipped under direct-API. This document is preserved as evidence cited by ADR-0014; the example commands and path references no longer execute.
+
 > **Status:** Live run completed against `opnsense-a` (staging) on 2026-04-30. ADR-0014 cites this document.
 
 ## Why this document exists
@@ -12,8 +14,8 @@ This spike is the proof. It builds the smallest sufficient direct-API path for *
 
 | Item                              | Value                       |
 | --------------------------------- | --------------------------- |
-| Spike script                      | `tools/spikes/vlan_direct_api.py` |
-| Example YAML                      | `tools/spikes/example-vlans.yaml` |
+| Spike script                      | `tools/spikes/vlan_direct_api.py` (removed) |
+| Example YAML                      | `tools/spikes/example-vlans.yaml` (removed) |
 | Lock-fixture YAML (used live)     | `tmp/agents/claude/spike-vlans-with-lock.yaml` (ad hoc; tracks WAN trunk with `lock: true`) |
 | Target box                        | `opnsense-a` (staging)      |
 | Detected OPNsense version         | `26.1.6_2`                  |
