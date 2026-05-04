@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777896895742,
+  "lastUpdate": 1777911790238,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7440,6 +7440,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010655644395959228",
             "extra": "mean: 81.46672963868225 usec\nrounds: 2382"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "459ea5eaef91875d69c4147d3c50ed73e19cc519",
+          "message": "feat: add OPNsense virtual_ips component (direct-API) (merges PR #737, addresses #723)\n\n* feat: add OPNsense virtual_ips component (direct-API)\n\nNew direct-API resource type supporting ipalias / carp / proxyarp modes.\nIdentity tuple (interface, mode, address, vhid). First direct-API resource\nto carry a secret: CARP password flows via secret://env_secrets/<path>\nURIs, resolved at apply time by a new EnvSecretsBackend plugged into the\nexisting SecretResolver. Mechanism documented in ADR-0014's new \"Secrets\nhandling\" section.\n\nAddresses #723\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* chore: silence bandit B105 false positives in virtual_ip\n\nThree pure false positives flagged by bandit B105 (hardcoded password\nstring) that surface in CI but pass locally because doit check's\nsecurity task swallows bandit failures via `|| echo`:\n\n- _PASSWORD_REDACTED_PLACEHOLDER constant (migrate output sentinel)\n- password = \"\" local-variable initialization in the per-mode handler\n- password == \"\" empty-string comparison in the validator\n\nNone are actual credentials. Same pattern used elsewhere\n(validator.py:104-106) for the same false-positive class.\n\nAddresses #723\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-04T17:22:33+01:00",
+          "tree_id": "e7e1b81520c61eda6ad5bc3633e3e980bd72047d",
+          "url": "https://github.com/endavis/infrafoundry/commit/459ea5eaef91875d69c4147d3c50ed73e19cc519"
+        },
+        "date": 1777911789576,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7031.718905445978,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014644030378443507",
+            "extra": "mean: 142.21273822898587 usec\nrounds: 2315"
           }
         ]
       }
