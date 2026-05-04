@@ -17,7 +17,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "opnsense-openapi>=0.4.0",
     "pyinfra>=3.5.1",
-    "boto3>=1.42.96",
+    "boto3>=1.43.2",
     "azure-identity>=1.15.0",
     "azure-keyvault-secrets>=4.11.0",
 ]
