@@ -5,6 +5,7 @@
 **Amended:** 2026-05-03 (#720, PR #N) — Gates (2) and (3) cleared; production conversion of `interface_assignments` from no-op to live complete (full CRUD via the in-tree `AssignSettingsController.php` fork at `src/infrafoundry/providers/opnsense/extensions/interface_assignments/`). Spike deleted.
 **Amended:** 2026-05-04 (#722) — `static_routes` per-component decision recorded (stock direct-REST against `routes/routes/*route`; natural-key identity tuple `(network, gateway)`)
 **Amended:** 2026-05-04 (#724) — `unbound_host_alias` and `unbound_forward` per-component decisions recorded (stock direct-REST against `unbound/settings/*`; natural-key identities; reconfigure via `unbound/service/reconfigure`; no controller fork)
+**Amended:** 2026-05-04 (#723) — `virtual_ips` per-component decision recorded (stock direct-REST against `interfaces/vip_settings/*`; natural-key tuple identity `(interface, mode, address, vhid)`); secrets-handling subsection added covering `secret://env_secrets/...` URI resolution at apply time by `EnvSecretsBackend` (first direct-API consumer: CARP `password`)
 **Status:** Accepted
 
 ## Status
@@ -145,6 +146,33 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 **Rollback strategy:** Same as the rest of §1's default mechanism.
 
+### `virtual_ips` (#723, 2026-05-04)
+
+**Mechanism:** Stock direct-REST against the `interfaces/vip_settings/*` controller — no controller fork required (this component falls under §1's default).
+
+- **Endpoints:** `POST interfaces/vip_settings/searchItem` (list / dataTable rows), `GET interfaces/vip_settings/getItem/<uuid>` (full record under `{"vip": {...}}` envelope, with `interface` / `mode` / `gateway` rendered as select option dicts), `POST interfaces/vip_settings/addItem` and `POST interfaces/vip_settings/setItem/<uuid>` (body envelope `{"vip": {...}}`), `POST interfaces/vip_settings/delItem/<uuid>`, `POST interfaces/vip_settings/reconfigure` (verb shared across all VIP resources). The auxiliary `GET interfaces/vip_settings/getUnusedVhid` and `GET diagnostics/interface/CarpStatus` endpoints are surfaced by the live API but not used by this component.
+- **Identity:** natural key tuple `(interface, mode, address, vhid)`. Including `mode` and `vhid` in the key allows multiple CARP VIPs to coexist on the same interface+address with different `vhid`s (a common dual-CARP setup) and distinguishes ipalias from CARP at the same IP. `vhid` is the empty string for non-CARP modes. The operator-facing YAML `name` is metadata only and never travels on the wire.
+- **Wire schema:** `interface` (option-dict), `mode` (option-dict; `ipalias` / `carp` / `proxyarp`), `address` (the IP), `network` (CIDR mask as a string, e.g. `"24"` or `"64"`), `descr` (operator description; YAML-side alias `description`), `vhid_txt` (display-only; never written). Mode-specific fields: ipalias adds `gateway` / `noexpand` / `nobind`; carp adds `vhid` / `password` / `advbase` / `advskew` / `peer` / `peer6` / `nosync`. The probe (live on `opnsense-a` running `26.1.6_2`, 2026-05-04) confirmed those fields exhaust the schema. The issue body's `subnet: 24` sketch and `alias|carp|proxyarp|other` mode list were both wrong — the probe is authoritative.
+- **Cross-resource ref:** `interface` validates against managed `interface_assignments` resources declared in YAML *and* live overview interfaces returned by `interfaces/overview/*`. Mirrors the nat_rule validator's interface-acceptance pattern.
+- **Secret-bearing field:** CARP `password` accepts a `secret://env_secrets/<dotted/path>` URI in YAML. Resolution happens at apply time inside the component manager (see "Secrets handling" below); the service layer receives plaintext only and stays unaware of secrets. This is the first direct-API resource to carry a secret, and adds the new `EnvSecretsBackend`.
+- **No description-suffix tag** and **no `infrafoundry` category bootstrap** (VIPs have no category surface; the natural-key tuple is sufficient for identity).
+
+**Rollback strategy:** Same as the rest of §1's default mechanism — rely on per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. No transactional rollback.
+
+## Secrets handling
+
+Direct-API resources can declare secret-bearing fields as `secret://env_secrets/<dotted/path>` URIs in YAML. Resolution is performed at apply time by the component manager, which:
+
+1. Constructs a `SecretResolver` and registers an `EnvSecretsBackend` initialized from `env_config.secrets` (the in-memory dict produced by SOPS decryption of `envs/<env>/secrets.yaml`).
+2. Walks each managed resource's `config` dict via `resolver.resolve_config()` to expand `secret://...` URIs to their plaintext values.
+3. Passes the resolved configs to the service layer, which sees plaintext only and stays unaware of secrets.
+
+The validator (plan-time) accepts `secret://...` URIs as a valid placeholder without resolving — resolution is strictly an apply-time concern. Plaintext values in secret-bearing fields are accepted but produce a soft warning so operators don't silently commit secrets to YAML.
+
+**First consumer:** `virtual_ips` (CARP `password`, #723).
+
+**Future-proofing:** if a follow-up direct-API resource needs secrets, that issue is the place to consolidate this pattern (e.g., generalize to runner-level pre-resolution rather than per-component manager). The current component-manager-level resolution is the smallest viable path.
+
 ## Rationale
 
 The VLAN spike supplied the load-bearing evidence:
@@ -182,6 +210,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#717](https://github.com/endavis/infrafoundry/issues/717): chore: amend ADR-0014 to record gist-based REST mechanism for `interface_assignments` (this amendment).
 - Issue [#720](https://github.com/endavis/infrafoundry/issues/720): feat: convert `OPNsenseDirectRunner.apply()` for `interface_assignments` from no-op to live. Carries out gates (2) and (3); recorded as cleared in the 2026-05-03 amendment line above and in the per-component decisions section.
 - Issue [#722](https://github.com/endavis/infrafoundry/issues/722): feat: add OPNsense `static_routes` component (direct-API, natural-key tuple identity).
+- Issue [#723](https://github.com/endavis/infrafoundry/issues/723): feat: add OPNsense `virtual_ips` component (direct-API, natural-key tuple identity `(interface, mode, address, vhid)`; first direct-API resource with secrets — CARP `password` via `secret://env_secrets/...` URIs and the new `EnvSecretsBackend`).
 - Issue [#724](https://github.com/endavis/infrafoundry/issues/724): feat: add OPNsense Unbound extensions — `unbound_host_alias` and `unbound_forward` (direct-API; merges domain_override into forward per live probe).
 
 ## Related Documentation
