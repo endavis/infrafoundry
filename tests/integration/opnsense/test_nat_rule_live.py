@@ -96,8 +96,8 @@ def service() -> Iterator[NATRuleService]:
             ):
                 with contextlib.suppress(Exception):
                     svc.delete(live.uuid, live.kind)
-        # Apply changes for both kinds; suppress errors if no changes.
-        for kind in ("outbound", "one_to_one"):
+        # Apply changes for all three kinds (#725); suppress errors if no changes.
+        for kind in ("outbound", "one_to_one", "port_forward"):
             with contextlib.suppress(Exception):
                 svc.apply_changes(kind)  # type: ignore[arg-type]
 
@@ -134,6 +134,38 @@ def test_one_to_one_round_trip_apply_then_plan_zero(service: NATRuleService) -> 
             external="198.51.100.99",
             source_net="10.99.99.99",
             description="integration test 1:1",
+            sequence=999,
+        )
+    ]
+
+    diff = compute_diff(desired, service.search_all(), add_only=True)
+    assert len(diff.adds) == 1
+    service.apply_diff(diff)
+
+    diff_after = compute_diff(desired, service.search_all(), add_only=True)
+    assert diff_after.adds == []
+    assert diff_after.updates == []
+
+
+def test_port_forward_round_trip_apply_then_plan_zero(service: NATRuleService) -> None:
+    """After apply, plan reports 0/0/0 add/updates for a port_forward rule.
+
+    Exercises the third kind (#725): direct-API at ``firewall/d_nat`` with
+    DNat schema (dotted source/destination keys, ``descr`` rather than
+    ``description``, ``disabled`` polarity, ``local-port`` hyphenation).
+    """
+    desired = [
+        NATRuleConfig(
+            name="test-pf-roundtrip",
+            kind="port_forward",
+            interface=_test_interface(),
+            target="10.99.99.10",
+            local_port="8080",
+            destination_net="wanip",
+            destination_port="80",
+            protocol="tcp",
+            ipprotocol="inet",
+            description="integration test port_forward",
             sequence=999,
         )
     ]
