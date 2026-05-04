@@ -50,6 +50,16 @@ def _one_to_one(name: str, **overrides: Any) -> ResourceConfig:
     return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
 
 
+def _port_forward(name: str, **overrides: Any) -> ResourceConfig:
+    config: dict[str, Any] = {
+        "kind": "port_forward",
+        "interface": "wan",
+        "target": "10.0.0.10",
+    }
+    config.update(overrides)
+    return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
+
+
 @pytest.fixture
 def report() -> ValidationReport:
     return ValidationReport()
@@ -88,15 +98,17 @@ class TestKind:
         )
         assert _failures(report, "nat_rule_bad_kind")
 
-    def test_invalid_kind_port_forward_fails(
+    def test_unknown_kind_fails(
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
-        # Port forwards are out of scope; kind: port_forward is rejected.
+        # ``port_forward`` was previously rejected as out-of-scope; #725
+        # added it as a third valid kind. ``unknown`` stands in for the
+        # "bad kind" negative-test coverage now.
         r = ResourceConfig(
             name="pf",
             type="nat_rules",
             provider="opnsense",
-            config={"kind": "port_forward", "interface": "wan"},
+            config={"kind": "unknown", "interface": "wan"},
         )
         validator.validate(
             [r],
@@ -470,6 +482,203 @@ class TestOneToOneEnums:
 
 
 # ---------------------------------------------------------------------------
+# Port-forward-specific validation (#725)
+# ---------------------------------------------------------------------------
+
+
+class TestPortForwardValidation:
+    """Validator coverage for the third kind."""
+
+    def test_port_forward_kind_passes(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            [_port_forward("web")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert not _failures(report, "nat_rule_web_kind")
+
+    def test_missing_target_fails(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        # Port_forward requires a non-empty target (redirect destination).
+        r = ResourceConfig(
+            name="bad",
+            type="nat_rules",
+            provider="opnsense",
+            config={"kind": "port_forward", "interface": "wan"},
+        )
+        validator.validate(
+            [r],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert _failures(report, "nat_rule_bad_target")
+
+    def test_missing_interface_fails(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        r = ResourceConfig(
+            name="bad",
+            type="nat_rules",
+            provider="opnsense",
+            config={"kind": "port_forward", "target": "10.0.0.10"},
+        )
+        validator.validate(
+            [r],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert _failures(report, "nat_rule_bad_interface")
+
+    def test_invalid_pass_action_fails(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            [_port_forward("bad", pass_action="bogus")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert _failures(report, "nat_rule_bad_pass_action")
+
+    def test_valid_pass_action_passes(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        for value in ("", "pass", "rule"):
+            sub_report = ValidationReport()
+            sub_validator = NATRuleValidator(sub_report)
+            sub_validator.validate(
+                [_port_forward("ok", pass_action=value)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
+            assert not _failures(sub_report, "nat_rule_ok_pass_action")
+
+    def test_invalid_poolopts_fails(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            [_port_forward("bad", poolopts="not-an-algorithm")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert _failures(report, "nat_rule_bad_poolopts")
+
+    def test_valid_poolopts_passes(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        for value in (
+            "",
+            "round-robin",
+            "round-robin sticky-address",
+            "random",
+            "random sticky-address",
+            "source-hash",
+            "bitmask",
+        ):
+            sub_report = ValidationReport()
+            sub_validator = NATRuleValidator(sub_report)
+            sub_validator.validate(
+                [_port_forward("ok", poolopts=value)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
+            assert not _failures(sub_report, "nat_rule_ok_poolopts")
+
+    def test_port_forward_natreflection_purenat_passes(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        # DNat-only value: ``purenat``.
+        validator.validate(
+            [_port_forward("ok", natreflection="purenat")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert not _failures(report, "nat_rule_ok_natreflection")
+
+    def test_port_forward_natreflection_enable_fails(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        # ``enable`` is the 1:1-only value; DNat must reject it.
+        validator.validate(
+            [_port_forward("bad", natreflection="enable")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert _failures(report, "nat_rule_bad_natreflection")
+
+    def test_one_to_one_natreflection_purenat_fails(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        # ``purenat`` is the DNat-only value; 1:1 must reject it.
+        validator.validate(
+            [_one_to_one("bad", natreflection="purenat")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert _failures(report, "nat_rule_bad_natreflection")
+
+    def test_port_forward_target_resolves_against_alias(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        # Target (redirect destination) cross-refs aliases just like
+        # outbound.
+        validator.validate(
+            [_port_forward("ok", target="webservers")],
+            alias_names={"webservers"},
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert not _failures(report, "nat_rule_ok_target")
+
+    def test_port_forward_interface_resolves(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            [_port_forward("ok", interface="wan")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert not _failures(report, "nat_rule_ok_interface")
+
+    def test_port_forward_description_identity_tag_rejected(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            [_port_forward("evil", description="forged [infrafoundry:other]")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+        )
+        assert _failures(report, "nat_rule_evil_description")
+
+
+# ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
 
@@ -495,6 +704,7 @@ class TestEdgeCases:
                 _outbound("a"),
                 _outbound("b"),
                 _one_to_one("c"),
+                _port_forward("d"),
             ],
             alias_names=set(),
             interface_assignment_names=set(),
@@ -505,4 +715,5 @@ class TestEdgeCases:
         names = {c.check_name for c in report.results if c.check_name.endswith("_interface")}
         assert "nat_rule_a_interface" in names
         assert "nat_rule_b_interface" in names
+        assert "nat_rule_d_interface" in names
         assert "nat_rule_c_interface" in names
