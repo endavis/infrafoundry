@@ -25,9 +25,9 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/Gateways` | `gateways` | Supported (direct-API; #721). Identity is the natural-key `name` (OPNsense enforces uniqueness server-side). Dynamic/virtual gateways synthesized from interface DHCP state (e.g., `WAN_DHCP`, `WAN_DHCP6`) are silently excluded from the diff — they're recreated from interface state on reconfigure and must not appear in YAML. |
 | `<staticroutes>/route` | `static_routes` | Supported (direct-API; #722). Identity is the natural-key tuple `(network, gateway)` (OPNsense exposes no server-unique `name` field on routes — operator-facing YAML `name` is metadata only and never travels on the wire). The `gateway` field cross-references either a managed `gateways` resource declared in YAML or a live system gateway (e.g., `WAN_DHCP`, `WAN_DHCP6`); the validator enforces protocol-family match (IPv4 CIDR → IPv4 gateway, IPv6 CIDR → IPv6 gateway). |
 | `<virtualip>/vip` | — | **Gap** |
-| `<OPNsense>/unboundplus/hosts/host/alias` | — | **Gap** (Unbound host alias) |
-| `<OPNsense>/unboundplus/domains/domain` | — | **Gap** (Unbound domain override) |
-| `<OPNsense>/unboundplus/forwarding/host` | — | **Gap** (Unbound forward) |
+| `<OPNsense>/unboundplus/hosts/host/alias` | `unbound_host_alias` | Supported (direct-API; #724). Identity is the natural-key tuple `(host_uuid, hostname)` — OPNsense keys aliases by parent host_override UUID; the operator-facing YAML uses `(host_name, hostname)` and the component manager resolves `host_name` → parent UUID at apply time by reading `searchHostOverride` rows. The `host` field cross-references either a managed `unbound_host_override` resource declared in YAML or a live host override (`hostname` or `hostname.domain` form). |
+| `<OPNsense>/unboundplus/domains/domain` | — | **Merged into `unbound_forward`** (per OPNsense API; see [ADR-0013 §"Implementation order" #5 amendment](../decisions/0013-opnsense-full-iac-migration.md#implementation-order), #724). A `Forward` entry with `type=forward, domain="example.com"` is what the GUI calls a "domain override"; with `domain=""` it is a global forwarder. There is no separate REST surface for domain overrides. |
+| `<OPNsense>/unboundplus/forwarding/host` | `unbound_forward` | Supported (direct-API; #724). Identity is the natural-key tuple `(type, domain, server, port)` — including `type` (forward / dot) lets DoT and plain forwarders coexist for the same domain/server/port. **Envelope key on the wire is `dot` regardless of `type` value** (counter-intuitive but empirically confirmed). Field names match the wire format verbatim — `verify` not `verify_cn`; `forward_tcp_upstream` not `forward_tls_upstream`. Empty `domain` = global forwarder; non-empty = per-domain forwarder (a.k.a. domain override). |
 
 Sections intentionally **out of IaC scope** (per ADR-0013): `<hasync>`, `<openvpn>`/`<OPNsense>/OpenVPN`, `<ca>`/`<cert>`, `<OPNsense>/AcmeClient`, `<gres>`, `<gifs>`, `<laggs>`, `<bridges>`, `<ppps>`, `<wireless>`. These are set-once items and are migrated via selective `config.xml` import on the target box.
 
@@ -77,7 +77,7 @@ Each gap row in the matrix above corresponds to a planned feature issue. The imp
 2. `nat_rules` — outbound + 1:1 ship in #713 (direct-API). Port forwards deferred to a follow-up spike — `26.1.6_2` exposes no MVC REST endpoint for them; the same gist-controller mechanism from #717 is the likely path.
 3. `gateways` (#721, completed) and `static_routes` (#722, completed)
 4. `virtual_ips`
-5. Unbound extensions (`domain_override`, `host_alias`, `forward`)
+5. Unbound extensions — scope reduced to two resources (`unbound_host_alias`, `unbound_forward`); `domain_override` merged into `unbound_forward` per the live API (#724, completed)
 6. `config migrate` extractors for every supported and newly-added resource type
 
 The follow-up issues will be filed against the InfraFoundry repo and linked from ADR-0013 as they're created.
