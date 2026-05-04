@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777924829046,
+  "lastUpdate": 1777933033313,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7502,6 +7502,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002321158660198734",
             "extra": "mean: 154.9596000010922 usec\nrounds: 10"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "056f3966d530770c565d2a2109fead9fbbe8b247",
+          "message": "refactor: extract config-migrate extractor registry (merges PR #739, addresses #726)\n\nReplace the per-component if/elif dispatch on the OPNsense provider\nand the hardcoded click.Choice on `config migrate` with a pluggable\nregistry keyed by (provider_name, resource_type). Providers populate\nthe registry during __init__; the CLI looks up extractors at runtime\nand validates --provider / --component against the registered set.\nResolves ADR-0014 §8.\n\nExpands the `config migrate` surface from 2 reachable OPNsense\ncomponents to all 10. Pre-#726 OPNsenseProvider.migrate_<resource>\nmethods retained as deprecated shims for one minor version.\n\nBREAKING CHANGE: `--component kea/dhcp` is now `--component kea_dhcp`,\nand `--component isc-to-kea` is now `--component isc_to_kea` (Python-\nidentifier form, matching the registry key). No transparent alias.\nDefault output filename for isc_to_kea follows the new name.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-04T23:16:40+01:00",
+          "tree_id": "63b4dd51520948ec7fc0546c38d5b1d7a53d5ccf",
+          "url": "https://github.com/endavis/infrafoundry/commit/056f3966d530770c565d2a2109fead9fbbe8b247"
+        },
+        "date": 1777933032199,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7183.601218201623,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015436694640989473",
+            "extra": "mean: 139.20594554528247 usec\nrounds: 2424"
           }
         ]
       }
