@@ -370,7 +370,7 @@ class VirtualIPValidator:
         operators should not commit secrets to YAML.
         """
         password = vip.config.get("password")
-        if password is None or password == "":
+        if password is None or password == "":  # nosec B105
             self.report.add_check(
                 check_name=f"virtual_ip_{vip.name}_password",
                 passed=False,

@@ -92,7 +92,7 @@ _DEFAULT_ADVSKEW = "0"
 # Placeholder substituted into exported YAML for CARP passwords —
 # OPNsense never returns the plaintext on ``getItem``, so a migration
 # round-trip can never reproduce the secret.
-_PASSWORD_REDACTED_PLACEHOLDER = "secret://env_secrets/opnsense/carp_passwords/REPLACE_ME"
+_PASSWORD_REDACTED_PLACEHOLDER = "secret://env_secrets/opnsense/carp_passwords/REPLACE_ME"  # nosec B105
 
 
 # ---------------------------------------------------------------------------
@@ -417,7 +417,7 @@ def virtual_ip_configs_from_resources(
         lock = _require_bool(config, "lock", default=False, resource_name=resource.name)
 
         # Per-mode field handling.
-        password = ""
+        password = ""  # nosec B105
         vhid = ""
         advbase = _DEFAULT_ADVBASE
         advskew = _DEFAULT_ADVSKEW
