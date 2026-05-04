@@ -7,7 +7,7 @@ InfraFoundry provides an automated migration from legacy ISC DHCP configs to Kea
 ## Audience and Prerequisites
 
 - **Audience:** Operators migrating OPNsense DHCP from ISC to Kea.
-- **Prereqs:** OPNsense access, `foundry config migrate` available, and target config repo to receive generated YAML.
+- **Prereqs:** OPNsense access, `foundry config migrate` available, and target config repo to receive generated YAML. The component name is `isc_to_kea` (Python-identifier form). Before issue #726 it was spelled `isc-to-kea`; the hyphenated form is no longer accepted.
 
 ## When to Use This
 
@@ -19,18 +19,18 @@ InfraFoundry provides an automated migration from legacy ISC DHCP configs to Kea
 
 ```bash
 # Migrate all interfaces
-foundry config migrate --env prod --provider opnsense --component isc-to-kea
+foundry config migrate --env prod --provider opnsense --component isc_to_kea
 
 # Migrate selected interfaces
-foundry config migrate --env prod --provider opnsense --component isc-to-kea -i lan -i opt1
+foundry config migrate --env prod --provider opnsense --component isc_to_kea -i lan -i opt1
 
 # Dry-run preview
-foundry config migrate --env prod --provider opnsense --component isc-to-kea --dry-run
+foundry config migrate --env prod --provider opnsense --component isc_to_kea --dry-run
 ```
 
 ## Configuration Details
 
-- **Outputs:** InfraFoundry YAML at `envs/{env}/resources/migrated-isc-to-kea.yaml` by default (use `-o` to override).
+- **Outputs:** InfraFoundry YAML at `envs/{env}/resources/migrated-isc_to_kea.yaml` by default (use `-o` to override).
 - **Coverage:**
   - DHCPv4: subnets, pools, gateway, DNS, domain, NTP, lease times, static mappings.
   - DHCPv6: subnets, pools, prefix delegation, DNS/search lists, lease times, static mappings.
@@ -47,7 +47,7 @@ foundry config migrate --env prod --provider opnsense --component isc-to-kea --d
 
 - **Custom output path:**
   ```bash
-  foundry config migrate --env prod --provider opnsense --component isc-to-kea -o custom/path/dhcp-config.yaml
+  foundry config migrate --env prod --provider opnsense --component isc_to_kea -o custom/path/dhcp-config.yaml
   ```
 - **Generated resource snippet:**
   ```yaml

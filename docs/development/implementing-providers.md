@@ -222,6 +222,48 @@ def generate_pyinfra(self, resources):
 - `templates/<provider>/deploy.py.j2` - PyInfra deployment script
 - `templates/<provider>/inventory.py.j2` - PyInfra inventory
 
+### Registering Extractors for `config migrate`
+
+**Purpose:** Make a component reachable from `foundry config migrate --component <resource_type>` by registering an [`Extractor`](../../src/infrafoundry/core/extractors.py) with the global registry. The CLI looks up extractors at runtime and validates `--provider` / `--component` against the registry — no `click.Choice` edit is required when adding a new component.
+
+**Contract:** An extractor is anything implementing the `Extractor` Protocol:
+
+```python
+class Extractor(Protocol):
+    def extract(self, env_name: str, **kwargs: Any) -> str: ...
+```
+
+The return value is InfraFoundry YAML.
+
+**Recommended pattern:** Register one extractor per migratable component during `__init__`. Use the project-provided `_ExtractorAdapter` (or your own equivalent) to bind a component manager class to `self.config_dir`:
+
+```python
+def __init__(self, config_dir: Path, output_dir: Path) -> None:
+    super().__init__("yourprovider", config_dir, output_dir)
+    # ... other setup ...
+    self._register_extractors()
+
+def _register_extractors(self) -> None:
+    from infrafoundry.core.extractors import register_extractor
+
+    components: list[tuple[str, type]] = [
+        ("widgets", WidgetManager),
+        ("gizmos", GizmoManager),
+    ]
+    for resource_type, manager_class in components:
+        register_extractor(
+            "yourprovider",
+            resource_type,
+            _ExtractorAdapter(manager_class, self.config_dir),
+        )
+```
+
+**Manager-side contract:** Each component manager must expose `migrate(env_name, **kwargs) -> str`. Per-component options (e.g., `interfaces=[...]` for ISC-to-Kea) are passed through `**kwargs` — the registry stays agnostic to per-component schemas.
+
+**Re-registration is silent:** Re-instantiating the provider overwrites prior entries (matches `RunnerRegistry` semantics). Test fixtures that repeatedly construct the provider are safe.
+
+**Reference implementation:** OPNsense registers all 10 of its migratable components this way; see `OPNsenseProvider._register_extractors` in `src/infrafoundry/providers/opnsense/__init__.py`. ADR-0014 §8 records the pre-#726 hardcoded-dispatch pattern this replaces.
+
 ## Examples
 
 - **Provider skeleton:**
