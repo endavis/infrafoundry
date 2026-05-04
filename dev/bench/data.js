@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777893323730,
+  "lastUpdate": 1777896895742,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7409,6 +7409,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003338075059161783",
             "extra": "mean: 152.4439272103878 usec\nrounds: 2624"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d6d80625d71706d45b5e35dcb07de68595acb457",
+          "message": "feat: add OPNsense unbound_host_alias and unbound_forward components (merges PR #736, addresses #724)\n\nTwo new direct-API Unbound resources. The originally-planned\nunbound_domain_override is dropped: a Step 0 live-API probe confirmed\nOPNsense merges domain_override into the Forward resource (a Forward\nentry with non-empty domain is a domain override; empty domain is a\nglobal forwarder). See ADR-0013 and ADR-0014 amendments.\n\nAddresses #724\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-04T13:14:20+01:00",
+          "tree_id": "8cf116af8d049aa0a0be3e6d69486bb72782ec33",
+          "url": "https://github.com/endavis/infrafoundry/commit/d6d80625d71706d45b5e35dcb07de68595acb457"
+        },
+        "date": 1777896893941,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12274.949595192507,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010655644395959228",
+            "extra": "mean: 81.46672963868225 usec\nrounds: 2382"
           }
         ]
       }
