@@ -1,7 +1,6 @@
 """Unit tests for ``infrafoundry.providers.opnsense.services.vlan``.
 
-Coverage (lifted from ``tests/spikes/test_vlan_direct_api.py`` and adapted
-for the production module path):
+Coverage:
     - Domain dataclasses (``VlanConfig``, ``LiveVlan``, ``Diff``).
     - ``compute_diff`` keyed by ``(device, tag)`` with lock + add-only semantics.
     - ``vlan_configs_from_resources`` validation.

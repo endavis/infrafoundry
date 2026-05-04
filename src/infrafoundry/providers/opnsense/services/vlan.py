@@ -1,9 +1,8 @@
 """VLAN service for OPNsense direct-API operations (ADR-0014).
 
-This service is the production version of the VLAN diff/apply engine
-prototyped in ``tools/spikes/vlan_direct_api.py``. It manages VLANs by
-identity ``(device, tag)`` — the operator-visible YAML ``name`` is for
-references only, never used for diff matching.
+This service manages VLANs by identity ``(device, tag)`` — the
+operator-visible YAML ``name`` is for references only, never used for
+diff matching.
 
 The service uses the production ``OPNsenseClient`` wrapper at
 ``infrafoundry.providers.opnsense.api_client``. Calls go through the
