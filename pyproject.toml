@@ -66,6 +66,7 @@ proxmox = "infrafoundry.providers.proxmox:register"
 
 [project.entry-points."infrafoundry.secrets"]
 env = "infrafoundry.secrets.backends.env:register"
+env_secrets = "infrafoundry.secrets.backends.env_secrets:register"
 file = "infrafoundry.secrets.backends.file:register"
 
 [build-system]

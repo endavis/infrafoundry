@@ -26,6 +26,7 @@ from infrafoundry.providers.opnsense.validators import (
     UnboundForwardValidator,
     UnboundHostAliasValidator,
     UnboundValidator,
+    VirtualIPValidator,
     VLANValidator,
 )
 
@@ -87,6 +88,7 @@ class OPNsenseValidator:
         self.nat_rule_validator = NATRuleValidator(report)
         self.gateway_validator = GatewayValidator(report)
         self.static_route_validator = StaticRouteValidator(report)
+        self.virtual_ip_validator = VirtualIPValidator(report)
         self.unbound_host_alias_validator = UnboundHostAliasValidator(report)
         self.unbound_forward_validator = UnboundForwardValidator(report)
 
@@ -237,6 +239,11 @@ class OPNsenseValidator:
                 resource_refs["gateway_names"],
                 existing_gateways,
             )
+            self.virtual_ip_validator.validate(
+                resource_refs["virtual_ips"],
+                resource_refs["interface_assignment_names"],
+                existing_interfaces,
+            )
             self.unbound_validator.validate(resource_refs["unbound_host_overrides"])
             self.unbound_host_alias_validator.validate(
                 resource_refs["unbound_host_aliases"],
@@ -276,6 +283,7 @@ class OPNsenseValidator:
         nat_rules = [r for r in resources if r.type == "nat_rules"]
         gateways = [r for r in resources if r.type == "gateways"]
         static_routes = [r for r in resources if r.type == "static_routes"]
+        virtual_ips = [r for r in resources if r.type == "virtual_ips"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}
@@ -283,6 +291,7 @@ class OPNsenseValidator:
         nat_rule_names = {r.name for r in nat_rules}
         gateway_names = {g.name for g in gateways}
         static_route_names = {r.name for r in static_routes}
+        virtual_ip_names = {v.name for v in virtual_ips}
         # ``unbound_host_alias.host`` cross-refs the *name* of a managed
         # ``unbound_host_override`` resource (the alias validator also
         # accepts a live override name from ``searchHostOverride``).
@@ -307,6 +316,8 @@ class OPNsenseValidator:
             "gateway_names": gateway_names,
             "static_routes": static_routes,
             "static_route_names": static_route_names,
+            "virtual_ips": virtual_ips,
+            "virtual_ip_names": virtual_ip_names,
         }
 
     def _get_existing_aliases(
