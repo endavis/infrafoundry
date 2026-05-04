@@ -435,3 +435,24 @@ class ISCToKeaMigrationManager(BaseComponentManager):
 
         config = {"resources": resources}
         return yaml.dump(config, default_flow_style=False, sort_keys=False)
+
+    def migrate(self, env_name: str, *, interfaces: list[str] | None = None) -> str:
+        """Protocol-conformant wrapper around :meth:`export_to_yaml`.
+
+        The :class:`infrafoundry.core.extractors.Extractor` Protocol expects
+        ``migrate(env_name, **kwargs) -> str`` on every component manager.
+        ISC-to-Kea predates the registry and historically exposed
+        ``export_to_yaml`` instead; this wrapper forwards through with the
+        provider name pinned to ``"opnsense"`` (the only environment this
+        manager runs in today).
+
+        Args:
+            env_name: Environment name.
+            interfaces: Optional list of interfaces to limit migration to.
+                ``None`` migrates every ISC-DHCP-enabled interface on the
+                OPNsense box.
+
+        Returns:
+            InfraFoundry YAML string.
+        """
+        return self.export_to_yaml(env_name, "opnsense", interfaces)

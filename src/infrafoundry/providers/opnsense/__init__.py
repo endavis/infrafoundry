@@ -2,6 +2,7 @@
 
 import base64
 import logging
+import warnings
 from pathlib import Path
 from typing import Any, ClassVar, override
 
@@ -38,6 +39,54 @@ def _normalize_field_value(value: str) -> str:
     return stripped
 
 
+class _ExtractorAdapter:
+    """Adapter that satisfies the :class:`Extractor` Protocol.
+
+    Binds a component manager class to a ``config_dir`` and forwards
+    ``extract(env_name, **kwargs)`` calls to ``manager.migrate(...)`` on a
+    fresh manager instance. Implemented as a class rather than a closure so
+    that ``repr()`` is informative and instances can be pickled by tests.
+
+    Attributes:
+        manager_class: Component manager class (must expose
+            ``migrate(env_name, **kwargs) -> str``).
+        config_dir: Configuration directory passed to the manager
+            constructor.
+    """
+
+    def __init__(self, manager_class: type, config_dir: Path) -> None:
+        """Initialize adapter for a manager class.
+
+        Args:
+            manager_class: Component manager class.
+            config_dir: Configuration directory to pass through.
+        """
+        self.manager_class = manager_class
+        self.config_dir = config_dir
+
+    def extract(self, env_name: str, **kwargs: Any) -> str:
+        """Instantiate the manager and call its ``migrate`` method.
+
+        Args:
+            env_name: Environment name.
+            **kwargs: Per-component keyword arguments
+                (e.g., ``interfaces`` for ISC-to-Kea).
+
+        Returns:
+            InfraFoundry YAML string.
+        """
+        manager = self.manager_class(self.config_dir)
+        result: str = manager.migrate(env_name, **kwargs)
+        return result
+
+    def __repr__(self) -> str:
+        """Return a debug-friendly representation."""
+        return (
+            f"_ExtractorAdapter(manager_class={self.manager_class.__name__}, "
+            f"config_dir={self.config_dir!r})"
+        )
+
+
 class OPNsenseProvider(
     ProviderBase,
     TemplateRendererMixin,
@@ -59,6 +108,56 @@ class OPNsenseProvider(
         self._setup_template_environment()
         # Add base64 encoding filter for Ansible templates
         self.jinja_env.filters["b64encode"] = lambda s: base64.b64encode(s.encode()).decode()
+        # Register migrate extractors for the CLI ``config migrate`` command.
+        # Must run after ``self.config_dir`` is set by ProviderBase.__init__.
+        self._register_extractors()
+
+    def _register_extractors(self) -> None:
+        """Register per-component extractors with the global registry.
+
+        Each extractor is an :class:`_ExtractorAdapter` that binds a
+        component manager class to ``self.config_dir`` and exposes the
+        :class:`infrafoundry.core.extractors.Extractor` Protocol surface
+        (``extract(env_name, **kwargs) -> str``). The CLI ``config migrate``
+        command looks up extractors by ``(provider_name, resource_type)``
+        and calls ``.extract(...)`` directly — no per-component if/elif
+        chain on the CLI side, no per-component method on the provider.
+
+        Re-registration silently overwrites prior entries (matches
+        ``RunnerRegistry`` semantics), so re-instantiating the provider
+        in tests doesn't error.
+        """
+        from infrafoundry.core.extractors import register_extractor
+
+        from .components.gateway import GatewayManager
+        from .components.interface_assignment import InterfaceAssignmentManager
+        from .components.isc_to_kea_migration import ISCToKeaMigrationManager
+        from .components.kea_dhcp import KeaDHCPManager
+        from .components.nat_rule import NATRuleManager
+        from .components.static_route import StaticRouteManager
+        from .components.unbound_forward import UnboundForwardManager
+        from .components.unbound_host_alias import UnboundHostAliasManager
+        from .components.virtual_ip import VirtualIPManager
+        from .components.vlan import VlanManager
+
+        components: list[tuple[str, type]] = [
+            ("vlans", VlanManager),
+            ("interface_assignments", InterfaceAssignmentManager),
+            ("nat_rules", NATRuleManager),
+            ("gateways", GatewayManager),
+            ("static_routes", StaticRouteManager),
+            ("virtual_ips", VirtualIPManager),
+            ("unbound_host_alias", UnboundHostAliasManager),
+            ("unbound_forward", UnboundForwardManager),
+            ("kea_dhcp", KeaDHCPManager),
+            ("isc_to_kea", ISCToKeaMigrationManager),
+        ]
+        for resource_type, manager_class in components:
+            register_extractor(
+                "opnsense",
+                resource_type,
+                _ExtractorAdapter(manager_class, self.config_dir),
+            )
 
     @override
     def validate_config(self, config: dict[str, Any]) -> bool:
@@ -736,24 +835,33 @@ class OPNsenseProvider(
         Reads the current Kea DHCPv4 and DHCPv6 configuration from OPNsense
         and generates InfraFoundry-compatible YAML configuration.
 
+        .. deprecated::
+            Use the :class:`infrafoundry.core.extractors.ExtractorRegistry`
+            via ``get_extractor("opnsense", "kea_dhcp").extract(env_name)``.
+            This shim will be removed after one minor version.
+
         Args:
             env_name: Environment name
 
         Returns:
             YAML configuration as a string
         """
-        from .components.kea_dhcp import KeaDHCPManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = KeaDHCPManager(self.config_dir)
-        return manager.migrate(env_name, "opnsense")
+        warnings.warn(
+            "OPNsenseProvider.migrate_kea_dhcp is deprecated; "
+            'use get_extractor("opnsense", "kea_dhcp").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "kea_dhcp").extract(env_name)
 
     def migrate_vlan(self, env_name: str) -> str:
         """Migrate current VLAN configuration to InfraFoundry YAML.
 
-        Reads the live VLAN list from OPNsense via the direct-API path and
-        generates InfraFoundry-compatible YAML. Mirrors ``migrate_kea_dhcp``.
-        Not yet exposed via ``config migrate`` CLI — that wiring is a
-        follow-up to this PR.
+        .. deprecated::
+            Use ``get_extractor("opnsense", "vlans").extract(env_name)``.
+            This shim will be removed after one minor version.
 
         Args:
             env_name: Environment name
@@ -761,21 +869,23 @@ class OPNsenseProvider(
         Returns:
             YAML configuration as a string
         """
-        from .components.vlan import VlanManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = VlanManager(self.config_dir)
-        return manager.migrate(env_name)
+        warnings.warn(
+            "OPNsenseProvider.migrate_vlan is deprecated; "
+            'use get_extractor("opnsense", "vlans").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "vlans").extract(env_name)
 
     def migrate_interface_assignment(self, env_name: str) -> str:
         """Migrate current interface assignments to InfraFoundry YAML.
 
-        Reads the live interface assignment table from OPNsense via the
-        direct-API path and generates InfraFoundry-compatible YAML.
-        Mirrors ``migrate_vlan``. Apply/destroy for ``interface_assignments``
-        is a no-op on OPNsense `26.1.6_2` (no REST write endpoint), so
-        the YAML this method emits is intended for cutover dumps and
-        documentation. Not yet exposed via ``config migrate`` CLI — that
-        wiring is a follow-up.
+        .. deprecated::
+            Use
+            ``get_extractor("opnsense", "interface_assignments").extract(env_name)``.
+            This shim will be removed after one minor version.
 
         Args:
             env_name: Environment name
@@ -783,21 +893,22 @@ class OPNsenseProvider(
         Returns:
             YAML configuration as a string
         """
-        from .components.interface_assignment import InterfaceAssignmentManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = InterfaceAssignmentManager(self.config_dir)
-        return manager.migrate(env_name)
+        warnings.warn(
+            "OPNsenseProvider.migrate_interface_assignment is deprecated; "
+            'use get_extractor("opnsense", "interface_assignments").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "interface_assignments").extract(env_name)
 
     def migrate_nat_rule(self, env_name: str) -> str:
         """Migrate current NAT rules (outbound + 1:1) to InfraFoundry YAML.
 
-        Reads the live NAT rule list from OPNsense via the direct-API path
-        and generates InfraFoundry-compatible YAML. Mirrors ``migrate_vlan``
-        and ``migrate_interface_assignment``. Only managed rules (those
-        carrying the ``[infrafoundry:<name>]`` description prefix) are
-        emitted; unmanaged rules are intentionally left to the operator.
-        Port forwards are out of scope (see ADR-0013, #713). Not yet
-        exposed via the ``config migrate`` CLI — that wiring is a follow-up.
+        .. deprecated::
+            Use ``get_extractor("opnsense", "nat_rules").extract(env_name)``.
+            This shim will be removed after one minor version.
 
         Args:
             env_name: Environment name
@@ -805,22 +916,22 @@ class OPNsenseProvider(
         Returns:
             YAML configuration as a string
         """
-        from .components.nat_rule import NATRuleManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = NATRuleManager(self.config_dir)
-        return manager.migrate(env_name)
+        warnings.warn(
+            "OPNsenseProvider.migrate_nat_rule is deprecated; "
+            'use get_extractor("opnsense", "nat_rules").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "nat_rules").extract(env_name)
 
     def migrate_gateway(self, env_name: str) -> str:
         """Migrate current gateways to InfraFoundry YAML.
 
-        Reads the live gateway list from OPNsense via the direct-API path
-        and generates InfraFoundry-compatible YAML. Mirrors ``migrate_vlan``,
-        ``migrate_interface_assignment``, and ``migrate_nat_rule``. Dynamic /
-        virtual gateways (those synthesized by OPNsense from interface DHCP
-        state — e.g., ``WAN_DHCP``, ``WAN_DHCP6``) are excluded from the
-        export — they're recreated from interface state on reconfigure and
-        shouldn't be in YAML. Not yet exposed via the ``config migrate``
-        CLI — that wiring is a follow-up (per ADR-0014 §8).
+        .. deprecated::
+            Use ``get_extractor("opnsense", "gateways").extract(env_name)``.
+            This shim will be removed after one minor version.
 
         Args:
             env_name: Environment name
@@ -828,22 +939,23 @@ class OPNsenseProvider(
         Returns:
             YAML configuration as a string
         """
-        from .components.gateway import GatewayManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = GatewayManager(self.config_dir)
-        return manager.migrate(env_name)
+        warnings.warn(
+            "OPNsenseProvider.migrate_gateway is deprecated; "
+            'use get_extractor("opnsense", "gateways").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "gateways").extract(env_name)
 
     def migrate_static_route(self, env_name: str) -> str:
         """Migrate current static routes to InfraFoundry YAML.
 
-        Reads the live static-route list from OPNsense via the direct-API
-        path and generates InfraFoundry-compatible YAML. Mirrors
-        ``migrate_gateway`` and the other migrate-* methods. The operator-
-        facing ``name`` is synthesized from the ``(network, gateway)``
-        natural-key tuple — the operator can rename freely after import,
-        since identity is the tuple, not the name. Not yet exposed via
-        the ``config migrate`` CLI — that wiring is a follow-up (per
-        ADR-0014 §8).
+        .. deprecated::
+            Use
+            ``get_extractor("opnsense", "static_routes").extract(env_name)``.
+            This shim will be removed after one minor version.
 
         Args:
             env_name: Environment name
@@ -851,26 +963,23 @@ class OPNsenseProvider(
         Returns:
             YAML configuration as a string
         """
-        from .components.static_route import StaticRouteManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = StaticRouteManager(self.config_dir)
-        return manager.migrate(env_name)
+        warnings.warn(
+            "OPNsenseProvider.migrate_static_route is deprecated; "
+            'use get_extractor("opnsense", "static_routes").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "static_routes").extract(env_name)
 
     def migrate_virtual_ip(self, env_name: str) -> str:
         """Migrate current virtual IPs (CARP / ipalias / proxyarp) to InfraFoundry YAML.
 
-        Reads the live virtual-IP list from OPNsense via the direct-API
-        path and generates InfraFoundry-compatible YAML. Mirrors
-        ``migrate_static_route`` and the other migrate-* methods. The
-        operator-facing ``name`` is synthesized from the
-        ``(interface, mode, address, vhid)`` natural-key tuple — the
-        operator can rename freely after import, since identity is the
-        tuple, not the name. CARP ``password`` is redacted (placeholder
-        ``secret://`` URI emitted) since OPNsense never returns
-        plaintext passwords on read; the operator must re-supply the
-        secret manually before re-applying. Not yet exposed via the
-        ``config migrate`` CLI — that wiring is a follow-up (per
-        ADR-0014 §8).
+        .. deprecated::
+            Use
+            ``get_extractor("opnsense", "virtual_ips").extract(env_name)``.
+            This shim will be removed after one minor version.
 
         Args:
             env_name: Environment name
@@ -878,24 +987,23 @@ class OPNsenseProvider(
         Returns:
             YAML configuration as a string
         """
-        from .components.virtual_ip import VirtualIPManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = VirtualIPManager(self.config_dir)
-        return manager.migrate(env_name)
+        warnings.warn(
+            "OPNsenseProvider.migrate_virtual_ip is deprecated; "
+            'use get_extractor("opnsense", "virtual_ips").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "virtual_ips").extract(env_name)
 
     def migrate_unbound_host_alias(self, env_name: str) -> str:
         """Migrate current Unbound host aliases to InfraFoundry YAML.
 
-        Reads the live host-alias list from OPNsense via the direct-API
-        path and generates InfraFoundry-compatible YAML. Mirrors
-        ``migrate_static_route`` and the other migrate-* methods. The
-        operator-facing ``name`` is synthesized from the
-        ``(parent_uuid, hostname)`` natural-key tuple — the operator can
-        rename freely after import, since identity is the tuple, not the
-        name. Cross-references to parent ``unbound_host_override`` are
-        emitted in ``hostname.domain`` form rather than as raw UUIDs.
-        Not yet exposed via the ``config migrate`` CLI — that wiring is
-        a follow-up (per ADR-0014 §8).
+        .. deprecated::
+            Use
+            ``get_extractor("opnsense", "unbound_host_alias").extract(env_name)``.
+            This shim will be removed after one minor version.
 
         Args:
             env_name: Environment name
@@ -903,25 +1011,23 @@ class OPNsenseProvider(
         Returns:
             YAML configuration as a string
         """
-        from .components.unbound_host_alias import UnboundHostAliasManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = UnboundHostAliasManager(self.config_dir)
-        return manager.migrate(env_name)
+        warnings.warn(
+            "OPNsenseProvider.migrate_unbound_host_alias is deprecated; "
+            'use get_extractor("opnsense", "unbound_host_alias").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "unbound_host_alias").extract(env_name)
 
     def migrate_unbound_forward(self, env_name: str) -> str:
         """Migrate current Unbound forwarders to InfraFoundry YAML.
 
-        Reads the live forward list from OPNsense via the direct-API path
-        and generates InfraFoundry-compatible YAML. Mirrors
-        ``migrate_static_route`` and the other migrate-* methods. The
-        operator-facing ``name`` is synthesized from the
-        ``(type, domain, server, port)`` natural-key tuple — the operator
-        can rename freely after import, since identity is the tuple, not
-        the name. Both DNS-over-TLS (``type=dot``) and plain forwards
-        (``type=forward``) are exported; an entry with ``domain=""`` is a
-        global forwarder while a non-empty domain is a domain-override.
-        Not yet exposed via the ``config migrate`` CLI — that wiring is
-        a follow-up (per ADR-0014 §8).
+        .. deprecated::
+            Use
+            ``get_extractor("opnsense", "unbound_forward").extract(env_name)``.
+            This shim will be removed after one minor version.
 
         Args:
             env_name: Environment name
@@ -929,16 +1035,23 @@ class OPNsenseProvider(
         Returns:
             YAML configuration as a string
         """
-        from .components.unbound_forward import UnboundForwardManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = UnboundForwardManager(self.config_dir)
-        return manager.migrate(env_name)
+        warnings.warn(
+            "OPNsenseProvider.migrate_unbound_forward is deprecated; "
+            'use get_extractor("opnsense", "unbound_forward").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "unbound_forward").extract(env_name)
 
     def migrate_isc_to_kea(self, env_name: str, interfaces: list[str] | None = None) -> str:
         """Migrate ISC DHCP configuration to Kea DHCP format.
 
-        Reads the legacy ISC DHCP configuration and generates InfraFoundry YAML
-        with Kea DHCP resources (both DHCPv4 and DHCPv6).
+        .. deprecated::
+            Use
+            ``get_extractor("opnsense", "isc_to_kea").extract(env_name, interfaces=...)``.
+            This shim will be removed after one minor version.
 
         Args:
             env_name: Environment name
@@ -947,7 +1060,16 @@ class OPNsenseProvider(
         Returns:
             YAML configuration as a string with Kea DHCP resources
         """
-        from .components.isc_to_kea_migration import ISCToKeaMigrationManager
+        from infrafoundry.core.extractors import get_extractor
 
-        manager = ISCToKeaMigrationManager(self.config_dir)
-        return manager.export_to_yaml(env_name, "opnsense", interfaces)
+        warnings.warn(
+            "OPNsenseProvider.migrate_isc_to_kea is deprecated; "
+            'use get_extractor("opnsense", "isc_to_kea").extract'
+            "(env_name, interfaces=...).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        kwargs: dict[str, Any] = {}
+        if interfaces is not None:
+            kwargs["interfaces"] = interfaces
+        return get_extractor("opnsense", "isc_to_kea").extract(env_name, **kwargs)

@@ -205,14 +205,29 @@ foundry config new create basic-vm ./my-new-vm
 
 Migrate existing infrastructure to InfraFoundry configuration by reading from provider APIs.
 
+The set of valid `--provider` and `--component` values is determined at runtime from the [extractor registry](../development/implementing-providers.md#registering-extractors-for-config-migrate) — every component a provider registers becomes immediately reachable via this command, with no separate edit to the CLI.
+
 ```bash
-foundry config migrate --env prod --provider opnsense --component kea/dhcp
-foundry config migrate --env prod --provider opnsense --component isc-to-kea
-foundry config migrate --env prod --provider opnsense --component isc-to-kea -i lan -i wan
-foundry config migrate --env prod --provider opnsense --component isc-to-kea --dry-run
+# OPNsense direct-API components
+foundry config migrate --env prod --provider opnsense --component vlans
+foundry config migrate --env prod --provider opnsense --component interface_assignments
+foundry config migrate --env prod --provider opnsense --component nat_rules
+foundry config migrate --env prod --provider opnsense --component gateways
+foundry config migrate --env prod --provider opnsense --component static_routes
+foundry config migrate --env prod --provider opnsense --component virtual_ips
+foundry config migrate --env prod --provider opnsense --component unbound_host_alias
+foundry config migrate --env prod --provider opnsense --component unbound_forward
+
+# OPNsense DHCP migration
+foundry config migrate --env prod --provider opnsense --component kea_dhcp
+foundry config migrate --env prod --provider opnsense --component isc_to_kea
+foundry config migrate --env prod --provider opnsense --component isc_to_kea -i lan -i wan
+foundry config migrate --env prod --provider opnsense --component isc_to_kea --dry-run
 ```
 
-**Options:** `-e/--env TEXT` (required), `-p/--provider [opnsense]` (required), `-c/--component [kea/dhcp|isc-to-kea]` (required), `-i/--interfaces TEXT` (repeatable), `-o/--output TEXT`, `--dry-run`
+**Options:** `-e/--env TEXT` (required), `-p/--provider TEXT` (required, validated at runtime against the registry), `-c/--component TEXT` (required, validated at runtime against the registry — for OPNsense: `gateways`, `interface_assignments`, `isc_to_kea`, `kea_dhcp`, `nat_rules`, `static_routes`, `unbound_forward`, `unbound_host_alias`, `virtual_ips`, `vlans`), `-i/--interfaces TEXT` (repeatable; currently consumed by `isc_to_kea` only), `-o/--output TEXT` (default: `envs/{env}/resources/migrated-{component}.yaml`), `--dry-run`
+
+> **Breaking change (#726):** Before #726, the component names were `kea/dhcp` and `isc-to-kea`. They are now `kea_dhcp` and `isc_to_kea` (Python-identifier form, matching the registry key). The hyphenated/slash forms are no longer accepted — there is no transparent alias. Update any scripts that pass these names.
 
 ### `config schema`
 
