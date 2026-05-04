@@ -6,6 +6,7 @@
 **Amended:** 2026-05-04 (#722) — `static_routes` per-component decision recorded (stock direct-REST against `routes/routes/*route`; natural-key identity tuple `(network, gateway)`)
 **Amended:** 2026-05-04 (#724) — `unbound_host_alias` and `unbound_forward` per-component decisions recorded (stock direct-REST against `unbound/settings/*`; natural-key identities; reconfigure via `unbound/service/reconfigure`; no controller fork)
 **Amended:** 2026-05-04 (#723) — `virtual_ips` per-component decision recorded (stock direct-REST against `interfaces/vip_settings/*`; natural-key tuple identity `(interface, mode, address, vhid)`); secrets-handling subsection added covering `secret://env_secrets/...` URI resolution at apply time by `EnvSecretsBackend` (first direct-API consumer: CARP `password`)
+**Amended:** 2026-05-04 (#725) — `port_forward` per-component decision recorded (stock direct-REST against `firewall/d_nat/*`; extends `nat_rules` with a third `kind`; identical mechanism to outbound and 1:1; no new wire mechanism)
 **Status:** Accepted
 
 ## Status
@@ -159,6 +160,18 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 **Rollback strategy:** Same as the rest of §1's default mechanism — rely on per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. No transactional rollback.
 
+### `port_forward` (#725, 2026-05-04)
+
+**Mechanism:** Stock direct-REST against the `firewall/d_nat/*` controller (the OPNsense stock `DNatController` extending `FilterBaseController`) — no controller fork required (this component falls under §1's default). Extends `nat_rules` (#713) with a third `kind`; identical mechanism to outbound and 1:1.
+
+- **Endpoints:** `POST firewall/d_nat/searchRule` (list), `GET firewall/d_nat/getRule/<uuid>`, `POST firewall/d_nat/addRule` and `POST firewall/d_nat/setRule/<uuid>` (body envelope `{"rule": {...}}`), `POST firewall/d_nat/delRule/<uuid>`, `POST firewall/d_nat/apply`. All standard verbs return 200 (`searchRule`, `getRule`, `addRule`, `setRule`, `delRule`, `apply`, `savepoint`, `toggleRule`, `moveRuleBefore`).
+- **URL note:** snake-case routing — `DNatController` → `firewall/d_nat`, NOT `firewall/dnat` (concatenated). The original 2026-05-03 probe used the concatenated form, got 404, and incorrectly concluded the controller was absent. The 2026-05-04 re-probe of `opnsense-a` running `26.1.6_2` confirmed the controller ships stock at the snake-case URL.
+- **Identity:** description-suffix `[infrafoundry:<name>]` + `infrafoundry` category, identical to outbound and 1:1 (#713). Per-kind diff isolation via the existing `(kind, name)` diff key — an outbound `foo` and a port_forward `foo` are independent identities.
+- **Wire schema:** `disabled` (negative polarity vs operator-facing `enabled`), `log`, `sequence`, `interface`, `ipprotocol`, `protocol`, `source.network` / `source.port` / `source.not` (dotted, NOT the underscore-flattened forms used by outbound + 1:1), `destination.network` / `destination.port` / `destination.not`, `target` (redirect destination — same wire field as outbound's source-NAT translation target but different operator-facing semantics; documented in the `NATRuleConfig` docstring), `local-port` (hyphenated wire key; `local_port` in YAML and dataclass), `nordr` ("no rdr" / deny match), `pass` (Python keyword; `pass_action` in YAML/dataclass; values `""` / `"pass"` / `"rule"` — note: `"pass"` injects an implicit OPNsense filter rule that bypasses any companion `firewall_rules` declaration), `poolopts` (closed set: `""` / `round-robin` / `round-robin sticky-address` / `random` / `random sticky-address` / `source-hash` / `bitmask`), `natreflection` (closed set: `""` / `"purenat"` / `"disable"` — different keyword set than 1:1 which uses `""` / `"enable"` / `"disable"`), `tag`, `tagged`, `nosync`, `descr` (NOT `description` — DNat schema uses the abbreviated form; outbound + 1:1 use `description`).
+- **Server-managed fields not exposed:** `created.*`, `updated.*`, `categories` index (managed via the `infrafoundry` category bootstrap), `associated-rule-id` (OPNsense uses this internally to link port_forward to its companion filter rule when `pass_action: "pass"` / `"rule"`; the DNat model docstring marks the field for removal in a future OPNsense version, so InfraFoundry never touches it — `pass_action` is the operator-facing knob).
+
+**Rollback strategy:** Same as the rest of §1's default mechanism.
+
 ## Secrets handling
 
 Direct-API resources can declare secret-bearing fields as `secret://env_secrets/<dotted/path>` URIs in YAML. Resolution is performed at apply time by the component manager, which:
@@ -212,6 +225,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#722](https://github.com/endavis/infrafoundry/issues/722): feat: add OPNsense `static_routes` component (direct-API, natural-key tuple identity).
 - Issue [#723](https://github.com/endavis/infrafoundry/issues/723): feat: add OPNsense `virtual_ips` component (direct-API, natural-key tuple identity `(interface, mode, address, vhid)`; first direct-API resource with secrets — CARP `password` via `secret://env_secrets/...` URIs and the new `EnvSecretsBackend`).
 - Issue [#724](https://github.com/endavis/infrafoundry/issues/724): feat: add OPNsense Unbound extensions — `unbound_host_alias` and `unbound_forward` (direct-API; merges domain_override into forward per live probe).
+- Issue [#725](https://github.com/endavis/infrafoundry/issues/725): feat: add OPNsense `port_forward` kind on `nat_rules` (direct-API at `firewall/d_nat`; closes ADR-0013 implementation-order item #2; the 2026-05-04 re-probe corrected the original deferral premise).
 
 ## Related Documentation
 

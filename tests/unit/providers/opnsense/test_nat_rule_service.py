@@ -95,6 +95,58 @@ def _one_to_one(
     )
 
 
+def _port_forward(
+    name: str,
+    *,
+    description: str = "",
+    target: str = "10.0.0.10",
+    interface: str = "wan",
+    sequence: int = 100,
+    lock: bool = False,
+    enabled: bool = True,
+    log: bool = False,
+    source_net: str = "any",
+    source_port: str = "",
+    destination_net: str = "wanip",
+    destination_port: str = "",
+    local_port: str = "8080",
+    protocol: str = "tcp",
+    ipprotocol: str = "inet",
+    nordr: bool = False,
+    pass_action: str = "",
+    poolopts: str = "",
+    natreflection: str = "",
+    tag: str = "",
+    tagged: str = "",
+    nosync: bool = False,
+) -> NATRuleConfig:
+    return NATRuleConfig(
+        name=name,
+        kind="port_forward",
+        enabled=enabled,
+        log=log,
+        sequence=sequence,
+        interface=interface,
+        description=description,
+        lock=lock,
+        ipprotocol=ipprotocol,
+        protocol=protocol,
+        source_net=source_net,
+        source_port=source_port,
+        destination_net=destination_net,
+        destination_port=destination_port,
+        target=target,
+        local_port=local_port,
+        nordr=nordr,
+        pass_action=pass_action,
+        poolopts=poolopts,
+        natreflection=natreflection,
+        tag=tag,
+        tagged=tagged,
+        nosync=nosync,
+    )
+
+
 def _live(
     uuid: str,
     name: str | None,
@@ -103,13 +155,17 @@ def _live(
     description: str = "",
     raw_overrides: dict[str, Any] | None = None,
 ) -> LiveNATRule:
+    descr_value = (
+        (f"{description} [infrafoundry:{name}]" if description else f"[infrafoundry:{name}]")
+        if name is not None
+        else description
+    )
+    # port_forward uses ``descr`` on the wire (DNat schema); outbound +
+    # 1:1 use ``description``.
+    raw_key = "descr" if kind == "port_forward" else "description"
     raw: dict[str, Any] = {
         "uuid": uuid,
-        "description": (
-            (f"{description} [infrafoundry:{name}]" if description else f"[infrafoundry:{name}]")
-            if name is not None
-            else description
-        ),
+        raw_key: descr_value,
     }
     if raw_overrides:
         raw.update(raw_overrides)
@@ -264,6 +320,120 @@ class TestPayloadIdentityIntegration:
         assert inner["description"] == "[infrafoundry:foo]"
 
 
+# ---------------------------------------------------------------------------
+# Port-forward payload (#725)
+# ---------------------------------------------------------------------------
+
+
+class TestPortForwardPayload:
+    """``_to_port_forward_payload`` shape and quirks."""
+
+    def test_payload_has_rule_envelope(self) -> None:
+        payload = _port_forward("web").to_payload()
+        assert set(payload.keys()) == {"rule"}
+
+    def test_dotted_source_destination_keys(self) -> None:
+        # DNat schema uses dotted keys ``source.network`` / ``source.port``
+        # / ``source.not`` / ``destination.*`` (not the underscored
+        # ``source_net`` etc. that outbound and 1:1 use).
+        rule = _port_forward(
+            "web",
+            source_net="10.0.0.0/24",
+            source_port="1024:65535",
+            destination_net="wanip",
+            destination_port="80",
+        )
+        inner = rule.to_payload()["rule"]
+        assert inner["source.network"] == "10.0.0.0/24"
+        assert inner["source.port"] == "1024:65535"
+        assert inner["source.not"] == "0"
+        assert inner["destination.network"] == "wanip"
+        assert inner["destination.port"] == "80"
+        assert inner["destination.not"] == "0"
+        # The outbound/1:1 underscored forms must NOT appear in the
+        # port_forward payload.
+        assert "source_net" not in inner
+        assert "destination_net" not in inner
+
+    def test_disabled_polarity_flip(self) -> None:
+        # enabled=True → disabled="0" (DNat negative polarity).
+        rule = _port_forward("web", enabled=True)
+        assert rule.to_payload()["rule"]["disabled"] == "0"
+        # enabled=False → disabled="1".
+        rule = _port_forward("web", enabled=False)
+        assert rule.to_payload()["rule"]["disabled"] == "1"
+
+    def test_local_port_uses_hyphenated_wire_key(self) -> None:
+        # ``local_port`` (YAML/dataclass) → ``local-port`` (wire).
+        rule = _port_forward("web", local_port="8080")
+        inner = rule.to_payload()["rule"]
+        assert inner["local-port"] == "8080"
+        assert "local_port" not in inner
+
+    def test_pass_action_uses_pass_wire_key(self) -> None:
+        # ``pass_action`` (Python; ``pass`` is a keyword) → ``pass`` (wire).
+        rule = _port_forward("web", pass_action="pass")
+        inner = rule.to_payload()["rule"]
+        assert inner["pass"] == "pass"
+        assert "pass_action" not in inner
+
+    def test_descr_wire_key_carries_identity_tag(self) -> None:
+        # DNat schema uses ``descr``, not ``description``. Identity-tag
+        # suffix is added at serialization, same as outbound + 1:1.
+        rule = _port_forward("web", description="HTTP -> 10.0.0.10")
+        inner = rule.to_payload()["rule"]
+        assert inner["descr"] == "HTTP -> 10.0.0.10 [infrafoundry:web]"
+        assert "description" not in inner
+
+    def test_empty_description_yields_tag_only_in_descr(self) -> None:
+        rule = _port_forward("web", description="")
+        inner = rule.to_payload()["rule"]
+        assert inner["descr"] == "[infrafoundry:web]"
+
+    def test_booleans_serialize_to_zero_one_strings(self) -> None:
+        rule = _port_forward(
+            "web",
+            log=True,
+            nordr=True,
+            nosync=True,
+            source_port="",
+        )
+        inner = rule.to_payload()["rule"]
+        assert inner["log"] == "1"
+        assert inner["nordr"] == "1"
+        assert inner["nosync"] == "1"
+
+    def test_default_field_set_complete(self) -> None:
+        # Confirm every wire field documented in the plan is present.
+        rule = _port_forward("web")
+        inner = rule.to_payload()["rule"]
+        expected_keys = {
+            "disabled",
+            "log",
+            "sequence",
+            "interface",
+            "ipprotocol",
+            "protocol",
+            "source.network",
+            "source.port",
+            "source.not",
+            "destination.network",
+            "destination.port",
+            "destination.not",
+            "target",
+            "local-port",
+            "nordr",
+            "pass",
+            "poolopts",
+            "natreflection",
+            "tag",
+            "tagged",
+            "nosync",
+            "descr",
+        }
+        assert set(inner.keys()) == expected_keys
+
+
 class TestDiffKey:
     def test_outbound_and_one_to_one_same_name_have_different_keys(self) -> None:
         out = _outbound("foo", target="wanip")
@@ -271,6 +441,15 @@ class TestDiffKey:
         assert out.diff_key != oto.diff_key
         assert out.diff_key == ("outbound", "foo")
         assert oto.diff_key == ("one_to_one", "foo")
+
+    def test_port_forward_has_distinct_diff_key(self) -> None:
+        out = _outbound("foo", target="wanip")
+        oto = _one_to_one("foo")
+        pf = _port_forward("foo")
+        keys = {out.diff_key, oto.diff_key, pf.diff_key}
+        # All three are distinct.
+        assert len(keys) == 3
+        assert pf.diff_key == ("port_forward", "foo")
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +620,109 @@ class TestComputeDiffPerKindIsolation:
         assert diff.deletes[0].kind == "one_to_one"
 
 
+class TestPortForwardDiff:
+    """Per-kind isolation for the third kind (#725)."""
+
+    def test_new_port_forward_adds(self) -> None:
+        diff = compute_diff([_port_forward("web")], [])
+        assert len(diff.adds) == 1
+        assert diff.adds[0].name == "web"
+        assert diff.adds[0].kind == "port_forward"
+
+    def test_no_update_when_port_forward_payload_matches(self) -> None:
+        rule = _port_forward("web", target="10.0.0.10", interface="wan", local_port="8080")
+        payload_inner = rule.to_payload()["rule"]
+        live_raw: dict[str, Any] = {"uuid": "u1", **payload_inner}
+        live = LiveNATRule(
+            uuid="u1",
+            kind="port_forward",
+            managed_name="web",
+            description="",
+            raw=live_raw,
+        )
+        diff = compute_diff([rule], [live])
+        assert diff.is_empty
+
+    def test_update_when_port_forward_target_changes(self) -> None:
+        rule_have = _port_forward("web", target="10.0.0.10", local_port="8080")
+        live_raw = {"uuid": "u1", **rule_have.to_payload()["rule"]}
+        live = LiveNATRule(
+            uuid="u1",
+            kind="port_forward",
+            managed_name="web",
+            description="",
+            raw=live_raw,
+        )
+        rule_want = _port_forward("web", target="10.0.0.99", local_port="8080")
+        diff = compute_diff([rule_want], [live])
+        assert len(diff.updates) == 1
+        live_record, want = diff.updates[0]
+        assert live_record.uuid == "u1"
+        assert want.target == "10.0.0.99"
+
+    def test_managed_port_forward_with_no_desired_is_deleted(self) -> None:
+        live = _live("u1", "stale", "port_forward")
+        diff = compute_diff([], [live])
+        assert len(diff.deletes) == 1
+        assert diff.deletes[0].uuid == "u1"
+        assert diff.deletes[0].kind == "port_forward"
+
+    def test_unmanaged_port_forward_silently_ignored(self) -> None:
+        live = LiveNATRule(
+            uuid="u-unmanaged",
+            kind="port_forward",
+            managed_name=None,
+            description="manually-created port forward",
+            raw={"uuid": "u-unmanaged", "descr": "manually-created port forward"},
+        )
+        diff = compute_diff([], [live])
+        assert diff.deletes == []
+        assert diff.is_empty
+
+    def test_locked_port_forward_skipped(self) -> None:
+        live = _live(
+            "u1",
+            "ssh-fwd",
+            "port_forward",
+            raw_overrides={"target": "10.0.0.5", "interface": "wan"},
+        )
+        rule = _port_forward("ssh-fwd", target="changed", lock=True)
+        diff = compute_diff([rule], [live])
+        assert diff.adds == []
+        assert diff.updates == []
+        assert diff.deletes == []
+        assert len(diff.locked) == 1
+
+    def test_three_kinds_with_same_name_are_independent(self) -> None:
+        # All three kinds share name "shared"; each lives in its own
+        # diff bucket.
+        out_live = _live("u-out", "shared", "outbound")
+        oto_live = _live("u-oto", "shared", "one_to_one")
+        pf_live = _live("u-pf", "shared", "port_forward")
+        rule_out = _outbound("shared", target="wanip", interface="wan")
+        rule_oto = _one_to_one("shared")
+        rule_pf = _port_forward("shared")
+        diff = compute_diff([rule_out, rule_oto, rule_pf], [out_live, oto_live, pf_live])
+        # No deletes — each kind's desired matches its own live name.
+        assert diff.deletes == []
+
+    def test_outbound_diff_does_not_match_port_forward_live(self) -> None:
+        # YAML has outbound "foo"; box has port_forward "foo".
+        pf_live = _live("u-pf", "foo", "port_forward")
+        rule_out = _outbound("foo", target="wanip", interface="wan")
+        diff = compute_diff([rule_out], [pf_live])
+        assert len(diff.adds) == 1
+        assert diff.adds[0].kind == "outbound"
+        assert len(diff.deletes) == 1
+        assert diff.deletes[0].kind == "port_forward"
+
+    def test_add_only_suppresses_port_forward_deletes(self) -> None:
+        live = _live("u1", "stale", "port_forward")
+        diff = compute_diff([], [live], add_only=True)
+        assert diff.deletes == []
+        assert diff.is_empty
+
+
 class TestDiffIsEmpty:
     def test_empty_diff(self) -> None:
         assert Diff().is_empty
@@ -538,9 +820,138 @@ class TestConfigsFromResourcesOneToOne:
             nat_rule_configs_from_resources([r])
 
 
+class TestConfigsFromResourcesPortForward:
+    """Parser checks for ``kind: port_forward`` (#725)."""
+
+    def test_valid_port_forward_parses(self) -> None:
+        r = _resource(
+            "web",
+            {
+                "kind": "port_forward",
+                "interface": "wan",
+                "target": "10.0.0.10",
+                "local_port": "8080",
+                "destination_net": "wanip",
+                "destination_port": "80",
+                "protocol": "tcp",
+                "description": "HTTP -> 10.0.0.10",
+            },
+        )
+        result = nat_rule_configs_from_resources([r])
+        assert len(result) == 1
+        cfg = result[0]
+        assert cfg.kind == "port_forward"
+        assert cfg.target == "10.0.0.10"
+        assert cfg.local_port == "8080"
+        assert cfg.destination_net == "wanip"
+        assert cfg.destination_port == "80"
+        assert cfg.protocol == "tcp"
+        assert cfg.description == "HTTP -> 10.0.0.10"
+
+    def test_port_forward_missing_target_rejected(self) -> None:
+        r = _resource("bad", {"kind": "port_forward", "interface": "wan"})
+        with pytest.raises(ValueError, match="target"):
+            nat_rule_configs_from_resources([r])
+
+    def test_port_forward_missing_interface_rejected(self) -> None:
+        r = _resource(
+            "bad",
+            {
+                "kind": "port_forward",
+                "target": "10.0.0.10",
+            },
+        )
+        with pytest.raises(ValueError, match="interface"):
+            nat_rule_configs_from_resources([r])
+
+    def test_port_forward_invalid_pass_action_rejected(self) -> None:
+        r = _resource(
+            "bad",
+            {
+                "kind": "port_forward",
+                "interface": "wan",
+                "target": "10.0.0.10",
+                "pass_action": "invalid",
+            },
+        )
+        with pytest.raises(ValueError, match="pass_action"):
+            nat_rule_configs_from_resources([r])
+
+    def test_port_forward_invalid_poolopts_rejected(self) -> None:
+        r = _resource(
+            "bad",
+            {
+                "kind": "port_forward",
+                "interface": "wan",
+                "target": "10.0.0.10",
+                "poolopts": "not-an-algorithm",
+            },
+        )
+        with pytest.raises(ValueError, match="poolopts"):
+            nat_rule_configs_from_resources([r])
+
+    def test_port_forward_invalid_natreflection_rejected(self) -> None:
+        # DNat allows "" / "purenat" / "disable"; "enable" (the 1:1 value)
+        # must be rejected here.
+        r = _resource(
+            "bad",
+            {
+                "kind": "port_forward",
+                "interface": "wan",
+                "target": "10.0.0.10",
+                "natreflection": "enable",
+            },
+        )
+        with pytest.raises(ValueError, match="natreflection"):
+            nat_rule_configs_from_resources([r])
+
+    def test_port_forward_purenat_natreflection_accepted(self) -> None:
+        # The DNat-only value should pass the parser.
+        r = _resource(
+            "ok",
+            {
+                "kind": "port_forward",
+                "interface": "wan",
+                "target": "10.0.0.10",
+                "natreflection": "purenat",
+            },
+        )
+        result = nat_rule_configs_from_resources([r])
+        assert result[0].natreflection == "purenat"
+
+    def test_port_forward_pass_pass_action_accepted(self) -> None:
+        r = _resource(
+            "ok",
+            {
+                "kind": "port_forward",
+                "interface": "wan",
+                "target": "10.0.0.10",
+                "pass_action": "pass",
+            },
+        )
+        result = nat_rule_configs_from_resources([r])
+        assert result[0].pass_action == "pass"
+
+    def test_port_forward_nordr_must_be_bool(self) -> None:
+        r = _resource(
+            "bad",
+            {
+                "kind": "port_forward",
+                "interface": "wan",
+                "target": "10.0.0.10",
+                "nordr": "true",  # string, not bool
+            },
+        )
+        with pytest.raises(ValueError, match="nordr"):
+            nat_rule_configs_from_resources([r])
+
+
 class TestConfigsFromResourcesGeneral:
     def test_invalid_kind_rejected(self) -> None:
-        r = _resource("bad", {"kind": "port_forward"})
+        # ``port_forward`` was previously rejected as out-of-scope; #725
+        # added it as a third valid kind. ``unknown`` stands in for the
+        # "bad kind" negative-test coverage now.
+        r = _resource("bad", {"kind": "unknown"})
         with pytest.raises(ValueError, match="kind"):
             nat_rule_configs_from_resources([r])
 
@@ -653,6 +1064,39 @@ class TestRowToLive:
         assert live.managed_name is None
         assert live.description == ""
 
+    def test_port_forward_row_uses_descr_field(self) -> None:
+        # DNat schema uses ``descr`` (not ``description``).
+        row = {"uuid": "u1", "descr": "HTTP fwd [infrafoundry:web]"}
+        live = _row_to_live(row, "port_forward")
+        assert live.uuid == "u1"
+        assert live.kind == "port_forward"
+        assert live.managed_name == "web"
+        assert live.description == "HTTP fwd"
+
+    def test_port_forward_row_descr_tag_only(self) -> None:
+        row = {"uuid": "u1", "descr": "[infrafoundry:web]"}
+        live = _row_to_live(row, "port_forward")
+        assert live.managed_name == "web"
+        assert live.description == ""
+
+    def test_port_forward_unmanaged_row(self) -> None:
+        row = {"uuid": "u1", "descr": "manual port forward"}
+        live = _row_to_live(row, "port_forward")
+        assert live.managed_name is None
+        assert live.description == "manual port forward"
+
+    def test_port_forward_falls_back_to_description_key(self) -> None:
+        # Defensive: if a hand-built row uses ``description`` instead of
+        # ``descr`` (e.g., from a unit test), parsing still succeeds.
+        row = {"uuid": "u1", "description": "X [infrafoundry:web]"}
+        live = _row_to_live(row, "port_forward")
+        assert live.managed_name == "web"
+
+    def test_port_forward_malformed_descr_raises(self) -> None:
+        row = {"uuid": "u1", "descr": "[infrafoundry:]"}
+        with pytest.raises(OpnsenseDriftError):
+            _row_to_live(row, "port_forward")
+
 
 # ---------------------------------------------------------------------------
 # NATRuleService API methods
@@ -690,14 +1134,16 @@ class TestServiceSearch:
         assert result[0].managed_name == "a"
         assert result[1].managed_name is None
 
-    def test_search_all_calls_both_controllers(self) -> None:
+    def test_search_all_calls_all_controllers(self) -> None:
         client = MagicMock()
         client.request.return_value = {"rows": []}
         svc = NATRuleService(client)
         svc.search_all()
         endpoints = [c.args[1] for c in client.request.call_args_list]
+        # All three kinds queried (#725).
         assert "firewall/source_nat/searchRule" in endpoints
         assert "firewall/one_to_one/searchRule" in endpoints
+        assert "firewall/d_nat/searchRule" in endpoints
 
 
 def _expected_with_category(rule: NATRuleConfig, category_uuid: str = "fake-cat") -> dict[str, Any]:
@@ -765,6 +1211,47 @@ class TestServiceWriteOps:
         svc.apply_changes("one_to_one")
         client.request.assert_called_once_with("POST", "firewall/one_to_one/apply")
 
+    def test_add_port_forward_posts_correct_endpoint(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"result": "saved", "uuid": "new"}
+        svc = NATRuleService(client)
+        svc._category_uuid = "fake-cat"
+        rule = _port_forward("web")
+        svc.add(rule)
+        client.request.assert_called_once_with(
+            "POST", "firewall/d_nat/addRule", data=_expected_with_category(rule)
+        )
+
+    def test_update_port_forward(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"result": "saved"}
+        svc = NATRuleService(client)
+        svc._category_uuid = "fake-cat"
+        rule = _port_forward("web")
+        svc.update("uuid-pf", rule)
+        client.request.assert_called_once_with(
+            "POST", "firewall/d_nat/setRule/uuid-pf", data=_expected_with_category(rule)
+        )
+
+    def test_delete_port_forward_uses_d_nat_endpoint(self) -> None:
+        client = MagicMock()
+        svc = NATRuleService(client)
+        svc.delete("u-pf", "port_forward")
+        client.request.assert_called_once_with("POST", "firewall/d_nat/delRule/u-pf")
+
+    def test_apply_changes_port_forward(self) -> None:
+        client = MagicMock()
+        svc = NATRuleService(client)
+        svc.apply_changes("port_forward")
+        client.request.assert_called_once_with("POST", "firewall/d_nat/apply")
+
+    def test_port_forward_search_calls_correct_endpoint(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"rows": []}
+        svc = NATRuleService(client)
+        svc.search("port_forward")
+        client.request.assert_called_once_with("POST", "firewall/d_nat/searchRule")
+
 
 class TestApplyDiff:
     def test_empty_diff_is_noop(self) -> None:
@@ -815,6 +1302,49 @@ class TestApplyDiff:
         assert "firewall/one_to_one/delRule/u2" in endpoints
         assert counts["deleted"] == 2
 
+    def test_port_forward_only_apply_calls_d_nat_apply(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"result": "saved"}
+        svc = NATRuleService(client)
+        svc._category_uuid = "fake-cat"
+        diff = Diff(adds=[_port_forward("web")])
+        counts = svc.apply_diff(diff)
+        endpoints = [c.args[1] for c in client.request.call_args_list]
+        assert "firewall/d_nat/addRule" in endpoints
+        assert "firewall/d_nat/apply" in endpoints
+        # Other kinds' apply endpoints must not be called.
+        assert "firewall/source_nat/apply" not in endpoints
+        assert "firewall/one_to_one/apply" not in endpoints
+        assert counts["created"] == 1
+
+    def test_three_kind_apply_calls_all_three_apply_endpoints(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"result": "saved"}
+        svc = NATRuleService(client)
+        svc._category_uuid = "fake-cat"
+        diff = Diff(
+            adds=[
+                _outbound("a", target="wanip", interface="wan"),
+                _one_to_one("b"),
+                _port_forward("c"),
+            ]
+        )
+        svc.apply_diff(diff)
+        endpoints = [c.args[1] for c in client.request.call_args_list]
+        assert "firewall/source_nat/apply" in endpoints
+        assert "firewall/one_to_one/apply" in endpoints
+        assert "firewall/d_nat/apply" in endpoints
+
+    def test_port_forward_delete_uses_d_nat_endpoint(self) -> None:
+        client = MagicMock()
+        svc = NATRuleService(client)
+        live_pf = _live("u-pf", "stale", "port_forward")
+        diff = Diff(deletes=[live_pf])
+        counts = svc.apply_diff(diff)
+        endpoints = [c.args[1] for c in client.request.call_args_list]
+        assert "firewall/d_nat/delRule/u-pf" in endpoints
+        assert counts["deleted"] == 1
+
 
 # ---------------------------------------------------------------------------
 # export_to_yaml
@@ -824,7 +1354,8 @@ class TestApplyDiff:
 class TestExportToYaml:
     def test_managed_rules_appear_in_export(self) -> None:
         client = MagicMock()
-        # First call: outbound rows. Second call: 1:1 rows.
+        # ``search_all`` iterates ALLOWED_KINDS in order:
+        # outbound → one_to_one → port_forward.
         client.request.side_effect = [
             {
                 "rows": [
@@ -847,14 +1378,33 @@ class TestExportToYaml:
                     }
                 ]
             },
+            # port_forward rows use ``descr`` (DNat schema) and dotted
+            # source/destination keys.
+            {
+                "rows": [
+                    {
+                        "uuid": "u4",
+                        "descr": "Web fwd [infrafoundry:web-fwd]",
+                        "interface": "wan",
+                        "target": "10.0.0.10",
+                        "local-port": "8080",
+                        "disabled": "0",
+                        "source.network": "any",
+                        "destination.network": "wanip",
+                    },
+                    {"uuid": "u5", "descr": "manual pf"},  # unmanaged
+                ]
+            },
         ]
         svc = NATRuleService(client)
         text = svc.export_to_yaml()
         assert "lan-out" in text
         assert "dmz" in text
+        assert "web-fwd" in text
         assert "manual" not in text  # unmanaged rule excluded
         assert "kind: outbound" in text
         assert "kind: one_to_one" in text
+        assert "kind: port_forward" in text
 
     def test_export_with_no_managed_rules_yields_empty_resources(self) -> None:
         client = MagicMock()

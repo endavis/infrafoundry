@@ -1,12 +1,15 @@
-"""NAT rule service for OPNsense direct-API operations (ADR-0014, #713).
+"""NAT rule service for OPNsense direct-API operations (ADR-0014, #713, #725).
 
-Manages **outbound** and **1:1** NAT rules via the OPNsense REST API. Port
-forwards are intentionally out of scope: live probe (2026-05-03) of
-``opnsense-a`` running ``26.1.6_2`` confirmed that ``firewall/{redirect,
-forward, portforward, nat_forward, rdr}/searchRule`` all return 404 and the
-legacy ``<nat>/<rule>`` config.xml section is GUI-only. Port forwards become a
-follow-up spike-driven issue. See the issue body and ADR-0013 for the
-deferral rationale.
+Manages **outbound**, **1:1**, and **port_forward** NAT rules via the OPNsense
+REST API. The 2026-05-04 re-probe of ``opnsense-a`` running ``26.1.6_2``
+found that the stock ``DNatController`` (extending ``FilterBaseController`` —
+the same base class as ``SourceNatController`` and ``OneToOneController``)
+exposes the standard CRUD verbs at ``firewall/d_nat/<action>``. The original
+2026-05-03 probe used ``firewall/dnat/...`` (concatenated, no underscore);
+the actual URL is the snake-case routing (``D`` + ``Nat`` → ``d_nat``). All
+three kinds use the same identity strategy and per-kind diff isolation; the
+component manager and apply orchestration are kind-agnostic. See ADR-0013
+implementation-order item #2 (#725) for the deferral history.
 
 Identity strategy
 -----------------
@@ -55,8 +58,8 @@ from infrafoundry.core.provider import ResourceConfig
 from .base import BaseService
 
 # Type alias for NAT rule kinds — the discriminator on every entry.
-NATRuleKind = Literal["outbound", "one_to_one"]
-ALLOWED_KINDS: tuple[NATRuleKind, ...] = ("outbound", "one_to_one")
+NATRuleKind = Literal["outbound", "one_to_one", "port_forward"]
+ALLOWED_KINDS: tuple[NATRuleKind, ...] = ("outbound", "one_to_one", "port_forward")
 
 # Strict regex for parsing the description-suffix identity tag. The
 # (optional) free-form user description leads, followed by whitespace,
@@ -75,6 +78,12 @@ _IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
 _OUTBOUND_BASE = "firewall/source_nat"
 # 1:1 endpoint suffix on ``firewall/one_to_one`` controller.
 _ONE_TO_ONE_BASE = "firewall/one_to_one"
+# Port-forward endpoint suffix on ``firewall/d_nat`` controller. Note the
+# snake-case routing: OPNsense's MVC controller is ``DNatController``
+# which OPNsense camelCase→snake_case routing renders as ``d_nat`` (not
+# ``dnat``). The 2026-05-03 probe missed this and incorrectly concluded the
+# controller was absent; the 2026-05-04 re-probe confirmed it ships stock.
+_PORT_FORWARD_BASE = "firewall/d_nat"
 
 # Default sequence for new rules — matches the OPNsense schema default.
 DEFAULT_SEQUENCE = 100
@@ -150,12 +159,12 @@ def parse_identity(description: str) -> tuple[str | None, str]:
 class NATRuleConfig:
     """Desired-state NAT rule configuration.
 
-    Captures both kinds in a single dataclass; per-kind fields default to
-    sentinel values that ``to_payload`` interprets according to ``kind``.
+    Captures all three kinds in a single dataclass; per-kind fields default
+    to sentinel values that ``to_payload`` interprets according to ``kind``.
 
     Attributes:
         name: Operator-facing YAML name; becomes the diff key.
-        kind: ``"outbound"`` or ``"one_to_one"``.
+        kind: ``"outbound"``, ``"one_to_one"``, or ``"port_forward"``.
         enabled: Whether the rule is active.
         log: Whether matching packets are logged.
         sequence: Position in the rule list (lower runs earlier).
@@ -181,7 +190,33 @@ class NATRuleConfig:
         1:1-specific:
             type: ``"binat"`` or ``"nat"``.
             external: External IP / alias.
-            natreflection: ``""``, ``"enable"``, or ``"disable"``.
+            natreflection: ``""``, ``"enable"``, or ``"disable"``
+                (1:1 model accepts these three values).
+
+        Port-forward-specific:
+            target: Redirect destination (alias, IP, or ``"wanip"``).
+                **Note:** ``target`` is shared with outbound but carries
+                different semantics — outbound's ``target`` is the
+                source-NAT translation target; port_forward's ``target``
+                is the redirect destination IP/alias.
+            local_port: Redirect destination port (or alias). Wire
+                key is ``local-port`` (hyphenated); converted in payload.
+            nordr: "no rdr" — exclude this match from forwarding (deny).
+            pass_action: ``""`` (manual), ``"pass"`` (implicit allow rule
+                injected), or ``"rule"`` (companion filter rule). Wire
+                key is ``pass`` (Python keyword conflict avoided).
+            poolopts: Pool selection algorithm (``""`` /
+                ``"round-robin"`` / ``"round-robin sticky-address"`` /
+                ``"random"`` / ``"random sticky-address"`` /
+                ``"source-hash"`` / ``"bitmask"``).
+            tag: Free-form rule tag.
+            tagged: Match-by-tag selector.
+            nosync: Exclude this rule from XMLRPC sync.
+
+            ``natreflection`` is also used by port_forward but with a
+            different value set — DNat model accepts ``""`` /
+            ``"purenat"`` / ``"disable"`` (note: ``"purenat"``, not
+            ``"enable"``). The validator handles per-kind dispatch.
     """
 
     name: str
@@ -212,6 +247,16 @@ class NATRuleConfig:
     external: str = ""
     natreflection: str = ""
 
+    # Port-forward-specific fields. ``target`` (redirect destination) is
+    # shared with outbound; see class docstring for the semantic note.
+    local_port: str = ""
+    nordr: bool = False
+    pass_action: str = ""
+    poolopts: str = ""
+    tag: str = ""
+    tagged: str = ""
+    nosync: bool = False
+
     @property
     def diff_key(self) -> tuple[NATRuleKind, str]:
         """Per-kind, name-based identity for this rule.
@@ -229,13 +274,15 @@ class NATRuleConfig:
         """Serialize to the ``addRule``/``setRule`` envelope OPNsense expects.
 
         Returns:
-            ``{"rule": {<fields>}}`` for both kinds. Field set varies by
-            ``kind``. Booleans are stringified to ``"0"``/``"1"`` per
+            ``{"rule": {<fields>}}`` for all three kinds. Field set varies
+            by ``kind``. Booleans are stringified to ``"0"``/``"1"`` per
             OPNsense convention.
         """
         if self.kind == "outbound":
             return self._to_outbound_payload()
-        return self._to_one_to_one_payload()
+        if self.kind == "one_to_one":
+            return self._to_one_to_one_payload()
+        return self._to_port_forward_payload()
 
     def _to_outbound_payload(self) -> dict[str, Any]:
         return {
@@ -275,6 +322,62 @@ class NATRuleConfig:
                 "external": self.external,
                 "natreflection": self.natreflection,
                 "description": self.encoded_description(),
+            }
+        }
+
+    def _to_port_forward_payload(self) -> dict[str, Any]:
+        """Build the ``firewall/d_nat`` payload.
+
+        Wire-side quirks handled here:
+
+        - ``enabled`` (Python) → ``disabled`` (API) with polarity flip.
+          OPNsense's DNat schema uses negative semantics on this field
+          (matches outbound + 1:1 schemas).
+        - ``local_port`` (YAML / dataclass) → ``local-port`` (hyphenated
+          API key).
+        - ``pass_action`` (Python; ``pass`` is a keyword) → ``pass``
+          (API).
+        - ``source_net`` / ``source_port`` / ``source_not`` → dotted
+          ``source.network`` / ``source.port`` / ``source.not`` (the
+          DNat schema uses the dotted shape; outbound + 1:1 use
+          underscore-flattened forms).
+
+        Returns:
+            ``{"rule": {<dotted-and-hyphenated field names>}}``.
+        """
+        return {
+            "rule": {
+                # Polarity flip: enabled=True → disabled="0"
+                "disabled": _bool_str(not self.enabled),
+                "log": _bool_str(self.log),
+                "sequence": str(self.sequence),
+                "interface": self.interface,
+                "ipprotocol": self.ipprotocol,
+                "protocol": self.protocol,
+                # DNat schema uses dotted source/destination, not the
+                # underscore-flattened source_net/source_port forms used
+                # by outbound + 1:1.
+                "source.network": self.source_net,
+                "source.port": self.source_port,
+                "source.not": _bool_str(self.source_not),
+                "destination.network": self.destination_net,
+                "destination.port": self.destination_port,
+                "destination.not": _bool_str(self.destination_not),
+                "target": self.target,
+                # Hyphenated wire key.
+                "local-port": self.local_port,
+                "nordr": _bool_str(self.nordr),
+                # Python keyword conflict avoided: pass_action → pass.
+                "pass": self.pass_action,
+                "poolopts": self.poolopts,
+                "natreflection": self.natreflection,
+                "tag": self.tag,
+                "tagged": self.tagged,
+                "nosync": _bool_str(self.nosync),
+                # ``descr`` is the wire key for port_forward (matches
+                # OPNsense's DNat schema), not ``description``. The
+                # operator-facing YAML field stays ``description``.
+                "descr": self.encoded_description(),
             }
         }
 
@@ -531,9 +634,22 @@ def nat_rule_configs_from_resources(
                     description=description,
                 )
             )
-        else:
+        elif kind == "one_to_one":
             configs.append(
                 _build_one_to_one_config(
+                    resource.name,
+                    config,
+                    enabled=enabled,
+                    log=log,
+                    lock=lock,
+                    sequence=sequence,
+                    interface=interface,
+                    description=description,
+                )
+            )
+        else:
+            configs.append(
+                _build_port_forward_config(
                     resource.name,
                     config,
                     enabled=enabled,
@@ -638,6 +754,91 @@ def _build_one_to_one_config(
     )
 
 
+# Closed sets for port-forward enum fields (match the DNat XML model).
+_PORT_FORWARD_PASS_ACTIONS = ("", "pass", "rule")
+_PORT_FORWARD_POOLOPTS = (
+    "",
+    "round-robin",
+    "round-robin sticky-address",
+    "random",
+    "random sticky-address",
+    "source-hash",
+    "bitmask",
+)
+# Port-forward (DNat) accepts a different ``natreflection`` value set than
+# 1:1 — DNat allows "" / "purenat" / "disable"; 1:1 allows
+# "" / "enable" / "disable". Per-kind dispatch below.
+_PORT_FORWARD_NATREFLECTION = ("", "purenat", "disable")
+
+
+def _build_port_forward_config(
+    name: str,
+    config: dict[str, Any],
+    *,
+    enabled: bool,
+    log: bool,
+    lock: bool,
+    sequence: int,
+    interface: str,
+    description: str,
+) -> NATRuleConfig:
+    if not interface:
+        raise ValueError(f"nat_rule '{name}' (port_forward) requires 'interface'")
+    target = config.get("target", "")
+    if not isinstance(target, str) or not target:
+        raise ValueError(f"nat_rule '{name}' (port_forward) requires non-empty string 'target'")
+
+    pass_action = _string_field(config, "pass_action", default="", name=name)
+    if pass_action not in _PORT_FORWARD_PASS_ACTIONS:
+        raise ValueError(
+            f"nat_rule '{name}' (port_forward) pass_action must be one of "
+            f"{_PORT_FORWARD_PASS_ACTIONS}, got {pass_action!r}"
+        )
+
+    poolopts = _string_field(config, "poolopts", default="", name=name)
+    if poolopts not in _PORT_FORWARD_POOLOPTS:
+        raise ValueError(
+            f"nat_rule '{name}' (port_forward) poolopts must be one of "
+            f"{_PORT_FORWARD_POOLOPTS}, got {poolopts!r}"
+        )
+
+    natreflection = _string_field(config, "natreflection", default="", name=name)
+    if natreflection not in _PORT_FORWARD_NATREFLECTION:
+        raise ValueError(
+            f"nat_rule '{name}' (port_forward) natreflection must be one of "
+            f"{_PORT_FORWARD_NATREFLECTION} (note: DNat uses 'purenat' not 'enable'), "
+            f"got {natreflection!r}"
+        )
+
+    return NATRuleConfig(
+        name=name,
+        kind="port_forward",
+        enabled=enabled,
+        log=log,
+        sequence=sequence,
+        interface=interface,
+        description=description,
+        lock=lock,
+        ipprotocol=_string_field(config, "ipprotocol", default="", name=name),
+        protocol=_string_field(config, "protocol", default="", name=name),
+        source_net=_string_field(config, "source_net", default="any", name=name),
+        source_not=_require_bool(config, "source_not", default=False, resource_name=name),
+        source_port=_string_field(config, "source_port", default="", name=name),
+        destination_net=_string_field(config, "destination_net", default="any", name=name),
+        destination_not=_require_bool(config, "destination_not", default=False, resource_name=name),
+        destination_port=_string_field(config, "destination_port", default="", name=name),
+        target=target,
+        local_port=_string_field(config, "local_port", default="", name=name),
+        nordr=_require_bool(config, "nordr", default=False, resource_name=name),
+        pass_action=pass_action,
+        poolopts=poolopts,
+        natreflection=natreflection,
+        tag=_string_field(config, "tag", default="", name=name),
+        tagged=_string_field(config, "tagged", default="", name=name),
+        nosync=_require_bool(config, "nosync", default=False, resource_name=name),
+    )
+
+
 def _require_bool(
     config: dict[str, Any], field_name: str, *, default: bool, resource_name: str
 ) -> bool:
@@ -702,7 +903,9 @@ class NATRuleService(BaseService):
     def _base_for(kind: NATRuleKind) -> str:
         if kind == "outbound":
             return _OUTBOUND_BASE
-        return _ONE_TO_ONE_BASE
+        if kind == "one_to_one":
+            return _ONE_TO_ONE_BASE
+        return _PORT_FORWARD_BASE
 
     # ------------------------------------------------------------------
     # Category bootstrap (fleet-wide marker)
@@ -950,11 +1153,18 @@ def _row_to_live(row: dict[str, Any], kind: NATRuleKind) -> LiveNATRule:
     """Normalize a ``searchRule`` row into a ``LiveNATRule``.
 
     Parses the ``description`` field for the InfraFoundry identity prefix.
-    Raises ``OpnsenseDriftError`` (via ``parse_identity``) if the prefix
-    marker is present but malformed.
+    For port_forward rows, the wire field name is ``descr`` (matching the
+    DNat schema); outbound and 1:1 use ``description``. Raises
+    ``OpnsenseDriftError`` (via ``parse_identity``) if the prefix marker
+    is present but malformed.
     """
     uuid = str(row.get("uuid", ""))
-    description = str(row.get("description", "") or "")
+    if kind == "port_forward":
+        # DNat schema uses ``descr``; fall back to ``description`` if the
+        # row was hand-built (defensive).
+        description = str(row.get("descr", row.get("description", "")) or "")
+    else:
+        description = str(row.get("description", "") or "")
     managed_name, user_description = parse_identity(description)
     return LiveNATRule(
         uuid=uuid,
@@ -986,15 +1196,42 @@ def _live_to_export_config(live: LiveNATRule) -> dict[str, Any]:
             "log": _normalize_field(raw.get("log")) == "1",
             "description": live.description,
         }
+    if live.kind == "one_to_one":
+        return {
+            "kind": "one_to_one",
+            "enabled": _normalize_field(raw.get("enabled")) == "1",
+            "type": _normalize_field(raw.get("type")) or "binat",
+            "interface": _normalize_field(raw.get("interface")),
+            "external": _normalize_field(raw.get("external")),
+            "source_net": _normalize_field(raw.get("source_net")) or "any",
+            "destination_net": _normalize_field(raw.get("destination_net")) or "any",
+            "natreflection": _normalize_field(raw.get("natreflection")),
+            "log": _normalize_field(raw.get("log")) == "1",
+            "description": live.description,
+        }
+    # port_forward: DNat schema uses dotted source/destination keys and
+    # negative ``disabled`` polarity (flipped to operator-facing
+    # ``enabled``); ``descr`` rather than ``description``.
     return {
-        "kind": "one_to_one",
-        "enabled": _normalize_field(raw.get("enabled")) == "1",
-        "type": _normalize_field(raw.get("type")) or "binat",
+        "kind": "port_forward",
+        # disabled="0" → enabled=True, missing/disabled="1" → enabled=False.
+        "enabled": _normalize_field(raw.get("disabled")) != "1",
         "interface": _normalize_field(raw.get("interface")),
-        "external": _normalize_field(raw.get("external")),
-        "source_net": _normalize_field(raw.get("source_net")) or "any",
-        "destination_net": _normalize_field(raw.get("destination_net")) or "any",
+        "ipprotocol": _normalize_field(raw.get("ipprotocol")),
+        "protocol": _normalize_field(raw.get("protocol")),
+        "source_net": _normalize_field(raw.get("source.network")) or "any",
+        "source_port": _normalize_field(raw.get("source.port")),
+        "destination_net": _normalize_field(raw.get("destination.network")) or "any",
+        "destination_port": _normalize_field(raw.get("destination.port")),
+        "target": _normalize_field(raw.get("target")),
+        "local_port": _normalize_field(raw.get("local-port")),
+        "nordr": _normalize_field(raw.get("nordr")) == "1",
+        "pass_action": _normalize_field(raw.get("pass")),
+        "poolopts": _normalize_field(raw.get("poolopts")),
         "natreflection": _normalize_field(raw.get("natreflection")),
+        "tag": _normalize_field(raw.get("tag")),
+        "tagged": _normalize_field(raw.get("tagged")),
+        "nosync": _normalize_field(raw.get("nosync")) == "1",
         "log": _normalize_field(raw.get("log")) == "1",
         "description": live.description,
     }

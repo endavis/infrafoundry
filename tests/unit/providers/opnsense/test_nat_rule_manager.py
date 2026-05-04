@@ -52,6 +52,19 @@ def _one_to_one_resource(name: str, *, lock: bool = False) -> ResourceConfig:
     return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
 
 
+def _port_forward_resource(name: str, *, lock: bool = False) -> ResourceConfig:
+    config: dict[str, Any] = {
+        "kind": "port_forward",
+        "interface": "wan",
+        "target": "10.0.0.10",
+        "local_port": "8080",
+        "description": f"{name} desc",
+    }
+    if lock:
+        config["lock"] = True
+    return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
+
+
 def _live_managed(uuid: str, name: str, kind: str) -> LiveNATRule:
     return LiveNATRule(
         uuid=uuid,
@@ -193,6 +206,35 @@ class TestApply:
             manager.apply("test-env", resources, add_only=True)
         assert service_mock.compute_diff.call_args.kwargs["add_only"] is True
 
+    def test_apply_emits_port_forward_outcomes(self, tmp_path: Path) -> None:
+        # Mixed-kind resource list including a port_forward (#725).
+        # Each resource emits its own ResourceOutcome regardless of kind.
+        manager = NATRuleManager(tmp_path)
+        resources = [_outbound_resource("a"), _port_forward_resource("b")]
+        diff = Diff(
+            adds=[
+                NATRuleConfig(name="a", kind="outbound", interface="wan", target="wanip"),
+                NATRuleConfig(
+                    name="b",
+                    kind="port_forward",
+                    interface="wan",
+                    target="10.0.0.10",
+                    local_port="8080",
+                ),
+            ]
+        )
+        service_mock = _make_service_mock(
+            diff=diff, apply_counts={"created": 2, "updated": 0, "deleted": 0}
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service_mock
+            result = manager.apply("test-env", resources)
+        outcomes = result["resource_outcomes"]
+        assert len(outcomes) == 2
+        names = {o.resource_name for o in outcomes}
+        assert names == {"a", "b"}
+        assert result["resources_created"] == 2
+
 
 # ---------------------------------------------------------------------------
 # destroy
@@ -259,6 +301,34 @@ class TestDestroy:
         assert apply_calls == {"outbound", "one_to_one"}
         assert result["resources_destroyed"] == 2
 
+    def test_destroy_three_kind_isolation(self, tmp_path: Path) -> None:
+        # All three kinds named ``foo`` (#725). Destroying deletes one
+        # per controller; apply_changes is called per kind that had work.
+        manager = NATRuleManager(tmp_path)
+        resources = [
+            _outbound_resource("foo"),
+            _one_to_one_resource("foo"),
+            _port_forward_resource("foo"),
+        ]
+        live = [
+            _live_managed("u-out", "foo", "outbound"),
+            _live_managed("u-oto", "foo", "one_to_one"),
+            _live_managed("u-pf", "foo", "port_forward"),
+        ]
+        service_mock = _make_service_mock(live=live)
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service_mock
+            result = manager.destroy("test-env", resources)
+        delete_calls = service_mock.delete.call_args_list
+        assert len(delete_calls) == 3
+        called_args = {call.args for call in delete_calls}
+        assert ("u-out", "outbound") in called_args
+        assert ("u-oto", "one_to_one") in called_args
+        assert ("u-pf", "port_forward") in called_args
+        apply_calls = {call.args[0] for call in service_mock.apply_changes.call_args_list}
+        assert apply_calls == {"outbound", "one_to_one", "port_forward"}
+        assert result["resources_destroyed"] == 3
+
 
 # ---------------------------------------------------------------------------
 # get_resource_ids
@@ -300,6 +370,22 @@ class TestGetResourceIds:
             svc_cls.from_environment.return_value = service_mock
             result = manager.get_resource_ids("test-env", resources)
         assert result == {"foo": "u-out"}
+
+    def test_per_kind_keys_distinguish_port_forward(self, tmp_path: Path) -> None:
+        # YAML has only the port_forward "foo"; live has all three kinds.
+        # Only the port_forward mapping is returned (#725).
+        manager = NATRuleManager(tmp_path)
+        resources = [_port_forward_resource("foo")]
+        live = [
+            _live_managed("u-out", "foo", "outbound"),
+            _live_managed("u-oto", "foo", "one_to_one"),
+            _live_managed("u-pf", "foo", "port_forward"),
+        ]
+        service_mock = _make_service_mock(live=live)
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service_mock
+            result = manager.get_resource_ids("test-env", resources)
+        assert result == {"foo": "u-pf"}
 
 
 # ---------------------------------------------------------------------------
