@@ -10,6 +10,9 @@ from infrafoundry.providers.opnsense.validators.nat_rule_validator import NATRul
 from infrafoundry.providers.opnsense.validators.resource_name_validator import (
     ResourceNameValidator,
 )
+from infrafoundry.providers.opnsense.validators.static_route_validator import (
+    StaticRouteValidator,
+)
 from infrafoundry.providers.opnsense.validators.unbound_validator import UnboundValidator
 from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValidator
 
@@ -20,6 +23,7 @@ __all__ = [
     "InterfaceAssignmentValidator",
     "NATRuleValidator",
     "ResourceNameValidator",
+    "StaticRouteValidator",
     "UnboundValidator",
     "VLANValidator",
 ]

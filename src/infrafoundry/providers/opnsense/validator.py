@@ -22,6 +22,7 @@ from infrafoundry.providers.opnsense.validators import (
     InterfaceAssignmentValidator,
     NATRuleValidator,
     ResourceNameValidator,
+    StaticRouteValidator,
     UnboundValidator,
     VLANValidator,
 )
@@ -83,6 +84,7 @@ class OPNsenseValidator:
         self.interface_assignment_validator = InterfaceAssignmentValidator(report)
         self.nat_rule_validator = NATRuleValidator(report)
         self.gateway_validator = GatewayValidator(report)
+        self.static_route_validator = StaticRouteValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -185,6 +187,9 @@ class OPNsenseValidator:
             # Get existing interfaces/VLANs
             existing_interfaces = self._get_existing_interfaces(api_url, api_key, api_secret)
 
+            # Get existing gateway names (managed + dynamic) for static-route refs
+            existing_gateways = self._get_existing_gateways(api_url, api_key, api_secret)
+
             # Validate using specialized validators
             self.firewall_validator.validate(
                 resource_refs["firewall_rules"],
@@ -217,6 +222,12 @@ class OPNsenseValidator:
                 resource_refs["interface_assignment_names"],
                 existing_interfaces,
             )
+            self.static_route_validator.validate(
+                resource_refs["static_routes"],
+                resource_refs["gateways"],
+                resource_refs["gateway_names"],
+                existing_gateways,
+            )
             self.unbound_validator.validate(resource_refs["unbound_host_overrides"])
             self.resource_name_validator.validate(resources)
 
@@ -247,12 +258,14 @@ class OPNsenseValidator:
         interface_assignments = [r for r in resources if r.type == "interface_assignments"]
         nat_rules = [r for r in resources if r.type == "nat_rules"]
         gateways = [r for r in resources if r.type == "gateways"]
+        static_routes = [r for r in resources if r.type == "static_routes"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}
         interface_assignment_names = {a.name for a in interface_assignments}
         nat_rule_names = {r.name for r in nat_rules}
         gateway_names = {g.name for g in gateways}
+        static_route_names = {r.name for r in static_routes}
 
         return {
             "aliases": aliases,
@@ -268,6 +281,8 @@ class OPNsenseValidator:
             "nat_rule_names": nat_rule_names,
             "gateways": gateways,
             "gateway_names": gateway_names,
+            "static_routes": static_routes,
+            "static_route_names": static_route_names,
         }
 
     def _get_existing_aliases(
@@ -386,3 +401,40 @@ class OPNsenseValidator:
             for iface in interface_list
             if (name := self._extract_interface_name(iface))
         }
+
+    def _get_existing_gateways(self, api_url: str, api_key: str, api_secret: str) -> set[str]:
+        """Get the set of live gateway names from OPNsense API.
+
+        Returns the union of managed and dynamic gateways (e.g.,
+        ``WAN_DHCP``, ``WAN_DHCP6``). Used by the static-route validator
+        to accept references to live system gateways without first
+        declaring them as managed.
+
+        Args:
+            api_url: OPNsense API base URL
+            api_key: API key
+            api_secret: API secret
+
+        Returns:
+            Set of gateway names; empty if the API call fails.
+        """
+        data = self.api_validator.fetch_json(
+            url=f"{api_url}/api/routing/settings/searchGateway",
+            auth=(api_key, api_secret),
+            verify_ssl=False,
+            timeout=10,
+            method="POST",
+            check_name="opnsense_get_gateways",
+            error_message="Could not retrieve existing gateways (status {status})",
+            error_level=ValidationLevel.WARNING,
+        )
+        if not data:
+            return set()
+        names: set[str] = set()
+        for row in data.get("rows", []):
+            if not isinstance(row, dict):
+                continue
+            name = row.get("name")
+            if isinstance(name, str) and name:
+                names.add(name)
+        return names

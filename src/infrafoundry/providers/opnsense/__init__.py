@@ -164,6 +164,7 @@ class OPNsenseProvider(
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.nat_rule import NATRuleManager
+        from .components.static_route import StaticRouteManager
         from .components.vlan import VlanManager
 
         return {
@@ -171,6 +172,7 @@ class OPNsenseProvider(
             "interface_assignments": InterfaceAssignmentManager,
             "nat_rules": NATRuleManager,
             "gateways": GatewayManager,
+            "static_routes": StaticRouteManager,
         }
 
     def _generate_aliases_terraform(self, aliases: list[ResourceConfig]) -> None:
@@ -631,6 +633,7 @@ class OPNsenseProvider(
             "unbound_host_override",
             "nat_rules",
             "gateways",
+            "static_routes",
         ]
 
     @override
@@ -665,6 +668,7 @@ class OPNsenseProvider(
             "unbound_host_override": [],
             "nat_rules": ["aliases", "interface_assignments"],
             "gateways": ["interface_assignments"],
+            "static_routes": ["gateways"],
         }
 
     @override
@@ -815,6 +819,29 @@ class OPNsenseProvider(
         from .components.gateway import GatewayManager
 
         manager = GatewayManager(self.config_dir)
+        return manager.migrate(env_name)
+
+    def migrate_static_route(self, env_name: str) -> str:
+        """Migrate current static routes to InfraFoundry YAML.
+
+        Reads the live static-route list from OPNsense via the direct-API
+        path and generates InfraFoundry-compatible YAML. Mirrors
+        ``migrate_gateway`` and the other migrate-* methods. The operator-
+        facing ``name`` is synthesized from the ``(network, gateway)``
+        natural-key tuple — the operator can rename freely after import,
+        since identity is the tuple, not the name. Not yet exposed via
+        the ``config migrate`` CLI — that wiring is a follow-up (per
+        ADR-0014 §8).
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            YAML configuration as a string
+        """
+        from .components.static_route import StaticRouteManager
+
+        manager = StaticRouteManager(self.config_dir)
         return manager.migrate(env_name)
 
     def migrate_isc_to_kea(self, env_name: str, interfaces: list[str] | None = None) -> str:
