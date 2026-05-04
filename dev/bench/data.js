@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777827235898,
+  "lastUpdate": 1777893323730,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7378,6 +7378,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000023644416591143295",
             "extra": "mean: 147.76285479672845 usec\nrounds: 2679"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "717c38e492305c07126d7e505b6ac5267f6cab8b",
+          "message": "feat: add OPNsense static_routes component (direct-API) (merges PR #735, addresses #722)\n\nAdds the OPNsense `static_routes` direct-API component (ADR-0013 step #3,\nthe gateways-paired half), closing the next gap in the box-to-box\nmigration scope. Identity is the natural-key tuple `(network, gateway)`;\nmechanism is stock direct REST against `routes/routes/{searchroute,\ngetroute, addroute, setroute, delroute, reconfigure}` -- confirmed via\nlive probe against opnsense-a (26.1.6_2) and cross-checked with the\nbundled OpenAPI spec for 26.1.6. Live probe also showed the field surface\nis narrower than initially planned (only `network`, `gateway`, `descr`,\n`disabled` -- no metric / mtu / interface override knobs on this version).\n\nValidator accepts both managed `gateway_names` and live `existing_gateways`\n(via a new `_get_existing_gateways()` helper that fetches `routing/settings/\nsearchGateway`), so static routes can target dynamic system gateways like\n`WAN_DHCP` / `WAN_DHCP6` without first declaring them as managed. Cross-\nprotocol mismatch is enforced at validation time -- the live API does not\nalways reject it server-side.\n\nIncludes service, component manager, validator, provider integration,\n118 unit tests, and ADR-0013/0014 amendments + resource coverage matrix\nupdates.\n\nAddresses #722\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-04T12:14:50+01:00",
+          "tree_id": "1da38cdc3e1d06463a63b10764144cd0a8633cea",
+          "url": "https://github.com/endavis/infrafoundry/commit/717c38e492305c07126d7e505b6ac5267f6cab8b"
+        },
+        "date": 1777893323211,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6559.789020784674,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003338075059161783",
+            "extra": "mean: 152.4439272103878 usec\nrounds: 2624"
           }
         ]
       }
