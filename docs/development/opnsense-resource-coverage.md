@@ -23,7 +23,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<nat>/outbound/rule` and `<nat>/onetoone/rule` | `nat_rules` (`kind: outbound` / `kind: one_to_one`) | Supported (outbound + 1:1, direct-API; #713). Identity is encoded as a **suffix** in the rule `description` — `<operator description> [infrafoundry:<name>]` — and every managed rule also carries the OPNsense `infrafoundry` category as a fleet-wide marker. Live rules without the suffix tag are unmanaged and ignored by the diff (do not edit a managed rule's description in the GUI — that breaks identity parsing). |
 | `<nat>/rule` (port forwards) | — | **Gap** pending a follow-up spike — `26.1.6_2` exposes no MVC REST endpoint for port forwards (`firewall/{redirect,forward,portforward,nat_forward,rdr}` all return 404). The gist-controller mechanism from #717 is the likely path. |
 | `<OPNsense>/Gateways` | `gateways` | Supported (direct-API; #721). Identity is the natural-key `name` (OPNsense enforces uniqueness server-side). Dynamic/virtual gateways synthesized from interface DHCP state (e.g., `WAN_DHCP`, `WAN_DHCP6`) are silently excluded from the diff — they're recreated from interface state on reconfigure and must not appear in YAML. |
-| `<staticroutes>/route` | — | **Gap** |
+| `<staticroutes>/route` | `static_routes` | Supported (direct-API; #722). Identity is the natural-key tuple `(network, gateway)` (OPNsense exposes no server-unique `name` field on routes — operator-facing YAML `name` is metadata only and never travels on the wire). The `gateway` field cross-references either a managed `gateways` resource declared in YAML or a live system gateway (e.g., `WAN_DHCP`, `WAN_DHCP6`); the validator enforces protocol-family match (IPv4 CIDR → IPv4 gateway, IPv6 CIDR → IPv6 gateway). |
 | `<virtualip>/vip` | — | **Gap** |
 | `<OPNsense>/unboundplus/hosts/host/alias` | — | **Gap** (Unbound host alias) |
 | `<OPNsense>/unboundplus/domains/domain` | — | **Gap** (Unbound domain override) |
@@ -75,7 +75,7 @@ Each gap row in the matrix above corresponds to a planned feature issue. The imp
 
 1. `interface_assignments` (read-only / migrate shipped in #711; write-path mechanism decided in ADR-0014 amendment #717 via a forked PHP REST controller; production conversion of `OPNsenseDirectRunner.apply()` is a follow-up issue)
 2. `nat_rules` — outbound + 1:1 ship in #713 (direct-API). Port forwards deferred to a follow-up spike — `26.1.6_2` exposes no MVC REST endpoint for them; the same gist-controller mechanism from #717 is the likely path.
-3. `gateways`, `static_routes`
+3. `gateways` (#721, completed) and `static_routes` (#722, completed)
 4. `virtual_ips`
 5. Unbound extensions (`domain_override`, `host_alias`, `forward`)
 6. `config migrate` extractors for every supported and newly-added resource type

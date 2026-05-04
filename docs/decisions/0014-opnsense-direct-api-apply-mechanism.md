@@ -3,6 +3,7 @@
 **Date:** 2026-04-30
 **Amended:** 2026-05-03 (#717, PR #718) — added second internal write path for resources with no native REST CRUD; records `interface_assignments` per-component decision
 **Amended:** 2026-05-03 (#720, PR #N) — Gates (2) and (3) cleared; production conversion of `interface_assignments` from no-op to live complete (full CRUD via the in-tree `AssignSettingsController.php` fork at `src/infrafoundry/providers/opnsense/extensions/interface_assignments/`). Spike deleted.
+**Amended:** 2026-05-04 (#722) — `static_routes` per-component decision recorded (stock direct-REST against `routes/routes/*route`; natural-key identity tuple `(network, gateway)`)
 **Status:** Accepted
 
 ## Status
@@ -106,6 +107,19 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 **Cross-reference:** [ADR-0013 §"Per-component decisions recorded so far"](0013-opnsense-full-iac-migration.md#per-component-decisions-recorded-so-far) updated to reflect this resolution. See also [`docs/development/opnsense-spike-interface-assignment-gist-findings.md`](../development/opnsense-spike-interface-assignment-gist-findings.md) for the load-bearing evidence.
 
+### `static_routes` (#722, 2026-05-04)
+
+**Mechanism:** Stock direct-REST against the `routes/routes/*route` controller — no controller fork required (this component falls under §1's default).
+
+- **Endpoints:** `POST routes/routes/searchroute` (list), `GET routes/routes/getroute/<uuid>` (full record under `{"route": {...}}` envelope, with `gateway` rendered as a select option dict), `POST routes/routes/addroute` and `POST routes/routes/setroute/<uuid>` (body envelope `{"route": {...}}`), `POST routes/routes/delroute/<uuid>`, `POST routes/routes/reconfigure`.
+- **Identity:** natural key tuple `(network, gateway)`. OPNsense exposes no server-unique `name` field on routes; the operator-facing YAML `name` is metadata only (used for cross-resource references and `ResourceOutcome` addressing) and never travels on the wire. Two routes with the same `(network, gateway)` tuple are the same record by the diff engine. Updating either field is a delete + add (the diff engine emits both); updating only `descr` or `disabled` is an in-place `setroute` (preserves UUID).
+- **Wire schema:** `network` (CIDR), `gateway` (next-hop gateway name), `descr` (operator description), `disabled` (`"0"`/`"1"` string). The probe (live on `opnsense-a` running `26.1.6_2`, 2026-05-04) confirmed those four fields plus the auto-assigned `uuid` exhaust the schema — no metric / mtu / interface override knobs exist on this OPNsense version.
+- **Gateway reference scope:** validator accepts both managed `gateways` resources declared in YAML *and* live system gateways (e.g., `WAN_DHCP`, `WAN_DHCP6`) returned by `searchGateway`. Mirrors the gateway validator's interface-acceptance pattern — operators can route through dynamic gateways without first declaring them as managed.
+- **Cross-protocol enforcement:** the live API empirically does *not* always reject an IPv4 CIDR routed through an IPv6 gateway (the probe accepted `203.0.113.0/24` → `WAN_DHCP6` without error), so the validator enforces the family match before the request lands. For managed gateways the protocol is read from YAML; for live system gateways the heuristic is the trailing-`6` convention (e.g., `WAN_DHCP6` → IPv6).
+- **No description-suffix tag** and **no `infrafoundry` category bootstrap** (routes have no categories). Different from `nat_rules` (which uses suffix tags because firewall rules have no stable name field) and same as `gateways` (which has a server-unique `name` field).
+
+**Rollback strategy:** Same as the rest of §1's default mechanism — rely on per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` (System → Configuration → Backups) is the residual safety net. No transactional rollback (option (c) from the `interface_assignments` rollback discussion applies fleet-wide for direct-REST mechanisms).
+
 ## Rationale
 
 The VLAN spike supplied the load-bearing evidence:
@@ -142,6 +156,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#715](https://github.com/endavis/infrafoundry/issues/715): feat: spike + extend OPNsense gist-based `interface_assignments` write API (closed; PR [#716](https://github.com/endavis/infrafoundry/pull/716) merged 2026-05-02). Load-bearing evidence for this amendment.
 - Issue [#717](https://github.com/endavis/infrafoundry/issues/717): chore: amend ADR-0014 to record gist-based REST mechanism for `interface_assignments` (this amendment).
 - Issue [#720](https://github.com/endavis/infrafoundry/issues/720): feat: convert `OPNsenseDirectRunner.apply()` for `interface_assignments` from no-op to live. Carries out gates (2) and (3); recorded as cleared in the 2026-05-03 amendment line above and in the per-component decisions section.
+- Issue [#722](https://github.com/endavis/infrafoundry/issues/722): feat: add OPNsense `static_routes` component (direct-API, natural-key tuple identity).
 
 ## Related Documentation
 
