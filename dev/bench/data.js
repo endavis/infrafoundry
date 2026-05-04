@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777911790238,
+  "lastUpdate": 1777924829046,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7471,6 +7471,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014644030378443507",
             "extra": "mean: 142.21273822898587 usec\nrounds: 2315"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ec7394119134adea80fb5966c189dc0e366402f9",
+          "message": "feat: add OPNsense port_forward kind on nat_rules (merges PR #738, addresses #725)",
+          "timestamp": "2026-05-04T20:59:48+01:00",
+          "tree_id": "a4fc3d86b0465fe99f722d8de8735cee01b13d82",
+          "url": "https://github.com/endavis/infrafoundry/commit/ec7394119134adea80fb5966c189dc0e366402f9"
+        },
+        "date": 1777924827891,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6453.294923276465,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002321158660198734",
+            "extra": "mean: 154.9596000010922 usec\nrounds: 10"
           }
         ]
       }
