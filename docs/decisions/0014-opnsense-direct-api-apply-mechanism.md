@@ -7,6 +7,7 @@
 **Amended:** 2026-05-04 (#724) — `unbound_host_alias` and `unbound_forward` per-component decisions recorded (stock direct-REST against `unbound/settings/*`; natural-key identities; reconfigure via `unbound/service/reconfigure`; no controller fork)
 **Amended:** 2026-05-04 (#723) — `virtual_ips` per-component decision recorded (stock direct-REST against `interfaces/vip_settings/*`; natural-key tuple identity `(interface, mode, address, vhid)`); secrets-handling subsection added covering `secret://env_secrets/...` URI resolution at apply time by `EnvSecretsBackend` (first direct-API consumer: CARP `password`)
 **Amended:** 2026-05-04 (#725) — `port_forward` per-component decision recorded (stock direct-REST against `firewall/d_nat/*`; extends `nat_rules` with a third `kind`; identical mechanism to outbound and 1:1; no new wire mechanism)
+**Amended:** 2026-05-04 (#726) — §8 resolved: pluggable extractor registry replaces per-component dispatch on the provider and CLI; new components are reachable via `config migrate` as soon as they register an extractor
 **Status:** Accepted
 
 ## Status
@@ -67,7 +68,13 @@ Granular locks (`lock: { delete: true, update: false }`) are deferred to a follo
 
 ### 8. `config migrate` integration
 
-**Per-component method on the OPNsense provider, hardcoded to the CLI's choice list.** This matches today's Kea DHCP pattern. A pluggable extractor registry is acknowledged as a follow-up but is out of scope for ADR-0014; nothing in the migrate flow blocks on it.
+**Pluggable extractor registry keyed by `(provider_name, resource_type)`.** The registry lives in [`src/infrafoundry/core/extractors.py`](../../src/infrafoundry/core/extractors.py) and is shaped like `RunnerRegistry`: a class-based registry plus a module-level singleton with thin convenience functions. Providers populate it during their own `__init__` by registering one `Extractor` (anything with `extract(env_name, **kwargs) -> str`) per migratable component. The CLI `config migrate` command looks up extractors at runtime and validates `--provider` / `--component` against the registered set — no `click.Choice` edit is required when adding a new component.
+
+The original 2026-04-30 form of this decision (per-component method on the provider, hardcoded to the CLI's choice list) was a deliberate deferral while the per-component shape settled in #711–#725. With ten components in flight that each followed the `migrate(env_name, **kwargs) -> str` contract, the dispatch became mechanical and the duplication was the larger cost. #726 carried out the resolution. The pre-#726 `OPNsenseProvider.migrate_<resource>` methods are retained as deprecated shims for one minor version; new callers should use `get_extractor("opnsense", "<resource_type>").extract(env_name)` directly.
+
+**Breaking CLI rename:** the two pre-#726 component names — `kea/dhcp` and `isc-to-kea` — are now `kea_dhcp` and `isc_to_kea` (Python-identifier form, matching the registry key). No transparent alias.
+
+See [`docs/development/implementing-providers.md`](../development/implementing-providers.md#registering-extractors-for-config-migrate) for the registration pattern.
 
 ### 9. Migration of existing Terraform-based paths
 
@@ -204,7 +211,6 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 
 ### Known follow-ups (not in scope here)
 
-- Pluggable extractor registry for `config migrate` (see decision #8).
 - Granular lock semantics if boolean `lock: true` proves insufficient (see decision #6).
 - Lossy round-trip validation (descriptions with quotes/unicode/long strings) before any production lift; see the [Round-trip property](../development/opnsense-spike-vlan-findings.md#round-trip-property) caveat.
 - Retirement of `templates/opnsense/playbook.yml.j2` after the last Terraform-based component migrates (see decision #9).
@@ -226,6 +232,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#723](https://github.com/endavis/infrafoundry/issues/723): feat: add OPNsense `virtual_ips` component (direct-API, natural-key tuple identity `(interface, mode, address, vhid)`; first direct-API resource with secrets — CARP `password` via `secret://env_secrets/...` URIs and the new `EnvSecretsBackend`).
 - Issue [#724](https://github.com/endavis/infrafoundry/issues/724): feat: add OPNsense Unbound extensions — `unbound_host_alias` and `unbound_forward` (direct-API; merges domain_override into forward per live probe).
 - Issue [#725](https://github.com/endavis/infrafoundry/issues/725): feat: add OPNsense `port_forward` kind on `nat_rules` (direct-API at `firewall/d_nat`; closes ADR-0013 implementation-order item #2; the 2026-05-04 re-probe corrected the original deferral premise).
+- Issue [#726](https://github.com/endavis/infrafoundry/issues/726): refactor: extract `config migrate` extractor registry from per-component dispatch (resolves §8; breaking CLI rename `kea/dhcp` → `kea_dhcp` and `isc-to-kea` → `isc_to_kea`).
 
 ## Related Documentation
 

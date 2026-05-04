@@ -1,9 +1,15 @@
 """Migrate existing infrastructure to InfraFoundry configuration."""
 
 from pathlib import Path
+from typing import Any
 
 import click
 
+from infrafoundry.core.extractors import (
+    get_extractor,
+    list_extractor_providers,
+    list_extractor_resource_types,
+)
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
@@ -16,15 +22,13 @@ from ...utils import console
     "--provider",
     "-p",
     required=True,
-    type=click.Choice(["opnsense"], case_sensitive=False),
-    help="Provider name",
+    help="Provider name (validated against the registered extractors)",
 )
 @click.option(
     "--component",
     "-c",
     required=True,
-    type=click.Choice(["kea/dhcp", "isc-to-kea"], case_sensitive=False),
-    help="Component to migrate",
+    help="Component to migrate (validated against the registered extractors)",
 )
 @click.option(
     "--interfaces",
@@ -52,56 +56,77 @@ def migrate(
     """Migrate existing infrastructure to InfraFoundry configuration.
 
     This command reads the current configuration from the provider's API
-    and generates InfraFoundry YAML configuration files.
+    and generates InfraFoundry YAML configuration files. The set of valid
+    ``--provider`` and ``--component`` values is determined at runtime
+    from the extractor registry — any component a provider registers
+    becomes immediately reachable via this command.
 
     Examples:
         # Migrate existing Kea DHCP configuration
-        infra migrate --env prod --provider opnsense --component kea/dhcp
+        foundry config migrate --env prod --provider opnsense --component kea_dhcp
+
+        # Migrate VLANs (direct-API)
+        foundry config migrate --env prod --provider opnsense --component vlans
 
         # Migrate ISC DHCP to Kea DHCP format
-        infra migrate --env prod --provider opnsense --component isc-to-kea
-        infra migrate --env prod --provider opnsense --component isc-to-kea -i lan -i wan
+        foundry config migrate --env prod --provider opnsense --component isc_to_kea
+        foundry config migrate --env prod --provider opnsense --component isc_to_kea -i lan -i wan
 
         # Dry-run mode
-        infra migrate --env prod --provider opnsense --component isc-to-kea --dry-run
+        foundry config migrate --env prod --provider opnsense --component isc_to_kea --dry-run
     """
+    # Force the registry to populate by instantiating the requested provider.
+    # ``orchestrator.providers`` is keyed by lowercase provider name; pulling
+    # it triggers ``OPNsenseProvider.__init__`` (which calls
+    # ``_register_extractors``) for any provider the orchestrator knows about.
     provider_lower = provider.lower()
-    if provider_lower != "opnsense":
-        raise click.ClickException(f"Unsupported provider: {provider}")
+    component_lower = component.lower()
 
-    from infrafoundry.providers.opnsense import OPNsenseProvider
+    provider_instance = orchestrator.providers.get(provider_lower)
 
-    provider_instance = orchestrator.providers.get("opnsense")
-    if not provider_instance or not isinstance(provider_instance, OPNsenseProvider):
-        raise click.ClickException("OPNsense provider not found")
+    registered_providers = list_extractor_providers()
+    if provider_lower not in registered_providers:
+        registered_str = ", ".join(registered_providers) or "<none>"
+        raise click.ClickException(
+            f"Unsupported provider {provider!r}. Registered providers: {registered_str}."
+        )
 
+    if provider_instance is None:
+        raise click.ClickException(
+            f"{provider} provider not found in this environment "
+            f"(no providers loaded for env {env!r})."
+        )
+
+    registered_components = list_extractor_resource_types(provider_lower)
+    if component_lower not in registered_components:
+        registered_str = ", ".join(registered_components) or "<none>"
+        raise click.ClickException(
+            f"Unsupported component {component!r} for provider {provider_lower!r}. "
+            f"Registered components: {registered_str}."
+        )
+
+    # ``provider_instance`` carries the live ``_current_environment`` used
+    # by some component managers; setting it here mirrors the prior behavior.
     provider_instance._current_environment = env
 
     if not output:
         config_dir = (ctx.obj or {}).get("config_dir", ".")
-        component_name = component.replace("/", "-")
         output_path = (
-            Path(config_dir) / "envs" / env / "resources" / f"migrated-{component_name}.yaml"
+            Path(config_dir) / "envs" / env / "resources" / f"migrated-{component_lower}.yaml"
         )
     else:
         output_path = Path(output)
 
-    component_lower = component.lower()
-    if component_lower == "kea/dhcp":
-        console.info("Migrating Kea DHCP configuration from OPNsense...")
-        yaml_content = provider_instance.migrate_kea_dhcp(env)
-    elif component_lower == "isc-to-kea":
-        console.info("Migrating ISC DHCP to Kea DHCP configuration from OPNsense...")
-        interfaces_list = list(interfaces) if interfaces else None
+    console.info(f"Migrating {component_lower} configuration from {provider_lower}...")
 
-        if interfaces_list:
-            console.info(f"Targeting interfaces: {', '.join(interfaces_list)}")
-        else:
-            console.info("Migrating all interfaces with ISC DHCP enabled")
+    kwargs: dict[str, Any] = {}
+    if interfaces:
+        interfaces_list = list(interfaces)
+        kwargs["interfaces"] = interfaces_list
+        console.info(f"Targeting interfaces: {', '.join(interfaces_list)}")
 
-        yaml_content = provider_instance.migrate_isc_to_kea(env, interfaces_list)
-    else:
-        raise click.ClickException(f"Unsupported component: {component}")
+    extractor = get_extractor(provider_lower, component_lower)
+    yaml_content = extractor.extract(env, **kwargs)
 
     if dry_run:
         console.warning("Dry-run mode - configuration would be written to:")

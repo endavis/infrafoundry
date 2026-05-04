@@ -215,4 +215,8 @@ class TestSecretsCommands:
 
         assert result.exit_code == 0
         assert "migrate" in result.output.lower()
-        assert "kea/dhcp" in result.output
+        # After #726 the per-component dispatch lives in the extractor
+        # registry; the help string mentions ``kea_dhcp`` as one example
+        # of a registered component (the breaking CLI rename replaces
+        # ``kea/dhcp`` with ``kea_dhcp``).
+        assert "kea_dhcp" in result.output
