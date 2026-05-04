@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777933033313,
+  "lastUpdate": 1777934447827,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7533,6 +7533,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015436694640989473",
             "extra": "mean: 139.20594554528247 usec\nrounds: 2424"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "740c4eb33ddacdf8b4def83760d0467e3d305d54",
+          "message": "chore: remove vlan direct-api spike after adr-0013 coverage (merges PR #740, addresses #727)",
+          "timestamp": "2026-05-04T23:40:21+01:00",
+          "tree_id": "4e7c1f42a7e64bc1bdd4762132e403c59f3df48e",
+          "url": "https://github.com/endavis/infrafoundry/commit/740c4eb33ddacdf8b4def83760d0467e3d305d54"
+        },
+        "date": 1777934447096,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 5687.956630900994,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000329224007066539",
+            "extra": "mean: 175.81006060547196 usec\nrounds: 66"
           }
         ]
       }
