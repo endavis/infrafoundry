@@ -1,16 +1,5 @@
 # Outputs for OPNsense resources
 
-{% if resources_by_type.get('firewall_rules') %}
-output "firewall_rules" {
-  description = "Created firewall rules"
-  value = [
-    {% for rule in resources_by_type['firewall_rules'] %}
-    "{{ rule.config.name }}",
-    {% endfor %}
-  ]
-}
-{% endif %}
-
 {% if resources_by_type.get('aliases') %}
 output "aliases" {
   description = "Created aliases"

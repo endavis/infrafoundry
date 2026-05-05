@@ -207,7 +207,7 @@ class TestDriftDetection:
         opnsense_provider.pyinfra_dir = Path("/tmp/pyinfra/opnsense")
         opnsense_provider.ensure_directories = Mock()
         opnsense_provider.generate_terraform = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["firewall_rule"])
+        opnsense_provider.get_resource_types = Mock(return_value=["aliases"])
         opnsense_provider.get_dependencies = Mock(return_value={})
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 
@@ -335,16 +335,17 @@ class TestMultiProviderCoordination:
         config_dir = tmp_path / "config" / "envs" / "dev" / "opnsense"
         config_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create OPNsense firewall rule config
-        rule_file = config_dir / "firewall_rule.yaml"
-        rule_file.write_text(
+        # Create OPNsense alias config (used to exercise the multi-provider
+        # dispatch path; firewall_rules is direct-API per ADR-0015 and not
+        # routed through ``generate_terraform``).
+        alias_file = config_dir / "aliases.yaml"
+        alias_file.write_text(
             """
-firewall_rules:
-  - name: allow-web
-    action: pass
-    interface: lan
-    protocol: tcp
-    destination_port: 80
+aliases:
+  - name: web-servers
+    type: host
+    content:
+      - 192.168.1.10
 """
         )
 
@@ -358,8 +359,8 @@ firewall_rules:
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.generate_ansible = Mock()
         opnsense_provider.validate_config = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["firewall_rule", "alias"])
-        opnsense_provider.get_dependencies = Mock(return_value={"firewall_rule": ["alias"]})
+        opnsense_provider.get_resource_types = Mock(return_value=["aliases"])
+        opnsense_provider.get_dependencies = Mock(return_value={"aliases": []})
         opnsense_provider.set_environment = Mock()
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 

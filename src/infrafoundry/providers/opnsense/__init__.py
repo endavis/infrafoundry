@@ -129,6 +129,7 @@ class OPNsenseProvider(
         """
         from infrafoundry.core.extractors import register_extractor
 
+        from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.isc_to_kea_migration import ISCToKeaMigrationManager
@@ -144,6 +145,7 @@ class OPNsenseProvider(
             ("vlans", VlanManager),
             ("interface_assignments", InterfaceAssignmentManager),
             ("nat_rules", NATRuleManager),
+            ("firewall_rules", FirewallRuleManager),
             ("gateways", GatewayManager),
             ("static_routes", StaticRouteManager),
             ("virtual_ips", VirtualIPManager),
@@ -177,10 +179,11 @@ class OPNsenseProvider(
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OPNsense resources.
 
-        VLANs are intentionally not generated here — they are managed
-        directly via ``OPNsenseDirectRunner`` per ADR-0014. The runner is
-        registered with ``priority = -10`` so VLAN apply precedes terraform
-        planning of dependents like ``firewall_rules`` and ``dhcp_static_maps``.
+        VLANs and firewall rules are intentionally not generated here —
+        both are managed directly via ``OPNsenseDirectRunner`` per ADR-0014
+        and ADR-0015. The runner is registered with ``priority = -10`` so
+        the direct-API apply precedes terraform planning of dependents like
+        ``dhcp_static_maps``.
         """
         resources_by_type = self.prepare_terraform_generation(resources)
 
@@ -191,9 +194,6 @@ class OPNsenseProvider(
         self.render_provider_and_variables()
 
         # Generate resources by type
-        if "firewall_rules" in resources_by_type:
-            self._generate_firewall_rules_terraform(resources_by_type["firewall_rules"])
-
         if "aliases" in resources_by_type:
             self._generate_aliases_terraform(resources_by_type["aliases"])
 
@@ -219,14 +219,6 @@ class OPNsenseProvider(
 
         # Generate outputs
         self.render_outputs_terraform(resources_by_type)
-
-    def _generate_firewall_rules_terraform(self, rules: list[ResourceConfig]) -> None:
-        """Generate Terraform for OPNsense firewall rules."""
-        self.render_and_write_terraform(
-            "opnsense/firewall_rules.tf.j2",
-            context={"rules": rules},
-            output_name="firewall_rules.tf",
-        )
 
     def generate_opnsense_direct(self, resources: list[ResourceConfig]) -> None:
         """No-op generator hook for the direct-API runner (ADR-0014).
@@ -260,6 +252,7 @@ class OPNsenseProvider(
             knows the duck-typed surface (``plan``, ``apply``, ``destroy``,
             ``get_resource_ids``) each manager must expose.
         """
+        from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.nat_rule import NATRuleManager
@@ -273,6 +266,7 @@ class OPNsenseProvider(
             "vlans": VlanManager,
             "interface_assignments": InterfaceAssignmentManager,
             "nat_rules": NATRuleManager,
+            "firewall_rules": FirewallRuleManager,
             "gateways": GatewayManager,
             "static_routes": StaticRouteManager,
             "virtual_ips": VirtualIPManager,
@@ -755,7 +749,6 @@ class OPNsenseProvider(
             "kea_reservation": ["opnsense_kea_reservation"],
             "kea_subnet": ["opnsense_kea_subnet"],
             "aliases": ["opnsense_firewall_alias"],
-            "firewall_rules": ["opnsense_firewall_rule"],
             "dhcp_static_maps": ["opnsense_dhcpv4_static_map"],
             "unbound_host_override": ["opnsense_unbound_host_override"],
         }
@@ -764,7 +757,7 @@ class OPNsenseProvider(
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
-            "firewall_rules": ["aliases", "vlans"],
+            "firewall_rules": ["aliases", "vlans", "interface_assignments", "gateways"],
             "vlans": [],
             "interface_assignments": ["vlans"],
             "aliases": [],
@@ -925,6 +918,29 @@ class OPNsenseProvider(
             stacklevel=2,
         )
         return get_extractor("opnsense", "nat_rules").extract(env_name)
+
+    def migrate_firewall_rule(self, env_name: str) -> str:
+        """Migrate current firewall rules (MVC) to InfraFoundry YAML.
+
+        .. deprecated::
+            Use ``get_extractor("opnsense", "firewall_rules").extract(env_name)``.
+            This shim will be removed after one minor version.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            YAML configuration as a string
+        """
+        from infrafoundry.core.extractors import get_extractor
+
+        warnings.warn(
+            "OPNsenseProvider.migrate_firewall_rule is deprecated; "
+            'use get_extractor("opnsense", "firewall_rules").extract(env_name).',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return get_extractor("opnsense", "firewall_rules").extract(env_name)
 
     def migrate_gateway(self, env_name: str) -> str:
         """Migrate current gateways to InfraFoundry YAML.

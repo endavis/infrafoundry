@@ -10,7 +10,7 @@ from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense.validator import OPNsenseValidator
 from infrafoundry.providers.opnsense.validators import (
     DHCPValidator,
-    FirewallValidator,
+    FirewallRuleValidator,
     InterfaceAssignmentValidator,
     ResourceNameValidator,
     UnboundValidator,
@@ -54,7 +54,7 @@ class TestComposition:
 
     def test_specialized_validators_initialized(self, validator):
         """All specialized validators are created."""
-        assert isinstance(validator.firewall_validator, FirewallValidator)
+        assert isinstance(validator.firewall_rule_validator, FirewallRuleValidator)
         assert isinstance(validator.dhcp_validator, DHCPValidator)
         assert isinstance(validator.vlan_validator, VLANValidator)
         assert isinstance(validator.unbound_validator, UnboundValidator)
@@ -187,7 +187,7 @@ class TestValidateReferences:
             }
         )
         validator.api_validator.fetch_json = MagicMock(return_value=None)
-        validator.firewall_validator = MagicMock()
+        validator.firewall_rule_validator = MagicMock()
         validator.dhcp_validator = MagicMock()
         validator.vlan_validator = MagicMock()
         validator.unbound_validator = MagicMock()
@@ -200,7 +200,7 @@ class TestValidateReferences:
 
         validator.validate_references(resources)
 
-        validator.firewall_validator.validate.assert_called_once()
+        validator.firewall_rule_validator.validate.assert_called_once()
         validator.dhcp_validator.validate.assert_called_once()
         validator.vlan_validator.validate.assert_called_once()
         validator.unbound_validator.validate.assert_called_once()

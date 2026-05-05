@@ -8,6 +8,7 @@
 **Amended:** 2026-05-04 (#723) — `virtual_ips` per-component decision recorded (stock direct-REST against `interfaces/vip_settings/*`; natural-key tuple identity `(interface, mode, address, vhid)`); secrets-handling subsection added covering `secret://env_secrets/...` URI resolution at apply time by `EnvSecretsBackend` (first direct-API consumer: CARP `password`)
 **Amended:** 2026-05-04 (#725) — `port_forward` per-component decision recorded (stock direct-REST against `firewall/d_nat/*`; extends `nat_rules` with a third `kind`; identical mechanism to outbound and 1:1; no new wire mechanism)
 **Amended:** 2026-05-04 (#726) — §8 resolved: pluggable extractor registry replaces per-component dispatch on the provider and CLI; new components are reachable via `config migrate` as soon as they register an extractor
+**Amended:** 2026-05-05 (#742) — `firewall_rules` per-component decision recorded (stock direct-REST against the MVC `firewall/filter/*` controller; identity scheme matches `nat_rules`; legacy terraform path retired in the same PR — no `kind: legacy` shim). See ADR-0015 for the full driving decision.
 **Status:** Accepted
 
 ## Status
@@ -178,6 +179,17 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Server-managed fields not exposed:** `created.*`, `updated.*`, `categories` index (managed via the `infrafoundry` category bootstrap), `associated-rule-id` (OPNsense uses this internally to link port_forward to its companion filter rule when `pass_action: "pass"` / `"rule"`; the DNat model docstring marks the field for removal in a future OPNsense version, so InfraFoundry never touches it — `pass_action` is the operator-facing knob).
 
 **Rollback strategy:** Same as the rest of §1's default mechanism.
+
+### `firewall_rules` (#742, 2026-05-05)
+
+**Mechanism:** Stock direct-REST against the OPNsense MVC stateful filter controller `firewall/filter/*` — no controller fork required (this component falls under §1's default). See [ADR-0015](0015-opnsense-firewall-rules-direct-api-via-mvc-controller.md) for the full per-component decision (controller choice, field coverage, identity scheme, migration story).
+
+- **Endpoints:** `POST firewall/filter/searchRule`, `GET firewall/filter/getRule[/<uuid>]`, `POST firewall/filter/addRule`, `POST firewall/filter/setRule/<uuid>`, `POST firewall/filter/delRule/<uuid>`, `POST firewall/filter/toggleRule/<uuid>/<enabled>`, `POST firewall/filter/apply`, `POST firewall/filter/savepoint`. All eight verbs confirmed live on `opnsense-a` running `26.1.6_2`.
+- **Identity:** description-suffix `[infrafoundry:<name>]` + `infrafoundry` category UUID — same scheme as `nat_rules` (#713). The MVC `categories` field is multi-valued (vs legacy single `<category>`), so the identity marker is **appended** to operator-supplied categories, not overwriting them; operator-set categories survive across applies.
+- **Wire schema:** ~50 scalar / enum fields covering the full MVC `getRule` template (per [ADR-0015 §"Field coverage"](0015-opnsense-firewall-rules-direct-api-via-mvc-controller.md#field-coverage)); `sched`, `shaper1`, `shaper2` punted to follow-up issues (require resources we don't manage yet). Fields with hyphens or dots in the wire key (`state-policy`, `divert-to`, `max-src-conn`, `max-src-conn-rate`, `set-prio`, `set-prio-low`, `udp-first`, `udp-multiple`, `udp-single`, etc.) use Python-identifier YAML/dataclass aliases mapped via a module-level `_PAYLOAD_FIELD_MAP` table.
+- **Coexistence with terraform path:** retired in the implementation PR — no `kind: legacy` shim. The legacy `firewall_rules.tf.j2` template, `_generate_firewall_rules_terraform`, and the old `FirewallValidator` (alias-only) are deleted in the same commit; `endavis-infra` has zero terraform-managed firewall rules and no other consuming repo was identified at PR-review time.
+
+**Rollback strategy:** Same as the rest of §1's default mechanism — per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. `firewall/filter/savepoint` is exposed on the service for manual rollback (15-revision retention) but is not auto-wired into apply.
 
 ## Secrets handling
 

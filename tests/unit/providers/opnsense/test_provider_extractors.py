@@ -16,6 +16,7 @@ from infrafoundry.core.extractors import (
 from infrafoundry.providers.opnsense import OPNsenseProvider, _ExtractorAdapter
 
 EXPECTED_RESOURCE_TYPES = [
+    "firewall_rules",
     "gateways",
     "interface_assignments",
     "isc_to_kea",
@@ -36,8 +37,8 @@ def provider(tmp_path: Path) -> OPNsenseProvider:
 
 
 @pytest.mark.usefixtures("provider")
-def test_provider_registers_all_ten_components() -> None:
-    """Instantiating the provider registers all 10 expected components."""
+def test_provider_registers_all_eleven_components() -> None:
+    """Instantiating the provider registers all 11 expected components."""
     registered = list_extractor_resource_types("opnsense")
 
     for resource_type in EXPECTED_RESOURCE_TYPES:
