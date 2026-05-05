@@ -45,18 +45,21 @@ use the underscored form in YAML.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import yaml
 
-from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.exceptions import APIError, InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
 
 from ._category_marker import INFRAFOUNDRY_CATEGORY_NAME as _SHARED_CATEGORY_NAME
 from ._category_marker import ensure_infrafoundry_category
 from .base import BaseService
+
+logger = logging.getLogger(__name__)
 
 # Regex for parsing the description-suffix identity tag. Operator-supplied
 # free-form text leads, followed by whitespace, followed by
@@ -902,6 +905,37 @@ class FirewallRuleService(BaseService):
                 rows = [r for r in raw_rows if isinstance(r, dict)]
         return [_row_to_live(row) for row in rows]
 
+    def search_tolerant(self) -> list[LiveFirewallRule]:
+        """Migrate-only variant of :meth:`search` that tolerates a missing controller.
+
+        Some OPNsense builds may ship without the ``firewall/filter`` MVC
+        controller. For ``export_to_yaml`` — which feeds
+        ``foundry config migrate`` — a missing controller must not abort
+        the entire extraction; instead, the migrate should produce an
+        empty resource list and log a WARNING so the operator knows what
+        was skipped. Other ``APIError`` status codes (5xx, 401/403, etc.)
+        propagate unchanged.
+
+        The strict :meth:`search` (used by apply-time logic) keeps
+        loud-fail semantics: a missing controller at apply time is a
+        real error.
+
+        Returns:
+            ``LiveFirewallRule`` instances from the box, or ``[]`` when
+            the controller responds with HTTP 404.
+        """
+        try:
+            return self.search()
+        except APIError as exc:
+            if exc.status_code == 404:
+                logger.warning(
+                    "OPNsense firewall filter controller is not available "
+                    "(HTTP 404 on %s/searchRule); skipping during migrate.",
+                    _FILTER_BASE,
+                )
+                return []
+            raise
+
     def add(self, rule: FirewallRuleConfig) -> dict[str, Any]:
         """Create a firewall rule.
 
@@ -999,10 +1033,14 @@ class FirewallRuleService(BaseService):
         of ``categories`` so the round-tripped YAML reflects the
         operator's view (any operator-supplied UUIDs survive).
 
+        Uses :meth:`search_tolerant` so a missing ``firewall/filter``
+        controller (HTTP 404) does not abort the entire migrate — the
+        export degrades to an empty resource list with a WARNING log.
+
         Returns:
             YAML string with ``provider/type/name/config`` entries.
         """
-        rules: list[LiveFirewallRule] = self.search()
+        rules: list[LiveFirewallRule] = self.search_tolerant()
         managed = [r for r in rules if r.managed_name is not None]
         marker_uuid = self._category_uuid  # may be None if cache cold
         resources = [

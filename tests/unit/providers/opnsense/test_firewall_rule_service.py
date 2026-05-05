@@ -20,12 +20,13 @@ Coverage:
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
-from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.exceptions import APIError, AuthenticationError, InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.services._category_marker import (
     reset_cache_for_tests as _reset_marker_cache,
@@ -784,6 +785,97 @@ class TestServiceSearch:
         svc = FirewallRuleService(client)
         with pytest.raises(OpnsenseDriftError):
             svc.search()
+
+
+# ---------------------------------------------------------------------------
+# search_tolerant — migrate-only 404 tolerance (#754)
+# ---------------------------------------------------------------------------
+
+
+class TestSearchTolerant:
+    """``search_tolerant`` swallows 404 with WARNING; non-404s raise; success matches strict."""
+
+    def test_404_returns_empty_with_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        # 404 from the filter controller must not abort migrate; result
+        # is ``[]`` and a single WARNING is emitted.
+        client = MagicMock()
+        client.request.side_effect = APIError(
+            "Not Found",
+            status_code=404,
+            response="Controller missing",
+            provider="opnsense",
+        )
+        svc = FirewallRuleService(client)
+
+        with caplog.at_level(logging.WARNING):
+            result = svc.search_tolerant()
+
+        assert result == []
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        message = warnings[0].getMessage()
+        assert "404" in message
+        assert "firewall/filter" in message
+
+    def test_non_404_api_error_propagates(self) -> None:
+        # 500 errors must not be swallowed.
+        client = MagicMock()
+        client.request.side_effect = APIError("Internal Server Error", status_code=500)
+        svc = FirewallRuleService(client)
+        with pytest.raises(APIError) as exc_info:
+            svc.search_tolerant()
+        assert exc_info.value.status_code == 500
+
+    def test_authentication_error_propagates(self) -> None:
+        # AuthenticationError (401/403) is a subclass of APIError; it
+        # must NOT be swallowed even though it is an APIError.
+        client = MagicMock()
+        client.request.side_effect = AuthenticationError("Unauthorized", status_code=401)
+        svc = FirewallRuleService(client)
+        with pytest.raises(AuthenticationError) as exc_info:
+            svc.search_tolerant()
+        assert exc_info.value.status_code == 401
+
+    def test_success_matches_search(self, caplog: pytest.LogCaptureFixture) -> None:
+        # When search() returns rows normally, search_tolerant returns
+        # the exact same list and does not emit any warning.
+        rows = [
+            {"uuid": "u1", "description": "desc [infrafoundry:a]"},
+            {"uuid": "u2", "description": "unmanaged"},
+        ]
+
+        client_a = MagicMock()
+        client_a.request.return_value = {"rows": rows}
+        svc_a = FirewallRuleService(client_a)
+        with caplog.at_level(logging.WARNING):
+            tolerant = svc_a.search_tolerant()
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert warnings == []
+
+        client_b = MagicMock()
+        client_b.request.return_value = {"rows": rows}
+        svc_b = FirewallRuleService(client_b)
+        strict = svc_b.search()
+
+        assert [(r.uuid, r.managed_name) for r in tolerant] == [
+            (r.uuid, r.managed_name) for r in strict
+        ]
+
+    def test_export_to_yaml_yields_empty_resources_on_404(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # End-to-end: when the controller is missing, ``export_to_yaml``
+        # produces ``resources: []`` and logs a WARNING.
+        client = MagicMock()
+        client.request.side_effect = APIError("Not Found", status_code=404)
+        svc = FirewallRuleService(client)
+
+        with caplog.at_level(logging.WARNING):
+            text = svc.export_to_yaml()
+
+        assert "resources: []" in text
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert len(warnings) == 1
 
 
 class TestServiceCRUD:
