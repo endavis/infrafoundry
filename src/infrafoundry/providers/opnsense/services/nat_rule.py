@@ -55,6 +55,8 @@ import yaml
 from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
 
+from ._category_marker import INFRAFOUNDRY_CATEGORY_NAME as _SHARED_CATEGORY_NAME
+from ._category_marker import ensure_infrafoundry_category
 from .base import BaseService
 
 # Type alias for NAT rule kinds — the discriminator on every entry.
@@ -884,15 +886,19 @@ class NATRuleService(BaseService):
     and its UUID is cached on the service instance.
     """
 
-    # Name of the OPNsense category created/used as the fleet-wide marker
-    # for InfraFoundry-managed rules.
-    INFRAFOUNDRY_CATEGORY_NAME = "infrafoundry"
+    # Class attribute kept for backward compatibility with existing
+    # tests and downstream references; forwards to the module-level
+    # constant in ``_category_marker``.
+    INFRAFOUNDRY_CATEGORY_NAME = _SHARED_CATEGORY_NAME
 
     def __init__(self, client: Any) -> None:
         """Initialize the service and prepare the per-instance category cache."""
         super().__init__(client)
-        # UUID of the OPNsense ``infrafoundry`` category, looked up or created
-        # lazily on the first add/update via ``_ensure_infrafoundry_category``.
+        # Per-instance fast-path cache: once an instance has resolved
+        # the category UUID via the shared helper, subsequent calls on
+        # the same instance skip even the helper's dict lookup. The
+        # process-wide cache and the search+create critical section
+        # both live in ``_category_marker``.
         self._category_uuid: str | None = None
 
     # ------------------------------------------------------------------
@@ -914,56 +920,33 @@ class NATRuleService(BaseService):
     def _ensure_infrafoundry_category(self) -> str:
         """Return the UUID of the ``infrafoundry`` category, creating it if absent.
 
-        The lookup is cached on the service instance so multiple add/update
-        calls in a single apply pay one round-trip total. Cache is per
-        instance; long-lived service objects across multiple environments
-        would need to invalidate manually, but the ``from_environment``
-        factory builds a fresh service per env so that's not a concern in
-        production.
+        Thin wrapper around the shared
+        ``_category_marker.ensure_infrafoundry_category`` helper. The
+        helper holds the process-wide cache and the lock that
+        serializes the search+create critical section across concurrent
+        callers (#746) — both ``FirewallRuleService`` and
+        ``NATRuleService`` delegate here, so a single ``addItem`` ever
+        fires per OPNsense box per process even if dispatch ever
+        becomes concurrent.
+
+        The per-instance ``self._category_uuid`` cache is preserved as
+        a fast-path: an instance that has already resolved the UUID
+        does not pay even the helper's dict-lookup cost on subsequent
+        calls.
 
         Returns:
             UUID string for the OPNsense category named ``infrafoundry``.
 
         Raises:
-            InfraFoundryError: If neither search nor create yields a UUID.
+            InfraFoundryError: If neither search nor create yields a
+                UUID (propagated unchanged from the helper).
         """
         if self._category_uuid is not None:
             return self._category_uuid
 
-        search_response = self.client.request("POST", "firewall/category/searchItem")
-        rows: list[dict[str, Any]] = []
-        if isinstance(search_response, dict):
-            raw_rows = search_response.get("rows")
-            if isinstance(raw_rows, list):
-                rows = [r for r in raw_rows if isinstance(r, dict)]
-        for row in rows:
-            if row.get("name") == self.INFRAFOUNDRY_CATEGORY_NAME:
-                uuid = str(row.get("uuid", ""))
-                if uuid:
-                    self._category_uuid = uuid
-                    return uuid
-
-        add_response = self.client.request(
-            "POST",
-            "firewall/category/addItem",
-            data={
-                "category": {
-                    "name": self.INFRAFOUNDRY_CATEGORY_NAME,
-                    "auto": "0",
-                    "color": "",
-                }
-            },
-        )
-        if isinstance(add_response, dict):
-            uuid = str(add_response.get("uuid", ""))
-            if uuid:
-                self._category_uuid = uuid
-                return uuid
-
-        raise InfraFoundryError(
-            f"Failed to ensure '{self.INFRAFOUNDRY_CATEGORY_NAME}' category exists on "
-            f"OPNsense; addItem response: {add_response!r}"
-        )
+        uuid = ensure_infrafoundry_category(self.client)
+        self._category_uuid = uuid
+        return uuid
 
     def _payload_with_category(self, rule: NATRuleConfig) -> dict[str, Any]:
         """Build the API payload for a rule with the InfraFoundry category injected."""
