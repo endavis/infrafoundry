@@ -39,6 +39,40 @@ def _normalize_field_value(value: str) -> str:
     return stripped
 
 
+def _select_option_dict_value(raw: Any) -> str:
+    """Normalize an OPNsense ``selected``-style field for comparison.
+
+    Several OPNsense API GET responses return select-style fields as nested
+    option-dicts of the form ``{"<key>": {"value": "...", "selected": 0|1}}``
+    rather than as plain strings.  This helper normalizes either shape into a
+    single comparable string:
+
+    - ``dict``: returns the comma-joined sorted list of keys whose entry has
+      ``selected`` truthy.  Returns an empty string when no entry is selected
+      (including the live shape ``{"": {"value": "", "selected": 1}}`` that
+      OPNsense uses to represent an unset value).
+    - ``str`` / ``None`` / missing: normalized via :func:`_normalize_field_value`
+      (whitespace-stripped, multi-line sorted) — preserves the original
+      plain-string path for OPNsense versions that return strings here.
+
+    Args:
+        raw: Raw field value from an OPNsense API GET response.
+
+    Returns:
+        Normalized string suitable for equality comparison against the
+        plain-string form built by ``_build_desired_*_fields``.
+    """
+    if isinstance(raw, dict):
+        selected = [
+            key for key, info in raw.items() if isinstance(info, dict) and info.get("selected", 0)
+        ]
+        # Filter empty-string keys (OPNsense's "no selection" sentinel) so the
+        # live shape ``{"": {..., "selected": 1}}`` extracts to "" — matching
+        # the desired side which omits the field entirely.
+        return ",".join(sorted(name for name in selected if name))
+    return _normalize_field_value(str(raw or ""))
+
+
 class _ExtractorAdapter:
     """Adapter that satisfies the :class:`Extractor` Protocol.
 
@@ -324,10 +358,12 @@ class OPNsenseProvider(
 
         The OPNsense API returns GET responses wrapped under a resource key
         (e.g., ``{"subnet6": {"subnet": "...", "interface": {...}, ...}}``).
-        Select fields like ``interface`` may be returned as dicts with
-        ``selected`` indicators rather than plain strings.  This method
-        normalizes those values so they can be compared with the flat
-        strings we send in update requests.
+        Select fields like ``interface`` and the ``option_data`` sub-fields
+        ``dns_servers`` / ``domain_search`` may be returned as dicts with
+        ``selected`` indicators (e.g. ``{"": {"value": "", "selected": 1}}``)
+        rather than plain strings.  This method normalizes those values via
+        :func:`_select_option_dict_value` so they can be compared with the
+        flat strings we send in update requests.
 
         Args:
             api_response: Raw response from ``get_dhcp6_subnet(uuid)``
@@ -343,26 +379,19 @@ class OPNsenseProvider(
             result[field] = _normalize_field_value(str(data.get(field, "") or ""))
 
         # Interface may be a dict with selected keys or a plain string
-        iface_raw = data.get("interface", "")
-        if isinstance(iface_raw, dict):
-            # Find selected interface(s)
-            selected = [
-                name
-                for name, info in iface_raw.items()
-                if isinstance(info, dict) and info.get("selected", 0)
-            ]
-            result["interface"] = ",".join(sorted(selected))
-        else:
-            result["interface"] = _normalize_field_value(str(iface_raw or ""))
+        result["interface"] = _select_option_dict_value(data.get("interface", ""))
 
-        # option_data sub-fields
+        # option_data sub-fields — OPNsense 25.7+ returns these as nested
+        # option-dicts (e.g. ``{"": {"value": "", "selected": 1}}``) rather
+        # than plain strings.  ``_select_option_dict_value`` normalizes either
+        # shape so change-detection isn't fooled by a Python-repr mismatch.
         option_data = data.get("option_data", {})
         if isinstance(option_data, dict):
-            result["option_data.dns_servers"] = _normalize_field_value(
-                str(option_data.get("dns_servers", "") or "")
+            result["option_data.dns_servers"] = _select_option_dict_value(
+                option_data.get("dns_servers", "")
             )
-            result["option_data.domain_search"] = _normalize_field_value(
-                str(option_data.get("domain_search", "") or "")
+            result["option_data.domain_search"] = _select_option_dict_value(
+                option_data.get("domain_search", "")
             )
         else:
             result["option_data.dns_servers"] = ""
@@ -453,6 +482,40 @@ class OPNsenseProvider(
         for field in ("subnet", "ip_address", "duid", "hostname", "description"):
             result[field] = str(reservation_data.get(field, "") or "")
         return result
+
+    # Fields the OPNsense Kea DHCPv6 subnet API accepts on write but does not
+    # return on read (verified live on OPNsense 25.7.11_1: ``valid_lifetime``
+    # is sent on ``addSubnet``/``setSubnet`` but is absent from the
+    # ``getSubnet`` response). Comparing them produces unconditional
+    # false-positive diffs ("current=''" vs "desired='86400'") on every plan,
+    # which previously triggered spurious subnet updates + Kea reconfigure
+    # on every plan/apply. ``_drop_non_round_trip_subnet_fields`` strips them
+    # from comparison only when the live response is missing/empty for that
+    # field, so a future OPNsense version that does expose the value would
+    # re-engage normal change-detection automatically.
+    _ASYMMETRIC_SUBNET_FIELDS: ClassVar[tuple[str, ...]] = ("valid_lifetime",)
+
+    @classmethod
+    def _drop_non_round_trip_subnet_fields(
+        cls,
+        current_fields: dict[str, str],
+        desired_fields: dict[str, str],
+    ) -> None:
+        """Drop subnet fields that the API doesn't round-trip via GET.
+
+        Mutates both dicts in place. A field is dropped from both sides
+        only when the live response is missing or empty for it — that
+        way change-detection still works when the API does return the
+        value (e.g., on a future OPNsense version).
+
+        The desired-side payload sent by ``update_dhcp6_subnet`` still
+        includes these fields, so apply continues to set them; this
+        helper only governs whether a diff is *triggered* by them.
+        """
+        for field in cls._ASYMMETRIC_SUBNET_FIELDS:
+            if not current_fields.get(field):
+                current_fields.pop(field, None)
+                desired_fields.pop(field, None)
 
     @staticmethod
     def _log_field_diff(
@@ -593,6 +656,7 @@ class OPNsenseProvider(
                 current = kea.get_dhcp6_subnet(existing_uuid)
                 current_fields = self._extract_subnet_fields(current)
                 desired_fields = self._build_desired_subnet_fields(subnet_data)
+                self._drop_non_round_trip_subnet_fields(current_fields, desired_fields)
 
                 if current_fields != desired_fields:
                     self._log_field_diff(
