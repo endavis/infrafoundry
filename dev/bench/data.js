@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777991999810,
+  "lastUpdate": 1777997903394,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7750,6 +7750,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000030412047770828278",
             "extra": "mean: 150.07765792650892 usec\nrounds: 2479"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f966261beb867ae7aa16ff61f9284bdd2ae8dd32",
+          "message": "fix: tolerate per-controller 404s in opnsense nat_rules / firewall_rules migrate (merges PR #755, addresses #754)\n\n`foundry config migrate --component nat_rules` aborted with HTTP 404\non a 25.7.x box that lacks the firewall/d_nat (port_forward) MVC\ncontroller, even though outbound and 1:1 controllers were present and\nwould have extracted cleanly.\n\nAdd migrate-only per-controller 404 tolerance:\n\n- NATRuleService.search_all_tolerant: per-kind try/except for APIError\n  with status_code=404; skip the missing kind, log a WARNING naming\n  the kind + endpoint, continue with surviving kinds. Other status\n  codes (5xx, 401/403) propagate.\n- FirewallRuleService.search_tolerant: same shape, single-controller\n  variant — returns [] with WARNING on 404.\n- export_to_yaml on both services now uses the tolerant variant.\n\nApply-time strict paths (search_all, search, diff/list) are\nintentionally unchanged — a missing controller at apply time on a box\nthat cannot host the resource is still a real error and propagates.\n\nLive-verified against prod (OPNsense 25.7.11_1): nat_rules migrate\nnow succeeds with the port_forward WARNING and writes resources: [];\nfirewall_rules migrate is regression-clean.\n\nAddresses #754\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-05T17:17:49+01:00",
+          "tree_id": "4596eb1a7e0fde85fa159523ef8a11d6411fa4d5",
+          "url": "https://github.com/endavis/infrafoundry/commit/f966261beb867ae7aa16ff61f9284bdd2ae8dd32"
+        },
+        "date": 1777997902553,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7088.041234817423,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015910092151357497",
+            "extra": "mean: 141.0827006885716 usec\nrounds: 2469"
           }
         ]
       }
