@@ -46,18 +46,21 @@ controllers; same name allowed).
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import yaml
 
-from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.exceptions import APIError, InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
 
 from ._category_marker import INFRAFOUNDRY_CATEGORY_NAME as _SHARED_CATEGORY_NAME
 from ._category_marker import ensure_infrafoundry_category
 from .base import BaseService
+
+logger = logging.getLogger(__name__)
 
 # Type alias for NAT rule kinds — the discriminator on every entry.
 NATRuleKind = Literal["outbound", "one_to_one", "port_forward"]
@@ -981,6 +984,44 @@ class NATRuleService(BaseService):
 
         return [_row_to_live(row, kind) for row in rows]
 
+    def search_all_tolerant(self) -> list[LiveNATRule]:
+        """Migrate-only variant of :meth:`search_all` that tolerates per-kind 404s.
+
+        Some OPNsense builds ship without one or more of the NAT MVC
+        controllers (e.g., an older or stripped image lacking the
+        ``firewall/d_nat`` port-forward controller). For ``export_to_yaml``
+        — which feeds ``foundry config migrate`` — a single missing
+        controller must not abort the entire extraction; the operator
+        should still be able to migrate whichever kinds the box exposes.
+        On a 404 from one kind, this method logs a WARNING naming the
+        skipped kind and continues with the remaining kinds. Other
+        ``APIError`` status codes (5xx, 401/403, etc.) propagate
+        unchanged.
+
+        The strict :meth:`search_all` (used by apply-time logic) keeps
+        loud-fail semantics: a missing controller at apply time is a
+        real error.
+
+        Returns:
+            ``LiveNATRule`` instances from every kind that responded
+            without a 404; kinds that 404'd contribute zero rows.
+        """
+        result: list[LiveNATRule] = []
+        for kind in ALLOWED_KINDS:
+            try:
+                result.extend(self.search(kind))
+            except APIError as exc:
+                if exc.status_code == 404:
+                    logger.warning(
+                        "OPNsense NAT controller for kind %r is not available "
+                        "(HTTP 404 on %s/searchRule); skipping during migrate.",
+                        kind,
+                        self._base_for(kind),
+                    )
+                    continue
+                raise
+        return result
+
     def search_all(self) -> list[LiveNATRule]:
         """Fetch the live rule list for both kinds, concatenated."""
         result: list[LiveNATRule] = []
@@ -1110,10 +1151,15 @@ class NATRuleService(BaseService):
         operator. Round-trip loss is expected: only the fields the schema
         captures are written; the prefix is stripped from ``description``.
 
+        Uses :meth:`search_all_tolerant` so a missing per-kind controller
+        (HTTP 404) does not abort the entire migrate — the kinds that
+        respond cleanly are still extracted, with a WARNING log naming
+        any kind that was skipped.
+
         Returns:
             YAML string with ``provider/type/name/config`` entries.
         """
-        rules: list[LiveNATRule] = self.search_all()
+        rules: list[LiveNATRule] = self.search_all_tolerant()
         managed = [r for r in rules if r.managed_name is not None]
         resources = [
             {
