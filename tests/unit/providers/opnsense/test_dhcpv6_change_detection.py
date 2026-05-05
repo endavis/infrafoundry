@@ -98,6 +98,103 @@ class TestExtractSubnetFields:
         assert result["option_data.dns_servers"] == "fd00::1,fd00::2"
         assert result["option_data.domain_search"] == "example.com"
 
+    def test_option_data_dns_servers_as_option_dict_empty_selected(self) -> None:
+        """DNS servers returned as the live empty-sentinel option-dict.
+
+        Captured live shape from OPNsense 25.7.11_1 when no DNS server is set.
+        Must extract to "" so it compares equal to a desired side that omits
+        the field.  Regression for #756.
+        """
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "option_data": {
+                    "dns_servers": {"": {"value": "", "selected": 1}},
+                    "domain_search": {"": {"value": "", "selected": 1}},
+                    "v6_dnr": "",
+                },
+            }
+        }
+        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        assert result["option_data.dns_servers"] == ""
+        assert result["option_data.domain_search"] == ""
+
+    def test_option_data_dns_servers_as_option_dict_with_value(self) -> None:
+        """DNS servers option-dict with one entry selected returns that key."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "option_data": {
+                    "dns_servers": {
+                        "2606:4700::1": {"value": "2606:4700::1", "selected": 1},
+                        "2001:4860:4860::8888": {
+                            "value": "2001:4860:4860::8888",
+                            "selected": 0,
+                        },
+                    },
+                    "domain_search": {"": {"value": "", "selected": 1}},
+                },
+            }
+        }
+        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        assert result["option_data.dns_servers"] == "2606:4700::1"
+        assert result["option_data.domain_search"] == ""
+
+    def test_option_data_dns_servers_as_option_dict_multiple_selected(self) -> None:
+        """Multiple DNS servers selected — sorted and comma-joined (matches interface)."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "option_data": {
+                    "dns_servers": {
+                        "2606:4700::1": {"value": "2606:4700::1", "selected": 1},
+                        "2001:4860:4860::8888": {
+                            "value": "2001:4860:4860::8888",
+                            "selected": 1,
+                        },
+                    },
+                },
+            }
+        }
+        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        assert result["option_data.dns_servers"] == "2001:4860:4860::8888,2606:4700::1"
+
+    def test_option_data_domain_search_as_option_dict(self) -> None:
+        """Domain search returned as an option-dict with one selected entry."""
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "option_data": {
+                    "dns_servers": {"": {"value": "", "selected": 1}},
+                    "domain_search": {
+                        "example.com": {"value": "example.com", "selected": 1},
+                        "other.example": {"value": "other.example", "selected": 0},
+                    },
+                },
+            }
+        }
+        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        assert result["option_data.domain_search"] == "example.com"
+
+    def test_option_data_dns_servers_plain_string_still_works(self) -> None:
+        """Plain-string option_data.dns_servers (older OPNsense shape) still extracted.
+
+        Backward-compatibility check — preserves the path used by OPNsense
+        versions that return plain strings here.
+        """
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "option_data": {
+                    "dns_servers": "2606:4700::1",
+                    "domain_search": "example.com",
+                },
+            }
+        }
+        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        assert result["option_data.dns_servers"] == "2606:4700::1"
+        assert result["option_data.domain_search"] == "example.com"
+
     def test_missing_fields_default_to_empty(self) -> None:
         """Missing or None fields default to empty strings."""
         api_response: dict[str, Any] = {"subnet6": {}}
@@ -329,6 +426,116 @@ class TestFieldComparisonRoundTrip:
         assert OPNsenseProvider._extract_subnet_fields(
             api_response
         ) != OPNsenseProvider._build_desired_subnet_fields(desired)
+
+    def test_subnet_unchanged_with_option_dict_dns_servers(self) -> None:
+        """Subnet matches when API returns the empty-sentinel option-dict shape.
+
+        Regression for #756: the user's prod box (OPNsense 25.7.11_1) returns
+        ``option_data.dns_servers`` and ``option_data.domain_search`` as
+        ``{"": {"value": "", "selected": 1}}`` even when no value is set, while
+        the desired side has no ``option_data`` at all.  Extract must yield
+        the same dict as build for plan to skip the update.
+        """
+        desired: dict[str, Any] = {
+            "subnet": "fd00:1::/64",
+            "interface": "opt1",
+            "pools": "::10-::ff",
+            "valid_lifetime": "3600",
+            "description": "VLAN 10",
+        }
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "interface": "opt1",
+                "pools": "::10-::ff",
+                "valid_lifetime": "3600",
+                "description": "VLAN 10",
+                "option_data": {
+                    "dns_servers": {"": {"value": "", "selected": 1}},
+                    "domain_search": {"": {"value": "", "selected": 1}},
+                    "v6_dnr": "",
+                },
+            }
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+
+    def test_subnet_unchanged_with_option_dict_dns_servers_populated(self) -> None:
+        """Subnet matches when API returns option-dict with a real value selected.
+
+        Mirrors the above but with a populated DNS server — the desired side
+        sends a plain string and the API returns an option-dict with that
+        same value selected.
+        """
+        desired: dict[str, Any] = {
+            "subnet": "fd00:1::/64",
+            "interface": "opt1",
+            "option_data": {
+                "dns_servers": "2606:4700::1",
+                "domain_search": "example.com",
+            },
+        }
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:1::/64",
+                "interface": "opt1",
+                "option_data": {
+                    "dns_servers": {
+                        "2606:4700::1": {"value": "2606:4700::1", "selected": 1},
+                        "2001:4860:4860::8888": {
+                            "value": "2001:4860:4860::8888",
+                            "selected": 0,
+                        },
+                    },
+                    "domain_search": {
+                        "example.com": {"value": "example.com", "selected": 1},
+                    },
+                },
+            }
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+
+    def test_subnet_unchanged_prod_live_fixture(self) -> None:
+        """Lock in the exact captured-live shape from the user's prod box.
+
+        Anonymized snapshot of the response that originally exposed #756.
+        Combines option-dict ``interface``, option-dict empty-sentinel
+        ``option_data.dns_servers`` / ``domain_search``, and a plain-string
+        ``v6_dnr`` field — must round-trip equal to the built desired fields
+        so plan skips the update.
+        """
+        desired: dict[str, Any] = {
+            "subnet": "fd00:10::/64",
+            "interface": "opt1",
+            "pools": "fd00:10::100-fd00:10::1ff",
+            "valid_lifetime": "4000",
+            "description": "infrastructure-v6",
+        }
+        api_response: dict[str, Any] = {
+            "subnet6": {
+                "subnet": "fd00:10::/64",
+                "interface": {
+                    "opt1": {"value": "OPT1 (infrastructure)", "selected": 1},
+                    "opt2": {"value": "OPT2 (servers)", "selected": 0},
+                    "lan": {"value": "LAN", "selected": 0},
+                    "wan": {"value": "WAN", "selected": 0},
+                },
+                "pools": "fd00:10::100-fd00:10::1ff",
+                "valid_lifetime": "4000",
+                "description": "infrastructure-v6",
+                "option_data": {
+                    "dns_servers": {"": {"value": "", "selected": 1}},
+                    "domain_search": {"": {"value": "", "selected": 1}},
+                    "v6_dnr": "",
+                },
+            }
+        }
+        assert OPNsenseProvider._extract_subnet_fields(
+            api_response
+        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
 
     def test_reservation_unchanged(self) -> None:
         """Reservation fields match when API returns identical values."""
@@ -598,6 +805,59 @@ class TestLogFieldDiff:
         assert caplog.text == ""
 
 
+class TestDropNonRoundTripSubnetFields:
+    """Tests for _drop_non_round_trip_subnet_fields.
+
+    The OPNsense Kea DHCPv6 subnet API accepts ``valid_lifetime`` on
+    write but does not return it on read (verified live on 25.7.11_1).
+    Comparing it produces unconditional false-positive diffs every plan;
+    this helper drops the field from comparison when the live response
+    is missing/empty so apply isn't triggered by a value we can't observe.
+    """
+
+    def test_drops_valid_lifetime_from_both_when_current_empty(self) -> None:
+        """The bug case: current has empty valid_lifetime, desired has a value."""
+        current = {"subnet": "fd00:1::/64", "valid_lifetime": ""}
+        desired = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
+        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        assert current == {"subnet": "fd00:1::/64"}
+        assert desired == {"subnet": "fd00:1::/64"}
+
+    def test_drops_valid_lifetime_from_both_when_current_missing(self) -> None:
+        """The other arm of the bug: key missing entirely from current."""
+        current = {"subnet": "fd00:1::/64"}
+        desired = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
+        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        assert current == {"subnet": "fd00:1::/64"}
+        assert desired == {"subnet": "fd00:1::/64"}
+
+    def test_keeps_valid_lifetime_when_current_has_value(self) -> None:
+        """Forward-compatible: future OPNsense versions returning the value re-engage comparison."""
+        current = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
+        desired = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
+        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        assert current == {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
+        assert desired == {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
+
+    def test_keeps_valid_lifetime_to_detect_real_drift(self) -> None:
+        """When current is non-empty and differs from desired, drift IS detected."""
+        current = {"subnet": "fd00:1::/64", "valid_lifetime": "3600"}
+        desired = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
+        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        assert current == {"subnet": "fd00:1::/64", "valid_lifetime": "3600"}
+        assert desired == {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
+        # Caller's equality check would still detect a difference.
+        assert current != desired
+
+    def test_does_not_touch_other_fields(self) -> None:
+        """Helper only drops keys named in _ASYMMETRIC_SUBNET_FIELDS."""
+        current = {"subnet": "fd00:1::/64", "description": "", "pools": "::10-::ff"}
+        desired = {"subnet": "fd00:1::/64", "description": "new", "pools": "::10-::ff"}
+        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        assert current == {"subnet": "fd00:1::/64", "description": "", "pools": "::10-::ff"}
+        assert desired == {"subnet": "fd00:1::/64", "description": "new", "pools": "::10-::ff"}
+
+
 # ---------------------------------------------------------------------------
 # Integration: _generate_kea_dhcp6_resources with mocked API
 # ---------------------------------------------------------------------------
@@ -634,7 +894,7 @@ def _make_kea_mock(
 def _patch_env_and_client(
     provider: OPNsenseProvider,
     kea_mock: MagicMock,
-) -> tuple[Any, Any]:
+) -> tuple[Any, Any, Any]:
     """Return context managers that patch environment loading and KeaClient."""
     provider._current_environment = "test"  # type: ignore[attr-defined]
 
