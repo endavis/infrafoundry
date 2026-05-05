@@ -17,7 +17,7 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense.validators import (
     DHCPValidator,
-    FirewallValidator,
+    FirewallRuleValidator,
     GatewayValidator,
     InterfaceAssignmentValidator,
     NATRuleValidator,
@@ -79,7 +79,7 @@ class OPNsenseValidator:
         )
 
         # Initialize specialized validators
-        self.firewall_validator = FirewallValidator(report)
+        self.firewall_rule_validator = FirewallRuleValidator(report)
         self.dhcp_validator = DHCPValidator(report)
         self.vlan_validator = VLANValidator(report)
         self.unbound_validator = UnboundValidator(report)
@@ -202,10 +202,15 @@ class OPNsenseValidator:
             )
 
             # Validate using specialized validators
-            self.firewall_validator.validate(
+            self.firewall_rule_validator.validate(
                 resource_refs["firewall_rules"],
                 resource_refs["alias_names"],
+                resource_refs["interface_assignment_names"],
+                resource_refs["gateway_names"],
+                existing_interfaces,
                 existing_aliases,
+                existing_gateways,
+                managed_gateways=resource_refs["gateways"],
             )
             self.dhcp_validator.validate(
                 resource_refs["dhcp_maps"],

@@ -1,10 +1,10 @@
 # ADR-0015: OPNsense firewall_rules direct-API via MVC controller
 
-**Status:** Proposed
+**Status:** Accepted
 
 ## Status
 
-Proposed — pending review of [#742](https://github.com/endavis/infrafoundry/issues/742).
+Accepted — implemented in [#742](https://github.com/endavis/infrafoundry/issues/742).
 
 ## Context
 
@@ -97,6 +97,8 @@ This sequence is added to [`docs/development/opnsense-resource-coverage.md`](../
 Existing `firewall_rules.tf.j2` rendering and the validator's terraform-managed firewall rule path **stay callable** during the deprecation window. The provider dispatch table (`OPNsenseProvider.get_direct_api_resource_types()`) routes `firewall_rules` resources to the new component manager **by default**; envs that have terraform-managed firewall rules in state can opt back into the old path via `kind: legacy` on the resource (parallel to `nat_rules`'s `kind: outbound | one_to_one | port_forward`) for one minor-release window. Removal of the terraform path is a follow-up issue with its own migration note for affected envs.
 
 If the PR-level review concludes there are no envs with terraform-managed `firewall_rules` worth carrying forward (the `endavis-infra` repo has 0; no other consuming repo is known), the `kind: legacy` shim can be dropped from the implementation and the terraform path retired in the same PR. Decide in the implementation PR.
+
+**Resolved at implementation time (#742, 2026-05-05):** terraform path retired cleanly — no `kind: legacy` shim. `endavis-infra` has zero terraform-managed firewall rules; no other consuming repo was identified at PR-review time. The legacy `firewall_rules.tf.j2` template, `_generate_firewall_rules_terraform`, the `firewall_rules` row in `get_terraform_resource_types()`, the `firewall_rules` block in `outputs.tf.j2`, and the alias-only `FirewallValidator` were deleted in the implementation PR. New deployments and existing greenfield envs use the direct-API path exclusively.
 
 ## Implementation outline
 
