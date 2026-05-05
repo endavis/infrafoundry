@@ -26,6 +26,7 @@ EXPECTED_RESOURCE_TYPES = [
     "static_routes",
     "unbound_forward",
     "unbound_host_alias",
+    "unbound_host_override",
     "virtual_ips",
     "vlans",
 ]
@@ -38,8 +39,8 @@ def provider(tmp_path: Path) -> OPNsenseProvider:
 
 
 @pytest.mark.usefixtures("provider")
-def test_provider_registers_all_twelve_components() -> None:
-    """Instantiating the provider registers all 12 expected components."""
+def test_provider_registers_all_thirteen_components() -> None:
+    """Instantiating the provider registers all 13 expected components."""
     registered = list_extractor_resource_types("opnsense")
 
     for resource_type in EXPECTED_RESOURCE_TYPES:
@@ -169,6 +170,31 @@ def test_aliases_extractor_delegates_to_alias_manager() -> None:
     init_mock.assert_called_once()
     migrate_mock.assert_called_once_with("env_test")
     assert result == "aliases: stub"
+
+
+@pytest.mark.usefixtures("provider")
+def test_unbound_host_override_extractor_delegates_to_manager() -> None:
+    """``opnsense:unbound_host_override`` delegates to ``UnboundHostOverrideManager.migrate``."""
+    from infrafoundry.providers.opnsense.components.unbound_host_override import (
+        UnboundHostOverrideManager,
+    )
+
+    extractor = get_extractor("opnsense", "unbound_host_override")
+
+    assert isinstance(extractor, _ExtractorAdapter)
+    assert extractor.manager_class is UnboundHostOverrideManager
+
+    with (
+        patch.object(extractor.manager_class, "__init__", return_value=None) as init_mock,
+        patch.object(
+            extractor.manager_class, "migrate", return_value="unbound_host_override: stub"
+        ) as migrate_mock,
+    ):
+        result = extractor.extract("env_test")
+
+    init_mock.assert_called_once()
+    migrate_mock.assert_called_once_with("env_test")
+    assert result == "unbound_host_override: stub"
 
 
 @pytest.mark.usefixtures("provider")
