@@ -9,6 +9,7 @@
 **Amended:** 2026-05-04 (#725) — `port_forward` per-component decision recorded (stock direct-REST against `firewall/d_nat/*`; extends `nat_rules` with a third `kind`; identical mechanism to outbound and 1:1; no new wire mechanism)
 **Amended:** 2026-05-04 (#726) — §8 resolved: pluggable extractor registry replaces per-component dispatch on the provider and CLI; new components are reachable via `config migrate` as soon as they register an extractor
 **Amended:** 2026-05-05 (#742) — `firewall_rules` per-component decision recorded (stock direct-REST against the MVC `firewall/filter/*` controller; identity scheme matches `nat_rules`; legacy terraform path retired in the same PR — no `kind: legacy` shim). See ADR-0015 for the full driving decision.
+**Amended:** 2026-05-05 (#746) — identity-marker bootstrap mechanism amended: shared, thread-safe helper (`services/_category_marker.py`) replaces per-service-lazy lookup. Closes a theoretical race between concurrent `firewall_rules` and `nat_rules` first apply against a fresh box (OPNsense `addItem` is not idempotent by category name). The "Per-component decisions" section gets a new "Marker bootstrap" entry; no per-component decisions change.
 **Status:** Accepted
 
 ## Status
@@ -191,6 +192,12 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 **Rollback strategy:** Same as the rest of §1's default mechanism — per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. `firewall/filter/savepoint` is exposed on the service for manual rollback (15-revision retention) but is not auto-wired into apply.
 
+### Marker bootstrap (#746, amended 2026-05-05)
+
+The `infrafoundry` category UUID is resolved via a shared, thread-safe helper (`src/infrafoundry/providers/opnsense/services/_category_marker.py`) rather than per-service lazy lookup. The helper holds a process-local cache keyed by OPNsense client `base_url` and serializes the search+create critical section under a `threading.Lock`. This closes a theoretical race that would surface if `OPNsenseDirectRunner.apply()` ever dispatched components concurrently — `addItem` is not idempotent by category name on OPNsense's side, so two concurrent first-apply dispatches would create two distinct `infrafoundry` rows. The runner's responsibility is unchanged; the fix lives entirely in the service layer.
+
+Both `FirewallRuleService._ensure_infrafoundry_category` and `NATRuleService._ensure_infrafoundry_category` are now thin wrappers that delegate to the helper. Each service keeps its per-instance `_category_uuid` cache as a fast-path so an instance that already resolved the UUID does not pay even the helper's dict-lookup cost on subsequent calls.
+
 ## Secrets handling
 
 Direct-API resources can declare secret-bearing fields as `secret://env_secrets/<dotted/path>` URIs in YAML. Resolution is performed at apply time by the component manager, which:
@@ -245,6 +252,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#724](https://github.com/endavis/infrafoundry/issues/724): feat: add OPNsense Unbound extensions — `unbound_host_alias` and `unbound_forward` (direct-API; merges domain_override into forward per live probe).
 - Issue [#725](https://github.com/endavis/infrafoundry/issues/725): feat: add OPNsense `port_forward` kind on `nat_rules` (direct-API at `firewall/d_nat`; closes ADR-0013 implementation-order item #2; the 2026-05-04 re-probe corrected the original deferral premise).
 - Issue [#726](https://github.com/endavis/infrafoundry/issues/726): refactor: extract `config migrate` extractor registry from per-component dispatch (resolves §8; breaking CLI rename `kea/dhcp` → `kea_dhcp` and `isc-to-kea` → `isc_to_kea`).
+- Issue [#746](https://github.com/endavis/infrafoundry/issues/746): bug — identity-marker race condition between concurrent `firewall_rules` and `nat_rules` first apply (closed by the shared-helper bootstrap recorded under "Marker bootstrap" above).
 
 ## Related Documentation
 

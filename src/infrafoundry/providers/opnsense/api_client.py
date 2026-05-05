@@ -27,6 +27,7 @@ class OPNsenseClient:
         verify_ssl: bool = True,
         timeout: int = 30,
     ) -> None:
+        self._base_url = base_url
         self.client = OpenAPIOPNsenseClient(
             base_url=base_url,
             api_key=api_key,
@@ -35,6 +36,17 @@ class OPNsenseClient:
             timeout=timeout,
             auto_detect_version=False,
         )
+
+    @property
+    def base_url(self) -> str:
+        """The OPNsense base URL this client targets.
+
+        Used as the per-box cache key by the shared
+        ``ensure_infrafoundry_category`` helper (#746) so that a single
+        process talking to multiple OPNsense boxes keeps separate
+        identity-marker UUID entries per box.
+        """
+        return self._base_url
 
     def request(
         self,

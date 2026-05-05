@@ -19,6 +19,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.providers.opnsense.services._category_marker import (
+    reset_cache_for_tests as _reset_marker_cache,
+)
 from infrafoundry.providers.opnsense.services.nat_rule import (
     Diff,
     LiveNATRule,
@@ -31,6 +34,19 @@ from infrafoundry.providers.opnsense.services.nat_rule import (
     nat_rule_configs_from_resources,
     parse_identity,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_category_marker_cache() -> None:
+    """Reset the shared identity-marker cache before each test.
+
+    Without this, cached UUIDs from earlier tests would leak into later
+    tests that share the same module-level ``_category_marker._cache``,
+    masking real assertions about ``searchItem``/``addItem`` call
+    counts.
+    """
+    _reset_marker_cache()
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1477,6 +1493,20 @@ class TestCategoryBootstrap:
         svc = NATRuleService(client)
         with pytest.raises(InfraFoundryError, match="infrafoundry"):
             svc._ensure_infrafoundry_category()
+
+    def test_ensure_infrafoundry_category_uses_shared_cache(self) -> None:
+        # Two distinct service instances against the same client share the
+        # process-wide cache: only the first instance triggers searchItem;
+        # the second hits the cache via the shared helper (#746).
+        client = MagicMock()
+        client.request.return_value = {"rows": [{"uuid": "shared-uuid", "name": "infrafoundry"}]}
+        svc_a = NATRuleService(client)
+        svc_b = NATRuleService(client)
+        assert svc_a._ensure_infrafoundry_category() == "shared-uuid"
+        assert svc_b._ensure_infrafoundry_category() == "shared-uuid"
+        # Only one searchItem across both instances; the second hits the
+        # process-wide cache in ``_category_marker``.
+        assert client.request.call_count == 1
 
     def test_add_includes_category_in_payload(self) -> None:
         client = MagicMock()
