@@ -13,11 +13,13 @@ Coverage:
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
+from infrafoundry.core.exceptions import APIError, AuthenticationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.services._category_marker import (
     reset_cache_for_tests as _reset_marker_cache,
@@ -1160,6 +1162,231 @@ class TestServiceSearch:
         assert "firewall/source_nat/searchRule" in endpoints
         assert "firewall/one_to_one/searchRule" in endpoints
         assert "firewall/d_nat/searchRule" in endpoints
+
+
+def _make_per_kind_request(
+    *,
+    outbound_response: Any = None,
+    one_to_one_response: Any = None,
+    port_forward_response: Any = None,
+) -> Any:
+    """Build a ``client.request`` side-effect that routes by URL substring.
+
+    Returns a callable that, when invoked with ``(method, url, **kwargs)``,
+    inspects ``url`` and returns (or raises) the response configured for
+    the matching NAT kind. Each ``*_response`` may be either a value to
+    return or an ``Exception`` instance to raise. ``None`` causes an
+    ``AssertionError`` (which surfaces as an unexpected call).
+
+    The URL substrings are the per-kind controller bases used by
+    :class:`NATRuleService`: ``firewall/source_nat`` (outbound),
+    ``firewall/one_to_one`` (1:1), ``firewall/d_nat`` (port_forward).
+    """
+
+    def side_effect(method: str, url: str, **_kwargs: Any) -> Any:
+        if "firewall/source_nat" in url:
+            response = outbound_response
+        elif "firewall/one_to_one" in url:
+            response = one_to_one_response
+        elif "firewall/d_nat" in url:
+            response = port_forward_response
+        else:  # pragma: no cover - defensive: unexpected URL
+            raise AssertionError(f"Unexpected URL routed to mock client: {url!r}")
+        if isinstance(response, BaseException):
+            raise response
+        if response is None:  # pragma: no cover - defensive
+            raise AssertionError(f"No mock response configured for URL {url!r}")
+        return response
+
+    return side_effect
+
+
+# ---------------------------------------------------------------------------
+# search_all_tolerant — migrate-only per-kind 404 tolerance (#754)
+# ---------------------------------------------------------------------------
+
+
+class TestSearchAllTolerant:
+    """``search_all_tolerant`` skips per-kind 404s with WARNING; non-404s raise."""
+
+    def test_only_port_forward_404s(self, caplog: pytest.LogCaptureFixture) -> None:
+        # outbound + 1:1 return rows; port_forward 404s. Result should
+        # contain rows from the two surviving kinds only, and a single
+        # WARNING should fire naming ``port_forward``.
+        client = MagicMock()
+        client.request.side_effect = _make_per_kind_request(
+            outbound_response={"rows": [{"uuid": "u-out", "description": "out [infrafoundry:o1]"}]},
+            one_to_one_response={
+                "rows": [{"uuid": "u-oto", "description": "oto [infrafoundry:t1]"}]
+            },
+            port_forward_response=APIError(
+                "Not Found",
+                status_code=404,
+                response="Controller missing",
+                provider="opnsense",
+            ),
+        )
+        svc = NATRuleService(client)
+
+        with caplog.at_level(logging.WARNING):
+            result = svc.search_all_tolerant()
+
+        managed_names = sorted(r.managed_name for r in result if r.managed_name is not None)
+        assert managed_names == ["o1", "t1"]
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        message = warnings[0].getMessage()
+        assert "port_forward" in message
+        assert "404" in message
+
+    def test_two_kinds_404(self, caplog: pytest.LogCaptureFixture) -> None:
+        # outbound + port_forward 404; only 1:1 survives. Two warnings.
+        client = MagicMock()
+        client.request.side_effect = _make_per_kind_request(
+            outbound_response=APIError("404", status_code=404),
+            one_to_one_response={
+                "rows": [{"uuid": "u-oto", "description": "oto [infrafoundry:t1]"}]
+            },
+            port_forward_response=APIError("404", status_code=404),
+        )
+        svc = NATRuleService(client)
+
+        with caplog.at_level(logging.WARNING):
+            result = svc.search_all_tolerant()
+
+        managed_names = [r.managed_name for r in result]
+        assert managed_names == ["t1"]
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert len(warnings) == 2
+        kinds_in_messages = {
+            kind
+            for rec in warnings
+            for kind in ("outbound", "one_to_one", "port_forward")
+            if kind in rec.getMessage()
+        }
+        assert kinds_in_messages == {"outbound", "port_forward"}
+
+    def test_all_three_kinds_404(self, caplog: pytest.LogCaptureFixture) -> None:
+        # All three controllers 404. Result is empty; three warnings.
+        client = MagicMock()
+        client.request.side_effect = _make_per_kind_request(
+            outbound_response=APIError("404", status_code=404),
+            one_to_one_response=APIError("404", status_code=404),
+            port_forward_response=APIError("404", status_code=404),
+        )
+        svc = NATRuleService(client)
+
+        with caplog.at_level(logging.WARNING):
+            result = svc.search_all_tolerant()
+
+        assert result == []
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert len(warnings) == 3
+
+    def test_non_404_api_error_propagates(self) -> None:
+        # 500 errors must not be swallowed — apply-time and migrate
+        # alike should fail loudly on a real server-side error.
+        client = MagicMock()
+        client.request.side_effect = _make_per_kind_request(
+            outbound_response={"rows": []},
+            one_to_one_response=APIError("Internal Server Error", status_code=500),
+            port_forward_response={"rows": []},
+        )
+        svc = NATRuleService(client)
+        with pytest.raises(APIError) as exc_info:
+            svc.search_all_tolerant()
+        assert exc_info.value.status_code == 500
+
+    def test_authentication_error_propagates(self) -> None:
+        # AuthenticationError is a subclass of APIError with 401/403 —
+        # it must NOT be swallowed even though it is an APIError.
+        client = MagicMock()
+        client.request.side_effect = _make_per_kind_request(
+            outbound_response=AuthenticationError("Unauthorized", status_code=401),
+            one_to_one_response={"rows": []},
+            port_forward_response={"rows": []},
+        )
+        svc = NATRuleService(client)
+        with pytest.raises(AuthenticationError) as exc_info:
+            svc.search_all_tolerant()
+        assert exc_info.value.status_code == 401
+
+    def test_success_path_matches_search_all(self, caplog: pytest.LogCaptureFixture) -> None:
+        # When no kind 404s, the tolerant variant returns the same rows
+        # as ``search_all`` (same input data) and emits no warnings.
+        rows_outbound = [{"uuid": "u-out", "description": "out [infrafoundry:o1]"}]
+        rows_one_to_one = [{"uuid": "u-oto", "description": "oto [infrafoundry:t1]"}]
+        rows_port_forward = [{"uuid": "u-pf", "descr": "pf [infrafoundry:p1]"}]
+
+        # Run search_all_tolerant.
+        client_a = MagicMock()
+        client_a.request.side_effect = _make_per_kind_request(
+            outbound_response={"rows": rows_outbound},
+            one_to_one_response={"rows": rows_one_to_one},
+            port_forward_response={"rows": rows_port_forward},
+        )
+        svc_a = NATRuleService(client_a)
+        with caplog.at_level(logging.WARNING):
+            tolerant = svc_a.search_all_tolerant()
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert warnings == []
+
+        # Run search_all on a separate client/instance with the same
+        # configured responses to compare outputs.
+        client_b = MagicMock()
+        client_b.request.side_effect = _make_per_kind_request(
+            outbound_response={"rows": rows_outbound},
+            one_to_one_response={"rows": rows_one_to_one},
+            port_forward_response={"rows": rows_port_forward},
+        )
+        svc_b = NATRuleService(client_b)
+        strict = svc_b.search_all()
+
+        # Same managed-name sequence and per-kind ordering.
+        assert [(r.kind, r.managed_name) for r in tolerant] == [
+            (r.kind, r.managed_name) for r in strict
+        ]
+
+    def test_export_to_yaml_uses_tolerant_path(self, caplog: pytest.LogCaptureFixture) -> None:
+        # End-to-end: when port_forward 404s, ``export_to_yaml`` produces
+        # YAML containing the outbound + 1:1 managed rules and a
+        # WARNING is logged naming ``port_forward``.
+        client = MagicMock()
+        client.request.side_effect = _make_per_kind_request(
+            outbound_response={
+                "rows": [
+                    {
+                        "uuid": "u-out",
+                        "description": "LAN out [infrafoundry:lan-out]",
+                        "interface": "wan",
+                        "target": "wanip",
+                    }
+                ]
+            },
+            one_to_one_response={
+                "rows": [
+                    {
+                        "uuid": "u-oto",
+                        "description": "DMZ [infrafoundry:dmz]",
+                        "interface": "wan",
+                        "external": "198.51.100.10",
+                    }
+                ]
+            },
+            port_forward_response=APIError("404", status_code=404),
+        )
+        svc = NATRuleService(client)
+
+        with caplog.at_level(logging.WARNING):
+            text = svc.export_to_yaml()
+
+        assert "lan-out" in text
+        assert "dmz" in text
+        # No port-forward managed rules emitted.
+        assert "kind: port_forward" not in text
+        warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert "port_forward" in warnings[0].getMessage()
 
 
 def _expected_with_category(rule: NATRuleConfig, category_uuid: str = "fake-cat") -> dict[str, Any]:
