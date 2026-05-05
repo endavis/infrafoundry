@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777997903394,
+  "lastUpdate": 1778000795925,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7781,6 +7781,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015910092151357497",
             "extra": "mean: 141.0827006885716 usec\nrounds: 2469"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4005ecaff6bd4f23b006663fbac9e7c9792c9b82",
+          "message": "fix: kea dhcpv6 subnet change-detection on option_data option-dicts and valid_lifetime asymmetric round-trip (merges PR #757, addresses #756)\n\n`foundry infra plan` was firing `update_dhcp6_subnet` for every managed\nsubnet plus `kea/service/reconfigure` on every plan run against an\nOPNsense 25.7.x box, even when the YAML matched live state byte-for-byte.\nTwo distinct shape mismatches in the change-detection path produced\nunconditional false-positive diffs:\n\n1. option_data.dns_servers / option_data.domain_search are returned by\n   getSubnet as nested option-dicts (`{\"\": {\"value\": \"\", \"selected\": 1}}`)\n   on 25.7+. The extractor did `str(option_data.get(...))`, producing a\n   Python repr that could never match the desired side's plain string.\n   Fixed by extracting `_select_option_dict_value` (mirrors how\n   `interface` is already handled) and using it for both option_data\n   sub-fields. Backward-compatible with the plain-string path.\n\n2. valid_lifetime is accepted on write but absent from getSubnet\n   responses on 25.7.11_1. The active culprit on this prod box.\n   Fixed by adding `_drop_non_round_trip_subnet_fields` +\n   `_ASYMMETRIC_SUBNET_FIELDS = (\"valid_lifetime\",)` constant. The\n   helper drops the field from comparison only when the live response\n   is missing/empty — a future OPNsense version that exposes the value\n   re-engages comparison automatically. The desired-side payload still\n   sends valid_lifetime, so apply continues to set it; only diff\n   triggering changes.\n\nPlan in steady state now emits zero write API calls; the existing\n`if changes_made:` guard around reconfigure_service() does the rest.\n\nLayer 1 (move kea dhcpv6 mutation off generate_terraform onto\nOPNsenseDirectRunner) is deferred to a focused follow-up — that's\nthe architectural fix for \"plan should never mutate\", whereas this\nPR is the functional change-detection fix that closes the immediate\noperator-visible bug.\n\nReferences #439 (whitespace normalization) and #441 (interface as\noption-dict) for context on prior fixes of the same shape.\n\nLive-verified against prod: 4 subnets + 12 reservations all report\n`unchanged, skipping update`; \"No DHCPv6 changes detected, skipping\nKea reconfigure\" line confirms the changes_made guard kicks in.\n\nAddresses #756\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-05T18:06:02+01:00",
+          "tree_id": "748479cda1a82538cb9de789fb438b0c8198cb07",
+          "url": "https://github.com/endavis/infrafoundry/commit/4005ecaff6bd4f23b006663fbac9e7c9792c9b82"
+        },
+        "date": 1778000795400,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8388.075492608494,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000029852180482967755",
+            "extra": "mean: 119.21685741636351 usec\nrounds: 2090"
           }
         ]
       }
