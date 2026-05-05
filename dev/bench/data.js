@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777943799588,
+  "lastUpdate": 1777976589330,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7595,6 +7595,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016832631746493745",
             "extra": "mean: 140.4524253861673 usec\nrounds: 2332"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "16b1f1f461032cfb713f0482652e31a315dca10b",
+          "message": "feat: migrate OPNsense firewall_rules to direct-API (merges PR #745, addresses #742)\n\nfeat: migrate OPNsense firewall_rules to direct-API via MVC controller\n\nMigrates firewall_rules from the terraform + browningluke/opnsense path\nto direct-API targeting the OPNsense MVC stateful filter controller at\nfirewall/filter/*. Field surface expands from ~10 to ~50 scalar/enum\nfields, covering everything production rules use (gateway, floating,\ndirection, quick, statetype, source/destination negation, <any>,\naddress-vs-network, ICMP/TCP/QoS/state knobs).\n\nMirrors the nat_rules pattern (#713/#725): three layers (service /\ncomponent manager / validator), [infrafoundry:<name>] description suffix\nidentity, infrafoundry category UUID as fleet-wide marker (multi-valued\non MVC, so appended to operator-set categories rather than overwriting).\n\nLegacy terraform path retired in this PR — no kind: legacy shim, since\nendavis-infra has zero terraform-managed firewall rules and no other\nconsumer was identified.\n\nADR-0015 flipped to Accepted; ADR-0014 amended with the firewall_rules\nper-component decision; coverage matrix updated.\n\nAddresses #742.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-05T11:22:40+01:00",
+          "tree_id": "544b0aaee43b91a1d3988918ed8ff6e733b5b312",
+          "url": "https://github.com/endavis/infrafoundry/commit/16b1f1f461032cfb713f0482652e31a315dca10b"
+        },
+        "date": 1777976588635,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7177.11285407846,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014191582117431796",
+            "extra": "mean: 139.33179264859137 usec\nrounds: 2122"
           }
         ]
       }
