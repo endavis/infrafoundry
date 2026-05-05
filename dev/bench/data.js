@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777983891696,
+  "lastUpdate": 1777991999810,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7719,6 +7719,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002242814990119685",
             "extra": "mean: 116.42267988493627 usec\nrounds: 1740"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e963b78948b7d72e76403733ddb6f9883807d91d",
+          "message": "feat: add env-var override for OPNsense direct-API runtime credentials (merges PR #752, addresses #741)\n\n* feat: add env-var override for OPNsense direct-API runtime credentials\n\nAdds an opt-in env-var override for OPNsense credentials gated by\nINFRAFOUNDRY_ALLOW_ENV_OVERRIDE. When the gate is set, OPNSENSE_API_URL,\nOPNSENSE_API_KEY, OPNSENSE_API_SECRET, and OPNSENSE_VERIFY_SSL win over\nprovider_settings.opnsense.* on a per-field basis. A one-time-per-process\nWARNING per resolved URL fires when the override changes the endpoint.\n\nResolution lives in a shared helper (services/_credentials.py); both\ndirect-API construction sites (BaseService.from_environment and the\nKea-DHCP path in OPNsenseProvider) delegate to it.\n\nADR-0014 amended with a Runtime credential resolution subsection;\nopnsense-resource-coverage.md step 5 (Switch endpoint) documents the\noverride as an alternative to editing settings.yaml. Terraform\nTF_VAR_* path is out of scope and tracked as a follow-up.\n\nAddresses #741\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* chore: silence bandit B105 and CodeQL URL-substring false positives\n\n- Add # nosec B105 to API_SECRET_ENV_VAR — the constant holds the env\n  var name \"OPNSENSE_API_SECRET\", not a credential value. Matches the\n  existing convention in providers/opnsense/__init__.py:101 and\n  providers/proxmox/__init__.py.\n- Rewrite five `assert \"URL\" in <message>` test assertions to use\n  `<message>.find(\"URL\") != -1` instead. Defuses CodeQL's\n  py/incomplete-url-substring-sanitization false positive without\n  changing what the tests assert.\n\ndoit check green; behavior unchanged.\n\nAddresses #741\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-05T15:39:23+01:00",
+          "tree_id": "78d07cdde39c2740a5b8052f9aa4821c16427731",
+          "url": "https://github.com/endavis/infrafoundry/commit/e963b78948b7d72e76403733ddb6f9883807d91d"
+        },
+        "date": 1777991998785,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6663.216989231582,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000030412047770828278",
+            "extra": "mean: 150.07765792650892 usec\nrounds: 2479"
           }
         ]
       }
