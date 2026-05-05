@@ -10,6 +10,7 @@
 **Amended:** 2026-05-04 (#726) — §8 resolved: pluggable extractor registry replaces per-component dispatch on the provider and CLI; new components are reachable via `config migrate` as soon as they register an extractor
 **Amended:** 2026-05-05 (#742) — `firewall_rules` per-component decision recorded (stock direct-REST against the MVC `firewall/filter/*` controller; identity scheme matches `nat_rules`; legacy terraform path retired in the same PR — no `kind: legacy` shim). See ADR-0015 for the full driving decision.
 **Amended:** 2026-05-05 (#746) — identity-marker bootstrap mechanism amended: shared, thread-safe helper (`services/_category_marker.py`) replaces per-service-lazy lookup. Closes a theoretical race between concurrent `firewall_rules` and `nat_rules` first apply against a fresh box (OPNsense `addItem` is not idempotent by category name). The "Per-component decisions" section gets a new "Marker bootstrap" entry; no per-component decisions change.
+**Amended:** 2026-05-05 (#741) — runtime credential resolution amended: a shared helper (`services/_credentials.py`) lets operators override `api_url` / `api_key` / `api_secret` / `verify_ssl` via `OPNSENSE_*` env vars, gated by `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1`. Both direct-API construction sites (`BaseService.from_environment` and the Kea-DHCP path in `OPNsenseProvider`) delegate to the helper. §"Secrets handling" gets a new "Runtime credential resolution" subsection; no per-component decisions change. Equivalent override paths for the terraform write path (`build_terraform_env_vars` in `core/provider_mixins.py`) and other providers are tracked as separate follow-ups.
 **Status:** Accepted
 
 ## Status
@@ -212,6 +213,22 @@ The validator (plan-time) accepts `secret://...` URIs as a valid placeholder wit
 
 **Future-proofing:** if a follow-up direct-API resource needs secrets, that issue is the place to consolidate this pattern (e.g., generalize to runner-level pre-resolution rather than per-component manager). The current component-manager-level resolution is the smallest viable path.
 
+### Runtime credential resolution (#741, 2026-05-05)
+
+OPNsense client credentials (`api_url`, `api_key`, `api_secret`, `verify_ssl`) are resolved at apply time by the shared helper `src/infrafoundry/providers/opnsense/services/_credentials.py`. Both direct-API construction sites — `BaseService.from_environment` (every direct-API service) and the Kea-DHCP path in `OPNsenseProvider` — delegate to `resolve_credentials(provider_settings)` rather than reading `provider_settings.opnsense` directly.
+
+**Precedence (gated):** when `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE` is set to a truthy value (anything not in `("", "0", "false", "no", "off")`, case-insensitive), each field resolves env-FIRST: a non-empty `OPNSENSE_API_URL` / `OPNSENSE_API_KEY` / `OPNSENSE_API_SECRET` / `OPNSENSE_VERIFY_SSL` env var wins, otherwise the corresponding `provider_settings` key is used. Empty string and unset are treated identically (fall back to settings). When the gate is unset (or falsy), behavior is unchanged from before — env vars are not consulted.
+
+**Why opt-in:** the gate prevents a forgotten direnv shell from silently mass-applying to the wrong box. An operator who exports `OPNSENSE_API_URL` for one shell session and forgets to unset it would otherwise have the next `foundry infra apply --env prod` redirect to the staging mirror (or the reverse) without warning. The gate makes the override explicit-per-shell rather than ambient.
+
+**`OPNSENSE_VERIFY_SSL` parsing** matches the project convention from `tests/integration/opnsense/test_vlan_live.py`: any value not in `("0", "false", "no", "off")` (case-insensitive after `.strip().lower()`) is true. Empty/unset falls back to the settings value.
+
+**Endpoint-redirect warning:** when the gate is active and the resolved `api_url` differs from `provider_settings.get("api_url")`, the helper emits a single WARNING-level log record naming the resolved URL. The warning is one-time per process per resolved URL — a single `infra plan` invocation that constructs multiple services produces one warning, not one per service. Override that does not change the URL (e.g., gate set with only `OPNSENSE_API_KEY` overridden) emits no warning, since there is no endpoint redirect to flag.
+
+**Operator ergonomic:** the runbook in [`opnsense-resource-coverage.md`](../development/opnsense-resource-coverage.md#box-to-box-migration-runbook-template) documents the env-var-override variant of step 5 ("Switch endpoint") for one-shot operator-driven cutover without editing the SOPS-encrypted `settings.yaml`.
+
+**Out of scope (follow-ups):** the equivalent override path for the terraform write path lives in `core/provider_mixins.py:build_terraform_env_vars`, which today reads `provider_settings` only — same gap. The same pattern for other providers (proxmox, oci) is not done. Both are tracked as separate per-subsystem issues; the issue body's claim that the terraform path already honors env vars was incorrect.
+
 ## Rationale
 
 The VLAN spike supplied the load-bearing evidence:
@@ -253,6 +270,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#725](https://github.com/endavis/infrafoundry/issues/725): feat: add OPNsense `port_forward` kind on `nat_rules` (direct-API at `firewall/d_nat`; closes ADR-0013 implementation-order item #2; the 2026-05-04 re-probe corrected the original deferral premise).
 - Issue [#726](https://github.com/endavis/infrafoundry/issues/726): refactor: extract `config migrate` extractor registry from per-component dispatch (resolves §8; breaking CLI rename `kea/dhcp` → `kea_dhcp` and `isc-to-kea` → `isc_to_kea`).
 - Issue [#746](https://github.com/endavis/infrafoundry/issues/746): bug — identity-marker race condition between concurrent `firewall_rules` and `nat_rules` first apply (closed by the shared-helper bootstrap recorded under "Marker bootstrap" above).
+- Issue [#741](https://github.com/endavis/infrafoundry/issues/741): feat — env-var override for OPNsense direct-API runtime credentials. Adds the shared `services/_credentials.py` helper, the `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE` gate, and the endpoint-redirect warning recorded under "Runtime credential resolution" above.
 
 ## Related Documentation
 

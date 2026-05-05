@@ -521,12 +521,14 @@ class OPNsenseProvider(
 
         # Initialize API client ONCE
         from .api_client import KeaClient, OPNsenseClient
+        from .services._credentials import resolve_credentials
 
+        api_url, api_key, api_secret, verify_ssl = resolve_credentials(provider_settings)
         client = OPNsenseClient(
-            api_key=provider_settings.get("api_key", ""),
-            api_secret=provider_settings.get("api_secret", ""),
-            base_url=provider_settings.get("api_url", ""),
-            verify_ssl=provider_settings.get("verify_ssl", True),
+            api_key=api_key,
+            api_secret=api_secret,
+            base_url=api_url,
+            verify_ssl=verify_ssl,
         )
         kea = KeaClient(client)
 
