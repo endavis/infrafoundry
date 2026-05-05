@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777934447827,
+  "lastUpdate": 1777943799588,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7564,6 +7564,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000329224007066539",
             "extra": "mean: 175.81006060547196 usec\nrounds: 66"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3903e8142912ca106eaa7935425929e8bddd9771",
+          "message": "docs: propose ADR-0015 for firewall_rules direct-API via MVC controller (merges PR #744, addresses #742)\n\nDrafts the architecture decision for migrating firewall_rules to direct-API\nagainst OPNsense's MVC firewall/filter/* controller, replacing the\nterraform/browningluke path. Survey of opnsense-a (26.1.6_2) confirmed\nthe full field surface (53 fields) covers 100% of #742's required gaps\nand the standard CRUD + apply + savepoint endpoints are live with no\ncontroller fork required.\n\nAddresses #742.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-05T02:16:10+01:00",
+          "tree_id": "2d3257b809f8c3cdca13a44a0f7aafb979ba23b8",
+          "url": "https://github.com/endavis/infrafoundry/commit/3903e8142912ca106eaa7935425929e8bddd9771"
+        },
+        "date": 1777943798373,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7119.848569724214,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016832631746493745",
+            "extra": "mean: 140.4524253861673 usec\nrounds: 2332"
           }
         ]
       }
