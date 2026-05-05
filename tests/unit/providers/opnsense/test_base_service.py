@@ -123,7 +123,7 @@ class TestFromEnvironmentWithOverride:
         # And the redirect WARNING fires once, naming the resolved URL.
         warnings = [r for r in caplog.records if r.name == CREDENTIALS_LOGGER]
         assert len(warnings) == 1
-        assert "https://prod-mirror.example" in warnings[0].getMessage()
+        assert warnings[0].getMessage().find("https://prod-mirror.example") != -1
 
     def test_no_provider_settings_raises(
         self,

@@ -135,7 +135,7 @@ class TestOverrideBehavior:
         # URL changed → warning fires once and names the resolved URL.
         warnings = [r for r in caplog.records if r.name == CREDENTIALS_LOGGER]
         assert len(warnings) == 1
-        assert "https://mirror.example" in warnings[0].getMessage()
+        assert warnings[0].getMessage().find("https://mirror.example") != -1
 
     def test_key_override_only(
         self,
@@ -189,7 +189,7 @@ class TestOverrideBehavior:
         assert result == ("https://mirror.example", "env-key", "env-secret", False)
         warnings = [r for r in caplog.records if r.name == CREDENTIALS_LOGGER]
         assert len(warnings) == 1
-        assert "https://mirror.example" in warnings[0].getMessage()
+        assert warnings[0].getMessage().find("https://mirror.example") != -1
 
 
 # ---------------------------------------------------------------------------
@@ -352,8 +352,8 @@ class TestWarningBehavior:
         # One warning per distinct resolved URL.
         assert len(warnings) == 2
         messages = sorted(w.getMessage() for w in warnings)
-        assert "https://mirror-a.example" in messages[0]
-        assert "https://mirror-b.example" in messages[1]
+        assert messages[0].find("https://mirror-a.example") != -1
+        assert messages[1].find("https://mirror-b.example") != -1
 
 
 # ---------------------------------------------------------------------------
