@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777981582993,
+  "lastUpdate": 1777983891696,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7688,6 +7688,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010295601614595046",
             "extra": "mean: 135.3089868611293 usec\nrounds: 2740"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e8fc8b06e6d9496c82d81801a990c46ef308bb6b",
+          "message": "fix: serialize infrafoundry category bootstrap to close race between firewall_rules and nat_rules (merges PR #751, addresses #746)\n\nAddresses #746\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-05T13:24:17+01:00",
+          "tree_id": "db1f6bd8a6ea3697adf436507c91b7383d5e58a2",
+          "url": "https://github.com/endavis/infrafoundry/commit/e8fc8b06e6d9496c82d81801a990c46ef308bb6b"
+        },
+        "date": 1777983890691,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8589.391697462448,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002242814990119685",
+            "extra": "mean: 116.42267988493627 usec\nrounds: 1740"
           }
         ]
       }
