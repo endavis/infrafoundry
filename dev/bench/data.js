@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777976589330,
+  "lastUpdate": 1777979468169,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7626,6 +7626,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014191582117431796",
             "extra": "mean: 139.33179264859137 usec\nrounds: 2122"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3809033ac21a551deaecd0fe82e00bad2b8d2a41",
+          "message": "feat: add config-migrate extractor for opnsense aliases (merges PR #749, addresses #747)\n\nAddresses #747\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-05T12:10:35+01:00",
+          "tree_id": "eb1338119b493e279b38cad33cb9fdc996f57a44",
+          "url": "https://github.com/endavis/infrafoundry/commit/3809033ac21a551deaecd0fe82e00bad2b8d2a41"
+        },
+        "date": 1777979467208,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6581.748352363136,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000321374756530335",
+            "extra": "mean: 151.93531360720533 usec\nrounds: 2484"
           }
         ]
       }
