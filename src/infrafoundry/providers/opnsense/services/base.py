@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Self
 
 from ..api_client import OPNsenseClient
+from ._credentials import resolve_credentials
 
 
 class BaseService(ABC):  # noqa: B024
@@ -31,6 +32,14 @@ class BaseService(ABC):  # noqa: B024
     ) -> Self:
         """Create service instance from environment configuration.
 
+        Resolves credentials via ``resolve_credentials`` so that, when
+        ``INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1`` is set, ``OPNSENSE_API_URL``
+        / ``OPNSENSE_API_KEY`` / ``OPNSENSE_API_SECRET`` /
+        ``OPNSENSE_VERIFY_SSL`` env vars take precedence over
+        ``settings.yaml``. See
+        ``infrafoundry.providers.opnsense.services._credentials`` and
+        ADR-0014 §"Secrets handling" → "Runtime credential resolution".
+
         Args:
             env_name: Environment name (e.g., 'prod', 'dev')
             provider_name: Provider name (e.g., 'opnsense')
@@ -53,11 +62,12 @@ class BaseService(ABC):  # noqa: B024
                 f"No {provider_name} provider settings found for environment {env_name}"
             )
 
+        api_url, api_key, api_secret, verify_ssl = resolve_credentials(provider_settings)
         client = OPNsenseClient(
-            api_key=provider_settings.get("api_key", ""),
-            api_secret=provider_settings.get("api_secret", ""),
-            base_url=provider_settings.get("api_url", ""),
-            verify_ssl=provider_settings.get("verify_ssl", True),
+            api_key=api_key,
+            api_secret=api_secret,
+            base_url=api_url,
+            verify_ssl=verify_ssl,
         )
 
         return cls(client)
