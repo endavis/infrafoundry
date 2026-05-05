@@ -16,6 +16,7 @@ from infrafoundry.core.extractors import (
 from infrafoundry.providers.opnsense import OPNsenseProvider, _ExtractorAdapter
 
 EXPECTED_RESOURCE_TYPES = [
+    "aliases",
     "firewall_rules",
     "gateways",
     "interface_assignments",
@@ -37,8 +38,8 @@ def provider(tmp_path: Path) -> OPNsenseProvider:
 
 
 @pytest.mark.usefixtures("provider")
-def test_provider_registers_all_eleven_components() -> None:
-    """Instantiating the provider registers all 11 expected components."""
+def test_provider_registers_all_twelve_components() -> None:
+    """Instantiating the provider registers all 12 expected components."""
     registered = list_extractor_resource_types("opnsense")
 
     for resource_type in EXPECTED_RESOURCE_TYPES:
@@ -145,6 +146,29 @@ def test_vlans_extractor_delegates_to_vlan_manager() -> None:
     init_mock.assert_called_once()
     migrate_mock.assert_called_once_with("env_test")
     assert result == "vlans: stub"
+
+
+@pytest.mark.usefixtures("provider")
+def test_aliases_extractor_delegates_to_alias_manager() -> None:
+    """The registered ``opnsense:aliases`` extractor delegates to ``AliasManager.migrate``."""
+    from infrafoundry.providers.opnsense.components.alias import AliasManager
+
+    extractor = get_extractor("opnsense", "aliases")
+
+    assert isinstance(extractor, _ExtractorAdapter)
+    assert extractor.manager_class is AliasManager
+
+    with (
+        patch.object(extractor.manager_class, "__init__", return_value=None) as init_mock,
+        patch.object(
+            extractor.manager_class, "migrate", return_value="aliases: stub"
+        ) as migrate_mock,
+    ):
+        result = extractor.extract("env_test")
+
+    init_mock.assert_called_once()
+    migrate_mock.assert_called_once_with("env_test")
+    assert result == "aliases: stub"
 
 
 @pytest.mark.usefixtures("provider")
