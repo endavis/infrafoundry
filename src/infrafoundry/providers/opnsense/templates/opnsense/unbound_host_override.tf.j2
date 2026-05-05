@@ -16,5 +16,17 @@ resource "opnsense_unbound_host_override" "{{ override.name | replace('-', '_') 
   {% if override.config.get('enabled') is not none %}
   enabled = {{ override.config.enabled | lower }}
   {% endif %}
+
+  {% if override.config.get('rr') %}
+  rr = "{{ override.config.rr }}"
+  {% endif %}
+
+  {% if override.config.get('mxprio') %}
+  mxprio = "{{ override.config.mxprio }}"
+  {% endif %}
+
+  {% if override.config.get('mx') %}
+  mx = "{{ override.config.mx }}"
+  {% endif %}
 }
 {% endfor %}

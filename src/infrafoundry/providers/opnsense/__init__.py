@@ -139,6 +139,7 @@ class OPNsenseProvider(
         from .components.static_route import StaticRouteManager
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
+        from .components.unbound_host_override import UnboundHostOverrideManager
         from .components.virtual_ip import VirtualIPManager
         from .components.vlan import VlanManager
 
@@ -151,6 +152,7 @@ class OPNsenseProvider(
             ("gateways", GatewayManager),
             ("static_routes", StaticRouteManager),
             ("virtual_ips", VirtualIPManager),
+            ("unbound_host_override", UnboundHostOverrideManager),
             ("unbound_host_alias", UnboundHostAliasManager),
             ("unbound_forward", UnboundForwardManager),
             ("kea_dhcp", KeaDHCPManager),
