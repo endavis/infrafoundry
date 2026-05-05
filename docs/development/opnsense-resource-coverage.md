@@ -12,7 +12,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | --- | --- | --- |
 | `<vlans>` | `vlans` | Supported (direct-API via `OPNsenseDirectRunner`; ADR-0014, #709) |
 | `<OPNsense>/Firewall/Alias` | `aliases` | Supported |
-| `<filter>/rule` | `firewall_rules` | Supported |
+| `<filter>/rule` (MVC `firewall/filter/*`) | `firewall_rules` | Supported (direct-API; #742). Identity is encoded as a **suffix** in the rule description — `<operator description> [infrafoundry:<name>]` — and every managed rule also carries the OPNsense `infrafoundry` category UUID in its multi-valued `categories` list as a fleet-wide marker (the MVC multi-value field empirically coexists with operator-set categories without collision; the marker is **appended** to the operator list, not overwriting it). Live rules without the suffix tag are unmanaged and ignored by the diff (do not edit a managed rule's description in the GUI — that breaks identity parsing). Targets the **MVC stateful filter controller**, not the legacy `<filter>` block; OPNsense 26.x ships both systems and they do not auto-cross-populate. Migrating an existing legacy ruleset to MVC is a one-time GUI operator step (no REST surface for migration). The terraform path (`firewall_rules.tf.j2` + `browningluke/opnsense_firewall_rule`) was retired in the same PR — no `kind: legacy` shim. Field coverage spans the full MVC `getRule` template (~50 fields) per [ADR-0015 §"Field coverage"](../decisions/0015-opnsense-firewall-rules-direct-api-via-mvc-controller.md#field-coverage); `sched`, `shaper1`, `shaper2` punted to follow-up issues. |
 | `<OPNsense>/Kea` (DHCPv4 subnets) | `kea_subnet` | Supported |
 | `<OPNsense>/Kea` (DHCPv4 reservations) | `kea_reservation` | Supported |
 | `<OPNsense>/Kea` (DHCPv6 subnets) | `kea_dhcp6_subnet` | Supported |
@@ -78,5 +78,6 @@ Each gap row in the matrix above corresponds to a planned feature issue. The imp
 4. `virtual_ips` (#723, completed) — direct-API, natural-key tuple `(interface, mode, address, vhid)`; modes `ipalias` / `carp` / `proxyarp`; CARP `password` flows via `secret://env_secrets/<path>` URIs resolved at apply time by the new `EnvSecretsBackend`.
 5. Unbound extensions — scope reduced to two resources (`unbound_host_alias`, `unbound_forward`); `domain_override` merged into `unbound_forward` per the live API (#724, completed)
 6. `config migrate` extractors for every supported and newly-added resource type
+7. `firewall_rules` — migrated to direct-API targeting the OPNsense MVC stateful filter controller `firewall/filter/*` (#742, [ADR-0015](../decisions/0015-opnsense-firewall-rules-direct-api-via-mvc-controller.md), completed). Field coverage is ~50 scalar/enum fields (full MVC `getRule` template); legacy `<filter>/rule` and the browningluke terraform path were retired in the same PR. Operators with existing legacy rulesets must perform a one-time GUI migration at `/ui/firewall/migration` on the source box — there is no REST surface for legacy → MVC migration.
 
 The follow-up issues will be filed against the InfraFoundry repo and linked from ADR-0013 as they're created.

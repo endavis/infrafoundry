@@ -14,7 +14,7 @@ edits are required.
 
 The runner deliberately runs at ``priority = -10`` so that direct-API resources
 (e.g., VLANs) are applied before any terraform-managed dependents
-(``firewall_rules``, ``dhcp_static_maps``) within the same provider. See
+(``dhcp_static_maps``) within the same provider. See
 ``orchestrator_workflows.py::_get_sorted_runners`` for the priority sort.
 
 Drift detection (``DriftDetectable``) is intentionally not implemented in this
@@ -78,8 +78,7 @@ class OPNsenseDirectRunner(BaseRunner):
 
         The orchestrator sorts runners by priority before each phase; placing
         this runner at -10 guarantees that VLAN add/update/delete completes
-        before terraform plans dependents like firewall_rules and
-        dhcp_static_maps.
+        before terraform plans dependents like dhcp_static_maps.
         """
         return -10
 

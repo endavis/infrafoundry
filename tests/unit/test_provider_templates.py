@@ -391,25 +391,6 @@ class TestOPNsenseTemplates:
         return OPNsenseProvider(config_dir, output_dir)
 
     @pytest.fixture
-    def firewall_rule(self) -> ResourceConfig:
-        """Create firewall rule resource."""
-        return ResourceConfig(
-            provider="opnsense",
-            type="firewall_rules",
-            name="allow-web-traffic",
-            config={
-                "name": "allow-web-traffic",
-                "action": "pass",
-                "interface": "lan",
-                "protocol": "tcp",
-                "source": "any",
-                "destination": "192.168.1.10",
-                "destination_port": "80,443",
-                "description": "Allow web traffic to web server",
-            },
-        )
-
-    @pytest.fixture
     def vlan_resource(self) -> ResourceConfig:
         """Create VLAN resource."""
         return ResourceConfig(
@@ -445,21 +426,26 @@ class TestOPNsenseTemplates:
         assert "opnsense" in content
         assert "browningluke/opnsense" in content
 
-    def test_generate_firewall_rule_terraform(
-        self, provider: OPNsenseProvider, firewall_rule: ResourceConfig
+    def test_generate_firewall_rule_terraform_does_not_emit_tf(
+        self, provider: OPNsenseProvider
     ) -> None:
-        """Test firewall rule Terraform generation."""
-        provider.generate_terraform([firewall_rule])
+        """Firewall rules are managed by ``OPNsenseDirectRunner`` per ADR-0015.
+
+        ``generate_terraform`` no longer emits a ``firewall_rules.tf`` for
+        ``firewall_rules`` resources; the direct-API runner handles them at
+        apply time. Verify the file is absent.
+        """
+        rule = ResourceConfig(
+            provider="opnsense",
+            type="firewall_rules",
+            name="allow-web-traffic",
+            config={"name": "allow-web-traffic", "action": "pass", "interface": "lan"},
+        )
+
+        provider.generate_terraform([rule])
 
         rules_tf = provider.terraform_dir / "firewall_rules.tf"
-        assert rules_tf.exists()
-
-        content = rules_tf.read_text()
-        assert "allow_web_traffic" in content
-        assert "action" in content and "pass" in content
-        assert "interface" in content and "lan" in content
-        assert 'protocol = "tcp"' in content
-        assert "Allow web traffic to web server" in content
+        assert not rules_tf.exists()
 
     def test_generate_vlan_terraform_does_not_emit_tf(
         self, provider: OPNsenseProvider, vlan_resource: ResourceConfig
@@ -490,29 +476,28 @@ class TestOPNsenseTemplates:
         assert "192.168.1.10" in content
         assert "Production web servers" in content
 
-    def test_generate_multiple_rules(self, provider: OPNsenseProvider) -> None:
-        """Test generating multiple firewall rules."""
-        rules = [
+    def test_generate_multiple_aliases(self, provider: OPNsenseProvider) -> None:
+        """Test generating multiple aliases."""
+        aliases = [
             ResourceConfig(
                 provider="opnsense",
-                type="firewall_rules",
-                name=f"rule-{i}",
+                type="aliases",
+                name=f"alias-{i}",
                 config={
-                    "name": f"rule-{i}",
-                    "action": "pass",
-                    "interface": "lan",
-                    "protocol": "tcp",
+                    "name": f"alias-{i}",
+                    "type": "host",
+                    "content": [f"10.0.0.{i}"],
                 },
             )
             for i in range(3)
         ]
 
-        provider.generate_terraform(rules)
+        provider.generate_terraform(aliases)
 
-        content = (provider.terraform_dir / "firewall_rules.tf").read_text()
-        assert "rule_0" in content
-        assert "rule_1" in content
-        assert "rule_2" in content
+        content = (provider.terraform_dir / "aliases.tf").read_text()
+        assert "alias_0" in content
+        assert "alias_1" in content
+        assert "alias_2" in content
 
     def test_generate_ansible_playbook(self, provider: OPNsenseProvider) -> None:
         """Test OPNsense Ansible playbook generation."""
@@ -573,10 +558,10 @@ class TestOPNsenseTemplates:
             assert "ansible.builtin.assert" in content
 
     def test_generate_outputs_tf(
-        self, provider: OPNsenseProvider, firewall_rule: ResourceConfig
+        self, provider: OPNsenseProvider, alias_resource: ResourceConfig
     ) -> None:
         """Test outputs.tf generation."""
-        provider.generate_terraform([firewall_rule])
+        provider.generate_terraform([alias_resource])
 
         outputs_tf = provider.terraform_dir / "outputs.tf"
         assert outputs_tf.exists()
@@ -908,8 +893,9 @@ class TestProviderResourceGrouping:
 
         provider.generate_terraform(resources)
 
-        assert (provider.terraform_dir / "firewall_rules.tf").exists()
-        # VLANs are managed by OPNsenseDirectRunner per ADR-0014 — no vlans.tf.
+        # Firewall rules are managed by OPNsenseDirectRunner per ADR-0015.
+        assert not (provider.terraform_dir / "firewall_rules.tf").exists()
+        # VLANs are managed by OPNsenseDirectRunner per ADR-0014.
         assert not (provider.terraform_dir / "vlans.tf").exists()
         assert (provider.terraform_dir / "aliases.tf").exists()
 
@@ -1016,10 +1002,14 @@ class TestProviderDependencies:
         provider = OPNsenseProvider(tmp_path / "config", tmp_path / "output")
         deps = provider.get_dependencies()
 
-        # Firewall rules depend on aliases and vlans
+        # Firewall rules (direct-API per ADR-0015) depend on aliases, vlans,
+        # interface_assignments (for ``interface``), and gateways (for the
+        # ``gateway`` policy-routing field).
         assert "firewall_rules" in deps
         assert "aliases" in deps["firewall_rules"]
         assert "vlans" in deps["firewall_rules"]
+        assert "interface_assignments" in deps["firewall_rules"]
+        assert "gateways" in deps["firewall_rules"]
 
     def test_kubernetes_get_dependencies(self, tmp_path: Path):
         """Test Kubernetes resource dependencies."""
