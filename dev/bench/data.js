@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777979468169,
+  "lastUpdate": 1777981582993,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7657,6 +7657,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000321374756530335",
             "extra": "mean: 151.93531360720533 usec\nrounds: 2484"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b88db055a0f91c131ab7eabb7b416d9a4df0ed24",
+          "message": "feat: add config-migrate extractor for opnsense unbound_host_override (merges PR #750, addresses #748)\n\nAddresses #748\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-05T12:45:47+01:00",
+          "tree_id": "2487ad9450687954fdaf23c6313d79e3af326bf7",
+          "url": "https://github.com/endavis/infrafoundry/commit/b88db055a0f91c131ab7eabb7b416d9a4df0ed24"
+        },
+        "date": 1777981582279,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7390.49211140959,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010295601614595046",
+            "extra": "mean: 135.3089868611293 usec\nrounds: 2740"
           }
         ]
       }
