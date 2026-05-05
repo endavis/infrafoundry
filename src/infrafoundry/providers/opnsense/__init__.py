@@ -129,6 +129,7 @@ class OPNsenseProvider(
         """
         from infrafoundry.core.extractors import register_extractor
 
+        from .components.alias import AliasManager
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
@@ -144,6 +145,7 @@ class OPNsenseProvider(
         components: list[tuple[str, type]] = [
             ("vlans", VlanManager),
             ("interface_assignments", InterfaceAssignmentManager),
+            ("aliases", AliasManager),
             ("nat_rules", NATRuleManager),
             ("firewall_rules", FirewallRuleManager),
             ("gateways", GatewayManager),
