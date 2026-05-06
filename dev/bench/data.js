@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778080978618,
+  "lastUpdate": 1778084633957,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7905,6 +7905,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009484748582668075",
             "extra": "mean: 104.62427936285938 usec\nrounds: 2699"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9d78d5aeb213e0b551d05796577acb7747fefb78",
+          "message": "fix: rename unbound host overrides output to avoid terraform reserved *_override.tf suffix (merges PR #764, addresses #763)",
+          "timestamp": "2026-05-06T17:23:22+01:00",
+          "tree_id": "cf87cddbb7c06d46cb7f9e9d4481f0eba74d26cb",
+          "url": "https://github.com/endavis/infrafoundry/commit/9d78d5aeb213e0b551d05796577acb7747fefb78"
+        },
+        "date": 1778084633432,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 4532.270383183835,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002329315730543532",
+            "extra": "mean: 220.639969696053 usec\nrounds: 33"
           }
         ]
       }
