@@ -533,6 +533,18 @@ class PlanOrchestrator(HookExecutionMixin):
                                 )
                                 provider_results[f"{tool_name}_plan"] = runner_result
 
+                                # Honor the runner's success flag: if the runner
+                                # returned ``success=False`` (e.g. OPNsenseDirectRunner
+                                # caught a per-component-manager exception), raise so
+                                # the CLI reports failure rather than printing a
+                                # misleading success message. The surrounding
+                                # ``except Exception`` handler emits RUNNER_FAILED.
+                                raise_on_runner_failure(
+                                    runner_result,
+                                    provider_name=provider_name,
+                                    phase="plan",
+                                )
+
                                 completed_event: RunnerEventData = {
                                     "provider": provider_name,
                                     "runner": tool_name,
