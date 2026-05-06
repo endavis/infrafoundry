@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778064472244,
+  "lastUpdate": 1778080379647,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7843,6 +7843,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005866339430820086",
             "extra": "mean: 103.3178858469394 usec\nrounds: 2155"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8a0c68ab3813c62f64dd0fa64fe453d6b94238dc",
+          "message": "fix: honor runner PlanResult.success in plan path (merges PR #762, addresses #761)",
+          "timestamp": "2026-05-06T16:12:23+01:00",
+          "tree_id": "a1abbebf9c27691bd2b8a1b5ce6ec7911cc53ea0",
+          "url": "https://github.com/endavis/infrafoundry/commit/8a0c68ab3813c62f64dd0fa64fe453d6b94238dc"
+        },
+        "date": 1778080379105,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7138.489376994251,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000023435460528924662",
+            "extra": "mean: 140.08566059126957 usec\nrounds: 2469"
           }
         ]
       }
