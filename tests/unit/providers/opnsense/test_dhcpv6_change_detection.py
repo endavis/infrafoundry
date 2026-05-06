@@ -1,33 +1,32 @@
-"""Unit tests for OPNsense DHCPv6 change detection logic.
+"""Unit tests for OPNsense DHCPv6 change detection helpers.
 
-Tests the static helper methods that extract and normalize fields from OPNsense
-API responses and desired configuration, as well as the integration behaviour of
-``_generate_kea_dhcp6_resources`` — verifying that updates and reconfigure calls
-are skipped when no changes are detected.
+Covers the module-private helpers in
+``infrafoundry.providers.opnsense.services.kea_dhcp`` that extract and
+normalize fields from OPNsense API responses and desired configuration:
+``_extract_subnet_fields``, ``_extract_reservation_fields``,
+``_build_desired_subnet_fields``, ``_build_desired_reservation_fields``,
+``_drop_non_round_trip_subnet_fields``, ``_log_field_diff``,
+``_normalize_field_value``.
+
+The integration tests that previously exercised
+``OPNsenseProvider._generate_kea_dhcp6_resources`` end-to-end have been
+migrated to ``test_kea_dhcp6_subnet_manager.py`` and
+``test_kea_dhcp6_reservation_manager.py`` along with the manager refactor
+in #758.
 """
 
 import logging
-from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
 
-import pytest
-
-from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.providers.opnsense import OPNsenseProvider, _normalize_field_value
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def provider(tmp_path: Path) -> OPNsenseProvider:
-    """Create OPNsense provider instance."""
-    config_dir = tmp_path / "config"
-    output_dir = tmp_path / "output"
-    return OPNsenseProvider(config_dir, output_dir)
-
+from infrafoundry.providers.opnsense.services.kea_dhcp import (
+    _build_desired_reservation_fields,
+    _build_desired_subnet_fields,
+    _drop_non_round_trip_subnet_fields,
+    _extract_reservation_fields,
+    _extract_subnet_fields,
+    _log_field_diff,
+    _normalize_field_value,
+)
 
 # ---------------------------------------------------------------------------
 # _extract_subnet_fields
@@ -35,7 +34,7 @@ def provider(tmp_path: Path) -> OPNsenseProvider:
 
 
 class TestExtractSubnetFields:
-    """Tests for _extract_subnet_fields static method."""
+    """Tests for _extract_subnet_fields."""
 
     def test_simple_string_fields(self) -> None:
         """Extract flat string fields from a subnet GET response."""
@@ -48,7 +47,7 @@ class TestExtractSubnetFields:
                 "interface": "opt1",
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["subnet"] == "fd00:1::/64"
         assert result["pools"] == "::10-::ff"
         assert result["valid_lifetime"] == "3600"
@@ -66,7 +65,7 @@ class TestExtractSubnetFields:
                 },
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["interface"] == "opt1"
 
     def test_interface_as_dict_multiple_selected(self) -> None:
@@ -80,7 +79,7 @@ class TestExtractSubnetFields:
                 },
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["interface"] == "opt1,opt2"
 
     def test_option_data_extracted(self) -> None:
@@ -94,7 +93,7 @@ class TestExtractSubnetFields:
                 },
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["option_data.dns_servers"] == "fd00::1,fd00::2"
         assert result["option_data.domain_search"] == "example.com"
 
@@ -115,7 +114,7 @@ class TestExtractSubnetFields:
                 },
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["option_data.dns_servers"] == ""
         assert result["option_data.domain_search"] == ""
 
@@ -136,7 +135,7 @@ class TestExtractSubnetFields:
                 },
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["option_data.dns_servers"] == "2606:4700::1"
         assert result["option_data.domain_search"] == ""
 
@@ -156,7 +155,7 @@ class TestExtractSubnetFields:
                 },
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["option_data.dns_servers"] == "2001:4860:4860::8888,2606:4700::1"
 
     def test_option_data_domain_search_as_option_dict(self) -> None:
@@ -173,7 +172,7 @@ class TestExtractSubnetFields:
                 },
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["option_data.domain_search"] == "example.com"
 
     def test_option_data_dns_servers_plain_string_still_works(self) -> None:
@@ -191,14 +190,14 @@ class TestExtractSubnetFields:
                 },
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["option_data.dns_servers"] == "2606:4700::1"
         assert result["option_data.domain_search"] == "example.com"
 
     def test_missing_fields_default_to_empty(self) -> None:
         """Missing or None fields default to empty strings."""
         api_response: dict[str, Any] = {"subnet6": {}}
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["subnet"] == ""
         assert result["pools"] == ""
         assert result["valid_lifetime"] == ""
@@ -216,7 +215,7 @@ class TestExtractSubnetFields:
                 "pools": None,
             }
         }
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["subnet"] == ""
         assert result["interface"] == ""
         assert result["pools"] == ""
@@ -224,7 +223,7 @@ class TestExtractSubnetFields:
     def test_missing_wrapper_key(self) -> None:
         """Response without the 'subnet6' wrapper key returns empty fields."""
         api_response: dict[str, Any] = {}
-        result = OPNsenseProvider._extract_subnet_fields(api_response)
+        result = _extract_subnet_fields(api_response)
         assert result["subnet"] == ""
         assert result["interface"] == ""
 
@@ -235,7 +234,7 @@ class TestExtractSubnetFields:
 
 
 class TestExtractReservationFields:
-    """Tests for _extract_reservation_fields static method."""
+    """Tests for _extract_reservation_fields."""
 
     def test_simple_string_fields(self) -> None:
         """Extract flat string fields from a reservation GET response."""
@@ -248,7 +247,7 @@ class TestExtractReservationFields:
                 "subnet": "uuid-1234",
             }
         }
-        result = OPNsenseProvider._extract_reservation_fields(api_response)
+        result = _extract_reservation_fields(api_response)
         assert result["ip_address"] == "fd00:1::10"
         assert result["duid"] == "00:01:00:01:2c:3d:00:01"
         assert result["hostname"] == "server1"
@@ -269,13 +268,13 @@ class TestExtractReservationFields:
                 },
             }
         }
-        result = OPNsenseProvider._extract_reservation_fields(api_response)
+        result = _extract_reservation_fields(api_response)
         assert result["subnet"] == "uuid-1234"
 
     def test_missing_fields_default_to_empty(self) -> None:
         """Missing fields default to empty strings."""
         api_response: dict[str, Any] = {"reservation": {}}
-        result = OPNsenseProvider._extract_reservation_fields(api_response)
+        result = _extract_reservation_fields(api_response)
         assert result["ip_address"] == ""
         assert result["duid"] == ""
         assert result["hostname"] == ""
@@ -285,7 +284,7 @@ class TestExtractReservationFields:
     def test_missing_wrapper_key(self) -> None:
         """Response without the 'reservation' wrapper key returns empty fields."""
         api_response: dict[str, Any] = {}
-        result = OPNsenseProvider._extract_reservation_fields(api_response)
+        result = _extract_reservation_fields(api_response)
         assert result["subnet"] == ""
         assert result["ip_address"] == ""
 
@@ -296,7 +295,7 @@ class TestExtractReservationFields:
 
 
 class TestBuildDesiredSubnetFields:
-    """Tests for _build_desired_subnet_fields static method."""
+    """Tests for _build_desired_subnet_fields."""
 
     def test_basic_subnet_data(self) -> None:
         """Build normalized fields from basic subnet data."""
@@ -307,7 +306,7 @@ class TestBuildDesiredSubnetFields:
             "valid_lifetime": "3600",
             "description": "VLAN 10",
         }
-        result = OPNsenseProvider._build_desired_subnet_fields(subnet_data)
+        result = _build_desired_subnet_fields(subnet_data)
         assert result["subnet"] == "fd00:1::/64"
         assert result["interface"] == "opt1"
         assert result["pools"] == "::10-::ff"
@@ -326,13 +325,13 @@ class TestBuildDesiredSubnetFields:
                 "domain_search": "example.com",
             },
         }
-        result = OPNsenseProvider._build_desired_subnet_fields(subnet_data)
+        result = _build_desired_subnet_fields(subnet_data)
         assert result["option_data.dns_servers"] == "fd00::1,fd00::2"
         assert result["option_data.domain_search"] == "example.com"
 
     def test_missing_fields_default_to_empty(self) -> None:
         """Missing fields default to empty strings."""
-        result = OPNsenseProvider._build_desired_subnet_fields({})
+        result = _build_desired_subnet_fields({})
         assert result["subnet"] == ""
         assert result["interface"] == ""
         assert result["pools"] == ""
@@ -346,7 +345,7 @@ class TestBuildDesiredSubnetFields:
 
 
 class TestBuildDesiredReservationFields:
-    """Tests for _build_desired_reservation_fields static method."""
+    """Tests for _build_desired_reservation_fields."""
 
     def test_basic_reservation_data(self) -> None:
         """Build normalized fields from basic reservation data."""
@@ -357,7 +356,7 @@ class TestBuildDesiredReservationFields:
             "hostname": "server1",
             "description": "Main server",
         }
-        result = OPNsenseProvider._build_desired_reservation_fields(reservation_data)
+        result = _build_desired_reservation_fields(reservation_data)
         assert result["subnet"] == "uuid-1234"
         assert result["ip_address"] == "fd00:1::10"
         assert result["duid"] == "00:01:00:01:2c:3d:00:01"
@@ -366,7 +365,7 @@ class TestBuildDesiredReservationFields:
 
     def test_missing_fields_default_to_empty(self) -> None:
         """Missing fields default to empty strings."""
-        result = OPNsenseProvider._build_desired_reservation_fields({})
+        result = _build_desired_reservation_fields({})
         assert all(v == "" for v in result.values())
 
 
@@ -405,9 +404,7 @@ class TestFieldComparisonRoundTrip:
                 },
             }
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_subnet_changed_description(self) -> None:
         """Subnet fields differ when description changes."""
@@ -423,9 +420,7 @@ class TestFieldComparisonRoundTrip:
                 "description": "VLAN 10",
             }
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) != OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) != _build_desired_subnet_fields(desired)
 
     def test_subnet_unchanged_with_option_dict_dns_servers(self) -> None:
         """Subnet matches when API returns the empty-sentinel option-dict shape.
@@ -457,9 +452,7 @@ class TestFieldComparisonRoundTrip:
                 },
             }
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_subnet_unchanged_with_option_dict_dns_servers_populated(self) -> None:
         """Subnet matches when API returns option-dict with a real value selected.
@@ -494,9 +487,7 @@ class TestFieldComparisonRoundTrip:
                 },
             }
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_subnet_unchanged_prod_live_fixture(self) -> None:
         """Lock in the exact captured-live shape from the user's prod box.
@@ -533,9 +524,7 @@ class TestFieldComparisonRoundTrip:
                 },
             }
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_reservation_unchanged(self) -> None:
         """Reservation fields match when API returns identical values."""
@@ -555,9 +544,9 @@ class TestFieldComparisonRoundTrip:
                 "description": "",
             }
         }
-        assert OPNsenseProvider._extract_reservation_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_reservation_fields(desired)
+        assert _extract_reservation_fields(api_response) == _build_desired_reservation_fields(
+            desired
+        )
 
     def test_reservation_changed_ip(self) -> None:
         """Reservation fields differ when IP changes."""
@@ -577,9 +566,9 @@ class TestFieldComparisonRoundTrip:
                 "description": "",
             }
         }
-        assert OPNsenseProvider._extract_reservation_fields(
-            api_response
-        ) != OPNsenseProvider._build_desired_reservation_fields(desired)
+        assert _extract_reservation_fields(api_response) != _build_desired_reservation_fields(
+            desired
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -597,8 +586,8 @@ class TestTypeNormalization:
         desired: dict[str, Any] = {"valid_lifetime": 3600}
         api_response: dict[str, Any] = {"subnet6": {"valid_lifetime": "3600"}}
         assert (
-            OPNsenseProvider._extract_subnet_fields(api_response)["valid_lifetime"]
-            == OPNsenseProvider._build_desired_subnet_fields(desired)["valid_lifetime"]
+            _extract_subnet_fields(api_response)["valid_lifetime"]
+            == _build_desired_subnet_fields(desired)["valid_lifetime"]
         )
 
 
@@ -657,9 +646,7 @@ class TestNormalizationEdgeCases:
             "interface": "opt1",
             "pools": "::10-::ff",
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_pools_different_order(self) -> None:
         """Pool ranges in different order produce matching fields."""
@@ -675,9 +662,7 @@ class TestNormalizationEdgeCases:
             "interface": "opt1",
             "pools": "::10-::1f\n::20-::ff",
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_valid_lifetime_int_in_api(self) -> None:
         """API returning valid_lifetime as int matches desired string."""
@@ -693,9 +678,7 @@ class TestNormalizationEdgeCases:
             "interface": "opt1",
             "valid_lifetime": "3600",
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_missing_option_data_matches_empty(self) -> None:
         """Missing option_data in API matches absent option_data in desired."""
@@ -709,9 +692,7 @@ class TestNormalizationEdgeCases:
             "subnet": "fd00:1::/64",
             "interface": "opt1",
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_empty_option_data_dict_matches_missing(self) -> None:
         """Empty option_data dict in API matches no option_data in desired."""
@@ -726,9 +707,7 @@ class TestNormalizationEdgeCases:
             "subnet": "fd00:1::/64",
             "interface": "opt1",
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_option_data_with_whitespace(self) -> None:
         """Whitespace in option_data values is stripped."""
@@ -750,9 +729,7 @@ class TestNormalizationEdgeCases:
                 "domain_search": "example.com",
             },
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
     def test_interface_with_whitespace(self) -> None:
         """Whitespace around interface value is stripped."""
@@ -766,9 +743,7 @@ class TestNormalizationEdgeCases:
             "subnet": "fd00:1::/64",
             "interface": "opt1",
         }
-        assert OPNsenseProvider._extract_subnet_fields(
-            api_response
-        ) == OPNsenseProvider._build_desired_subnet_fields(desired)
+        assert _extract_subnet_fields(api_response) == _build_desired_subnet_fields(desired)
 
 
 # ---------------------------------------------------------------------------
@@ -776,32 +751,38 @@ class TestNormalizationEdgeCases:
 # ---------------------------------------------------------------------------
 
 
+# The helpers' logger lives on the kea_dhcp service module after #758;
+# caplog filters propagate to the root via the shared
+# ``infrafoundry.providers.opnsense`` ancestor.
+_LOGGER_NAME = "infrafoundry.providers.opnsense.services.kea_dhcp"
+
+
 class TestLogFieldDiff:
     """Tests for _log_field_diff debug logging."""
 
-    def test_logs_differing_fields(self, provider: OPNsenseProvider, caplog: Any) -> None:
+    def test_logs_differing_fields(self, caplog: Any) -> None:
         """Differing fields are logged at DEBUG level."""
         current = {"subnet": "fd00:1::/64", "description": "old"}
         desired = {"subnet": "fd00:1::/64", "description": "new"}
-        with caplog.at_level(logging.DEBUG, logger="infrafoundry.providers.opnsense"):
-            provider._log_field_diff("test-subnet", current, desired)
+        with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
+            _log_field_diff("test-subnet", current, desired)
         assert "description" in caplog.text
         assert "'old'" in caplog.text
         assert "'new'" in caplog.text
 
-    def test_no_log_when_fields_match(self, provider: OPNsenseProvider, caplog: Any) -> None:
+    def test_no_log_when_fields_match(self, caplog: Any) -> None:
         """No log output when all fields match."""
         fields = {"subnet": "fd00:1::/64", "description": "same"}
-        with caplog.at_level(logging.DEBUG, logger="infrafoundry.providers.opnsense"):
-            provider._log_field_diff("test-subnet", fields, fields)
+        with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
+            _log_field_diff("test-subnet", fields, fields)
         assert caplog.text == ""
 
-    def test_no_log_above_debug(self, provider: OPNsenseProvider, caplog: Any) -> None:
+    def test_no_log_above_debug(self, caplog: Any) -> None:
         """No log output when log level is above DEBUG."""
         current = {"description": "old"}
         desired = {"description": "new"}
-        with caplog.at_level(logging.INFO, logger="infrafoundry.providers.opnsense"):
-            provider._log_field_diff("test-subnet", current, desired)
+        with caplog.at_level(logging.INFO, logger=_LOGGER_NAME):
+            _log_field_diff("test-subnet", current, desired)
         assert caplog.text == ""
 
 
@@ -819,7 +800,7 @@ class TestDropNonRoundTripSubnetFields:
         """The bug case: current has empty valid_lifetime, desired has a value."""
         current = {"subnet": "fd00:1::/64", "valid_lifetime": ""}
         desired = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
-        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        _drop_non_round_trip_subnet_fields(current, desired)
         assert current == {"subnet": "fd00:1::/64"}
         assert desired == {"subnet": "fd00:1::/64"}
 
@@ -827,7 +808,7 @@ class TestDropNonRoundTripSubnetFields:
         """The other arm of the bug: key missing entirely from current."""
         current = {"subnet": "fd00:1::/64"}
         desired = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
-        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        _drop_non_round_trip_subnet_fields(current, desired)
         assert current == {"subnet": "fd00:1::/64"}
         assert desired == {"subnet": "fd00:1::/64"}
 
@@ -835,7 +816,7 @@ class TestDropNonRoundTripSubnetFields:
         """Forward-compatible: future OPNsense versions returning the value re-engage comparison."""
         current = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
         desired = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
-        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        _drop_non_round_trip_subnet_fields(current, desired)
         assert current == {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
         assert desired == {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
 
@@ -843,7 +824,7 @@ class TestDropNonRoundTripSubnetFields:
         """When current is non-empty and differs from desired, drift IS detected."""
         current = {"subnet": "fd00:1::/64", "valid_lifetime": "3600"}
         desired = {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
-        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        _drop_non_round_trip_subnet_fields(current, desired)
         assert current == {"subnet": "fd00:1::/64", "valid_lifetime": "3600"}
         assert desired == {"subnet": "fd00:1::/64", "valid_lifetime": "86400"}
         # Caller's equality check would still detect a difference.
@@ -853,590 +834,6 @@ class TestDropNonRoundTripSubnetFields:
         """Helper only drops keys named in _ASYMMETRIC_SUBNET_FIELDS."""
         current = {"subnet": "fd00:1::/64", "description": "", "pools": "::10-::ff"}
         desired = {"subnet": "fd00:1::/64", "description": "new", "pools": "::10-::ff"}
-        OPNsenseProvider._drop_non_round_trip_subnet_fields(current, desired)
+        _drop_non_round_trip_subnet_fields(current, desired)
         assert current == {"subnet": "fd00:1::/64", "description": "", "pools": "::10-::ff"}
         assert desired == {"subnet": "fd00:1::/64", "description": "new", "pools": "::10-::ff"}
-
-
-# ---------------------------------------------------------------------------
-# Integration: _generate_kea_dhcp6_resources with mocked API
-# ---------------------------------------------------------------------------
-
-
-def _make_kea_mock(
-    existing_subnets: list[dict[str, Any]] | None = None,
-    existing_reservations: list[dict[str, Any]] | None = None,
-    get_subnet_responses: dict[str, dict[str, Any]] | None = None,
-    get_reservation_responses: dict[str, dict[str, Any]] | None = None,
-) -> MagicMock:
-    """Build a mock KeaClient with preconfigured responses."""
-    kea = MagicMock()
-    kea.search_dhcp6_subnets.return_value = existing_subnets or []
-    kea.search_dhcp6_reservations.return_value = existing_reservations or []
-
-    def _get_subnet(uuid: str) -> dict[str, Any]:
-        return (get_subnet_responses or {}).get(uuid, {"subnet6": {}})
-
-    def _get_reservation(uuid: str) -> dict[str, Any]:
-        return (get_reservation_responses or {}).get(uuid, {"reservation": {}})
-
-    kea.get_dhcp6_subnet.side_effect = _get_subnet
-    kea.get_dhcp6_reservation.side_effect = _get_reservation
-    kea.add_dhcp6_subnet.return_value = {"result": "saved"}
-    kea.add_dhcp6_reservation.return_value = {"result": "saved"}
-    kea.update_dhcp6_subnet.return_value = {"result": "saved"}
-    kea.update_dhcp6_reservation.return_value = {"result": "saved"}
-    kea.reconfigure_service.return_value = {"status": "ok"}
-
-    return kea
-
-
-def _patch_env_and_client(
-    provider: OPNsenseProvider,
-    kea_mock: MagicMock,
-) -> tuple[Any, Any, Any]:
-    """Return context managers that patch environment loading and KeaClient."""
-    provider._current_environment = "test"  # type: ignore[attr-defined]
-
-    config_mgr_patch = patch("infrafoundry.providers.opnsense.ConfigManager")
-    client_patch = patch("infrafoundry.providers.opnsense.OPNsenseClient")
-    kea_patch = patch("infrafoundry.providers.opnsense.KeaClient", return_value=kea_mock)
-
-    return config_mgr_patch, client_patch, kea_patch
-
-
-class TestGenerateKeaDhcp6ResourcesNoChanges:
-    """When existing resources match desired state, skip updates and reconfigure."""
-
-    def test_subnet_unchanged_skips_update_and_reconfigure(
-        self, provider: OPNsenseProvider
-    ) -> None:
-        """No update or reconfigure when subnet config matches."""
-        subnet = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_subnet",
-            name="vlan10-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "interface": "opt1",
-                "pools": [{"range": "::10-::ff"}],
-                "valid_lifetime": 3600,
-                "description": "VLAN 10",
-            },
-        )
-
-        kea = _make_kea_mock(
-            existing_subnets=[{"subnet": "fd00:1::/64", "uuid": "sub-uuid-1"}],
-            get_subnet_responses={
-                "sub-uuid-1": {
-                    "subnet6": {
-                        "subnet": "fd00:1::/64",
-                        "interface": "opt1",
-                        "pools": "::10-::ff",
-                        "valid_lifetime": "3600",
-                        "description": "VLAN 10",
-                    }
-                }
-            },
-        )
-
-        provider._current_environment = "test"  # type: ignore[attr-defined]
-        with (
-            patch("infrafoundry.core.config.ConfigManager") as cfg_cls,
-            patch(
-                "infrafoundry.providers.opnsense.api_client.OPNsenseClient",
-            ),
-            patch(
-                "infrafoundry.providers.opnsense.api_client.KeaClient",
-                return_value=kea,
-            ),
-        ):
-            env_config = MagicMock()
-            env_config.get_provider_settings.return_value = {
-                "api_key": "k",
-                "api_secret": "s",
-                "api_url": "https://fw",
-            }
-            cfg_cls.return_value.load_environment.return_value = env_config
-
-            provider._generate_kea_dhcp6_resources([subnet], [])
-
-        kea.update_dhcp6_subnet.assert_not_called()
-        kea.reconfigure_service.assert_not_called()
-
-    def test_reservation_unchanged_skips_update_and_reconfigure(
-        self, provider: OPNsenseProvider
-    ) -> None:
-        """No update or reconfigure when reservation config matches."""
-        reservation = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_reservation",
-            name="server1-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "ip_address": "fd00:1::10",
-                "duid": "00:01:00:01:2c:3d:00:01",
-                "hostname": "server1",
-                "description": "",
-            },
-        )
-
-        kea = _make_kea_mock(
-            existing_reservations=[
-                {
-                    "duid": "00:01:00:01:2c:3d:00:01",
-                    "subnet": "sub-uuid-1",
-                    "uuid": "res-uuid-1",
-                }
-            ],
-            get_reservation_responses={
-                "res-uuid-1": {
-                    "reservation": {
-                        "subnet": "sub-uuid-1",
-                        "ip_address": "fd00:1::10",
-                        "duid": "00:01:00:01:2c:3d:00:01",
-                        "hostname": "server1",
-                        "description": "",
-                    }
-                }
-            },
-        )
-
-        # Provide the subnet map so the reservation can resolve its subnet UUID
-        kea.search_dhcp6_subnets.return_value = [{"subnet": "fd00:1::/64", "uuid": "sub-uuid-1"}]
-
-        provider._current_environment = "test"  # type: ignore[attr-defined]
-        with (
-            patch("infrafoundry.core.config.ConfigManager") as cfg_cls,
-            patch(
-                "infrafoundry.providers.opnsense.api_client.OPNsenseClient",
-            ),
-            patch(
-                "infrafoundry.providers.opnsense.api_client.KeaClient",
-                return_value=kea,
-            ),
-        ):
-            env_config = MagicMock()
-            env_config.get_provider_settings.return_value = {
-                "api_key": "k",
-                "api_secret": "s",
-                "api_url": "https://fw",
-            }
-            cfg_cls.return_value.load_environment.return_value = env_config
-
-            # Pass empty subnets list but provide the subnet in search results
-            # so the reservation can resolve its subnet_id
-            provider._generate_kea_dhcp6_resources([], [reservation])
-
-        kea.update_dhcp6_reservation.assert_not_called()
-        kea.reconfigure_service.assert_not_called()
-
-
-class TestGenerateKeaDhcp6ResourcesWithChanges:
-    """When existing resources differ from desired state, update and reconfigure."""
-
-    def test_subnet_changed_triggers_update_and_reconfigure(
-        self, provider: OPNsenseProvider
-    ) -> None:
-        """Update and reconfigure when subnet description changes."""
-        subnet = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_subnet",
-            name="vlan10-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "interface": "opt1",
-                "description": "Updated VLAN 10",
-            },
-        )
-
-        kea = _make_kea_mock(
-            existing_subnets=[{"subnet": "fd00:1::/64", "uuid": "sub-uuid-1"}],
-            get_subnet_responses={
-                "sub-uuid-1": {
-                    "subnet6": {
-                        "subnet": "fd00:1::/64",
-                        "interface": "opt1",
-                        "description": "VLAN 10",
-                    }
-                }
-            },
-        )
-
-        provider._current_environment = "test"  # type: ignore[attr-defined]
-        with (
-            patch("infrafoundry.core.config.ConfigManager") as cfg_cls,
-            patch("infrafoundry.providers.opnsense.api_client.OPNsenseClient"),
-            patch("infrafoundry.providers.opnsense.api_client.KeaClient", return_value=kea),
-        ):
-            env_config = MagicMock()
-            env_config.get_provider_settings.return_value = {
-                "api_key": "k",
-                "api_secret": "s",
-                "api_url": "https://fw",
-            }
-            cfg_cls.return_value.load_environment.return_value = env_config
-
-            provider._generate_kea_dhcp6_resources([subnet], [])
-
-        kea.update_dhcp6_subnet.assert_called_once()
-        kea.reconfigure_service.assert_called_once()
-
-    def test_reservation_changed_triggers_update_and_reconfigure(
-        self, provider: OPNsenseProvider
-    ) -> None:
-        """Update and reconfigure when reservation IP changes."""
-        # A subnet resource is needed so existing_subnets_map gets populated
-        subnet = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_subnet",
-            name="vlan10-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "interface": "opt1",
-            },
-        )
-        reservation = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_reservation",
-            name="server1-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "ip_address": "fd00:1::20",
-                "duid": "00:01:00:01:2c:3d:00:01",
-                "hostname": "server1",
-                "description": "",
-            },
-        )
-
-        kea = _make_kea_mock(
-            existing_subnets=[{"subnet": "fd00:1::/64", "uuid": "sub-uuid-1"}],
-            existing_reservations=[
-                {
-                    "duid": "00:01:00:01:2c:3d:00:01",
-                    "subnet": "sub-uuid-1",
-                    "uuid": "res-uuid-1",
-                }
-            ],
-            get_subnet_responses={
-                "sub-uuid-1": {
-                    "subnet6": {
-                        "subnet": "fd00:1::/64",
-                        "interface": "opt1",
-                    }
-                }
-            },
-            get_reservation_responses={
-                "res-uuid-1": {
-                    "reservation": {
-                        "subnet": "sub-uuid-1",
-                        "ip_address": "fd00:1::10",
-                        "duid": "00:01:00:01:2c:3d:00:01",
-                        "hostname": "server1",
-                        "description": "",
-                    }
-                }
-            },
-        )
-
-        provider._current_environment = "test"  # type: ignore[attr-defined]
-        with (
-            patch("infrafoundry.core.config.ConfigManager") as cfg_cls,
-            patch("infrafoundry.providers.opnsense.api_client.OPNsenseClient"),
-            patch("infrafoundry.providers.opnsense.api_client.KeaClient", return_value=kea),
-        ):
-            env_config = MagicMock()
-            env_config.get_provider_settings.return_value = {
-                "api_key": "k",
-                "api_secret": "s",
-                "api_url": "https://fw",
-            }
-            cfg_cls.return_value.load_environment.return_value = env_config
-
-            provider._generate_kea_dhcp6_resources([subnet], [reservation])
-
-        kea.update_dhcp6_reservation.assert_called_once()
-        kea.reconfigure_service.assert_called_once()
-
-    def test_new_subnet_triggers_create_and_reconfigure(self, provider: OPNsenseProvider) -> None:
-        """Create and reconfigure when subnet does not exist yet."""
-        subnet = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_subnet",
-            name="vlan10-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "interface": "opt1",
-            },
-        )
-
-        kea = _make_kea_mock(existing_subnets=[])
-        # First call returns [] (initial search), second returns created subnet
-        kea.search_dhcp6_subnets.side_effect = [
-            [],
-            [{"subnet": "fd00:1::/64", "uuid": "new-uuid"}],
-        ]
-
-        provider._current_environment = "test"  # type: ignore[attr-defined]
-        with (
-            patch("infrafoundry.core.config.ConfigManager") as cfg_cls,
-            patch("infrafoundry.providers.opnsense.api_client.OPNsenseClient"),
-            patch("infrafoundry.providers.opnsense.api_client.KeaClient", return_value=kea),
-        ):
-            env_config = MagicMock()
-            env_config.get_provider_settings.return_value = {
-                "api_key": "k",
-                "api_secret": "s",
-                "api_url": "https://fw",
-            }
-            cfg_cls.return_value.load_environment.return_value = env_config
-
-            provider._generate_kea_dhcp6_resources([subnet], [])
-
-        kea.add_dhcp6_subnet.assert_called_once()
-        kea.reconfigure_service.assert_called_once()
-
-    def test_new_reservation_triggers_create_and_reconfigure(
-        self, provider: OPNsenseProvider
-    ) -> None:
-        """Create and reconfigure when reservation does not exist yet."""
-        # A subnet resource is needed so existing_subnets_map gets populated
-        subnet = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_subnet",
-            name="vlan10-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "interface": "opt1",
-            },
-        )
-        reservation = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_reservation",
-            name="server1-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "ip_address": "fd00:1::10",
-                "duid": "00:01:00:01:2c:3d:00:01",
-                "hostname": "server1",
-                "description": "",
-            },
-        )
-
-        kea = _make_kea_mock(
-            existing_subnets=[{"subnet": "fd00:1::/64", "uuid": "sub-uuid-1"}],
-            existing_reservations=[],
-            get_subnet_responses={
-                "sub-uuid-1": {
-                    "subnet6": {
-                        "subnet": "fd00:1::/64",
-                        "interface": "opt1",
-                    }
-                }
-            },
-        )
-
-        provider._current_environment = "test"  # type: ignore[attr-defined]
-        with (
-            patch("infrafoundry.core.config.ConfigManager") as cfg_cls,
-            patch("infrafoundry.providers.opnsense.api_client.OPNsenseClient"),
-            patch("infrafoundry.providers.opnsense.api_client.KeaClient", return_value=kea),
-        ):
-            env_config = MagicMock()
-            env_config.get_provider_settings.return_value = {
-                "api_key": "k",
-                "api_secret": "s",
-                "api_url": "https://fw",
-            }
-            cfg_cls.return_value.load_environment.return_value = env_config
-
-            provider._generate_kea_dhcp6_resources([subnet], [reservation])
-
-        kea.add_dhcp6_reservation.assert_called_once()
-        kea.reconfigure_service.assert_called_once()
-
-
-class TestGenerateKeaDhcp6ResourcesMixedChanges:
-    """Mixed scenarios: some resources changed, some not."""
-
-    def test_mixed_subnets_only_updates_changed(self, provider: OPNsenseProvider) -> None:
-        """Only the changed subnet is updated; reconfigure still called."""
-        subnet_unchanged = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_subnet",
-            name="vlan10-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "interface": "opt1",
-                "description": "VLAN 10",
-            },
-        )
-        subnet_changed = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_subnet",
-            name="vlan20-v6",
-            config={
-                "subnet": "fd00:2::/64",
-                "interface": "opt2",
-                "description": "Updated VLAN 20",
-            },
-        )
-
-        kea = _make_kea_mock(
-            existing_subnets=[
-                {"subnet": "fd00:1::/64", "uuid": "sub-uuid-1"},
-                {"subnet": "fd00:2::/64", "uuid": "sub-uuid-2"},
-            ],
-            get_subnet_responses={
-                "sub-uuid-1": {
-                    "subnet6": {
-                        "subnet": "fd00:1::/64",
-                        "interface": "opt1",
-                        "description": "VLAN 10",
-                    }
-                },
-                "sub-uuid-2": {
-                    "subnet6": {
-                        "subnet": "fd00:2::/64",
-                        "interface": "opt2",
-                        "description": "VLAN 20",
-                    }
-                },
-            },
-        )
-
-        provider._current_environment = "test"  # type: ignore[attr-defined]
-        with (
-            patch("infrafoundry.core.config.ConfigManager") as cfg_cls,
-            patch("infrafoundry.providers.opnsense.api_client.OPNsenseClient"),
-            patch("infrafoundry.providers.opnsense.api_client.KeaClient", return_value=kea),
-        ):
-            env_config = MagicMock()
-            env_config.get_provider_settings.return_value = {
-                "api_key": "k",
-                "api_secret": "s",
-                "api_url": "https://fw",
-            }
-            cfg_cls.return_value.load_environment.return_value = env_config
-
-            provider._generate_kea_dhcp6_resources([subnet_unchanged, subnet_changed], [])
-
-        # Only subnet-2 should be updated
-        kea.update_dhcp6_subnet.assert_called_once()
-        call_args = kea.update_dhcp6_subnet.call_args
-        assert call_args[0][0] == "sub-uuid-2"  # UUID of changed subnet
-        kea.reconfigure_service.assert_called_once()
-
-
-class TestSubnetWithInterfaceDict:
-    """Handle OPNsense API returning interface as a dict with selected flags."""
-
-    def test_interface_dict_matching_skips_update(self, provider: OPNsenseProvider) -> None:
-        """Skip update when interface dict's selected value matches desired."""
-        subnet = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_subnet",
-            name="vlan10-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "interface": "opt1",
-            },
-        )
-
-        kea = _make_kea_mock(
-            existing_subnets=[{"subnet": "fd00:1::/64", "uuid": "sub-uuid-1"}],
-            get_subnet_responses={
-                "sub-uuid-1": {
-                    "subnet6": {
-                        "subnet": "fd00:1::/64",
-                        "interface": {
-                            "opt1": {"value": "OPT1", "selected": 1},
-                            "opt2": {"value": "OPT2", "selected": 0},
-                        },
-                    }
-                }
-            },
-        )
-
-        provider._current_environment = "test"  # type: ignore[attr-defined]
-        with (
-            patch("infrafoundry.core.config.ConfigManager") as cfg_cls,
-            patch("infrafoundry.providers.opnsense.api_client.OPNsenseClient"),
-            patch("infrafoundry.providers.opnsense.api_client.KeaClient", return_value=kea),
-        ):
-            env_config = MagicMock()
-            env_config.get_provider_settings.return_value = {
-                "api_key": "k",
-                "api_secret": "s",
-                "api_url": "https://fw",
-            }
-            cfg_cls.return_value.load_environment.return_value = env_config
-
-            provider._generate_kea_dhcp6_resources([subnet], [])
-
-        kea.update_dhcp6_subnet.assert_not_called()
-        kea.reconfigure_service.assert_not_called()
-
-
-class TestReservationWithSubnetDict:
-    """Handle OPNsense API returning subnet as a dict with selected flags."""
-
-    def test_subnet_dict_matching_skips_update(self, provider: OPNsenseProvider) -> None:
-        """Skip update when subnet dict's selected UUID matches desired."""
-        reservation = ResourceConfig(
-            provider="opnsense",
-            type="kea_dhcp6_reservation",
-            name="server1-v6",
-            config={
-                "subnet": "fd00:1::/64",
-                "ip_address": "fd00:1::10",
-                "duid": "00:01:00:01:2c:3d:00:01",
-                "hostname": "server1",
-                "description": "",
-            },
-        )
-
-        kea = _make_kea_mock(
-            existing_reservations=[
-                {
-                    "duid": "00:01:00:01:2c:3d:00:01",
-                    "subnet": "sub-uuid-1",
-                    "uuid": "res-uuid-1",
-                }
-            ],
-            get_reservation_responses={
-                "res-uuid-1": {
-                    "reservation": {
-                        "subnet": {
-                            "sub-uuid-1": {"value": "fd00:1::/64", "selected": 1},
-                            "sub-uuid-2": {"value": "fd00:2::/64", "selected": 0},
-                        },
-                        "ip_address": "fd00:1::10",
-                        "duid": "00:01:00:01:2c:3d:00:01",
-                        "hostname": "server1",
-                        "description": "",
-                    }
-                }
-            },
-        )
-
-        kea.search_dhcp6_subnets.return_value = [{"subnet": "fd00:1::/64", "uuid": "sub-uuid-1"}]
-
-        provider._current_environment = "test"  # type: ignore[attr-defined]
-        with (
-            patch("infrafoundry.core.config.ConfigManager") as cfg_cls,
-            patch("infrafoundry.providers.opnsense.api_client.OPNsenseClient"),
-            patch("infrafoundry.providers.opnsense.api_client.KeaClient", return_value=kea),
-        ):
-            env_config = MagicMock()
-            env_config.get_provider_settings.return_value = {
-                "api_key": "k",
-                "api_secret": "s",
-                "api_url": "https://fw",
-            }
-            cfg_cls.return_value.load_environment.return_value = env_config
-
-            provider._generate_kea_dhcp6_resources([], [reservation])
-
-        kea.update_dhcp6_reservation.assert_not_called()
-        kea.reconfigure_service.assert_not_called()

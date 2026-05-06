@@ -11,6 +11,7 @@
 **Amended:** 2026-05-05 (#742) — `firewall_rules` per-component decision recorded (stock direct-REST against the MVC `firewall/filter/*` controller; identity scheme matches `nat_rules`; legacy terraform path retired in the same PR — no `kind: legacy` shim). See ADR-0015 for the full driving decision.
 **Amended:** 2026-05-05 (#746) — identity-marker bootstrap mechanism amended: shared, thread-safe helper (`services/_category_marker.py`) replaces per-service-lazy lookup. Closes a theoretical race between concurrent `firewall_rules` and `nat_rules` first apply against a fresh box (OPNsense `addItem` is not idempotent by category name). The "Per-component decisions" section gets a new "Marker bootstrap" entry; no per-component decisions change.
 **Amended:** 2026-05-05 (#741) — runtime credential resolution amended: a shared helper (`services/_credentials.py`) lets operators override `api_url` / `api_key` / `api_secret` / `verify_ssl` via `OPNSENSE_*` env vars, gated by `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1`. Both direct-API construction sites (`BaseService.from_environment` and the Kea-DHCP path in `OPNsenseProvider`) delegate to the helper. §"Secrets handling" gets a new "Runtime credential resolution" subsection; no per-component decisions change. Equivalent override paths for the terraform write path (`build_terraform_env_vars` in `core/provider_mixins.py`) and other providers are tracked as separate follow-ups.
+**Amended:** 2026-05-06 (#758) — `kea_dhcp6` per-component decision recorded (stock direct-REST against the existing `kea/dhcpv6/*` controller, now driven by `KeaDHCPv6SubnetManager` and `KeaDHCPv6ReservationManager` on `OPNsenseDirectRunner` instead of the legacy `OPNsenseProvider._generate_kea_dhcp6_resources` path that ran under `generate_terraform()`). Adds a new "Finalization hooks" subsection describing a generic runner facility for end-of-apply work shared across managers (e.g., a single Kea reconfigure for both subnets and reservations). Reservation→subnet UUID resolution now raises `ReferenceValidationError` on a missing live subnet rather than silently skipping with a warning — a behavioral upgrade.
 **Status:** Accepted
 
 ## Status
@@ -193,6 +194,32 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 **Rollback strategy:** Same as the rest of §1's default mechanism — per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. `firewall/filter/savepoint` is exposed on the service for manual rollback (15-revision retention) but is not auto-wired into apply.
 
+### `kea_dhcp6` — subnets and reservations (#758, 2026-05-06)
+
+**Mechanism:** Stock direct-REST against the existing `kea/dhcpv6/*` controller — no controller fork required (this component falls under §1's default). The wire surface is unchanged from the pre-#758 path; what changes is *where* mutation happens: two new component managers (`KeaDHCPv6SubnetManager`, `KeaDHCPv6ReservationManager`) drive `OPNsenseDirectRunner` instead of the inline `OPNsenseProvider._generate_kea_dhcp6_resources` path that ran under `generate_terraform()`.
+
+- **Endpoints:** `GET kea/dhcpv6/searchSubnet` / `getSubnet/<uuid>` / `addSubnet` / `setSubnet/<uuid>` / `delSubnet/<uuid>`, mirrored for reservations. `kea/service/reconfigure` triggers via the runner's finalization hook (see "Finalization hooks" below). All operations confirmed live on OPNsense `25.7.11_1` and `26.1.6_2` per the prior #757 / #756 work.
+- **Identity:** subnets are keyed by the natural `subnet` CIDR (operator YAML `subnet:` field; e.g., `fd00:1::/64`). Reservations are keyed by the `(duid, subnet_uuid)` tuple — same scheme the legacy path used. The reservation manager resolves `subnet` (a CIDR in YAML) → live subnet UUID at plan/apply time via `service.search_dhcpv6_subnets()`.
+- **Reservation→subnet reference scope:** the resolver raises `ReferenceValidationError` if the YAML CIDR has no live match, surfacing typos at plan time rather than silently skipping the reservation with a warning at apply time. This is a deliberate behavioral upgrade over the legacy path.
+- **Change-detection helpers:** the `_extract_*` / `_build_desired_*` / `_drop_non_round_trip_subnet_fields` / `_log_field_diff` / `_select_option_dict_value` / `_normalize_field_value` helpers (originally added in PR #757 for #756) live at module scope in `src/infrafoundry/providers/opnsense/services/kea_dhcp.py`. The asymmetric `valid_lifetime` and option-dict normalization fixes from #757 survive intact (relocation, not rewrite).
+- **`add_only`:** both managers honor the `--add-only` runner flag (a behavioral gain — the legacy path had no concept of `add_only`).
+- **Path-B over Path-A:** the alternative was to add a runner-level "post-apply pass" contract specifically for the kea reconfigure. Path B (manager split + reusable finalization hook) was chosen because the subnet/reservation managers fall cleanly into the existing nine-component dispatch table, the finalization-hook mechanism generalizes (future components with shared post-apply work can reuse it), and the runner contract stays simpler (one `apply()` body, opt-in hook attribute on the manager class).
+
+**Rollback strategy:** Same as the rest of §1's default mechanism — per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. No transactional rollback.
+
+### Finalization hooks (runner facility, #758)
+
+`OPNsenseDirectRunner.apply()` exposes a generic end-of-apply hook mechanism so component managers can defer work that must run **after** every component has applied (instead of running it in each manager's own `apply` body, which would double-fire on shared-resource operations like a Kea reconfigure).
+
+The contract is opt-in on both sides and graceful in absence:
+
+1. **Manager side (opt-in):** A component manager class declares an optional class-level attribute `FINALIZATION_HOOK: ClassVar[str] = "<key>"`. Managers that don't declare it are unaffected.
+2. **Provider side (opt-in):** A provider exposes an optional method `get_finalization_hooks(self) -> dict[str, Callable[[str], None]]` returning hook callables keyed by string. Providers that don't implement it are a graceful no-op (the runner falls back to skipping the hook firing).
+3. **Runner side (mandatory plumbing):** During `apply()`, the runner tracks per-type "had_changes" booleans (sum of created/updated/deleted > 0) and collects the `FINALIZATION_HOOK` value of every manager that mutated state. The collected set is deduped, then each unique key resolves to a hook callable via `provider.get_finalization_hooks()`. Each callable is invoked exactly once with `env_name`. Hook errors propagate so a failing post-apply step (e.g., reconfigure) fails the apply loud.
+4. **Contract scope:** Hooks fire on `apply` only. `plan` and `destroy` skip the hook firing entirely — `plan` never mutates, and `destroy` is a separate operational mode where the operator explicitly opts into per-component teardown semantics.
+
+The first registered hook is `kea_dhcp6_reconfigure`, declared on both `KeaDHCPv6SubnetManager` and `KeaDHCPv6ReservationManager`, resolved by `OPNsenseProvider.get_finalization_hooks()` to a closure that calls `KeaDHCPService.reconfigure()`. Subnet and reservation changes that land in the same `apply` share a single Kea reconfigure firing — preserving the legacy "one reconfigure per plan/apply" operational behavior. Future components with shared post-apply work register their own key here.
+
 ### Marker bootstrap (#746, amended 2026-05-05)
 
 The `infrafoundry` category UUID is resolved via a shared, thread-safe helper (`src/infrafoundry/providers/opnsense/services/_category_marker.py`) rather than per-service lazy lookup. The helper holds a process-local cache keyed by OPNsense client `base_url` and serializes the search+create critical section under a `threading.Lock`. This closes a theoretical race that would surface if `OPNsenseDirectRunner.apply()` ever dispatched components concurrently — `addItem` is not idempotent by category name on OPNsense's side, so two concurrent first-apply dispatches would create two distinct `infrafoundry` rows. The runner's responsibility is unchanged; the fix lives entirely in the service layer.
@@ -271,6 +298,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#726](https://github.com/endavis/infrafoundry/issues/726): refactor: extract `config migrate` extractor registry from per-component dispatch (resolves §8; breaking CLI rename `kea/dhcp` → `kea_dhcp` and `isc-to-kea` → `isc_to_kea`).
 - Issue [#746](https://github.com/endavis/infrafoundry/issues/746): bug — identity-marker race condition between concurrent `firewall_rules` and `nat_rules` first apply (closed by the shared-helper bootstrap recorded under "Marker bootstrap" above).
 - Issue [#741](https://github.com/endavis/infrafoundry/issues/741): feat — env-var override for OPNsense direct-API runtime credentials. Adds the shared `services/_credentials.py` helper, the `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE` gate, and the endpoint-redirect warning recorded under "Runtime credential resolution" above.
+- Issue [#758](https://github.com/endavis/infrafoundry/issues/758): refactor — move `kea_dhcp6` management off `generate_terraform()` onto `OPNsenseDirectRunner` via two new component managers + a reusable finalization-hook runner facility. Recorded under "Per-component decisions" / `kea_dhcp6` and "Finalization hooks" above.
 
 ## Related Documentation
 

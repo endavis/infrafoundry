@@ -13,6 +13,7 @@ Coverage:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -603,3 +604,211 @@ class TestMultiComponentDispatch:
         vlan_manager.plan.assert_called_once()
         passed_resources = vlan_manager.plan.call_args.args[1]
         assert all(r.type == "vlans" for r in passed_resources)
+
+
+# ---------------------------------------------------------------------------
+# Finalization-hook plumbing (#758)
+# ---------------------------------------------------------------------------
+
+
+def _hook_manager(
+    *,
+    hook_key: str | None,
+    created: int = 0,
+    updated: int = 0,
+    deleted: int = 0,
+) -> tuple[MagicMock, MagicMock]:
+    """Build a manager_cls + manager_instance pair with a configurable hook key.
+
+    The first element is the dispatch-table value (a callable returning the
+    instance); the second is the manager instance. Tests assert on the
+    instance's apply-call shape and on the runner's hook firing.
+    """
+    instance = MagicMock()
+    instance.apply.return_value = {
+        "success": True,
+        "resources_created": created,
+        "resources_updated": updated,
+        "resources_deleted": deleted,
+        "resource_outcomes": [],
+    }
+
+    cls = MagicMock(return_value=instance)
+    if hook_key is not None:
+        cls.FINALIZATION_HOOK = hook_key
+    else:
+        # Manager class explicitly without the attribute.
+        if hasattr(cls, "FINALIZATION_HOOK"):
+            del cls.FINALIZATION_HOOK
+    return cls, instance
+
+
+class TestFinalizationHookPlumbing:
+    """Apply collects ``FINALIZATION_HOOK`` keys from changed managers and fires them once."""
+
+    def test_hook_fires_when_manager_had_changes(self, provider_with_env: MagicMock) -> None:
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        manager_cls, _ = _hook_manager(hook_key="my_hook", created=1)
+        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"my_hook": hook}
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+        hook.assert_called_once_with("test-env")
+
+    def test_hook_skipped_when_manager_had_no_changes(self, provider_with_env: MagicMock) -> None:
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        manager_cls, _ = _hook_manager(hook_key="my_hook", created=0)
+        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"my_hook": hook}
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+        hook.assert_not_called()
+
+    def test_shared_hook_key_fires_once(self, provider_with_env: MagicMock) -> None:
+        # Two different manager classes both declare the same FINALIZATION_HOOK
+        # key — the runner must dedupe and call the hook exactly once.
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10), _ifa_resource("lan")]
+
+        cls_a, _ = _hook_manager(hook_key="shared_hook", created=1)
+        cls_b, _ = _hook_manager(hook_key="shared_hook", updated=1)
+
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "vlans": cls_a,
+            "interface_assignments": cls_b,
+        }
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"shared_hook": hook}
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+
+        hook.assert_called_once_with("test-env")
+
+    def test_distinct_hook_keys_fire_each_once(self, provider_with_env: MagicMock) -> None:
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10), _ifa_resource("lan")]
+
+        cls_a, _ = _hook_manager(hook_key="hook_a", created=1)
+        cls_b, _ = _hook_manager(hook_key="hook_b", deleted=1)
+
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "vlans": cls_a,
+            "interface_assignments": cls_b,
+        }
+        hook_a = MagicMock()
+        hook_b = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {
+            "hook_a": hook_a,
+            "hook_b": hook_b,
+        }
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+
+        hook_a.assert_called_once_with("test-env")
+        hook_b.assert_called_once_with("test-env")
+
+    def test_manager_without_hook_key_does_not_trigger(self, provider_with_env: MagicMock) -> None:
+        # A manager that simply doesn't declare ``FINALIZATION_HOOK`` is
+        # unaffected — the runner skips it without touching ``hooks``.
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        manager_cls, _ = _hook_manager(hook_key=None, created=1)
+        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        # Provider exposes a hooks dict — but the manager didn't trigger any key.
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"unrelated": hook}
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+        hook.assert_not_called()
+
+    def test_provider_without_get_finalization_hooks_is_graceful_noop(self) -> None:
+        # When the provider doesn't expose ``get_finalization_hooks`` at all,
+        # the runner must continue without raising. We construct a bare object
+        # to avoid MagicMock auto-attributes.
+        runner = OPNsenseDirectRunner()
+        manager_cls, _ = _hook_manager(hook_key="my_hook", created=1)
+
+        class _BareProvider:
+            name = "opnsense"
+            _current_environment = "test-env"
+            config_dir = Path("/tmp")
+
+            def generate_opnsense_direct(self, resources: Any) -> None:
+                pass
+
+            def get_direct_api_resource_types(self) -> dict[str, Any]:
+                return {"vlans": manager_cls}
+
+        provider = _BareProvider()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            result = runner.apply(provider)  # type: ignore[arg-type]
+        # No hooks dict, no error.
+        assert result["success"] is True  # type: ignore[typeddict-item]
+
+    def test_hook_error_propagates_and_fails_apply(self, provider_with_env: MagicMock) -> None:
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        manager_cls, _ = _hook_manager(hook_key="my_hook", created=1)
+        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+
+        def _boom(_env: str) -> None:
+            raise RuntimeError("reconfigure failed")
+
+        provider_with_env.get_finalization_hooks.return_value = {"my_hook": _boom}
+
+        with (
+            patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources),
+            pytest.raises(RuntimeError, match="reconfigure failed"),
+        ):
+            runner.apply(provider_with_env)
+
+    def test_unregistered_hook_key_is_skipped(self, provider_with_env: MagicMock) -> None:
+        # A manager declares a key the provider's hooks dict doesn't carry.
+        # Runner logs and continues — does NOT raise.
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        manager_cls, _ = _hook_manager(hook_key="missing_hook", created=1)
+        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_finalization_hooks.return_value = {}
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            result = runner.apply(provider_with_env)
+        assert result["success"] is True  # type: ignore[typeddict-item]
+
+    def test_hooks_skip_on_destroy(self, provider_with_env: MagicMock) -> None:
+        # Destroy must NOT fire finalization hooks — the contract is
+        # apply-only.
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        manager_cls, instance = _hook_manager(hook_key="my_hook", deleted=1)
+        instance.destroy.return_value = {
+            "success": True,
+            "resources_destroyed": 1,
+            "locked_skipped": 0,
+        }
+        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"my_hook": hook}
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.destroy(provider_with_env)
+        hook.assert_not_called()
+
+    def test_hooks_skip_on_plan(self, provider_with_env: MagicMock) -> None:
+        # Plan must NOT fire finalization hooks — plan never mutates.
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        manager_cls, instance = _hook_manager(hook_key="my_hook", created=1)
+        instance.plan.return_value = Diff(adds=[VlanConfig("v1", "igb0", 10, "x", 0)])
+        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"my_hook": hook}
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.plan(provider_with_env)
+        hook.assert_not_called()
