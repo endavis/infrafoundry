@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778080379647,
+  "lastUpdate": 1778080978618,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7874,6 +7874,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000023435460528924662",
             "extra": "mean: 140.08566059126957 usec\nrounds: 2469"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8874c57723e4996dd887ed02965da87177b6d345",
+          "message": "refactor: drive kea_dhcp6 via OPNsenseDirectRunner managers (merges PR #760, addresses #758)",
+          "timestamp": "2026-05-06T16:22:14+01:00",
+          "tree_id": "9ca4e8118a721833bacf90e29b9e1584cd417f69",
+          "url": "https://github.com/endavis/infrafoundry/commit/8874c57723e4996dd887ed02965da87177b6d345"
+        },
+        "date": 1778080977413,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9558.010875580669,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009484748582668075",
+            "extra": "mean: 104.62427936285938 usec\nrounds: 2699"
           }
         ]
       }
