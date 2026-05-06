@@ -53,8 +53,13 @@ class TestUnboundHostOverrideTemplates:
         """Test basic host override Terraform generation."""
         provider.generate_terraform([basic_override])
 
-        override_tf = provider.terraform_dir / "unbound_host_override.tf"
+        override_tf = provider.terraform_dir / "unbound_host_overrides.tf"
         assert override_tf.exists()
+        # Terraform reserves the ``*_override.tf`` filename suffix for override
+        # files (resource blocks must reference resources defined elsewhere).
+        # See #763 — using the singular form caused "Missing resource to
+        # override" errors during plan/init.
+        assert not override_tf.name.endswith("_override.tf")
 
         content = override_tf.read_text()
         assert 'resource "opnsense_unbound_host_override"' in content
@@ -69,7 +74,7 @@ class TestUnboundHostOverrideTemplates:
         """Test host override with description renders correctly."""
         provider.generate_terraform([override_with_description])
 
-        content = (provider.terraform_dir / "unbound_host_override.tf").read_text()
+        content = (provider.terraform_dir / "unbound_host_overrides.tf").read_text()
         assert 'description = "Mail server override"' in content
 
     def test_generate_override_without_optional_fields(self, provider: OPNsenseProvider) -> None:
@@ -86,7 +91,7 @@ class TestUnboundHostOverrideTemplates:
 
         provider.generate_terraform([override])
 
-        content = (provider.terraform_dir / "unbound_host_override.tf").read_text()
+        content = (provider.terraform_dir / "unbound_host_overrides.tf").read_text()
         assert 'hostname = "app"' in content
         assert 'domain   = "internal.local"' in content
         assert "server" not in content
@@ -110,7 +115,7 @@ class TestUnboundHostOverrideTemplates:
 
         provider.generate_terraform(overrides)
 
-        content = (provider.terraform_dir / "unbound_host_override.tf").read_text()
+        content = (provider.terraform_dir / "unbound_host_overrides.tf").read_text()
         assert "host_0" in content
         assert "host_1" in content
         assert "host_2" in content
@@ -129,7 +134,7 @@ class TestUnboundHostOverrideTemplates:
 
         provider.generate_terraform([override])
 
-        content = (provider.terraform_dir / "unbound_host_override.tf").read_text()
+        content = (provider.terraform_dir / "unbound_host_overrides.tf").read_text()
         assert "my_web_server" in content
         assert (
             "my-web-server"

@@ -343,7 +343,7 @@ class OPNsenseProvider(
         self.render_and_write_terraform(
             "opnsense/unbound_host_override.tf.j2",
             context={"overrides": overrides},
-            output_name="unbound_host_override.tf",
+            output_name="unbound_host_overrides.tf",
         )
 
     # DHCPv6 subnet / reservation management lives on
