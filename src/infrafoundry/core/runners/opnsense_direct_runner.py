@@ -378,6 +378,11 @@ class OPNsenseDirectRunner(BaseRunner):
         all_outcomes: list[ResourceOutcome] = []
         any_dispatched = False
 
+        # Track finalization-hook keys whose managers actually mutated state in
+        # this apply (#758). A hook fires once at end-of-apply per unique key,
+        # so multiple managers sharing a key share a single hook firing.
+        triggered_hook_keys: set[str] = set()
+
         for type_name, manager_cls in dispatch_table.items():
             typed_resources = self._filter_by_type(resources, type_name, target_resources)
             if not typed_resources:
@@ -401,11 +406,22 @@ class OPNsenseDirectRunner(BaseRunner):
             total_deleted += deleted
             all_outcomes.extend(result.get("resource_outcomes", []))
 
+            had_changes = (created + updated + deleted) > 0
+            if had_changes:
+                hook_key = getattr(manager_cls, "FINALIZATION_HOOK", None)
+                if isinstance(hook_key, str) and hook_key:
+                    triggered_hook_keys.add(hook_key)
+
             self._log_apply_progress(type_name, result, created, updated, deleted)
 
         if not any_dispatched:
             self.console.print("  [dim]opnsense_direct: no direct-API resources to apply[/dim]")
             return self._empty_apply_result()
+
+        # Fire finalization hooks once each (#758). Errors propagate — a failing
+        # post-apply hook (e.g., Kea reconfigure) must fail the apply.
+        if triggered_hook_keys:
+            self._fire_finalization_hooks(provider, env_name, triggered_hook_keys)
 
         applied: ApplyResult = {
             "success": True,
@@ -418,6 +434,64 @@ class OPNsenseDirectRunner(BaseRunner):
             o.to_dict() for o in all_outcomes
         ]
         return applied
+
+    def _fire_finalization_hooks(
+        self,
+        provider: ProviderBase,
+        env_name: str,
+        hook_keys: set[str],
+    ) -> None:
+        """Run end-of-apply finalization hooks the provider exposes (#758).
+
+        The runner discovers hook keys from each manager class's optional
+        ``FINALIZATION_HOOK`` ClassVar during the apply loop and dispatches
+        them here exactly once per unique key. Each provider that needs
+        post-apply work (e.g., Kea reconfigure for DHCPv6 changes) exposes
+        a ``get_finalization_hooks()`` method returning
+        ``{key: callable(env_name)}``; providers that don't implement it
+        produce a graceful no-op.
+
+        This is a generic facility, not kea-specific: any future component
+        whose apply needs deferred end-of-apply work can register a key
+        and a hook callable. See ADR-0014 §"Finalization hooks".
+
+        Args:
+            provider: Provider whose components were dispatched.
+            env_name: Active environment name; passed verbatim to each hook.
+            hook_keys: Hook keys triggered by managers that mutated state.
+
+        Raises:
+            Any exception the hook itself raises — propagated so a failing
+            hook (e.g., reconfigure) fails the apply.
+        """
+        getter = getattr(provider, "get_finalization_hooks", None)
+        if not callable(getter):
+            logger.debug(
+                "opnsense_direct: provider %r does not expose get_finalization_hooks; "
+                "skipping %d triggered hook(s)",
+                getattr(provider, "name", provider),
+                len(hook_keys),
+            )
+            return
+
+        hooks = getter()
+        if not isinstance(hooks, dict):
+            logger.debug(
+                "opnsense_direct: provider.get_finalization_hooks() did not return a dict; "
+                "skipping %d triggered hook(s)",
+                len(hook_keys),
+            )
+            return
+
+        for key in sorted(hook_keys):
+            hook = hooks.get(key)
+            if hook is None:
+                logger.debug(
+                    "opnsense_direct: no finalization hook registered for key %r; skipping", key
+                )
+                continue
+            self.console.print(f"  [dim]opnsense_direct: running finalization hook {key}[/dim]")
+            hook(env_name)
 
     @staticmethod
     def _empty_apply_result() -> ApplyResult:
