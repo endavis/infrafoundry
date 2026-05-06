@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778000795925,
+  "lastUpdate": 1778064472244,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7812,6 +7812,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000029852180482967755",
             "extra": "mean: 119.21685741636351 usec\nrounds: 2090"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6ff9b66c0cbe7b1034611e5e743e507a6360101c",
+          "message": "docs: refresh opnsense interface_assignments runbook for #720 live apply (merges PR #759, addresses #753)",
+          "timestamp": "2026-05-06T11:47:23+01:00",
+          "tree_id": "9bcb9fe8b024c92969006bab35ec59543b90d3bd",
+          "url": "https://github.com/endavis/infrafoundry/commit/6ff9b66c0cbe7b1034611e5e743e507a6360101c"
+        },
+        "date": 1778064471781,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9678.866266015673,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005866339430820086",
+            "extra": "mean: 103.3178858469394 usec\nrounds: 2155"
           }
         ]
       }
