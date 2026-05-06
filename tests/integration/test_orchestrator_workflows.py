@@ -242,6 +242,64 @@ class TestPlanOrchestrator:
 
         assert EventType.PLAN_FAILED in events_received
 
+    def test_plan_runner_returning_success_false_marks_deployment_failed(self, orchestrator):
+        """Plan must mark deployment FAILED when runner returns success=False.
+
+        Mirrors ``test_plan_failure_updates_deployment_status`` but exercises
+        the path where the runner returns ``PlanResult(success=False, ...)``
+        instead of raising. Without ``raise_on_runner_failure`` in the plan
+        path, the orchestrator would silently mark the deployment COMPLETED
+        and the CLI would exit 0 despite the failure.
+        """
+        from infrafoundry.core.exceptions import TerraformError
+
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
+            mock_plan.return_value = {
+                "success": False,
+                "error": "boom",
+                "exit_code": 1,
+                "output": "",
+                "stderr": "boom",
+            }
+
+            with pytest.raises(TerraformError):
+                orchestrator.plan(env_name="dev", dry_run=False)
+
+            # Check deployment was marked as failed and the runner's error
+            # message propagated into the deployment record.
+            deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
+            assert deployments[0].status == DeploymentStatus.FAILED
+            assert "boom" in deployments[0].error_message
+
+    def test_plan_runner_returning_success_false_emits_plan_failed_event(self, orchestrator):
+        """Plan must emit PLAN_FAILED when runner returns success=False.
+
+        Mirrors ``test_plan_emits_failure_event`` but exercises the
+        runner-returns-success-False path rather than the runner-raises path.
+        """
+        from infrafoundry.core.exceptions import TerraformError
+
+        events_received = []
+
+        def capture_event(event):
+            events_received.append(event.event_type)
+
+        orchestrator.event_manager.subscribe(EventType.PLAN_FAILED, capture_event)
+
+        with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
+            mock_plan.return_value = {
+                "success": False,
+                "error": "boom",
+                "exit_code": 1,
+                "output": "",
+                "stderr": "boom",
+            }
+
+            with pytest.raises(TerraformError):
+                orchestrator.plan(env_name="dev", dry_run=False)
+
+        assert EventType.PLAN_FAILED in events_received
+
 
 class TestApplyOrchestrator:
     """Tests for apply workflow."""

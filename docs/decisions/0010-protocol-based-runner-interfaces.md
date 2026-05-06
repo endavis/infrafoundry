@@ -6,7 +6,7 @@
 
 **Deciders:** Development Team
 
-**Related Issues:** #48
+**Related Issues:** #48, #761
 
 **Related PRs:** #77
 
