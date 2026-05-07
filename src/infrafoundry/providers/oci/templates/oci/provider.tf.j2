@@ -5,7 +5,7 @@ terraform {
       version = "~> 6.0"
     }
     # Required by the Tailscale cloud-init module
-    # (tailscale/cloudinit/tailscale). Declared unconditionally so consumers
+    # (tailscale/tailscale/cloudinit). Declared unconditionally so consumers
     # that enable the optional ``tailscale:`` resource block don't need any
     # extra wiring. Unused when no instance declares ``tailscale:``.
     cloudinit = {

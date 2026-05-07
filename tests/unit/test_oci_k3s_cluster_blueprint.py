@@ -206,7 +206,7 @@ def test_oci_k3s_cluster_example_uses_tailscale_module(loader: PackageLoader) ->
     """Every instance declares a tailscale: block referencing the OAuth
     secrets in the env's secrets.tailscale.* dict. Issue #212 phase 2
     replaced the custom cloud-init snippet with the official
-    tailscale/cloudinit/tailscale Terraform module; this test verifies
+    tailscale/tailscale/cloudinit Terraform module; this test verifies
     every blueprint instance opted into the new schema."""
     resources, _events, _variables = loader.load_package(
         PACKAGE_DIR, provider="oci", env_name="oci-k3s"
