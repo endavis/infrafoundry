@@ -376,6 +376,22 @@ class TestExtractPlanSummary:
         assert drift["summary"] == TerraformRunner.extract_plan_summary(output)
         assert drift["summary"] == "5 to add, 3 to change"
 
+    def test_strips_ansi_escape_codes_before_parsing(self) -> None:
+        """ANSI-colored terraform output still yields the canonical summary.
+
+        Regression test for #773: real ``terraform plan`` output contains
+        CSI color escapes (``\x1b[1m``, ``\x1b[0m``, etc.) inline with the
+        ``Plan:`` line even when stdout is captured by ``subprocess.run``.
+        Without stripping, the regex never matches and the helper falls
+        through to ``"Unable to parse plan output"``. The fixture below is a
+        realistic captured-from-terraform sample.
+        """
+        output = (
+            "Terraform will perform the following actions:\n"
+            "\x1b[1mPlan:\x1b[0m \x1b[0m32 to add, 8 to change, 0 to destroy.\n"
+        )
+        assert TerraformRunner.extract_plan_summary(output) == "32 to add, 8 to change"
+
 
 class TestResolveTargets:
     """Tests for _resolve_terraform_targets."""
