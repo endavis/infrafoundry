@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778154692375,
+  "lastUpdate": 1778167816811,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7998,6 +7998,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002260577061830232",
             "extra": "mean: 145.22941341911965 usec\nrounds: 2489"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3dcc073911a4bb04fbfc6bea1517b7afc02c3c9e",
+          "message": "feat: add --provider scoping flag to infra plan/apply/destroy (merges PR #770, addresses #769)\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-07T16:29:34+01:00",
+          "tree_id": "3b715891898b3c444e96f8186453b4df8046fa1a",
+          "url": "https://github.com/endavis/infrafoundry/commit/3dcc073911a4bb04fbfc6bea1517b7afc02c3c9e"
+        },
+        "date": 1778167816178,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9697.498263158755,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001694799513127771",
+            "extra": "mean: 103.1193791288467 usec\nrounds: 2089"
           }
         ]
       }
