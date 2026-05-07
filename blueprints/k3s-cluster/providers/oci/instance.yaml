@@ -4,7 +4,7 @@
 # Multi-instance safe: every outer name is templated. workers: is a list of
 # dicts with schema {name, ocpus, memory_gb}; see blueprint README.
 #
-# Tailscale is wired up via the official tailscale/cloudinit/tailscale
+# Tailscale is wired up via the official tailscale/tailscale/cloudinit
 # Terraform module (issue #212). Auth credentials live in the env's
 # sops-encrypted secrets.yaml under secrets.tailscale.* and flow into
 # Terraform via the framework's secrets→TF_VAR_* bridge — values never

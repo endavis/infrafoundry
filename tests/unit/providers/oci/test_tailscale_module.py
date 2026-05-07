@@ -68,7 +68,7 @@ class TestOCITailscaleAuthKey:
         instances_tf = _read_tf(output_dir, "instances.tf")
 
         assert 'module "tailscale_ts_control"' in instances_tf
-        assert 'source  = "tailscale/cloudinit/tailscale"' in instances_tf
+        assert 'source  = "tailscale/tailscale/cloudinit"' in instances_tf
         assert 'version = "0.0.11"' in instances_tf
         assert "auth_key = var.tailscale_auth_key" in instances_tf
         # client_id/secret should NOT appear in auth_key mode

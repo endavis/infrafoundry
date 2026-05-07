@@ -70,7 +70,7 @@ class TestProxmoxTailscaleAuthKey:
         vms_tf = _read_tf(output_dir, "vms.tf")
 
         assert 'module "tailscale_ts_control"' in vms_tf
-        assert 'source  = "tailscale/cloudinit/tailscale"' in vms_tf
+        assert 'source  = "tailscale/tailscale/cloudinit"' in vms_tf
         assert 'version = "0.0.11"' in vms_tf
         assert "auth_key = var.tailscale_auth_key" in vms_tf
 
