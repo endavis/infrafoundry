@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778084633957,
+  "lastUpdate": 1778148215079,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7936,6 +7936,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002329315730543532",
             "extra": "mean: 220.639969696053 usec\nrounds: 33"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3b45475c1c12c6660b8e1d6352a5a54e44e6f3b0",
+          "message": "fix: align opnsense terraform templates with browningluke/opnsense provider schema (merges PR #766, addresses #765)",
+          "timestamp": "2026-05-07T11:03:01+01:00",
+          "tree_id": "b5fa11d4918f1359408a88a9e5e23fb3eae72464",
+          "url": "https://github.com/endavis/infrafoundry/commit/3b45475c1c12c6660b8e1d6352a5a54e44e6f3b0"
+        },
+        "date": 1778148214483,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7249.428923865378,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000143103891612892",
+            "extra": "mean: 137.94190004511452 usec\nrounds: 2221"
           }
         ]
       }
