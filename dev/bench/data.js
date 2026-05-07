@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778174649809,
+  "lastUpdate": 1778178626225,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8091,6 +8091,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015637203112152666",
             "extra": "mean: 107.05238043848065 usec\nrounds: 2597"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ebfa292865eb7318ef4e4fc4a085b9c398ca0f80",
+          "message": "feat: migrate opnsense firewall_alias from terraform to direct-api (merges PR #779, addresses #775)\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-07T19:29:39+01:00",
+          "tree_id": "65c15a3bb43c1a64b3d8d39a9352e704fbdbd038",
+          "url": "https://github.com/endavis/infrafoundry/commit/ebfa292865eb7318ef4e4fc4a085b9c398ca0f80"
+        },
+        "date": 1778178624707,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7022.720015166762,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002413971999335009",
+            "extra": "mean: 142.3949691629923 usec\nrounds: 1816"
           }
         ]
       }
