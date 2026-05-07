@@ -783,13 +783,23 @@ class TerraformRunner(BaseRunner):
         "the runner produced no output" from "no changes were needed".
 
         Args:
-            output: Captured terraform stdout from ``terraform plan``.
+            output: Captured terraform stdout from ``terraform plan``. ANSI
+                color escape codes (CSI sequences like ``\x1b[1m``) are
+                stripped before parsing because real terraform invocations
+                emit colored output even when stdout is captured via a
+                pipe, and the embedded escapes block the regex match.
 
         Returns:
             A short summary like ``"21 to add, 0 to change, 0 to destroy"``,
             ``"No changes"``, or ``"Unable to parse plan output"`` when
             neither marker is found.
         """
+        # Strip ANSI color escape codes before parsing. Terraform colors its
+        # output by default (e.g. ``\x1b[1mPlan:\x1b[0m \x1b[0m32 to add, ...``)
+        # even when stdout is captured, which prevents the regex from matching.
+        # No-op on already-clean strings.
+        output = re.sub(r"\x1b\[[0-9;]*m", "", output)
+
         plan_pattern = r"Plan: (\d+) to add, (\d+) to change, (\d+) to destroy"
         match = re.search(plan_pattern, output)
 
