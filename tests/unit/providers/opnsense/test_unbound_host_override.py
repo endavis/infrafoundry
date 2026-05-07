@@ -154,6 +154,65 @@ class TestUnboundHostOverrideTemplates:
         assert "unbound_host_overrides" in content
         assert content.find("web.example.com") != -1
 
+    def test_generate_aaaa_record_renders_type_arg(self, provider: OPNsenseProvider) -> None:
+        """AAAA records must render `type = "AAAA"` (the provider's argument
+        name) and must NOT render the legacy `rr =` form (#765).
+        """
+        override = ResourceConfig(
+            provider="opnsense",
+            type="unbound_host_override",
+            name="aaaa-host",
+            config={
+                "hostname": "v6",
+                "domain": "example.com",
+                "server": "2001:db8::10",
+                "rr": "AAAA",
+            },
+        )
+
+        provider.generate_terraform([override])
+
+        content = (provider.terraform_dir / "unbound_host_overrides.tf").read_text()
+        assert 'type = "AAAA"' in content
+        # The YAML field is still `rr` (translation-layer rename only), but
+        # it must NEVER appear as a rendered terraform argument name.
+        assert "rr =" not in content
+        assert "rr=" not in content
+
+    def test_generate_mx_record_renders_mx_host_and_mx_priority_args(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        """MX records must render the renamed `mx_host` / `mx_priority`
+        arguments (formerly `mx` / `mxprio`) and the renamed `type` (#765).
+        """
+        override = ResourceConfig(
+            provider="opnsense",
+            type="unbound_host_override",
+            name="mx-host",
+            config={
+                "hostname": "mail",
+                "domain": "example.com",
+                "rr": "MX",
+                "mx": "mail.example.com",
+                "mxprio": "10",
+            },
+        )
+
+        provider.generate_terraform([override])
+
+        content = (provider.terraform_dir / "unbound_host_overrides.tf").read_text()
+        assert 'type = "MX"' in content
+        assert 'mx_host = "mail.example.com"' in content
+        assert 'mx_priority = "10"' in content
+        # Legacy YAML-internal names must not appear as rendered arg names.
+        assert "rr =" not in content
+        assert "mxprio =" not in content
+        # `mx =` (without `_host`) must not appear, but `mx_host =` must —
+        # so check using a regex-ish negative substring assertion.
+        # The simple "mx =" check is sufficient because `mx_host =` and
+        # `mx_priority =` don't contain that exact substring.
+        assert "mx =" not in content
+
 
 class TestUnboundHostOverrideProvider:
     """Test OPNsense provider integration for unbound_host_override."""

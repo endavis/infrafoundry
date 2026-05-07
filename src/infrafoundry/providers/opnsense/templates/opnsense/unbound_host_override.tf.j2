@@ -18,15 +18,15 @@ resource "opnsense_unbound_host_override" "{{ override.name | replace('-', '_') 
   {% endif %}
 
   {% if override.config.get('rr') %}
-  rr = "{{ override.config.rr }}"
+  type = "{{ override.config.rr }}"
   {% endif %}
 
   {% if override.config.get('mxprio') %}
-  mxprio = "{{ override.config.mxprio }}"
+  mx_priority = "{{ override.config.mxprio }}"
   {% endif %}
 
   {% if override.config.get('mx') %}
-  mx = "{{ override.config.mx }}"
+  mx_host = "{{ override.config.mx }}"
   {% endif %}
 }
 {% endfor %}

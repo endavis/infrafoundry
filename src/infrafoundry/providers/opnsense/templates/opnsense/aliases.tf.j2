@@ -12,10 +12,10 @@ resource "opnsense_firewall_alias" "{{ alias.config.name | replace('-', '_') }}"
 
   enabled = {{ alias.config.enabled | default(true) | lower }}
   {% if alias.config.proto is defined %}
-  proto = "{{ alias.config.proto }}"
+  ip_protocol = "{{ alias.config.proto }}"
   {% endif %}
   {% if alias.config.updatefreq is defined %}
-  updatefreq = "{{ alias.config.updatefreq }}"
+  update_freq = "{{ alias.config.updatefreq }}"
   {% endif %}
   {% if alias.config.categories is defined %}
   categories = [
@@ -23,9 +23,6 @@ resource "opnsense_firewall_alias" "{{ alias.config.name | replace('-', '_') }}"
     "{{ category }}",
     {% endfor %}
   ]
-  {% endif %}
-  {% if alias.config.counters is defined %}
-  counters = {{ alias.config.counters | lower }}
   {% endif %}
   {% if alias.config.interface is defined %}
   interface = "{{ alias.config.interface }}"

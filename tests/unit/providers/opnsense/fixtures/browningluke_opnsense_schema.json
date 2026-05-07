@@ -1,0 +1,52 @@
+{
+  "opnsense_firewall_alias": [
+    "categories",
+    "content",
+    "description",
+    "enabled",
+    "id",
+    "interface",
+    "ip_protocol",
+    "name",
+    "stats",
+    "type",
+    "update_freq"
+  ],
+  "opnsense_kea_reservation": [
+    "description",
+    "hostname",
+    "id",
+    "ip_address",
+    "mac_address",
+    "subnet_id"
+  ],
+  "opnsense_kea_subnet": [
+    "auto_collect",
+    "description",
+    "dns_servers",
+    "domain_name",
+    "domain_search",
+    "id",
+    "match_client_id",
+    "next_server",
+    "ntp_servers",
+    "pools",
+    "routers",
+    "static_routes",
+    "subnet",
+    "tfpt_server",
+    "tftp_bootfile",
+    "time_servers"
+  ],
+  "opnsense_unbound_host_override": [
+    "description",
+    "domain",
+    "enabled",
+    "hostname",
+    "id",
+    "mx_host",
+    "mx_priority",
+    "server",
+    "type"
+  ]
+}
