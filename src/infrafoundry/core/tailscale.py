@@ -32,9 +32,9 @@ from typing import Any
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_mixins import sanitize_secret_ref_to_tf_var
 
-#: Pinned version of the ``tailscale/cloudinit/tailscale`` module.
+#: Pinned version of the ``tailscale/tailscale/cloudinit`` module.
 TAILSCALE_MODULE_VERSION = "0.0.11"
-TAILSCALE_MODULE_SOURCE = "tailscale/cloudinit/tailscale"
+TAILSCALE_MODULE_SOURCE = "tailscale/tailscale/cloudinit"
 
 
 class TailscaleSchemaError(ValueError):

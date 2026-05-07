@@ -38,7 +38,7 @@ provider_settings:
 #     env: block via {{ secrets.tailscale.api_key }} templating.
 secrets:
   tailscale:
-    # OAuth client credentials for the official tailscale/cloudinit/tailscale
+    # OAuth client credentials for the official tailscale/tailscale/cloudinit
     # Terraform module. Generate at:
     #   https://login.tailscale.com/admin/settings/oauth
     # Required scope: Devices Core (read+write).
