@@ -213,6 +213,33 @@ class PackageNotFoundError(InfraFoundryError):
     """Raised when a named package is not found in the environment."""
 
 
+class ProviderFilterError(InfraFoundryError):
+    """Raised when ``--provider`` filter references unknown provider names.
+
+    Carries both the requested names and the providers actually available
+    in the target environment so the CLI can render an actionable error.
+    """
+
+    def __init__(self, requested: list[str], available: list[str]) -> None:
+        """Initialize provider filter error.
+
+        Args:
+            requested: Provider names supplied via ``--provider``/``-P``
+                that did not match any provider in the environment.
+            available: Provider names that are present in the environment.
+        """
+        self.requested = list(requested)
+        self.available = list(available)
+        message = (
+            f"Unknown provider(s): {sorted(self.requested)}. Available: {sorted(self.available)}"
+        )
+        context: dict[str, Any] = {
+            "requested": self.requested,
+            "available": self.available,
+        }
+        super().__init__(message, context)
+
+
 class PackageMoveRollbackError(InfraFoundryError):
     """Raised when a package move fails and rollback also encounters errors.
 
@@ -399,6 +426,7 @@ __all__ = [
     "PolicyViolationError",
     # Provider
     "ProviderError",
+    "ProviderFilterError",
     "ProviderInitializationError",
     "ProviderNotFoundError",
     "ReferenceValidationError",

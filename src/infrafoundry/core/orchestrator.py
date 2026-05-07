@@ -514,6 +514,7 @@ class Orchestrator:
         enforce_policies: bool = False,
         package_filter: str | None = None,
         add_only: bool = False,
+        provider_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Plan infrastructure changes.
 
@@ -526,6 +527,10 @@ class Orchestrator:
             add_only: If True, suppress deletes for live resources not
                 described in YAML. Honored by direct-API runners; other
                 runners accept and ignore.
+            provider_filter: Optional list of provider names to target.
+                Cross-provider dependency edges pointing at filtered-out
+                providers are silently skipped for this run. Raises
+                ``ProviderFilterError`` if any name is unknown.
 
         Returns:
             Dict with plan results per provider
@@ -537,6 +542,7 @@ class Orchestrator:
             enforce_policies,
             package_filter,
             add_only=add_only,
+            provider_filter=provider_filter,
         )
 
     def apply(
@@ -550,6 +556,7 @@ class Orchestrator:
         lock_timeout: int = 0,
         lock_ttl: int = 600,
         add_only: bool = False,
+        provider_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Apply infrastructure changes.
 
@@ -568,6 +575,10 @@ class Orchestrator:
             add_only: If True, suppress deletes for live resources not
                 described in YAML. Honored by direct-API runners; other
                 runners accept and ignore.
+            provider_filter: Optional list of provider names to target.
+                Cross-provider dependency edges pointing at filtered-out
+                providers are silently skipped for this run. Raises
+                ``ProviderFilterError`` if any name is unknown.
 
         Returns:
             Dict with apply results per provider
@@ -588,6 +599,7 @@ class Orchestrator:
                 resource_filter=resource_filter,
                 package_filter=package_filter,
                 add_only=add_only,
+                provider_filter=provider_filter,
             )
             return self.apply_orchestrator.apply(
                 env_name=env_name,
@@ -597,6 +609,7 @@ class Orchestrator:
                 max_workers=max_workers,
                 package_filter=package_filter,
                 add_only=add_only,
+                provider_filter=provider_filter,
             )
 
     def _apply_providers_serial(
@@ -691,6 +704,7 @@ class Orchestrator:
         package_filter: str | None = None,
         lock_timeout: int = 0,
         lock_ttl: int = 600,
+        provider_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Destroy infrastructure.
 
@@ -705,6 +719,10 @@ class Orchestrator:
             lock_ttl: Lock TTL in seconds (default: 10 minutes). The lock is
                 extended automatically while the process runs, so this only
                 governs stale-lock recovery after a crash.
+            provider_filter: Optional list of provider names to target.
+                Cross-provider dependency edges pointing at filtered-out
+                providers are silently skipped for this run. Raises
+                ``ProviderFilterError`` if any name is unknown.
 
         Returns:
             Dict with destroy results per provider
@@ -719,7 +737,12 @@ class Orchestrator:
             event_manager=self.event_manager,
         ):
             return self.destroy_orchestrator.destroy(
-                env_name, resource_filter, auto_approve, confirm_callback, package_filter
+                env_name,
+                resource_filter,
+                auto_approve,
+                confirm_callback,
+                package_filter,
+                provider_filter=provider_filter,
             )
 
     def rollback(

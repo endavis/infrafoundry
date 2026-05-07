@@ -162,9 +162,9 @@ Key commands (`foundry` via `uv run foundry ...`):
 
 **Infra group (`infra`):**
 - `infra doctor --env <name>` – validate infrastructure against provider APIs
-- `infra plan --env <name>` – generate files only (use `--dry-run` when applicable)
-- `infra apply --env <name>` – generate and execute Terraform/Ansible
-- `infra destroy --env <name>` – tear down infrastructure
+- `infra plan --env <name>` – generate files only (use `--dry-run` when applicable). Supports `--provider/-P <name>` (repeatable) to scope to specific provider(s).
+- `infra apply --env <name>` – generate and execute Terraform/Ansible. Supports `--provider/-P <name>` (repeatable) to scope to specific provider(s).
+- `infra destroy --env <name>` – tear down infrastructure. Supports `--provider/-P <name>` (repeatable) to scope to specific provider(s).
 - `infra drift <detect|remediate|history>` – detect and remediate drift
 - `infra deployed --env <name>` – show deployment status and resources
 - `infra history [--env <name>]` – inspect past deployments

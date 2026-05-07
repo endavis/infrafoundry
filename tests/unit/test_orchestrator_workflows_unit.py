@@ -1229,3 +1229,313 @@ def test_apply_restores_prior_warnings_env_var(monkeypatch, tmp_path):
 
     assert captured["mid"] != str(prior)
     assert os.environ.get(ENV_VAR) == str(prior)
+
+
+# ---------------------------------------------------------------------------
+# Provider scoping (--provider / -P) — issue #769
+# ---------------------------------------------------------------------------
+
+
+def test_apply_provider_filter_isolates_to_requested_provider(console):
+    """``provider_filter=["opnsense"]`` keeps Proxmox resources out of the apply path."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 200
+    event_manager = MagicMock()
+
+    res_proxmox = [_resource("vm1", provider="proxmox")]
+    res_opnsense = [_resource("fw1", provider="opnsense", type_="firewall_rule")]
+
+    captured: dict[str, dict[str, list[ResourceConfig]]] = {}
+
+    def apply_serial(
+        env_name,
+        deployment_id,
+        resources_by_provider,
+        resource_filter,
+        auto_approve,
+        package_filter=None,
+        *,
+        add_only=False,
+    ):
+        captured["resources_by_provider"] = resources_by_provider
+        return {"opnsense": {"success": True}}
+
+    apply_parallel = MagicMock()
+
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        lambda env: (
+            res_proxmox + res_opnsense,
+            {"proxmox": res_proxmox, "opnsense": res_opnsense},
+        ),
+        apply_serial=apply_serial,
+        apply_parallel=apply_parallel,
+        get_current_user=lambda: "tester",
+    )
+
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+        provider_filter=["opnsense"],
+    )
+
+    apply_parallel.assert_not_called()
+    # Filter dropped proxmox; only opnsense reached the serial executor.
+    assert list(captured["resources_by_provider"].keys()) == ["opnsense"]
+    assert captured["resources_by_provider"]["opnsense"] == res_opnsense
+
+
+def test_apply_provider_filter_none_preserves_full_iteration(console):
+    """Passing ``provider_filter=None`` is equivalent to no filter (regression check)."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 201
+    event_manager = MagicMock()
+
+    res_proxmox = [_resource("vm1", provider="proxmox")]
+    res_opnsense = [_resource("fw1", provider="opnsense", type_="firewall_rule")]
+
+    captured: dict[str, dict[str, list[ResourceConfig]]] = {}
+
+    def apply_serial(
+        env_name,
+        deployment_id,
+        resources_by_provider,
+        resource_filter,
+        auto_approve,
+        package_filter=None,
+        *,
+        add_only=False,
+    ):
+        captured["resources_by_provider"] = resources_by_provider
+        return {}
+
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        lambda env: (
+            res_proxmox + res_opnsense,
+            {"proxmox": res_proxmox, "opnsense": res_opnsense},
+        ),
+        apply_serial=apply_serial,
+        apply_parallel=MagicMock(),
+        get_current_user=lambda: "tester",
+    )
+
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+        provider_filter=None,
+    )
+
+    assert set(captured["resources_by_provider"].keys()) == {"proxmox", "opnsense"}
+
+
+def test_apply_provider_filter_unknown_name_raises(console):
+    """An unknown name in ``provider_filter`` raises ``ProviderFilterError``."""
+    from infrafoundry.core.exceptions import ProviderFilterError
+
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 202
+    event_manager = MagicMock()
+
+    res_proxmox = [_resource("vm1", provider="proxmox")]
+    res_opnsense = [_resource("fw1", provider="opnsense", type_="firewall_rule")]
+
+    apply_serial = MagicMock()
+
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        lambda env: (
+            res_proxmox + res_opnsense,
+            {"proxmox": res_proxmox, "opnsense": res_opnsense},
+        ),
+        apply_serial=apply_serial,
+        apply_parallel=MagicMock(),
+        get_current_user=lambda: "tester",
+    )
+
+    with pytest.raises(ProviderFilterError) as excinfo:
+        orchestrator.apply(
+            env_name="dev",
+            resource_filter=None,
+            auto_approve=True,
+            parallel=False,
+            max_workers=1,
+            provider_filter=["nope"],
+        )
+
+    assert excinfo.value.requested == ["nope"]
+    assert sorted(excinfo.value.available) == ["opnsense", "proxmox"]
+    apply_serial.assert_not_called()
+    state_manager.update_deployment_status.assert_called_with(
+        202, DeploymentStatus.FAILED, str(excinfo.value)
+    )
+
+
+def test_apply_provider_filter_multi_provider_scoping(console):
+    """``provider_filter=["opnsense", "proxmox"]`` keeps both, drops the third."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 203
+    event_manager = MagicMock()
+
+    res_proxmox = [_resource("vm1", provider="proxmox")]
+    res_opnsense = [_resource("fw1", provider="opnsense", type_="firewall_rule")]
+    res_oci = [_resource("box1", provider="oci", type_="instance")]
+
+    captured: dict[str, dict[str, list[ResourceConfig]]] = {}
+
+    def apply_serial(
+        env_name,
+        deployment_id,
+        resources_by_provider,
+        resource_filter,
+        auto_approve,
+        package_filter=None,
+        *,
+        add_only=False,
+    ):
+        captured["resources_by_provider"] = resources_by_provider
+        return {}
+
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        lambda env: (
+            res_proxmox + res_opnsense + res_oci,
+            {"proxmox": res_proxmox, "opnsense": res_opnsense, "oci": res_oci},
+        ),
+        apply_serial=apply_serial,
+        apply_parallel=MagicMock(),
+        get_current_user=lambda: "tester",
+    )
+
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+        provider_filter=["opnsense", "proxmox"],
+    )
+
+    assert set(captured["resources_by_provider"].keys()) == {"opnsense", "proxmox"}
+    assert "oci" not in captured["resources_by_provider"]
+
+
+def test_apply_provider_filter_drops_cross_provider_dependency_silently(console):
+    """When a filtered-in provider has a dep on a filtered-out provider, the run still completes.
+
+    The orchestrator-level provider filter narrows ``resources_by_provider`` to the
+    requested keys before iteration; any cross-provider dependency edges pointing at
+    the dropped providers are silently skipped for this run.
+    """
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 204
+    event_manager = MagicMock()
+
+    # Proxmox resource conceptually depends on the OPNsense firewall rule, but
+    # we filter to ["proxmox"]; the dependency target is excluded for this run.
+    res_proxmox = [_resource("vm1", provider="proxmox")]
+    res_opnsense = [_resource("fw1", provider="opnsense", type_="firewall_rule")]
+
+    captured: dict[str, dict[str, list[ResourceConfig]]] = {}
+    serial_called = MagicMock()
+
+    def apply_serial(
+        env_name,
+        deployment_id,
+        resources_by_provider,
+        resource_filter,
+        auto_approve,
+        package_filter=None,
+        *,
+        add_only=False,
+    ):
+        captured["resources_by_provider"] = resources_by_provider
+        serial_called(env_name)
+        return {"proxmox": {"success": True}}
+
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        lambda env: (
+            res_proxmox + res_opnsense,
+            {"proxmox": res_proxmox, "opnsense": res_opnsense},
+        ),
+        apply_serial=apply_serial,
+        apply_parallel=MagicMock(),
+        get_current_user=lambda: "tester",
+    )
+
+    # Should NOT raise even though the dropped opnsense provider was a
+    # cross-provider dependency target.
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+        provider_filter=["proxmox"],
+    )
+
+    serial_called.assert_called_once_with("dev")
+    assert list(captured["resources_by_provider"].keys()) == ["proxmox"]
+    assert "opnsense" not in captured["resources_by_provider"]
+    state_manager.update_deployment_status.assert_called_with(204, DeploymentStatus.COMPLETED)
+
+
+def test_plan_provider_filter_unknown_name_raises(console):
+    """Plan also raises ``ProviderFilterError`` for unknown names."""
+    from infrafoundry.core.exceptions import ProviderFilterError
+
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 205
+    event_manager = MagicMock()
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    providers = {"proxmox": MagicMock()}
+
+    def load_resources(env: str):
+        res = [_resource("vm1")]
+        return res, {"proxmox": res}
+
+    orchestrator = PlanOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
+            ProviderResourceBatch("proxmox", resources_by_provider["proxmox"], 1)
+        ],
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+    )
+
+    with pytest.raises(ProviderFilterError):
+        orchestrator.plan(
+            env_name="dev",
+            dry_run=True,
+            resource_filter=None,
+            enforce_policies=False,
+            provider_filter=["nope"],
+        )
