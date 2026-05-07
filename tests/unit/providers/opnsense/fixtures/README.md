@@ -33,7 +33,6 @@ guard doing its job — investigate which template needs updating.
 
 Only resource types InfraFoundry's templates currently emit are listed:
 
-- `opnsense_firewall_alias` (from `aliases.tf.j2`)
 - `opnsense_kea_reservation` (from `kea_reservation.tf.j2`)
 - `opnsense_kea_subnet` (from `kea_subnet.tf.j2`)
 - `opnsense_unbound_host_override` (from `unbound_host_override.tf.j2`)

@@ -461,43 +461,19 @@ class TestOPNsenseTemplates:
         vlans_tf = provider.terraform_dir / "vlans.tf"
         assert not vlans_tf.exists()
 
-    def test_generate_alias_terraform(
+    def test_generate_alias_terraform_does_not_emit_tf(
         self, provider: OPNsenseProvider, alias_resource: ResourceConfig
     ) -> None:
-        """Test alias Terraform generation."""
+        """Aliases are managed by ``OPNsenseDirectRunner`` per ADR-0014 (#775).
+
+        ``generate_terraform`` no longer emits an ``aliases.tf`` for
+        ``aliases`` resources; the direct-API runner handles them at
+        apply time. Verify the file is absent.
+        """
         provider.generate_terraform([alias_resource])
 
         aliases_tf = provider.terraform_dir / "aliases.tf"
-        assert aliases_tf.exists()
-
-        content = aliases_tf.read_text()
-        assert "web_servers" in content
-        assert "type" in content and "host" in content
-        assert "192.168.1.10" in content
-        assert "Production web servers" in content
-
-    def test_generate_multiple_aliases(self, provider: OPNsenseProvider) -> None:
-        """Test generating multiple aliases."""
-        aliases = [
-            ResourceConfig(
-                provider="opnsense",
-                type="aliases",
-                name=f"alias-{i}",
-                config={
-                    "name": f"alias-{i}",
-                    "type": "host",
-                    "content": [f"10.0.0.{i}"],
-                },
-            )
-            for i in range(3)
-        ]
-
-        provider.generate_terraform(aliases)
-
-        content = (provider.terraform_dir / "aliases.tf").read_text()
-        assert "alias_0" in content
-        assert "alias_1" in content
-        assert "alias_2" in content
+        assert not aliases_tf.exists()
 
     def test_generate_ansible_playbook(self, provider: OPNsenseProvider) -> None:
         """Test OPNsense Ansible playbook generation."""
@@ -897,7 +873,8 @@ class TestProviderResourceGrouping:
         assert not (provider.terraform_dir / "firewall_rules.tf").exists()
         # VLANs are managed by OPNsenseDirectRunner per ADR-0014.
         assert not (provider.terraform_dir / "vlans.tf").exists()
-        assert (provider.terraform_dir / "aliases.tf").exists()
+        # Aliases are managed by OPNsenseDirectRunner per ADR-0014 (#775).
+        assert not (provider.terraform_dir / "aliases.tf").exists()
 
     def test_kubernetes_mixed_resource_types(self, tmp_path: Path) -> None:
         """Test Kubernetes with multiple resource types."""
