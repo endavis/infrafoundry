@@ -332,7 +332,12 @@ class TestProviderTerraformResourceTypes:
         assert "proxmox_virtual_environment_storage_nfs" in mapping["storage"]
 
     def test_opnsense_mapping(self, tmp_path: Path) -> None:
-        """OPNsense provider returns correct terraform type mapping."""
+        """OPNsense provider returns correct terraform type mapping.
+
+        ``aliases``, ``vlans``, and ``firewall_rules`` are intentionally
+        absent — they are managed by ``OPNsenseDirectRunner`` per
+        ADR-0014 / ADR-0015 and don't have a terraform counterpart.
+        """
         from infrafoundry.providers.opnsense import OPNsenseProvider
 
         provider = OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
@@ -340,8 +345,10 @@ class TestProviderTerraformResourceTypes:
 
         assert "kea_reservation" in mapping
         assert "opnsense_kea_reservation" in mapping["kea_reservation"]
-        assert "aliases" in mapping
-        assert "opnsense_firewall_alias" in mapping["aliases"]
+        # Direct-API resources are absent from the terraform mapping.
+        assert "aliases" not in mapping
+        assert "vlans" not in mapping
+        assert "firewall_rules" not in mapping
 
     def test_esxi_mapping(self, tmp_path: Path) -> None:
         """ESXi provider returns correct terraform type mapping."""

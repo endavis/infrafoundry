@@ -165,10 +165,11 @@ class OPNsenseProvider(
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OPNsense resources.
 
-        VLANs and firewall rules are intentionally not generated here —
-        both are managed directly via ``OPNsenseDirectRunner`` per ADR-0014
-        and ADR-0015. The runner is registered with ``priority = -10`` so
-        the direct-API apply precedes terraform planning of dependents like
+        VLANs, firewall rules, and aliases are intentionally not generated
+        here — all three are managed directly via ``OPNsenseDirectRunner``
+        per ADR-0014 (and ADR-0015 for firewall rules). The runner is
+        registered with ``priority = -10`` so the direct-API apply
+        precedes terraform planning of dependents like
         ``dhcp_static_maps``.
         """
         resources_by_type = self.prepare_terraform_generation(resources)
@@ -180,9 +181,6 @@ class OPNsenseProvider(
         self.render_provider_and_variables()
 
         # Generate resources by type
-        if "aliases" in resources_by_type:
-            self._generate_aliases_terraform(resources_by_type["aliases"])
-
         if "dhcp_static_maps" in resources_by_type:
             self._generate_dhcp_static_maps_terraform(resources_by_type["dhcp_static_maps"])
 
@@ -236,6 +234,7 @@ class OPNsenseProvider(
             knows the duck-typed surface (``plan``, ``apply``, ``destroy``,
             ``get_resource_ids``) each manager must expose.
         """
+        from .components.alias import AliasManager
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
@@ -252,10 +251,13 @@ class OPNsenseProvider(
         # ``OPNsenseDirectRunner``). DHCPv6 subnets must be applied before
         # reservations because reservations resolve their subnet UUID via
         # ``search_dhcpv6_subnets`` at apply time — a brand-new subnet must
-        # exist on the box before its reservations can reference it.
+        # exist on the box before its reservations can reference it. Aliases
+        # are applied before ``nat_rules`` and ``firewall_rules`` so the
+        # alias names those rules reference exist on the box first (#775).
         return {
             "vlans": VlanManager,
             "interface_assignments": InterfaceAssignmentManager,
+            "aliases": AliasManager,
             "nat_rules": NATRuleManager,
             "firewall_rules": FirewallRuleManager,
             "gateways": GatewayManager,
@@ -305,14 +307,6 @@ class OPNsenseProvider(
 
         service = KeaDHCPService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
-
-    def _generate_aliases_terraform(self, aliases: list[ResourceConfig]) -> None:
-        """Generate Terraform for OPNsense aliases."""
-        self.render_and_write_terraform(
-            "opnsense/aliases.tf.j2",
-            context={"aliases": aliases},
-            output_name="aliases.tf",
-        )
 
     def _generate_dhcp_static_maps_terraform(self, static_maps: list[ResourceConfig]) -> None:
         """Generate Terraform for OPNsense DHCP static mappings."""
@@ -392,13 +386,13 @@ class OPNsenseProvider(
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
         """Map InfraFoundry resource types to terraform resource types.
 
-        ``vlans`` is omitted here per ADR-0014 — VLANs are managed by
-        ``OPNsenseDirectRunner``, not terraform.
+        ``vlans``, ``firewall_rules``, and ``aliases`` are omitted here
+        per ADR-0014 — they are managed by ``OPNsenseDirectRunner``,
+        not terraform.
         """
         return {
             "kea_reservation": ["opnsense_kea_reservation"],
             "kea_subnet": ["opnsense_kea_subnet"],
-            "aliases": ["opnsense_firewall_alias"],
             "dhcp_static_maps": ["opnsense_dhcpv4_static_map"],
             "unbound_host_override": ["opnsense_unbound_host_override"],
         }

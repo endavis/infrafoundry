@@ -80,41 +80,10 @@ def _extract_resource_blocks(content: str) -> list[tuple[str, str]]:
 # Each fixture exercises every conditional branch in the corresponding
 # template, so the schema-compliance test would catch a wrong-arg-name
 # regression on any optional path.
-def _aliases_resources() -> list[ResourceConfig]:
-    return [
-        # Minimal alias — exercises only the always-rendered args.
-        ResourceConfig(
-            provider="opnsense",
-            type="aliases",
-            name="alias-min",
-            config={
-                "name": "alias-min",
-                "type": "host",
-                "content": ["192.168.1.10"],
-            },
-        ),
-        # Alias with every optional field set — exercises all conditional
-        # branches in the template (`proto`, `updatefreq`, `categories`,
-        # `interface`). `counters` is intentionally dropped post-#765 and
-        # must not be rendered even if present in the YAML.
-        ResourceConfig(
-            provider="opnsense",
-            type="aliases",
-            name="alias-full",
-            config={
-                "name": "alias-full",
-                "type": "urltable",
-                "description": "all-optionals alias",
-                "content": ["https://example.com/list.txt"],
-                "enabled": True,
-                "proto": "IPv4",
-                "updatefreq": "0.5",
-                "categories": ["cat-a", "cat-b"],
-                "counters": True,
-                "interface": "lan",
-            },
-        ),
-    ]
+#
+# The `aliases` template was retired in #775 — `firewall_alias` is now
+# managed via `OPNsenseDirectRunner` (no terraform path); the parameter
+# was removed from the parametrize list below.
 
 
 def _kea_subnet_resources() -> list[ResourceConfig]:
@@ -230,7 +199,6 @@ def _unbound_host_override_resources() -> list[ResourceConfig]:
 # follow-up to #765.
 # TODO(#765 follow-up): Resolve `dhcp_static_maps.tf.j2` and re-include here.
 _TEMPLATE_PARAMS: list[tuple[str, str, Any]] = [
-    ("aliases", "aliases.tf", _aliases_resources),
     ("kea_subnet", "kea_subnet.tf", _kea_subnet_resources),
     ("kea_reservation", "kea_reservation.tf", _kea_reservation_resources),
     (

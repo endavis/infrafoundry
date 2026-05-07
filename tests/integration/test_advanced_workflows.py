@@ -207,7 +207,7 @@ class TestDriftDetection:
         opnsense_provider.pyinfra_dir = Path("/tmp/pyinfra/opnsense")
         opnsense_provider.ensure_directories = Mock()
         opnsense_provider.generate_terraform = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["aliases"])
+        opnsense_provider.get_resource_types = Mock(return_value=["unbound_host_override"])
         opnsense_provider.get_dependencies = Mock(return_value={})
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 
@@ -335,17 +335,20 @@ class TestMultiProviderCoordination:
         config_dir = tmp_path / "config" / "envs" / "dev" / "opnsense"
         config_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create OPNsense alias config (used to exercise the multi-provider
-        # dispatch path; firewall_rules is direct-API per ADR-0015 and not
-        # routed through ``generate_terraform``).
-        alias_file = config_dir / "aliases.yaml"
-        alias_file.write_text(
+        # Create OPNsense unbound host override config (used to exercise
+        # the multi-provider dispatch path; firewall_rules is direct-API
+        # per ADR-0015 and aliases is direct-API per ADR-0014 §"Per-component
+        # decisions" / firewall_alias (#775) — neither routes through
+        # ``generate_terraform``. unbound_host_override is still terraform-
+        # managed at the time of this test).
+        override_file = config_dir / "unbound_host_override.yaml"
+        override_file.write_text(
             """
-aliases:
-  - name: web-servers
-    type: host
-    content:
-      - 192.168.1.10
+unbound_host_override:
+  - name: web-server
+    hostname: web
+    domain: example.com
+    server: 192.168.1.10
 """
         )
 
@@ -359,8 +362,8 @@ aliases:
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.generate_ansible = Mock()
         opnsense_provider.validate_config = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["aliases"])
-        opnsense_provider.get_dependencies = Mock(return_value={"aliases": []})
+        opnsense_provider.get_resource_types = Mock(return_value=["unbound_host_override"])
+        opnsense_provider.get_dependencies = Mock(return_value={"unbound_host_override": []})
         opnsense_provider.set_environment = Mock()
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 

@@ -1,17 +1,4 @@
 {
-  "opnsense_firewall_alias": [
-    "categories",
-    "content",
-    "description",
-    "enabled",
-    "id",
-    "interface",
-    "ip_protocol",
-    "name",
-    "stats",
-    "type",
-    "update_freq"
-  ],
   "opnsense_kea_reservation": [
     "description",
     "hostname",

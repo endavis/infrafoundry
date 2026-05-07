@@ -1,5 +1,6 @@
 """Specialized validators for OPNsense resources."""
 
+from infrafoundry.providers.opnsense.validators.alias_validator import AliasValidator
 from infrafoundry.providers.opnsense.validators.dhcp_validator import DHCPValidator
 from infrafoundry.providers.opnsense.validators.firewall_rule_validator import (
     FirewallRuleValidator,
@@ -26,6 +27,7 @@ from infrafoundry.providers.opnsense.validators.virtual_ip_validator import Virt
 from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValidator
 
 __all__ = [
+    "AliasValidator",
     "DHCPValidator",
     "FirewallRuleValidator",
     "GatewayValidator",
