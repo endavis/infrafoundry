@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778178626225,
+  "lastUpdate": 1778181525453,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8122,6 +8122,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002413971999335009",
             "extra": "mean: 142.3949691629923 usec\nrounds: 1816"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "48b9ae2fd7a0448b6647a7fb00c9b1714472cf44",
+          "message": "feat: migrate opnsense unbound_host_override to direct-api (merges PR #780, addresses #776)\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-07T20:18:14+01:00",
+          "tree_id": "ba4df670ac343dc5ba6f9c72a44006a8496cb959",
+          "url": "https://github.com/endavis/infrafoundry/commit/48b9ae2fd7a0448b6647a7fb00c9b1714472cf44"
+        },
+        "date": 1778181524515,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9536.03725380967,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009071505675430286",
+            "extra": "mean: 104.86536213986554 usec\nrounds: 2187"
           }
         ]
       }
