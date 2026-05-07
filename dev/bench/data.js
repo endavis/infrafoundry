@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778148215079,
+  "lastUpdate": 1778154692375,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7967,6 +7967,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000143103891612892",
             "extra": "mean: 137.94190004511452 usec\nrounds: 2221"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d9e715389e1cf4b3e463ba2bfdc3eb507d1c0fb6",
+          "message": "fix: correct tailscale terraform module source path (registry 404) (merges PR #768, addresses #767)\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-07T12:51:06+01:00",
+          "tree_id": "637afcbf27dfd9309d2a3e386432bbb02cadd7b8",
+          "url": "https://github.com/endavis/infrafoundry/commit/d9e715389e1cf4b3e463ba2bfdc3eb507d1c0fb6"
+        },
+        "date": 1778154691884,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6885.65750185939,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002260577061830232",
+            "extra": "mean: 145.22941341911965 usec\nrounds: 2489"
           }
         ]
       }
