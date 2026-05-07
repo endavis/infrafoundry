@@ -390,3 +390,31 @@ class TestListAndMigrate:
             result = manager.migrate("test-env")
         assert result == "resources: []\n"
         service_mock.export_to_yaml.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Finalization hook contract (#776)
+# ---------------------------------------------------------------------------
+
+
+class TestFinalizationHook:
+    """The manager declares the shared ``unbound_reconfigure`` hook key and
+    apply must NOT call ``service.reconfigure`` inline (the runner fires it
+    via ``OPNsenseProvider.get_finalization_hooks()`` instead, coalescing
+    across host_override / host_alias / forward managers).
+    """
+
+    def test_finalization_hook_classvar_declared(self) -> None:
+        assert UnboundHostAliasManager.FINALIZATION_HOOK == "unbound_reconfigure"
+
+    def test_apply_does_not_call_reconfigure_inline(self, tmp_path: Path) -> None:
+        manager = UnboundHostAliasManager(tmp_path)
+        resources = [_resource("foo")]
+        diff = Diff(adds=[_alias("foo")])
+        service_mock = _make_service_mock(
+            diff=diff, apply_counts={"created": 1, "updated": 0, "deleted": 0}
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service_mock
+            manager.apply("test-env", resources)
+        service_mock.reconfigure.assert_not_called()

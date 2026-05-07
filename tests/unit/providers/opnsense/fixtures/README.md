@@ -35,7 +35,10 @@ Only resource types InfraFoundry's templates currently emit are listed:
 
 - `opnsense_kea_reservation` (from `kea_reservation.tf.j2`)
 - `opnsense_kea_subnet` (from `kea_subnet.tf.j2`)
-- `opnsense_unbound_host_override` (from `unbound_host_override.tf.j2`)
+
+`opnsense_unbound_host_override` was previously emitted by
+`unbound_host_override.tf.j2`; that template was retired in #776 when the
+component migrated to the direct-API write path.
 
 `dhcp_static_maps.tf.j2` is intentionally excluded — it references
 `opnsense_dhcpv4_static_map`, a resource type that doesn't exist in the

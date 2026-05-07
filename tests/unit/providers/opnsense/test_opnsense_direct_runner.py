@@ -814,3 +814,132 @@ class TestFinalizationHookPlumbing:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             runner.plan(provider_with_env)
         hook.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Unbound reconfigure coalescing (#776)
+# ---------------------------------------------------------------------------
+
+
+def _uho_resource(name: str) -> ResourceConfig:
+    return ResourceConfig(
+        name=name,
+        type="unbound_host_override",
+        provider="opnsense",
+        config={"hostname": "web", "domain": "example.com", "server": "192.168.1.10"},
+    )
+
+
+def _uha_resource(name: str) -> ResourceConfig:
+    return ResourceConfig(
+        name=name,
+        type="unbound_host_alias",
+        provider="opnsense",
+        config={"host": "web", "hostname": "alias", "domain": "example.com"},
+    )
+
+
+def _ufwd_resource(name: str) -> ResourceConfig:
+    return ResourceConfig(
+        name=name,
+        type="unbound_forward",
+        provider="opnsense",
+        config={"server": "10.0.0.53"},
+    )
+
+
+class TestUnboundReconfigureCoalescing:
+    """All three unbound managers (host_override / host_alias / forward)
+    declare ``FINALIZATION_HOOK = "unbound_reconfigure"`` (#776). The runner
+    must coalesce the hook firing across them so a multi-unbound apply
+    produces exactly one ``unbound/service/reconfigure`` call.
+
+    These tests use the same ``unbound_reconfigure`` hook key as the
+    production code so they verify the contract end-to-end through the
+    runner's hook plumbing.
+    """
+
+    def test_apply_touching_all_three_unbound_types_fires_hook_once(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        runner = OPNsenseDirectRunner()
+        resources = [
+            _uho_resource("override-1"),
+            _uha_resource("alias-1"),
+            _ufwd_resource("forward-1"),
+        ]
+        # All three managers declare the same hook key and report changes.
+        cls_uho, _ = _hook_manager(hook_key="unbound_reconfigure", created=1)
+        cls_uha, _ = _hook_manager(hook_key="unbound_reconfigure", updated=1)
+        cls_ufwd, _ = _hook_manager(hook_key="unbound_reconfigure", deleted=1)
+
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "unbound_host_override": cls_uho,
+            "unbound_host_alias": cls_uha,
+            "unbound_forward": cls_ufwd,
+        }
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"unbound_reconfigure": hook}
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+
+        hook.assert_called_once_with("test-env")
+
+    def test_apply_touching_only_one_unbound_type_fires_hook_once(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        runner = OPNsenseDirectRunner()
+        resources = [_uho_resource("override-1")]
+        cls_uho, _ = _hook_manager(hook_key="unbound_reconfigure", created=1)
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "unbound_host_override": cls_uho,
+        }
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"unbound_reconfigure": hook}
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+
+        hook.assert_called_once_with("test-env")
+
+    def test_apply_touching_none_fires_hook_zero_times(self, provider_with_env: MagicMock) -> None:
+        runner = OPNsenseDirectRunner()
+        # Manager registered for the type but no resources of that type.
+        # The dispatch table is iterated but no manager is instantiated.
+        resources: list[ResourceConfig] = [_vlan_resource("v1", "igb0", 10)]
+        cls_uho, _ = _hook_manager(hook_key="unbound_reconfigure", created=1)
+        # Register a vlan manager that returns zero changes — apply walks
+        # the dispatch table but no unbound manager fires.
+        cls_vlan, _ = _hook_manager(hook_key=None, created=0)
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "vlans": cls_vlan,
+            "unbound_host_override": cls_uho,
+        }
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"unbound_reconfigure": hook}
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+
+        hook.assert_not_called()
+
+    def test_apply_with_unbound_changes_but_no_change_only_unbound_skips_hook(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        # If the unbound manager runs but reports no changes, the hook
+        # must not fire (the runner only adds the key when the manager
+        # actually mutated state).
+        runner = OPNsenseDirectRunner()
+        resources = [_uho_resource("override-1")]
+        cls_uho, _ = _hook_manager(hook_key="unbound_reconfigure", created=0)
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "unbound_host_override": cls_uho,
+        }
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"unbound_reconfigure": hook}
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+
+        hook.assert_not_called()
