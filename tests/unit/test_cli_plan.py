@@ -39,6 +39,7 @@ def test_plan_basic(cli_runner, mock_orchestrator):
             package_filter=None,
             add_only=False,
             provider_filter=None,
+            verbose=False,
         )
 
 
@@ -57,6 +58,7 @@ def test_plan_with_dry_run(cli_runner, mock_orchestrator):
             package_filter=None,
             add_only=False,
             provider_filter=None,
+            verbose=False,
         )
 
 
@@ -77,6 +79,7 @@ def test_plan_with_resource_filter(cli_runner, mock_orchestrator):
             package_filter=None,
             add_only=False,
             provider_filter=None,
+            verbose=False,
         )
 
 
@@ -97,6 +100,7 @@ def test_plan_with_enforce_policies(cli_runner, mock_orchestrator):
             package_filter=None,
             add_only=False,
             provider_filter=None,
+            verbose=False,
         )
 
 
@@ -128,6 +132,7 @@ def test_plan_with_single_provider_filter(cli_runner, mock_orchestrator):
             package_filter=None,
             add_only=False,
             provider_filter=["opnsense"],
+            verbose=False,
         )
 
 
@@ -148,6 +153,7 @@ def test_plan_with_short_provider_flag(cli_runner, mock_orchestrator):
             package_filter=None,
             add_only=False,
             provider_filter=["opnsense"],
+            verbose=False,
         )
 
 
@@ -177,6 +183,7 @@ def test_plan_with_multiple_provider_filter(cli_runner, mock_orchestrator):
             package_filter=None,
             add_only=False,
             provider_filter=["opnsense", "proxmox"],
+            verbose=False,
         )
 
 
@@ -246,3 +253,54 @@ def test_plan_unknown_provider_filter_surfaces_error(cli_runner, mock_orchestrat
         assert "nope" in result.output
         assert "opnsense" in result.output
         assert "proxmox" in result.output
+
+
+# ---------------------------------------------------------------------------
+# --verbose/-v flag (#771)
+# ---------------------------------------------------------------------------
+
+
+def test_plan_with_verbose_long_flag(cli_runner, mock_orchestrator):
+    """``--verbose`` forwards ``verbose=True`` to the orchestrator."""
+    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+        result = cli_runner.invoke(main, ["infra", "plan", "--env", "test", "--verbose"])
+
+        assert result.exit_code == 0
+        mock_orchestrator.plan.assert_called_once_with(
+            "test",
+            dry_run=False,
+            resource_filter=None,
+            enforce_policies=False,
+            package_filter=None,
+            add_only=False,
+            provider_filter=None,
+            verbose=True,
+        )
+
+
+def test_plan_with_verbose_short_flag(cli_runner, mock_orchestrator):
+    """``-v`` is equivalent to ``--verbose``."""
+    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+        result = cli_runner.invoke(main, ["infra", "plan", "--env", "test", "-v"])
+
+        assert result.exit_code == 0
+        mock_orchestrator.plan.assert_called_once_with(
+            "test",
+            dry_run=False,
+            resource_filter=None,
+            enforce_policies=False,
+            package_filter=None,
+            add_only=False,
+            provider_filter=None,
+            verbose=True,
+        )
+
+
+def test_plan_default_verbose_is_false(cli_runner, mock_orchestrator):
+    """Without ``--verbose``/``-v``, the orchestrator receives ``verbose=False``."""
+    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+        result = cli_runner.invoke(main, ["infra", "plan", "--env", "test"])
+
+        assert result.exit_code == 0
+        kwargs = mock_orchestrator.plan.call_args.kwargs
+        assert kwargs["verbose"] is False

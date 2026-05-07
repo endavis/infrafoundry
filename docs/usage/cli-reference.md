@@ -322,13 +322,16 @@ foundry infra plan --env dev --provider opnsense
 foundry infra plan --env dev --provider opnsense --provider proxmox
 foundry infra plan --env dev --enforce-policies
 foundry infra plan --env dev --add-only
+foundry infra plan --env dev --verbose
 ```
 
-**Options:** `-e/--env TEXT` (required), `--dry-run`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable), `--enforce-policies`, `--add-only`
+**Options:** `-e/--env TEXT` (required), `--dry-run`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable), `--enforce-policies`, `--add-only`, `-v/--verbose`
 
 **`--add-only`:** Suppresses deletes for live resources not present in YAML, for direct-API runners that compute live-vs-desired diffs (currently `OPNsenseDirectRunner`). Useful for partial cutover migrations where IaC adopts a subset of existing resources before taking full ownership. Other runners ignore the flag.
 
 **`-P/--provider`:** Limit the operation to one or more providers. Cross-provider dependencies pointing at filtered-out providers are silently skipped for this run. Unknown provider names raise an error.
+
+**`-v/--verbose`:** Print the full captured terraform plan diff for each provider in addition to the per-provider summary line. Without `--verbose`, `infra plan` always prints a single summary line per terraform-emitting provider (e.g. `terraform: 21 to add, 0 to change, 0 to destroy` or `terraform: No changes`) so the operator can confirm what would change without re-running with extra flags. The opnsense direct-API runner's existing per-component diff lines are unaffected by this flag.
 
 Note: `--resource`, `--package`, and `--provider` are mutually exclusive.
 

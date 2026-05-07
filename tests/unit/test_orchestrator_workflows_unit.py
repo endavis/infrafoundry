@@ -351,6 +351,189 @@ def test_plan_emits_runner_starting_and_completed(console):
     }
 
 
+# ---------------------------------------------------------------------------
+# Plan output surfacing — issue #771
+# ---------------------------------------------------------------------------
+
+
+def _build_plan_orchestrator_with_runner(
+    *,
+    runner: MagicMock,
+    runner_output: str,
+    expose_extractor: bool = True,
+    extractor_return: str = "21 to add, 0 to change, 0 to destroy",
+):
+    """Build a PlanOrchestrator wired to *runner* and a captured-output dict.
+
+    The runner is registered under the name ``terraform`` and the provider
+    exposes ``generate_terraform`` so the IaC iteration enters the plan
+    branch. ``runner.plan`` returns ``{"success": True, "output": ...}``
+    matching the real terraform runner's plan return shape.
+    """
+    runner.priority = 0
+    runner.is_iac_runner = True
+    runner.plan = MagicMock(return_value={"success": True, "output": runner_output})
+
+    if expose_extractor:
+        runner.extract_plan_summary = MagicMock(return_value=extractor_return)
+    else:
+        # spec the mock so getattr(runner, "extract_plan_summary", None) is None
+        del runner.extract_plan_summary
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    runner_registry.create_runner.return_value = runner
+
+    provider = MagicMock()
+    provider.generate_terraform = MagicMock()
+    providers = {"proxmox": provider}
+
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 1234
+    event_manager = MagicMock()
+    console_mock = MagicMock(spec=Console)
+
+    def load_resources(env: str):
+        res = [_resource("vm1")]
+        return res, {"proxmox": res}
+
+    orchestrator = PlanOrchestrator(
+        console_mock,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+    )
+    return orchestrator, console_mock, runner
+
+
+def _print_strings(console_mock: MagicMock) -> list[str]:
+    """Collect the leading positional argument of each console.print call as a string."""
+    out: list[str] = []
+    for call in console_mock.print.call_args_list:
+        if call.args:
+            out.append(str(call.args[0]))
+    return out
+
+
+def test_plan_prints_per_provider_summary_line_by_default(console):
+    """Default-on summary: one ``terraform: <summary>`` line per provider."""
+    runner = MagicMock()
+    output = (
+        "Terraform will perform the following actions:\n"
+        "Plan: 21 to add, 0 to change, 0 to destroy.\n"
+    )
+    orchestrator, console_mock, _ = _build_plan_orchestrator_with_runner(
+        runner=runner, runner_output=output
+    )
+
+    orchestrator.plan(env_name="dev", dry_run=False, resource_filter=None, enforce_policies=False)
+
+    prints = _print_strings(console_mock)
+    summary_lines = [p for p in prints if "terraform: 21 to add" in p]
+    assert len(summary_lines) == 1
+    assert "[dim]" in summary_lines[0]
+
+
+def test_plan_does_not_print_full_output_by_default(console):
+    """Default-off verbose: the full captured output is NOT printed when verbose=False."""
+    runner = MagicMock()
+    diff_body = (
+        "Terraform will perform the following actions:\n"
+        "  # proxmox_virtual_environment_vm.web will be created\n"
+        "Plan: 1 to add, 0 to change, 0 to destroy.\n"
+    )
+    orchestrator, console_mock, _ = _build_plan_orchestrator_with_runner(
+        runner=runner, runner_output=diff_body, extractor_return="1 to add"
+    )
+
+    orchestrator.plan(env_name="dev", dry_run=False, resource_filter=None, enforce_policies=False)
+
+    prints = _print_strings(console_mock)
+    # The diff body line is unique enough that we can grep for it directly.
+    assert not any("# proxmox_virtual_environment_vm.web will be created" in p for p in prints)
+
+
+def test_plan_prints_full_output_when_verbose(console):
+    """When ``verbose=True``, the full captured runner output is printed verbatim."""
+    runner = MagicMock()
+    diff_body = (
+        "Terraform will perform the following actions:\n"
+        "  # proxmox_virtual_environment_vm.web will be created\n"
+        "Plan: 1 to add, 0 to change, 0 to destroy.\n"
+    )
+    orchestrator, console_mock, _ = _build_plan_orchestrator_with_runner(
+        runner=runner, runner_output=diff_body, extractor_return="1 to add"
+    )
+
+    orchestrator.plan(
+        env_name="dev",
+        dry_run=False,
+        resource_filter=None,
+        enforce_policies=False,
+        verbose=True,
+    )
+
+    # When verbose=True we still get the summary line, AND the full output.
+    full_output_calls = [
+        call
+        for call in console_mock.print.call_args_list
+        if call.args and call.args[0] == diff_body
+    ]
+    assert len(full_output_calls) == 1
+    # The verbose body is printed with markup/highlight off so terraform's own
+    # bracketed diff text survives without being reinterpreted by Rich.
+    kwargs = full_output_calls[0].kwargs
+    assert kwargs.get("markup") is False
+    assert kwargs.get("highlight") is False
+
+
+def test_plan_summary_handles_no_changes_output(console):
+    """Output containing ``No changes`` produces a ``terraform: No changes`` line."""
+    runner = MagicMock()
+    orchestrator, console_mock, _ = _build_plan_orchestrator_with_runner(
+        runner=runner,
+        runner_output="No changes. Your infrastructure matches the configuration.\n",
+        extractor_return="No changes",
+    )
+
+    orchestrator.plan(env_name="dev", dry_run=False, resource_filter=None, enforce_policies=False)
+
+    prints = _print_strings(console_mock)
+    assert any("terraform: No changes" in p for p in prints)
+
+
+def test_plan_skips_summary_for_runner_without_extract_plan_summary(console):
+    """A runner without ``extract_plan_summary`` (e.g. ansible) prints no summary line."""
+    # spec the mock so ``getattr(runner, "extract_plan_summary", None)`` is None
+    runner = MagicMock(spec=["priority", "is_iac_runner", "plan"])
+    orchestrator, console_mock, _ = _build_plan_orchestrator_with_runner(
+        runner=runner, runner_output="output", expose_extractor=False
+    )
+    # The provider must expose ``generate_terraform`` regardless of the runner
+    # name. Re-point the runner registry so the iteration finds this runner.
+    # _build_plan_orchestrator_with_runner already registers it under "terraform".
+
+    orchestrator.plan(env_name="dev", dry_run=False, resource_filter=None, enforce_policies=False)
+
+    prints = _print_strings(console_mock)
+    # No call should mention a "<tool_name>: <summary>" pattern that the helper would emit.
+    # The orchestrator emits other "Running terraform plan..." lines; only the
+    # summary is suppressed.
+    assert not any("terraform: " in p and "Running" not in p for p in prints)
+
+
 def test_destroy_emits_runner_starting_and_completed(console):
     """Runner events are emitted around each runner.destroy() call."""
     state_manager = MagicMock()
