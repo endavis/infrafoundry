@@ -22,7 +22,19 @@ from ...utils import console
     "--package",
     "-p",
     "package_name",
-    help="Target a specific package by name (mutually exclusive with -r)",
+    help="Target a specific package by name (mutually exclusive with -r and -P)",
+)
+@click.option(
+    "--provider",
+    "-P",
+    "provider",
+    multiple=True,
+    help=(
+        "Limit operation to specific provider(s) (can be used multiple times). "
+        "Mutually exclusive with --package and --resource. Cross-provider "
+        "dependencies pointing at filtered-out providers are silently skipped "
+        "for this run."
+    ),
 )
 @click.option(
     "--enforce-policies",
@@ -47,18 +59,21 @@ def plan(
     dry_run: bool,
     resource: tuple[str, ...],
     package_name: str | None,
+    provider: tuple[str, ...],
     enforce_policies: bool,
     add_only: bool,
 ) -> None:
     """Plan infrastructure changes."""
-    if package_name and resource:
-        raise click.UsageError("--package and --resource are mutually exclusive")
+    if sum(bool(x) for x in (package_name, resource, provider)) > 1:
+        raise click.UsageError("--package, --resource, and --provider are mutually exclusive")
 
     resource_filter: list[str] | None = None
     if package_name:
         resource_filter = orchestrator.config_manager.resolve_package_filter(env, package_name)
     elif resource:
         resource_filter = list(resource)
+
+    provider_filter: list[str] | None = list(provider) if provider else None
 
     with OperationTimer() as timer:
         orchestrator.plan(
@@ -68,6 +83,7 @@ def plan(
             enforce_policies=enforce_policies,
             package_filter=package_name,
             add_only=add_only,
+            provider_filter=provider_filter,
         )
 
     if dry_run:
