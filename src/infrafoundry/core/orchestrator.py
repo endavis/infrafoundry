@@ -515,6 +515,8 @@ class Orchestrator:
         package_filter: str | None = None,
         add_only: bool = False,
         provider_filter: list[str] | None = None,
+        *,
+        verbose: bool = False,
     ) -> dict[str, Any]:
         """Plan infrastructure changes.
 
@@ -531,6 +533,8 @@ class Orchestrator:
                 Cross-provider dependency edges pointing at filtered-out
                 providers are silently skipped for this run. Raises
                 ``ProviderFilterError`` if any name is unknown.
+            verbose: If True, print the full captured terraform plan diff
+                in addition to the always-on per-provider summary line.
 
         Returns:
             Dict with plan results per provider
@@ -543,6 +547,7 @@ class Orchestrator:
             package_filter,
             add_only=add_only,
             provider_filter=provider_filter,
+            verbose=verbose,
         )
 
     def apply(

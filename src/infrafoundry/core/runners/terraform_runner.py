@@ -769,6 +769,53 @@ class TerraformRunner(BaseRunner):
             self.console.print(f"[yellow]Warning: Could not extract Terraform IDs: {e}[/yellow]")
             return {}
 
+    @staticmethod
+    def extract_plan_summary(output: str) -> str:
+        """Extract a one-line human-readable summary from terraform plan output.
+
+        Scans *output* for Terraform's canonical
+        ``Plan: N to add, M to change, K to destroy.`` line and returns the
+        same shape as :meth:`parse_plan_for_drift`'s ``summary`` field. When
+        no plan line is present but the output contains a "no changes"
+        marker, ``"No changes"`` is returned. Empty or unparsable output
+        falls through to the documented default ``"Unable to parse plan output"``
+        so callers can render it verbatim and the operator can disambiguate
+        "the runner produced no output" from "no changes were needed".
+
+        Args:
+            output: Captured terraform stdout from ``terraform plan``.
+
+        Returns:
+            A short summary like ``"21 to add, 0 to change, 0 to destroy"``,
+            ``"No changes"``, or ``"Unable to parse plan output"`` when
+            neither marker is found.
+        """
+        plan_pattern = r"Plan: (\d+) to add, (\d+) to change, (\d+) to destroy"
+        match = re.search(plan_pattern, output)
+
+        if match:
+            to_add = int(match.group(1))
+            to_change = int(match.group(2))
+            to_destroy = int(match.group(3))
+
+            # Mirror parse_plan_for_drift's summary: omit zero-counts so
+            # "Plan: 1 to add, 0 to change, 0 to destroy." renders as
+            # "1 to add" rather than the noisier full triple.
+            parts = []
+            if to_add > 0:
+                parts.append(f"{to_add} to add")
+            if to_change > 0:
+                parts.append(f"{to_change} to change")
+            if to_destroy > 0:
+                parts.append(f"{to_destroy} to destroy")
+
+            return ", ".join(parts) if parts else "No changes"
+
+        if "No changes" in output or "no changes are needed" in output.lower():
+            return "No changes"
+
+        return "Unable to parse plan output"
+
     def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
         """Parse Terraform plan output to detect drift.
 
@@ -790,17 +837,7 @@ class TerraformRunner(BaseRunner):
             to_destroy = int(match.group(3))
 
             has_changes = (to_add + to_change + to_destroy) > 0
-
-            # Build summary message
-            parts = []
-            if to_add > 0:
-                parts.append(f"{to_add} to add")
-            if to_change > 0:
-                parts.append(f"{to_change} to change")
-            if to_destroy > 0:
-                parts.append(f"{to_destroy} to destroy")
-
-            summary = ", ".join(parts) if parts else "No changes"
+            summary = self.extract_plan_summary(output)
 
             return {
                 "has_changes": has_changes,

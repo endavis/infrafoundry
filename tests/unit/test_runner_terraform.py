@@ -316,6 +316,67 @@ def test_parse_plan_for_drift_detects_changes(runner: TerraformRunner) -> None:
     assert "add" in result["summary"]
 
 
+class TestExtractPlanSummary:
+    """Tests for ``TerraformRunner.extract_plan_summary``.
+
+    Mirrors the patterns at line 174 of this file: deterministic input
+    string in, summary string out. Used by the plan orchestrator (#771)
+    to surface terraform plan results to the operator.
+    """
+
+    def test_returns_canonical_summary_for_typical_plan(self) -> None:
+        """A typical terraform plan summary line yields a comma-joined summary.
+
+        Zero-count fields are omitted to mirror ``parse_plan_for_drift``'s
+        existing summary shape.
+        """
+        output = (
+            "Terraform will perform the following actions:\n"
+            "Plan: 21 to add, 0 to change, 0 to destroy.\n"
+        )
+        assert TerraformRunner.extract_plan_summary(output) == "21 to add"
+
+    def test_returns_full_triple_when_all_nonzero(self) -> None:
+        """Adds, changes, and destroys all appear when each is nonzero."""
+        output = "Plan: 1 to add, 2 to change, 3 to destroy."
+        assert TerraformRunner.extract_plan_summary(output) == "1 to add, 2 to change, 3 to destroy"
+
+    def test_returns_no_changes_when_all_zero(self) -> None:
+        """``Plan: 0 to add, 0 to change, 0 to destroy`` collapses to ``No changes``."""
+        output = "Plan: 0 to add, 0 to change, 0 to destroy."
+        assert TerraformRunner.extract_plan_summary(output) == "No changes"
+
+    def test_returns_no_changes_for_no_changes_marker(self) -> None:
+        """Output containing ``No changes`` (with no Plan: line) returns ``No changes``."""
+        output = "No changes. Your infrastructure matches the configuration.\n"
+        assert TerraformRunner.extract_plan_summary(output) == "No changes"
+
+    def test_returns_no_changes_for_lowercase_marker(self) -> None:
+        """The lowercase ``no changes are needed`` form is also recognized."""
+        output = "Note: no changes are needed.\n"
+        assert TerraformRunner.extract_plan_summary(output) == "No changes"
+
+    def test_returns_default_for_empty_output(self) -> None:
+        """Empty output falls through to the documented default."""
+        assert TerraformRunner.extract_plan_summary("") == "Unable to parse plan output"
+
+    def test_returns_default_for_malformed_output(self) -> None:
+        """Output that contains neither marker falls through to the default."""
+        output = "Something terraform-shaped but not the canonical summary.\n"
+        assert TerraformRunner.extract_plan_summary(output) == "Unable to parse plan output"
+
+    def test_parse_plan_for_drift_uses_helper_summary(self, runner: TerraformRunner) -> None:
+        """``parse_plan_for_drift`` returns the same summary shape as the helper.
+
+        Regression guard for the refactor: the drift function and the new
+        helper must agree on the visible summary string.
+        """
+        output = "Plan: 5 to add, 3 to change, 0 to destroy."
+        drift = runner.parse_plan_for_drift({"output": output})
+        assert drift["summary"] == TerraformRunner.extract_plan_summary(output)
+        assert drift["summary"] == "5 to add, 3 to change"
+
+
 class TestResolveTargets:
     """Tests for _resolve_terraform_targets."""
 

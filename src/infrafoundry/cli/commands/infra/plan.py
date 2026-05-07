@@ -51,6 +51,12 @@ from ...utils import console
         "runners accept and ignore."
     ),
 )
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show full terraform plan diff in addition to the per-provider summary.",
+)
 @with_orchestrator("Plan failed")
 def plan(
     _ctx: click.Context,
@@ -62,6 +68,7 @@ def plan(
     provider: tuple[str, ...],
     enforce_policies: bool,
     add_only: bool,
+    verbose: bool,
 ) -> None:
     """Plan infrastructure changes."""
     if sum(bool(x) for x in (package_name, resource, provider)) > 1:
@@ -84,6 +91,7 @@ def plan(
             package_filter=package_name,
             add_only=add_only,
             provider_filter=provider_filter,
+            verbose=verbose,
         )
 
     if dry_run:
