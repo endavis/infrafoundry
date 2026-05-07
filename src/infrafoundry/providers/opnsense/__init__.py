@@ -190,10 +190,10 @@ class OPNsenseProvider(
         if "kea_reservation" in resources_by_type:
             self._generate_kea_reservation_terraform(resources_by_type["kea_reservation"])
 
-        if "unbound_host_override" in resources_by_type:
-            self._generate_unbound_host_override_terraform(
-                resources_by_type["unbound_host_override"]
-            )
+        # ``unbound_host_override`` is managed by ``OPNsenseDirectRunner``
+        # via ``UnboundHostOverrideManager`` (ADR-0014 per-component
+        # decision, #776) — no terraform generation. Legacy template
+        # ``unbound_host_override.tf.j2`` deleted in same PR.
 
         # DHCPv6 subnets / reservations are managed by ``OPNsenseDirectRunner``
         # via ``KeaDHCPv6SubnetManager`` / ``KeaDHCPv6ReservationManager``
@@ -244,6 +244,7 @@ class OPNsenseProvider(
         from .components.static_route import StaticRouteManager
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
+        from .components.unbound_host_override import UnboundHostOverrideManager
         from .components.virtual_ip import VirtualIPManager
         from .components.vlan import VlanManager
 
@@ -254,6 +255,9 @@ class OPNsenseProvider(
         # exist on the box before its reservations can reference it. Aliases
         # are applied before ``nat_rules`` and ``firewall_rules`` so the
         # alias names those rules reference exist on the box first (#775).
+        # ``unbound_host_override`` is applied before ``unbound_host_alias``
+        # so a brand-new override exists on the box before any aliases
+        # reference it (#776).
         return {
             "vlans": VlanManager,
             "interface_assignments": InterfaceAssignmentManager,
@@ -263,6 +267,7 @@ class OPNsenseProvider(
             "gateways": GatewayManager,
             "static_routes": StaticRouteManager,
             "virtual_ips": VirtualIPManager,
+            "unbound_host_override": UnboundHostOverrideManager,
             "unbound_host_alias": UnboundHostAliasManager,
             "unbound_forward": UnboundForwardManager,
             "kea_dhcp6_subnet": KeaDHCPv6SubnetManager,
@@ -270,25 +275,35 @@ class OPNsenseProvider(
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
-        """Return end-of-apply hooks the direct-API runner fires per key (#758).
+        """Return end-of-apply hooks the direct-API runner fires per key (#758, #776).
 
         Each component manager opts in by declaring a ``FINALIZATION_HOOK``
         ClassVar; ``OPNsenseDirectRunner`` collects those keys for managers
         that mutated state during a given apply, dedupes them, and calls
         the matching callable here exactly once.
 
-        Currently the only registered hook is ``kea_dhcp6_reconfigure``,
-        shared by :class:`KeaDHCPv6SubnetManager` and
-        :class:`KeaDHCPv6ReservationManager` so a Kea reconfigure fires
-        exactly once per apply when either component changed state. The
-        mechanism is generic — future components with shared post-apply
+        Registered hooks:
+
+        - ``kea_dhcp6_reconfigure`` — shared by :class:`KeaDHCPv6SubnetManager`
+          and :class:`KeaDHCPv6ReservationManager` so a Kea reconfigure fires
+          exactly once per apply when either component changed state.
+        - ``unbound_reconfigure`` (#776) — shared by
+          :class:`UnboundHostOverrideManager`, :class:`UnboundHostAliasManager`,
+          and :class:`UnboundForwardManager` so a single
+          ``unbound/service/reconfigure`` call fires per apply when any of
+          the three unbound components changed state.
+
+        The mechanism is generic — future components with shared post-apply
         work register their own key here.
 
         Returns:
             ``{hook_key: callable(env_name)}`` mapping; missing keys are a
             graceful no-op on the runner side.
         """
-        return {"kea_dhcp6_reconfigure": self._reconfigure_kea_dhcp6}
+        return {
+            "kea_dhcp6_reconfigure": self._reconfigure_kea_dhcp6,
+            "unbound_reconfigure": self._reconfigure_unbound,
+        }
 
     def _reconfigure_kea_dhcp6(self, env_name: str) -> None:
         """Reconfigure the Kea DHCP service after a DHCPv6 mutation (#758).
@@ -306,6 +321,26 @@ class OPNsenseProvider(
         from .services.kea_dhcp import KeaDHCPService
 
         service = KeaDHCPService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
+    def _reconfigure_unbound(self, env_name: str) -> None:
+        """Reconfigure the Unbound service after any unbound mutation (#776).
+
+        Used by :meth:`get_finalization_hooks` so the OPNsense direct-API
+        runner can fire a single ``unbound/service/reconfigure`` call after
+        the host_override, host_alias, and forward managers have applied.
+        All three unbound services share the same reconfigure verb, so any
+        of the three service instances works; this implementation uses
+        :class:`UnboundHostOverrideService` arbitrarily. Hook errors
+        propagate, failing the apply.
+
+        Args:
+            env_name: Active environment name (matches the runner's hook
+                contract — ``hook(env_name) -> None``).
+        """
+        from .services.unbound_host_override import UnboundHostOverrideService
+
+        service = UnboundHostOverrideService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
     def _generate_dhcp_static_maps_terraform(self, static_maps: list[ResourceConfig]) -> None:
@@ -332,13 +367,10 @@ class OPNsenseProvider(
             output_name="kea_reservation.tf",
         )
 
-    def _generate_unbound_host_override_terraform(self, overrides: list[ResourceConfig]) -> None:
-        """Generate Terraform for Unbound DNS host overrides."""
-        self.render_and_write_terraform(
-            "opnsense/unbound_host_override.tf.j2",
-            context={"overrides": overrides},
-            output_name="unbound_host_overrides.tf",
-        )
+    # ``unbound_host_override`` terraform generation has been removed
+    # (#776). The component now uses the direct-API path via
+    # :class:`UnboundHostOverrideManager` registered in
+    # :meth:`get_direct_api_resource_types`.
 
     # DHCPv6 subnet / reservation management lives on
     # ``OPNsenseDirectRunner`` via the ``KeaDHCPv6SubnetManager`` and
@@ -386,15 +418,14 @@ class OPNsenseProvider(
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
         """Map InfraFoundry resource types to terraform resource types.
 
-        ``vlans``, ``firewall_rules``, and ``aliases`` are omitted here
-        per ADR-0014 — they are managed by ``OPNsenseDirectRunner``,
-        not terraform.
+        ``vlans``, ``firewall_rules``, ``aliases``, and
+        ``unbound_host_override`` are omitted here per ADR-0014 — they
+        are managed by ``OPNsenseDirectRunner``, not terraform.
         """
         return {
             "kea_reservation": ["opnsense_kea_reservation"],
             "kea_subnet": ["opnsense_kea_subnet"],
             "dhcp_static_maps": ["opnsense_dhcpv4_static_map"],
-            "unbound_host_override": ["opnsense_unbound_host_override"],
         }
 
     @override

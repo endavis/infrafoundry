@@ -545,12 +545,17 @@ class UnboundForwardService(BaseService):
         return compute_diff(desired, live, add_only=add_only)
 
     def apply_diff(self, diff: Diff) -> dict[str, int]:
-        """Dispatch the operations described by ``diff``, then reconfigure.
+        """Dispatch the operations described by ``diff``.
+
+        Does **not** call ``reconfigure()`` — the runner fires the shared
+        ``unbound_reconfigure`` finalization hook exactly once per apply
+        across all three unbound managers (#776). Mutation-without-
+        reconfigure is the new contract; callers wanting the legacy
+        inline behavior can call ``service.reconfigure()`` directly.
 
         Returns:
             Counts of operations actually performed:
-            ``{"created": N, "updated": M, "deleted": K}``. ``reconfigure``
-            is called once at the end if any mutation happened.
+            ``{"created": N, "updated": M, "deleted": K}``.
         """
         created = 0
         updated = 0
@@ -567,9 +572,6 @@ class UnboundForwardService(BaseService):
         for live in diff.deletes:
             self.delete(live.uuid)
             deleted += 1
-
-        if created or updated or deleted:
-            self.reconfigure()
 
         return {"created": created, "updated": updated, "deleted": deleted}
 

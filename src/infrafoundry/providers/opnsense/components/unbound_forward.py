@@ -1,4 +1,4 @@
-"""Unbound forward component manager for OPNsense (ADR-0014, #724).
+"""Unbound forward component manager for OPNsense (ADR-0014, #724, #776).
 
 Mirrors the layout of ``components/static_route.py``: a thin orchestration
 layer that loads ``UnboundForwardService`` from the environment and
@@ -9,11 +9,23 @@ issue plan; the manager takes no part in matching — that is entirely the
 diff engine's job in ``services/unbound_forward.py``. The operator-facing
 ``name`` is metadata only and is used for ``ResourceOutcome.address``
 synthesis.
+
+Reconfigure semantics (#776):
+
+This manager **does not** call ``service.reconfigure()`` directly from
+``apply``. Instead it declares ``FINALIZATION_HOOK = "unbound_reconfigure"``
+and ``OPNsenseDirectRunner`` fires the matching hook from
+``OPNsenseProvider.get_finalization_hooks()`` exactly once after the apply
+loop. The same hook is shared by ``UnboundHostOverrideManager`` and
+``UnboundHostAliasManager``, so a multi-unbound apply produces a single
+``unbound/service/reconfigure`` call instead of up to three. ``destroy``
+still calls ``service.reconfigure()`` inline because the runner's hook
+plumbing fires on apply only (per ADR-0014 §"Finalization hooks").
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
@@ -35,6 +47,12 @@ class UnboundForwardManager(BaseComponentManager):
     runner is responsible for translating exceptions into
     ``PlanResult.error``/``ApplyResult.error``.
     """
+
+    #: Runner-level finalization hook key (#776). The host-override and
+    #: host-alias managers declare the same value so all three unbound
+    #: components share a single ``unbound/service/reconfigure`` call
+    #: per apply.
+    FINALIZATION_HOOK: ClassVar[str] = "unbound_reconfigure"
 
     # ------------------------------------------------------------------
     # Plan / apply / destroy
