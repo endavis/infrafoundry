@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778169963952,
+  "lastUpdate": 1778174649809,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8060,6 +8060,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010657105022076456",
             "extra": "mean: 136.36944922047135 usec\nrounds: 2373"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "53e453dbeb7d2d7ecb25be9942b3087c44a7dc78",
+          "message": "fix: strip ansi color codes before parsing terraform plan summary (merges PR #774, addresses #773)\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-07T18:23:30+01:00",
+          "tree_id": "bcf6b4479b85d4ebda955dd6e110d381008e80b4",
+          "url": "https://github.com/endavis/infrafoundry/commit/53e453dbeb7d2d7ecb25be9942b3087c44a7dc78"
+        },
+        "date": 1778174648022,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9341.221520755122,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015637203112152666",
+            "extra": "mean: 107.05238043848065 usec\nrounds: 2597"
           }
         ]
       }
