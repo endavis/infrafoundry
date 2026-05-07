@@ -589,7 +589,9 @@ class TestMultiComponentDispatch:
         # runner just doesn't dispatch it.
         runner = OPNsenseDirectRunner()
         resources = [
-            _alias_resource("a1"),  # type "aliases" is NOT in the dispatch table
+            _alias_resource(
+                "a1"
+            ),  # "aliases" is intentionally absent from THIS test's mock dispatch
             _vlan_resource("v1", "igb0", 10),
         ]
         vlan_manager = MagicMock()
