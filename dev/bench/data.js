@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778167816811,
+  "lastUpdate": 1778169963952,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8029,6 +8029,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001694799513127771",
             "extra": "mean: 103.1193791288467 usec\nrounds: 2089"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bb04eae21e709d4f9cf451ef32f32378c3d9e26b",
+          "message": "fix: print terraform plan summary, add infra plan -v/--verbose (merges PR #772, addresses #771)\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-07T17:05:26+01:00",
+          "tree_id": "738c408f91a38d2198ee7e32f7e6aa33e4fee6ed",
+          "url": "https://github.com/endavis/infrafoundry/commit/bb04eae21e709d4f9cf451ef32f32378c3d9e26b"
+        },
+        "date": 1778169962840,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7333.0207441351395,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010657105022076456",
+            "extra": "mean: 136.36944922047135 usec\nrounds: 2373"
           }
         ]
       }
