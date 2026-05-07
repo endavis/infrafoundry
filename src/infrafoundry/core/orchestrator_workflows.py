@@ -25,6 +25,7 @@ from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.protocols import Destroyable, Plannable
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.result_types import PlanResult
 from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
@@ -440,8 +441,24 @@ class PlanOrchestrator(HookExecutionMixin):
         *,
         add_only: bool = False,
         provider_filter: list[str] | None = None,
+        verbose: bool = False,
     ) -> dict[str, Any]:
-        """Execute the plan workflow for the requested environment."""
+        """Execute the plan workflow for the requested environment.
+
+        Args:
+            env_name: Environment to plan against.
+            dry_run: If True, skip generation and runner execution.
+            resource_filter: Optional list of resource names to target.
+            enforce_policies: If True, block on policy violations.
+            package_filter: Optional package name to restrict event handlers.
+            add_only: Suppress deletes for live resources missing from YAML
+                (direct-API runners only).
+            provider_filter: Optional list of provider names to target.
+            verbose: If True, after each per-provider summary line, also
+                print the full captured runner output (e.g. terraform's
+                native diff body) so the operator can review the proposed
+                changes inline. The summary line itself is always printed.
+        """
         plan_metadata: PlanDeploymentMetadata = {
             "resource_filter": resource_filter,
             "provider_filter": provider_filter,
@@ -591,6 +608,14 @@ class PlanOrchestrator(HookExecutionMixin):
                                     phase="plan",
                                 )
 
+                                # Surface the runner's plan to the operator. The
+                                # opnsense_direct runner already prints its own
+                                # per-component summary; for terraform-style runners
+                                # we parse the captured stdout and render a single
+                                # summary line by default, plus the full diff body
+                                # when -v/--verbose was set. See #771.
+                                self._print_plan_summary(tool_name, runner, runner_result, verbose)
+
                                 completed_event: RunnerEventData = {
                                     "provider": provider_name,
                                     "runner": tool_name,
@@ -695,6 +720,53 @@ class PlanOrchestrator(HookExecutionMixin):
             self.console.print(
                 f"\n[bold]{provider_name}[/bold]: {len(provider_resources)} resources"
             )
+
+    def _print_plan_summary(
+        self,
+        tool_name: str,
+        runner: BaseRunner,
+        runner_result: PlanResult,
+        verbose: bool,
+    ) -> None:
+        """Render a per-runner plan summary (and optional full diff) to the console.
+
+        The terraform/opentofu runners capture their plan stdout but the
+        orchestrator historically discarded it, leaving the operator without
+        any visible indication of what the plan contained (#771). This
+        helper restores visibility:
+
+        * If *runner* exposes ``extract_plan_summary``, the captured output
+          is parsed into a one-line summary like
+          ``"21 to add, 0 to change, 0 to destroy"`` or ``"No changes"``
+          and printed in the same dim style as the existing
+          ``opnsense_direct`` per-component lines.
+        * When *verbose* is True, the full captured output is printed
+          verbatim after the summary so the operator can review the
+          terraform diff body inline.
+
+        Runners without ``extract_plan_summary`` (e.g. ansible) are
+        skipped silently — they emit their own progress to the console
+        as part of ``runner.plan(...)``.
+
+        Args:
+            tool_name: Registered runner name (``"terraform"``, ``"opentofu"``).
+            runner: The runner instance whose plan just completed.
+            runner_result: The dict returned by ``runner.plan(...)``.
+            verbose: When True, also print the captured runner output as-is.
+        """
+        extractor = getattr(runner, "extract_plan_summary", None)
+        if not callable(extractor):
+            return
+
+        output = runner_result.get("output", "") or ""
+        summary = extractor(output)
+        self.console.print(f"  [dim]{tool_name}: {summary}[/dim]")
+
+        if verbose and output:
+            # Preserve terraform's own coloring/format: stream as-is via
+            # markup=False/highlight=False so Rich does not reinterpret
+            # bracketed text in the diff body.
+            self.console.print(output, markup=False, highlight=False)
 
     def _track_planned_resources(
         self,

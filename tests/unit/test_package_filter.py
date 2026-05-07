@@ -194,6 +194,7 @@ class TestPlanWithPackage:
                 package_filter="my-cluster",
                 add_only=False,
                 provider_filter=None,
+                verbose=False,
             )
 
     def test_plan_with_unknown_package_fails(self, cli_runner, mock_orchestrator):
