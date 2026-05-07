@@ -207,7 +207,7 @@ class TestDriftDetection:
         opnsense_provider.pyinfra_dir = Path("/tmp/pyinfra/opnsense")
         opnsense_provider.ensure_directories = Mock()
         opnsense_provider.generate_terraform = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["unbound_host_override"])
+        opnsense_provider.get_resource_types = Mock(return_value=["kea_subnet"])
         opnsense_provider.get_dependencies = Mock(return_value={})
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 
@@ -335,20 +335,22 @@ class TestMultiProviderCoordination:
         config_dir = tmp_path / "config" / "envs" / "dev" / "opnsense"
         config_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create OPNsense unbound host override config (used to exercise
-        # the multi-provider dispatch path; firewall_rules is direct-API
-        # per ADR-0015 and aliases is direct-API per ADR-0014 §"Per-component
-        # decisions" / firewall_alias (#775) — neither routes through
-        # ``generate_terraform``. unbound_host_override is still terraform-
-        # managed at the time of this test).
-        override_file = config_dir / "unbound_host_override.yaml"
-        override_file.write_text(
+        # Create OPNsense kea_subnet config (used to exercise the multi-
+        # provider dispatch path; firewall_rules is direct-API per
+        # ADR-0015, aliases is direct-API per ADR-0014 §"Per-component
+        # decisions" / firewall_alias (#775), and unbound_host_override is
+        # direct-API per ADR-0014 §"Per-component decisions" /
+        # unbound_host_override (#776) — none of those route through
+        # ``generate_terraform``. ``kea_subnet`` is still terraform-managed
+        # at the time of this test (until #777 lands).
+        subnet_file = config_dir / "kea_subnet.yaml"
+        subnet_file.write_text(
             """
-unbound_host_override:
-  - name: web-server
-    hostname: web
-    domain: example.com
-    server: 192.168.1.10
+kea_subnet:
+  - name: lan-subnet
+    subnet: 192.168.1.0/24
+    pools:
+      - 192.168.1.100-192.168.1.200
 """
         )
 
@@ -362,8 +364,8 @@ unbound_host_override:
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.generate_ansible = Mock()
         opnsense_provider.validate_config = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["unbound_host_override"])
-        opnsense_provider.get_dependencies = Mock(return_value={"unbound_host_override": []})
+        opnsense_provider.get_resource_types = Mock(return_value=["kea_subnet"])
+        opnsense_provider.get_dependencies = Mock(return_value={"kea_subnet": []})
         opnsense_provider.set_environment = Mock()
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 

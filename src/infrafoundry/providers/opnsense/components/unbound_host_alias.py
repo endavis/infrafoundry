@@ -1,4 +1,4 @@
-"""Unbound host-alias component manager for OPNsense (ADR-0014, #724).
+"""Unbound host-alias component manager for OPNsense (ADR-0014, #724, #776).
 
 Mirrors the layout of ``components/static_route.py``: a thin orchestration
 layer that loads ``UnboundHostAliasService`` from the environment and
@@ -12,11 +12,23 @@ representation requires the parent's UUID. The manager resolves
 ``searchHostOverride`` rows; if no live override matches, the manager
 raises ``ReferenceValidationError`` so the failure is visible at plan
 time rather than as a server-side validation error at apply time.
+
+Reconfigure semantics (#776):
+
+This manager **does not** call ``service.reconfigure()`` directly from
+``apply``. Instead it declares ``FINALIZATION_HOOK = "unbound_reconfigure"``
+and ``OPNsenseDirectRunner`` fires the matching hook from
+``OPNsenseProvider.get_finalization_hooks()`` exactly once after the apply
+loop. The same hook is shared by ``UnboundHostOverrideManager`` and
+``UnboundForwardManager``, so a multi-unbound apply produces a single
+``unbound/service/reconfigure`` call instead of up to three. ``destroy``
+still calls ``service.reconfigure()`` inline because the runner's hook
+plumbing fires on apply only (per ADR-0014 §"Finalization hooks").
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from infrafoundry.core.exceptions import ReferenceValidationError
 from infrafoundry.core.provider import ResourceConfig
@@ -40,6 +52,12 @@ class UnboundHostAliasManager(BaseComponentManager):
     runner is responsible for translating exceptions into
     ``PlanResult.error``/``ApplyResult.error``.
     """
+
+    #: Runner-level finalization hook key (#776). The host-override and
+    #: forward managers declare the same value so all three unbound
+    #: components share a single ``unbound/service/reconfigure`` call
+    #: per apply.
+    FINALIZATION_HOOK: ClassVar[str] = "unbound_reconfigure"
 
     # ------------------------------------------------------------------
     # Plan / apply / destroy

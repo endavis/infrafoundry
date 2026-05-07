@@ -150,46 +150,6 @@ def _kea_reservation_resources() -> list[ResourceConfig]:
     return [parent_subnet, minimal, full]
 
 
-def _unbound_host_override_resources() -> list[ResourceConfig]:
-    return [
-        # Minimal — only required args.
-        ResourceConfig(
-            provider="opnsense",
-            type="unbound_host_override",
-            name="uho-min",
-            config={"hostname": "min", "domain": "example.com"},
-        ),
-        # AAAA record — exercises the renamed `type` arg (was `rr`).
-        ResourceConfig(
-            provider="opnsense",
-            type="unbound_host_override",
-            name="uho-aaaa",
-            config={
-                "hostname": "v6",
-                "domain": "example.com",
-                "server": "2001:db8::10",
-                "rr": "AAAA",
-                "enabled": True,
-                "description": "AAAA record",
-            },
-        ),
-        # MX record — exercises the renamed `mx_host` / `mx_priority` args
-        # (were `mx` / `mxprio`).
-        ResourceConfig(
-            provider="opnsense",
-            type="unbound_host_override",
-            name="uho-mx",
-            config={
-                "hostname": "mail",
-                "domain": "example.com",
-                "rr": "MX",
-                "mx": "mail.example.com",
-                "mxprio": "10",
-            },
-        ),
-    ]
-
-
 # Maps `(template_label, output_filename)` to the fixture-builder.
 #
 # `dhcp_static_maps` is INTENTIONALLY EXCLUDED (#765). The template references
@@ -198,14 +158,13 @@ def _unbound_host_override_resources() -> list[ResourceConfig]:
 # to `opnsense_kea_reservation` — is its own decision and is tracked as a
 # follow-up to #765.
 # TODO(#765 follow-up): Resolve `dhcp_static_maps.tf.j2` and re-include here.
+#
+# `unbound_host_override` was removed in #776 — the component now uses the
+# direct-API write path via `UnboundHostOverrideManager`; the
+# `unbound_host_override.tf.j2` template was deleted in the same PR.
 _TEMPLATE_PARAMS: list[tuple[str, str, Any]] = [
     ("kea_subnet", "kea_subnet.tf", _kea_subnet_resources),
     ("kea_reservation", "kea_reservation.tf", _kea_reservation_resources),
-    (
-        "unbound_host_override",
-        "unbound_host_overrides.tf",
-        _unbound_host_override_resources,
-    ),
 ]
 
 

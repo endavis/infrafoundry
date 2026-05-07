@@ -11,7 +11,8 @@ Coverage:
       ``domain`` empty allowed, port int-or-string accepted, IP not
       checked here (that is the validator's job).
     - ``UnboundForwardService`` API method dispatch.
-    - ``apply_diff`` orchestration (single ``reconfigure`` if any mutation).
+    - ``apply_diff`` orchestration (does NOT call ``reconfigure`` — runner
+      fires the shared ``unbound_reconfigure`` finalization hook per #776).
     - ``_normalize_field`` for OPNsense select dicts and bool variants.
     - ``export_to_yaml`` round-trip with synthetic name generation.
 """
@@ -713,7 +714,10 @@ class TestApplyDiff:
         client.request.assert_not_called()
         assert counts == {"created": 0, "updated": 0, "deleted": 0}
 
-    def test_add_calls_reconfigure_once(self) -> None:
+    def test_add_does_not_call_reconfigure(self) -> None:
+        # Per #776 the service no longer calls reconfigure inline; the
+        # runner fires the shared ``unbound_reconfigure`` finalization
+        # hook exactly once per apply across all three unbound managers.
         client = MagicMock()
         client.request.return_value = {"result": "saved"}
         svc = UnboundForwardService(client)
@@ -721,10 +725,10 @@ class TestApplyDiff:
         counts = svc.apply_diff(diff)
         endpoints = [c.args[1] for c in client.request.call_args_list]
         assert endpoints.count("unbound/settings/addForward") == 2
-        assert endpoints.count("unbound/service/reconfigure") == 1
+        assert "unbound/service/reconfigure" not in endpoints
         assert counts == {"created": 2, "updated": 0, "deleted": 0}
 
-    def test_update_calls_reconfigure_once(self) -> None:
+    def test_update_does_not_call_reconfigure(self) -> None:
         client = MagicMock()
         client.request.return_value = {"result": "saved"}
         svc = UnboundForwardService(client)
@@ -734,10 +738,10 @@ class TestApplyDiff:
         counts = svc.apply_diff(diff)
         endpoints = [c.args[1] for c in client.request.call_args_list]
         assert "unbound/settings/setForward/u1" in endpoints
-        assert endpoints.count("unbound/service/reconfigure") == 1
+        assert "unbound/service/reconfigure" not in endpoints
         assert counts == {"created": 0, "updated": 1, "deleted": 0}
 
-    def test_delete_calls_reconfigure_once(self) -> None:
+    def test_delete_does_not_call_reconfigure(self) -> None:
         client = MagicMock()
         svc = UnboundForwardService(client)
         diff = Diff(
@@ -750,10 +754,10 @@ class TestApplyDiff:
         endpoints = [c.args[1] for c in client.request.call_args_list]
         assert "unbound/settings/delForward/u1" in endpoints
         assert "unbound/settings/delForward/u2" in endpoints
-        assert endpoints.count("unbound/service/reconfigure") == 1
+        assert "unbound/service/reconfigure" not in endpoints
         assert counts == {"created": 0, "updated": 0, "deleted": 2}
 
-    def test_mixed_diff_single_reconfigure(self) -> None:
+    def test_mixed_diff_does_not_call_reconfigure(self) -> None:
         client = MagicMock()
         client.request.return_value = {"result": "saved"}
         svc = UnboundForwardService(client)
@@ -768,7 +772,7 @@ class TestApplyDiff:
         )
         counts = svc.apply_diff(diff)
         endpoints = [c.args[1] for c in client.request.call_args_list]
-        assert endpoints.count("unbound/service/reconfigure") == 1
+        assert "unbound/service/reconfigure" not in endpoints
         assert counts == {"created": 1, "updated": 1, "deleted": 1}
 
 
