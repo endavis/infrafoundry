@@ -22,7 +22,19 @@ from ...utils import console
     "--package",
     "-p",
     "package_name",
-    help="Target a specific package by name (mutually exclusive with -r)",
+    help="Target a specific package by name (mutually exclusive with -r and -P)",
+)
+@click.option(
+    "--provider",
+    "-P",
+    "provider",
+    multiple=True,
+    help=(
+        "Limit operation to specific provider(s) (can be used multiple times). "
+        "Mutually exclusive with --package and --resource. Cross-provider "
+        "dependencies pointing at filtered-out providers are silently skipped "
+        "for this run."
+    ),
 )
 @click.option(
     "--parallel",
@@ -69,6 +81,7 @@ def apply(
     auto_approve: bool,
     resource: tuple[str, ...],
     package_name: str | None,
+    provider: tuple[str, ...],
     parallel: bool,
     max_workers: int,
     lock_timeout: int,
@@ -76,8 +89,8 @@ def apply(
     add_only: bool,
 ) -> None:
     """Apply infrastructure changes."""
-    if package_name and resource:
-        raise click.UsageError("--package and --resource are mutually exclusive")
+    if sum(bool(x) for x in (package_name, resource, provider)) > 1:
+        raise click.UsageError("--package, --resource, and --provider are mutually exclusive")
 
     resource_filter: list[str] | None = None
     if package_name:
@@ -85,12 +98,16 @@ def apply(
     elif resource:
         resource_filter = list(resource)
 
+    provider_filter: list[str] | None = list(provider) if provider else None
+
     # If not auto-approve, ask for confirmation at InfraFoundry level
     if not auto_approve:
         if package_name:
             resource_desc = f" (package: {package_name})"
         elif resource:
             resource_desc = f" (resources: {', '.join(resource)})"
+        elif provider:
+            resource_desc = f" (providers: {', '.join(provider)})"
         else:
             resource_desc = ""
         console.warning(f"About to apply infrastructure for environment: {env}{resource_desc}")
@@ -114,5 +131,6 @@ def apply(
             lock_timeout=lock_timeout,
             lock_ttl=lock_ttl,
             add_only=add_only,
+            provider_filter=provider_filter,
         )
     console.success(f"Apply complete! ({timer.elapsed_str})")

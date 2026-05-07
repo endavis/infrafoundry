@@ -93,6 +93,7 @@ class PlanDeploymentMetadata(TypedDict, total=False):
     """Metadata recorded for plan deployments."""
 
     resource_filter: list[str] | None
+    provider_filter: list[str] | None
 
 
 class ApplyDeploymentMetadata(PlanDeploymentMetadata, total=False):

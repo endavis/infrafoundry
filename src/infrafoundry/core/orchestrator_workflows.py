@@ -21,7 +21,7 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
-from infrafoundry.core.exceptions import TerraformError
+from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.protocols import Destroyable, Plannable
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
@@ -94,6 +94,47 @@ class ProviderResourceBatch:
     name: str
     resources: list[ResourceConfig]
     original_count: int
+
+
+def _apply_provider_filter(
+    resources_by_provider: dict[str, list[ResourceConfig]],
+    provider_filter: list[str] | None,
+) -> dict[str, list[ResourceConfig]]:
+    """Apply a provider-name filter to ``resources_by_provider``.
+
+    When ``provider_filter`` is ``None`` or empty, returns the input dict
+    unchanged. Otherwise returns a new dict containing only the requested
+    provider keys, in the same order they appeared in the input. Raises
+    :class:`ProviderFilterError` if any requested name is not present in
+    ``resources_by_provider``.
+
+    Cross-provider dependency edges that point at filtered-out providers
+    are silently dropped for the run; callers operate only on the filtered
+    set returned here.
+
+    Args:
+        resources_by_provider: Mapping of provider name to its resources.
+        provider_filter: Optional list of provider names to retain.
+
+    Returns:
+        A possibly-narrowed dict of the same shape.
+
+    Raises:
+        ProviderFilterError: If any requested provider name does not match
+            an entry in ``resources_by_provider``.
+    """
+    if not provider_filter:
+        return resources_by_provider
+
+    available = list(resources_by_provider.keys())
+    requested = list(dict.fromkeys(provider_filter))  # de-dupe, preserve order
+    available_set = set(available)
+    unknown = [name for name in requested if name not in available_set]
+    if unknown:
+        raise ProviderFilterError(requested=unknown, available=available)
+
+    requested_set = set(requested)
+    return {name: resources_by_provider[name] for name in available if name in requested_set}
 
 
 class DriftOrchestrator:
@@ -398,9 +439,13 @@ class PlanOrchestrator(HookExecutionMixin):
         package_filter: str | None = None,
         *,
         add_only: bool = False,
+        provider_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Execute the plan workflow for the requested environment."""
-        plan_metadata: PlanDeploymentMetadata = {"resource_filter": resource_filter}
+        plan_metadata: PlanDeploymentMetadata = {
+            "resource_filter": resource_filter,
+            "provider_filter": provider_filter,
+        }
         deployment_id = self.state_manager.create_deployment(
             environment=env_name,
             command="plan",
@@ -426,6 +471,7 @@ class PlanOrchestrator(HookExecutionMixin):
         try:
             self._print_header("Planning", env_name, resource_filter, style="bold cyan")
             all_resources, resources_by_provider = self._load_resources(env_name)
+            resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
 
             if self._has_policies():
                 self._check_policies(env_name, all_resources, enforce_policies)
@@ -819,11 +865,13 @@ class ApplyOrchestrator(HookExecutionMixin):
         package_filter: str | None = None,
         *,
         add_only: bool = False,
+        provider_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Apply infrastructure across providers."""
         apply_metadata: ApplyDeploymentMetadata = {
             "resource_filter": resource_filter,
             "auto_approve": auto_approve,
+            "provider_filter": provider_filter,
         }
         deployment_id = self.state_manager.create_deployment(
             environment=env_name,
@@ -865,6 +913,7 @@ class ApplyOrchestrator(HookExecutionMixin):
         try:
             self._print_header("Applying", env_name, resource_filter, "bold green")
             all_resources, resources_by_provider = self._load_resources(env_name)
+            resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
             self._store_rollback_snapshot(deployment_id, env_name, all_resources)
 
             # Convert to set for O(1) lookups
@@ -1031,11 +1080,14 @@ class DestroyOrchestrator(HookExecutionMixin):
         auto_approve: bool,
         confirm_callback: Callable[[], bool] | None = None,
         package_filter: str | None = None,
+        *,
+        provider_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Destroy all requested resources."""
         destroy_metadata: DestroyDeploymentMetadata = {
             "resource_filter": resource_filter,
             "auto_approve": auto_approve,
+            "provider_filter": provider_filter,
         }
         deployment_id = self.state_manager.create_deployment(
             environment=env_name,
@@ -1085,6 +1137,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                     return {"success": False, "message": "User aborted"}
 
             _, resources_by_provider = self._load_resources(env_name)
+            resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
             providers = self._get_providers()
 
             # Execute environment-level before_destroy hooks
