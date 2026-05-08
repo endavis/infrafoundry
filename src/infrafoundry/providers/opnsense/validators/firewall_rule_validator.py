@@ -42,6 +42,7 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
 
 from ..services.firewall_rule import (
     ACTION_CHOICES,
@@ -51,6 +52,13 @@ from ..services.firewall_rule import (
     STATETYPE_CHOICES,
     encode_identity,
 )
+
+# Dotted types referenced by the firewall-rule cross-reference fields.
+# Pulled out as constants so the bare-name fallback and the resolver
+# call agree on the target type.
+_MANAGED_ALIAS_TYPE = "firewall.aliases"
+_MANAGED_GATEWAY_TYPE = "routing.gateways"
+_MANAGED_INTERFACE_TYPE = "interfaces.assignments"
 
 # OPNsense built-in net keywords commonly accepted in firewall rules.
 # Conservative — unknown values surface as warnings (not errors) so a
@@ -97,6 +105,7 @@ class FirewallRuleValidator:
         existing_aliases: dict[str, Any],
         existing_gateways: set[str],
         managed_gateways: list[ResourceConfig] | None = None,
+        index: XRefIndex | None = None,
     ) -> None:
         """Validate firewall-rule resources.
 
@@ -113,6 +122,11 @@ class FirewallRuleValidator:
             managed_gateways: ``gateways`` ``ResourceConfig`` entries —
                 used to resolve the gateway's IP protocol for the
                 protocol-match check.
+            index: Optional dotted-type cross-reference index (#793).
+                When provided, alias / interface / gateway fields
+                accept dotted-path forms in addition to bare names.
+                ``None`` falls back to bare-name lookup only,
+                preserving the pre-#793 behaviour.
         """
         gateway_protocols = _index_managed_gateway_protocols(managed_gateways or [])
         for rule in firewall_rules:
@@ -125,6 +139,7 @@ class FirewallRuleValidator:
                 existing_aliases=existing_aliases,
                 existing_gateways=existing_gateways,
                 gateway_protocols=gateway_protocols,
+                index=index,
             )
 
     def _validate_one(
@@ -138,6 +153,7 @@ class FirewallRuleValidator:
         existing_aliases: dict[str, Any],
         existing_gateways: set[str],
         gateway_protocols: dict[str, str],
+        index: XRefIndex | None,
     ) -> None:
         """Run all checks for a single firewall-rule entry."""
         self._validate_description(rule)
@@ -163,6 +179,7 @@ class FirewallRuleValidator:
             rule,
             interface_assignment_names=interface_assignment_names,
             existing_interfaces=existing_interfaces,
+            index=index,
         )
         self._validate_gateway(
             rule,
@@ -170,18 +187,21 @@ class FirewallRuleValidator:
             existing_gateways=existing_gateways,
             gateway_protocols=gateway_protocols,
             ipprotocol=ipprotocol,
+            index=index,
         )
         self._validate_net_field(
             rule,
             "source_net",
             alias_names=alias_names,
             existing_aliases=existing_aliases,
+            index=index,
         )
         self._validate_net_field(
             rule,
             "destination_net",
             alias_names=alias_names,
             existing_aliases=existing_aliases,
+            index=index,
         )
         self._validate_tcpflags_mutex(rule)
         self._validate_int_field(rule, "max")
@@ -412,6 +432,7 @@ class FirewallRuleValidator:
         *,
         interface_assignment_names: set[str],
         existing_interfaces: dict[str, Any],
+        index: XRefIndex | None,
     ) -> None:
         interface = rule.config.get("interface", "")
         state_policy = rule.config.get("state_policy", "")
@@ -440,11 +461,29 @@ class FirewallRuleValidator:
                 level=ValidationLevel.ERROR,
             )
             return
-        if interface in interface_assignment_names or interface in existing_interfaces:
+
+        # Dotted-form resolution (#793). On a hit, fall through to the
+        # bare-name check using the resolved name so live-interface
+        # lookups still work. ``current_plugin`` is the first segment
+        # of the referencing rule's type (e.g. ``firewall`` for
+        # ``firewall.rules``).
+        bare_name = interface
+        if index is not None and "." in interface:
+            current_plugin = rule.type.split(".", 1)[0] if "." in rule.type else None
+            resolved = resolve_xref(
+                interface,
+                expected_type=_MANAGED_INTERFACE_TYPE,
+                index=index,
+                current_plugin=current_plugin,
+            )
+            if resolved is not None:
+                bare_name = resolved.name
+
+        if bare_name in interface_assignment_names or bare_name in existing_interfaces:
             self.report.add_check(
                 check_name=f"firewall_rule_{rule.name}_interface",
                 passed=True,
-                message=(f"Interface '{interface}' resolved for firewall_rule '{rule.name}'"),
+                message=(f"Interface '{bare_name}' resolved for firewall_rule '{rule.name}'"),
                 level=ValidationLevel.INFO,
             )
             return
@@ -471,6 +510,7 @@ class FirewallRuleValidator:
         existing_gateways: set[str],
         gateway_protocols: dict[str, str],
         ipprotocol: str | None,
+        index: XRefIndex | None,
     ) -> None:
         gateway = rule.config.get("gateway", "")
         if not gateway:
@@ -486,7 +526,25 @@ class FirewallRuleValidator:
                 level=ValidationLevel.ERROR,
             )
             return
-        if gateway not in gateway_names and gateway not in existing_gateways:
+
+        # Dotted-form resolution (#793). On a hit fall through to the
+        # bare-name flow with the resolved canonical name so the
+        # protocol-match heuristic keys off the bare gateway name.
+        # ``current_plugin`` is the first segment of the referencing
+        # rule's type.
+        bare_name = gateway
+        if index is not None and "." in gateway:
+            current_plugin = rule.type.split(".", 1)[0] if "." in rule.type else None
+            resolved = resolve_xref(
+                gateway,
+                expected_type=_MANAGED_GATEWAY_TYPE,
+                index=index,
+                current_plugin=current_plugin,
+            )
+            if resolved is not None:
+                bare_name = resolved.name
+
+        if bare_name not in gateway_names and bare_name not in existing_gateways:
             self.report.add_check(
                 check_name=f"firewall_rule_{rule.name}_gateway",
                 passed=False,
@@ -502,15 +560,15 @@ class FirewallRuleValidator:
         # — the live-gateway heuristic (trailing-6) is best-effort.
         if ipprotocol in (None, "inet46"):
             return
-        gateway_protocol = gateway_protocols.get(gateway)
+        gateway_protocol = gateway_protocols.get(bare_name)
         if gateway_protocol is None:
-            gateway_protocol = "inet6" if gateway.endswith("6") else "inet"
+            gateway_protocol = "inet6" if bare_name.endswith("6") else "inet"
         if gateway_protocol != ipprotocol:
             self.report.add_check(
                 check_name=f"firewall_rule_{rule.name}_gateway_protocol",
                 passed=False,
                 message=(
-                    f"firewall_rule '{rule.name}' gateway '{gateway}' protocol "
+                    f"firewall_rule '{rule.name}' gateway '{bare_name}' protocol "
                     f"({gateway_protocol!r}) does not match rule ipprotocol "
                     f"({ipprotocol!r})"
                 ),
@@ -528,6 +586,7 @@ class FirewallRuleValidator:
         *,
         alias_names: set[str],
         existing_aliases: dict[str, Any],
+        index: XRefIndex | None,
     ) -> None:
         if field_name not in rule.config:
             return
@@ -546,11 +605,33 @@ class FirewallRuleValidator:
         if value == "":
             # Empty defaults to ``"any"`` in the parser; not a problem.
             return
-        if value in _NET_KEYWORDS or value in alias_names or value in existing_aliases:
+
+        # Dotted-form alias resolution (#793). On a hit, treat as alias
+        # match. The resolved canonical name is checked against
+        # ``alias_names`` for parity with the bare-name flow.
+        # ``current_plugin`` is the first segment of the referencing
+        # rule's type.
+        bare_value = value
+        if index is not None and "." in value:
+            current_plugin = rule.type.split(".", 1)[0] if "." in rule.type else None
+            resolved = resolve_xref(
+                value,
+                expected_type=_MANAGED_ALIAS_TYPE,
+                index=index,
+                current_plugin=current_plugin,
+            )
+            if resolved is not None:
+                bare_value = resolved.name
+
+        if (
+            bare_value in _NET_KEYWORDS
+            or bare_value in alias_names
+            or bare_value in existing_aliases
+        ):
             return
-        if _looks_like_iface_sentinel(value):
+        if _looks_like_iface_sentinel(bare_value):
             return
-        if _looks_like_ip_or_cidr(value):
+        if _looks_like_ip_or_cidr(bare_value):
             return
         self.report.add_check(
             check_name=f"firewall_rule_{rule.name}_{field_name}",

@@ -465,3 +465,96 @@ class TestEdgeCases:
         # through to the trailing-6 heuristic (no trailing 6 ⇒ v4),
         # and a v4 network + heuristic-v4 ⇒ pass.
         assert not _failures(report, "static_route_ok_protocol_match")
+
+
+# ---------------------------------------------------------------------------
+# Dotted-path cross-references (#793) — forward-compat
+# ---------------------------------------------------------------------------
+
+
+class TestDottedPathXRefs:
+    """The static-route validator accepts dotted-path gateway refs when
+    an ``index`` is supplied (Phase 3 of #793). Bare-name behaviour
+    is unchanged when ``index`` is None — covered by the other test
+    classes above. These tests confirm forward-compat for the new
+    syntax."""
+
+    def test_cross_plugin_absolute_gateway_ref_resolves(
+        self, validator: StaticRouteValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        gw = _gw("WAN_GW", protocol="inet")
+        index = build_xref_index([gw])
+        validator.validate(
+            [_route("ok", gateway="routing.gateways.WAN_GW")],
+            managed_gateways=[gw],
+            gateway_names={"WAN_GW"},
+            existing_gateways=set(),
+            index=index,
+        )
+        assert not _failures(report, "static_route_ok_gateway")
+
+    def test_in_plugin_relative_gateway_ref_resolves(
+        self, validator: StaticRouteValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        gw = _gw("WAN_GW", protocol="inet")
+        index = build_xref_index([gw])
+        validator.validate(
+            [_route("ok", gateway="gateways.WAN_GW")],
+            managed_gateways=[gw],
+            gateway_names={"WAN_GW"},
+            existing_gateways=set(),
+            index=index,
+        )
+        assert not _failures(report, "static_route_ok_gateway")
+
+    def test_dotted_miss_falls_back_to_bare_name(
+        self, validator: StaticRouteValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        # Empty index — the dotted lookup misses, but we don't dotted-
+        # form the gateway value, so the bare-name path should still
+        # validate against the live gateway set.
+        index = build_xref_index([])
+        validator.validate(
+            [_route("ok", gateway="WAN_DHCP")],
+            managed_gateways=[],
+            gateway_names=set(),
+            existing_gateways={"WAN_DHCP"},
+            index=index,
+        )
+        assert not _failures(report, "static_route_ok_gateway")
+
+    def test_index_none_preserves_legacy_behaviour(
+        self, validator: StaticRouteValidator, report: ValidationReport
+    ) -> None:
+        # Calling without ``index`` is the pre-#793 contract: bare
+        # names only, no dotted-form support.
+        validator.validate(
+            [_route("ok", gateway="WAN_DHCP")],
+            managed_gateways=[],
+            gateway_names=set(),
+            existing_gateways={"WAN_DHCP"},
+        )
+        assert not _failures(report, "static_route_ok_gateway")
+
+    def test_dotted_unknown_falls_back_then_fails(
+        self, validator: StaticRouteValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        # Dotted form misses index AND falls back to bare-name lookup
+        # which also misses → final ERROR.
+        index = build_xref_index([])
+        validator.validate(
+            [_route("ok", gateway="routing.gateways.GHOST")],
+            managed_gateways=[],
+            gateway_names=set(),
+            existing_gateways=set(),
+            index=index,
+        )
+        assert _failures(report, "static_route_ok_gateway")

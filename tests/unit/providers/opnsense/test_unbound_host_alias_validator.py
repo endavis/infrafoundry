@@ -397,3 +397,98 @@ class TestEdgeCases:
         assert "unbound_host_alias_a_host" in names
         assert "unbound_host_alias_b_host" in names
         assert "unbound_host_alias_c_host" in names
+
+
+# ---------------------------------------------------------------------------
+# Dotted-path cross-references (#793) — forward-compat
+# ---------------------------------------------------------------------------
+
+
+class TestDottedPathXRefs:
+    """Forward-compat tests for the dotted-path resolver. Bare-name
+    behaviour (``index=None``) is unchanged. Validating dotted refs
+    requires an ``index``."""
+
+    def test_cross_plugin_absolute_host_resolves(
+        self, validator: UnboundHostAliasValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        host = ResourceConfig(
+            name="db-primary",
+            type="unbound.host_overrides",
+            provider="opnsense",
+            config={"hostname": "db", "domain": "internal", "ip": "10.0.0.1"},
+        )
+        index = build_xref_index([host])
+        # ``unbound.host_overrides.db-primary`` is a 3-part path → cross-
+        # plugin absolute. Resolver matches the (type, name) tuple.
+        validator.validate(
+            [_alias("ok", host="unbound.host_overrides.db-primary")],
+            managed_host_override_names={"db-primary"},
+            existing_host_override_names=set(),
+            index=index,
+        )
+        passed = [
+            c for c in report.results if c.check_name == "unbound_host_alias_ok_host" and c.passed
+        ]
+        assert passed
+
+    def test_in_plugin_relative_host_resolves(
+        self, validator: UnboundHostAliasValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        host = ResourceConfig(
+            name="db-primary",
+            type="unbound.host_overrides",
+            provider="opnsense",
+            config={"hostname": "db", "domain": "internal", "ip": "10.0.0.1"},
+        )
+        index = build_xref_index([host])
+        # Alias type ``unbound.host_aliases`` → current_plugin="unbound"
+        # → ``host_overrides.db-primary`` resolves to
+        # ``unbound.host_overrides.db-primary``.
+        validator.validate(
+            [_alias("ok", host="host_overrides.db-primary")],
+            managed_host_override_names={"db-primary"},
+            existing_host_override_names=set(),
+            index=index,
+        )
+        passed = [
+            c for c in report.results if c.check_name == "unbound_host_alias_ok_host" and c.passed
+        ]
+        assert passed
+
+    def test_live_hostname_with_dot_falls_back_to_existing(
+        self, validator: UnboundHostAliasValidator, report: ValidationReport
+    ) -> None:
+        # The live ``hostname.domain`` form contains a dot but is NOT a
+        # dotted xref — the resolver lookup misses, then the bare-name
+        # fallback finds it in ``existing_host_override_names``.
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        index = build_xref_index([])
+        validator.validate(
+            [_alias("ok", host="db.internal")],
+            managed_host_override_names=set(),
+            existing_host_override_names={"db.internal"},
+            index=index,
+        )
+        passed = [
+            c for c in report.results if c.check_name == "unbound_host_alias_ok_host" and c.passed
+        ]
+        assert passed
+
+    def test_index_none_preserves_legacy_behaviour(
+        self, validator: UnboundHostAliasValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            [_alias("ok")],
+            managed_host_override_names={"db-primary"},
+            existing_host_override_names=set(),
+        )
+        passed = [
+            c for c in report.results if c.check_name == "unbound_host_alias_ok_host" and c.passed
+        ]
+        assert passed

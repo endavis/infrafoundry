@@ -944,3 +944,125 @@ class TestEdgeCases:
             existing_gateways={"WAN_DHCP"},
         )
         assert not _failures(report, "firewall_rule_ok_gateway")
+
+
+# ---------------------------------------------------------------------------
+# Dotted-path cross-references (#793) — forward-compat
+# ---------------------------------------------------------------------------
+
+
+class TestDottedPathXRefs:
+    """Forward-compat tests for the dotted-path resolver. Bare-name
+    behaviour (``index=None``) is unchanged — covered by the test
+    classes above. These tests confirm the new dotted forms are
+    accepted when an ``index`` is supplied."""
+
+    def test_cross_plugin_absolute_alias_in_source_net_resolves(
+        self, validator: FirewallRuleValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        admins = ResourceConfig(
+            name="admins",
+            type="firewall.aliases",
+            provider="opnsense",
+            config={"type": "host"},
+        )
+        index = build_xref_index([admins])
+        validator.validate(
+            [_rule("ok", source_net="firewall.aliases.admins")],
+            alias_names={"admins"},
+            interface_assignment_names=set(),
+            gateway_names=set(),
+            existing_interfaces={"lan": {}},
+            existing_aliases={},
+            existing_gateways=set(),
+            index=index,
+        )
+        # No warning surfaced for the dotted alias.
+        assert not [c for c in report.results if c.check_name == "firewall_rule_ok_source_net"]
+
+    def test_in_plugin_relative_alias_in_destination_net_resolves(
+        self, validator: FirewallRuleValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        admins = ResourceConfig(
+            name="admins",
+            type="firewall.aliases",
+            provider="opnsense",
+            config={"type": "host"},
+        )
+        index = build_xref_index([admins])
+        # Rule type ``firewall.rules`` → current_plugin="firewall" →
+        # ``aliases.admins`` resolves to ``firewall.aliases.admins``.
+        validator.validate(
+            [_rule("ok", destination_net="aliases.admins")],
+            alias_names={"admins"},
+            interface_assignment_names=set(),
+            gateway_names=set(),
+            existing_interfaces={"lan": {}},
+            existing_aliases={},
+            existing_gateways=set(),
+            index=index,
+        )
+        assert not [c for c in report.results if c.check_name == "firewall_rule_ok_destination_net"]
+
+    def test_cross_plugin_absolute_gateway_resolves(
+        self, validator: FirewallRuleValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        gw = _gw("WAN_GW", protocol="inet")
+        index = build_xref_index([gw])
+        validator.validate(
+            [_rule("ok", gateway="routing.gateways.WAN_GW")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            gateway_names={"WAN_GW"},
+            existing_interfaces={"lan": {}},
+            existing_aliases={},
+            existing_gateways=set(),
+            managed_gateways=[gw],
+            index=index,
+        )
+        assert not _failures(report, "firewall_rule_ok_gateway")
+
+    def test_cross_plugin_absolute_interface_resolves(
+        self, validator: FirewallRuleValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        iface = ResourceConfig(
+            name="lan",
+            type="interfaces.assignments",
+            provider="opnsense",
+            config={"name": "lan"},
+        )
+        index = build_xref_index([iface])
+        validator.validate(
+            [_rule("ok", interface="interfaces.assignments.lan")],
+            alias_names=set(),
+            interface_assignment_names={"lan"},
+            gateway_names=set(),
+            existing_interfaces={},
+            existing_aliases={},
+            existing_gateways=set(),
+            index=index,
+        )
+        assert not _failures(report, "firewall_rule_ok_interface")
+
+    def test_index_none_preserves_legacy_behaviour(
+        self, validator: FirewallRuleValidator, report: ValidationReport
+    ) -> None:
+        # Bare-name lookup still works without ``index``.
+        validator.validate(
+            [_rule("ok", gateway="WAN_DHCP")],
+            alias_names=set(),
+            interface_assignment_names=set(),
+            gateway_names=set(),
+            existing_interfaces={"lan": {}},
+            existing_aliases={},
+            existing_gateways={"WAN_DHCP"},
+        )
+        assert not _failures(report, "firewall_rule_ok_gateway")
