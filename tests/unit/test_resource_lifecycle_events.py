@@ -334,21 +334,25 @@ class TestProviderTerraformResourceTypes:
     def test_opnsense_mapping(self, tmp_path: Path) -> None:
         """OPNsense provider returns correct terraform type mapping.
 
-        ``aliases``, ``vlans``, and ``firewall_rules`` are intentionally
-        absent — they are managed by ``OPNsenseDirectRunner`` per
-        ADR-0014 / ADR-0015 and don't have a terraform counterpart.
+        After #777/#778, only ``dhcp_static_maps`` remains
+        terraform-managed. All other OPNsense components are managed by
+        ``OPNsenseDirectRunner`` per ADR-0014 / ADR-0015.
         """
         from infrafoundry.providers.opnsense import OPNsenseProvider
 
         provider = OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
         mapping = provider.get_terraform_resource_types()
 
-        assert "kea_reservation" in mapping
-        assert "opnsense_kea_reservation" in mapping["kea_reservation"]
+        assert "dhcp_static_maps" in mapping
+        assert "opnsense_dhcpv4_static_map" in mapping["dhcp_static_maps"]
         # Direct-API resources are absent from the terraform mapping.
         assert "aliases" not in mapping
         assert "vlans" not in mapping
         assert "firewall_rules" not in mapping
+        assert "kea_subnet" not in mapping
+        assert "kea_reservation" not in mapping
+        assert "kea_dhcp6_subnet" not in mapping
+        assert "kea_dhcp6_reservation" not in mapping
 
     def test_esxi_mapping(self, tmp_path: Path) -> None:
         """ESXi provider returns correct terraform type mapping."""

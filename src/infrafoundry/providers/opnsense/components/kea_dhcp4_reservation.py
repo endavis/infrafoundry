@@ -1,34 +1,32 @@
-"""Kea DHCPv6 reservation component manager for OPNsense (ADR-0014, #758).
+"""Kea DHCPv4 reservation component manager for OPNsense (ADR-0014, #778).
 
 Implements the standard ``plan`` / ``apply`` / ``destroy`` /
 ``get_resource_ids`` surface against ``KeaDHCPService`` so that
-``OPNsenseDirectRunner`` can dispatch DHCPv6 reservations alongside the other
-direct-API components. Replaces the inline reservation handling in
-``OPNsenseProvider._generate_kea_dhcp6_resources`` (#758).
+``OPNsenseDirectRunner`` can dispatch DHCPv4 reservations alongside the
+other direct-API components. Replaces the terraform write path
+(``opnsense_kea_reservation`` via ``browningluke/opnsense``) that
+previously ran under ``generate_terraform()``.
 
-The change-detection helpers used here live at module scope in
-``services/kea_dhcp.py`` (relocated in #758, byte-identical move).
+Mirrors :mod:`.kea_dhcp6_reservation` line-for-line; differences are
+flagged inline:
 
-Identity / wire schema:
-
-- Identity is the natural key ``(duid, subnet_uuid)`` — the same tuple
-  the original ``_generate_kea_dhcp6_resources`` used. ``subnet_uuid`` is
-  resolved at apply time by reading ``service.search_dhcpv6_subnets()``
-  and matching the operator-facing ``subnet`` field (an IPv6 CIDR) to
-  the live subnet UUID. If no live subnet matches, the manager raises
-  :class:`ReferenceValidationError` so the failure surfaces at plan
-  time rather than as a silent skip-with-warning at apply time
-  (a deliberate behavioral upgrade flagged in the #758 plan).
-- Wire schema: ``subnet`` (UUID, not the CIDR), ``ip_address``,
-  ``duid``, ``hostname``, ``description``.
+- Identity is the natural key ``(hw_address, subnet_uuid)`` — DHCPv4
+  uses MAC address, not DUID. ``subnet_uuid`` is resolved at apply time
+  by reading ``service.search_dhcpv4_subnets()`` and matching the
+  operator-facing ``subnet`` field (an IPv4 CIDR) to the live subnet
+  UUID. If no live subnet matches, the manager raises
+  :class:`ReferenceValidationError` so the failure surfaces at plan time
+  rather than as a silent skip-with-warning at apply time.
+- Wire schema: ``subnet`` (UUID, not the CIDR), ``hw_address`` (MAC),
+  ``ip_address``, ``hostname``, ``description``.
 
 Reconfigure semantics:
 
 - This manager **does not** call ``service.reconfigure()`` directly.
   It declares ``FINALIZATION_HOOK = "kea_reconfigure"`` (the same key
-  as :class:`KeaDHCPv6SubnetManager` and the DHCPv4 managers) so the
-  runner fires exactly one Kea reconfigure even when subnets and
-  reservations across both wire families changed in the same apply.
+  as :class:`KeaDHCPv4SubnetManager` and the DHCPv6 managers) so the
+  runner fires exactly one Kea reconfigure even when both subnets and
+  reservations changed in the same apply.
 """
 
 from __future__ import annotations
@@ -41,17 +39,17 @@ from infrafoundry.core.types import ResourceOutcome
 
 from ..services.kea_dhcp import (
     KeaDHCPService,
-    _build_desired_reservation_fields,
-    _extract_reservation_fields,
+    _build_desired_reservation4_fields,
+    _extract_reservation4_fields,
     _log_field_diff,
 )
 from .base import BaseComponentManager
 
 
 class _Diff:
-    """Add/update/delete plan for DHCPv6 reservations.
+    """Add/update/delete plan for DHCPv4 reservations.
 
-    Same shape as :class:`.kea_dhcp6_subnet._Diff` so the runner's
+    Same shape as :class:`.kea_dhcp4_subnet._Diff` so the runner's
     ``_format_plan_summary`` can read the plan summary uniformly across
     every direct-API component.
     """
@@ -74,14 +72,14 @@ class _Diff:
         return not (self.adds or self.updates or self.deletes)
 
 
-class KeaDHCPv6ReservationManager(BaseComponentManager):
-    """Manager for OPNsense Kea DHCPv6 reservation operations."""
+class KeaDHCPv4ReservationManager(BaseComponentManager):
+    """Manager for OPNsense Kea DHCPv4 reservation operations."""
 
     #: Runner-level finalization hook key. Matched against
     #: ``OPNsenseProvider.get_finalization_hooks()``; shared with
-    #: :class:`KeaDHCPv6SubnetManager` and the DHCPv4 managers so a
-    #: single Kea reconfigure fires per apply when any Kea component
-    #: changed state.
+    #: :class:`KeaDHCPv4SubnetManager` and the DHCPv6 managers so a
+    #: single Kea reconfigure fires per apply when any Kea-managed
+    #: component changed state.
     FINALIZATION_HOOK: ClassVar[str] = "kea_reconfigure"
 
     # ------------------------------------------------------------------
@@ -100,7 +98,7 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
 
         Args:
             env_name: Active environment name.
-            resources: DHCPv6 reservation ``ResourceConfig`` entries.
+            resources: DHCPv4 reservation ``ResourceConfig`` entries.
             add_only: If True, suppress deletes for live reservations not in YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
@@ -109,7 +107,7 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
 
         Raises:
             ReferenceValidationError: If any reservation references a
-                ``subnet`` CIDR that does not match any live DHCPv6 subnet.
+                ``subnet`` CIDR that does not match any live DHCPv4 subnet.
         """
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
         return self._compute_diff(service, resources, add_only=add_only)
@@ -123,14 +121,14 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
         add_only: bool = False,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
-        """Apply the diff: add / update / delete DHCPv6 reservations.
+        """Apply the diff: add / update / delete DHCPv4 reservations.
 
         Does **not** call ``service.reconfigure()`` directly — see the
         module docstring for the runner-side hook contract.
 
         Args:
             env_name: Active environment name.
-            resources: DHCPv6 reservation ``ResourceConfig`` entries.
+            resources: DHCPv4 reservation ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
             provider_name: Provider identifier (defaults to ``opnsense``).
@@ -141,7 +139,7 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
 
         Raises:
             ReferenceValidationError: If any reservation references a
-                ``subnet`` CIDR that does not match any live DHCPv6 subnet.
+                ``subnet`` CIDR that does not match any live DHCPv4 subnet.
         """
         del auto_approve
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
@@ -154,15 +152,15 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
 
         for reservation_data in diff.adds:
             reservation_name = str(reservation_data.pop("__name__"))
-            result = service.add_dhcpv6_reservation(reservation_data)
+            result = service.add_dhcpv4_reservation(reservation_data)
             if result.get("result") == "failed":
                 validations = result.get("validations", {})
                 raise ValueError(
-                    f"Failed to create DHCPv6 reservation {reservation_name}: {validations}"
+                    f"Failed to create DHCPv4 reservation {reservation_name}: {validations}"
                 )
             outcomes.append(
                 ResourceOutcome(
-                    address=f"opnsense_kea_dhcp6_reservation.{reservation_name}",
+                    address=f"opnsense_kea_reservation.{reservation_name}",
                     action="add",
                     resource_name=reservation_name,
                 )
@@ -171,10 +169,10 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
 
         for uuid, reservation_data in diff.updates:
             reservation_name = str(reservation_data.pop("__name__"))
-            service.update_dhcpv6_reservation(uuid, reservation_data)
+            service.update_dhcpv4_reservation(uuid, reservation_data)
             outcomes.append(
                 ResourceOutcome(
-                    address=f"opnsense_kea_dhcp6_reservation.{reservation_name}",
+                    address=f"opnsense_kea_reservation.{reservation_name}",
                     action="update",
                     resource_name=reservation_name,
                 )
@@ -182,11 +180,11 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
             updated += 1
 
         for uuid, descriptor in diff.deletes:
-            service.delete_dhcpv6_reservation(uuid)
+            service.delete_dhcpv4_reservation(uuid)
             synthetic_name = f"reservation-{descriptor}"
             outcomes.append(
                 ResourceOutcome(
-                    address=f"opnsense_kea_dhcp6_reservation.{synthetic_name}",
+                    address=f"opnsense_kea_reservation.{synthetic_name}",
                     action="delete",
                     resource_name=synthetic_name,
                 )
@@ -211,13 +209,13 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
     ) -> dict[str, Any]:
         """Delete every live reservation matching ``resources``.
 
-        Matches by ``(duid, subnet_uuid)`` — the natural-key tuple. The
-        ``subnet_uuid`` is resolved from each resource's ``subnet`` CIDR
-        via ``search_dhcpv6_subnets`` (mirrors apply-time resolution).
+        Matches by ``(hw_address, subnet_uuid)`` — the natural-key tuple.
+        The ``subnet_uuid`` is resolved from each resource's ``subnet``
+        CIDR via ``search_dhcpv4_subnets`` (mirrors apply-time resolution).
 
         Args:
             env_name: Active environment name.
-            resources: DHCPv6 reservation ``ResourceConfig`` entries to destroy.
+            resources: DHCPv4 reservation ``ResourceConfig`` entries to destroy.
             auto_approve: Currently a no-op.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
@@ -226,27 +224,27 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
 
         Raises:
             ReferenceValidationError: If any reservation references a
-                ``subnet`` CIDR that does not match any live DHCPv6 subnet.
+                ``subnet`` CIDR that does not match any live DHCPv4 subnet.
         """
         del auto_approve
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
         cidr_to_uuid = _build_subnet_cidr_lookup(service)
 
-        live_reservations = service.search_dhcpv6_reservations()
+        live_reservations = service.search_dhcpv4_reservations()
         live_by_key: dict[tuple[str, str], str] = {
-            (str(r.get("duid", "")), str(r.get("subnet", ""))): str(r.get("uuid", ""))
+            (str(r.get("hw_address", "")), str(r.get("subnet", ""))): str(r.get("uuid", ""))
             for r in live_reservations
         }
 
         deleted = 0
         for resource in resources:
-            duid = str(resource.config.get("duid", ""))
+            hw_address = str(resource.config.get("hw_address", ""))
             subnet_cidr = str(resource.config.get("subnet", ""))
             subnet_uuid = _resolve_subnet_uuid(cidr_to_uuid, subnet_cidr, resource.name)
-            uuid = live_by_key.get((duid, subnet_uuid))
+            uuid = live_by_key.get((hw_address, subnet_uuid))
             if not uuid:
                 continue
-            service.delete_dhcpv6_reservation(uuid)
+            service.delete_dhcpv4_reservation(uuid)
             deleted += 1
 
         return {
@@ -268,13 +266,13 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
     ) -> dict[str, str]:
         """Return ``{resource_name: opnsense_uuid}`` for live reservations.
 
-        Matches by the natural-key ``(duid, subnet_uuid)`` tuple. The
+        Matches by the natural-key ``(hw_address, subnet_uuid)`` tuple. The
         operator-facing ``name`` is only used as the dict key in the
         return value.
 
         Args:
             env_name: Active environment name.
-            resources: DHCPv6 reservation ``ResourceConfig`` entries.
+            resources: DHCPv4 reservation ``ResourceConfig`` entries.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -283,23 +281,23 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
 
         Raises:
             ReferenceValidationError: If any reservation references a
-                ``subnet`` CIDR that does not match any live DHCPv6 subnet.
+                ``subnet`` CIDR that does not match any live DHCPv4 subnet.
         """
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
         cidr_to_uuid = _build_subnet_cidr_lookup(service)
 
-        live_reservations = service.search_dhcpv6_reservations()
+        live_reservations = service.search_dhcpv4_reservations()
         live_by_key: dict[tuple[str, str], str] = {
-            (str(r.get("duid", "")), str(r.get("subnet", ""))): str(r.get("uuid", ""))
+            (str(r.get("hw_address", "")), str(r.get("subnet", ""))): str(r.get("uuid", ""))
             for r in live_reservations
         }
 
         result: dict[str, str] = {}
         for resource in resources:
-            duid = str(resource.config.get("duid", ""))
+            hw_address = str(resource.config.get("hw_address", ""))
             subnet_cidr = str(resource.config.get("subnet", ""))
             subnet_uuid = _resolve_subnet_uuid(cidr_to_uuid, subnet_cidr, resource.name)
-            uuid = live_by_key.get((duid, subnet_uuid))
+            uuid = live_by_key.get((hw_address, subnet_uuid))
             if uuid:
                 result[resource.name] = uuid
         return result
@@ -318,15 +316,15 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
         """Compute the add/update/delete diff against live state.
 
         Resolves each reservation's ``subnet`` CIDR to a live subnet
-        UUID via ``search_dhcpv6_subnets``; raises
+        UUID via ``search_dhcpv4_subnets``; raises
         ``ReferenceValidationError`` if the CIDR doesn't match any live
-        subnet (a deliberate upgrade over today's silent-skip path).
+        subnet (mirrors the DHCPv6 manager's behavior).
         """
         cidr_to_uuid = _build_subnet_cidr_lookup(service)
 
-        live_reservations = service.search_dhcpv6_reservations()
+        live_reservations = service.search_dhcpv4_reservations()
         live_by_key: dict[tuple[str, str], dict[str, Any]] = {
-            (str(r.get("duid", "")), str(r.get("subnet", ""))): r for r in live_reservations
+            (str(r.get("hw_address", "")), str(r.get("subnet", ""))): r for r in live_reservations
         }
 
         adds: list[dict[str, Any]] = []
@@ -337,19 +335,19 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
             subnet_cidr = str(resource.config.get("subnet", ""))
             subnet_uuid = _resolve_subnet_uuid(cidr_to_uuid, subnet_cidr, resource.name)
             reservation_data = _build_reservation_payload(resource, subnet_uuid)
-            duid = str(reservation_data["duid"])
-            key = (duid, subnet_uuid)
+            hw_address = str(reservation_data["hw_address"])
+            key = (hw_address, subnet_uuid)
             seen_keys.add(key)
 
             existing = live_by_key.get(key)
             if existing is not None:
                 existing_uuid = str(existing.get("uuid", ""))
-                current = service.get_dhcpv6_reservation(existing_uuid)
-                current_fields = _extract_reservation_fields(current)
-                desired_fields = _build_desired_reservation_fields(reservation_data)
+                current = service.get_dhcpv4_reservation(existing_uuid)
+                current_fields = _extract_reservation4_fields(current)
+                desired_fields = _build_desired_reservation4_fields(reservation_data)
                 if current_fields != desired_fields:
                     _log_field_diff(
-                        f"DHCPv6 reservation {resource.name}",
+                        f"DHCPv4 reservation {resource.name}",
                         current_fields,
                         desired_fields,
                     )
@@ -361,25 +359,25 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
 
         deletes: list[tuple[str, str]] = []
         if not add_only:
-            for (duid, subnet_uuid), live in live_by_key.items():
-                if (duid, subnet_uuid) in seen_keys:
+            for (hw_address, subnet_uuid), live in live_by_key.items():
+                if (hw_address, subnet_uuid) in seen_keys:
                     continue
                 live_uuid = str(live.get("uuid", ""))
                 if not live_uuid:
                     continue
                 # Synthetic descriptor for the delete outcome's resource_name.
-                descriptor = duid or live_uuid
+                descriptor = hw_address or live_uuid
                 deletes.append((live_uuid, descriptor))
 
         return _Diff(adds=adds, updates=updates, deletes=deletes)
 
 
 def _build_subnet_cidr_lookup(service: KeaDHCPService) -> dict[str, str]:
-    """Build a ``{subnet_cidr: subnet_uuid}`` map from live DHCPv6 subnets.
+    """Build a ``{subnet_cidr: subnet_uuid}`` map from live DHCPv4 subnets.
 
-    Mirrors :func:`unbound_host_alias._resolve_host_uuids` — one search
-    call, build a name-shaped lookup, fail loudly on misses at the call
-    site.
+    Mirrors :func:`.kea_dhcp6_reservation._build_subnet_cidr_lookup` —
+    one search call, build a name-shaped lookup, fail loudly on misses
+    at the call site.
 
     Args:
         service: ``KeaDHCPService`` already bound to the active env.
@@ -387,7 +385,7 @@ def _build_subnet_cidr_lookup(service: KeaDHCPService) -> dict[str, str]:
     Returns:
         Map from each live subnet's CIDR to its UUID.
     """
-    rows = service.search_dhcpv6_subnets()
+    rows = service.search_dhcpv4_subnets()
     lookup: dict[str, str] = {}
     for row in rows:
         cidr = str(row.get("subnet", ""))
@@ -406,7 +404,7 @@ def _resolve_subnet_uuid(
 
     Args:
         cidr_to_uuid: Pre-built map from CIDR to UUID.
-        subnet_cidr: Operator-facing subnet reference (e.g., ``fd00:1::/64``).
+        subnet_cidr: Operator-facing subnet reference (e.g., ``192.168.1.0/24``).
         resource_name: Operator-facing reservation name for error messages.
 
     Returns:
@@ -414,38 +412,41 @@ def _resolve_subnet_uuid(
 
     Raises:
         ReferenceValidationError: If ``subnet_cidr`` does not match any
-            live DHCPv6 subnet on the box. This is a behavioral upgrade
-            over the legacy ``_generate_kea_dhcp6_resources`` path,
-            which silently skipped reservations with unresolved subnets.
+            live DHCPv4 subnet on the box. This is a behavioral upgrade
+            over the legacy terraform path, which silently failed when
+            the subnet didn't exist (terraform-graph dependency would be
+            broken by the box-to-box cutover).
     """
     uuid = cidr_to_uuid.get(subnet_cidr)
     if not uuid:
         raise ReferenceValidationError(
-            f"kea_dhcp6_reservation '{resource_name}' references unknown "
-            f"subnet '{subnet_cidr}'; no live kea_dhcp6_subnet matches"
+            f"kea_reservation '{resource_name}' references unknown "
+            f"subnet '{subnet_cidr}'; no live kea_subnet matches"
         )
     return uuid
 
 
 def _build_reservation_payload(resource: ResourceConfig, subnet_uuid: str) -> dict[str, Any]:
-    """Build the wire-format payload sent to OPNsense for a reservation.
+    """Build the wire-format payload sent to OPNsense for a DHCPv4 reservation.
 
-    Mirrors the original ``_generate_kea_dhcp6_resources`` construction
-    shape so wire-level behavior is unchanged.
+    Mirrors the legacy terraform template (``kea_reservation.tf.j2``)
+    field coverage so wire-level behavior is unchanged. DHCPv4 uses
+    ``hw_address`` (MAC) for client identity, distinct from DHCPv6's
+    ``duid``.
 
     Args:
-        resource: DHCPv6 reservation resource.
+        resource: DHCPv4 reservation resource.
         subnet_uuid: Resolved subnet UUID (populated by the caller).
 
     Returns:
-        Dict suitable for passing to ``service.add_dhcpv6_reservation`` /
-        ``service.update_dhcpv6_reservation``.
+        Dict suitable for passing to ``service.add_dhcpv4_reservation`` /
+        ``service.update_dhcpv4_reservation``.
     """
     config = resource.config
     return {
         "subnet": subnet_uuid,
+        "hw_address": config.get("hw_address"),
         "ip_address": config.get("ip_address"),
-        "duid": config.get("duid"),
-        "hostname": config.get("hostname", ""),
+        "hostname": config.get("hostname", resource.name),
         "description": config.get("description", ""),
     }

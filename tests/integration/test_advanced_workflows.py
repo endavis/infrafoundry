@@ -199,7 +199,10 @@ class TestDriftDetection:
         """Test drift detection across multiple providers."""
         orchestrator, provider = advanced_orchestrator
 
-        # Add second provider
+        # Add second provider. ``dhcp_static_maps`` is the only OPNsense
+        # resource type still terraform-managed after #777/#778; previous
+        # iterations of this test exercised ``kea_subnet`` (still terraform
+        # at the time) and ``firewall_rules`` (since migrated by #742).
         opnsense_provider = Mock()
         opnsense_provider.name = "opnsense"
         opnsense_provider.terraform_dir = Path("/tmp/terraform/opnsense")
@@ -207,7 +210,7 @@ class TestDriftDetection:
         opnsense_provider.pyinfra_dir = Path("/tmp/pyinfra/opnsense")
         opnsense_provider.ensure_directories = Mock()
         opnsense_provider.generate_terraform = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["kea_subnet"])
+        opnsense_provider.get_resource_types = Mock(return_value=["dhcp_static_maps"])
         opnsense_provider.get_dependencies = Mock(return_value={})
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 
@@ -335,22 +338,22 @@ class TestMultiProviderCoordination:
         config_dir = tmp_path / "config" / "envs" / "dev" / "opnsense"
         config_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create OPNsense kea_subnet config (used to exercise the multi-
-        # provider dispatch path; firewall_rules is direct-API per
+        # Create OPNsense dhcp_static_maps config (used to exercise the
+        # multi-provider dispatch path). Firewall rules is direct-API per
         # ADR-0015, aliases is direct-API per ADR-0014 §"Per-component
-        # decisions" / firewall_alias (#775), and unbound_host_override is
-        # direct-API per ADR-0014 §"Per-component decisions" /
-        # unbound_host_override (#776) — none of those route through
-        # ``generate_terraform``. ``kea_subnet`` is still terraform-managed
-        # at the time of this test (until #777 lands).
-        subnet_file = config_dir / "kea_subnet.yaml"
-        subnet_file.write_text(
+        # decisions" / firewall_alias (#775), unbound_host_override is
+        # direct-API (#776), and kea_subnet / kea_reservation /
+        # kea_dhcp6_* are direct-API (#777, #778, #758) — none of those
+        # route through ``generate_terraform``. ``dhcp_static_maps`` is
+        # the only OPNsense type that still does at the time of this test.
+        static_maps_file = config_dir / "dhcp_static_maps.yaml"
+        static_maps_file.write_text(
             """
-kea_subnet:
-  - name: lan-subnet
-    subnet: 192.168.1.0/24
-    pools:
-      - 192.168.1.100-192.168.1.200
+dhcp_static_maps:
+  - name: server1
+    interface: lan
+    mac: aa:bb:cc:dd:ee:ff
+    ip_address: 192.168.1.50
 """
         )
 
@@ -364,8 +367,8 @@ kea_subnet:
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.generate_ansible = Mock()
         opnsense_provider.validate_config = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["kea_subnet"])
-        opnsense_provider.get_dependencies = Mock(return_value={"kea_subnet": []})
+        opnsense_provider.get_resource_types = Mock(return_value=["dhcp_static_maps"])
+        opnsense_provider.get_dependencies = Mock(return_value={"dhcp_static_maps": []})
         opnsense_provider.set_environment = Mock()
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 

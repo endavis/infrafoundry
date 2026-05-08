@@ -26,7 +26,6 @@ from typing import Any
 
 import pytest
 
-from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense import OPNsenseProvider
 
 # Match HCL argument assignments. Captures the argument name on lines like
@@ -84,70 +83,12 @@ def _extract_resource_blocks(content: str) -> list[tuple[str, str]]:
 # The `aliases` template was retired in #775 — `firewall_alias` is now
 # managed via `OPNsenseDirectRunner` (no terraform path); the parameter
 # was removed from the parametrize list below.
-
-
-def _kea_subnet_resources() -> list[ResourceConfig]:
-    return [
-        ResourceConfig(
-            provider="opnsense",
-            type="kea_subnet",
-            name="subnet-min",
-            config={"subnet": "192.168.10.0/24"},
-        ),
-        # Exercises every conditional branch in the kea_subnet template.
-        ResourceConfig(
-            provider="opnsense",
-            type="kea_subnet",
-            name="subnet-full",
-            config={
-                "subnet": "192.168.20.0/24",
-                "pools": ["192.168.20.100-192.168.20.200"],
-                "match_client_id": True,
-                "auto_collect": False,
-                "routers": ["192.168.20.1"],
-                "dns_servers": ["192.168.20.1"],
-                "domain_name": "example.com",
-                "domain_search": ["example.com", "internal.example.com"],
-                "ntp_servers": ["192.168.20.1"],
-                "description": "full-coverage subnet",
-            },
-        ),
-    ]
-
-
-def _kea_reservation_resources() -> list[ResourceConfig]:
-    # Reservation needs its parent subnet rendered too (the template
-    # references `opnsense_kea_subnet.<name>.id`); pass both so
-    # `generate_terraform` writes both files.
-    parent_subnet = ResourceConfig(
-        provider="opnsense",
-        type="kea_subnet",
-        name="reservation-parent",
-        config={"subnet": "192.168.30.0/24"},
-    )
-    minimal = ResourceConfig(
-        provider="opnsense",
-        type="kea_reservation",
-        name="res-min",
-        config={
-            "subnet_ref": "reservation-parent",
-            "hw_address": "00:11:22:33:44:55",
-            "ip_address": "192.168.30.10",
-        },
-    )
-    full = ResourceConfig(
-        provider="opnsense",
-        type="kea_reservation",
-        name="res-full",
-        config={
-            "subnet_ref": "reservation-parent",
-            "hw_address": "aa:bb:cc:dd:ee:ff",
-            "ip_address": "192.168.30.20",
-            "hostname": "explicit-hostname",
-            "description": "with-description reservation",
-        },
-    )
-    return [parent_subnet, minimal, full]
+#
+# The `kea_subnet` and `kea_reservation` templates were retired in
+# #777/#778 — DHCPv4 subnets and reservations now use the direct-API
+# write path via `KeaDHCPv4SubnetManager` / `KeaDHCPv4ReservationManager`;
+# the `kea_subnet.tf.j2` / `kea_reservation.tf.j2` templates were
+# deleted in the same PR.
 
 
 # Maps `(template_label, output_filename)` to the fixture-builder.
@@ -162,10 +103,14 @@ def _kea_reservation_resources() -> list[ResourceConfig]:
 # `unbound_host_override` was removed in #776 — the component now uses the
 # direct-API write path via `UnboundHostOverrideManager`; the
 # `unbound_host_override.tf.j2` template was deleted in the same PR.
-_TEMPLATE_PARAMS: list[tuple[str, str, Any]] = [
-    ("kea_subnet", "kea_subnet.tf", _kea_subnet_resources),
-    ("kea_reservation", "kea_reservation.tf", _kea_reservation_resources),
-]
+#
+# `kea_subnet` and `kea_reservation` were removed in #777/#778 — DHCPv4
+# subnets and reservations now use the direct-API write path; the
+# `kea_subnet.tf.j2` / `kea_reservation.tf.j2` templates were deleted in
+# the same PR. After this PR there are no OPNsense terraform templates
+# in the schema-compliance scope (only `dhcp_static_maps.tf.j2` remains
+# at the file-level, but it's #765-excluded).
+_TEMPLATE_PARAMS: list[tuple[str, str, Any]] = []
 
 
 @pytest.fixture
