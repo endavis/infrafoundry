@@ -12,10 +12,12 @@ that dispatch table at plan/apply/destroy/get_resource_ids time. Adding a
 new direct-API component is a one-entry change in the provider; no runner
 edits are required.
 
-The runner deliberately runs at ``priority = -10`` so that direct-API resources
-(e.g., VLANs) are applied before any terraform-managed dependents
-(``dhcp_static_maps``) within the same provider. See
-``orchestrator_workflows.py::_get_sorted_runners`` for the priority sort.
+The runner runs at ``priority = -10`` so that direct-API resources
+(e.g., VLANs) are applied before any terraform-managed dependents within
+the same provider. After #782, OPNsense itself has no terraform-managed
+components left; the priority is retained for the cross-runner ordering
+contract and for any future provider that introduces a terraform path
+behind direct-API state.
 
 Drift detection (``DriftDetectable``) is intentionally not implemented in this
 PR; ``infra plan`` provides equivalent UX via the diff engine, and a full
@@ -77,8 +79,10 @@ class OPNsenseDirectRunner(BaseRunner):
         """Run before terraform (priority 0) so direct-API VLANs apply first.
 
         The orchestrator sorts runners by priority before each phase; placing
-        this runner at -10 guarantees that VLAN add/update/delete completes
-        before terraform plans dependents like dhcp_static_maps.
+        this runner at -10 keeps the cross-runner ordering contract stable.
+        After #782, OPNsense has no terraform-managed components left, so
+        the contract is currently inert for OPNsense — but future providers
+        with mixed direct-API + terraform dispatch rely on the same priority.
         """
         return -10
 

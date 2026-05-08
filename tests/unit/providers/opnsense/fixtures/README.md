@@ -31,17 +31,15 @@ guard doing its job — investigate which template needs updating.
 
 ## Scope
 
-Only resource types InfraFoundry's templates currently emit are listed:
+After the OPNsense cutover-unblock series (#775 / #776 / #758 / #777 / #778
+/ #782), all OPNsense components are managed by `OPNsenseDirectRunner` —
+no terraform templates remain in scope. The fixture is retained so a
+future terraform-managed component (if any is introduced) can be wired
+into `test_template_schema_compliance.py` without re-running the
+provider-schema extraction from scratch.
 
-- `opnsense_kea_reservation` (from `kea_reservation.tf.j2`)
-- `opnsense_kea_subnet` (from `kea_subnet.tf.j2`)
-
-`opnsense_unbound_host_override` was previously emitted by
-`unbound_host_override.tf.j2`; that template was retired in #776 when the
-component migrated to the direct-API write path.
-
-`dhcp_static_maps.tf.j2` is intentionally excluded — it references
-`opnsense_dhcpv4_static_map`, a resource type that doesn't exist in the
-current `browningluke/opnsense` provider. Resolution (delete the template
-or port to `opnsense_kea_reservation`) is tracked as a follow-up to #765
-and out of scope for the schema-compliance fixture.
+The fixture's keys are the `opnsense_*` resource types that *were*
+emitted by historical templates: `opnsense_kea_reservation`,
+`opnsense_kea_subnet`, `opnsense_unbound_host_override`. They remain in
+the JSON for reference; trim them when the next provider-pin bump
+forces a regeneration.

@@ -2,18 +2,13 @@
 emitted by an OPNsense `*.tf.j2` template is a supported attribute of the
 target `browningluke/opnsense` resource type.
 
-Catches three classes of recurrence at PR-time (rather than at apply-time
-on a live OPNsense box, see #765):
-
-1. Wrong argument name (e.g. `rr` instead of `type`).
-2. Argument with no provider equivalent (e.g. the dropped `counters`).
-3. Resource type that doesn't exist in the provider (e.g. the still-broken
-   `opnsense_dhcpv4_static_map` referenced by `dhcp_static_maps.tf.j2`,
-   which is out of scope for this PR — see TODO below).
-
-The schema fixture is a pinned snapshot of the provider's
-`terraform providers schema -json` output. See
-`tests/unit/providers/opnsense/fixtures/README.md` for regeneration
+After #782, every OPNsense component is managed by ``OPNsenseDirectRunner``
+— no terraform write paths remain — so ``_TEMPLATE_PARAMS`` is empty and
+the parametrize collects zero cases. The harness is retained so a future
+terraform-managed component (if any is added) can be wired in by appending
+to the list. The schema fixture is a pinned snapshot of the provider's
+``terraform providers schema -json`` output; see
+``tests/unit/providers/opnsense/fixtures/README.md`` for regeneration
 instructions.
 """
 
@@ -76,40 +71,13 @@ def _extract_resource_blocks(content: str) -> list[tuple[str, str]]:
     return blocks
 
 
-# Each fixture exercises every conditional branch in the corresponding
-# template, so the schema-compliance test would catch a wrong-arg-name
-# regression on any optional path.
-#
-# The `aliases` template was retired in #775 — `firewall_alias` is now
-# managed via `OPNsenseDirectRunner` (no terraform path); the parameter
-# was removed from the parametrize list below.
-#
-# The `kea_subnet` and `kea_reservation` templates were retired in
-# #777/#778 — DHCPv4 subnets and reservations now use the direct-API
-# write path via `KeaDHCPv4SubnetManager` / `KeaDHCPv4ReservationManager`;
-# the `kea_subnet.tf.j2` / `kea_reservation.tf.j2` templates were
-# deleted in the same PR.
-
-
-# Maps `(template_label, output_filename)` to the fixture-builder.
-#
-# `dhcp_static_maps` is INTENTIONALLY EXCLUDED (#765). The template references
-# `opnsense_dhcpv4_static_map`, which doesn't exist in the current
-# `browningluke/opnsense` provider. Resolution — delete the template or port
-# to `opnsense_kea_reservation` — is its own decision and is tracked as a
-# follow-up to #765.
-# TODO(#765 follow-up): Resolve `dhcp_static_maps.tf.j2` and re-include here.
-#
-# `unbound_host_override` was removed in #776 — the component now uses the
-# direct-API write path via `UnboundHostOverrideManager`; the
-# `unbound_host_override.tf.j2` template was deleted in the same PR.
-#
-# `kea_subnet` and `kea_reservation` were removed in #777/#778 — DHCPv4
-# subnets and reservations now use the direct-API write path; the
-# `kea_subnet.tf.j2` / `kea_reservation.tf.j2` templates were deleted in
-# the same PR. After this PR there are no OPNsense terraform templates
-# in the schema-compliance scope (only `dhcp_static_maps.tf.j2` remains
-# at the file-level, but it's #765-excluded).
+# Maps `(template_label, output_filename, fixture_factory)` for templates
+# that are still terraform-managed and within scope of this compliance
+# regression. After the cutover-unblock series (#775 firewall_alias, #776
+# unbound_host_override, #758 kea_dhcp6, #777/#778 kea_subnet/kea_reservation
+# DHCPv4) and the dhcp_static_maps retirement (#782), this list is empty.
+# Add a new entry only if a future OPNsense component reverts to or
+# introduces a terraform write path.
 _TEMPLATE_PARAMS: list[tuple[str, str, Any]] = []
 
 

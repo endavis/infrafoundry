@@ -165,12 +165,13 @@ class OPNsenseProvider(
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OPNsense resources.
 
-        VLANs, firewall rules, and aliases are intentionally not generated
-        here — all three are managed directly via ``OPNsenseDirectRunner``
-        per ADR-0014 (and ADR-0015 for firewall rules). The runner is
-        registered with ``priority = -10`` so the direct-API apply
-        precedes terraform planning of dependents like
-        ``dhcp_static_maps``.
+        After #782, every OPNsense resource type is managed via
+        ``OPNsenseDirectRunner`` (per ADR-0014, ADR-0015) — no
+        terraform write paths remain. This method now only emits the
+        backend/provider/variables scaffold and the outputs block, both
+        of which are still terraform-side concerns (state backend
+        configuration, environment-variable mapping, output
+        declarations) but produce no resource blocks.
         """
         resources_by_type = self.prepare_terraform_generation(resources)
 
@@ -179,22 +180,6 @@ class OPNsenseProvider(
 
         # Generate provider configuration
         self.render_provider_and_variables()
-
-        # Generate resources by type
-        if "dhcp_static_maps" in resources_by_type:
-            self._generate_dhcp_static_maps_terraform(resources_by_type["dhcp_static_maps"])
-
-        # ``unbound_host_override`` is managed by ``OPNsenseDirectRunner``
-        # via ``UnboundHostOverrideManager`` (ADR-0014 per-component
-        # decision, #776) — no terraform generation. Legacy template
-        # ``unbound_host_override.tf.j2`` deleted in same PR.
-
-        # DHCPv4 subnets / reservations are managed by ``OPNsenseDirectRunner``
-        # via ``KeaDHCPv4SubnetManager`` / ``KeaDHCPv4ReservationManager``
-        # (ADR-0014 per-component decision, #777, #778) — no terraform generation.
-        # DHCPv6 subnets / reservations are managed by ``OPNsenseDirectRunner``
-        # via ``KeaDHCPv6SubnetManager`` / ``KeaDHCPv6ReservationManager``
-        # (ADR-0014 per-component decision, #758) — no terraform generation.
 
         # Generate outputs
         self.render_outputs_terraform(resources_by_type)
@@ -350,27 +335,20 @@ class OPNsenseProvider(
         service = UnboundHostOverrideService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
-    def _generate_dhcp_static_maps_terraform(self, static_maps: list[ResourceConfig]) -> None:
-        """Generate Terraform for OPNsense DHCP static mappings."""
-        self.render_and_write_terraform(
-            "opnsense/dhcp_static_maps.tf.j2",
-            context={"static_maps": static_maps},
-            output_name="dhcp_static_maps.tf",
-        )
-
-    # ``unbound_host_override`` terraform generation has been removed
-    # (#776). The component now uses the direct-API path via
-    # :class:`UnboundHostOverrideManager` registered in
-    # :meth:`get_direct_api_resource_types`.
-
-    # DHCPv4 / DHCPv6 subnet / reservation management lives on
-    # ``OPNsenseDirectRunner`` via the ``KeaDHCPv4*Manager`` /
-    # ``KeaDHCPv6*Manager`` component managers (#777, #778, #758;
-    # ADR-0014 per-component decisions). The ~250 lines of inline
-    # mutation logic that previously lived here (DHCPv6) and the
-    # ``kea_subnet.tf.j2`` / ``kea_reservation.tf.j2`` templates
-    # (DHCPv4) have been removed; the change-detection helpers were
-    # relocated to ``services/kea_dhcp.py``.
+    # All OPNsense components are now managed by ``OPNsenseDirectRunner``
+    # (ADR-0014). Per-component history:
+    # - ``firewall_rules`` (#724, ADR-0015), ``aliases`` (#775, firewall_alias),
+    #   ``unbound_host_override`` / ``unbound_host_alias`` / ``unbound_forward``
+    #   (#776), ``kea_dhcp6_subnet`` / ``kea_dhcp6_reservation`` (#758),
+    #   ``kea_subnet`` / ``kea_reservation`` DHCPv4 (#777, #778), and
+    #   ``dhcp_static_maps`` (#782, deletion — superseded by
+    #   ``kea_reservation`` direct-API; the legacy
+    #   ``opnsense_dhcpv4_static_map`` terraform resource never existed
+    #   in browningluke/opnsense).
+    # The ``generate_terraform`` body retains only backend / provider /
+    # outputs scaffolding so the orchestrator's terraform-runner
+    # registration stays consistent with the other terraform-using
+    # providers.
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
@@ -393,7 +371,6 @@ class OPNsenseProvider(
             "vlans",
             "interface_assignments",
             "aliases",
-            "dhcp_static_maps",
             "kea_subnet",
             "kea_reservation",
             "kea_dhcp6_subnet",
@@ -411,16 +388,14 @@ class OPNsenseProvider(
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
         """Map InfraFoundry resource types to terraform resource types.
 
-        ``vlans``, ``firewall_rules``, ``aliases``,
-        ``unbound_host_override``, ``kea_subnet``, ``kea_reservation``,
-        ``kea_dhcp6_subnet``, and ``kea_dhcp6_reservation`` are omitted
-        here per ADR-0014 — they are managed by ``OPNsenseDirectRunner``,
-        not terraform. Only ``dhcp_static_maps`` remains terraform-managed
-        (tracked as a separate follow-up).
+        After #782, every OPNsense resource type is managed by
+        ``OPNsenseDirectRunner`` per ADR-0014 / ADR-0015 — no terraform
+        write paths remain. The mapping is empty; the method is kept
+        on the provider so the ``ProviderBase`` contract is satisfied
+        and any future terraform-managed component can be added without
+        an interface change.
         """
-        return {
-            "dhcp_static_maps": ["opnsense_dhcpv4_static_map"],
-        }
+        return {}
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
@@ -430,7 +405,6 @@ class OPNsenseProvider(
             "vlans": [],
             "interface_assignments": ["vlans"],
             "aliases": [],
-            "dhcp_static_maps": ["vlans"],
             "kea_subnet": ["vlans"],
             "kea_reservation": ["kea_subnet"],
             "kea_dhcp6_subnet": ["vlans"],

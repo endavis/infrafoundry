@@ -15,6 +15,7 @@
 **Amended:** 2026-05-07 (#775) — `firewall_alias` per-component decision recorded (stock direct-REST against `firewall/alias/*` controller; natural-key identity = alias `name` (OPNsense-enforced unique); no controller fork; reconfigure via `firewall/alias/reconfigure`). The legacy terraform write path (`browningluke/opnsense` + `aliases.tf.j2`) is retired in the same PR — no `kind: legacy` shim. Mirrors #724's pattern for `unbound_host_alias`.
 **Amended:** 2026-05-07 (#776) — `unbound_host_override` per-component decision recorded (stock direct-REST against `unbound/settings/HostOverride*`; natural-key identity = `(hostname, domain, rr)`; shared `unbound_reconfigure` finalization hook now coalesces across `unbound_host_alias`, `unbound_forward`, and `unbound_host_override`). Mirrors #724's pattern; legacy terraform path retired in same PR.
 **Amended:** 2026-05-08 (#777, #778) — `kea_dhcp4` per-component decision recorded (stock direct-REST against the existing `kea/dhcpv4/*` controller, now driven by `KeaDHCPv4SubnetManager` and `KeaDHCPv4ReservationManager` on `OPNsenseDirectRunner` instead of the legacy terraform write path via `browningluke/opnsense`). Finalization hook key renamed from `kea_dhcp6_reconfigure` to `kea_reconfigure` and shared across all four Kea managers (DHCPv4 + DHCPv6, subnet + reservation). After this amendment, `dhcp_static_maps` is the only OPNsense component still on the terraform write path — closes the cutover-unblock series for OPNsense (companion: #775 firewall_alias, #776 unbound_host_override, #758 kea_dhcp6).
+**Amended:** 2026-05-08 (#782) — `dhcp_static_maps` retired (deletion, not migration). The legacy template `dhcp_static_maps.tf.j2` referenced `opnsense_dhcpv4_static_map`, a terraform resource that never existed in `browningluke/opnsense`; the surface had no working apply path. After #777/#778, `kea_reservation` direct-API supersedes `dhcp_static_maps` for every operational use case (MAC-bound static IP, hostname, description). The template, the `_generate_dhcp_static_maps_terraform` provider method, the `dhcp_static_maps` entry in `get_resource_types()` / `get_terraform_resource_types()` / `get_dependencies()`, the `DHCPValidator` and its tests, and the `dhcp_static_maps` fixtures in test_advanced_workflows / test_import_blocks are all deleted. **`OPNsenseProvider.get_terraform_resource_types()` now returns an empty mapping — every OPNsense component flows through `OPNsenseDirectRunner`.**
 **Status:** Accepted
 
 ## Status
@@ -89,7 +90,7 @@ See [`docs/development/implementing-providers.md`](../development/implementing-p
 
 1. **VLANs** — the spike code is the seed; first to land.
 2. `aliases`, `firewall_rules`, `unbound_host_override`.
-3. `kea_subnet` / `kea_reservation` / `dhcp_static_maps` (these already use the OPNsense REST API directly via `opnsense_openapi`; the work is normalizing them onto `OPNsenseDirectRunner`).
+3. `kea_subnet` / `kea_reservation` (these already use the OPNsense REST API directly via `opnsense_openapi`; the work is normalizing them onto `OPNsenseDirectRunner`). `dhcp_static_maps` was retired in #782 (deletion, not migration — the legacy terraform path referenced a nonexistent provider resource; superseded by `kea_reservation` direct-API).
 
 The `templates/opnsense/playbook.yml.j2` Ansible service-reload playbook retires once the last Terraform-based component is gone.
 
@@ -238,7 +239,7 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 ### `kea_dhcp4` — subnets and reservations (#777, #778, 2026-05-08)
 
-**Mechanism:** Stock direct-REST against the existing `kea/dhcpv4/*` controller — no controller fork required (this component falls under §1's default). Mirrors #758's pattern for `kea_dhcp6`: two new component managers (`KeaDHCPv4SubnetManager`, `KeaDHCPv4ReservationManager`) drive `OPNsenseDirectRunner` instead of the legacy terraform write path via `browningluke/opnsense` (`opnsense_kea_subnet`, `opnsense_kea_reservation`). The legacy templates `kea_subnet.tf.j2` / `kea_reservation.tf.j2`, the `_generate_kea_subnet_terraform` / `_generate_kea_reservation_terraform` provider methods, and the corresponding entries in `get_terraform_resource_types()` are retired in the same PR — no `kind: legacy` shim. After this PR, `dhcp_static_maps` is the only OPNsense component still on the terraform write path.
+**Mechanism:** Stock direct-REST against the existing `kea/dhcpv4/*` controller — no controller fork required (this component falls under §1's default). Mirrors #758's pattern for `kea_dhcp6`: two new component managers (`KeaDHCPv4SubnetManager`, `KeaDHCPv4ReservationManager`) drive `OPNsenseDirectRunner` instead of the legacy terraform write path via `browningluke/opnsense` (`opnsense_kea_subnet`, `opnsense_kea_reservation`). The legacy templates `kea_subnet.tf.j2` / `kea_reservation.tf.j2`, the `_generate_kea_subnet_terraform` / `_generate_kea_reservation_terraform` provider methods, and the corresponding entries in `get_terraform_resource_types()` are retired in the same PR — no `kind: legacy` shim. After this PR, only `dhcp_static_maps` remains terraform-managed; that is itself retired (deletion) in the immediately-following #782 (see the next sub-section).
 
 - **Endpoints:** `GET kea/dhcpv4/searchSubnet` / `getSubnet/<uuid>` / `addSubnet` / `setSubnet/<uuid>` / `delSubnet/<uuid>`, mirrored for reservations. `kea/service/reconfigure` triggers via the runner's finalization hook (see "Finalization hooks" below). The `KeaClient._crud_*` helpers (originally hardcoded to `kea/dhcpv6/`) gained an `api_version: str` parameter so DHCPv4 and DHCPv6 share the same plumbing.
 - **Identity:** subnets are keyed by the natural `subnet` CIDR (operator YAML `subnet:` field; e.g., `10.0.10.0/24`). Reservations are keyed by the `(hw_address, subnet_uuid)` tuple — DHCPv4 uses MAC address as the client identity (distinct from DHCPv6's `duid`). The reservation manager resolves `subnet` (a CIDR in YAML) → live subnet UUID at plan/apply time via `service.search_dhcpv4_subnets()`.
@@ -252,6 +253,23 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Path-B over Path-A:** same trade-off as #758. Path B (manager split + shared `kea_reconfigure` finalization hook) chosen because the DHCPv4 managers slot cleanly into the existing dispatch table and reuse the same hook the DHCPv6 managers already declared.
 
 **Rollback strategy:** Same as the rest of §1's default mechanism — per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. No transactional rollback.
+
+### `dhcp_static_maps` — retired (#782, 2026-05-08)
+
+**Mechanism: deletion, not migration.** `dhcp_static_maps` was the legacy ISC DHCP static-mapping resource type, intended to be backed by the terraform resource `opnsense_dhcpv4_static_map`. Live audit during the cutover-unblock series (#766) confirmed that resource never existed in the `browningluke/opnsense` provider; the surface had no working apply path under any provider version the project pinned.
+
+After #777/#778, `kea_reservation` (DHCPv4, direct-API) supersedes `dhcp_static_maps` for every operational use case the legacy type targeted: MAC-bound static IP assignment with hostname and description, scoped to a Kea-managed subnet. Kea is OPNsense's modern DHCP daemon; ISC `<dhcpd>` is being phased out upstream.
+
+**Scope of the retirement (#782 single-PR cleanup):**
+
+- Template `templates/opnsense/dhcp_static_maps.tf.j2` — deleted.
+- Provider methods `OPNsenseProvider._generate_dhcp_static_maps_terraform` and the `dhcp_static_maps` dispatch in `generate_terraform()` — deleted; the method no longer dispatches any per-type terraform generation, only backend/provider/outputs scaffolding.
+- Provider registrations: `dhcp_static_maps` removed from `get_resource_types()`, `get_terraform_resource_types()` (which now returns `{}`), and `get_dependencies()`.
+- Validator: `DHCPValidator` (the dhcp_static_maps-specific validator class) and its module — deleted; the `dhcp_validator` field, the `dhcp_maps` resource collection, and the corresponding `validate(...)` call site in `OPNsenseValidator` — deleted.
+- Tests: `tests/unit/providers/opnsense/test_dhcp_validator.py` — deleted; `dhcp_static_maps` fixtures in `test_advanced_workflows.py` and `test_import_blocks.py` — swapped to `vlans` (the OPNsense-side test) and `proxmox_vm_qemu` / `vms` (the import-block fixture); the dhcp-validator-related test cases in `test_opnsense_validator.py` — removed.
+- Docs: `docs/development/opnsense-resource-coverage.md` `dhcp_static_maps` row — replaced with a "retired" entry pointing to `kea_reservation`. `docs/guides/dhcp-vm-integration.md` operator example — rewritten to use `kea_subnet` + `kea_reservation` instead of `dhcp_static_maps`. `tests/unit/providers/opnsense/fixtures/README.md` — updated to reflect that no terraform templates remain in compliance scope.
+
+**End-of-series milestone:** with #782 merged, **OPNsense has no terraform write paths left**. Every component flows through `OPNsenseDirectRunner`. The `generate_terraform()` body is now backend/provider/outputs-only; `get_terraform_resource_types()` returns `{}`. Companion to the cutover-unblock series (#779 firewall_alias, #780 unbound_host_override, #781 kea_dhcpv4 subnet+reservation, #758 kea_dhcpv6 subnet+reservation, all on `OPNsenseDirectRunner`).
 
 ### Finalization hooks (runner facility, #758)
 
@@ -351,6 +369,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#776](https://github.com/endavis/infrafoundry/issues/776): feat: migrate `unbound_host_override` write path from terraform to direct-API (`unbound/settings/*HostOverride` controller; natural-key identity = `(hostname, domain, rr)`; shared `unbound_reconfigure` finalization hook coalesces across host_override / host_alias / forward; legacy terraform path retired in the same PR — no `kind: legacy` shim). Recorded under "Per-component decisions" / `unbound_host_override` and "Finalization hooks" above.
 - Issue [#777](https://github.com/endavis/infrafoundry/issues/777): feat: migrate `kea_subnet` (DHCPv4) write path from terraform to direct-API (paired with #778). Recorded under "Per-component decisions" / `kea_dhcp4` and "Finalization hooks" above.
 - Issue [#778](https://github.com/endavis/infrafoundry/issues/778): feat: migrate `kea_reservation` (DHCPv4) write path from terraform to direct-API (paired with #777; identity tuple `(hw_address, subnet_uuid)`; reservation→subnet UUID resolution raises `ReferenceValidationError` on missing live subnet). Recorded under "Per-component decisions" / `kea_dhcp4` above.
+- Issue [#782](https://github.com/endavis/infrafoundry/issues/782): refactor: retire `dhcp_static_maps` (deletion, not migration — superseded by `kea_reservation` direct-API; the legacy `opnsense_dhcpv4_static_map` terraform resource never existed in `browningluke/opnsense`). End-of-series milestone: OPNsense now has no terraform write paths. Recorded under "Per-component decisions" / `dhcp_static_maps` above.
 
 ## Related Documentation
 
