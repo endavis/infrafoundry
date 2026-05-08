@@ -1,28 +1,23 @@
-"""Kea DHCPv6 subnet component manager for OPNsense (ADR-0014, #758).
+"""Kea DHCPv4 subnet component manager for OPNsense (ADR-0014, #777).
 
 Implements the standard ``plan`` / ``apply`` / ``destroy`` / ``get_resource_ids``
 surface against ``KeaDHCPService`` so that ``OPNsenseDirectRunner`` can dispatch
-DHCPv6 subnets alongside the other direct-API components. Replaces the inline
-``OPNsenseProvider._generate_kea_dhcp6_resources`` path that previously ran
-under ``generate_terraform()`` (#758).
+DHCPv4 subnets alongside the other direct-API components. Replaces the
+terraform write path (``opnsense_kea_subnet`` via ``browningluke/opnsense``)
+that previously ran under ``generate_terraform()``.
 
-The change-detection helpers used here live at module scope in
-``services/kea_dhcp.py`` (relocated in #758, byte-identical move so the
-asymmetric ``valid_lifetime`` and option-dict normalization fixes from PR
-#757 / #756 survive intact).
+Mirrors :mod:`.kea_dhcp6_subnet` line-for-line; differences are flagged inline:
 
-Identity / wire schema:
-
-- Identity is the natural key ``subnet`` (the IPv6 CIDR string, e.g.,
-  ``fd00:1::/64``). Matches the original ``_generate_kea_dhcp6_resources``
-  implementation.
-- Wire schema: ``subnet``, ``interface``, ``pools`` (newline-joined
-  ``range`` strings), ``valid_lifetime`` (string), ``description``,
-  and ``option_data`` (with ``dns_servers`` / ``domain_search`` as
-  comma-joined strings) — same shape ``KeaClient.add_dhcp6_subnet`` and
-  ``update_dhcp6_subnet`` accept.
+- Identity is the natural key ``subnet`` (the IPv4 CIDR string, e.g.,
+  ``10.0.10.0/24``).
+- Wire schema uses **flat** ``option_data_*`` fields (not nested under
+  ``option_data`` like DHCPv6), e.g., ``option_data_dns_servers`` /
+  ``option_data_routers`` / ``option_data_domain_name`` /
+  ``option_data_ntp_servers`` / ``option_data_domain_search`` /
+  ``option_data_autocollect``. Confirmed by reading
+  ``services/kea_dhcp.py:export_to_yaml`` which already reads these fields.
 - The ``add`` API response does not include the new UUID; the manager
-  re-runs ``search_dhcpv6_subnets`` after each create to recover it.
+  re-runs ``search_dhcpv4_subnets`` after each create to recover it.
 
 Reconfigure semantics:
 
@@ -30,11 +25,9 @@ Reconfigure semantics:
   Instead it declares ``FINALIZATION_HOOK = "kea_reconfigure"`` and
   ``OPNsenseDirectRunner`` fires the matching hook from
   ``OPNsenseProvider.get_finalization_hooks()`` exactly once after the
-  apply loop, so DHCPv4 + DHCPv6 subnets and reservations share a
-  single Kea reconfigure (preserving today's "one reconfigure per
-  plan/apply" operational behavior). The hook key was renamed from
-  ``kea_dhcp6_reconfigure`` (#758) to ``kea_reconfigure`` in #777/#778
-  when DHCPv4 was migrated to direct-API and joined the same hook.
+  apply loop, so DHCPv4 + DHCPv6 subnets and reservations share a single
+  Kea reconfigure (preserving today's "one reconfigure per plan/apply"
+  operational behavior).
 """
 
 from __future__ import annotations
@@ -46,21 +39,21 @@ from infrafoundry.core.types import ResourceOutcome
 
 from ..services.kea_dhcp import (
     KeaDHCPService,
-    _build_desired_subnet_fields,
-    _drop_non_round_trip_subnet_fields,
-    _extract_subnet_fields,
+    _build_desired_subnet4_fields,
+    _drop_non_round_trip_subnet4_fields,
+    _extract_subnet4_fields,
     _log_field_diff,
 )
 from .base import BaseComponentManager
 
 
 class _Diff:
-    """Add/update/delete plan for DHCPv6 subnets.
+    """Add/update/delete plan for DHCPv4 subnets.
 
     Lightweight container shaped after the other direct-API services'
     ``Diff`` dataclasses so the runner's ``_format_plan_summary`` can
     read ``adds``/``updates``/``deletes``/``locked`` and ``is_empty``
-    uniformly. ``locked`` is always empty here — DHCPv6 subnets do not
+    uniformly. ``locked`` is always empty here — DHCPv4 subnets do not
     yet support the per-resource ``lock: true`` annotation; promoting
     it is a separate change.
     """
@@ -83,8 +76,8 @@ class _Diff:
         return not (self.adds or self.updates or self.deletes)
 
 
-class KeaDHCPv6SubnetManager(BaseComponentManager):
-    """Manager for OPNsense Kea DHCPv6 subnet operations.
+class KeaDHCPv4SubnetManager(BaseComponentManager):
+    """Manager for OPNsense Kea DHCPv4 subnet operations.
 
     Plan/apply/destroy delegate to ``KeaDHCPService``; the runner is
     responsible for translating exceptions into ``PlanResult.error`` /
@@ -95,8 +88,8 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
     #: Runner-level finalization hook key. Matched against the keys
     #: returned by ``OPNsenseProvider.get_finalization_hooks()``; the
     #: reservation manager declares the same value, and so do the
-    #: DHCPv4 managers (#777, #778), so a single Kea reconfigure fires
-    #: per apply when any Kea component changed state.
+    #: DHCPv6 subnet/reservation managers, so a single Kea reconfigure
+    #: fires per apply regardless of which Kea components changed.
     FINALIZATION_HOOK: ClassVar[str] = "kea_reconfigure"
 
     # ------------------------------------------------------------------
@@ -115,7 +108,7 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
 
         Args:
             env_name: Active environment name.
-            resources: DHCPv6 subnet ``ResourceConfig`` entries (filtered upstream).
+            resources: DHCPv4 subnet ``ResourceConfig`` entries (filtered upstream).
             add_only: If True, suppress deletes for live subnets not in YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
@@ -134,17 +127,17 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         add_only: bool = False,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
-        """Apply the diff: add / update / delete DHCPv6 subnets.
+        """Apply the diff: add / update / delete DHCPv4 subnets.
 
         Does **not** call ``service.reconfigure()`` directly — the runner
         fires the ``kea_reconfigure`` finalization hook once after every
         component has applied. This preserves today's "one reconfigure
-        per plan/apply" operational behavior across all four Kea
-        managers (DHCPv4 + DHCPv6, subnet + reservation).
+        per plan/apply" operational behavior across both the subnet and
+        reservation managers (DHCPv4 + DHCPv6).
 
         Args:
             env_name: Active environment name.
-            resources: DHCPv6 subnet ``ResourceConfig`` entries.
+            resources: DHCPv4 subnet ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
             provider_name: Provider identifier (defaults to ``opnsense``).
@@ -156,14 +149,15 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         del auto_approve  # diff engine is the gate; flag accepted for protocol shape
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
 
-        # Ensure DHCPv6 service is enabled with the required interfaces before
-        # we mutate subnets — preserves the legacy provider behavior
-        # (``_generate_kea_dhcp6_resources`` did this unconditionally).
+        # Ensure DHCPv4 service is enabled with the required interfaces before
+        # we mutate subnets — preserves the legacy provider behavior (the
+        # terraform path implicitly enabled the service via the browningluke
+        # provider's resource creation).
         required_interfaces = sorted(
             {str(r.config.get("interface")) for r in resources if r.config.get("interface")}
         )
         if required_interfaces:
-            service.ensure_dhcpv6_enabled(required_interfaces)
+            service.ensure_dhcpv4_enabled(required_interfaces)
 
         diff = self._compute_diff(service, resources, add_only=add_only)
 
@@ -174,26 +168,24 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
 
         for subnet_data in diff.adds:
             subnet_name = str(subnet_data.pop("__name__"))
-            subnet_address = str(subnet_data.get("subnet", ""))
-            result = service.add_dhcpv6_subnet(subnet_data)
+            result = service.add_dhcpv4_subnet(subnet_data)
             if result.get("result") == "failed":
-                raise ValueError(f"Failed to create DHCPv6 subnet {subnet_name}: {result}")
+                raise ValueError(f"Failed to create DHCPv4 subnet {subnet_name}: {result}")
             outcomes.append(
                 ResourceOutcome(
-                    address=f"opnsense_kea_dhcp6_subnet.{subnet_name}",
+                    address=f"opnsense_kea_subnet.{subnet_name}",
                     action="add",
                     resource_name=subnet_name,
                 )
             )
             created += 1
-            del subnet_address  # informational only
 
         for uuid, subnet_data in diff.updates:
             subnet_name = str(subnet_data.pop("__name__"))
-            service.update_dhcpv6_subnet(uuid, subnet_data)
+            service.update_dhcpv4_subnet(uuid, subnet_data)
             outcomes.append(
                 ResourceOutcome(
-                    address=f"opnsense_kea_dhcp6_subnet.{subnet_name}",
+                    address=f"opnsense_kea_subnet.{subnet_name}",
                     action="update",
                     resource_name=subnet_name,
                 )
@@ -201,11 +193,11 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             updated += 1
 
         for uuid, subnet_address in diff.deletes:
-            service.delete_dhcpv6_subnet(uuid)
+            service.delete_dhcpv4_subnet(uuid)
             synthetic_name = f"subnet-{subnet_address}"
             outcomes.append(
                 ResourceOutcome(
-                    address=f"opnsense_kea_dhcp6_subnet.{synthetic_name}",
+                    address=f"opnsense_kea_subnet.{synthetic_name}",
                     action="delete",
                     resource_name=synthetic_name,
                 )
@@ -230,13 +222,13 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
     ) -> dict[str, Any]:
         """Delete every live subnet whose ``subnet`` CIDR is in ``resources``.
 
-        DHCPv6 subnets do not yet honor a per-resource ``lock`` flag at
+        DHCPv4 subnets do not yet honor a per-resource ``lock`` flag at
         the diff layer; ``locked_skipped`` is always 0 today. Adding
         ``lock`` support is a separate change.
 
         Args:
             env_name: Active environment name.
-            resources: DHCPv6 subnet ``ResourceConfig`` entries to destroy.
+            resources: DHCPv4 subnet ``ResourceConfig`` entries to destroy.
             auto_approve: Currently a no-op.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
@@ -246,7 +238,7 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         del auto_approve
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
 
-        existing = service.search_dhcpv6_subnets()
+        existing = service.search_dhcpv4_subnets()
         existing_by_subnet = {str(s.get("subnet", "")): str(s.get("uuid", "")) for s in existing}
 
         deleted = 0
@@ -255,7 +247,7 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             uuid = existing_by_subnet.get(subnet_address)
             if not uuid:
                 continue
-            service.delete_dhcpv6_subnet(uuid)
+            service.delete_dhcpv4_subnet(uuid)
             deleted += 1
 
         return {
@@ -275,14 +267,14 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         *,
         provider_name: str = "opnsense",
     ) -> dict[str, str]:
-        """Return ``{resource_name: opnsense_uuid}`` for live DHCPv6 subnets.
+        """Return ``{resource_name: opnsense_uuid}`` for live DHCPv4 subnets.
 
         Matches by the natural-key ``subnet`` CIDR; the operator-facing
         ``name`` is only used as the dict key in the return value.
 
         Args:
             env_name: Active environment name.
-            resources: DHCPv6 subnet ``ResourceConfig`` entries.
+            resources: DHCPv4 subnet ``ResourceConfig`` entries.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -290,7 +282,7 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             Resources without a matching live record are omitted.
         """
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
-        existing = service.search_dhcpv6_subnets()
+        existing = service.search_dhcpv4_subnets()
         existing_by_subnet = {str(s.get("subnet", "")): str(s.get("uuid", "")) for s in existing}
 
         result: dict[str, str] = {}
@@ -320,7 +312,7 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         deletes carry ``(uuid, subnet_address)`` for synthetic-name
         construction.
         """
-        existing = service.search_dhcpv6_subnets()
+        existing = service.search_dhcpv4_subnets()
         existing_by_subnet = {str(s.get("subnet", "")): str(s.get("uuid", "")) for s in existing}
 
         adds: list[dict[str, Any]] = []
@@ -334,13 +326,13 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
 
             existing_uuid = existing_by_subnet.get(subnet_address)
             if existing_uuid:
-                current = service.get_dhcpv6_subnet(existing_uuid)
-                current_fields = _extract_subnet_fields(current)
-                desired_fields = _build_desired_subnet_fields(subnet_data)
-                _drop_non_round_trip_subnet_fields(current_fields, desired_fields)
+                current = service.get_dhcpv4_subnet(existing_uuid)
+                current_fields = _extract_subnet4_fields(current)
+                desired_fields = _build_desired_subnet4_fields(subnet_data)
+                _drop_non_round_trip_subnet4_fields(current_fields, desired_fields)
                 if current_fields != desired_fields:
                     _log_field_diff(
-                        f"DHCPv6 subnet {resource.name}", current_fields, desired_fields
+                        f"DHCPv4 subnet {resource.name}", current_fields, desired_fields
                     )
                     updates.append(
                         (existing_uuid, {**subnet_data, "__name__": resource.name}),
@@ -358,40 +350,60 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
 
 
 def _build_subnet_payload(resource: ResourceConfig) -> dict[str, Any]:
-    """Build the wire-format payload sent to OPNsense for a subnet.
+    """Build the wire-format payload sent to OPNsense for a DHCPv4 subnet.
 
-    Mirrors the original ``_generate_kea_dhcp6_resources`` construction
-    shape so wire-level behavior is unchanged.
+    Mirrors the legacy terraform template (``kea_subnet.tf.j2``) field
+    coverage so wire-level behavior is unchanged. DHCPv4 uses **flat**
+    ``option_data_*`` fields on the wire, distinct from DHCPv6's nested
+    ``option_data`` dict.
 
     Args:
-        resource: DHCPv6 subnet resource (validated upstream).
+        resource: DHCPv4 subnet resource (validated upstream).
 
     Returns:
-        Dict suitable for passing to ``service.add_dhcpv6_subnet`` /
-        ``service.update_dhcpv6_subnet``.
+        Dict suitable for passing to ``service.add_dhcpv4_subnet`` /
+        ``service.update_dhcpv4_subnet``.
     """
     config = resource.config
     subnet_data: dict[str, Any] = {
         "subnet": config.get("subnet"),
-        "interface": config.get("interface"),
     }
 
-    # Pools is a newline-separated string of ranges
+    if "interface" in config:
+        subnet_data["interface"] = config["interface"]
+
+    # Pools is a newline-separated string of ranges. The legacy terraform
+    # template accepted plain string entries (e.g., "192.168.1.10-192.168.1.99"),
+    # not the dict-with-range shape DHCPv6 uses.
     if "pools" in config:
-        pool_strings = [pool["range"] for pool in config["pools"]]
+        pool_strings: list[str] = []
+        for pool in config["pools"]:
+            if isinstance(pool, dict) and "range" in pool:
+                pool_strings.append(str(pool["range"]))
+            else:
+                pool_strings.append(str(pool))
         subnet_data["pools"] = "\n".join(pool_strings)
 
     if "valid_lifetime" in config:
         subnet_data["valid_lifetime"] = str(config["valid_lifetime"])
     if "description" in config:
         subnet_data["description"] = config["description"]
+    if "domain_name" in config:
+        subnet_data["domain_name"] = config["domain_name"]
 
-    option_data: dict[str, str] = {}
+    if "match_client_id" in config:
+        subnet_data["match_client_id"] = "1" if config["match_client_id"] else "0"
+    if "auto_collect" in config:
+        subnet_data["option_data_autocollect"] = "1" if config["auto_collect"] else "0"
+
+    # Flat option_data_* fields — comma-joined strings (DHCPv4 wire shape).
     if "dns_servers" in config:
-        option_data["dns_servers"] = ",".join(config["dns_servers"])
-    if "dns_search_list" in config:
-        option_data["domain_search"] = ",".join(config["dns_search_list"])
-    if option_data:
-        subnet_data["option_data"] = option_data
+        subnet_data["option_data_dns_servers"] = ",".join(config["dns_servers"])
+    if "routers" in config:
+        subnet_data["option_data_routers"] = ",".join(config["routers"])
+    if "ntp_servers" in config:
+        subnet_data["option_data_ntp_servers"] = ",".join(config["ntp_servers"])
+    if "domain_search" in config:
+        subnet_data["option_data_domain_search"] = ",".join(config["domain_search"])
 
     return subnet_data

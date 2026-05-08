@@ -184,17 +184,14 @@ class OPNsenseProvider(
         if "dhcp_static_maps" in resources_by_type:
             self._generate_dhcp_static_maps_terraform(resources_by_type["dhcp_static_maps"])
 
-        if "kea_subnet" in resources_by_type:
-            self._generate_kea_subnet_terraform(resources_by_type["kea_subnet"])
-
-        if "kea_reservation" in resources_by_type:
-            self._generate_kea_reservation_terraform(resources_by_type["kea_reservation"])
-
         # ``unbound_host_override`` is managed by ``OPNsenseDirectRunner``
         # via ``UnboundHostOverrideManager`` (ADR-0014 per-component
         # decision, #776) — no terraform generation. Legacy template
         # ``unbound_host_override.tf.j2`` deleted in same PR.
 
+        # DHCPv4 subnets / reservations are managed by ``OPNsenseDirectRunner``
+        # via ``KeaDHCPv4SubnetManager`` / ``KeaDHCPv4ReservationManager``
+        # (ADR-0014 per-component decision, #777, #778) — no terraform generation.
         # DHCPv6 subnets / reservations are managed by ``OPNsenseDirectRunner``
         # via ``KeaDHCPv6SubnetManager`` / ``KeaDHCPv6ReservationManager``
         # (ADR-0014 per-component decision, #758) — no terraform generation.
@@ -238,6 +235,8 @@ class OPNsenseProvider(
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
+        from .components.kea_dhcp4_reservation import KeaDHCPv4ReservationManager
+        from .components.kea_dhcp4_subnet import KeaDHCPv4SubnetManager
         from .components.kea_dhcp6_reservation import KeaDHCPv6ReservationManager
         from .components.kea_dhcp6_subnet import KeaDHCPv6SubnetManager
         from .components.nat_rule import NATRuleManager
@@ -249,12 +248,13 @@ class OPNsenseProvider(
         from .components.vlan import VlanManager
 
         # Iteration order matches Python dict insertion order (preserved by
-        # ``OPNsenseDirectRunner``). DHCPv6 subnets must be applied before
-        # reservations because reservations resolve their subnet UUID via
-        # ``search_dhcpv6_subnets`` at apply time — a brand-new subnet must
-        # exist on the box before its reservations can reference it. Aliases
-        # are applied before ``nat_rules`` and ``firewall_rules`` so the
-        # alias names those rules reference exist on the box first (#775).
+        # ``OPNsenseDirectRunner``). DHCPv4/DHCPv6 subnets must be applied
+        # before reservations because reservations resolve their subnet UUID
+        # via ``search_dhcpv4_subnets`` / ``search_dhcpv6_subnets`` at apply
+        # time — a brand-new subnet must exist on the box before its
+        # reservations can reference it. Aliases are applied before
+        # ``nat_rules`` and ``firewall_rules`` so the alias names those
+        # rules reference exist on the box first (#775).
         # ``unbound_host_override`` is applied before ``unbound_host_alias``
         # so a brand-new override exists on the box before any aliases
         # reference it (#776).
@@ -270,12 +270,14 @@ class OPNsenseProvider(
             "unbound_host_override": UnboundHostOverrideManager,
             "unbound_host_alias": UnboundHostAliasManager,
             "unbound_forward": UnboundForwardManager,
+            "kea_subnet": KeaDHCPv4SubnetManager,
+            "kea_reservation": KeaDHCPv4ReservationManager,
             "kea_dhcp6_subnet": KeaDHCPv6SubnetManager,
             "kea_dhcp6_reservation": KeaDHCPv6ReservationManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
-        """Return end-of-apply hooks the direct-API runner fires per key (#758, #776).
+        """Return end-of-apply hooks the direct-API runner fires per key (#758, #776, #777).
 
         Each component manager opts in by declaring a ``FINALIZATION_HOOK``
         ClassVar; ``OPNsenseDirectRunner`` collects those keys for managers
@@ -284,9 +286,13 @@ class OPNsenseProvider(
 
         Registered hooks:
 
-        - ``kea_dhcp6_reconfigure`` — shared by :class:`KeaDHCPv6SubnetManager`
-          and :class:`KeaDHCPv6ReservationManager` so a Kea reconfigure fires
-          exactly once per apply when either component changed state.
+        - ``kea_reconfigure`` — shared by :class:`KeaDHCPv4SubnetManager`,
+          :class:`KeaDHCPv4ReservationManager`, :class:`KeaDHCPv6SubnetManager`,
+          and :class:`KeaDHCPv6ReservationManager` so a single
+          ``kea/service/reconfigure`` call fires per apply when any Kea
+          component changed state. Renamed from the original
+          ``kea_dhcp6_reconfigure`` (#758) to drop the v6-specific suffix
+          when DHCPv4 was migrated to direct-API (#777, #778).
         - ``unbound_reconfigure`` (#776) — shared by
           :class:`UnboundHostOverrideManager`, :class:`UnboundHostAliasManager`,
           and :class:`UnboundForwardManager` so a single
@@ -301,18 +307,19 @@ class OPNsenseProvider(
             graceful no-op on the runner side.
         """
         return {
-            "kea_dhcp6_reconfigure": self._reconfigure_kea_dhcp6,
+            "kea_reconfigure": self._reconfigure_kea,
             "unbound_reconfigure": self._reconfigure_unbound,
         }
 
-    def _reconfigure_kea_dhcp6(self, env_name: str) -> None:
-        """Reconfigure the Kea DHCP service after a DHCPv6 mutation (#758).
+    def _reconfigure_kea(self, env_name: str) -> None:
+        """Reconfigure the Kea DHCP service after a DHCPv4 or DHCPv6 mutation.
 
         Used by :meth:`get_finalization_hooks` so the OPNsense direct-API
-        runner can fire a single Kea reconfigure after subnet and
-        reservation managers have applied. Hook errors propagate, failing
-        the apply (matches the legacy DHCPv6 path's behavior, which raised
-        on a failed reconfigure response).
+        runner can fire a single Kea reconfigure after any of the four
+        Kea managers (DHCPv4 + DHCPv6, subnet + reservation) have
+        applied. The OPNsense ``kea/service/reconfigure`` endpoint is
+        shared between v4 and v6, so one call covers both. Hook errors
+        propagate, failing the apply.
 
         Args:
             env_name: Active environment name (matches the runner's hook
@@ -351,33 +358,19 @@ class OPNsenseProvider(
             output_name="dhcp_static_maps.tf",
         )
 
-    def _generate_kea_subnet_terraform(self, subnets: list[ResourceConfig]) -> None:
-        """Generate Terraform for Kea DHCP subnets."""
-        self.render_and_write_terraform(
-            "opnsense/kea_subnet.tf.j2",
-            context={"subnets": subnets},
-            output_name="kea_subnet.tf",
-        )
-
-    def _generate_kea_reservation_terraform(self, reservations: list[ResourceConfig]) -> None:
-        """Generate Terraform for Kea DHCP reservations."""
-        self.render_and_write_terraform(
-            "opnsense/kea_reservation.tf.j2",
-            context={"reservations": reservations},
-            output_name="kea_reservation.tf",
-        )
-
     # ``unbound_host_override`` terraform generation has been removed
     # (#776). The component now uses the direct-API path via
     # :class:`UnboundHostOverrideManager` registered in
     # :meth:`get_direct_api_resource_types`.
 
-    # DHCPv6 subnet / reservation management lives on
-    # ``OPNsenseDirectRunner`` via the ``KeaDHCPv6SubnetManager`` and
-    # ``KeaDHCPv6ReservationManager`` component managers (#758,
-    # ADR-0014 per-component decision). The ~200 lines of inline
-    # mutation logic that previously lived here have been removed; the
-    # change-detection helpers were relocated to ``services/kea_dhcp.py``.
+    # DHCPv4 / DHCPv6 subnet / reservation management lives on
+    # ``OPNsenseDirectRunner`` via the ``KeaDHCPv4*Manager`` /
+    # ``KeaDHCPv6*Manager`` component managers (#777, #778, #758;
+    # ADR-0014 per-component decisions). The ~250 lines of inline
+    # mutation logic that previously lived here (DHCPv6) and the
+    # ``kea_subnet.tf.j2`` / ``kea_reservation.tf.j2`` templates
+    # (DHCPv4) have been removed; the change-detection helpers were
+    # relocated to ``services/kea_dhcp.py``.
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
@@ -418,13 +411,14 @@ class OPNsenseProvider(
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
         """Map InfraFoundry resource types to terraform resource types.
 
-        ``vlans``, ``firewall_rules``, ``aliases``, and
-        ``unbound_host_override`` are omitted here per ADR-0014 — they
-        are managed by ``OPNsenseDirectRunner``, not terraform.
+        ``vlans``, ``firewall_rules``, ``aliases``,
+        ``unbound_host_override``, ``kea_subnet``, ``kea_reservation``,
+        ``kea_dhcp6_subnet``, and ``kea_dhcp6_reservation`` are omitted
+        here per ADR-0014 — they are managed by ``OPNsenseDirectRunner``,
+        not terraform. Only ``dhcp_static_maps`` remains terraform-managed
+        (tracked as a separate follow-up).
         """
         return {
-            "kea_reservation": ["opnsense_kea_reservation"],
-            "kea_subnet": ["opnsense_kea_subnet"],
             "dhcp_static_maps": ["opnsense_dhcpv4_static_map"],
         }
 

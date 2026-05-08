@@ -98,9 +98,13 @@ class OPNsenseClient:
 class KeaClient:
     """Kea DHCP-specific API operations.
 
-    This class provides methods for managing Kea DHCPv6 subnets and reservations
-    through the OPNsense API. It wraps the generic OPNsenseClient with domain-
-    specific operations.
+    This class provides methods for managing Kea DHCPv4 and DHCPv6 subnets
+    and reservations through the OPNsense API. It wraps the generic
+    OPNsenseClient with domain-specific operations.
+
+    The generic ``_crud_*`` helpers take an ``api_version`` parameter
+    (``"dhcpv4"`` or ``"dhcpv6"``) so the same helper covers both wire
+    families; the public per-version wrappers below dispatch to it.
 
     Args:
         client: OPNsenseClient instance for making authenticated requests
@@ -120,79 +124,302 @@ class KeaClient:
 
     # Generic CRUD helper methods
 
-    def _crud_search(self, resource_type: str) -> list[dict[str, Any]]:
-        """Generic search operation for Kea DHCPv6 resources.
+    def _crud_search(self, api_version: str, resource_type: str) -> list[dict[str, Any]]:
+        """Generic search operation for Kea DHCP resources.
 
         Args:
+            api_version: Kea API version segment (``"dhcpv4"`` or ``"dhcpv6"``)
             resource_type: Resource type (e.g., "Subnet", "Reservation")
 
         Returns:
             List of resource dictionaries from the 'rows' field
         """
-        endpoint = f"kea/dhcpv6/search{resource_type}"
+        endpoint = f"kea/{api_version}/search{resource_type}"
         response = self.client.request("GET", endpoint)
         return cast(list[dict[str, Any]], response.get("rows", []))
 
-    def _crud_get(self, resource_type: str, uuid: str) -> dict[str, Any]:
-        """Generic get operation for a specific Kea DHCPv6 resource.
+    def _crud_get(self, api_version: str, resource_type: str, uuid: str) -> dict[str, Any]:
+        """Generic get operation for a specific Kea DHCP resource.
 
         Args:
+            api_version: Kea API version segment (``"dhcpv4"`` or ``"dhcpv6"``)
             resource_type: Resource type (e.g., "Subnet", "Reservation")
             uuid: Resource UUID
 
         Returns:
             Resource configuration dictionary
         """
-        endpoint = f"kea/dhcpv6/get{resource_type}/{uuid}"
+        endpoint = f"kea/{api_version}/get{resource_type}/{uuid}"
         return self.client.request("GET", endpoint)
 
     def _crud_add(
-        self, resource_type: str, resource_key: str, data: dict[str, Any]
+        self, api_version: str, resource_type: str, resource_key: str, data: dict[str, Any]
     ) -> dict[str, Any]:
-        """Generic add operation for a new Kea DHCPv6 resource.
+        """Generic add operation for a new Kea DHCP resource.
 
         Args:
+            api_version: Kea API version segment (``"dhcpv4"`` or ``"dhcpv6"``)
             resource_type: Resource type (e.g., "Subnet", "Reservation")
-            resource_key: Key to wrap data in request (e.g., "subnet", "reservation")
+            resource_key: Key to wrap data in request (e.g., "subnet4", "reservation")
             data: Resource configuration
 
         Returns:
             Response with 'result' field (uuid is NOT included in add responses)
         """
-        endpoint = f"kea/dhcpv6/add{resource_type}"
+        endpoint = f"kea/{api_version}/add{resource_type}"
         request_data = {resource_key: data}
         return self.client.request("POST", endpoint, data=request_data)
 
     def _crud_update(
-        self, resource_type: str, uuid: str, resource_key: str, data: dict[str, Any]
+        self,
+        api_version: str,
+        resource_type: str,
+        uuid: str,
+        resource_key: str,
+        data: dict[str, Any],
     ) -> dict[str, Any]:
-        """Generic update operation for an existing Kea DHCPv6 resource.
+        """Generic update operation for an existing Kea DHCP resource.
 
         Args:
+            api_version: Kea API version segment (``"dhcpv4"`` or ``"dhcpv6"``)
             resource_type: Resource type (e.g., "Subnet", "Reservation")
             uuid: Resource UUID
-            resource_key: Key to wrap data in request (e.g., "subnet", "reservation")
+            resource_key: Key to wrap data in request (e.g., "subnet4", "reservation")
             data: Updated resource configuration
 
         Returns:
             Response with 'result' field
         """
-        endpoint = f"kea/dhcpv6/set{resource_type}/{uuid}"
+        endpoint = f"kea/{api_version}/set{resource_type}/{uuid}"
         request_data = {resource_key: data}
         return self.client.request("POST", endpoint, data=request_data)
 
-    def _crud_delete(self, resource_type: str, uuid: str) -> dict[str, Any]:
-        """Generic delete operation for a Kea DHCPv6 resource.
+    def _crud_delete(self, api_version: str, resource_type: str, uuid: str) -> dict[str, Any]:
+        """Generic delete operation for a Kea DHCP resource.
 
         Args:
+            api_version: Kea API version segment (``"dhcpv4"`` or ``"dhcpv6"``)
             resource_type: Resource type (e.g., "Subnet", "Reservation")
             uuid: Resource UUID
 
         Returns:
             Response with 'result' field
         """
-        endpoint = f"kea/dhcpv6/del{resource_type}/{uuid}"
+        endpoint = f"kea/{api_version}/del{resource_type}/{uuid}"
         return self.client.request("POST", endpoint)
+
+    # DHCPv4 Subnet operations
+
+    def search_dhcp4_subnets(self) -> list[dict[str, Any]]:
+        """Search for all DHCPv4 subnets.
+
+        Returns:
+            List of subnet dictionaries with 'uuid', 'subnet', 'description', etc.
+        """
+        return self._crud_search("dhcpv4", "Subnet")
+
+    def get_dhcp4_subnet(self, uuid: str) -> dict[str, Any]:
+        """Get a specific DHCPv4 subnet by UUID.
+
+        Args:
+            uuid: Subnet UUID
+
+        Returns:
+            Subnet configuration dictionary (raw envelope ``{"subnet4": {...}}``)
+        """
+        return self._crud_get("dhcpv4", "Subnet", uuid)
+
+    def add_dhcp4_subnet(self, subnet_data: dict[str, Any]) -> dict[str, Any]:
+        """Add a new DHCPv4 subnet.
+
+        Args:
+            subnet_data: Subnet configuration dictionary with flat
+                ``option_data_*`` fields (DHCPv4 wire schema; differs from
+                DHCPv6 which nests under ``option_data``):
+                - subnet: IPv4 subnet (e.g., "192.168.1.0/24")
+                - interface: Interface name (e.g., "opt1")
+                - pools: Newline-joined pool ranges
+                - description: Operator description
+                - option_data_dns_servers: Comma-separated DNS server IPv4 addresses
+                - option_data_routers: Comma-separated default-gateway addresses
+                - option_data_domain_name: Domain name (string)
+                - option_data_ntp_servers: Comma-separated NTP server addresses
+                - option_data_domain_search: Comma-separated DNS search domains
+                - option_data_autocollect: Auto-collect options ("0" / "1")
+
+        Returns:
+            Response with 'result' field (uuid is NOT included in add responses).
+        """
+        return self._crud_add("dhcpv4", "Subnet", "subnet4", subnet_data)
+
+    def update_dhcp4_subnet(self, uuid: str, subnet_data: dict[str, Any]) -> dict[str, Any]:
+        """Update an existing DHCPv4 subnet.
+
+        Args:
+            uuid: Subnet UUID
+            subnet_data: Updated subnet configuration
+
+        Returns:
+            Response with 'result' field
+        """
+        return self._crud_update("dhcpv4", "Subnet", uuid, "subnet4", subnet_data)
+
+    def delete_dhcp4_subnet(self, uuid: str) -> dict[str, Any]:
+        """Delete a DHCPv4 subnet.
+
+        Args:
+            uuid: Subnet UUID
+
+        Returns:
+            Response with 'result' field
+        """
+        return self._crud_delete("dhcpv4", "Subnet", uuid)
+
+    # DHCPv4 Reservation operations
+
+    def search_dhcp4_reservations(self) -> list[dict[str, Any]]:
+        """Search for all DHCPv4 reservations.
+
+        Returns:
+            List of reservation dictionaries with 'uuid', 'subnet', 'hw_address', etc.
+        """
+        return self._crud_search("dhcpv4", "Reservation")
+
+    def get_dhcp4_reservation(self, uuid: str) -> dict[str, Any]:
+        """Get a specific DHCPv4 reservation by UUID.
+
+        Args:
+            uuid: Reservation UUID
+
+        Returns:
+            Reservation configuration dictionary (raw envelope ``{"reservation": {...}}``)
+        """
+        return self._crud_get("dhcpv4", "Reservation", uuid)
+
+    def add_dhcp4_reservation(self, reservation_data: dict[str, Any]) -> dict[str, Any]:
+        """Add a new DHCPv4 reservation.
+
+        Args:
+            reservation_data: Reservation configuration with fields:
+                - subnet: UUID of the subnet
+                - hw_address: MAC address (e.g., "aa:bb:cc:dd:ee:ff")
+                - ip_address: IPv4 address to reserve
+                - hostname: Hostname for the reservation
+                - description: Optional description
+
+        Returns:
+            Response with 'result' field (uuid is NOT included in add responses).
+        """
+        return self._crud_add("dhcpv4", "Reservation", "reservation", reservation_data)
+
+    def update_dhcp4_reservation(
+        self, uuid: str, reservation_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Update an existing DHCPv4 reservation.
+
+        Args:
+            uuid: Reservation UUID
+            reservation_data: Updated reservation configuration
+
+        Returns:
+            Response with 'result' field
+        """
+        return self._crud_update("dhcpv4", "Reservation", uuid, "reservation", reservation_data)
+
+    def delete_dhcp4_reservation(self, uuid: str) -> dict[str, Any]:
+        """Delete a DHCPv4 reservation.
+
+        Args:
+            uuid: Reservation UUID
+
+        Returns:
+            Response with 'result' field
+        """
+        return self._crud_delete("dhcpv4", "Reservation", uuid)
+
+    # DHCPv4 General Settings operations
+
+    def get_dhcp4_general(self) -> dict[str, Any]:
+        """Get Kea DHCPv4 general settings.
+
+        Returns:
+            General settings dictionary with 'dhcpv4' key containing
+            'general' (with 'enabled', 'interfaces', etc.).
+        """
+        return self.client.request("GET", "kea/dhcpv4/get")
+
+    def set_dhcp4_general(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Update Kea DHCPv4 general settings.
+
+        Args:
+            settings: General settings to update, wrapped in 'dhcpv4' key.
+                Example: {"dhcpv4": {"general": {"enabled": "1", "interfaces": "opt1,opt2"}}}
+
+        Returns:
+            Response with 'result' field
+        """
+        return self.client.request("POST", "kea/dhcpv4/set", data=settings)
+
+    def ensure_dhcp4_enabled(self, interfaces: list[str]) -> None:
+        """Ensure Kea DHCPv4 is enabled with the specified interfaces selected.
+
+        Mirrors :meth:`ensure_dhcp6_enabled` for the DHCPv4 controller. Reads
+        current settings, enables the service if needed, and adds any missing
+        interfaces to the selection. Only makes API calls if changes are
+        required.
+
+        Args:
+            interfaces: List of interface names that must be enabled
+                (e.g., ``["opt1", "opt2"]``).
+        """
+        general = self.get_dhcp4_general()
+        # API returns: {"dhcpv4": {"general": {"enabled": "0", "interfaces": {...}}}}
+        general_settings = general.get("dhcpv4", {}).get("general", {})
+
+        currently_enabled = general_settings.get("enabled", "0") == "1"
+
+        current_interfaces_raw = general_settings.get("interfaces", {})
+        selected_interfaces: set[str] = set()
+
+        if isinstance(current_interfaces_raw, dict):
+            for iface_name, iface_data in current_interfaces_raw.items():
+                if isinstance(iface_data, dict) and iface_data.get("selected", 0):
+                    selected_interfaces.add(iface_name)
+        elif isinstance(current_interfaces_raw, str) and current_interfaces_raw:
+            selected_interfaces = set(current_interfaces_raw.split(","))
+
+        required = set(interfaces)
+        missing_interfaces = required - selected_interfaces
+        needs_enable = not currently_enabled
+        needs_interface_update = bool(missing_interfaces)
+
+        if not needs_enable and not needs_interface_update:
+            logger.info("Kea DHCPv4 already enabled with required interfaces")
+            return
+
+        new_interfaces = selected_interfaces | required
+        update_data: dict[str, Any] = {
+            "dhcpv4": {
+                "general": {
+                    "enabled": "1",
+                    "interfaces": ",".join(sorted(new_interfaces)),
+                }
+            }
+        }
+
+        if needs_enable:
+            print("Enabling Kea DHCPv4 service...")
+        if needs_interface_update:
+            print(f"Adding interfaces to DHCPv4: {', '.join(sorted(missing_interfaces))}")
+
+        result = self.set_dhcp4_general(update_data)
+        if result.get("result") == "failed":
+            validations = result.get("validations", {})
+            raise ValueError(f"Failed to update DHCPv4 general settings: {validations}")
+
+        # Reconfigure to apply the general settings change
+        self.reconfigure_service()
+        print("Kea DHCPv4 service configured and running")
 
     # DHCPv6 Subnet operations
 
@@ -202,7 +429,7 @@ class KeaClient:
         Returns:
             List of subnet dictionaries with 'uuid', 'subnet', 'interface', etc.
         """
-        return self._crud_search("Subnet")
+        return self._crud_search("dhcpv6", "Subnet")
 
     def get_dhcp6_subnet(self, uuid: str) -> dict[str, Any]:
         """Get a specific DHCPv6 subnet by UUID.
@@ -213,7 +440,7 @@ class KeaClient:
         Returns:
             Subnet configuration dictionary
         """
-        return self._crud_get("Subnet", uuid)
+        return self._crud_get("dhcpv6", "Subnet", uuid)
 
     def add_dhcp6_subnet(self, subnet_data: dict[str, Any]) -> dict[str, Any]:
         """Add a new DHCPv6 subnet.
@@ -231,7 +458,7 @@ class KeaClient:
         Returns:
             Response with 'result' and 'uuid' fields
         """
-        return self._crud_add("Subnet", "subnet6", subnet_data)
+        return self._crud_add("dhcpv6", "Subnet", "subnet6", subnet_data)
 
     def update_dhcp6_subnet(self, uuid: str, subnet_data: dict[str, Any]) -> dict[str, Any]:
         """Update an existing DHCPv6 subnet.
@@ -243,7 +470,7 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        return self._crud_update("Subnet", uuid, "subnet6", subnet_data)
+        return self._crud_update("dhcpv6", "Subnet", uuid, "subnet6", subnet_data)
 
     def delete_dhcp6_subnet(self, uuid: str) -> dict[str, Any]:
         """Delete a DHCPv6 subnet.
@@ -254,7 +481,7 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        return self._crud_delete("Subnet", uuid)
+        return self._crud_delete("dhcpv6", "Subnet", uuid)
 
     # DHCPv6 Reservation operations
 
@@ -264,7 +491,7 @@ class KeaClient:
         Returns:
             List of reservation dictionaries with 'uuid', 'subnet_id', 'duid', etc.
         """
-        return self._crud_search("Reservation")
+        return self._crud_search("dhcpv6", "Reservation")
 
     def get_dhcp6_reservation(self, uuid: str) -> dict[str, Any]:
         """Get a specific DHCPv6 reservation by UUID.
@@ -275,7 +502,7 @@ class KeaClient:
         Returns:
             Reservation configuration dictionary
         """
-        return self._crud_get("Reservation", uuid)
+        return self._crud_get("dhcpv6", "Reservation", uuid)
 
     def add_dhcp6_reservation(self, reservation_data: dict[str, Any]) -> dict[str, Any]:
         """Add a new DHCPv6 reservation.
@@ -291,7 +518,7 @@ class KeaClient:
         Returns:
             Response with 'result' and 'uuid' fields
         """
-        return self._crud_add("Reservation", "reservation", reservation_data)
+        return self._crud_add("dhcpv6", "Reservation", "reservation", reservation_data)
 
     def update_dhcp6_reservation(
         self, uuid: str, reservation_data: dict[str, Any]
@@ -305,7 +532,7 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        return self._crud_update("Reservation", uuid, "reservation", reservation_data)
+        return self._crud_update("dhcpv6", "Reservation", uuid, "reservation", reservation_data)
 
     def delete_dhcp6_reservation(self, uuid: str) -> dict[str, Any]:
         """Delete a DHCPv6 reservation.
@@ -316,7 +543,7 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        return self._crud_delete("Reservation", uuid)
+        return self._crud_delete("dhcpv6", "Reservation", uuid)
 
     # DHCPv6 General Settings operations
 
