@@ -9,6 +9,15 @@ contract shared between :class:`KeaDHCPv6SubnetManager` and
 ``providers/opnsense/__init__.py`` in #758 (byte-identical move; see the
 ADR-0014 per-component decision for ``kea_dhcp6``) so both managers can
 reuse them without provider coupling.
+
+DHCPv4 parallels (``_extract_subnet4_fields``, ``_build_desired_subnet4_fields``,
+``_extract_reservation4_fields``, ``_build_desired_reservation4_fields``,
+``_drop_non_round_trip_subnet4_fields``) follow the same pattern but
+target the DHCPv4 wire schema (#777, #778). DHCPv4's wire format uses
+flat ``option_data_*`` fields (not nested under ``option_data`` like
+DHCPv6); the helpers below normalize the live shape so change-detection
+matches what ``KeaClient.add_dhcp4_subnet`` / ``update_dhcp4_subnet``
+accept.
 """
 
 import logging
@@ -277,6 +286,178 @@ def _log_field_diff(
             )
 
 
+# ---------------------------------------------------------------------------
+# DHCPv4 change-detection helpers (#777, #778). Parallel structure to the
+# DHCPv6 helpers above; differences captured inline:
+#
+# - DHCPv4 uses FLAT ``option_data_*`` keys (not nested under ``option_data``
+#   like DHCPv6). The ``export_to_yaml`` read-side at ``services/kea_dhcp.py``
+#   already reads ``option_data_dns_servers`` / ``option_data_routers`` /
+#   ``option_data_domain_name`` / ``option_data_ntp_servers`` /
+#   ``option_data_domain_search`` / ``option_data_autocollect`` directly,
+#   confirming the wire shape.
+# - Subnet GET is wrapped under the ``"subnet4"`` envelope key (parallel to
+#   DHCPv6's ``"subnet6"``); reservation GET is wrapped under
+#   ``"reservation"`` (same as DHCPv6).
+# - Reservation identity uses ``hw_address`` (MAC) instead of DHCPv6's ``duid``.
+# ---------------------------------------------------------------------------
+
+
+def _extract_subnet4_fields(api_response: dict[str, Any]) -> dict[str, str]:
+    """Extract and normalize subnet fields from a DHCPv4 GET response.
+
+    The OPNsense API returns DHCPv4 GET responses wrapped under
+    ``{"subnet4": {...}}`` with flat ``option_data_*`` keys (not nested
+    under ``option_data`` like DHCPv6). Select fields like ``interface``
+    and ``option_data_*`` may be returned as option-dicts (e.g.,
+    ``{"": {"value": "", "selected": 1}}`` for "no value selected"); this
+    helper normalizes either shape so they can be compared with the flat
+    strings we send in update requests.
+
+    Args:
+        api_response: Raw response from ``get_dhcp4_subnet(uuid)``.
+
+    Returns:
+        Flat dictionary of normalized field values (all strings).
+    """
+    data = api_response.get("subnet4", {})
+    result: dict[str, str] = {}
+
+    # Simple string fields — normalize whitespace and sort multi-line values
+    for field in ("subnet", "pools", "valid_lifetime", "description", "domain_name"):
+        result[field] = _normalize_field_value(str(data.get(field, "") or ""))
+
+    # Interface may be a dict with selected keys or a plain string
+    result["interface"] = _select_option_dict_value(data.get("interface", ""))
+
+    # Boolean-like fields. ``match_client_id`` and ``option_data_autocollect``
+    # are returned as ``"0"`` / ``"1"`` strings on the live API; preserve as-is.
+    for field in ("match_client_id", "option_data_autocollect"):
+        result[field] = _normalize_field_value(str(data.get(field, "") or ""))
+
+    # Flat option_data_* fields — comma-joined lists or scalars. May be
+    # returned as option-dicts (DNS servers selected from interface dropdowns)
+    # or plain strings depending on field type.
+    for field in (
+        "option_data_dns_servers",
+        "option_data_routers",
+        "option_data_ntp_servers",
+        "option_data_domain_search",
+    ):
+        result[field] = _select_option_dict_value(data.get(field, ""))
+
+    return result
+
+
+def _build_desired_subnet4_fields(subnet_data: dict[str, Any]) -> dict[str, str]:
+    """Build a normalized field dict from the desired DHCPv4 subnet data.
+
+    Args:
+        subnet_data: Subnet configuration dict prepared for the update call
+            (built by ``_build_subnet_payload`` in
+            ``components/kea_dhcp4_subnet.py``).
+
+    Returns:
+        Flat dictionary of normalized field values matching the format
+        returned by :func:`_extract_subnet4_fields`.
+    """
+    result: dict[str, str] = {}
+    for field in ("subnet", "pools", "valid_lifetime", "description", "domain_name"):
+        result[field] = _normalize_field_value(str(subnet_data.get(field, "") or ""))
+    result["interface"] = _normalize_field_value(str(subnet_data.get("interface", "") or ""))
+
+    for field in ("match_client_id", "option_data_autocollect"):
+        result[field] = _normalize_field_value(str(subnet_data.get(field, "") or ""))
+
+    for field in (
+        "option_data_dns_servers",
+        "option_data_routers",
+        "option_data_ntp_servers",
+        "option_data_domain_search",
+    ):
+        result[field] = _normalize_field_value(str(subnet_data.get(field, "") or ""))
+
+    return result
+
+
+def _extract_reservation4_fields(api_response: dict[str, Any]) -> dict[str, str]:
+    """Extract and normalize reservation fields from a DHCPv4 GET response.
+
+    The OPNsense API returns DHCPv4 reservation GET responses wrapped under
+    ``{"reservation": {...}}``. The ``subnet`` field is the parent subnet's
+    UUID and may be returned as a select option-dict.
+
+    Args:
+        api_response: Raw response from ``get_dhcp4_reservation(uuid)``.
+
+    Returns:
+        Flat dictionary of normalized field values (all strings).
+    """
+    data = api_response.get("reservation", {})
+    result: dict[str, str] = {}
+
+    # Simple string fields
+    for field in ("ip_address", "hw_address", "hostname", "description"):
+        result[field] = str(data.get(field, "") or "")
+
+    # Subnet may be a dict with selected UUID or a plain string
+    subnet_raw = data.get("subnet", "")
+    if isinstance(subnet_raw, dict):
+        selected = [
+            uuid
+            for uuid, info in subnet_raw.items()
+            if isinstance(info, dict) and info.get("selected", 0)
+        ]
+        result["subnet"] = selected[0] if selected else ""
+    else:
+        result["subnet"] = str(subnet_raw or "")
+
+    return result
+
+
+def _build_desired_reservation4_fields(reservation_data: dict[str, Any]) -> dict[str, str]:
+    """Build a normalized field dict from the desired DHCPv4 reservation data.
+
+    Args:
+        reservation_data: Reservation configuration dict prepared for the
+            update call.
+
+    Returns:
+        Flat dictionary of normalized field values matching the format
+        returned by :func:`_extract_reservation4_fields`.
+    """
+    result: dict[str, str] = {}
+    for field in ("subnet", "ip_address", "hw_address", "hostname", "description"):
+        result[field] = str(reservation_data.get(field, "") or "")
+    return result
+
+
+# Fields the OPNsense Kea DHCPv4 subnet API may accept on write but not
+# return on read (parallel to ``_ASYMMETRIC_SUBNET_FIELDS`` for DHCPv6).
+# The same ``valid_lifetime`` asymmetry applies — an empty live value is
+# dropped from the comparison so apply doesn't trigger spurious updates
+# every plan/apply cycle.
+_ASYMMETRIC_SUBNET4_FIELDS: Final[tuple[str, ...]] = ("valid_lifetime",)
+
+
+def _drop_non_round_trip_subnet4_fields(
+    current_fields: dict[str, str],
+    desired_fields: dict[str, str],
+) -> None:
+    """Drop DHCPv4 subnet fields that the API doesn't round-trip via GET.
+
+    Mutates both dicts in place. Mirrors
+    :func:`_drop_non_round_trip_subnet_fields` for the DHCPv6 case; the
+    desired-side payload sent to ``update_dhcp4_subnet`` still includes
+    these fields, so apply continues to set them. This helper only
+    governs whether a diff is *triggered* by them.
+    """
+    for field in _ASYMMETRIC_SUBNET4_FIELDS:
+        if not current_fields.get(field):
+            current_fields.pop(field, None)
+            desired_fields.pop(field, None)
+
+
 class KeaDHCPService(BaseService):
     """Service for Kea DHCP operations via OPNsense API.
 
@@ -300,8 +481,43 @@ class KeaDHCPService(BaseService):
         Returns:
             List of reservation dictionaries with uuid, hostname, hw_address, etc.
         """
-        response = self.client.request("GET", "kea/dhcpv4/searchReservation")
-        return response.get("rows", []) if response else []
+        return self.kea_client.search_dhcp4_reservations()
+
+    def get_dhcpv4_reservation(self, uuid: str) -> dict[str, Any]:
+        """Get a single DHCPv4 reservation by UUID.
+
+        Args:
+            uuid: Reservation UUID
+
+        Returns:
+            Reservation configuration dictionary (raw envelope ``{"reservation": {...}}``)
+        """
+        return self.kea_client.get_dhcp4_reservation(uuid)
+
+    def add_dhcpv4_reservation(self, reservation_data: dict[str, Any]) -> dict[str, Any]:
+        """Add a new DHCPv4 reservation.
+
+        Args:
+            reservation_data: Reservation configuration dict (wire-format fields).
+
+        Returns:
+            API response (typically ``{"result": "saved"}``).
+        """
+        return self.kea_client.add_dhcp4_reservation(reservation_data)
+
+    def update_dhcpv4_reservation(
+        self, uuid: str, reservation_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Update an existing DHCPv4 reservation by UUID.
+
+        Args:
+            uuid: Reservation UUID.
+            reservation_data: Reservation configuration dict (wire-format fields).
+
+        Returns:
+            API response.
+        """
+        return self.kea_client.update_dhcp4_reservation(uuid, reservation_data)
 
     def delete_dhcpv4_reservation(self, uuid: str) -> None:
         """Delete a DHCPv4 reservation by UUID.
@@ -309,7 +525,7 @@ class KeaDHCPService(BaseService):
         Args:
             uuid: Reservation UUID
         """
-        self.client.request("POST", f"kea/dhcpv4/delReservation/{uuid}")
+        self.kea_client.delete_dhcp4_reservation(uuid)
 
     def delete_all_dhcpv4_reservations(self) -> int:
         """Delete all DHCPv4 reservations.
@@ -331,8 +547,42 @@ class KeaDHCPService(BaseService):
         Returns:
             List of subnet dictionaries with uuid, subnet, description, etc.
         """
-        response = self.client.request("GET", "kea/dhcpv4/searchSubnet")
-        return response.get("rows", []) if response else []
+        return self.kea_client.search_dhcp4_subnets()
+
+    def get_dhcpv4_subnet(self, uuid: str) -> dict[str, Any]:
+        """Get a single DHCPv4 subnet by UUID.
+
+        Args:
+            uuid: Subnet UUID
+
+        Returns:
+            Subnet configuration dictionary (raw envelope ``{"subnet4": {...}}``)
+        """
+        return self.kea_client.get_dhcp4_subnet(uuid)
+
+    def add_dhcpv4_subnet(self, subnet_data: dict[str, Any]) -> dict[str, Any]:
+        """Add a new DHCPv4 subnet.
+
+        Args:
+            subnet_data: Subnet configuration dict (wire-format fields).
+
+        Returns:
+            API response (typically ``{"result": "saved"}``; the UUID is
+            *not* included — callers must re-search to recover it).
+        """
+        return self.kea_client.add_dhcp4_subnet(subnet_data)
+
+    def update_dhcpv4_subnet(self, uuid: str, subnet_data: dict[str, Any]) -> dict[str, Any]:
+        """Update an existing DHCPv4 subnet by UUID.
+
+        Args:
+            uuid: Subnet UUID.
+            subnet_data: Subnet configuration dict (wire-format fields).
+
+        Returns:
+            API response.
+        """
+        return self.kea_client.update_dhcp4_subnet(uuid, subnet_data)
 
     def delete_dhcpv4_subnet(self, uuid: str) -> None:
         """Delete a DHCPv4 subnet by UUID.
@@ -340,7 +590,18 @@ class KeaDHCPService(BaseService):
         Args:
             uuid: Subnet UUID
         """
-        self.client.request("POST", f"kea/dhcpv4/delSubnet/{uuid}")
+        self.kea_client.delete_dhcp4_subnet(uuid)
+
+    def ensure_dhcpv4_enabled(self, interfaces: list[str]) -> None:
+        """Ensure Kea DHCPv4 is enabled with the specified interfaces selected.
+
+        Thin pass-through to :meth:`KeaClient.ensure_dhcp4_enabled` so
+        component managers do not need to reach through ``service.kea_client``.
+
+        Args:
+            interfaces: Interface names that must be enabled.
+        """
+        self.kea_client.ensure_dhcp4_enabled(interfaces)
 
     def delete_all_dhcpv4_subnets(self) -> int:
         """Delete all DHCPv4 subnets.

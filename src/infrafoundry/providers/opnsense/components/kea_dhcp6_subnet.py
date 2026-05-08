@@ -27,12 +27,14 @@ Identity / wire schema:
 Reconfigure semantics:
 
 - This manager **does not** call ``service.reconfigure()`` directly.
-  Instead it declares ``FINALIZATION_HOOK = "kea_dhcp6_reconfigure"``
-  and ``OPNsenseDirectRunner`` fires the matching hook from
+  Instead it declares ``FINALIZATION_HOOK = "kea_reconfigure"`` and
+  ``OPNsenseDirectRunner`` fires the matching hook from
   ``OPNsenseProvider.get_finalization_hooks()`` exactly once after the
-  apply loop, so subnets and reservations share a single Kea
-  reconfigure (preserving today's "one reconfigure per plan/apply"
-  operational behavior).
+  apply loop, so DHCPv4 + DHCPv6 subnets and reservations share a
+  single Kea reconfigure (preserving today's "one reconfigure per
+  plan/apply" operational behavior). The hook key was renamed from
+  ``kea_dhcp6_reconfigure`` (#758) to ``kea_reconfigure`` in #777/#778
+  when DHCPv4 was migrated to direct-API and joined the same hook.
 """
 
 from __future__ import annotations
@@ -92,9 +94,10 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
 
     #: Runner-level finalization hook key. Matched against the keys
     #: returned by ``OPNsenseProvider.get_finalization_hooks()``; the
-    #: reservation manager declares the same value so subnets and
-    #: reservations share a single Kea reconfigure per apply.
-    FINALIZATION_HOOK: ClassVar[str] = "kea_dhcp6_reconfigure"
+    #: reservation manager declares the same value, and so do the
+    #: DHCPv4 managers (#777, #778), so a single Kea reconfigure fires
+    #: per apply when any Kea component changed state.
+    FINALIZATION_HOOK: ClassVar[str] = "kea_reconfigure"
 
     # ------------------------------------------------------------------
     # Plan / apply / destroy
@@ -134,10 +137,10 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         """Apply the diff: add / update / delete DHCPv6 subnets.
 
         Does **not** call ``service.reconfigure()`` directly — the runner
-        fires the ``kea_dhcp6_reconfigure`` finalization hook once after
-        every component has applied. This preserves today's "one
-        reconfigure per plan/apply" operational behavior across both
-        the subnet and reservation managers.
+        fires the ``kea_reconfigure`` finalization hook once after every
+        component has applied. This preserves today's "one reconfigure
+        per plan/apply" operational behavior across all four Kea
+        managers (DHCPv4 + DHCPv6, subnet + reservation).
 
         Args:
             env_name: Active environment name.

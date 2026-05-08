@@ -69,8 +69,8 @@ def _make_service_mock(
 class TestFinalizationHook:
     """The manager declares the documented hook key."""
 
-    def test_class_attribute_is_kea_dhcp6_reconfigure(self) -> None:
-        assert KeaDHCPv6SubnetManager.FINALIZATION_HOOK == "kea_dhcp6_reconfigure"
+    def test_class_attribute_is_kea_reconfigure(self) -> None:
+        assert KeaDHCPv6SubnetManager.FINALIZATION_HOOK == "kea_reconfigure"
 
 
 # ---------------------------------------------------------------------------

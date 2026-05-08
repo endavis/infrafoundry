@@ -25,10 +25,10 @@ Identity / wire schema:
 Reconfigure semantics:
 
 - This manager **does not** call ``service.reconfigure()`` directly.
-  It declares ``FINALIZATION_HOOK = "kea_dhcp6_reconfigure"`` (the
-  same key as :class:`KeaDHCPv6SubnetManager`) so the runner fires
-  exactly one Kea reconfigure even when both subnets and reservations
-  changed in the same apply.
+  It declares ``FINALIZATION_HOOK = "kea_reconfigure"`` (the same key
+  as :class:`KeaDHCPv6SubnetManager` and the DHCPv4 managers) so the
+  runner fires exactly one Kea reconfigure even when subnets and
+  reservations across both wire families changed in the same apply.
 """
 
 from __future__ import annotations
@@ -79,9 +79,10 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
 
     #: Runner-level finalization hook key. Matched against
     #: ``OPNsenseProvider.get_finalization_hooks()``; shared with
-    #: :class:`KeaDHCPv6SubnetManager` so a single Kea reconfigure
-    #: fires per apply when both managers had changes.
-    FINALIZATION_HOOK: ClassVar[str] = "kea_dhcp6_reconfigure"
+    #: :class:`KeaDHCPv6SubnetManager` and the DHCPv4 managers so a
+    #: single Kea reconfigure fires per apply when any Kea component
+    #: changed state.
+    FINALIZATION_HOOK: ClassVar[str] = "kea_reconfigure"
 
     # ------------------------------------------------------------------
     # Plan / apply / destroy
