@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778237766096,
+  "lastUpdate": 1778243978009,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8184,6 +8184,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000057839728395607224",
             "extra": "mean: 182.95511755650338 usec\nrounds: 1948"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1d7a93c61444ba6a960a410127769b7b8a64474e",
+          "message": "refactor: retire opnsense dhcp_static_maps (merges PR #785, addresses #782)\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-08T13:39:03+01:00",
+          "tree_id": "30fb7907f2254737f84c28d81d76140b1a22405b",
+          "url": "https://github.com/endavis/infrafoundry/commit/1d7a93c61444ba6a960a410127769b7b8a64474e"
+        },
+        "date": 1778243976130,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6364.508546698304,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002876466298988226",
+            "extra": "mean: 157.12132251260263 usec\nrounds: 2372"
           }
         ]
       }
