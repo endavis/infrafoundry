@@ -9,7 +9,6 @@ from infrafoundry.core.validation import ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense.validator import OPNsenseValidator
 from infrafoundry.providers.opnsense.validators import (
-    DHCPValidator,
     FirewallRuleValidator,
     InterfaceAssignmentValidator,
     ResourceNameValidator,
@@ -55,7 +54,6 @@ class TestComposition:
     def test_specialized_validators_initialized(self, validator):
         """All specialized validators are created."""
         assert isinstance(validator.firewall_rule_validator, FirewallRuleValidator)
-        assert isinstance(validator.dhcp_validator, DHCPValidator)
         assert isinstance(validator.vlan_validator, VLANValidator)
         assert isinstance(validator.unbound_validator, UnboundValidator)
         assert isinstance(validator.resource_name_validator, ResourceNameValidator)
@@ -188,7 +186,6 @@ class TestValidateReferences:
         )
         validator.api_validator.fetch_json = MagicMock(return_value=None)
         validator.firewall_rule_validator = MagicMock()
-        validator.dhcp_validator = MagicMock()
         validator.vlan_validator = MagicMock()
         validator.unbound_validator = MagicMock()
         validator.resource_name_validator = MagicMock()
@@ -201,7 +198,6 @@ class TestValidateReferences:
         validator.validate_references(resources)
 
         validator.firewall_rule_validator.validate.assert_called_once()
-        validator.dhcp_validator.validate.assert_called_once()
         validator.vlan_validator.validate.assert_called_once()
         validator.unbound_validator.validate.assert_called_once()
         validator.resource_name_validator.validate.assert_called_once()
@@ -262,16 +258,6 @@ class TestCollectResourceReferences:
         refs = validator._collect_resource_references(resources)
 
         assert len(refs["firewall_rules"]) == 1
-
-    def test_collects_dhcp_maps(self, validator):
-        """Collects DHCP static map resources."""
-        resources = [
-            ResourceConfig(name="map1", type="dhcp_static_maps", provider="opnsense", config={}),
-        ]
-
-        refs = validator._collect_resource_references(resources)
-
-        assert len(refs["dhcp_maps"]) == 1
 
     def test_collects_unbound_host_overrides(self, validator):
         """Collects unbound host override resources."""

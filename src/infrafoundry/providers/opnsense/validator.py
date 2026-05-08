@@ -16,7 +16,6 @@ from infrafoundry.core.types import OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense.validators import (
-    DHCPValidator,
     FirewallRuleValidator,
     GatewayValidator,
     InterfaceAssignmentValidator,
@@ -80,7 +79,6 @@ class OPNsenseValidator:
 
         # Initialize specialized validators
         self.firewall_rule_validator = FirewallRuleValidator(report)
-        self.dhcp_validator = DHCPValidator(report)
         self.vlan_validator = VLANValidator(report)
         self.unbound_validator = UnboundValidator(report)
         self.resource_name_validator = ResourceNameValidator(report)
@@ -212,11 +210,6 @@ class OPNsenseValidator:
                 existing_gateways,
                 managed_gateways=resource_refs["gateways"],
             )
-            self.dhcp_validator.validate(
-                resource_refs["dhcp_maps"],
-                resource_refs["vlan_names"],
-                existing_interfaces,
-            )
             self.vlan_validator.validate(
                 resource_refs["vlans"],
                 existing_interfaces,
@@ -280,7 +273,6 @@ class OPNsenseValidator:
         aliases = [r for r in resources if r.type == "aliases"]
         vlans = [r for r in resources if r.type == "vlans"]
         firewall_rules = [r for r in resources if r.type == "firewall_rules"]
-        dhcp_maps = [r for r in resources if r.type == "dhcp_static_maps"]
         unbound_host_overrides = [r for r in resources if r.type == "unbound_host_override"]
         unbound_host_aliases = [r for r in resources if r.type == "unbound_host_alias"]
         unbound_forwards = [r for r in resources if r.type == "unbound_forward"]
@@ -308,7 +300,6 @@ class OPNsenseValidator:
             "vlans": vlans,
             "vlan_names": vlan_names,
             "firewall_rules": firewall_rules,
-            "dhcp_maps": dhcp_maps,
             "unbound_host_overrides": unbound_host_overrides,
             "unbound_host_override_names": unbound_host_override_names,
             "unbound_host_aliases": unbound_host_aliases,

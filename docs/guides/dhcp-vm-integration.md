@@ -1,13 +1,13 @@
-# DHCP Static Mapping and VM Integration
+# DHCP Reservations and VM Integration
 
 ## Overview
 
-InfraFoundry can align OPNsense DHCP static mappings with Proxmox VMs so VMs use DHCP while still receiving predictable IPs.
+InfraFoundry aligns OPNsense Kea DHCPv4 reservations with Proxmox VMs so VMs use DHCP while still receiving predictable IPs. (The legacy `dhcp_static_maps` resource type was retired in #782 — Kea is OPNsense's modern DHCP daemon and `kea_reservation` direct-API supersedes it for every static-mapping use case.)
 
 ## Audience and Prerequisites
 
 - **Audience:** Operators configuring Proxmox + OPNsense environments.
-- **Prereqs:** OPNsense API access, Proxmox API access, environment config repo set, and matching MAC addresses for DHCP reservations and VM NICs.
+- **Prereqs:** OPNsense API access, Proxmox API access, environment config repo set, matching MAC addresses for DHCP reservations and VM NICs, and a `kea_subnet` resource declared for the subnet the reservation falls into (Kea reservations resolve their parent subnet by CIDR at apply time).
 
 ## When to Use This
 
@@ -17,21 +17,35 @@ InfraFoundry can align OPNsense DHCP static mappings with Proxmox VMs so VMs use
 
 ## Quick Start
 
-1. Add a DHCP static map:
+1. Declare the subnet (one entry per VLAN/interface; can be reused across many reservations):
+   ```yaml
+   # envs/{env}/resources/dhcp-subnets.yaml
+   resources:
+     - provider: opnsense
+       type: kea_subnet
+       name: lan-subnet
+       config:
+         subnet: "192.168.10.0/24"
+         interface: opt1
+         pools:
+           - range: "192.168.10.100-192.168.10.200"
+         dns_servers: ["192.168.10.1"]
+   ```
+2. Add a DHCP reservation for the VM:
    ```yaml
    # envs/{env}/resources/dhcp-mappings.yaml
    resources:
      - provider: opnsense
-       type: dhcp_static_maps
+       type: kea_reservation
        name: my-vm-dhcp
        config:
-         interface: opt1
-         mac: "BC:24:11:10:00:96"
-         ip: "192.168.10.50"
+         subnet: "192.168.10.0/24"   # CIDR of the kea_subnet above
+         hw_address: "BC:24:11:10:00:96"
+         ip_address: "192.168.10.50"
          hostname: "my-vm-01"
          description: "My VM - Managed by InfraFoundry"
    ```
-2. Create a VM using the same MAC:
+3. Create a VM using the same MAC:
    ```yaml
    # envs/{env}/resources/my-vm.yaml
    resources:
@@ -48,7 +62,7 @@ InfraFoundry can align OPNsense DHCP static mappings with Proxmox VMs so VMs use
          ipconfig: ip=dhcp
          oncreate: false
    ```
-3. Apply:
+4. Apply:
    ```bash
    foundry infra apply --env homelab
    ```
