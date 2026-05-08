@@ -1,21 +1,21 @@
 # Outputs for OPNsense resources
 
-{% if resources_by_type.get('aliases') %}
+{% if resources_by_type.get('firewall.aliases') %}
 output "aliases" {
   description = "Created aliases"
   value = [
-    {% for alias in resources_by_type['aliases'] %}
+    {% for alias in resources_by_type['firewall.aliases'] %}
     "{{ alias.config.name }}",
     {% endfor %}
   ]
 }
 {% endif %}
 
-{% if resources_by_type.get('unbound_host_override') %}
+{% if resources_by_type.get('unbound.host_overrides') %}
 output "unbound_host_overrides" {
   description = "Created Unbound DNS host overrides"
   value = [
-    {% for override in resources_by_type['unbound_host_override'] %}
+    {% for override in resources_by_type['unbound.host_overrides'] %}
     "{{ override.config.hostname }}.{{ override.config.domain }}",
     {% endfor %}
   ]

@@ -107,7 +107,7 @@ class TestInitialize:
 def _vlan_resource(name: str, device: str, tag: int) -> ResourceConfig:
     return ResourceConfig(
         name=name,
-        type="vlans",
+        type="interfaces.vlans",
         provider="opnsense",
         config={
             "device": device,
@@ -121,14 +121,14 @@ def _vlan_resource(name: str, device: str, tag: int) -> ResourceConfig:
 def _alias_resource(name: str) -> ResourceConfig:
     return ResourceConfig(
         name=name,
-        type="aliases",
+        type="firewall.aliases",
         provider="opnsense",
         config={"name": name},
     )
 
 
 class TestFilterVlans:
-    """``_filter_vlans`` picks out only ``type='vlans'`` resources."""
+    """``_filter_vlans`` picks out only ``type='interfaces.vlans'`` resources."""
 
     def test_picks_only_vlan_resources(self) -> None:
         resources = [
@@ -164,9 +164,13 @@ class TestFilterByType:
             _alias_resource("a1"),
             _vlan_resource("v2", "igb0", 20),
         ]
-        vlans = OPNsenseDirectRunner._filter_by_type(resources, "vlans", target_resources=None)
+        vlans = OPNsenseDirectRunner._filter_by_type(
+            resources, "interfaces.vlans", target_resources=None
+        )
         assert {r.name for r in vlans} == {"v1", "v2"}
-        aliases = OPNsenseDirectRunner._filter_by_type(resources, "aliases", target_resources=None)
+        aliases = OPNsenseDirectRunner._filter_by_type(
+            resources, "firewall.aliases", target_resources=None
+        )
         assert {r.name for r in aliases} == {"a1"}
 
     def test_unknown_type_returns_empty(self) -> None:
@@ -180,8 +184,8 @@ class TestFilterByType:
             _vlan_resource("v2", "igb0", 20),
             _alias_resource("v1"),  # same name, different type
         ]
-        result = OPNsenseDirectRunner._filter_by_type(resources, "vlans", ["v1"])
-        assert [r.type for r in result] == ["vlans"]
+        result = OPNsenseDirectRunner._filter_by_type(resources, "interfaces.vlans", ["v1"])
+        assert [r.type for r in result] == ["interfaces.vlans"]
         assert [r.name for r in result] == ["v1"]
 
 
@@ -190,9 +194,9 @@ class TestResolveDispatchTable:
 
     def test_returns_provider_table_when_callable(self) -> None:
         provider = MagicMock()
-        provider.get_direct_api_resource_types.return_value = {"vlans": object}
+        provider.get_direct_api_resource_types.return_value = {"interfaces.vlans": object}
         table = OPNsenseDirectRunner._resolve_dispatch_table(provider)
-        assert table == {"vlans": object}
+        assert table == {"interfaces.vlans": object}
 
     def test_returns_empty_when_attribute_missing(self) -> None:
         class _Bare:
@@ -257,7 +261,9 @@ class TestPlanDelegation:
         runner = OPNsenseDirectRunner()
         # Even with VLAN registered, an empty resource list means no dispatch.
         manager_cls = MagicMock()
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             result = runner.plan(provider_with_env)
         assert result["success"] is True
@@ -285,7 +291,9 @@ class TestPlanDelegation:
         manager_mock.plan.return_value = diff
         manager_cls = MagicMock(return_value=manager_mock)
 
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
 
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.plan(provider_with_env, add_only=True)
@@ -305,7 +313,9 @@ class TestPlanDelegation:
         manager_mock.plan.side_effect = RuntimeError("boom")
         manager_cls = MagicMock(return_value=manager_mock)
 
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
 
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.plan(provider_with_env)
@@ -320,7 +330,9 @@ class TestApplyDelegation:
     def test_no_vlans_returns_zero_counts(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
         manager_cls = MagicMock()
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             result = runner.apply(provider_with_env)
         assert result["success"] is True
@@ -343,7 +355,9 @@ class TestApplyDelegation:
             "resource_outcomes": [outcome],
         }
         manager_cls = MagicMock(return_value=manager_mock)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
 
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.apply(provider_with_env, auto_approve=True, add_only=False)
@@ -366,7 +380,9 @@ class TestApplyDelegation:
             "resource_outcomes": [],
         }
         manager_cls = MagicMock(return_value=manager_mock)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             runner.apply(provider_with_env, add_only=True)
         # add_only kwarg propagated.
@@ -378,7 +394,9 @@ class TestApplyDelegation:
         manager_mock = MagicMock()
         manager_mock.apply.side_effect = RuntimeError("api down")
         manager_cls = MagicMock(return_value=manager_mock)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.apply(provider_with_env)
         assert result["success"] is False
@@ -391,7 +409,9 @@ class TestDestroyDelegation:
     def test_no_vlans_returns_zero(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
         manager_cls = MagicMock()
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             result = runner.destroy(provider_with_env)
         assert result["success"] is True
@@ -407,7 +427,9 @@ class TestDestroyDelegation:
             "locked_skipped": 0,
         }
         manager_cls = MagicMock(return_value=manager_mock)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.destroy(provider_with_env, auto_approve=True)
         assert result["resources_destroyed"] == 1  # type: ignore[typeddict-item]
@@ -423,7 +445,9 @@ class TestGetResourceIds:
         manager_mock = MagicMock()
         manager_mock.get_resource_ids.return_value = {"v1": "uuid-1"}
         manager_cls = MagicMock(return_value=manager_mock)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             ids = runner.get_resource_ids(provider_with_env)
         assert ids == {"v1": "uuid-1"}
@@ -431,7 +455,9 @@ class TestGetResourceIds:
     def test_empty_when_no_vlans(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
         manager_cls = MagicMock()
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             ids = runner.get_resource_ids(provider_with_env)
         assert ids == {}
@@ -445,7 +471,9 @@ class TestGetResourceIds:
         manager_mock = MagicMock()
         manager_mock.get_resource_ids.side_effect = RuntimeError("transient")
         manager_cls = MagicMock(return_value=manager_mock)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             ids = runner.get_resource_ids(provider_with_env)
         assert ids == {}
@@ -459,7 +487,7 @@ class TestGetResourceIds:
 def _ifa_resource(name: str) -> ResourceConfig:
     return ResourceConfig(
         name=name,
-        type="interface_assignments",
+        type="interfaces.assignments",
         provider="opnsense",
         config={"device": "igb0", "description": name},
     )
@@ -485,8 +513,8 @@ class TestMultiComponentDispatch:
         ifa_manager.plan.return_value = readonly_diff
 
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "vlans": MagicMock(return_value=vlan_manager),
-            "interface_assignments": MagicMock(return_value=ifa_manager),
+            "interfaces.vlans": MagicMock(return_value=vlan_manager),
+            "interfaces.assignments": MagicMock(return_value=ifa_manager),
         }
 
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
@@ -496,8 +524,8 @@ class TestMultiComponentDispatch:
         # vlans diff has an add → has_changes is True overall.
         assert result["has_changes"] is True  # type: ignore[typeddict-item]
         summary = result["changes_summary"]  # type: ignore[typeddict-item]
-        assert "vlans:" in summary
-        assert "interface_assignments:" in summary
+        assert "interfaces.vlans:" in summary
+        assert "interfaces.assignments:" in summary
         assert "read-only" in summary
 
     def test_apply_aggregates_counts_and_outcomes(self, provider_with_env: MagicMock) -> None:
@@ -525,8 +553,8 @@ class TestMultiComponentDispatch:
         }
 
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "vlans": MagicMock(return_value=vlan_manager),
-            "interface_assignments": MagicMock(return_value=ifa_manager),
+            "interfaces.vlans": MagicMock(return_value=vlan_manager),
+            "interfaces.assignments": MagicMock(return_value=ifa_manager),
         }
 
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
@@ -556,8 +584,8 @@ class TestMultiComponentDispatch:
         }
 
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "vlans": MagicMock(return_value=vlan_manager),
-            "interface_assignments": MagicMock(return_value=ifa_manager),
+            "interfaces.vlans": MagicMock(return_value=vlan_manager),
+            "interfaces.assignments": MagicMock(return_value=ifa_manager),
         }
 
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
@@ -575,8 +603,8 @@ class TestMultiComponentDispatch:
         ifa_manager.get_resource_ids.return_value = {"lan": "lan"}
 
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "vlans": MagicMock(return_value=vlan_manager),
-            "interface_assignments": MagicMock(return_value=ifa_manager),
+            "interfaces.vlans": MagicMock(return_value=vlan_manager),
+            "interfaces.assignments": MagicMock(return_value=ifa_manager),
         }
 
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
@@ -591,13 +619,13 @@ class TestMultiComponentDispatch:
         resources = [
             _alias_resource(
                 "a1"
-            ),  # "aliases" is intentionally absent from THIS test's mock dispatch
+            ),  # "firewall.aliases" is intentionally absent from THIS test's mock dispatch
             _vlan_resource("v1", "igb0", 10),
         ]
         vlan_manager = MagicMock()
         vlan_manager.plan.return_value = Diff()
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "vlans": MagicMock(return_value=vlan_manager),
+            "interfaces.vlans": MagicMock(return_value=vlan_manager),
         }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.plan(provider_with_env)
@@ -605,7 +633,7 @@ class TestMultiComponentDispatch:
         # vlan_manager.plan called with only the VLAN resource, never the alias.
         vlan_manager.plan.assert_called_once()
         passed_resources = vlan_manager.plan.call_args.args[1]
-        assert all(r.type == "vlans" for r in passed_resources)
+        assert all(r.type == "interfaces.vlans" for r in passed_resources)
 
 
 # ---------------------------------------------------------------------------
@@ -652,7 +680,9 @@ class TestFinalizationHookPlumbing:
         runner = OPNsenseDirectRunner()
         resources = [_vlan_resource("v1", "igb0", 10)]
         manager_cls, _ = _hook_manager(hook_key="my_hook", created=1)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"my_hook": hook}
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
@@ -663,7 +693,9 @@ class TestFinalizationHookPlumbing:
         runner = OPNsenseDirectRunner()
         resources = [_vlan_resource("v1", "igb0", 10)]
         manager_cls, _ = _hook_manager(hook_key="my_hook", created=0)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"my_hook": hook}
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
@@ -680,8 +712,8 @@ class TestFinalizationHookPlumbing:
         cls_b, _ = _hook_manager(hook_key="shared_hook", updated=1)
 
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "vlans": cls_a,
-            "interface_assignments": cls_b,
+            "interfaces.vlans": cls_a,
+            "interfaces.assignments": cls_b,
         }
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"shared_hook": hook}
@@ -699,8 +731,8 @@ class TestFinalizationHookPlumbing:
         cls_b, _ = _hook_manager(hook_key="hook_b", deleted=1)
 
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "vlans": cls_a,
-            "interface_assignments": cls_b,
+            "interfaces.vlans": cls_a,
+            "interfaces.assignments": cls_b,
         }
         hook_a = MagicMock()
         hook_b = MagicMock()
@@ -721,7 +753,9 @@ class TestFinalizationHookPlumbing:
         runner = OPNsenseDirectRunner()
         resources = [_vlan_resource("v1", "igb0", 10)]
         manager_cls, _ = _hook_manager(hook_key=None, created=1)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         # Provider exposes a hooks dict — but the manager didn't trigger any key.
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"unrelated": hook}
@@ -745,7 +779,7 @@ class TestFinalizationHookPlumbing:
                 pass
 
             def get_direct_api_resource_types(self) -> dict[str, Any]:
-                return {"vlans": manager_cls}
+                return {"interfaces.vlans": manager_cls}
 
         provider = _BareProvider()
         resources = [_vlan_resource("v1", "igb0", 10)]
@@ -758,7 +792,9 @@ class TestFinalizationHookPlumbing:
         runner = OPNsenseDirectRunner()
         resources = [_vlan_resource("v1", "igb0", 10)]
         manager_cls, _ = _hook_manager(hook_key="my_hook", created=1)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
 
         def _boom(_env: str) -> None:
             raise RuntimeError("reconfigure failed")
@@ -777,7 +813,9 @@ class TestFinalizationHookPlumbing:
         runner = OPNsenseDirectRunner()
         resources = [_vlan_resource("v1", "igb0", 10)]
         manager_cls, _ = _hook_manager(hook_key="missing_hook", created=1)
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         provider_with_env.get_finalization_hooks.return_value = {}
 
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
@@ -795,7 +833,9 @@ class TestFinalizationHookPlumbing:
             "resources_destroyed": 1,
             "locked_skipped": 0,
         }
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"my_hook": hook}
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
@@ -808,7 +848,9 @@ class TestFinalizationHookPlumbing:
         resources = [_vlan_resource("v1", "igb0", 10)]
         manager_cls, instance = _hook_manager(hook_key="my_hook", created=1)
         instance.plan.return_value = Diff(adds=[VlanConfig("v1", "igb0", 10, "x", 0)])
-        provider_with_env.get_direct_api_resource_types.return_value = {"vlans": manager_cls}
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls
+        }
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"my_hook": hook}
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
@@ -824,7 +866,7 @@ class TestFinalizationHookPlumbing:
 def _uho_resource(name: str) -> ResourceConfig:
     return ResourceConfig(
         name=name,
-        type="unbound_host_override",
+        type="unbound.host_overrides",
         provider="opnsense",
         config={"hostname": "web", "domain": "example.com", "server": "192.168.1.10"},
     )
@@ -833,7 +875,7 @@ def _uho_resource(name: str) -> ResourceConfig:
 def _uha_resource(name: str) -> ResourceConfig:
     return ResourceConfig(
         name=name,
-        type="unbound_host_alias",
+        type="unbound.host_aliases",
         provider="opnsense",
         config={"host": "web", "hostname": "alias", "domain": "example.com"},
     )
@@ -842,7 +884,7 @@ def _uha_resource(name: str) -> ResourceConfig:
 def _ufwd_resource(name: str) -> ResourceConfig:
     return ResourceConfig(
         name=name,
-        type="unbound_forward",
+        type="unbound.forwards",
         provider="opnsense",
         config={"server": "10.0.0.53"},
     )
@@ -874,9 +916,9 @@ class TestUnboundReconfigureCoalescing:
         cls_ufwd, _ = _hook_manager(hook_key="unbound_reconfigure", deleted=1)
 
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "unbound_host_override": cls_uho,
-            "unbound_host_alias": cls_uha,
-            "unbound_forward": cls_ufwd,
+            "unbound.host_overrides": cls_uho,
+            "unbound.host_aliases": cls_uha,
+            "unbound.forwards": cls_ufwd,
         }
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"unbound_reconfigure": hook}
@@ -893,7 +935,7 @@ class TestUnboundReconfigureCoalescing:
         resources = [_uho_resource("override-1")]
         cls_uho, _ = _hook_manager(hook_key="unbound_reconfigure", created=1)
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "unbound_host_override": cls_uho,
+            "unbound.host_overrides": cls_uho,
         }
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"unbound_reconfigure": hook}
@@ -913,8 +955,8 @@ class TestUnboundReconfigureCoalescing:
         # the dispatch table but no unbound manager fires.
         cls_vlan, _ = _hook_manager(hook_key=None, created=0)
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "vlans": cls_vlan,
-            "unbound_host_override": cls_uho,
+            "interfaces.vlans": cls_vlan,
+            "unbound.host_overrides": cls_uho,
         }
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"unbound_reconfigure": hook}
@@ -934,7 +976,7 @@ class TestUnboundReconfigureCoalescing:
         resources = [_uho_resource("override-1")]
         cls_uho, _ = _hook_manager(hook_key="unbound_reconfigure", created=0)
         provider_with_env.get_direct_api_resource_types.return_value = {
-            "unbound_host_override": cls_uho,
+            "unbound.host_overrides": cls_uho,
         }
         hook = MagicMock()
         provider_with_env.get_finalization_hooks.return_value = {"unbound_reconfigure": hook}

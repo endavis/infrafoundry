@@ -346,7 +346,7 @@ def gateway_configs_from_resources(
     """
     configs: list[GatewayConfig] = []
     for resource in resources:
-        if resource.type != "gateways":
+        if resource.type != "routing.gateways":
             continue
 
         config = resource.config

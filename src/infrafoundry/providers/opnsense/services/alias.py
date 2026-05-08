@@ -389,7 +389,7 @@ def alias_configs_from_resources(
     """
     configs: list[AliasConfig] = []
     for resource in resources:
-        if resource.type != "aliases":
+        if resource.type != "firewall.aliases":
             continue
 
         config = resource.config

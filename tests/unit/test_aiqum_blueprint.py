@@ -77,7 +77,7 @@ def test_aiqum_example_renders_vm_and_dhcp_resources(loader: PackageLoader) -> N
     assert vm.name == "aiqum"
 
     dhcp = by_provider["opnsense"]
-    assert dhcp.type == "kea_reservation"
+    assert dhcp.type == "kea.dhcp4.reservations"
     assert dhcp.name == "aiqum"
 
 
@@ -127,7 +127,9 @@ def test_aiqum_example_dhcp_config_uses_merged_values(loader: PackageLoader) -> 
         PACKAGE_DIR, provider="proxmox", env_name="dev"
     )
 
-    dhcp = next(r for r in resources if r.provider == "opnsense" and r.type == "kea_reservation")
+    dhcp = next(
+        r for r in resources if r.provider == "opnsense" and r.type == "kea.dhcp4.reservations"
+    )
     config = dhcp.config
 
     assert config["subnet_ref"] == "my-subnet"
@@ -241,8 +243,8 @@ def test_aiqum_blueprint_supports_multiple_instances(tmp_path: Path) -> None:
     assert vm_b.config["target_node"] == "pve2"
 
     # DHCP reservations also distinct
-    dhcp_a = next(r for r in resources_a if r.type == "kea_reservation")
-    dhcp_b = next(r for r in resources_b if r.type == "kea_reservation")
+    dhcp_a = next(r for r in resources_a if r.type == "kea.dhcp4.reservations")
+    dhcp_b = next(r for r in resources_b if r.type == "kea.dhcp4.reservations")
     assert dhcp_a.name == "aiqum-a"
     assert dhcp_b.name == "aiqum-b"
     assert dhcp_a.config["ip_address"] == "192.168.1.51"

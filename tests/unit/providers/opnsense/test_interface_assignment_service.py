@@ -90,7 +90,7 @@ def _resource(
     if ipv6 is not None:
         config["ipv6"] = ipv6
     return ResourceConfig(
-        name=name, type="interface_assignments", provider="opnsense", config=config
+        name=name, type="interfaces.assignments", provider="opnsense", config=config
     )
 
 
@@ -251,7 +251,7 @@ class TestConfigsFromResources:
 
     def test_non_matching_resources_ignored(self) -> None:
         ifa = _resource("lan")
-        alias = ResourceConfig(name="a", type="aliases", provider="opnsense", config={})
+        alias = ResourceConfig(name="a", type="firewall.aliases", provider="opnsense", config={})
         result = interface_assignment_configs_from_resources([ifa, alias])
         assert len(result) == 1
 
@@ -327,7 +327,7 @@ class TestConfigsFromResources:
     def test_missing_device_rejected(self) -> None:
         bad = ResourceConfig(
             name="lan",
-            type="interface_assignments",
+            type="interfaces.assignments",
             provider="opnsense",
             config={"description": "lan"},
         )
@@ -342,7 +342,7 @@ class TestConfigsFromResources:
     def test_non_string_description_rejected(self) -> None:
         bad = ResourceConfig(
             name="lan",
-            type="interface_assignments",
+            type="interfaces.assignments",
             provider="opnsense",
             config={"device": "ixl1", "description": 123},
         )
@@ -352,7 +352,7 @@ class TestConfigsFromResources:
     def test_non_bool_enabled_rejected(self) -> None:
         bad = ResourceConfig(
             name="lan",
-            type="interface_assignments",
+            type="interfaces.assignments",
             provider="opnsense",
             config={"device": "ixl1", "enabled": "yes"},
         )
@@ -362,7 +362,7 @@ class TestConfigsFromResources:
     def test_non_bool_lock_rejected(self) -> None:
         bad = ResourceConfig(
             name="lan",
-            type="interface_assignments",
+            type="interfaces.assignments",
             provider="opnsense",
             config={"device": "ixl1", "lock": "yes"},
         )
@@ -372,7 +372,7 @@ class TestConfigsFromResources:
     def test_non_string_spoof_mac_rejected(self) -> None:
         bad = ResourceConfig(
             name="lan",
-            type="interface_assignments",
+            type="interfaces.assignments",
             provider="opnsense",
             config={"device": "ixl1", "spoof_mac": 12345},
         )
@@ -430,7 +430,7 @@ class TestConfigsFromResources:
     def test_ipv4_block_must_be_mapping(self) -> None:
         bad = ResourceConfig(
             name="opt5",
-            type="interface_assignments",
+            type="interfaces.assignments",
             provider="opnsense",
             config={"device": "ixl1", "ipv4": "static"},
         )
@@ -441,7 +441,7 @@ class TestConfigsFromResources:
         # YAML "ipv4:" with no value parses as None.
         bad = ResourceConfig(
             name="opt5",
-            type="interface_assignments",
+            type="interfaces.assignments",
             provider="opnsense",
             config={"device": "ixl1", "ipv4": None},
         )
@@ -451,7 +451,7 @@ class TestConfigsFromResources:
     def test_ipv6_block_must_be_mapping(self) -> None:
         bad = ResourceConfig(
             name="opt5",
-            type="interface_assignments",
+            type="interfaces.assignments",
             provider="opnsense",
             config={"device": "ixl1", "ipv6": "track6"},
         )
@@ -461,7 +461,7 @@ class TestConfigsFromResources:
     def test_ipv6_none_treated_as_empty(self) -> None:
         bad = ResourceConfig(
             name="opt5",
-            type="interface_assignments",
+            type="interfaces.assignments",
             provider="opnsense",
             config={"device": "ixl1", "ipv6": None},
         )

@@ -16,19 +16,19 @@ from infrafoundry.core.extractors import (
 from infrafoundry.providers.opnsense import OPNsenseProvider, _ExtractorAdapter
 
 EXPECTED_RESOURCE_TYPES = [
-    "aliases",
-    "firewall_rules",
-    "gateways",
-    "interface_assignments",
+    "firewall.aliases",
+    "firewall.rules",
+    "routing.gateways",
+    "interfaces.assignments",
     "isc_to_kea",
     "kea_dhcp",
-    "nat_rules",
-    "static_routes",
-    "unbound_forward",
-    "unbound_host_alias",
-    "unbound_host_override",
-    "virtual_ips",
-    "vlans",
+    "firewall.nat",
+    "routing.static",
+    "unbound.forwards",
+    "unbound.host_aliases",
+    "unbound.host_overrides",
+    "interfaces.virtual_ips",
+    "interfaces.vlans",
 ]
 
 
@@ -129,8 +129,8 @@ def test_extractor_adapter_extract_no_kwargs(tmp_path: Path) -> None:
 
 @pytest.mark.usefixtures("provider")
 def test_vlans_extractor_delegates_to_vlan_manager() -> None:
-    """The registered ``opnsense:vlans`` extractor delegates to ``VlanManager.migrate``."""
-    extractor = get_extractor("opnsense", "vlans")
+    """``opnsense:interfaces.vlans`` extractor delegates to ``VlanManager.migrate``."""
+    extractor = get_extractor("opnsense", "interfaces.vlans")
 
     # The adapter holds a class reference; replacing the class's
     # ``__init__`` and ``migrate`` exercises the full extract path.
@@ -151,10 +151,10 @@ def test_vlans_extractor_delegates_to_vlan_manager() -> None:
 
 @pytest.mark.usefixtures("provider")
 def test_aliases_extractor_delegates_to_alias_manager() -> None:
-    """The registered ``opnsense:aliases`` extractor delegates to ``AliasManager.migrate``."""
+    """``opnsense:firewall.aliases`` extractor delegates to ``AliasManager.migrate``."""
     from infrafoundry.providers.opnsense.components.alias import AliasManager
 
-    extractor = get_extractor("opnsense", "aliases")
+    extractor = get_extractor("opnsense", "firewall.aliases")
 
     assert isinstance(extractor, _ExtractorAdapter)
     assert extractor.manager_class is AliasManager
@@ -174,12 +174,12 @@ def test_aliases_extractor_delegates_to_alias_manager() -> None:
 
 @pytest.mark.usefixtures("provider")
 def test_unbound_host_override_extractor_delegates_to_manager() -> None:
-    """``opnsense:unbound_host_override`` delegates to ``UnboundHostOverrideManager.migrate``."""
+    """``opnsense:unbound.host_overrides`` delegates to ``UnboundHostOverrideManager.migrate``."""
     from infrafoundry.providers.opnsense.components.unbound_host_override import (
         UnboundHostOverrideManager,
     )
 
-    extractor = get_extractor("opnsense", "unbound_host_override")
+    extractor = get_extractor("opnsense", "unbound.host_overrides")
 
     assert isinstance(extractor, _ExtractorAdapter)
     assert extractor.manager_class is UnboundHostOverrideManager

@@ -36,13 +36,13 @@ def _route(name: str, **overrides: Any) -> ResourceConfig:
         "gateway": "WAN_DHCP",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="static_routes", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="routing.static", provider="opnsense", config=config)
 
 
 def _gw(name: str, *, protocol: str = "inet") -> ResourceConfig:
     return ResourceConfig(
         name=name,
-        type="gateways",
+        type="routing.gateways",
         provider="opnsense",
         config={"interface": "wan", "protocol": protocol, "gateway": "192.0.2.1"},
     )
@@ -95,7 +95,7 @@ class TestNetwork:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="static_routes",
+            type="routing.static",
             provider="opnsense",
             config={"gateway": "WAN_DHCP"},
         )
@@ -209,7 +209,7 @@ class TestGateway:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="static_routes",
+            type="routing.static",
             provider="opnsense",
             config={"network": "10.0.0.0/24"},
         )
@@ -451,7 +451,7 @@ class TestEdgeCases:
         # from ``GatewayValidator`` and is skipped here.
         bad_gw = ResourceConfig(
             name="bad-gw",
-            type="gateways",
+            type="routing.gateways",
             provider="opnsense",
             config={"interface": "wan", "protocol": "ipv7", "gateway": "192.0.2.1"},
         )

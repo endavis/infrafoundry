@@ -313,7 +313,7 @@ def static_route_configs_from_resources(
     """
     configs: list[StaticRouteConfig] = []
     for resource in resources:
-        if resource.type != "static_routes":
+        if resource.type != "routing.static":
             continue
 
         config = resource.config

@@ -565,7 +565,7 @@ def _live_for_diff(
 
 def _resource_config(name: str, config: dict[str, Any]) -> ResourceConfig:
     return ResourceConfig(
-        name=name, type="unbound_host_override", provider="opnsense", config=config
+        name=name, type="unbound.host_overrides", provider="opnsense", config=config
     )
 
 
@@ -962,7 +962,7 @@ class TestConfigsFromResources:
     def test_non_dict_config_rejected(self) -> None:
         r = ResourceConfig(
             name="bad",
-            type="unbound_host_override",
+            type="unbound.host_overrides",
             provider="opnsense",
             config={"hostname": "h", "domain": "d"},
         )
@@ -973,7 +973,7 @@ class TestConfigsFromResources:
 
     def test_non_unbound_host_override_resources_ignored(self) -> None:
         ok = _resource_config("ok", {"hostname": "h", "domain": "d"})
-        other = ResourceConfig(name="x", type="aliases", provider="opnsense", config={})
+        other = ResourceConfig(name="x", type="firewall.aliases", provider="opnsense", config={})
         result = unbound_host_override_configs_from_resources([ok, other])
         assert len(result) == 1
         assert result[0].name == "ok"

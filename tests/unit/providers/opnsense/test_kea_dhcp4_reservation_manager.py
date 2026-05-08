@@ -47,7 +47,7 @@ def _reservation(
 ) -> ResourceConfig:
     return ResourceConfig(
         name=name,
-        type="kea_reservation",
+        type="kea.dhcp4.reservations",
         provider="opnsense",
         config={
             "subnet": subnet,

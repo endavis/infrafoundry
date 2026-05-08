@@ -43,7 +43,7 @@ def _resource(
     }
     if lock:
         config["lock"] = True
-    return ResourceConfig(name=name, type="static_routes", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="routing.static", provider="opnsense", config=config)
 
 
 def _live(

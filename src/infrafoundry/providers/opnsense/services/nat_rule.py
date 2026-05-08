@@ -586,7 +586,7 @@ def nat_rule_configs_from_resources(
     """
     configs: list[NATRuleConfig] = []
     for resource in resources:
-        if resource.type != "nat_rules":
+        if resource.type != "firewall.nat":
             continue
 
         config = resource.config

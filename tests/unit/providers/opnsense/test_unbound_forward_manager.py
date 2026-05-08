@@ -47,7 +47,7 @@ def _resource(
     }
     if lock:
         config["lock"] = True
-    return ResourceConfig(name=name, type="unbound_forward", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="unbound.forwards", provider="opnsense", config=config)
 
 
 def _live(

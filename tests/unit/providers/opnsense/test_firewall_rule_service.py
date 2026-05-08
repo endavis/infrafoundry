@@ -147,7 +147,7 @@ def _live(
 
 
 def _resource(name: str, config: dict[str, Any]) -> ResourceConfig:
-    return ResourceConfig(name=name, type="firewall_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.rules", provider="opnsense", config=config)
 
 
 # ---------------------------------------------------------------------------
@@ -678,7 +678,7 @@ class TestConfigsFromResources:
     def test_non_dict_config_rejected(self) -> None:
         r = ResourceConfig(
             name="bad",
-            type="firewall_rules",
+            type="firewall.rules",
             provider="opnsense",
             config={"interface": "lan"},
         )
@@ -689,7 +689,7 @@ class TestConfigsFromResources:
 
     def test_non_firewall_resources_ignored(self) -> None:
         fw = _resource("ok", {"interface": "lan"})
-        other = ResourceConfig(name="x", type="aliases", provider="opnsense", config={})
+        other = ResourceConfig(name="x", type="firewall.aliases", provider="opnsense", config={})
         result = firewall_rule_configs_from_resources([fw, other])
         assert len(result) == 1
 

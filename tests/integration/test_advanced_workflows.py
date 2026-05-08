@@ -212,7 +212,7 @@ class TestDriftDetection:
         opnsense_provider.pyinfra_dir = Path("/tmp/pyinfra/opnsense")
         opnsense_provider.ensure_directories = Mock()
         opnsense_provider.generate_terraform = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["vlans"])
+        opnsense_provider.get_resource_types = Mock(return_value=["interfaces.vlans"])
         opnsense_provider.get_dependencies = Mock(return_value={})
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 
@@ -368,8 +368,8 @@ vlans:
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.generate_ansible = Mock()
         opnsense_provider.validate_config = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["vlans"])
-        opnsense_provider.get_dependencies = Mock(return_value={"vlans": []})
+        opnsense_provider.get_resource_types = Mock(return_value=["interfaces.vlans"])
+        opnsense_provider.get_dependencies = Mock(return_value={"interfaces.vlans": []})
         opnsense_provider.set_environment = Mock()
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 

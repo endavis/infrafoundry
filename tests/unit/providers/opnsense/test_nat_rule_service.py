@@ -200,7 +200,7 @@ def _resource(
     name: str,
     config: dict[str, Any],
 ) -> ResourceConfig:
-    return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.nat", provider="opnsense", config=config)
 
 
 # ---------------------------------------------------------------------------
@@ -980,7 +980,7 @@ class TestConfigsFromResourcesGeneral:
 
     def test_non_nat_resources_ignored(self) -> None:
         nat = _resource("ok", {"kind": "outbound", "interface": "wan", "target": "wanip"})
-        other = ResourceConfig(name="x", type="aliases", provider="opnsense", config={})
+        other = ResourceConfig(name="x", type="firewall.aliases", provider="opnsense", config={})
         result = nat_rule_configs_from_resources([nat, other])
         assert len(result) == 1
 
@@ -1034,7 +1034,7 @@ class TestConfigsFromResourcesGeneral:
     def test_non_dict_config_rejected(self) -> None:
         r = ResourceConfig(
             name="bad",
-            type="nat_rules",
+            type="firewall.nat",
             provider="opnsense",
             config={"kind": "outbound", "interface": "wan", "target": "wanip"},
         )

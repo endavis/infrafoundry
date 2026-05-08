@@ -192,7 +192,7 @@ class TestValidateReferences:
         validator.interface_assignment_validator = MagicMock()
 
         resources = [
-            ResourceConfig(name="alias1", type="aliases", provider="opnsense", config={}),
+            ResourceConfig(name="alias1", type="firewall.aliases", provider="opnsense", config={}),
         ]
 
         validator.validate_references(resources)
@@ -217,7 +217,9 @@ class TestValidateReferences:
 
         validator.validate_references(
             [
-                ResourceConfig(name="alias1", type="aliases", provider="opnsense", config={}),
+                ResourceConfig(
+                    name="alias1", type="firewall.aliases", provider="opnsense", config={}
+                ),
             ]
         )
 
@@ -230,7 +232,9 @@ class TestCollectResourceReferences:
     def test_collects_aliases(self, validator):
         """Collects alias resources."""
         resources = [
-            ResourceConfig(name="my-alias", type="aliases", provider="opnsense", config={}),
+            ResourceConfig(
+                name="my-alias", type="firewall.aliases", provider="opnsense", config={}
+            ),
         ]
 
         refs = validator._collect_resource_references(resources)
@@ -241,7 +245,7 @@ class TestCollectResourceReferences:
     def test_collects_vlans(self, validator):
         """Collects VLAN resources."""
         resources = [
-            ResourceConfig(name="vlan10", type="vlans", provider="opnsense", config={}),
+            ResourceConfig(name="vlan10", type="interfaces.vlans", provider="opnsense", config={}),
         ]
 
         refs = validator._collect_resource_references(resources)
@@ -252,7 +256,7 @@ class TestCollectResourceReferences:
     def test_collects_firewall_rules(self, validator):
         """Collects firewall rule resources."""
         resources = [
-            ResourceConfig(name="rule1", type="firewall_rules", provider="opnsense", config={}),
+            ResourceConfig(name="rule1", type="firewall.rules", provider="opnsense", config={}),
         ]
 
         refs = validator._collect_resource_references(resources)
@@ -263,7 +267,7 @@ class TestCollectResourceReferences:
         """Collects unbound host override resources."""
         resources = [
             ResourceConfig(
-                name="host1", type="unbound_host_override", provider="opnsense", config={}
+                name="host1", type="unbound.host_overrides", provider="opnsense", config={}
             ),
         ]
 
@@ -276,7 +280,7 @@ class TestCollectResourceReferences:
         resources = [
             ResourceConfig(
                 name="lan",
-                type="interface_assignments",
+                type="interfaces.assignments",
                 provider="opnsense",
                 config={"device": "ixl1"},
             ),

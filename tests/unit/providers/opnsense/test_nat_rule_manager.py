@@ -37,7 +37,7 @@ def _outbound_resource(name: str, *, lock: bool = False) -> ResourceConfig:
     }
     if lock:
         config["lock"] = True
-    return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.nat", provider="opnsense", config=config)
 
 
 def _one_to_one_resource(name: str, *, lock: bool = False) -> ResourceConfig:
@@ -49,7 +49,7 @@ def _one_to_one_resource(name: str, *, lock: bool = False) -> ResourceConfig:
     }
     if lock:
         config["lock"] = True
-    return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.nat", provider="opnsense", config=config)
 
 
 def _port_forward_resource(name: str, *, lock: bool = False) -> ResourceConfig:
@@ -62,7 +62,7 @@ def _port_forward_resource(name: str, *, lock: bool = False) -> ResourceConfig:
     }
     if lock:
         config["lock"] = True
-    return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.nat", provider="opnsense", config=config)
 
 
 def _live_managed(uuid: str, name: str, kind: str) -> LiveNATRule:

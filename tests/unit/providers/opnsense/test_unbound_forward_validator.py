@@ -37,7 +37,7 @@ def _forward(name: str, **overrides: Any) -> ResourceConfig:
         "server": "10.0.0.53",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="unbound_forward", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="unbound.forwards", provider="opnsense", config=config)
 
 
 @pytest.fixture
@@ -109,7 +109,7 @@ class TestDomain:
         # ``domain`` is optional — missing is fine (defaults to empty).
         r = ResourceConfig(
             name="ok",
-            type="unbound_forward",
+            type="unbound.forwards",
             provider="opnsense",
             config={"server": "10.0.0.53"},
         )
@@ -148,7 +148,7 @@ class TestServer:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="unbound_forward",
+            type="unbound.forwards",
             provider="opnsense",
             config={"domain": "x"},
         )

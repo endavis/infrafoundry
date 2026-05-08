@@ -192,7 +192,7 @@ def vlan_configs_from_resources(resources: list[ResourceConfig]) -> list[VlanCon
     """
     vlans: list[VlanConfig] = []
     for resource in resources:
-        if resource.type != "vlans":
+        if resource.type != "interfaces.vlans":
             continue
 
         config = resource.config
