@@ -32,9 +32,9 @@ class TestResourceDeclRegex:
         assert match.group(2) == "my_server"
 
     def test_matches_with_opening_brace(self) -> None:
-        match = _RESOURCE_DECL_RE.match('resource "opnsense_dhcpv4_static_map" "server1" {')
+        match = _RESOURCE_DECL_RE.match('resource "proxmox_vm_qemu" "server1" {')
         assert match is not None
-        assert match.group(1) == "opnsense_dhcpv4_static_map"
+        assert match.group(1) == "proxmox_vm_qemu"
         assert match.group(2) == "server1"
 
     def test_does_not_match_non_resource_lines(self) -> None:
@@ -73,17 +73,15 @@ class TestGenerateImportBlocks:
     def test_single_resource_with_import_id(self) -> None:
         rc = ResourceConfig(
             name="server-1",
-            type="dhcp_static_maps",
-            provider="opnsense",
+            type="vms",
+            provider="proxmox",
             config={},
             import_id="uuid-1234",
         )
-        rendered = (
-            'resource "opnsense_dhcpv4_static_map" "server_1" {\n  ip_address = "192.168.1.50"\n}'
-        )
-        result = self.mixin._generate_import_blocks(rendered, {"static_maps": [rc]})
+        rendered = 'resource "proxmox_vm_qemu" "server_1" {\n  name = "server-1"\n}'
+        result = self.mixin._generate_import_blocks(rendered, {"vms": [rc]})
         assert "import {" in result
-        assert "to = opnsense_dhcpv4_static_map.server_1" in result
+        assert "to = proxmox_vm_qemu.server_1" in result
         assert 'id = "uuid-1234"' in result
 
     def test_hyphen_to_underscore_matching(self) -> None:
@@ -146,28 +144,26 @@ class TestRenderAndWriteTerraformWithImport:
     def test_import_blocks_prepended_to_output(self) -> None:
         rc = ResourceConfig(
             name="server-1",
-            type="dhcp_static_maps",
-            provider="opnsense",
+            type="vms",
+            provider="proxmox",
             config={},
             import_id="uuid-abc",
         )
-        rendered_tf = (
-            'resource "opnsense_dhcpv4_static_map" "server_1" {\n  ip_address = "192.168.1.50"\n}'
-        )
-        context = {"static_maps": [rc]}
+        rendered_tf = 'resource "proxmox_vm_qemu" "server_1" {\n  name = "server-1"\n}'
+        context = {"vms": [rc]}
 
         with patch.object(self.mixin, "render_template", return_value=rendered_tf):
             self.mixin.render_and_write_terraform(
-                "test.tf.j2", context=context, output_name="dhcp_static_maps.tf"
+                "test.tf.j2", context=context, output_name="vms.tf"
             )
 
-        written = self.mixin._written_files["dhcp_static_maps.tf"]
+        written = self.mixin._written_files["vms.tf"]
         # Import block comes first
         assert written.startswith("import {")
-        assert "to = opnsense_dhcpv4_static_map.server_1" in written
+        assert "to = proxmox_vm_qemu.server_1" in written
         assert 'id = "uuid-abc"' in written
         # Original resource block follows
-        assert 'resource "opnsense_dhcpv4_static_map" "server_1"' in written
+        assert 'resource "proxmox_vm_qemu" "server_1"' in written
 
     def test_no_import_id_leaves_output_unchanged(self) -> None:
         rc = ResourceConfig(name="srv", type="vm", provider="p", config={})

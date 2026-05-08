@@ -199,10 +199,12 @@ class TestDriftDetection:
         """Test drift detection across multiple providers."""
         orchestrator, provider = advanced_orchestrator
 
-        # Add second provider. ``dhcp_static_maps`` is the only OPNsense
-        # resource type still terraform-managed after #777/#778; previous
-        # iterations of this test exercised ``kea_subnet`` (still terraform
-        # at the time) and ``firewall_rules`` (since migrated by #742).
+        # Add second provider. After #782 OPNsense is fully direct-API
+        # (no terraform write paths remain), so the type listed here
+        # (``vlans``) is direct-API and the orchestrator never invokes
+        # ``TerraformRunner`` for OPNsense. The test still exercises the
+        # multi-provider dispatch path because ``proxmox`` (the first
+        # provider) remains terraform-managed.
         opnsense_provider = Mock()
         opnsense_provider.name = "opnsense"
         opnsense_provider.terraform_dir = Path("/tmp/terraform/opnsense")
@@ -210,7 +212,7 @@ class TestDriftDetection:
         opnsense_provider.pyinfra_dir = Path("/tmp/pyinfra/opnsense")
         opnsense_provider.ensure_directories = Mock()
         opnsense_provider.generate_terraform = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["dhcp_static_maps"])
+        opnsense_provider.get_resource_types = Mock(return_value=["vlans"])
         opnsense_provider.get_dependencies = Mock(return_value={})
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 
@@ -338,22 +340,21 @@ class TestMultiProviderCoordination:
         config_dir = tmp_path / "config" / "envs" / "dev" / "opnsense"
         config_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create OPNsense dhcp_static_maps config (used to exercise the
-        # multi-provider dispatch path). Firewall rules is direct-API per
-        # ADR-0015, aliases is direct-API per ADR-0014 §"Per-component
-        # decisions" / firewall_alias (#775), unbound_host_override is
-        # direct-API (#776), and kea_subnet / kea_reservation /
-        # kea_dhcp6_* are direct-API (#777, #778, #758) — none of those
-        # route through ``generate_terraform``. ``dhcp_static_maps`` is
-        # the only OPNsense type that still does at the time of this test.
-        static_maps_file = config_dir / "dhcp_static_maps.yaml"
-        static_maps_file.write_text(
+        # Create OPNsense vlans config to exercise the multi-provider
+        # dispatch path. After #782 OPNsense is fully direct-API (no
+        # terraform write paths remain), so ``vlans`` is the natural
+        # fixture: it's a real OPNsense resource type, the YAML loads,
+        # and the Mock provider sidesteps the actual runner dispatch.
+        # The test asserts proxmox_provider.generate_terraform was
+        # called — that remains the load-bearing assertion.
+        vlans_file = config_dir / "vlans.yaml"
+        vlans_file.write_text(
             """
-dhcp_static_maps:
-  - name: server1
-    interface: lan
-    mac: aa:bb:cc:dd:ee:ff
-    ip_address: 192.168.1.50
+vlans:
+  - name: lan-vlan
+    interface: igb1
+    tag: 100
+    description: LAN VLAN
 """
         )
 
@@ -367,8 +368,8 @@ dhcp_static_maps:
         opnsense_provider.generate_terraform = Mock()
         opnsense_provider.generate_ansible = Mock()
         opnsense_provider.validate_config = Mock()
-        opnsense_provider.get_resource_types = Mock(return_value=["dhcp_static_maps"])
-        opnsense_provider.get_dependencies = Mock(return_value={"dhcp_static_maps": []})
+        opnsense_provider.get_resource_types = Mock(return_value=["vlans"])
+        opnsense_provider.get_dependencies = Mock(return_value={"vlans": []})
         opnsense_provider.set_environment = Mock()
         opnsense_provider.get_terraform_env_vars = Mock(return_value={})
 
