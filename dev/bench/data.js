@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778181525453,
+  "lastUpdate": 1778237766096,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8153,6 +8153,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009071505675430286",
             "extra": "mean: 104.86536213986554 usec\nrounds: 2187"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e33e878a045887824cfb634a5c5f7319f2f8e27b",
+          "message": "feat: migrate kea_subnet/kea_reservation (DHCPv4) to opnsense_direct (merges PR #781, addresses #777, #778)\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-08T11:55:26+01:00",
+          "tree_id": "9685a9af1b53951ea281323e5a53295e87400c37",
+          "url": "https://github.com/endavis/infrafoundry/commit/e33e878a045887824cfb634a5c5f7319f2f8e27b"
+        },
+        "date": 1778237764929,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 5465.821417600755,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000057839728395607224",
+            "extra": "mean: 182.95511755650338 usec\nrounds: 1948"
           }
         ]
       }
