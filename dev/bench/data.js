@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778336359060,
+  "lastUpdate": 1778337425911,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8246,6 +8246,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007061622973948332",
             "extra": "mean: 80.6800839357868 usec\nrounds: 2490"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c60cc3847745ed6df3cffcb87307e6e69f11a637",
+          "message": "refactor: rename direct-OPNsense ResourceConfig.type strings to dotted paths (#793 Phase 1) (merges PR #795, addresses #793)\n\nrefactor: rename direct-OPNsense ResourceConfig.type strings to dotted paths\n\nRenames the 15 internal type strings for direct-API resource types from flat\nunderscored names (firewall_log, kea_subnet, etc.) to dotted paths matching\nthe API endpoint hierarchy (firewall.log, kea.dhcp4.subnets, etc.) per\nADR-0016.\n\nAdds a transient STEM_TO_DOTTED translation shim in the loader (and the\nprovider-centric/resource-centric loader modules) so existing flat-keyed\nYAML files continue to parse correctly during the multi-phase rollout. The\nshim is marked with TODO comments pointing at #793 Phase 5 hard cutover.\n\nYAML schema is unchanged in this phase. Updates dispatch dict, extractor\nregistry, runner filter defaults, validator type guards, service type\nguards, manager type guards, output template references, and ~50 test\nfiles.\n\nAddresses #793.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-09T15:36:40+01:00",
+          "tree_id": "abe2e3d80be6a0bd293ee00b8ba7671733a7ea2c",
+          "url": "https://github.com/endavis/infrafoundry/commit/c60cc3847745ed6df3cffcb87307e6e69f11a637"
+        },
+        "date": 1778337425427,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7852.888912339544,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000029825757196695966",
+            "extra": "mean: 127.34167147438721 usec\nrounds: 1872"
           }
         ]
       }
