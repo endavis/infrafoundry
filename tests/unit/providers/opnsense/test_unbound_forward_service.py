@@ -844,7 +844,8 @@ class TestExportToYaml:
         client.request.return_value = {"rows": []}
         svc = UnboundForwardService(client)
         text = svc.export_to_yaml()
-        assert "resources: []" in text
+        # Nested format: empty leaf list at opnsense.unbound.forwards.
+        assert "forwards: []" in text
 
 
 class TestLiveToExportConfig:

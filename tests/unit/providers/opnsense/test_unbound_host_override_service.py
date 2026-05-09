@@ -413,7 +413,8 @@ class TestExportToYaml:
         client.request.return_value = {"rows": []}
         svc = UnboundHostOverrideService(client)
         text = svc.export_to_yaml()
-        assert "resources: []" in text
+        # Nested format: empty leaf list at opnsense.unbound.host_overrides.
+        assert "host_overrides: []" in text
 
     def test_export_round_trip_loads_back_to_dict(self) -> None:
         client = MagicMock()
@@ -440,24 +441,23 @@ class TestExportToYaml:
         svc = UnboundHostOverrideService(client)
         text = svc.export_to_yaml()
         loaded = yaml.safe_load(text)
-        assert "resources" in loaded
-        assert len(loaded["resources"]) == 3
+        # Nested format per ADR-0016 (#793 Phase 4).
+        overrides = loaded["opnsense"]["unbound"]["host_overrides"]
+        assert len(overrides) == 3
 
-        web = loaded["resources"][0]
-        assert web["provider"] == "opnsense"
-        assert web["type"] == "unbound_host_override"
+        web = overrides[0]
         assert web["name"] == "web-example-com"
         assert web["config"]["hostname"] == "web"
         assert web["config"]["domain"] == "example.com"
         assert web["config"]["server"] == "10.0.0.1"
         assert "rr" not in web["config"]
 
-        web6 = loaded["resources"][1]
+        web6 = overrides[1]
         assert web6["name"] == "web6-example-com-aaaa"
         assert web6["config"]["rr"] == "AAAA"
         assert web6["config"]["server"] == "2001:db8::1"
 
-        mx = loaded["resources"][2]
+        mx = overrides[2]
         assert mx["name"] == "@-example-com-mx"
         assert mx["config"]["rr"] == "MX"
         assert mx["config"]["mxprio"] == "10"
@@ -466,18 +466,16 @@ class TestExportToYaml:
 
     def test_export_field_order_stable(self) -> None:
         # ``yaml.safe_dump(..., sort_keys=False)`` preserves insertion
-        # order on the resource dict, so ``provider`` precedes ``type``
-        # precedes ``name`` precedes ``config`` in the output. Operator
-        # diffs are noisy if this churns.
+        # order on the entry dict, so under nested format each entry's
+        # ``name`` precedes ``config``. Operator diffs are noisy if this
+        # churns.
         client = MagicMock()
         client.request.return_value = {"rows": [_row("web", "example.com", server="10.0.0.1")]}
         svc = UnboundHostOverrideService(client)
         text = svc.export_to_yaml()
-        provider_idx = text.index("provider:")
-        type_idx = text.index("type:")
         name_idx = text.index("name:")
         config_idx = text.index("config:")
-        assert provider_idx < type_idx < name_idx < config_idx
+        assert name_idx < config_idx
 
 
 # ---------------------------------------------------------------------------

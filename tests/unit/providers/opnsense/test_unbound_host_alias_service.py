@@ -868,7 +868,8 @@ class TestExportToYaml:
         client.request.side_effect = [{"rows": []}, {"rows": []}]
         svc = UnboundHostAliasService(client)
         text = svc.export_to_yaml()
-        assert "resources: []" in text
+        # Nested format: empty leaf list at opnsense.unbound.host_aliases.
+        assert "host_aliases: []" in text
 
 
 class TestLiveToExportConfig:

@@ -883,7 +883,8 @@ class TestExportToYaml:
         client.request.return_value = {"rows": []}
         svc = VirtualIPService(client)
         text = svc.export_to_yaml()
-        assert "resources: []" in text
+        # Nested format: empty leaf list at opnsense.interfaces.virtual_ips.
+        assert "virtual_ips: []" in text
 
 
 class TestLiveToExportConfig:

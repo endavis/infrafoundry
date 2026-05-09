@@ -1032,7 +1032,10 @@ class TestExportToYaml:
         client.request.return_value = {"rows": []}
         svc = AliasService(client)
         text = svc.export_to_yaml()
-        assert "resources: []" in text
+        # Nested format: empty list at the leaf, not flat ``resources: []``.
+        assert "aliases: []" in text
+        loaded = yaml.safe_load(text)
+        assert loaded == {"opnsense": {"firewall": {"aliases": []}}}
 
     def test_export_round_trip_loads_back_to_dict(self) -> None:
         client = MagicMock()
@@ -1057,19 +1060,19 @@ class TestExportToYaml:
         svc = AliasService(client)
         text = svc.export_to_yaml()
         loaded = yaml.safe_load(text)
-        assert "resources" in loaded
-        assert len(loaded["resources"]) == 2
+        # Nested format per ADR-0016 (#793 Phase 4).
+        assert loaded["opnsense"]["firewall"]["aliases"]
+        aliases = loaded["opnsense"]["firewall"]["aliases"]
+        assert len(aliases) == 2
 
-        web = loaded["resources"][0]
-        assert web["provider"] == "opnsense"
-        assert web["type"] == "aliases"
+        web = aliases[0]
         assert web["name"] == "web_servers"
         assert web["config"]["name"] == "web_servers"
         assert web["config"]["type"] == "host"
         assert web["config"]["content"] == ["10.0.0.1"]
         assert "proto" not in web["config"]
 
-        geo = loaded["resources"][1]
+        geo = aliases[1]
         assert geo["name"] == "geo_eu"
         assert geo["config"]["type"] == "geoip"
         assert geo["config"]["proto"] == "IPv4"
@@ -1086,7 +1089,8 @@ class TestExportToYaml:
         }
         svc = AliasService(client)
         loaded = yaml.safe_load(svc.export_to_yaml())
-        names = [r["name"] for r in loaded["resources"]]
+        aliases = loaded["opnsense"]["firewall"]["aliases"]
+        names = [r["name"] for r in aliases]
         assert names == ["web_servers"]
 
 

@@ -35,10 +35,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-import yaml
-
 from infrafoundry.core.provider import ResourceConfig
 
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # ---------------------------------------------------------------------------
@@ -940,21 +939,22 @@ class InterfaceAssignmentService(BaseService):
     def export_to_yaml(self) -> str:
         """Export the current interface assignments to InfraFoundry YAML.
 
-        Produces a resource-centric YAML document where each row's
-        ``identifier`` becomes both ``name`` (operator-facing) and
-        the future-state binding key. ``ipv4``/``ipv6`` are emitted
+        Each row's ``identifier`` becomes both ``name`` (operator-facing)
+        and the future-state binding key. ``ipv4``/``ipv6`` are emitted
         verbatim from the live raw dicts for forward-compat.
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); assignments land at
+        ``opnsense.interfaces.assignments`` as a YAML sequence.
+
         Returns:
-            YAML string suitable for placement under
-            ``envs/<env>/resources/`` or
-            ``envs/<env>/opnsense/interface_assignments.yaml``.
+            YAML string with the nested ``opnsense:`` namespace and an
+            ``interfaces.assignments`` list leaf, suitable for placement
+            under ``envs/<env>/resources/``.
         """
         live = self.list()
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "interface_assignments",
                 "name": entry.identifier,
                 "config": {
                     "device": entry.device,
@@ -966,7 +966,7 @@ class InterfaceAssignmentService(BaseService):
             }
             for entry in live
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("interfaces.assignments", entries)
 
     # ------------------------------------------------------------------
     # Read paths (``list`` is defined LAST so it doesn't shadow the

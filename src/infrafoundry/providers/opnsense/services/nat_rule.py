@@ -51,13 +51,12 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import yaml
-
 from infrafoundry.core.exceptions import APIError, InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
 
 from ._category_marker import INFRAFOUNDRY_CATEGORY_NAME as _SHARED_CATEGORY_NAME
 from ._category_marker import ensure_infrafoundry_category
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 logger = logging.getLogger(__name__)
@@ -1156,21 +1155,24 @@ class NATRuleService(BaseService):
         respond cleanly are still extracted, with a WARNING log naming
         any kind that was skipped.
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); NAT rules land at ``opnsense.firewall.nat`` as a
+        YAML sequence.
+
         Returns:
-            YAML string with ``provider/type/name/config`` entries.
+            YAML string with the nested ``opnsense:`` namespace and a
+            ``firewall.nat`` list leaf.
         """
         rules: list[LiveNATRule] = self.search_all_tolerant()
         managed = [r for r in rules if r.managed_name is not None]
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "nat_rules",
                 "name": r.managed_name,
                 "config": _live_to_export_config(r),
             }
             for r in managed
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("firewall.nat", entries)
 
 
 # ---------------------------------------------------------------------------
