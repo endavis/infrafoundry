@@ -182,6 +182,39 @@ class OPNsenseDirectRunner(BaseRunner):
         return filtered
 
     @staticmethod
+    def _sibling_resources_for(
+        manager_cls: type[Any],
+        all_resources: list[ResourceConfig],
+    ) -> list[ResourceConfig] | None:
+        """Return the sibling-resource slice for a manager that opts in (#802).
+
+        Managers that need cross-resource context at dispatch time (e.g.,
+        the kea reservation managers needing the matching kea subnets to
+        resolve ``subnet_ref`` to a CIDR) declare a class-level
+        ``SIBLING_RESOURCE_TYPE: ClassVar[str | None]`` whose value is
+        the dotted resource type to slice from ``all_resources``.
+
+        Managers that don't declare the attribute return ``None`` here —
+        the dispatch loops check for ``None`` before threading the
+        ``sibling_resources`` kwarg, so existing managers keep their
+        unchanged signatures.
+
+        Args:
+            manager_cls: The manager class registered in the dispatch
+                table.
+            all_resources: All provider resources for the active
+                environment.
+
+        Returns:
+            The sibling slice (possibly empty if the type isn't present
+            in YAML) or ``None`` when the manager doesn't opt in.
+        """
+        sibling_type = getattr(manager_cls, "SIBLING_RESOURCE_TYPE", None)
+        if not isinstance(sibling_type, str) or not sibling_type:
+            return None
+        return [r for r in all_resources if r.type == sibling_type]
+
+    @staticmethod
     def _filter_vlans(
         resources: list[ResourceConfig],
         target_resources: list[str] | None,
@@ -294,8 +327,12 @@ class OPNsenseDirectRunner(BaseRunner):
                 continue
 
             manager = manager_cls(provider.config_dir)
+            sibling_resources = self._sibling_resources_for(manager_cls, resources)
+            extra_kwargs: dict[str, Any] = {}
+            if sibling_resources is not None:
+                extra_kwargs["sibling_resources"] = sibling_resources
             try:
-                diff = manager.plan(env_name, typed_resources, add_only=add_only)
+                diff = manager.plan(env_name, typed_resources, add_only=add_only, **extra_kwargs)
             except Exception as exc:
                 logger.exception("opnsense_direct %s plan failed", type_name)
                 return PlanResult(success=False, error=str(exc))
@@ -395,9 +432,17 @@ class OPNsenseDirectRunner(BaseRunner):
             any_dispatched = True
 
             manager = manager_cls(provider.config_dir)
+            sibling_resources = self._sibling_resources_for(manager_cls, resources)
+            extra_kwargs: dict[str, Any] = {}
+            if sibling_resources is not None:
+                extra_kwargs["sibling_resources"] = sibling_resources
             try:
                 result = manager.apply(
-                    env_name, typed_resources, auto_approve=auto_approve, add_only=add_only
+                    env_name,
+                    typed_resources,
+                    auto_approve=auto_approve,
+                    add_only=add_only,
+                    **extra_kwargs,
                 )
             except Exception as exc:
                 logger.exception("opnsense_direct %s apply failed", type_name)
@@ -572,8 +617,14 @@ class OPNsenseDirectRunner(BaseRunner):
             any_dispatched = True
 
             manager = manager_cls(provider.config_dir)
+            sibling_resources = self._sibling_resources_for(manager_cls, resources)
+            extra_kwargs: dict[str, Any] = {}
+            if sibling_resources is not None:
+                extra_kwargs["sibling_resources"] = sibling_resources
             try:
-                result = manager.destroy(env_name, typed_resources, auto_approve=auto_approve)
+                result = manager.destroy(
+                    env_name, typed_resources, auto_approve=auto_approve, **extra_kwargs
+                )
             except Exception as exc:
                 logger.exception("opnsense_direct %s destroy failed", type_name)
                 return DestroyResult(success=False, error=str(exc))
@@ -628,8 +679,12 @@ class OPNsenseDirectRunner(BaseRunner):
                 continue
 
             manager = manager_cls(provider.config_dir)
+            sibling_resources = self._sibling_resources_for(manager_cls, resources)
+            extra_kwargs: dict[str, Any] = {}
+            if sibling_resources is not None:
+                extra_kwargs["sibling_resources"] = sibling_resources
             try:
-                ids = manager.get_resource_ids(env_name, typed_resources)
+                ids = manager.get_resource_ids(env_name, typed_resources, **extra_kwargs)
             except Exception as exc:
                 logger.warning("opnsense_direct %s get_resource_ids failed: %s", type_name, exc)
                 continue

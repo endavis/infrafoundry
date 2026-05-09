@@ -503,3 +503,160 @@ class TestGetResourceIds:
             svc_cls.from_environment.return_value = service
             result = manager.get_resource_ids("test-env", [_reservation("server1")])
         assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# Sibling-resource subnet_ref resolution (#802)
+# ---------------------------------------------------------------------------
+
+
+def _v4_subnet(name: str, *, subnet: str = "10.0.10.0/24") -> ResourceConfig:
+    """Helper for ``kea.dhcp4.subnets`` sibling-resource fixtures (#802)."""
+    return ResourceConfig(
+        name=name,
+        type="kea.dhcp4.subnets",
+        provider="opnsense",
+        config={"subnet": subnet},
+    )
+
+
+def _v4_reservation_with_ref(
+    name: str,
+    *,
+    subnet_ref: str | None = None,
+    subnet: str | None = None,
+    hw_address: str = "aa:bb:cc:dd:ee:01",
+    ip_address: str = "10.0.10.50",
+    hostname: str = "server1",
+    description: str = "",
+) -> ResourceConfig:
+    """Build a reservation with the new ``subnet_ref`` field (#802)."""
+    config: dict[str, Any] = {
+        "ip_address": ip_address,
+        "hw_address": hw_address,
+        "hostname": hostname,
+        "description": description,
+    }
+    if subnet_ref is not None:
+        config["subnet_ref"] = subnet_ref
+    if subnet is not None:
+        config["subnet"] = subnet
+    return ResourceConfig(
+        name=name,
+        type="kea.dhcp4.reservations",
+        provider="opnsense",
+        config=config,
+    )
+
+
+class TestSubnetRefResolution:
+    """The manager resolves ``subnet_ref`` against sibling subnets (#802)."""
+
+    def test_subnet_ref_resolves_to_cidr(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[{"subnet": "10.0.10.0/24", "uuid": "u-sub-1"}],
+        )
+        siblings = [_v4_subnet("lan-dhcp", subnet="10.0.10.0/24")]
+        reservation = _v4_reservation_with_ref("server1", subnet_ref="lan-dhcp")
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan("test-env", [reservation], sibling_resources=siblings)
+        assert len(diff.adds) == 1
+        # The wire payload carries the resolved subnet UUID.
+        assert diff.adds[0]["subnet"] == "u-sub-1"
+
+    def test_legacy_subnet_field_still_works(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[{"subnet": "10.0.10.0/24", "uuid": "u-sub-1"}],
+        )
+        # No siblings; legacy ``subnet:`` literal must still resolve.
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan("test-env", [_reservation("server1")])
+        assert len(diff.adds) == 1
+        assert diff.adds[0]["subnet"] == "u-sub-1"
+
+    def test_unknown_subnet_ref_raises_reference_validation_error(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[{"subnet": "10.0.10.0/24", "uuid": "u-sub-1"}],
+        )
+        siblings = [_v4_subnet("lan-dhcp", subnet="10.0.10.0/24")]
+        reservation = _v4_reservation_with_ref("server1", subnet_ref="missing-subnet")
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            with pytest.raises(ReferenceValidationError) as excinfo:
+                manager.plan("test-env", [reservation], sibling_resources=siblings)
+        assert "missing-subnet" in str(excinfo.value)
+
+    def test_missing_both_fields_raises(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[{"subnet": "10.0.10.0/24", "uuid": "u-sub-1"}],
+        )
+        # Reservation with neither subnet_ref nor subnet — must error.
+        reservation = _v4_reservation_with_ref("naked")
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            with pytest.raises(ReferenceValidationError) as excinfo:
+                manager.plan("test-env", [reservation], sibling_resources=[])
+        assert "naked" in str(excinfo.value)
+
+    def test_both_present_and_disagree_raises(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[
+                {"subnet": "10.0.10.0/24", "uuid": "u-sub-1"},
+                {"subnet": "10.0.20.0/24", "uuid": "u-sub-2"},
+            ],
+        )
+        siblings = [_v4_subnet("lan-dhcp", subnet="10.0.10.0/24")]
+        reservation = _v4_reservation_with_ref(
+            "server1", subnet_ref="lan-dhcp", subnet="10.0.20.0/24"
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            with pytest.raises(ReferenceValidationError) as excinfo:
+                manager.plan("test-env", [reservation], sibling_resources=siblings)
+        assert "conflicting" in str(excinfo.value)
+
+    def test_destroy_uses_resolution(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[{"subnet": "10.0.10.0/24", "uuid": "u-sub-1"}],
+            existing_reservations=[
+                {
+                    "hw_address": "aa:bb:cc:dd:ee:01",
+                    "subnet": "u-sub-1",
+                    "uuid": "u-res-1",
+                }
+            ],
+        )
+        siblings = [_v4_subnet("lan-dhcp", subnet="10.0.10.0/24")]
+        reservation = _v4_reservation_with_ref("server1", subnet_ref="lan-dhcp")
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            result = manager.destroy("test-env", [reservation], sibling_resources=siblings)
+        service.delete_dhcpv4_reservation.assert_called_once_with("u-res-1")
+        assert result["resources_destroyed"] == 1
+
+    def test_get_resource_ids_uses_resolution(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[{"subnet": "10.0.10.0/24", "uuid": "u-sub-1"}],
+            existing_reservations=[
+                {
+                    "hw_address": "aa:bb:cc:dd:ee:01",
+                    "subnet": "u-sub-1",
+                    "uuid": "u-res-1",
+                }
+            ],
+        )
+        siblings = [_v4_subnet("lan-dhcp", subnet="10.0.10.0/24")]
+        reservation = _v4_reservation_with_ref("server1", subnet_ref="lan-dhcp")
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            result = manager.get_resource_ids("test-env", [reservation], sibling_resources=siblings)
+        assert result == {"server1": "u-res-1"}
