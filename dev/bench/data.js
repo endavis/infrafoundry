@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778337814948,
+  "lastUpdate": 1778338065873,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8339,6 +8339,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000019896672811319872",
             "extra": "mean: 141.03258756605808 usec\nrounds: 2461"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "52c7de52aa993dae50ed7c362943aae13c503b5e",
+          "message": "refactor: emit nested-format YAML from direct-OPNsense migrate paths (merges PR #798, addresses #793)\n\nPhase 4 of #793. Each direct-OPNsense component manager's migrate()\ndelegates to its service's export_to_yaml(); update those service\nmethods to emit the API-aligned nested opnsense: schema (ADR-0016)\ninstead of the flat resource-centric format.\n\nA new helper module ``services/_nested_emit.py`` centralises the\nwrapping (list/singleton/multi-branch shapes), validates the dotted\npath against ``DOTTED_RESOURCE_SHAPES`` (the loader's source of\ntruth), and lets services emit by composition rather than by\nhand-rolling YAML. The Kea service uses the multi-branch helper to\nkeep its all-four-types output in a single document.\n\nEnd-to-end golden tests cover all 15 dotted resource types; each test\nmocks the live API, calls Manager.migrate(), and round-trips the\noutput through the loader's nested-format parser.\n\nAddresses #793.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-09T15:47:16+01:00",
+          "tree_id": "4c42a67fe32f52caa2b2fa542e8c0847dca13ead",
+          "url": "https://github.com/endavis/infrafoundry/commit/52c7de52aa993dae50ed7c362943aae13c503b5e"
+        },
+        "date": 1778338065045,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8094.282628123037,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000030299710904070006",
+            "extra": "mean: 123.54399345107714 usec\nrounds: 1985"
           }
         ]
       }
