@@ -12,7 +12,6 @@ import yaml
 
 from infrafoundry.core.config.package_loader import (
     NESTED_PROVIDER_NAMESPACE,
-    STEM_TO_DOTTED,
     PackageLoader,
 )
 from infrafoundry.core.exceptions import InvalidConfigurationError
@@ -119,16 +118,10 @@ class ProviderCentricLoader:
                 f"got {type(resource_list).__name__}"
             )
 
-        # Translate flat type names to dotted paths for direct-OPNsense
-        # components per ADR-0016 (#793 Phase 1). Old flat YAML files
-        # (e.g. ``vlans.yaml`` with ``vlans:`` top-level key) keep parsing.
-        # TODO: remove in #793 Phase 5 hard cutover.
-        emitted_type = STEM_TO_DOTTED.get(resource_type, resource_type)
-
         resources = [
             ResourceConfig(
                 name=item["name"],
-                type=emitted_type,
+                type=resource_type,
                 provider=provider,
                 config=item,
                 import_id=item.get("import_id"),

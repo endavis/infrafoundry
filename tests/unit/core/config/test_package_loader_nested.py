@@ -33,7 +33,7 @@ class TestNestedFormatConstants:
         assert NESTED_PROVIDER_NAMESPACE == "opnsense"
 
     def test_dotted_shapes_includes_existing_list_types(self):
-        """All current STEM_TO_DOTTED targets are list-shape paths."""
+        """The 15 currently-shipped direct-OPNsense paths are list-shape."""
         assert DOTTED_RESOURCE_SHAPES["firewall.aliases"] == "list"
         assert DOTTED_RESOURCE_SHAPES["firewall.rules"] == "list"
         assert DOTTED_RESOURCE_SHAPES["routing.gateways"] == "list"
@@ -469,20 +469,30 @@ class TestNestedFlatAmbiguity:
 
 
 @pytest.mark.unit
-class TestNestedFormatBackwardsCompat:
-    """Flat-format paths still work after Phase 2 (additive only)."""
+class TestFlatFormatNoLongerTranslated:
+    """After Phase 5 hard cutover (#793), legacy flat OPNsense type names
+    no longer auto-translate to dotted paths. Operators must use the nested
+    ``opnsense:`` schema (or already-dotted types in resource-centric files);
+    the conversion script in #793 Phase 6 does the one-shot migration.
+    """
 
-    def test_flat_provider_centric_still_works(self, temp_dir):
-        """``aliases.yaml`` with top-level ``aliases:`` still translates."""
+    def test_flat_provider_centric_keeps_stem_type(self, temp_dir):
+        """``aliases.yaml`` with top-level ``aliases:`` no longer translates.
+
+        The loader still parses the document but emits ``ResourceConfig.type
+        == 'aliases'`` (the filename stem). Dispatch will not match any
+        OPNsense direct-API component — the operator sees a clear "unknown
+        type" error downstream rather than silent acceptance.
+        """
         loader = PackageLoader(temp_dir)
         data = {"aliases": [{"name": "trusted", "config": {"type": "host"}}]}
         resources = loader._parse_resources_from_data(data, "aliases.yaml", "opnsense")
         assert len(resources) == 1
-        assert resources[0].type == "firewall.aliases"  # via STEM_TO_DOTTED
+        assert resources[0].type == "aliases"
         assert resources[0].name == "trusted"
 
-    def test_flat_resource_centric_still_works(self, temp_dir):
-        """``resources:`` list format still works (with STEM_TO_DOTTED)."""
+    def test_flat_resource_centric_keeps_raw_type(self, temp_dir):
+        """``resources:`` with legacy ``type: kea_subnet`` no longer translates."""
         loader = PackageLoader(temp_dir)
         data = {
             "resources": [
@@ -496,8 +506,25 @@ class TestNestedFormatBackwardsCompat:
         }
         resources = loader._parse_resources_from_data(data, "rc.yaml", "opnsense")
         assert len(resources) == 1
-        assert resources[0].type == "kea.dhcp4.subnets"  # via STEM_TO_DOTTED
+        assert resources[0].type == "kea_subnet"
         assert resources[0].name == "lan"
+
+    def test_resource_centric_dotted_type_passes_through(self, temp_dir):
+        """``resources:`` with already-dotted ``type:`` is unchanged."""
+        loader = PackageLoader(temp_dir)
+        data = {
+            "resources": [
+                {
+                    "provider": "opnsense",
+                    "type": "kea.dhcp4.subnets",
+                    "name": "lan",
+                    "config": {"subnet": "10.0.0.0/24"},
+                }
+            ]
+        }
+        resources = loader._parse_resources_from_data(data, "rc.yaml", "opnsense")
+        assert len(resources) == 1
+        assert resources[0].type == "kea.dhcp4.subnets"
 
     def test_unknown_nested_key_with_dict_value_recurses(self, temp_dir):
         """Unknown interior dict key recurses without error if no leaves."""
@@ -570,8 +597,15 @@ class TestNestedFormatProviderCentricLoader:
             loader.load_resources("dev", "opnsense", "fw")
         assert "cannot mix" in str(excinfo.value)
 
-    def test_provider_centric_loader_flat_still_works(self, temp_dir):
-        """Existing flat YAML still parses through the loader."""
+    def test_provider_centric_loader_flat_keeps_stem_type(self, temp_dir):
+        """After #793 Phase 5, flat OPNsense YAML no longer auto-translates.
+
+        The file parses (so existing test/blueprint fixtures don't break
+        outright), but the emitted ``ResourceConfig.type`` is the filename
+        stem (``aliases``) rather than the dotted path (``firewall.aliases``).
+        Dispatch will reject it downstream — operators must convert to the
+        nested ``opnsense:`` schema (see #793 Phase 6 conversion script).
+        """
         loader = ProviderCentricLoader(temp_dir)
         self._write_yaml(
             temp_dir / "dev" / "opnsense" / "aliases.yaml",
@@ -579,7 +613,7 @@ class TestNestedFormatProviderCentricLoader:
         )
         resources = loader.load_resources("dev", "opnsense", "aliases")
         assert len(resources) == 1
-        assert resources[0].type == "firewall.aliases"
+        assert resources[0].type == "aliases"
 
 
 @pytest.mark.unit
