@@ -575,7 +575,7 @@ class TestComputeDiffViaServiceMethod:
 
 
 class TestExportToYaml:
-    """Live VLANs render as resource-centric YAML."""
+    """Live VLANs render as nested ``opnsense:`` YAML (ADR-0016, #793 Phase 4)."""
 
     def test_export_renders_yaml(self) -> None:
         client = MagicMock()
@@ -589,11 +589,15 @@ class TestExportToYaml:
         assert "vlan-igb0-10" in text
         assert "device: igb0" in text
         assert "tag: 10" in text
-        assert "type: vlans" in text
+        # Nested format: VLANs land at opnsense.interfaces.vlans (per ADR-0016).
+        assert "opnsense:" in text
+        assert "interfaces:" in text
+        assert "vlans:" in text
 
     def test_export_with_no_vlans_yields_empty_resources(self) -> None:
         client = MagicMock()
         client.request.return_value = {"rows": []}
         service = VlanService(client)
         text = service.export_to_yaml()
-        assert "resources: []" in text
+        # Empty leaf list at opnsense.interfaces.vlans.
+        assert "vlans: []" in text

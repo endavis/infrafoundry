@@ -120,10 +120,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import yaml
-
 from infrafoundry.core.provider import ResourceConfig
 
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # Controller base for all alias CRUD + reconfigure endpoints.
@@ -653,21 +652,24 @@ class AliasService(BaseService):
         (the diff engine keys on ``config.name``, not the top-level
         ``name``).
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); aliases land at ``opnsense.firewall.aliases`` as
+        a YAML sequence.
+
         Returns:
-            YAML string with ``provider/type/name/config`` entries.
+            YAML string with the nested ``opnsense:`` namespace and a
+            ``firewall.aliases`` list leaf.
         """
         live = self.search()
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "aliases",
                 "name": alias.name,
                 "config": _live_to_export_config(alias),
             }
             for alias in live
             if alias.type not in _SYSTEM_ALIAS_TYPES
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("firewall.aliases", entries)
 
 
 # ---------------------------------------------------------------------------

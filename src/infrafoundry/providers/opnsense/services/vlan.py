@@ -22,10 +22,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import yaml
-
 from infrafoundry.core.provider import ResourceConfig
 
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # Required fields on every VLAN config. Matches the OPNsense schema:
@@ -381,15 +380,17 @@ class VlanService(BaseService):
     def export_to_yaml(self) -> str:
         """Export the current VLAN configuration to InfraFoundry YAML.
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); VLANs land at ``opnsense.interfaces.vlans`` as a
+        YAML sequence.
+
         Returns:
-            YAML string containing ``provider/type/name/config`` entries
-            suitable for inclusion in a resource-centric config file.
+            YAML string with the nested ``opnsense:`` namespace and an
+            ``interfaces.vlans`` list leaf.
         """
         live = self.search()
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "vlans",
                 "name": f"vlan-{v.device}-{v.tag}",
                 "config": {
                     "device": v.device,
@@ -400,7 +401,7 @@ class VlanService(BaseService):
             }
             for v in live
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("interfaces.vlans", entries)
 
 
 # ---------------------------------------------------------------------------

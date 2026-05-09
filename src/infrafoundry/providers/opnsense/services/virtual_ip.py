@@ -70,10 +70,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import yaml
-
 from infrafoundry.core.provider import ResourceConfig
 
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # Allowed values for the ``mode`` discriminator. ``ipalias`` (NOT
@@ -693,20 +692,23 @@ class VirtualIPService(BaseService):
         URI for CARP entries; the operator must populate the secret
         manually before re-applying.
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); virtual IPs land at
+        ``opnsense.interfaces.virtual_ips`` as a YAML sequence.
+
         Returns:
-            YAML string with ``provider/type/name/config`` entries.
+            YAML string with the nested ``opnsense:`` namespace and an
+            ``interfaces.virtual_ips`` list leaf.
         """
         live = self.search()
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "virtual_ips",
                 "name": _synthesize_name(vip),
                 "config": _live_to_export_config(self.get(vip.uuid)),
             }
             for vip in live
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("interfaces.virtual_ips", entries)
 
 
 # ---------------------------------------------------------------------------

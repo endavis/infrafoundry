@@ -65,10 +65,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import yaml
-
 from infrafoundry.core.provider import ResourceConfig
 
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # Controller base for all host-alias CRUD endpoints.
@@ -587,8 +586,13 @@ class UnboundHostAliasService(BaseService):
         has no name field — the operator can rename freely after import;
         identity is the tuple, not the name.
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); host aliases land at
+        ``opnsense.unbound.host_aliases`` as a YAML sequence.
+
         Returns:
-            YAML string with ``provider/type/name/config`` entries.
+            YAML string with the nested ``opnsense:`` namespace and an
+            ``unbound.host_aliases`` list leaf.
         """
         live = self.search()
         # Build a UUID → "hostname.domain" map from the live host-override
@@ -605,16 +609,14 @@ class UnboundHostAliasService(BaseService):
             if uuid:
                 uuid_to_label[uuid] = label or uuid
 
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "unbound_host_alias",
                 "name": _synthesize_name(alias),
                 "config": _live_to_export_config(self.get(alias.uuid), uuid_to_label),
             }
             for alias in live
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("unbound.host_aliases", entries)
 
 
 # ---------------------------------------------------------------------------
