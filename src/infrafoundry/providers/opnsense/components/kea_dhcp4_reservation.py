@@ -13,12 +13,30 @@ flagged inline:
 - Identity is the natural key ``(hw_address, subnet_uuid)`` — DHCPv4
   uses MAC address, not DUID. ``subnet_uuid`` is resolved at apply time
   by reading ``service.search_dhcpv4_subnets()`` and matching the
-  operator-facing ``subnet`` field (an IPv4 CIDR) to the live subnet
-  UUID. If no live subnet matches, the manager raises
-  :class:`ReferenceValidationError` so the failure surfaces at plan time
-  rather than as a silent skip-with-warning at apply time.
-- Wire schema: ``subnet`` (UUID, not the CIDR), ``hw_address`` (MAC),
-  ``ip_address``, ``hostname``, ``description``.
+  operator-facing subnet CIDR to the live subnet UUID. If no live subnet
+  matches, the manager raises :class:`ReferenceValidationError` so the
+  failure surfaces at plan time rather than as a silent skip-with-warning
+  at apply time.
+- Wire schema: ``subnet`` (UUID on the wire; see operator-facing schema
+  below), ``hw_address`` (MAC), ``ip_address``, ``hostname``,
+  ``description``.
+
+Operator-facing schema (#802):
+
+- Preferred: ``subnet_ref: <managed kea.dhcp4.subnets name>`` — what the
+  framework's blueprints emit. Resolved against the sibling
+  ``kea.dhcp4.subnets`` resource list to yield the CIDR, then through
+  the live ``search_dhcpv4_subnets`` lookup to yield the wire-format
+  UUID.
+- Legacy: ``subnet: <CIDR>`` — direct CIDR literal; still supported.
+- Both fields present must agree on the resolved CIDR; mismatch raises
+  :class:`ReferenceValidationError`.
+- Both fields absent raises :class:`ReferenceValidationError`.
+
+The sibling ``kea.dhcp4.subnets`` resource slice is threaded into each
+public method by ``OPNsenseDirectRunner`` via the
+``sibling_resources`` kwarg, gated on the
+``SIBLING_RESOURCE_TYPE`` ClassVar marker.
 
 Reconfigure semantics:
 
@@ -82,6 +100,12 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
     #: component changed state.
     FINALIZATION_HOOK: ClassVar[str] = "kea_reconfigure"
 
+    #: Resource type whose ``ResourceConfig`` slice the runner threads
+    #: into each public method as the ``sibling_resources`` kwarg (#802).
+    #: The slice is consumed by ``_build_subnet_name_to_cidr`` to resolve
+    #: ``subnet_ref`` to a CIDR before the live UUID lookup.
+    SIBLING_RESOURCE_TYPE: ClassVar[str | None] = "kea.dhcp4.subnets"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -93,6 +117,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         *,
         add_only: bool = False,
         provider_name: str = "opnsense",
+        sibling_resources: list[ResourceConfig] | None = None,
     ) -> _Diff:
         """Compute the add/update/delete diff for the given reservations.
 
@@ -101,16 +126,23 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
             resources: DHCPv4 reservation ``ResourceConfig`` entries.
             add_only: If True, suppress deletes for live reservations not in YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
+            sibling_resources: ``kea.dhcp4.subnets`` resources, threaded
+                in by ``OPNsenseDirectRunner``. Used to resolve
+                ``subnet_ref`` to a CIDR (#802). ``None`` (or empty) is
+                fine for resources using the legacy ``subnet: <CIDR>``
+                form exclusively.
 
         Returns:
             ``_Diff`` describing what apply would do.
 
         Raises:
-            ReferenceValidationError: If any reservation references a
-                ``subnet`` CIDR that does not match any live DHCPv4 subnet.
+            ReferenceValidationError: If any reservation's ``subnet_ref``
+                or ``subnet`` CIDR does not match any live DHCPv4 subnet,
+                or if both fields disagree, or if neither is present.
         """
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
-        return self._compute_diff(service, resources, add_only=add_only)
+        name_to_cidr = _build_subnet_name_to_cidr(sibling_resources)
+        return self._compute_diff(service, resources, add_only=add_only, name_to_cidr=name_to_cidr)
 
     def apply(
         self,
@@ -120,6 +152,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         auto_approve: bool = True,
         add_only: bool = False,
         provider_name: str = "opnsense",
+        sibling_resources: list[ResourceConfig] | None = None,
     ) -> dict[str, Any]:
         """Apply the diff: add / update / delete DHCPv4 reservations.
 
@@ -132,18 +165,23 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
             provider_name: Provider identifier (defaults to ``opnsense``).
+            sibling_resources: ``kea.dhcp4.subnets`` resources, threaded
+                in by ``OPNsenseDirectRunner``. Used to resolve
+                ``subnet_ref`` to a CIDR (#802).
 
         Returns:
             Dict with ``resources_created``, ``resources_updated``,
             ``resources_deleted`` counts and a ``resource_outcomes`` list.
 
         Raises:
-            ReferenceValidationError: If any reservation references a
-                ``subnet`` CIDR that does not match any live DHCPv4 subnet.
+            ReferenceValidationError: If any reservation's ``subnet_ref``
+                or ``subnet`` CIDR does not match any live DHCPv4 subnet,
+                or if both fields disagree, or if neither is present.
         """
         del auto_approve
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
-        diff = self._compute_diff(service, resources, add_only=add_only)
+        name_to_cidr = _build_subnet_name_to_cidr(sibling_resources)
+        diff = self._compute_diff(service, resources, add_only=add_only, name_to_cidr=name_to_cidr)
 
         outcomes: list[ResourceOutcome] = []
         created = 0
@@ -206,6 +244,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         provider_name: str = "opnsense",
+        sibling_resources: list[ResourceConfig] | None = None,
     ) -> dict[str, Any]:
         """Delete every live reservation matching ``resources``.
 
@@ -218,16 +257,21 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
             resources: DHCPv4 reservation ``ResourceConfig`` entries to destroy.
             auto_approve: Currently a no-op.
             provider_name: Provider identifier (defaults to ``opnsense``).
+            sibling_resources: ``kea.dhcp4.subnets`` resources, threaded
+                in by ``OPNsenseDirectRunner``. Used to resolve
+                ``subnet_ref`` to a CIDR (#802).
 
         Returns:
             Dict with ``resources_destroyed`` and ``locked_skipped`` counts.
 
         Raises:
-            ReferenceValidationError: If any reservation references a
-                ``subnet`` CIDR that does not match any live DHCPv4 subnet.
+            ReferenceValidationError: If any reservation's ``subnet_ref``
+                or ``subnet`` CIDR does not match any live DHCPv4 subnet,
+                or if both fields disagree, or if neither is present.
         """
         del auto_approve
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
+        name_to_cidr = _build_subnet_name_to_cidr(sibling_resources)
         cidr_to_uuid = _build_subnet_cidr_lookup(service)
 
         live_reservations = service.search_dhcpv4_reservations()
@@ -239,7 +283,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         deleted = 0
         for resource in resources:
             hw_address = str(resource.config.get("hw_address", ""))
-            subnet_cidr = str(resource.config.get("subnet", ""))
+            subnet_cidr = _resolve_subnet_cidr(resource, name_to_cidr)
             subnet_uuid = _resolve_subnet_uuid(cidr_to_uuid, subnet_cidr, resource.name)
             uuid = live_by_key.get((hw_address, subnet_uuid))
             if not uuid:
@@ -263,6 +307,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         provider_name: str = "opnsense",
+        sibling_resources: list[ResourceConfig] | None = None,
     ) -> dict[str, str]:
         """Return ``{resource_name: opnsense_uuid}`` for live reservations.
 
@@ -274,16 +319,21 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
             env_name: Active environment name.
             resources: DHCPv4 reservation ``ResourceConfig`` entries.
             provider_name: Provider identifier (defaults to ``opnsense``).
+            sibling_resources: ``kea.dhcp4.subnets`` resources, threaded
+                in by ``OPNsenseDirectRunner``. Used to resolve
+                ``subnet_ref`` to a CIDR (#802).
 
         Returns:
             Mapping from operator-facing resource name to OPNsense UUID.
             Resources without a matching live record are omitted.
 
         Raises:
-            ReferenceValidationError: If any reservation references a
-                ``subnet`` CIDR that does not match any live DHCPv4 subnet.
+            ReferenceValidationError: If any reservation's ``subnet_ref``
+                or ``subnet`` CIDR does not match any live DHCPv4 subnet,
+                or if both fields disagree, or if neither is present.
         """
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
+        name_to_cidr = _build_subnet_name_to_cidr(sibling_resources)
         cidr_to_uuid = _build_subnet_cidr_lookup(service)
 
         live_reservations = service.search_dhcpv4_reservations()
@@ -295,7 +345,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         result: dict[str, str] = {}
         for resource in resources:
             hw_address = str(resource.config.get("hw_address", ""))
-            subnet_cidr = str(resource.config.get("subnet", ""))
+            subnet_cidr = _resolve_subnet_cidr(resource, name_to_cidr)
             subnet_uuid = _resolve_subnet_uuid(cidr_to_uuid, subnet_cidr, resource.name)
             uuid = live_by_key.get((hw_address, subnet_uuid))
             if uuid:
@@ -312,13 +362,15 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         add_only: bool,
+        name_to_cidr: dict[str, str],
     ) -> _Diff:
         """Compute the add/update/delete diff against live state.
 
-        Resolves each reservation's ``subnet`` CIDR to a live subnet
+        Resolves each reservation's ``subnet_ref`` (or legacy ``subnet``)
+        to a CIDR via the sibling-resource map, then to a live subnet
         UUID via ``search_dhcpv4_subnets``; raises
-        ``ReferenceValidationError`` if the CIDR doesn't match any live
-        subnet (mirrors the DHCPv6 manager's behavior).
+        ``ReferenceValidationError`` on any miss (mirrors the DHCPv6
+        manager's behavior).
         """
         cidr_to_uuid = _build_subnet_cidr_lookup(service)
 
@@ -332,7 +384,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         seen_keys: set[tuple[str, str]] = set()
 
         for resource in resources:
-            subnet_cidr = str(resource.config.get("subnet", ""))
+            subnet_cidr = _resolve_subnet_cidr(resource, name_to_cidr)
             subnet_uuid = _resolve_subnet_uuid(cidr_to_uuid, subnet_cidr, resource.name)
             reservation_data = _build_reservation_payload(resource, subnet_uuid)
             hw_address = str(reservation_data["hw_address"])
@@ -393,6 +445,105 @@ def _build_subnet_cidr_lookup(service: KeaDHCPService) -> dict[str, str]:
         if cidr and uuid:
             lookup[cidr] = uuid
     return lookup
+
+
+def _build_subnet_name_to_cidr(
+    sibling_resources: list[ResourceConfig] | None,
+) -> dict[str, str]:
+    """Build a ``{subnet_name: subnet_cidr}`` map from sibling subnet resources (#802).
+
+    The runner threads the ``kea.dhcp4.subnets`` slice in via the
+    ``sibling_resources`` kwarg on each public method; this helper turns
+    it into the name→CIDR map used by ``_resolve_subnet_cidr``. Subnets
+    missing or with non-string ``subnet`` fields are skipped — those
+    will surface as malformed-config errors elsewhere in the pipeline.
+
+    Args:
+        sibling_resources: ``kea.dhcp4.subnets`` resources, or ``None``
+            (treated as empty).
+
+    Returns:
+        Map from operator-facing subnet name to CIDR; empty if the
+        sibling slice is None / empty.
+    """
+    if not sibling_resources:
+        return {}
+    name_to_cidr: dict[str, str] = {}
+    for subnet in sibling_resources:
+        cidr = subnet.config.get("subnet")
+        if isinstance(cidr, str) and cidr:
+            name_to_cidr[subnet.name] = cidr
+    return name_to_cidr
+
+
+def _resolve_subnet_cidr(
+    resource: ResourceConfig,
+    name_to_cidr: dict[str, str],
+) -> str:
+    """Resolve a reservation's operator-facing subnet field to a CIDR (#802).
+
+    Field acceptance precedence (matches
+    ``KeaReservationValidator._validate_one``):
+
+    1. ``subnet_ref`` present → resolve via ``name_to_cidr``; raise
+       ``ReferenceValidationError`` if it doesn't resolve.
+    2. Only ``subnet`` present → use directly (back-compat).
+    3. Both present and agree → use the resolved CIDR.
+    4. Both present and disagree → ``ReferenceValidationError``.
+    5. Neither present → ``ReferenceValidationError``.
+
+    Args:
+        resource: DHCPv4 reservation resource.
+        name_to_cidr: Map from sibling subnet names to their CIDRs (built
+            once by ``_build_subnet_name_to_cidr``).
+
+    Returns:
+        The resolved subnet CIDR string.
+
+    Raises:
+        ReferenceValidationError: When the reservation lacks both fields,
+            when both fields disagree, or when ``subnet_ref`` does not
+            resolve to a managed sibling subnet.
+    """
+    subnet_ref = resource.config.get("subnet_ref")
+    subnet_literal = resource.config.get("subnet")
+
+    if subnet_ref is None and subnet_literal is None:
+        raise ReferenceValidationError(
+            f"kea_reservation '{resource.name}' missing required field; "
+            f"expected one of 'subnet_ref' (preferred) or 'subnet' (legacy CIDR)"
+        )
+
+    resolved: str | None = None
+    if subnet_ref is not None:
+        if not isinstance(subnet_ref, str) or not subnet_ref:
+            raise ReferenceValidationError(
+                f"kea_reservation '{resource.name}' subnet_ref must be a non-empty string"
+            )
+        # Accept fully qualified dotted forms like
+        # ``kea.dhcp4.subnets.<name>`` by taking the trailing segment.
+        candidate = subnet_ref.split(".")[-1] if "." in subnet_ref else subnet_ref
+        resolved = name_to_cidr.get(candidate)
+        if resolved is None:
+            raise ReferenceValidationError(
+                f"kea_reservation '{resource.name}' references unknown "
+                f"subnet_ref '{subnet_ref}'; no managed kea.dhcp4.subnets resource matches"
+            )
+
+    if subnet_literal is not None and resolved is not None:
+        literal_str = str(subnet_literal)
+        if literal_str != resolved:
+            raise ReferenceValidationError(
+                f"kea_reservation '{resource.name}' has conflicting subnet fields: "
+                f"subnet_ref={subnet_ref!r} resolves to {resolved!r}, "
+                f"but subnet={literal_str!r}"
+            )
+        return resolved
+
+    if resolved is not None:
+        return resolved
+
+    return str(subnet_literal)
 
 
 def _resolve_subnet_uuid(

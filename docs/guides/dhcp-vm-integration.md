@@ -31,20 +31,45 @@ InfraFoundry aligns OPNsense Kea DHCPv4 reservations with Proxmox VMs so VMs use
            - range: "192.168.10.100-192.168.10.200"
          dns_servers: ["192.168.10.1"]
    ```
-2. Add a DHCP reservation for the VM:
+2. Add a DHCP reservation for the VM. The reservation must point at a
+   `kea_subnet` resource declared in the same environment. Two equivalent
+   schemas are accepted:
+
    ```yaml
-   # envs/{env}/resources/dhcp-mappings.yaml
+   # envs/{env}/resources/dhcp-mappings.yaml — preferred (#802, what
+   # the framework's own blueprints emit)
    resources:
      - provider: opnsense
        type: kea_reservation
        name: my-vm-dhcp
        config:
-         subnet: "192.168.10.0/24"   # CIDR of the kea_subnet above
+         subnet_ref: lan-subnet           # name of the kea_subnet above
          hw_address: "BC:24:11:10:00:96"
          ip_address: "192.168.10.50"
          hostname: "my-vm-01"
          description: "My VM - Managed by InfraFoundry"
    ```
+
+   ```yaml
+   # Legacy literal-CIDR form — still supported, useful when the subnet
+   # is not declared as a managed resource in this environment
+   resources:
+     - provider: opnsense
+       type: kea_reservation
+       name: my-vm-dhcp
+       config:
+         subnet: "192.168.10.0/24"        # CIDR of the kea_subnet above
+         hw_address: "BC:24:11:10:00:96"
+         ip_address: "192.168.10.50"
+         hostname: "my-vm-01"
+         description: "My VM - Managed by InfraFoundry"
+   ```
+
+   `subnet_ref` resolves to the kea_subnet's CIDR at plan/apply time;
+   both forms produce identical wire calls. Both fields may be present
+   simultaneously, in which case the resolved CIDR must match the
+   literal `subnet` value. The same dual-form schema applies to
+   `kea_dhcp6_reservation`.
 3. Create a VM using the same MAC:
    ```yaml
    # envs/{env}/resources/my-vm.yaml
