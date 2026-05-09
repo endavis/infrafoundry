@@ -4,7 +4,7 @@
    multi-instance safety. -#}
 resources:
   - provider: opnsense
-    type: kea_reservation
+    type: kea.dhcp4.reservations
     name: "{{ vm_name }}"
     config:
       subnet_ref: "{{ dhcp_subnet }}"
