@@ -19,6 +19,7 @@ from infrafoundry.providers.opnsense.validators import (
     FirewallRuleValidator,
     GatewayValidator,
     InterfaceAssignmentValidator,
+    KeaReservationValidator,
     NATRuleValidator,
     ResourceNameValidator,
     StaticRouteValidator,
@@ -90,6 +91,7 @@ class OPNsenseValidator:
         self.virtual_ip_validator = VirtualIPValidator(report)
         self.unbound_host_alias_validator = UnboundHostAliasValidator(report)
         self.unbound_forward_validator = UnboundForwardValidator(report)
+        self.kea_reservation_validator = KeaReservationValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -262,6 +264,13 @@ class OPNsenseValidator:
                 index=xref_index,
             )
             self.unbound_forward_validator.validate(resource_refs["unbound_forwards"])
+            self.kea_reservation_validator.validate(
+                resource_refs["kea_dhcp4_reservations"],
+                resource_refs["kea_dhcp6_reservations"],
+                resource_refs["kea_dhcp4_subnet_names"],
+                resource_refs["kea_dhcp6_subnet_names"],
+                index=xref_index,
+            )
             self.resource_name_validator.validate(resources)
 
         except Exception as exc:
@@ -294,6 +303,10 @@ class OPNsenseValidator:
         gateways = [r for r in resources if r.type == "routing.gateways"]
         static_routes = [r for r in resources if r.type == "routing.static"]
         virtual_ips = [r for r in resources if r.type == "interfaces.virtual_ips"]
+        kea_dhcp4_reservations = [r for r in resources if r.type == "kea.dhcp4.reservations"]
+        kea_dhcp6_reservations = [r for r in resources if r.type == "kea.dhcp6.reservations"]
+        kea_dhcp4_subnets = [r for r in resources if r.type == "kea.dhcp4.subnets"]
+        kea_dhcp6_subnets = [r for r in resources if r.type == "kea.dhcp6.subnets"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}
@@ -302,6 +315,8 @@ class OPNsenseValidator:
         gateway_names = {g.name for g in gateways}
         static_route_names = {r.name for r in static_routes}
         virtual_ip_names = {v.name for v in virtual_ips}
+        kea_dhcp4_subnet_names = {s.name for s in kea_dhcp4_subnets}
+        kea_dhcp6_subnet_names = {s.name for s in kea_dhcp6_subnets}
         # ``unbound_host_alias.host`` cross-refs the *name* of a managed
         # ``unbound_host_override`` resource (the alias validator also
         # accepts a live override name from ``searchHostOverride``).
@@ -327,6 +342,12 @@ class OPNsenseValidator:
             "static_route_names": static_route_names,
             "virtual_ips": virtual_ips,
             "virtual_ip_names": virtual_ip_names,
+            "kea_dhcp4_reservations": kea_dhcp4_reservations,
+            "kea_dhcp6_reservations": kea_dhcp6_reservations,
+            "kea_dhcp4_subnets": kea_dhcp4_subnets,
+            "kea_dhcp6_subnets": kea_dhcp6_subnets,
+            "kea_dhcp4_subnet_names": kea_dhcp4_subnet_names,
+            "kea_dhcp6_subnet_names": kea_dhcp6_subnet_names,
         }
 
     def _get_existing_aliases(

@@ -985,3 +985,134 @@ class TestUnboundReconfigureCoalescing:
             runner.apply(provider_with_env)
 
         hook.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Sibling-resource threading (#802)
+# ---------------------------------------------------------------------------
+
+
+def _kea_subnet(name: str, *, subnet: str = "10.0.10.0/24") -> ResourceConfig:
+    """Helper for ``kea.dhcp4.subnets`` resources."""
+    return ResourceConfig(
+        name=name,
+        type="kea.dhcp4.subnets",
+        provider="opnsense",
+        config={"subnet": subnet},
+    )
+
+
+def _kea_reservation(name: str) -> ResourceConfig:
+    """Helper for ``kea.dhcp4.reservations`` resources."""
+    return ResourceConfig(
+        name=name,
+        type="kea.dhcp4.reservations",
+        provider="opnsense",
+        config={
+            "subnet_ref": "lan-dhcp",
+            "hw_address": "aa:bb:cc:dd:ee:01",
+            "ip_address": "10.0.10.50",
+            "hostname": name,
+        },
+    )
+
+
+class TestSiblingResourceThreading:
+    """Runner threads ``sibling_resources`` to managers that opt-in via
+    ``SIBLING_RESOURCE_TYPE`` (#802). Managers without the attribute keep
+    unchanged signatures.
+    """
+
+    def test_sibling_resources_for_returns_slice_when_attribute_set(self) -> None:
+        # Build a fake manager class that opts in to the kea.dhcp4.subnets slice.
+        class _OptedInManager:
+            SIBLING_RESOURCE_TYPE = "kea.dhcp4.subnets"
+
+        all_resources = [
+            _kea_subnet("lan-dhcp", subnet="10.0.10.0/24"),
+            _kea_subnet("guest-dhcp", subnet="10.0.20.0/24"),
+            _kea_reservation("server1"),
+            _vlan_resource("v1", "igb0", 10),
+        ]
+        sibling = OPNsenseDirectRunner._sibling_resources_for(_OptedInManager, all_resources)
+        assert sibling is not None
+        assert len(sibling) == 2
+        assert {r.name for r in sibling} == {"lan-dhcp", "guest-dhcp"}
+
+    def test_sibling_resources_for_returns_none_when_attribute_missing(self) -> None:
+        class _BareManager:
+            pass
+
+        sibling = OPNsenseDirectRunner._sibling_resources_for(
+            _BareManager, [_vlan_resource("v1", "igb0", 10)]
+        )
+        assert sibling is None
+
+    def test_sibling_resources_for_returns_none_when_attribute_is_none(self) -> None:
+        class _ExplicitNoneManager:
+            SIBLING_RESOURCE_TYPE = None
+
+        sibling = OPNsenseDirectRunner._sibling_resources_for(
+            _ExplicitNoneManager, [_vlan_resource("v1", "igb0", 10)]
+        )
+        assert sibling is None
+
+    def test_dispatch_passes_sibling_resources_to_kea_reservation_managers(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        """The runner threads kea.dhcp4.subnets into the reservation manager."""
+        runner = OPNsenseDirectRunner()
+        all_resources = [
+            _kea_subnet("lan-dhcp", subnet="10.0.10.0/24"),
+            _kea_reservation("server1"),
+        ]
+
+        # Build a manager class that opts in via SIBLING_RESOURCE_TYPE.
+        manager_instance = MagicMock()
+        manager_instance.plan.return_value = MagicMock(
+            adds=[], updates=[], deletes=[], locked=[], is_empty=True
+        )
+        manager_cls = MagicMock(return_value=manager_instance)
+        manager_cls.SIBLING_RESOURCE_TYPE = "kea.dhcp4.subnets"
+
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "kea.dhcp4.reservations": manager_cls,
+        }
+
+        with patch.object(
+            OPNsenseDirectRunner, "_load_provider_resources", return_value=all_resources
+        ):
+            runner.plan(provider_with_env)
+
+        manager_instance.plan.assert_called_once()
+        call_kwargs = manager_instance.plan.call_args.kwargs
+        # The runner must pass sibling_resources containing the sibling subnet slice.
+        assert "sibling_resources" in call_kwargs
+        passed_siblings = call_kwargs["sibling_resources"]
+        assert len(passed_siblings) == 1
+        assert passed_siblings[0].name == "lan-dhcp"
+        assert passed_siblings[0].type == "kea.dhcp4.subnets"
+
+    def test_dispatch_does_not_pass_sibling_resources_when_manager_does_not_opt_in(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        """Existing managers (no SIBLING_RESOURCE_TYPE) must keep unchanged kwargs."""
+        runner = OPNsenseDirectRunner()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+
+        manager_instance = MagicMock()
+        manager_instance.plan.return_value = Diff(adds=[VlanConfig("v1", "igb0", 10, "x", 0)])
+        # Bare manager class — no SIBLING_RESOURCE_TYPE attribute.
+        manager_cls = MagicMock(spec=["__call__"], return_value=manager_instance)
+
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": manager_cls,
+        }
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.plan(provider_with_env)
+
+        manager_instance.plan.assert_called_once()
+        call_kwargs = manager_instance.plan.call_args.kwargs
+        # The runner must NOT pass sibling_resources to managers that don't opt in.
+        assert "sibling_resources" not in call_kwargs
