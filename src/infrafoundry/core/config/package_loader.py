@@ -35,35 +35,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Transient flat→dotted resource-type translation for the direct-OPNsense
-# provider's filename-derived stem path (#793 Phase 1). Old flat YAML files
-# (e.g., ``vlans.yaml`` with a top-level ``vlans:`` key) keep parsing
-# correctly while internal ``ResourceConfig.type`` strings are already
-# dotted everywhere else (dispatch tables, validators, manager guards).
-# Per ADR-0016, the cutover is hard at Phase 5 in lockstep with the
-# operator-side ``endavis-infra/`` conversion script (#793 Phase 6).
-#
-# TODO: remove in #793 Phase 5 hard cutover.
-STEM_TO_DOTTED: dict[str, str] = {
-    "vlans": "interfaces.vlans",
-    "interface_assignments": "interfaces.assignments",
-    "aliases": "firewall.aliases",
-    "nat_rules": "firewall.nat",
-    "firewall_rules": "firewall.rules",
-    "gateways": "routing.gateways",
-    "static_routes": "routing.static",
-    "virtual_ips": "interfaces.virtual_ips",
-    "unbound_host_override": "unbound.host_overrides",
-    "unbound_host_alias": "unbound.host_aliases",
-    "unbound_forward": "unbound.forwards",
-    "kea_subnet": "kea.dhcp4.subnets",
-    "kea_reservation": "kea.dhcp4.reservations",
-    "kea_dhcp6_subnet": "kea.dhcp6.subnets",
-    "kea_dhcp6_reservation": "kea.dhcp6.reservations",
-}
-
 # Map of dotted resource-type paths → declared YAML leaf shape under the
-# nested ``opnsense:`` namespace (#793 Phase 2, per ADR-0016).
+# nested ``opnsense:`` namespace (#793 per ADR-0016).
 #
 # - ``"list"`` paths must appear as YAML sequences (each entry a dict with a
 #   ``name:`` field). Each entry emits one ``ResourceConfig``.
@@ -74,13 +47,27 @@ STEM_TO_DOTTED: dict[str, str] = {
 # of ``firewall: {rules: [...]}``) raises a clear error rather than
 # silently round-tripping as a singleton.
 #
-# Currently-implemented list-shape types come from ``STEM_TO_DOTTED.values()``.
-# The remaining entries are documented in ADR-0016 from in-flight issues
-# #786 to #792; they are accepted by the loader now so operator YAML and tests
-# can land alongside each component as it ships, without requiring a loader
-# change for every new component.
+# Path entries below the divider come from in-flight feature issues
+# (#786 to #792); they are accepted by the loader now so operator YAML and
+# tests can land alongside each component as it ships, without requiring a
+# loader change for every new component.
 DOTTED_RESOURCE_SHAPES: dict[str, str] = {
-    **dict.fromkeys(STEM_TO_DOTTED.values(), "list"),
+    # Direct-OPNsense components currently shipped (#793).
+    "interfaces.vlans": "list",
+    "interfaces.assignments": "list",
+    "interfaces.virtual_ips": "list",
+    "firewall.aliases": "list",
+    "firewall.nat": "list",
+    "firewall.rules": "list",
+    "routing.gateways": "list",
+    "routing.static": "list",
+    "unbound.host_overrides": "list",
+    "unbound.host_aliases": "list",
+    "unbound.forwards": "list",
+    "kea.dhcp4.subnets": "list",
+    "kea.dhcp4.reservations": "list",
+    "kea.dhcp6.subnets": "list",
+    "kea.dhcp6.reservations": "list",
     # Singletons / surfaces from in-flight feature issues (ADR-0016).
     # #786 firewall_log
     "firewall.log": "dict",
@@ -591,16 +578,10 @@ class PackageLoader:
                 f"got {type(resource_list).__name__}"
             )
 
-        # Translate flat type names to dotted paths for direct-OPNsense
-        # components per ADR-0016 (#793 Phase 1). Non-OPNsense filename stems
-        # (and any new top-level keys) pass through unchanged.
-        # TODO: remove in #793 Phase 5 hard cutover.
-        emitted_type = STEM_TO_DOTTED.get(resource_type, resource_type)
-
         return [
             ResourceConfig(
                 name=item["name"],
-                type=emitted_type,
+                type=resource_type,
                 provider=item.get("provider", provider),
                 config=item,
                 events=item.get("events"),
@@ -777,17 +758,10 @@ class PackageLoader:
             config = item.get("config", item)
             if "config" in item and "name" not in config:
                 config["name"] = item["name"]
-            # Translate flat type names to dotted paths for direct-OPNsense
-            # components per ADR-0016 (#793 Phase 1). Existing blueprints and
-            # user resource-centric YAML files (e.g. ``type: kea_reservation``)
-            # continue parsing while internal dispatch keys are already dotted.
-            # TODO: remove in #793 Phase 5 hard cutover.
-            raw_type = str(item["type"])
-            emitted_type = STEM_TO_DOTTED.get(raw_type, raw_type)
             result.append(
                 ResourceConfig(
                     name=item["name"],
-                    type=emitted_type,
+                    type=str(item["type"]),
                     provider=item.get("provider", default_provider),
                     config=config,
                     events=item.get("events"),

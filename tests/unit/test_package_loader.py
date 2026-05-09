@@ -533,7 +533,7 @@ resources:
       vmid: 220
       target_node: pve1
   - provider: opnsense
-    type: kea_reservation
+    type: kea.dhcp4.reservations
     name: ontap-node-01
     config:
       subnet_ref: opt1-infrastructure
