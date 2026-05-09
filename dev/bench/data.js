@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778338609044,
+  "lastUpdate": 1778339904936,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8401,6 +8401,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000025053363107470343",
             "extra": "mean: 119.08889968208786 usec\nrounds: 2213"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "877850a2cbc5f9b68ae545d7f55dacdd54082466",
+          "message": "fix: nested loader flattens entry config to match resource-centric (merges PR #801, addresses #800)\n\nThe nested-format loader was passing the whole entry mapping\n(``{name, config: {<fields>}}``) through as ``ResourceConfig.config``,\nwhich buried the actual field values one level deeper than every\ndirect-API component expects. ``ResourceCentricLoader`` already does\nthe right thing (``config = item.get(\"config\", {})`` + add ``name``);\nmirror that in ``_parse_nested_provider_format`` so both loaders\nproduce the same shape.\n\nPhase 4's migrate golden test had a round-trip assertion that read\n``v4_subnets[0].config[\"config\"][\"subnet\"]`` — that was asserting the\nbuggy shape. Updated to ``v4_subnets[0].config[\"subnet\"]``.\n\nFound while verifying #793 Phase 6 conversion of ``endavis-infra/`` —\n``foundry infra plan --provider opnsense`` was failing on the very\nfirst VLAN with \"missing required field(s): device, tag, description,\npriority\" despite the fields being present in the nested YAML.\n\nAddresses #800.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-09T16:17:45+01:00",
+          "tree_id": "957e837e1a77f7e51ce610b72554f00582d8c0ad",
+          "url": "https://github.com/endavis/infrafoundry/commit/877850a2cbc5f9b68ae545d7f55dacdd54082466"
+        },
+        "date": 1778339903883,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12387.277543056673,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005824250797249672",
+            "extra": "mean: 80.7279885773223 usec\nrounds: 1926"
           }
         ]
       }
