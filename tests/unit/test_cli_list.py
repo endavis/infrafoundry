@@ -39,7 +39,7 @@ def sample_resources():
     firewall = Mock()
     firewall.name = "firewall-01"
     firewall.provider = "opnsense"
-    firewall.type = "firewall_rules"
+    firewall.type = "firewall.rules"
 
     return [vm1, vm2, firewall]
 

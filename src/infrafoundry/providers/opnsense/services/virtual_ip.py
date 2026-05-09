@@ -383,7 +383,7 @@ def virtual_ip_configs_from_resources(
     """
     configs: list[VirtualIPConfig] = []
     for resource in resources:
-        if resource.type != "virtual_ips":
+        if resource.type != "interfaces.virtual_ips":
             continue
 
         config = resource.config

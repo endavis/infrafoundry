@@ -84,7 +84,7 @@ def _live(
 
 
 def _resource(name: str, config: dict[str, Any]) -> ResourceConfig:
-    return ResourceConfig(name=name, type="gateways", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="routing.gateways", provider="opnsense", config=config)
 
 
 # ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ class TestConfigsFromResources:
             "ok",
             {"interface": "wan", "protocol": "inet", "gateway": "192.0.2.1"},
         )
-        other = ResourceConfig(name="x", type="aliases", provider="opnsense", config={})
+        other = ResourceConfig(name="x", type="firewall.aliases", provider="opnsense", config={})
         result = gateway_configs_from_resources([gw, other])
         assert len(result) == 1
 
@@ -432,7 +432,7 @@ class TestConfigsFromResources:
     def test_non_dict_config_rejected(self) -> None:
         r = ResourceConfig(
             name="bad",
-            type="gateways",
+            type="routing.gateways",
             provider="opnsense",
             config={"interface": "wan", "protocol": "inet", "gateway": "192.0.2.1"},
         )

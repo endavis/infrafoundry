@@ -52,7 +52,9 @@ def _resource(
     }
     if lock:
         config["lock"] = True
-    return ResourceConfig(name=name, type="unbound_host_alias", provider="opnsense", config=config)
+    return ResourceConfig(
+        name=name, type="unbound.host_aliases", provider="opnsense", config=config
+    )
 
 
 def _live(

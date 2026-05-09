@@ -38,7 +38,7 @@ def _vlan(name: str, **config_overrides) -> ResourceConfig:
         "priority": 0,
     }
     base.update(config_overrides)
-    return ResourceConfig(name=name, type="vlans", provider="opnsense", config=base)
+    return ResourceConfig(name=name, type="interfaces.vlans", provider="opnsense", config=base)
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ def test_validate_no_device_skipped(validator, report):
     """Absence of ``device`` is not a validator concern (caught by config loader)."""
     vlan = ResourceConfig(
         name="v",
-        type="vlans",
+        type="interfaces.vlans",
         provider="opnsense",
         config={},
     )

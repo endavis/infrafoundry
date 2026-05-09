@@ -39,13 +39,13 @@ def _rule(name: str, **overrides: Any) -> ResourceConfig:
         "interface": "lan",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="firewall_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.rules", provider="opnsense", config=config)
 
 
 def _gw(name: str, *, protocol: str = "inet") -> ResourceConfig:
     return ResourceConfig(
         name=name,
-        type="gateways",
+        type="routing.gateways",
         provider="opnsense",
         config={"interface": "wan", "protocol": protocol, "gateway": "192.0.2.1"},
     )

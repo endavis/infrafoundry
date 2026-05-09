@@ -59,7 +59,7 @@ class ExtractorRegistry:
         Args:
             provider_name: Provider name (e.g., ``"opnsense"``).
             resource_type: Resource type / component name
-                (e.g., ``"vlans"``, ``"kea_dhcp"``).
+                (e.g., ``"interfaces.vlans"``, ``"kea_dhcp"``).
             extractor: An object satisfying the :class:`Extractor`
                 Protocol.
         """

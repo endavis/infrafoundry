@@ -48,7 +48,7 @@ def _resource(
     if extra:
         config.update(extra)
     return ResourceConfig(
-        name=name, type="interface_assignments", provider="opnsense", config=config
+        name=name, type="interfaces.assignments", provider="opnsense", config=config
     )
 
 

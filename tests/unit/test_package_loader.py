@@ -554,7 +554,7 @@ resources:
         assert resources[0].type == "ova_vm"
         assert resources[0].name == "ontap-node-01"
         assert resources[1].provider == "opnsense"
-        assert resources[1].type == "kea_reservation"
+        assert resources[1].type == "kea.dhcp4.reservations"
 
     def test_resource_centric_default_provider(self, temp_dir):
         """Resource-centric items without provider use parent provider."""

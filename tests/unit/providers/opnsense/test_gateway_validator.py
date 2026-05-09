@@ -43,7 +43,7 @@ def _gw(name: str, **overrides: Any) -> ResourceConfig:
         "gateway": "192.0.2.1",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="gateways", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="routing.gateways", provider="opnsense", config=config)
 
 
 @pytest.fixture
@@ -87,7 +87,7 @@ class TestProtocol:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="gateways",
+            type="routing.gateways",
             provider="opnsense",
             config={"interface": "wan", "gateway": "192.0.2.1"},
         )
@@ -160,7 +160,7 @@ class TestInterface:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="gateways",
+            type="routing.gateways",
             provider="opnsense",
             config={"protocol": "inet", "gateway": "192.0.2.1"},
         )

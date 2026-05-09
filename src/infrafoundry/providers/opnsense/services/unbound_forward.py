@@ -341,7 +341,7 @@ def unbound_forward_configs_from_resources(
     """
     configs: list[UnboundForwardConfig] = []
     for resource in resources:
-        if resource.type != "unbound_forward":
+        if resource.type != "unbound.forwards":
             continue
 
         config = resource.config

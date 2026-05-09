@@ -241,7 +241,7 @@ def interface_assignment_configs_from_resources(
     """
     configs: list[InterfaceAssignmentConfig] = []
     for resource in resources:
-        if resource.type != "interface_assignments":
+        if resource.type != "interfaces.assignments":
             continue
 
         config = resource.config

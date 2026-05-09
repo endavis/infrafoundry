@@ -270,17 +270,17 @@ class OPNsenseValidator:
         Returns:
             Dict with collected references organized by type
         """
-        aliases = [r for r in resources if r.type == "aliases"]
-        vlans = [r for r in resources if r.type == "vlans"]
-        firewall_rules = [r for r in resources if r.type == "firewall_rules"]
-        unbound_host_overrides = [r for r in resources if r.type == "unbound_host_override"]
-        unbound_host_aliases = [r for r in resources if r.type == "unbound_host_alias"]
-        unbound_forwards = [r for r in resources if r.type == "unbound_forward"]
-        interface_assignments = [r for r in resources if r.type == "interface_assignments"]
-        nat_rules = [r for r in resources if r.type == "nat_rules"]
-        gateways = [r for r in resources if r.type == "gateways"]
-        static_routes = [r for r in resources if r.type == "static_routes"]
-        virtual_ips = [r for r in resources if r.type == "virtual_ips"]
+        aliases = [r for r in resources if r.type == "firewall.aliases"]
+        vlans = [r for r in resources if r.type == "interfaces.vlans"]
+        firewall_rules = [r for r in resources if r.type == "firewall.rules"]
+        unbound_host_overrides = [r for r in resources if r.type == "unbound.host_overrides"]
+        unbound_host_aliases = [r for r in resources if r.type == "unbound.host_aliases"]
+        unbound_forwards = [r for r in resources if r.type == "unbound.forwards"]
+        interface_assignments = [r for r in resources if r.type == "interfaces.assignments"]
+        nat_rules = [r for r in resources if r.type == "firewall.nat"]
+        gateways = [r for r in resources if r.type == "routing.gateways"]
+        static_routes = [r for r in resources if r.type == "routing.static"]
+        virtual_ips = [r for r in resources if r.type == "interfaces.virtual_ips"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}

@@ -49,7 +49,7 @@ def _resource(
     }
     if lock:
         config["lock"] = True
-    return ResourceConfig(name=name, type="aliases", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.aliases", provider="opnsense", config=config)
 
 
 def _live(

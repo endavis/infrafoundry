@@ -43,7 +43,7 @@ def _alias(name: str, **overrides: Any) -> ResourceConfig:
         "content": ["192.0.2.1"],
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="aliases", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.aliases", provider="opnsense", config=config)
 
 
 @pytest.fixture
@@ -106,7 +106,7 @@ class TestName:
     def test_space_rejected(self, validator: AliasValidator, report: ValidationReport) -> None:
         r = ResourceConfig(
             name="bad space",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "bad space", "type": "host", "content": ["192.0.2.1"]},
         )
@@ -128,7 +128,7 @@ class TestName:
     def test_empty_name_rejected(self, validator: AliasValidator, report: ValidationReport) -> None:
         r = ResourceConfig(
             name="bad",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "", "type": "host", "content": ["192.0.2.1"]},
         )
@@ -140,7 +140,7 @@ class TestName:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": 12345, "type": "host", "content": ["192.0.2.1"]},
         )
@@ -154,7 +154,7 @@ class TestName:
         # resource name.
         r = ResourceConfig(
             name="ok_name",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"type": "host", "content": ["192.0.2.1"]},
         )
@@ -234,7 +234,7 @@ class TestType:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "bad", "content": ["192.0.2.1"]},
         )
@@ -244,7 +244,7 @@ class TestType:
     def test_empty_type_rejected(self, validator: AliasValidator, report: ValidationReport) -> None:
         r = ResourceConfig(
             name="bad",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "bad", "type": "", "content": []},
         )
@@ -256,7 +256,7 @@ class TestType:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "bad", "type": 12345, "content": []},
         )
@@ -393,7 +393,7 @@ class TestContentShape:
         # to OPNsense.
         r = ResourceConfig(
             name="ok",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "ok", "type": "host"},
         )
@@ -588,13 +588,13 @@ class TestUniqueness:
         # wire identity) independently from the top-level resource name.
         first = ResourceConfig(
             name="first",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "shared", "type": "host", "content": ["192.0.2.1"]},
         )
         dup = ResourceConfig(
             name="dup",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "shared", "type": "host", "content": ["192.0.2.2"]},
         )
@@ -607,13 +607,13 @@ class TestUniqueness:
         # Two entries with distinct wire names — no collision.
         a = ResourceConfig(
             name="entry_a",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "entry_a", "type": "host", "content": ["192.0.2.1"]},
         )
         b = ResourceConfig(
             name="entry_b",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "entry_b", "type": "host", "content": ["192.0.2.2"]},
         )

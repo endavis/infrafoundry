@@ -59,7 +59,9 @@ def _resource(
         config["lock"] = True
     if extras:
         config.update(extras)
-    return ResourceConfig(name=name, type="virtual_ips", provider="opnsense", config=config)
+    return ResourceConfig(
+        name=name, type="interfaces.virtual_ips", provider="opnsense", config=config
+    )
 
 
 def _live(

@@ -168,7 +168,8 @@ class OPNsenseDirectRunner(BaseRunner):
 
         Args:
             resources: All provider resources for the current environment.
-            type_name: ``ResourceConfig.type`` to keep (e.g., ``"vlans"``).
+            type_name: ``ResourceConfig.type`` to keep
+                (e.g., ``"interfaces.vlans"``).
             target_resources: Optional name filter (CLI ``--resource``).
 
         Returns:
@@ -198,7 +199,7 @@ class OPNsenseDirectRunner(BaseRunner):
         Returns:
             VLAN ResourceConfig entries the runner should act on.
         """
-        return OPNsenseDirectRunner._filter_by_type(resources, "vlans", target_resources)
+        return OPNsenseDirectRunner._filter_by_type(resources, "interfaces.vlans", target_resources)
 
     @staticmethod
     def _resolve_dispatch_table(provider: ProviderBase) -> dict[str, type[Any]]:
@@ -321,7 +322,7 @@ class OPNsenseDirectRunner(BaseRunner):
         """Render a one-line plan summary for a single component's diff.
 
         Args:
-            type_name: Resource type name (e.g., ``"vlans"``).
+            type_name: Resource type name (e.g., ``"interfaces.vlans"``).
             diff: A ``Diff``-like object exposing ``adds``/``updates``/
                 ``deletes``/``locked`` lists. Read-only components may
                 supply additional attributes (e.g., ``read_only``,

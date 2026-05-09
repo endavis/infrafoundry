@@ -618,7 +618,7 @@ def _index_managed_gateway_protocols(
     """Build ``{gateway_name: protocol}`` from managed gateway resources."""
     result: dict[str, str] = {}
     for gateway in managed_gateways:
-        if gateway.type != "gateways":
+        if gateway.type != "routing.gateways":
             continue
         protocol = gateway.config.get("protocol")
         if isinstance(protocol, str) and protocol in ("inet", "inet6"):

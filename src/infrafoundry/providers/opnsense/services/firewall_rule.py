@@ -616,7 +616,7 @@ def firewall_rule_configs_from_resources(
     """
     configs: list[FirewallRuleConfig] = []
     for resource in resources:
-        if resource.type != "firewall_rules":
+        if resource.type != "firewall.rules":
             continue
 
         config = resource.config

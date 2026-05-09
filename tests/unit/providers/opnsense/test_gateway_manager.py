@@ -38,7 +38,7 @@ def _resource(name: str, *, lock: bool = False) -> ResourceConfig:
     }
     if lock:
         config["lock"] = True
-    return ResourceConfig(name=name, type="gateways", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="routing.gateways", provider="opnsense", config=config)
 
 
 def _live_managed(uuid: str, name: str) -> LiveGateway:

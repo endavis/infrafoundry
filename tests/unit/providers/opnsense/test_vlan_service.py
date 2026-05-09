@@ -66,7 +66,7 @@ def _resource(
     }
     if lock is not None:
         config["lock"] = lock
-    return ResourceConfig(name=name, type="vlans", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="interfaces.vlans", provider="opnsense", config=config)
 
 
 # ---------------------------------------------------------------------------
@@ -292,7 +292,7 @@ class TestVlanConfigsFromResources:
 
     def test_non_vlan_resources_ignored(self) -> None:
         vlan = _resource("v1", "igb0", 100)
-        alias = ResourceConfig(name="a", type="aliases", provider="opnsense", config={})
+        alias = ResourceConfig(name="a", type="firewall.aliases", provider="opnsense", config={})
         result = vlan_configs_from_resources([vlan, alias])
         assert len(result) == 1
         assert result[0].name == "v1"
@@ -300,7 +300,7 @@ class TestVlanConfigsFromResources:
     def test_missing_required_field(self) -> None:
         bad = ResourceConfig(
             name="v1",
-            type="vlans",
+            type="interfaces.vlans",
             provider="opnsense",
             config={"device": "igb0", "tag": 10, "description": "x"},  # priority missing
         )
@@ -325,7 +325,7 @@ class TestVlanConfigsFromResources:
     def test_non_integer_tag(self) -> None:
         bad = ResourceConfig(
             name="v1",
-            type="vlans",
+            type="interfaces.vlans",
             provider="opnsense",
             config={
                 "device": "igb0",
@@ -340,7 +340,7 @@ class TestVlanConfigsFromResources:
     def test_empty_device_rejected(self) -> None:
         bad = ResourceConfig(
             name="v1",
-            type="vlans",
+            type="interfaces.vlans",
             provider="opnsense",
             config={
                 "device": "",
@@ -365,7 +365,7 @@ class TestVlanConfigsFromResources:
     def test_lock_must_be_boolean(self) -> None:
         bad = ResourceConfig(
             name="v1",
-            type="vlans",
+            type="interfaces.vlans",
             provider="opnsense",
             config={
                 "device": "igb0",
@@ -381,7 +381,7 @@ class TestVlanConfigsFromResources:
     def test_description_must_be_string(self) -> None:
         bad = ResourceConfig(
             name="v1",
-            type="vlans",
+            type="interfaces.vlans",
             provider="opnsense",
             config={
                 "device": "igb0",

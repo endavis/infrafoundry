@@ -206,7 +206,7 @@ def test_migrate_vlans_via_registry(
                 "--provider",
                 "opnsense",
                 "--component",
-                "vlans",
+                "interfaces.vlans",
                 "--output",
                 str(output_file),
             ],
@@ -407,7 +407,7 @@ def test_migrate_unsupported_component_lists_registered(
         # the error rather than every name to keep the test robust to
         # additional registrations.
         assert "Unsupported component" in result.output
-        assert "vlans" in result.output
+        assert "interfaces.vlans" in result.output
         assert not output_file.exists()
 
 

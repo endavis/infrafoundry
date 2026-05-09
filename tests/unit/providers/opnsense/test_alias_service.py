@@ -122,7 +122,7 @@ def _live(
 
 
 def _resource(name: str, config: dict[str, Any]) -> ResourceConfig:
-    return ResourceConfig(name=name, type="aliases", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.aliases", provider="opnsense", config=config)
 
 
 # ---------------------------------------------------------------------------
@@ -793,7 +793,7 @@ class TestConfigsFromResources:
     def test_non_dict_config_rejected(self) -> None:
         r = ResourceConfig(
             name="bad",
-            type="aliases",
+            type="firewall.aliases",
             provider="opnsense",
             config={"name": "bad", "type": "host"},
         )
@@ -804,7 +804,7 @@ class TestConfigsFromResources:
 
     def test_non_aliases_resources_ignored(self) -> None:
         ok = _resource("ok", {"name": "ok", "type": "host"})
-        other = ResourceConfig(name="x", type="vlans", provider="opnsense", config={})
+        other = ResourceConfig(name="x", type="interfaces.vlans", provider="opnsense", config={})
         result = alias_configs_from_resources([ok, other])
         assert len(result) == 1
         assert result[0].name == "ok"

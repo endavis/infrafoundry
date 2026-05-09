@@ -347,7 +347,7 @@ def unbound_host_alias_configs_from_resources(
     """
     configs: list[UnboundHostAliasConfig] = []
     for resource in resources:
-        if resource.type != "unbound_host_alias":
+        if resource.type != "unbound.host_aliases":
             continue
 
         config = resource.config

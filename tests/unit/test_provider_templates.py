@@ -395,7 +395,7 @@ class TestOPNsenseTemplates:
         """Create VLAN resource."""
         return ResourceConfig(
             provider="opnsense",
-            type="vlans",
+            type="interfaces.vlans",
             name="vlan-100",
             config={"name": "vlan-100", "tag": 100, "parent": "igb0", "description": "Web VLAN"},
         )
@@ -405,7 +405,7 @@ class TestOPNsenseTemplates:
         """Create alias resource."""
         return ResourceConfig(
             provider="opnsense",
-            type="aliases",
+            type="firewall.aliases",
             name="web-servers",
             config={
                 "name": "web-servers",
@@ -437,7 +437,7 @@ class TestOPNsenseTemplates:
         """
         rule = ResourceConfig(
             provider="opnsense",
-            type="firewall_rules",
+            type="firewall.rules",
             name="allow-web-traffic",
             config={"name": "allow-web-traffic", "action": "pass", "interface": "lan"},
         )
@@ -849,19 +849,19 @@ class TestProviderResourceGrouping:
         resources = [
             ResourceConfig(
                 provider="opnsense",
-                type="firewall_rules",
+                type="firewall.rules",
                 name="rule1",
                 config={"name": "rule1", "action": "pass"},
             ),
             ResourceConfig(
                 provider="opnsense",
-                type="vlans",
+                type="interfaces.vlans",
                 name="vlan1",
                 config={"name": "vlan1", "tag": 100},
             ),
             ResourceConfig(
                 provider="opnsense",
-                type="aliases",
+                type="firewall.aliases",
                 name="alias1",
                 config={"name": "alias1", "type": "host"},
             ),
@@ -982,11 +982,11 @@ class TestProviderDependencies:
         # Firewall rules (direct-API per ADR-0015) depend on aliases, vlans,
         # interface_assignments (for ``interface``), and gateways (for the
         # ``gateway`` policy-routing field).
-        assert "firewall_rules" in deps
-        assert "aliases" in deps["firewall_rules"]
-        assert "vlans" in deps["firewall_rules"]
-        assert "interface_assignments" in deps["firewall_rules"]
-        assert "gateways" in deps["firewall_rules"]
+        assert "firewall.rules" in deps
+        assert "firewall.aliases" in deps["firewall.rules"]
+        assert "interfaces.vlans" in deps["firewall.rules"]
+        assert "interfaces.assignments" in deps["firewall.rules"]
+        assert "routing.gateways" in deps["firewall.rules"]
 
     def test_kubernetes_get_dependencies(self, tmp_path: Path):
         """Test Kubernetes resource dependencies."""

@@ -47,7 +47,9 @@ def _ipalias(name: str, **overrides: Any) -> ResourceConfig:
         "network": "24",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="virtual_ips", provider="opnsense", config=config)
+    return ResourceConfig(
+        name=name, type="interfaces.virtual_ips", provider="opnsense", config=config
+    )
 
 
 def _carp(name: str, **overrides: Any) -> ResourceConfig:
@@ -60,7 +62,9 @@ def _carp(name: str, **overrides: Any) -> ResourceConfig:
         "password": "secret://env_secrets/opnsense/carp_passwords/lan_carp_1",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="virtual_ips", provider="opnsense", config=config)
+    return ResourceConfig(
+        name=name, type="interfaces.virtual_ips", provider="opnsense", config=config
+    )
 
 
 def _proxyarp(name: str, **overrides: Any) -> ResourceConfig:
@@ -71,7 +75,9 @@ def _proxyarp(name: str, **overrides: Any) -> ResourceConfig:
         "network": "32",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="virtual_ips", provider="opnsense", config=config)
+    return ResourceConfig(
+        name=name, type="interfaces.virtual_ips", provider="opnsense", config=config
+    )
 
 
 @pytest.fixture
@@ -140,7 +146,7 @@ class TestMode:
         # Missing mode coerces to default (ipalias) — should not fail.
         r = ResourceConfig(
             name="ok",
-            type="virtual_ips",
+            type="interfaces.virtual_ips",
             provider="opnsense",
             config={
                 "interface": "lan",
@@ -229,7 +235,7 @@ class TestInterface:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="virtual_ips",
+            type="interfaces.virtual_ips",
             provider="opnsense",
             config={
                 "mode": "ipalias",
@@ -292,7 +298,7 @@ class TestAddress:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="virtual_ips",
+            type="interfaces.virtual_ips",
             provider="opnsense",
             config={
                 "mode": "ipalias",
@@ -381,7 +387,7 @@ class TestNetwork:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="virtual_ips",
+            type="interfaces.virtual_ips",
             provider="opnsense",
             config={
                 "mode": "ipalias",
@@ -485,7 +491,7 @@ class TestCarpVhid:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="virtual_ips",
+            type="interfaces.virtual_ips",
             provider="opnsense",
             config={
                 "mode": "carp",
@@ -580,7 +586,7 @@ class TestCarpPassword:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="virtual_ips",
+            type="interfaces.virtual_ips",
             provider="opnsense",
             config={
                 "mode": "carp",

@@ -126,17 +126,17 @@ class OPNsenseProvider(
         from .components.vlan import VlanManager
 
         components: list[tuple[str, type]] = [
-            ("vlans", VlanManager),
-            ("interface_assignments", InterfaceAssignmentManager),
-            ("aliases", AliasManager),
-            ("nat_rules", NATRuleManager),
-            ("firewall_rules", FirewallRuleManager),
-            ("gateways", GatewayManager),
-            ("static_routes", StaticRouteManager),
-            ("virtual_ips", VirtualIPManager),
-            ("unbound_host_override", UnboundHostOverrideManager),
-            ("unbound_host_alias", UnboundHostAliasManager),
-            ("unbound_forward", UnboundForwardManager),
+            ("interfaces.vlans", VlanManager),
+            ("interfaces.assignments", InterfaceAssignmentManager),
+            ("firewall.aliases", AliasManager),
+            ("firewall.nat", NATRuleManager),
+            ("firewall.rules", FirewallRuleManager),
+            ("routing.gateways", GatewayManager),
+            ("routing.static", StaticRouteManager),
+            ("interfaces.virtual_ips", VirtualIPManager),
+            ("unbound.host_overrides", UnboundHostOverrideManager),
+            ("unbound.host_aliases", UnboundHostAliasManager),
+            ("unbound.forwards", UnboundForwardManager),
             ("kea_dhcp", KeaDHCPManager),
             ("isc_to_kea", ISCToKeaMigrationManager),
         ]
@@ -244,21 +244,21 @@ class OPNsenseProvider(
         # so a brand-new override exists on the box before any aliases
         # reference it (#776).
         return {
-            "vlans": VlanManager,
-            "interface_assignments": InterfaceAssignmentManager,
-            "aliases": AliasManager,
-            "nat_rules": NATRuleManager,
-            "firewall_rules": FirewallRuleManager,
-            "gateways": GatewayManager,
-            "static_routes": StaticRouteManager,
-            "virtual_ips": VirtualIPManager,
-            "unbound_host_override": UnboundHostOverrideManager,
-            "unbound_host_alias": UnboundHostAliasManager,
-            "unbound_forward": UnboundForwardManager,
-            "kea_subnet": KeaDHCPv4SubnetManager,
-            "kea_reservation": KeaDHCPv4ReservationManager,
-            "kea_dhcp6_subnet": KeaDHCPv6SubnetManager,
-            "kea_dhcp6_reservation": KeaDHCPv6ReservationManager,
+            "interfaces.vlans": VlanManager,
+            "interfaces.assignments": InterfaceAssignmentManager,
+            "firewall.aliases": AliasManager,
+            "firewall.nat": NATRuleManager,
+            "firewall.rules": FirewallRuleManager,
+            "routing.gateways": GatewayManager,
+            "routing.static": StaticRouteManager,
+            "interfaces.virtual_ips": VirtualIPManager,
+            "unbound.host_overrides": UnboundHostOverrideManager,
+            "unbound.host_aliases": UnboundHostAliasManager,
+            "unbound.forwards": UnboundForwardManager,
+            "kea.dhcp4.subnets": KeaDHCPv4SubnetManager,
+            "kea.dhcp4.reservations": KeaDHCPv4ReservationManager,
+            "kea.dhcp6.subnets": KeaDHCPv6SubnetManager,
+            "kea.dhcp6.reservations": KeaDHCPv6ReservationManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -367,21 +367,21 @@ class OPNsenseProvider(
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
         return [
-            "firewall_rules",
-            "vlans",
-            "interface_assignments",
-            "aliases",
-            "kea_subnet",
-            "kea_reservation",
-            "kea_dhcp6_subnet",
-            "kea_dhcp6_reservation",
-            "unbound_host_override",
-            "nat_rules",
-            "gateways",
-            "static_routes",
-            "virtual_ips",
-            "unbound_host_alias",
-            "unbound_forward",
+            "firewall.rules",
+            "interfaces.vlans",
+            "interfaces.assignments",
+            "firewall.aliases",
+            "kea.dhcp4.subnets",
+            "kea.dhcp4.reservations",
+            "kea.dhcp6.subnets",
+            "kea.dhcp6.reservations",
+            "unbound.host_overrides",
+            "firewall.nat",
+            "routing.gateways",
+            "routing.static",
+            "interfaces.virtual_ips",
+            "unbound.host_aliases",
+            "unbound.forwards",
         ]
 
     @override
@@ -401,21 +401,26 @@ class OPNsenseProvider(
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
-            "firewall_rules": ["aliases", "vlans", "interface_assignments", "gateways"],
-            "vlans": [],
-            "interface_assignments": ["vlans"],
-            "aliases": [],
-            "kea_subnet": ["vlans"],
-            "kea_reservation": ["kea_subnet"],
-            "kea_dhcp6_subnet": ["vlans"],
-            "kea_dhcp6_reservation": ["kea_dhcp6_subnet"],
-            "unbound_host_override": [],
-            "nat_rules": ["aliases", "interface_assignments"],
-            "gateways": ["interface_assignments"],
-            "static_routes": ["gateways"],
-            "virtual_ips": ["interface_assignments"],
-            "unbound_host_alias": ["unbound_host_override"],
-            "unbound_forward": [],
+            "firewall.rules": [
+                "firewall.aliases",
+                "interfaces.vlans",
+                "interfaces.assignments",
+                "routing.gateways",
+            ],
+            "interfaces.vlans": [],
+            "interfaces.assignments": ["interfaces.vlans"],
+            "firewall.aliases": [],
+            "kea.dhcp4.subnets": ["interfaces.vlans"],
+            "kea.dhcp4.reservations": ["kea.dhcp4.subnets"],
+            "kea.dhcp6.subnets": ["interfaces.vlans"],
+            "kea.dhcp6.reservations": ["kea.dhcp6.subnets"],
+            "unbound.host_overrides": [],
+            "firewall.nat": ["firewall.aliases", "interfaces.assignments"],
+            "routing.gateways": ["interfaces.assignments"],
+            "routing.static": ["routing.gateways"],
+            "interfaces.virtual_ips": ["interfaces.assignments"],
+            "unbound.host_aliases": ["unbound.host_overrides"],
+            "unbound.forwards": [],
         }
 
     @override
@@ -496,7 +501,7 @@ class OPNsenseProvider(
         """Migrate current VLAN configuration to InfraFoundry YAML.
 
         .. deprecated::
-            Use ``get_extractor("opnsense", "vlans").extract(env_name)``.
+            Use ``get_extractor("opnsense", "interfaces.vlans").extract(env_name)``.
             This shim will be removed after one minor version.
 
         Args:
@@ -509,18 +514,18 @@ class OPNsenseProvider(
 
         warnings.warn(
             "OPNsenseProvider.migrate_vlan is deprecated; "
-            'use get_extractor("opnsense", "vlans").extract(env_name).',
+            'use get_extractor("opnsense", "interfaces.vlans").extract(env_name).',
             DeprecationWarning,
             stacklevel=2,
         )
-        return get_extractor("opnsense", "vlans").extract(env_name)
+        return get_extractor("opnsense", "interfaces.vlans").extract(env_name)
 
     def migrate_interface_assignment(self, env_name: str) -> str:
         """Migrate current interface assignments to InfraFoundry YAML.
 
         .. deprecated::
             Use
-            ``get_extractor("opnsense", "interface_assignments").extract(env_name)``.
+            ``get_extractor("opnsense", "interfaces.assignments").extract(env_name)``.
             This shim will be removed after one minor version.
 
         Args:
@@ -533,17 +538,17 @@ class OPNsenseProvider(
 
         warnings.warn(
             "OPNsenseProvider.migrate_interface_assignment is deprecated; "
-            'use get_extractor("opnsense", "interface_assignments").extract(env_name).',
+            'use get_extractor("opnsense", "interfaces.assignments").extract(env_name).',
             DeprecationWarning,
             stacklevel=2,
         )
-        return get_extractor("opnsense", "interface_assignments").extract(env_name)
+        return get_extractor("opnsense", "interfaces.assignments").extract(env_name)
 
     def migrate_nat_rule(self, env_name: str) -> str:
         """Migrate current NAT rules (outbound + 1:1) to InfraFoundry YAML.
 
         .. deprecated::
-            Use ``get_extractor("opnsense", "nat_rules").extract(env_name)``.
+            Use ``get_extractor("opnsense", "firewall.nat").extract(env_name)``.
             This shim will be removed after one minor version.
 
         Args:
@@ -556,17 +561,17 @@ class OPNsenseProvider(
 
         warnings.warn(
             "OPNsenseProvider.migrate_nat_rule is deprecated; "
-            'use get_extractor("opnsense", "nat_rules").extract(env_name).',
+            'use get_extractor("opnsense", "firewall.nat").extract(env_name).',
             DeprecationWarning,
             stacklevel=2,
         )
-        return get_extractor("opnsense", "nat_rules").extract(env_name)
+        return get_extractor("opnsense", "firewall.nat").extract(env_name)
 
     def migrate_firewall_rule(self, env_name: str) -> str:
         """Migrate current firewall rules (MVC) to InfraFoundry YAML.
 
         .. deprecated::
-            Use ``get_extractor("opnsense", "firewall_rules").extract(env_name)``.
+            Use ``get_extractor("opnsense", "firewall.rules").extract(env_name)``.
             This shim will be removed after one minor version.
 
         Args:
@@ -579,17 +584,17 @@ class OPNsenseProvider(
 
         warnings.warn(
             "OPNsenseProvider.migrate_firewall_rule is deprecated; "
-            'use get_extractor("opnsense", "firewall_rules").extract(env_name).',
+            'use get_extractor("opnsense", "firewall.rules").extract(env_name).',
             DeprecationWarning,
             stacklevel=2,
         )
-        return get_extractor("opnsense", "firewall_rules").extract(env_name)
+        return get_extractor("opnsense", "firewall.rules").extract(env_name)
 
     def migrate_gateway(self, env_name: str) -> str:
         """Migrate current gateways to InfraFoundry YAML.
 
         .. deprecated::
-            Use ``get_extractor("opnsense", "gateways").extract(env_name)``.
+            Use ``get_extractor("opnsense", "routing.gateways").extract(env_name)``.
             This shim will be removed after one minor version.
 
         Args:
@@ -602,18 +607,18 @@ class OPNsenseProvider(
 
         warnings.warn(
             "OPNsenseProvider.migrate_gateway is deprecated; "
-            'use get_extractor("opnsense", "gateways").extract(env_name).',
+            'use get_extractor("opnsense", "routing.gateways").extract(env_name).',
             DeprecationWarning,
             stacklevel=2,
         )
-        return get_extractor("opnsense", "gateways").extract(env_name)
+        return get_extractor("opnsense", "routing.gateways").extract(env_name)
 
     def migrate_static_route(self, env_name: str) -> str:
         """Migrate current static routes to InfraFoundry YAML.
 
         .. deprecated::
             Use
-            ``get_extractor("opnsense", "static_routes").extract(env_name)``.
+            ``get_extractor("opnsense", "routing.static").extract(env_name)``.
             This shim will be removed after one minor version.
 
         Args:
@@ -626,18 +631,18 @@ class OPNsenseProvider(
 
         warnings.warn(
             "OPNsenseProvider.migrate_static_route is deprecated; "
-            'use get_extractor("opnsense", "static_routes").extract(env_name).',
+            'use get_extractor("opnsense", "routing.static").extract(env_name).',
             DeprecationWarning,
             stacklevel=2,
         )
-        return get_extractor("opnsense", "static_routes").extract(env_name)
+        return get_extractor("opnsense", "routing.static").extract(env_name)
 
     def migrate_virtual_ip(self, env_name: str) -> str:
         """Migrate current virtual IPs (CARP / ipalias / proxyarp) to InfraFoundry YAML.
 
         .. deprecated::
             Use
-            ``get_extractor("opnsense", "virtual_ips").extract(env_name)``.
+            ``get_extractor("opnsense", "interfaces.virtual_ips").extract(env_name)``.
             This shim will be removed after one minor version.
 
         Args:
@@ -650,18 +655,18 @@ class OPNsenseProvider(
 
         warnings.warn(
             "OPNsenseProvider.migrate_virtual_ip is deprecated; "
-            'use get_extractor("opnsense", "virtual_ips").extract(env_name).',
+            'use get_extractor("opnsense", "interfaces.virtual_ips").extract(env_name).',
             DeprecationWarning,
             stacklevel=2,
         )
-        return get_extractor("opnsense", "virtual_ips").extract(env_name)
+        return get_extractor("opnsense", "interfaces.virtual_ips").extract(env_name)
 
     def migrate_unbound_host_alias(self, env_name: str) -> str:
         """Migrate current Unbound host aliases to InfraFoundry YAML.
 
         .. deprecated::
             Use
-            ``get_extractor("opnsense", "unbound_host_alias").extract(env_name)``.
+            ``get_extractor("opnsense", "unbound.host_aliases").extract(env_name)``.
             This shim will be removed after one minor version.
 
         Args:
@@ -674,18 +679,18 @@ class OPNsenseProvider(
 
         warnings.warn(
             "OPNsenseProvider.migrate_unbound_host_alias is deprecated; "
-            'use get_extractor("opnsense", "unbound_host_alias").extract(env_name).',
+            'use get_extractor("opnsense", "unbound.host_aliases").extract(env_name).',
             DeprecationWarning,
             stacklevel=2,
         )
-        return get_extractor("opnsense", "unbound_host_alias").extract(env_name)
+        return get_extractor("opnsense", "unbound.host_aliases").extract(env_name)
 
     def migrate_unbound_forward(self, env_name: str) -> str:
         """Migrate current Unbound forwarders to InfraFoundry YAML.
 
         .. deprecated::
             Use
-            ``get_extractor("opnsense", "unbound_forward").extract(env_name)``.
+            ``get_extractor("opnsense", "unbound.forwards").extract(env_name)``.
             This shim will be removed after one minor version.
 
         Args:
@@ -698,11 +703,11 @@ class OPNsenseProvider(
 
         warnings.warn(
             "OPNsenseProvider.migrate_unbound_forward is deprecated; "
-            'use get_extractor("opnsense", "unbound_forward").extract(env_name).',
+            'use get_extractor("opnsense", "unbound.forwards").extract(env_name).',
             DeprecationWarning,
             stacklevel=2,
         )
-        return get_extractor("opnsense", "unbound_forward").extract(env_name)
+        return get_extractor("opnsense", "unbound.forwards").extract(env_name)
 
     def migrate_isc_to_kea(self, env_name: str, interfaces: list[str] | None = None) -> str:
         """Migrate ISC DHCP configuration to Kea DHCP format.
