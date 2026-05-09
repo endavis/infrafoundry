@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778338065873,
+  "lastUpdate": 1778338609044,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8370,6 +8370,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000030299710904070006",
             "extra": "mean: 123.54399345107714 usec\nrounds: 1985"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e5319fe9cb3f66ff01d4dc32762e8640f409d188",
+          "message": "refactor: drop direct-OPNsense flat→dotted shim (hard cutover) (merges PR #799, addresses #793)\n\n* refactor: drop direct-OPNsense flat→dotted shim (hard cutover)\n\nPhase 5 of #793. Removes the transient ``STEM_TO_DOTTED`` translation\ntable and its three call sites that auto-translated legacy flat\ndirect-OPNsense type names (e.g. filename stem ``vlans`` → dotted\n``interfaces.vlans``, resource-centric ``type: kea_subnet`` →\n``kea.dhcp4.reservations``) to the API-aligned dotted paths\nintroduced in Phase 1.\n\nAfter this commit operators must use either the nested ``opnsense:``\nschema (per ADR-0016) or already-dotted ``type:`` strings in\nresource-centric files. Flat OPNsense YAML still parses but emits\n``ResourceConfig.type`` matching the filename stem / raw type, which\nno longer matches any registered direct-OPNsense component — dispatch\nfails with a clear \"unknown type\" error. The conversion script in\nPhase 6 handles the one-shot operator-side migration.\n\nTest fixtures using the legacy flat OPNsense format are converted to\nthe nested schema or dotted-type form in this same commit so the test\nsuite stays green.\n\nAddresses #793.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* fix: convert blueprint dhcp.yaml type names to dotted paths\n\nFixup for #793 Phase 5. The shipped blueprints under ``blueprints/``\nwere emitting legacy stem ``type: kea_reservation`` which Phase 5's\nhard cutover no longer auto-translates to ``kea.dhcp4.reservations``.\nThe blueprint test suite caught the regression.\n\nConvert each ``type: kea_reservation`` to ``type: kea.dhcp4.reservations``\nin:\n\n- blueprints/ontap-cluster/dhcp.yaml (5 entries)\n- blueprints/service-vm/dhcp.yaml\n- blueprints/aiqum/dhcp.yaml\n- blueprints/k3s-cluster/providers/proxmox/dhcp.yaml (2 entries)\n\nAddresses #793.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-09T15:56:23+01:00",
+          "tree_id": "7567bdbd85a0e72c4c54da97237442500642a9de",
+          "url": "https://github.com/endavis/infrafoundry/commit/e5319fe9cb3f66ff01d4dc32762e8640f409d188"
+        },
+        "date": 1778338608554,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8397.088248103193,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000025053363107470343",
+            "extra": "mean: 119.08889968208786 usec\nrounds: 2213"
           }
         ]
       }
