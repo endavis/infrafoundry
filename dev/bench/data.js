@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778243978009,
+  "lastUpdate": 1778336359060,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8215,6 +8215,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002876466298988226",
             "extra": "mean: 157.12132251260263 usec\nrounds: 2372"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8046ea1295230109f34679117aa65427e68038bf",
+          "message": "refactor: add ADR-0016 for direct-OPNsense nested YAML schema (#793 Phase 0) (merges PR #794, addresses #793)\n\ndocs: add ADR-0016 for direct-OPNsense nested YAML schema\n\nFormalizes the convention for migrating the direct-OPNsense provider's\nYAML schema from flat top-level resource type keys to a nested API-aligned\nhierarchy. Locks the type rename mapping, cross-reference syntax, migration\nstrategy (hard cutover with transient STEM_TO_DOTTED shim during Phases 1-4),\nand the 6-phase implementation sequence from issue #793 before any code\nlands.\n\nAddresses #793.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-09T15:18:39+01:00",
+          "tree_id": "246dc4f78c854efab0dcf68b15ed61d02090591d",
+          "url": "https://github.com/endavis/infrafoundry/commit/8046ea1295230109f34679117aa65427e68038bf"
+        },
+        "date": 1778336356897,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12394.632618328696,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007061622973948332",
+            "extra": "mean: 80.6800839357868 usec\nrounds: 2490"
           }
         ]
       }
