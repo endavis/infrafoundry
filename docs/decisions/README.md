@@ -101,5 +101,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 
 | ADR | Title | Status |
 |-----|-------|--------|
-
-_(No project-level ADRs yet.)_
+| [0016](0016-direct-opnsense-nested-yaml-schema.md) | Direct-OPNsense nested YAML schema convention | Accepted |
