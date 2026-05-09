@@ -303,7 +303,7 @@ class VirtualIPManager(BaseComponentManager):
         try:
             resolved_resources: list[ResourceConfig] = []
             for resource in resources:
-                if resource.type != "virtual_ips":
+                if resource.type != "interfaces.virtual_ips":
                     # Forward non-virtual_ips resources unchanged so the
                     # parser sees them and skips them as expected.
                     resolved_resources.append(resource)

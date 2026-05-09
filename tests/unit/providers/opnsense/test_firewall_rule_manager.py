@@ -38,7 +38,7 @@ def _resource(name: str, *, lock: bool = False, **overrides: Any) -> ResourceCon
     if lock:
         config["lock"] = True
     config.update(overrides)
-    return ResourceConfig(name=name, type="firewall_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.rules", provider="opnsense", config=config)
 
 
 def _live_managed(uuid: str, name: str) -> LiveFirewallRule:

@@ -46,7 +46,7 @@ def _resource(
     if ipv6 is not None:
         config["ipv6"] = ipv6
     return ResourceConfig(
-        name=name, type="interface_assignments", provider="opnsense", config=config
+        name=name, type="interfaces.assignments", provider="opnsense", config=config
     )
 
 

@@ -39,7 +39,7 @@ def _subnet(name: str, *, subnet: str = "10.0.10.0/24", **overrides: Any) -> Res
         "description": overrides.pop("description", f"{name} desc"),
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="kea_subnet", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="kea.dhcp4.subnets", provider="opnsense", config=config)
 
 
 SERVICE_PATH = "infrafoundry.providers.opnsense.components.kea_dhcp4_subnet.KeaDHCPService"

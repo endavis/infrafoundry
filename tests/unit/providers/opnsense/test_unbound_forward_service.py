@@ -106,7 +106,7 @@ def _live(
 
 
 def _resource(name: str, config: dict[str, Any]) -> ResourceConfig:
-    return ResourceConfig(name=name, type="unbound_forward", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="unbound.forwards", provider="opnsense", config=config)
 
 
 # ---------------------------------------------------------------------------
@@ -526,7 +526,7 @@ class TestConfigsFromResources:
     def test_non_dict_config_rejected(self) -> None:
         r = ResourceConfig(
             name="bad",
-            type="unbound_forward",
+            type="unbound.forwards",
             provider="opnsense",
             config={"server": "1.1.1.1"},
         )
@@ -536,7 +536,7 @@ class TestConfigsFromResources:
 
     def test_non_unbound_forward_resources_ignored(self) -> None:
         ok = _resource("ok", {"server": "1.1.1.1"})
-        other = ResourceConfig(name="x", type="aliases", provider="opnsense", config={})
+        other = ResourceConfig(name="x", type="firewall.aliases", provider="opnsense", config={})
         result = unbound_forward_configs_from_resources([ok, other])
         assert len(result) == 1
         assert result[0].name == "ok"

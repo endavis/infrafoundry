@@ -35,7 +35,9 @@ def _alias(name: str, **overrides: Any) -> ResourceConfig:
         "domain": "internal",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="unbound_host_alias", provider="opnsense", config=config)
+    return ResourceConfig(
+        name=name, type="unbound.host_aliases", provider="opnsense", config=config
+    )
 
 
 @pytest.fixture
@@ -103,7 +105,7 @@ class TestHostCrossRef:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="unbound_host_alias",
+            type="unbound.host_aliases",
             provider="opnsense",
             config={"hostname": "db", "domain": "internal"},
         )
@@ -156,7 +158,7 @@ class TestHostname:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="unbound_host_alias",
+            type="unbound.host_aliases",
             provider="opnsense",
             config={"host": "db-primary", "domain": "internal"},
         )
@@ -209,7 +211,7 @@ class TestDomain:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="unbound_host_alias",
+            type="unbound.host_aliases",
             provider="opnsense",
             config={"host": "db-primary", "hostname": "db"},
         )

@@ -118,7 +118,9 @@ def _live(
 
 
 def _resource(name: str, config: dict[str, Any]) -> ResourceConfig:
-    return ResourceConfig(name=name, type="virtual_ips", provider="opnsense", config=config)
+    return ResourceConfig(
+        name=name, type="interfaces.virtual_ips", provider="opnsense", config=config
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -534,7 +536,7 @@ class TestParserRejection:
     def test_non_dict_config_rejected(self) -> None:
         r = ResourceConfig(
             name="bad",
-            type="virtual_ips",
+            type="interfaces.virtual_ips",
             provider="opnsense",
             config={"mode": "ipalias", "interface": "lan", "address": "10.0.0.10", "network": "24"},
         )
@@ -562,7 +564,7 @@ class TestParserRejection:
             "ok",
             {"mode": "ipalias", "interface": "lan", "address": "10.0.0.10", "network": "24"},
         )
-        other = ResourceConfig(name="x", type="aliases", provider="opnsense", config={})
+        other = ResourceConfig(name="x", type="firewall.aliases", provider="opnsense", config={})
         result = virtual_ip_configs_from_resources([v, other])
         assert len(result) == 1
         assert result[0].name == "ok"

@@ -267,7 +267,7 @@ def _desired_with_resource_names(
     parsed = alias_configs_from_resources(resources)
     parsed_iter = iter(parsed)
     for resource in resources:
-        if resource.type != "aliases":
+        if resource.type != "firewall.aliases":
             continue
         cfg = next(parsed_iter, None)
         if cfg is None:

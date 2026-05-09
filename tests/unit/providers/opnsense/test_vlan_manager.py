@@ -37,7 +37,7 @@ def _resource(name: str, device: str, tag: int, *, lock: bool = False) -> Resour
     }
     if lock:
         config["lock"] = True
-    return ResourceConfig(name=name, type="vlans", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="interfaces.vlans", provider="opnsense", config=config)
 
 
 SERVICE_PATH = "infrafoundry.providers.opnsense.components.vlan.VlanService"

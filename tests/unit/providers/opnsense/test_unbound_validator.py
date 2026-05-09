@@ -25,7 +25,7 @@ def test_validate_valid_override(validator, report):
     """Test validation of a valid host override with all fields."""
     override = ResourceConfig(
         name="web-server",
-        type="unbound_host_override",
+        type="unbound.host_overrides",
         provider="opnsense",
         config={
             "hostname": "web",
@@ -46,7 +46,7 @@ def test_validate_missing_hostname(validator, report):
     """Test validation fails when hostname is missing."""
     override = ResourceConfig(
         name="bad-override",
-        type="unbound_host_override",
+        type="unbound.host_overrides",
         provider="opnsense",
         config={
             "domain": "example.com",
@@ -72,7 +72,7 @@ def test_validate_missing_domain(validator, report):
     """Test validation fails when domain is missing."""
     override = ResourceConfig(
         name="bad-override",
-        type="unbound_host_override",
+        type="unbound.host_overrides",
         provider="opnsense",
         config={
             "hostname": "web",
@@ -98,7 +98,7 @@ def test_validate_empty_hostname(validator, report):
     """Test validation fails when hostname is empty string."""
     override = ResourceConfig(
         name="bad-override",
-        type="unbound_host_override",
+        type="unbound.host_overrides",
         provider="opnsense",
         config={
             "hostname": "",
@@ -122,7 +122,7 @@ def test_validate_invalid_server_ip(validator, report):
     """Test validation fails when server is not a valid IP address."""
     override = ResourceConfig(
         name="bad-ip",
-        type="unbound_host_override",
+        type="unbound.host_overrides",
         provider="opnsense",
         config={
             "hostname": "web",
@@ -149,7 +149,7 @@ def test_validate_valid_ipv6_server(validator, report):
     """Test validation passes with valid IPv6 server address."""
     override = ResourceConfig(
         name="ipv6-override",
-        type="unbound_host_override",
+        type="unbound.host_overrides",
         provider="opnsense",
         config={
             "hostname": "web",
@@ -174,7 +174,7 @@ def test_validate_no_server_field(validator, report):
     """Test validation passes when server field is not provided (optional)."""
     override = ResourceConfig(
         name="no-server",
-        type="unbound_host_override",
+        type="unbound.host_overrides",
         provider="opnsense",
         config={
             "hostname": "web",
@@ -202,7 +202,7 @@ def test_validate_multiple_resources(validator, report):
     overrides = [
         ResourceConfig(
             name="web",
-            type="unbound_host_override",
+            type="unbound.host_overrides",
             provider="opnsense",
             config={
                 "hostname": "web",
@@ -212,7 +212,7 @@ def test_validate_multiple_resources(validator, report):
         ),
         ResourceConfig(
             name="mail",
-            type="unbound_host_override",
+            type="unbound.host_overrides",
             provider="opnsense",
             config={
                 "hostname": "mail",
@@ -233,7 +233,7 @@ def test_validate_mixed_valid_and_invalid(validator, report):
     overrides = [
         ResourceConfig(
             name="good",
-            type="unbound_host_override",
+            type="unbound.host_overrides",
             provider="opnsense",
             config={
                 "hostname": "web",
@@ -243,7 +243,7 @@ def test_validate_mixed_valid_and_invalid(validator, report):
         ),
         ResourceConfig(
             name="bad",
-            type="unbound_host_override",
+            type="unbound.host_overrides",
             provider="opnsense",
             config={
                 "hostname": "",

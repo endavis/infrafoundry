@@ -81,7 +81,7 @@ def test_service_vm_renders_vm_and_dhcp_resources(loader: PackageLoader) -> None
     assert vm.name == "infra-web"
 
     dhcp = by_provider["opnsense"]
-    assert dhcp.type == "kea_reservation"
+    assert dhcp.type == "kea.dhcp4.reservations"
     assert dhcp.name == "infra-web"
 
 
@@ -133,7 +133,9 @@ def test_service_vm_dhcp_config_uses_merged_values(loader: PackageLoader) -> Non
         PACKAGE_DIR, provider="proxmox", env_name="dev"
     )
 
-    dhcp = next(r for r in resources if r.provider == "opnsense" and r.type == "kea_reservation")
+    dhcp = next(
+        r for r in resources if r.provider == "opnsense" and r.type == "kea.dhcp4.reservations"
+    )
     config = dhcp.config
 
     assert config["subnet_ref"] == "opt1-infrastructure"
@@ -224,8 +226,8 @@ def test_service_vm_blueprint_supports_multiple_instances(tmp_path: Path) -> Non
     assert vm_b.config["target_node"] == "pve2"
 
     # DHCP reservations also distinct
-    dhcp_a = next(r for r in resources_a if r.type == "kea_reservation")
-    dhcp_b = next(r for r in resources_b if r.type == "kea_reservation")
+    dhcp_a = next(r for r in resources_a if r.type == "kea.dhcp4.reservations")
+    dhcp_b = next(r for r in resources_b if r.type == "kea.dhcp4.reservations")
     assert dhcp_a.name == "svc-a"
     assert dhcp_b.name == "svc-b"
     assert dhcp_a.config["ip_address"] == "192.168.10.71"

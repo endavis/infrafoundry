@@ -351,7 +351,7 @@ def unbound_host_override_configs_from_resources(
     """
     configs: list[UnboundHostOverrideConfig] = []
     for resource in resources:
-        if resource.type != "unbound_host_override":
+        if resource.type != "unbound.host_overrides":
             continue
 
         config = resource.config

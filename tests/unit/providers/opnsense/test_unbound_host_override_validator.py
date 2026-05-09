@@ -43,7 +43,7 @@ def _override(name: str, **overrides: Any) -> ResourceConfig:
     }
     config.update(overrides)
     return ResourceConfig(
-        name=name, type="unbound_host_override", provider="opnsense", config=config
+        name=name, type="unbound.host_overrides", provider="opnsense", config=config
     )
 
 
@@ -79,7 +79,7 @@ class TestHostnameDomain:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="unbound_host_override",
+            type="unbound.host_overrides",
             provider="opnsense",
             config={"domain": "example.com"},
         )
@@ -103,7 +103,7 @@ class TestHostnameDomain:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="unbound_host_override",
+            type="unbound.host_overrides",
             provider="opnsense",
             config={"hostname": "web"},
         )

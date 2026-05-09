@@ -78,7 +78,7 @@ def _live(
 
 
 def _resource(name: str, config: dict[str, Any]) -> ResourceConfig:
-    return ResourceConfig(name=name, type="static_routes", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="routing.static", provider="opnsense", config=config)
 
 
 # ---------------------------------------------------------------------------
@@ -465,7 +465,7 @@ class TestConfigsFromResources:
     def test_non_dict_config_rejected(self) -> None:
         r = ResourceConfig(
             name="bad",
-            type="static_routes",
+            type="routing.static",
             provider="opnsense",
             config={"network": "10.0.0.0/24", "gateway": "WAN_DHCP"},
         )
@@ -476,7 +476,7 @@ class TestConfigsFromResources:
 
     def test_non_static_routes_resources_ignored(self) -> None:
         sr = _resource("ok", {"network": "10.0.0.0/24", "gateway": "WAN_DHCP"})
-        other = ResourceConfig(name="x", type="aliases", provider="opnsense", config={})
+        other = ResourceConfig(name="x", type="firewall.aliases", provider="opnsense", config={})
         result = static_route_configs_from_resources([sr, other])
         assert len(result) == 1
         assert result[0].name == "ok"

@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 
+from infrafoundry.core.config.package_loader import STEM_TO_DOTTED
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -88,10 +89,18 @@ class ResourceCentricLoader:
             # Include name in config for template convenience
             config["name"] = item["name"]
 
+            # Translate flat type names to dotted paths for direct-OPNsense
+            # components per ADR-0016 (#793 Phase 1). Existing user
+            # resource-centric YAML files keep parsing while internal
+            # dispatch keys are dotted.
+            # TODO: remove in #793 Phase 5 hard cutover.
+            raw_type = str(item["type"])
+            emitted_type = STEM_TO_DOTTED.get(raw_type, raw_type)
+
             resources.append(
                 ResourceConfig(
                     name=item["name"],
-                    type=item["type"],
+                    type=emitted_type,
                     provider=item["provider"],
                     config=config,
                     import_id=item.get("import_id"),

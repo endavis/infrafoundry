@@ -64,7 +64,7 @@ def _resource(
     if lock:
         config["lock"] = True
     return ResourceConfig(
-        name=name, type="unbound_host_override", provider="opnsense", config=config
+        name=name, type="unbound.host_overrides", provider="opnsense", config=config
     )
 
 

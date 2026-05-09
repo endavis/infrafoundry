@@ -37,7 +37,7 @@ def _outbound(name: str, **overrides: Any) -> ResourceConfig:
         "target": "wanip",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.nat", provider="opnsense", config=config)
 
 
 def _one_to_one(name: str, **overrides: Any) -> ResourceConfig:
@@ -47,7 +47,7 @@ def _one_to_one(name: str, **overrides: Any) -> ResourceConfig:
         "external": "198.51.100.10",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.nat", provider="opnsense", config=config)
 
 
 def _port_forward(name: str, **overrides: Any) -> ResourceConfig:
@@ -57,7 +57,7 @@ def _port_forward(name: str, **overrides: Any) -> ResourceConfig:
         "target": "10.0.0.10",
     }
     config.update(overrides)
-    return ResourceConfig(name=name, type="nat_rules", provider="opnsense", config=config)
+    return ResourceConfig(name=name, type="firewall.nat", provider="opnsense", config=config)
 
 
 @pytest.fixture
@@ -85,7 +85,7 @@ class TestKind:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="nat_rules",
+            type="firewall.nat",
             provider="opnsense",
             config={"interface": "wan", "target": "wanip"},
         )
@@ -106,7 +106,7 @@ class TestKind:
         # "bad kind" negative-test coverage now.
         r = ResourceConfig(
             name="pf",
-            type="nat_rules",
+            type="firewall.nat",
             provider="opnsense",
             config={"kind": "unknown", "interface": "wan"},
         )
@@ -240,7 +240,7 @@ class TestOutboundRequiredFields:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="nat_rules",
+            type="firewall.nat",
             provider="opnsense",
             config={"kind": "outbound", "interface": "wan"},
         )
@@ -260,7 +260,7 @@ class TestOneToOneRequiredFields:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="nat_rules",
+            type="firewall.nat",
             provider="opnsense",
             config={"kind": "one_to_one", "interface": "wan"},
         )
@@ -507,7 +507,7 @@ class TestPortForwardValidation:
         # Port_forward requires a non-empty target (redirect destination).
         r = ResourceConfig(
             name="bad",
-            type="nat_rules",
+            type="firewall.nat",
             provider="opnsense",
             config={"kind": "port_forward", "interface": "wan"},
         )
@@ -525,7 +525,7 @@ class TestPortForwardValidation:
     ) -> None:
         r = ResourceConfig(
             name="bad",
-            type="nat_rules",
+            type="firewall.nat",
             provider="opnsense",
             config={"kind": "port_forward", "target": "10.0.0.10"},
         )

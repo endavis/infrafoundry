@@ -81,7 +81,7 @@ def test_proxmox_k3s_cluster_example_renders_correct_resource_count(
     assert len(resources) == 6
 
     vms = [r for r in resources if r.type == "vm"]
-    dhcps = [r for r in resources if r.type == "kea_reservation"]
+    dhcps = [r for r in resources if r.type == "kea.dhcp4.reservations"]
     assert len(vms) == 3
     assert len(dhcps) == 3
     assert all(r.provider == "proxmox" for r in vms)
@@ -166,7 +166,7 @@ def test_proxmox_k3s_cluster_example_dhcp_configs(loader: PackageLoader) -> None
         PACKAGE_DIR, provider="proxmox", env_name="dev"
     )
 
-    dhcps_by_name = {r.name: r for r in resources if r.type == "kea_reservation"}
+    dhcps_by_name = {r.name: r for r in resources if r.type == "kea.dhcp4.reservations"}
     assert set(dhcps_by_name) == {
         "k3s-dev-server-dhcp",
         "k3s-dev-agent-1-dhcp",
@@ -305,12 +305,12 @@ def test_proxmox_k3s_cluster_blueprint_supports_multiple_instances(tmp_path: Pat
     # A: 1 server + 2 agents = 3 VMs + 3 DHCP reservations = 6
     assert len(resources_a) == 6
     assert sum(1 for r in resources_a if r.type == "vm") == 3
-    assert sum(1 for r in resources_a if r.type == "kea_reservation") == 3
+    assert sum(1 for r in resources_a if r.type == "kea.dhcp4.reservations") == 3
 
     # B: 1 server + 4 agents = 5 VMs + 5 DHCP reservations = 10
     assert len(resources_b) == 10
     assert sum(1 for r in resources_b if r.type == "vm") == 5
-    assert sum(1 for r in resources_b if r.type == "kea_reservation") == 5
+    assert sum(1 for r in resources_b if r.type == "kea.dhcp4.reservations") == 5
 
     # VM names are distinct between instances
     vm_names_a = {r.name for r in resources_a if r.type == "vm"}
@@ -332,7 +332,7 @@ def test_proxmox_k3s_cluster_blueprint_supports_multiple_instances(tmp_path: Pat
     assert vm_b_agent4.config["network"][0]["macaddr"] == "BC:24:11:00:0B:04"
 
     # DHCP reservation names follow the "<vm>-dhcp" template
-    dhcp_names_a = {r.name for r in resources_a if r.type == "kea_reservation"}
+    dhcp_names_a = {r.name for r in resources_a if r.type == "kea.dhcp4.reservations"}
     assert dhcp_names_a == {"k3s-a-server-dhcp", "k3s-a-agent-1-dhcp", "k3s-a-agent-2-dhcp"}
 
     # Events are per-instance: requires field references the correct server_name
@@ -377,7 +377,7 @@ def test_proxmox_k3s_cluster_blueprint_with_zero_agents(tmp_path: Path) -> None:
 
     assert len(resources) == 2
     vms = [r for r in resources if r.type == "vm"]
-    dhcps = [r for r in resources if r.type == "kea_reservation"]
+    dhcps = [r for r in resources if r.type == "kea.dhcp4.reservations"]
     assert len(vms) == 1
     assert len(dhcps) == 1
     assert vms[0].name == "k3s-solo-server"
