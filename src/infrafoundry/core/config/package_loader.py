@@ -711,12 +711,23 @@ class PackageLoader:
                             f"'{NESTED_PROVIDER_NAMESPACE}.{dotted}' is missing "
                             "the required 'name:' field"
                         )
+                    # Mirror ResourceCentricLoader: extract the inner
+                    # ``config:`` dict and expose entry ``name`` inside it for
+                    # template/component convenience. Components downstream
+                    # read fields directly off ``ResourceConfig.config``
+                    # (e.g. ``config["device"]`` for VLANs); the nested loader
+                    # used to pass ``item`` through unchanged, leaving fields
+                    # buried under ``config.config.<field>`` and silently
+                    # breaking every direct-API component validator.
+                    entry_config = item.get("config", {})
+                    if "name" not in entry_config:
+                        entry_config["name"] = item["name"]
                     results.append(
                         ResourceConfig(
                             name=item["name"],
                             type=dotted,
                             provider=item.get("provider", provider),
-                            config=item,
+                            config=entry_config,
                             events=item.get("events"),
                             import_id=item.get("import_id"),
                         )

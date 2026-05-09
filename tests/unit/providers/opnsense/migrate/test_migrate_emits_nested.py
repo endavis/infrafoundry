@@ -860,7 +860,7 @@ class TestMigrateKeaDHCPEmitsNested:
         v4_subnets = [r for r in parsed if r.type == "kea.dhcp4.subnets"]
         assert len(v4_subnets) == 1
         assert v4_subnets[0].name == "lan"
-        assert v4_subnets[0].config["config"]["subnet"] == "10.0.0.0/24"
+        assert v4_subnets[0].config["subnet"] == "10.0.0.0/24"
 
     def test_kea_dhcp4_reservations_round_trip(
         self, manager_with_service: tuple[Any, MagicMock]
