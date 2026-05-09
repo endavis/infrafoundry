@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778337540901,
+  "lastUpdate": 1778337814948,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8308,6 +8308,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001965527249810555",
             "extra": "mean: 108.30603245844529 usec\nrounds: 2095"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "42d4bae73bac1b90a1c3dbef553c955ed21df58b",
+          "message": "refactor: add dotted-path cross-reference resolver for OPNsense validators (#793 Phase 3) (merges PR #797, addresses #793)\n\nrefactor: add dotted-path cross-reference resolver for OPNsense validators\n\nAdds a shared dotted-path resolver in\nsrc/infrafoundry/providers/opnsense/validators/_xref.py that handles all\nthree cross-reference forms from ADR-0016:\n\n  - bare name: gateway: WAN_GW                        (today's flat form)\n  - in-plugin relative: gateway: gateways.WAN_GW       (new)\n  - cross-plugin absolute: update_cron: cron.jobs.x    (new)\n\nPlus build_xref_index(resources) helper that produces the\n{dotted_type: {name: ResourceConfig}} index OPNsenseValidator.validate_references()\nnow builds once and passes to per-resource validators.\n\nUpdates 5 validators that have cross-reference fields to call resolve_xref\nbefore falling back to the existing bare-name lookup (so flat-format YAML\ncontinues to validate identically while dotted-form YAML resolves correctly):\n\n  - static_route_validator.py: gateway field\n  - firewall_rule_validator.py: interface, gateway, source_net,\n    destination_net fields\n  - nat_rule_validator.py: interface, source_net, destination_net,\n    target fields\n  - unbound_host_alias_validator.py: host field\n  - virtual_ip_validator.py: interface field\n\nThe XRefIndex parameter is optional on every adopted validator (default\nNone), so existing call sites continue to work without modification.\ncurrent_plugin is derived per-resource as resource.type.split(\".\", 1)[0]\nso a routing.static resource resolves \"gateways.WAN_GW\" to\n\"routing.gateways.WAN_GW\" automatically.\n\nAdds 32 unit tests for _xref.py (100% coverage of the new module) plus\n21 tests for dotted-path resolution across the 5 adopted validators.\n\nAddresses #793.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-09T15:43:01+01:00",
+          "tree_id": "b3afe295cd01a06b2d43c1518ae993b5aca52744",
+          "url": "https://github.com/endavis/infrafoundry/commit/42d4bae73bac1b90a1c3dbef553c955ed21df58b"
+        },
+        "date": 1778337813868,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7090.559829171475,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000019896672811319872",
+            "extra": "mean: 141.03258756605808 usec\nrounds: 2461"
           }
         ]
       }
