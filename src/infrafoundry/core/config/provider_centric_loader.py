@@ -10,7 +10,12 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from infrafoundry.core.config.package_loader import STEM_TO_DOTTED, PackageLoader
+from infrafoundry.core.config.package_loader import (
+    NESTED_PROVIDER_NAMESPACE,
+    STEM_TO_DOTTED,
+    PackageLoader,
+)
+from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.secrets.provider import SecretProvider
 
@@ -44,6 +49,12 @@ class ProviderCentricLoader:
     ) -> list[ResourceConfig]:
         """Load resource configurations for a provider from a specific file.
 
+        Supports the nested ``opnsense:`` namespace format (#793 Phase 2,
+        per ADR-0016) in addition to the existing flat provider-centric
+        layout. Detection is by top-level key: a dict-valued ``opnsense:``
+        key triggers nested parsing; otherwise the filename-stem path is
+        used.
+
         Args:
             env_name: Environment name
             provider: Provider name (e.g., 'proxmox')
@@ -51,6 +62,10 @@ class ProviderCentricLoader:
 
         Returns:
             List of ResourceConfig objects
+
+        Raises:
+            InvalidConfigurationError: If a nested file mixes formats or
+                contains an unknown nested resource path.
         """
         resource_path = self.base_dir / env_name / provider / f"{resource_file}.yaml"
         if not resource_path.exists():
@@ -61,6 +76,23 @@ class ProviderCentricLoader:
 
         if not data:
             return []
+
+        # Nested provider-namespace format (#793 Phase 2) — branch before
+        # the filename-stem path so a top-level ``opnsense:`` key always
+        # wins, regardless of filename.
+        if isinstance(data, dict):
+            nested = data.get(NESTED_PROVIDER_NAMESPACE)
+            if isinstance(nested, dict):
+                extra_keys = [k for k in data if k != NESTED_PROVIDER_NAMESPACE]
+                if extra_keys:
+                    raise InvalidConfigurationError(
+                        f"{resource_path}: cannot mix nested "
+                        f"'{NESTED_PROVIDER_NAMESPACE}:' format with other top-level "
+                        f"keys (found: {sorted(extra_keys)!r}). Use one format per file."
+                    )
+                return self._package_loader._parse_nested_provider_format(
+                    nested, NESTED_PROVIDER_NAMESPACE, str(resource_path)
+                )
 
         # Extract resource type from filename
         # Supports:

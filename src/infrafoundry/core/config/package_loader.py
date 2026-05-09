@@ -62,6 +62,61 @@ STEM_TO_DOTTED: dict[str, str] = {
     "kea_dhcp6_reservation": "kea.dhcp6.reservations",
 }
 
+# Map of dotted resource-type paths → declared YAML leaf shape under the
+# nested ``opnsense:`` namespace (#793 Phase 2, per ADR-0016).
+#
+# - ``"list"`` paths must appear as YAML sequences (each entry a dict with a
+#   ``name:`` field). Each entry emits one ``ResourceConfig``.
+# - ``"dict"`` paths must appear as YAML mappings. The whole mapping becomes
+#   a single singleton ``ResourceConfig`` with ``name="settings"``.
+#
+# Mismatched shape (e.g. operator typo ``firewall: {rules: {...}}`` instead
+# of ``firewall: {rules: [...]}``) raises a clear error rather than
+# silently round-tripping as a singleton.
+#
+# Currently-implemented list-shape types come from ``STEM_TO_DOTTED.values()``.
+# The remaining entries are documented in ADR-0016 from in-flight issues
+# #786 to #792; they are accepted by the loader now so operator YAML and tests
+# can land alongside each component as it ships, without requiring a loader
+# change for every new component.
+DOTTED_RESOURCE_SHAPES: dict[str, str] = {
+    **dict.fromkeys(STEM_TO_DOTTED.values(), "list"),
+    # Singletons / surfaces from in-flight feature issues (ADR-0016).
+    # #786 firewall_log
+    "firewall.log": "dict",
+    # #787 tailscale (settings singleton + subnets/auth lists)
+    "tailscale.settings": "dict",
+    "tailscale.subnets": "list",
+    "tailscale.auth": "dict",
+    # #788 radvd (singleton; subshape verified at component-land time)
+    "radvd": "dict",
+    # #789 cron jobs (list)
+    "cron.jobs": "list",
+    # #790 acmeclient (settings singleton + lists)
+    "acmeclient.settings": "dict",
+    "acmeclient.accounts": "list",
+    "acmeclient.validations": "list",
+    "acmeclient.certs": "list",
+    "acmeclient.actions": "list",
+    # #791 monit (settings singleton + lists)
+    "monit.settings": "dict",
+    "monit.alerts": "list",
+    "monit.services": "list",
+    "monit.tests": "list",
+    # #792 hostwatch (singleton; subshape verified at component-land time)
+    "hostwatch": "dict",
+}
+
+# Set of dotted resource-type paths recognised under the nested ``opnsense:``
+# namespace. Provided as a separate constant for callers that only need to
+# check membership (e.g. cross-reference resolvers in #793 Phase 3).
+DOTTED_RESOURCE_TYPES: frozenset[str] = frozenset(DOTTED_RESOURCE_SHAPES)
+
+# YAML namespace key that triggers the nested-format parse branch (#793
+# Phase 2). The direct-OPNsense provider is the only consumer; nested format
+# under any other top-level key is not currently supported.
+NESTED_PROVIDER_NAMESPACE: str = "opnsense"
+
 
 class PackageLoader:
     """Loads infrastructure packages from provider subdirectories.
@@ -463,14 +518,26 @@ class PackageLoader:
     ) -> list[ResourceConfig]:
         """Extract ResourceConfig objects from parsed YAML data.
 
-        Supports two formats:
+        Supports three formats:
 
-        1. **Resource-centric** (``resources:`` key): Each item declares its own
+        1. **Nested provider-namespace** (``opnsense:`` top-level key with a
+           dict value): Walk the nested structure under ``opnsense:`` to
+           collect leaves; each leaf's dotted path (e.g. ``firewall.aliases``,
+           ``kea.dhcp4.subnets``) becomes the ``ResourceConfig.type``. Lists
+           emit one resource per entry; dicts emit a single ``settings``
+           singleton. Provider is forced to ``opnsense``. Per ADR-0016
+           (#793 Phase 2).
+
+        2. **Resource-centric** (``resources:`` key): Each item declares its own
            ``provider`` and ``type``. The parent provider is used as fallback.
 
-        2. **Provider-centric** (type-named key like ``ova_vms:``): Resource type
+        3. **Provider-centric** (type-named key like ``ova_vms:``): Resource type
            is derived from the filename stem. Individual items may override
            ``provider`` via an optional ``provider`` field.
+
+        Mixing formats in the same file is rejected — a top-level
+        ``opnsense:`` dict alongside a ``resources:`` list or any flat
+        provider-centric key raises ``InvalidConfigurationError``.
 
         Args:
             data: Parsed YAML data dictionary
@@ -479,11 +546,32 @@ class PackageLoader:
 
         Returns:
             List of ResourceConfig objects
+
+        Raises:
+            InvalidConfigurationError: If the file mixes nested and flat
+                formats, contains an unknown nested path, or has a malformed
+                leaf (neither list nor dict).
         """
         if not data:
             return []
 
-        # Check for resource-centric format first
+        # Nested provider-namespace format (#793 Phase 2). Detect and branch
+        # before either of the flat parse paths so a top-level ``opnsense:``
+        # key always wins. Mixing with other formats is rejected explicitly.
+        nested = data.get(NESTED_PROVIDER_NAMESPACE)
+        if isinstance(nested, dict):
+            extra_keys = [k for k in data if k != NESTED_PROVIDER_NAMESPACE]
+            if extra_keys:
+                raise InvalidConfigurationError(
+                    f"{resource_file}: cannot mix nested '{NESTED_PROVIDER_NAMESPACE}:' "
+                    f"format with other top-level keys (found: {sorted(extra_keys)!r}). "
+                    "Use one format per file."
+                )
+            return self._parse_nested_provider_format(
+                nested, NESTED_PROVIDER_NAMESPACE, resource_file
+            )
+
+        # Check for resource-centric format
         if "resources" in data and isinstance(data["resources"], list):
             return self._parse_resource_centric(data["resources"], resource_file, provider)
 
@@ -521,6 +609,148 @@ class PackageLoader:
             for item in resource_list
             if isinstance(item, dict) and "name" in item
         ]
+
+    def _parse_nested_provider_format(
+        self,
+        namespace_data: dict[str, Any],
+        provider: str,
+        resource_file: str,
+    ) -> list[ResourceConfig]:
+        """Walk a nested ``provider:`` block and emit ``ResourceConfig`` items.
+
+        The block mirrors the OPNsense API path tree
+        (``/api/<plugin>/<surface>/<action>``). Per ADR-0016, the dotted path
+        registered in ``DOTTED_RESOURCE_SHAPES`` declares the expected leaf
+        shape:
+
+        - **List-shape** path (e.g. ``firewall.aliases``) — leaf must be a
+          YAML sequence; each entry must be a dict with a ``name:`` field.
+          Each entry emits one ``ResourceConfig``.
+        - **Dict-shape** path (e.g. ``firewall.log``) — leaf must be a YAML
+          mapping. Emits a single ``ResourceConfig`` with ``name="settings"``
+          and the mapping as ``config``.
+
+        Unknown dotted paths and shape mismatches (operator typo
+        ``firewall: {rules: {...}}`` instead of ``firewall: {rules: [...]}``)
+        produce a clear error naming the path.
+
+        Args:
+            namespace_data: Value of the top-level provider key (e.g. the
+                dict under ``opnsense:`` in the YAML).
+            provider: Provider name that all emitted ``ResourceConfig`` items
+                should carry. For now only ``"opnsense"`` is used by callers.
+            resource_file: Source filename for error messages.
+
+        Returns:
+            List of ``ResourceConfig`` objects with dotted ``type`` paths.
+
+        Raises:
+            InvalidConfigurationError: If a leaf has an unknown dotted path,
+                a shape mismatch, a malformed key, or a list entry without a
+                ``name:`` field.
+        """
+        results: list[ResourceConfig] = []
+        if not namespace_data:
+            return results
+
+        # Walk the tree; ``stack`` holds (current-dotted-path-parts, value).
+        # Empty path-parts means we are at the namespace root and have not
+        # consumed any key yet.
+        stack: list[tuple[tuple[str, ...], Any]] = [((), namespace_data)]
+        while stack:
+            path_parts, value = stack.pop()
+            dotted = ".".join(path_parts)
+
+            if isinstance(value, dict):
+                # Discrimination: if the *current* path is a known resource
+                # type, the dict is its leaf — validate shape and emit.
+                # Otherwise it is an interior node and we recurse.
+                if dotted and dotted in DOTTED_RESOURCE_SHAPES:
+                    expected_shape = DOTTED_RESOURCE_SHAPES[dotted]
+                    if expected_shape != "dict":
+                        raise InvalidConfigurationError(
+                            f"{resource_file}: '{NESTED_PROVIDER_NAMESPACE}.{dotted}' "
+                            f"is declared as a {expected_shape} resource type, "
+                            "got a YAML mapping. Use a YAML sequence "
+                            "('- name: ...' entries) for collections."
+                        )
+                    # Singleton leaf — emit one ResourceConfig with
+                    # name="settings" and the dict as config.
+                    results.append(
+                        ResourceConfig(
+                            name="settings",
+                            type=dotted,
+                            provider=provider,
+                            config=dict(value),
+                        )
+                    )
+                    continue
+                # Interior node — recurse into children.
+                for key, child in value.items():
+                    if not isinstance(key, str):
+                        raise InvalidConfigurationError(
+                            f"{resource_file}: nested key under "
+                            f"'{NESTED_PROVIDER_NAMESPACE}.{dotted or '<root>'}' "
+                            f"must be a string, got {type(key).__name__}: {key!r}"
+                        )
+                    stack.append(((*path_parts, key), child))
+            elif isinstance(value, list):
+                # List leaf — collection of resources. Path must be a known
+                # dotted list-shape resource type.
+                if not dotted:
+                    raise InvalidConfigurationError(
+                        f"{resource_file}: top-level list directly under "
+                        f"'{NESTED_PROVIDER_NAMESPACE}:' is not allowed; "
+                        "lists must live at a known dotted resource path."
+                    )
+                if dotted not in DOTTED_RESOURCE_SHAPES:
+                    raise InvalidConfigurationError(
+                        f"{resource_file}: unknown nested resource path "
+                        f"'{NESTED_PROVIDER_NAMESPACE}.{dotted}'. "
+                        f"Known paths: {sorted(DOTTED_RESOURCE_SHAPES)!r}"
+                    )
+                expected_shape = DOTTED_RESOURCE_SHAPES[dotted]
+                if expected_shape != "list":
+                    raise InvalidConfigurationError(
+                        f"{resource_file}: '{NESTED_PROVIDER_NAMESPACE}.{dotted}' "
+                        f"is declared as a {expected_shape} resource type, "
+                        "got a YAML sequence. Use a YAML mapping "
+                        "(key: value pairs) for singletons."
+                    )
+                for index, item in enumerate(value):
+                    if not isinstance(item, dict):
+                        raise InvalidConfigurationError(
+                            f"{resource_file}: entry {index} under "
+                            f"'{NESTED_PROVIDER_NAMESPACE}.{dotted}' must be a "
+                            f"mapping, got {type(item).__name__}"
+                        )
+                    if "name" not in item:
+                        raise InvalidConfigurationError(
+                            f"{resource_file}: entry {index} under "
+                            f"'{NESTED_PROVIDER_NAMESPACE}.{dotted}' is missing "
+                            "the required 'name:' field"
+                        )
+                    results.append(
+                        ResourceConfig(
+                            name=item["name"],
+                            type=dotted,
+                            provider=item.get("provider", provider),
+                            config=item,
+                            events=item.get("events"),
+                            import_id=item.get("import_id"),
+                        )
+                    )
+            else:
+                # Scalar or other malformed leaf at a position that demands
+                # either a list (collection) or a dict (singleton/interior).
+                raise InvalidConfigurationError(
+                    f"{resource_file}: leaf at "
+                    f"'{NESTED_PROVIDER_NAMESPACE}.{dotted or '<root>'}' must be a "
+                    f"list (collection) or a dict (singleton/interior), got "
+                    f"{type(value).__name__}: {value!r}"
+                )
+
+        return results
 
     def _parse_resource_centric(
         self, resources: list[Any], resource_file: str, default_provider: str

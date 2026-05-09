@@ -8,7 +8,12 @@ from typing import Any
 
 import yaml
 
-from infrafoundry.core.config.package_loader import STEM_TO_DOTTED
+from infrafoundry.core.config.package_loader import (
+    NESTED_PROVIDER_NAMESPACE,
+    STEM_TO_DOTTED,
+    PackageLoader,
+)
+from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -22,6 +27,10 @@ class ResourceCentricLoader:
             base_dir: Base directory for environment configs (e.g., ./envs)
         """
         self.base_dir = base_dir
+        # Lazily-instantiated helper for the nested-format walk; the loader
+        # delegates to ``PackageLoader._parse_nested_provider_format`` so the
+        # nested-format logic lives in a single module (#793 Phase 2).
+        self._package_loader = PackageLoader(base_dir)
 
     def load_resources(self, env_name: str) -> list[ResourceConfig]:
         """Load resource-centric configuration files.
@@ -36,6 +45,9 @@ class ResourceCentricLoader:
               cores: 4
               memory: 8192
         ```
+
+        Files under the nested ``opnsense:`` namespace (#793 Phase 2, per
+        ADR-0016) are also accepted; detection is by top-level key.
 
         Args:
             env_name: Environment name
@@ -62,11 +74,35 @@ class ResourceCentricLoader:
 
         Returns:
             List of ResourceConfig objects from the file
+
+        Raises:
+            InvalidConfigurationError: If a nested-format file mixes
+                ``opnsense:`` with other top-level keys.
         """
         with open(config_file) as f:
             data = yaml.safe_load(f)
 
-        if not data or "resources" not in data:
+        if not data:
+            return []
+
+        # Nested provider-namespace format (#793 Phase 2) — branch before
+        # the existing ``resources:``-key path so a top-level ``opnsense:``
+        # key always wins.
+        if isinstance(data, dict):
+            nested = data.get(NESTED_PROVIDER_NAMESPACE)
+            if isinstance(nested, dict):
+                extra_keys = [k for k in data if k != NESTED_PROVIDER_NAMESPACE]
+                if extra_keys:
+                    raise InvalidConfigurationError(
+                        f"{config_file}: cannot mix nested "
+                        f"'{NESTED_PROVIDER_NAMESPACE}:' format with other top-level "
+                        f"keys (found: {sorted(extra_keys)!r}). Use one format per file."
+                    )
+                return self._package_loader._parse_nested_provider_format(
+                    nested, NESTED_PROVIDER_NAMESPACE, str(config_file)
+                )
+
+        if "resources" not in data:
             return []
 
         resource_list = data["resources"]
