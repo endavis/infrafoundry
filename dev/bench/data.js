@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778339904936,
+  "lastUpdate": 1778342754668,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8432,6 +8432,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005824250797249672",
             "extra": "mean: 80.7279885773223 usec\nrounds: 1926"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "23594a985dced001b8a1731dd3ef5a0820ac69b8",
+          "message": "fix: restore subnet_ref resolution for kea reservations after direct-api migration (merges PR #803, addresses #802)\n\nPR #781 (DHCPv4 kea direct-API migration) deleted the terraform\ntemplate that resolved ``subnet_ref: <name>`` → kea subnet UUID via\nJinja but did not add an equivalent translation step in the new\ndirect-API ``KeaDHCPv4ReservationManager``. The component reads\n``resource.config[\"subnet\"]`` as a literal CIDR; operator YAML written\nagainst the framework's own blueprints (which all emit\n``subnet_ref: \"{{ dhcp_subnet }}\"``) had every reservation crashing\nplan with ``ReferenceValidationError: kea_reservation '<name>'\nreferences unknown subnet ''``.\n\nRestore the translation as a split-layer fix:\n\n- New ``KeaReservationValidator`` runs at plan-time\n  ``validate_references`` using the shared #793 ``_xref`` resolver to\n  surface unknown / wrong-version / disagreeing references early.\n  Pure check; never mutates ``resource.config``.\n- Component layer (``KeaDHCPv{4,6}ReservationManager``) gains\n  ``SIBLING_RESOURCE_TYPE`` ClassVar opt-in marker and a\n  ``sibling_resources`` kwarg on plan / apply / destroy /\n  get_resource_ids; module helpers ``_build_subnet_name_to_cidr`` and\n  ``_resolve_subnet_cidr`` translate ``subnet_ref`` → CIDR before the\n  existing ``cidr → uuid`` lookup.\n- Runner gains a generic ``_sibling_resources_for(manager_cls,\n  resources)`` helper that threads the right slice (managers without\n  the marker keep unchanged signatures).\n\nCovers DHCPv4 (the regression) plus DHCPv6 for schema parity. Legacy\n``subnet: <CIDR>`` literal form still works on both. ADR-0014 is\namended to record the dual-form schema and the SIBLING_RESOURCE_TYPE\nmechanism.\n\nAddresses #802.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-09T17:05:19+01:00",
+          "tree_id": "1e5199c0eb798c1617b6de489b6ad3159e154a33",
+          "url": "https://github.com/endavis/infrafoundry/commit/23594a985dced001b8a1731dd3ef5a0820ac69b8"
+        },
+        "date": 1778342753448,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6372.730832245893,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00008217095606594933",
+            "extra": "mean: 156.91859994149127 usec\nrounds: 5"
           }
         ]
       }
