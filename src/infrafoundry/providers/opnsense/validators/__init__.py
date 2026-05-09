@@ -1,5 +1,10 @@
 """Specialized validators for OPNsense resources."""
 
+from infrafoundry.providers.opnsense.validators._xref import (
+    XRefIndex,
+    build_xref_index,
+    resolve_xref,
+)
 from infrafoundry.providers.opnsense.validators.alias_validator import AliasValidator
 from infrafoundry.providers.opnsense.validators.firewall_rule_validator import (
     FirewallRuleValidator,
@@ -42,4 +47,7 @@ __all__ = [
     "UnboundValidator",
     "VLANValidator",
     "VirtualIPValidator",
+    "XRefIndex",
+    "build_xref_index",
+    "resolve_xref",
 ]
