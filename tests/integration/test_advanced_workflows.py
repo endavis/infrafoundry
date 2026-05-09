@@ -347,14 +347,20 @@ class TestMultiProviderCoordination:
         # and the Mock provider sidesteps the actual runner dispatch.
         # The test asserts proxmox_provider.generate_terraform was
         # called — that remains the load-bearing assertion.
+        # Nested ``opnsense:`` schema per ADR-0016 (#793). After Phase 5
+        # the legacy flat ``vlans:`` top-level key is no longer translated
+        # to the ``interfaces.vlans`` dotted type.
         vlans_file = config_dir / "vlans.yaml"
         vlans_file.write_text(
             """
-vlans:
-  - name: lan-vlan
-    interface: igb1
-    tag: 100
-    description: LAN VLAN
+opnsense:
+  interfaces:
+    vlans:
+      - name: lan-vlan
+        config:
+          interface: igb1
+          tag: 100
+          description: LAN VLAN
 """
         )
 

@@ -6,7 +6,7 @@
 resources:
   # --- Server node ---
   - provider: opnsense
-    type: kea_reservation
+    type: kea.dhcp4.reservations
     name: "{{ server_name }}-dhcp"
     config:
       subnet_ref: "{{ dhcp_subnet }}"
@@ -17,7 +17,7 @@ resources:
 
 {% for agent in agents %}
   - provider: opnsense
-    type: kea_reservation
+    type: kea.dhcp4.reservations
     name: "{{ agent.name }}-dhcp"
     config:
       subnet_ref: "{{ dhcp_subnet }}"

@@ -7,7 +7,7 @@
 # Node mgmt MACs are real NIC MACs from the VM config.
 resources:
   - provider: opnsense
-    type: kea_reservation
+    type: kea.dhcp4.reservations
     name: "{{ node01_name }}"
     config:
       subnet_ref: "{{ dhcp_subnet }}"
@@ -17,7 +17,7 @@ resources:
       description: "ONTAP Simulator Node 1 (e0c mgmt)"
 
   - provider: opnsense
-    type: kea_reservation
+    type: kea.dhcp4.reservations
     name: "{{ node02_name }}"
     config:
       subnet_ref: "{{ dhcp_subnet }}"
@@ -27,7 +27,7 @@ resources:
       description: "ONTAP Simulator Node 2 (e0c mgmt)"
 
   - provider: opnsense
-    type: kea_reservation
+    type: kea.dhcp4.reservations
     name: "{{ cluster_name }}"
     config:
       subnet_ref: "{{ dhcp_subnet }}"
@@ -37,7 +37,7 @@ resources:
       description: "ONTAP Cluster Management LIF"
 
   - provider: opnsense
-    type: kea_reservation
+    type: kea.dhcp4.reservations
     name: "{{ cluster_name }}-data1"
     config:
       subnet_ref: "{{ dhcp_subnet }}"
@@ -47,7 +47,7 @@ resources:
       description: "ONTAP Cluster Data LIF 1 ({{ svm_name }})"
 
   - provider: opnsense
-    type: kea_reservation
+    type: kea.dhcp4.reservations
     name: "{{ cluster_name }}-data2"
     config:
       subnet_ref: "{{ dhcp_subnet }}"
