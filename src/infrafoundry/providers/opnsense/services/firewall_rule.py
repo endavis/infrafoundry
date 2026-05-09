@@ -50,13 +50,12 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import yaml
-
 from infrafoundry.core.exceptions import APIError, InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
 
 from ._category_marker import INFRAFOUNDRY_CATEGORY_NAME as _SHARED_CATEGORY_NAME
 from ._category_marker import ensure_infrafoundry_category
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 logger = logging.getLogger(__name__)
@@ -1037,22 +1036,25 @@ class FirewallRuleService(BaseService):
         controller (HTTP 404) does not abort the entire migrate — the
         export degrades to an empty resource list with a WARNING log.
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); firewall rules land at ``opnsense.firewall.rules``
+        as a YAML sequence.
+
         Returns:
-            YAML string with ``provider/type/name/config`` entries.
+            YAML string with the nested ``opnsense:`` namespace and a
+            ``firewall.rules`` list leaf.
         """
         rules: list[LiveFirewallRule] = self.search_tolerant()
         managed = [r for r in rules if r.managed_name is not None]
         marker_uuid = self._category_uuid  # may be None if cache cold
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "firewall_rules",
                 "name": r.managed_name,
                 "config": _live_to_export_config(r, marker_uuid),
             }
             for r in managed
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("firewall.rules", entries)
 
 
 # ---------------------------------------------------------------------------

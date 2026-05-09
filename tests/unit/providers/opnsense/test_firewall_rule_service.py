@@ -873,7 +873,8 @@ class TestSearchTolerant:
         with caplog.at_level(logging.WARNING):
             text = svc.export_to_yaml()
 
-        assert "resources: []" in text
+        # Nested format: empty leaf list at opnsense.firewall.rules.
+        assert "rules: []" in text
         warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
         assert len(warnings) == 1
 
@@ -1170,15 +1171,18 @@ class TestExportToYaml:
         text = svc.export_to_yaml()
         assert "lan-allow" in text
         assert "manual" not in text  # unmanaged excluded
-        assert "type: firewall_rules" in text
-        assert "provider: opnsense" in text
+        # Nested format per ADR-0016 (#793 Phase 4).
+        assert "opnsense:" in text
+        assert "firewall:" in text
+        assert "rules:" in text
 
     def test_export_with_no_managed_rules_yields_empty_resources(self) -> None:
         client = MagicMock()
         client.request.return_value = {"rows": []}
         svc = FirewallRuleService(client)
         text = svc.export_to_yaml()
-        assert "resources: []" in text
+        # Nested format: empty leaf list at opnsense.firewall.rules.
+        assert "rules: []" in text
 
     def test_export_strips_marker_from_categories(self) -> None:
         client = MagicMock()

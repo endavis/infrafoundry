@@ -23,9 +23,8 @@ accept.
 import logging
 from typing import Any, Final
 
-import yaml
-
 from ..api_client import KeaClient, OPNsenseClient
+from ._nested_emit import emit_nested_multi_yaml
 from .base import BaseService
 
 logger = logging.getLogger(__name__)
@@ -769,108 +768,120 @@ class KeaDHCPService(BaseService):
     def export_to_yaml(self) -> str:
         """Export current Kea DHCP configuration to YAML.
 
-        Exports both DHCPv4 and DHCPv6 configurations in InfraFoundry
-        resource-centric format.
+        Emits all four Kea resource types (DHCPv4 subnets, DHCPv4
+        reservations, DHCPv6 subnets, DHCPv6 reservations) in a single
+        nested document under the ``opnsense:`` namespace per ADR-0016
+        (#793 Phase 4):
+
+        .. code-block:: yaml
+
+            opnsense:
+              kea:
+                dhcp4:
+                  subnets: [...]
+                  reservations: [...]
+                dhcp6:
+                  subnets: [...]
+                  reservations: [...]
+
+        Empty branches are still emitted (as ``[]``) so the operator can
+        see at a glance which Kea surfaces are unconfigured.
 
         Returns:
-            YAML string containing all Kea DHCP resources
+            YAML string with the nested ``opnsense:`` namespace and four
+            list leaves under ``kea.dhcp4`` / ``kea.dhcp6``.
         """
-        resources = []
-
-        # Export DHCPv4 subnets
-        dhcpv4_subnets = self.search_dhcpv4_subnets()
-        for subnet in dhcpv4_subnets:
-            resource = {
-                "provider": "opnsense",
-                "type": "kea_subnet",
-                "name": subnet.get("description", "").lower().replace(" ", "_"),
-                "config": {
-                    "subnet": subnet.get("subnet", ""),
-                    "pools": subnet.get("pools", []),
-                    "description": subnet.get("description", ""),
-                },
+        # DHCPv4 subnets
+        dhcp4_subnet_entries: list[dict[str, Any]] = []
+        for subnet in self.search_dhcpv4_subnets():
+            entry_config: dict[str, Any] = {
+                "subnet": subnet.get("subnet", ""),
+                "pools": subnet.get("pools", []),
+                "description": subnet.get("description", ""),
             }
-            # Add optional fields if present
             if subnet.get("option_data_autocollect") == "1":
-                resource["config"]["auto_collect"] = True
+                entry_config["auto_collect"] = True
             if dns_servers := subnet.get("option_data_dns_servers"):
-                resource["config"]["dns_servers"] = [s.strip() for s in dns_servers.split(",")]
+                entry_config["dns_servers"] = [s.strip() for s in dns_servers.split(",")]
             if routers := subnet.get("option_data_routers"):
-                resource["config"]["routers"] = [r.strip() for r in routers.split(",")]
+                entry_config["routers"] = [r.strip() for r in routers.split(",")]
             if domain_name := subnet.get("option_data_domain_name"):
-                resource["config"]["domain_name"] = domain_name
+                entry_config["domain_name"] = domain_name
             if ntp_servers := subnet.get("option_data_ntp_servers"):
-                resource["config"]["ntp_servers"] = [n.strip() for n in ntp_servers.split(",")]
+                entry_config["ntp_servers"] = [n.strip() for n in ntp_servers.split(",")]
+            dhcp4_subnet_entries.append(
+                {
+                    "name": subnet.get("description", "").lower().replace(" ", "_"),
+                    "config": entry_config,
+                }
+            )
 
-            resources.append(resource)
-
-        # Export DHCPv4 reservations
-        dhcpv4_reservations = self.search_dhcpv4_reservations()
-        for reservation in dhcpv4_reservations:
+        # DHCPv4 reservations
+        dhcp4_reservation_entries: list[dict[str, Any]] = []
+        for reservation in self.search_dhcpv4_reservations():
             hostname = reservation.get("hostname", "")
-            name = hostname.lower().replace(" ", "_").replace("-", "_")
-            resource = {
-                "provider": "opnsense",
-                "type": "kea_reservation",
-                "name": name,
-                "config": {
-                    "subnet": reservation.get("subnet", ""),
-                    "hw_address": reservation.get("hw_address", ""),
-                    "ip_address": reservation.get("ip_address", ""),
-                },
+            res_config: dict[str, Any] = {
+                "subnet": reservation.get("subnet", ""),
+                "hw_address": reservation.get("hw_address", ""),
+                "ip_address": reservation.get("ip_address", ""),
             }
             if hostname:
-                resource["config"]["hostname"] = hostname
+                res_config["hostname"] = hostname
             if description := reservation.get("description"):
-                resource["config"]["description"] = description
+                res_config["description"] = description
+            dhcp4_reservation_entries.append(
+                {
+                    "name": hostname.lower().replace(" ", "_").replace("-", "_"),
+                    "config": res_config,
+                }
+            )
 
-            resources.append(resource)
-
-        # Export DHCPv6 subnets
-        dhcpv6_subnets = self.search_dhcpv6_subnets()
-        for subnet in dhcpv6_subnets:
-            resource = {
-                "provider": "opnsense",
-                "type": "kea_dhcp6_subnet",
-                "name": f"{subnet.get('description', '').lower().replace(' ', '_')}_v6",
-                "config": {
-                    "subnet": subnet.get("subnet", ""),
-                    "description": subnet.get("description", ""),
-                },
+        # DHCPv6 subnets
+        dhcp6_subnet_entries: list[dict[str, Any]] = []
+        for subnet in self.search_dhcpv6_subnets():
+            entry_config = {
+                "subnet": subnet.get("subnet", ""),
+                "description": subnet.get("description", ""),
             }
-            # Add optional fields if present
             if subnet.get("option_data_autocollect") == "1":
-                resource["config"]["auto_collect"] = True
+                entry_config["auto_collect"] = True
             if dns_servers := subnet.get("option_data_dns_servers"):
-                resource["config"]["dns_servers"] = [s.strip() for s in dns_servers.split(",")]
+                entry_config["dns_servers"] = [s.strip() for s in dns_servers.split(",")]
             if domain_search := subnet.get("option_data_domain_search"):
-                resource["config"]["domain_search"] = [d.strip() for d in domain_search.split(",")]
+                entry_config["domain_search"] = [d.strip() for d in domain_search.split(",")]
+            dhcp6_subnet_entries.append(
+                {
+                    "name": f"{subnet.get('description', '').lower().replace(' ', '_')}_v6",
+                    "config": entry_config,
+                }
+            )
 
-            resources.append(resource)
-
-        # Export DHCPv6 reservations
-        dhcpv6_reservations = self.search_dhcpv6_reservations()
-        for reservation in dhcpv6_reservations:
+        # DHCPv6 reservations
+        dhcp6_reservation_entries: list[dict[str, Any]] = []
+        for reservation in self.search_dhcpv6_reservations():
             hostname = reservation.get("hostname", "")
-            name = f"{hostname.lower().replace(' ', '_').replace('-', '_')}_v6"
-            resource = {
-                "provider": "opnsense",
-                "type": "kea_dhcp6_reservation",
-                "name": name,
-                "config": {
-                    "subnet": reservation.get("subnet", ""),
-                    "ip_address": reservation.get("ip_address", ""),
-                },
+            res_config = {
+                "subnet": reservation.get("subnet", ""),
+                "ip_address": reservation.get("ip_address", ""),
             }
             if duid := reservation.get("duid"):
-                resource["config"]["duid"] = duid
+                res_config["duid"] = duid
             if hostname:
-                resource["config"]["hostname"] = hostname
+                res_config["hostname"] = hostname
             if description := reservation.get("description"):
-                resource["config"]["description"] = description
+                res_config["description"] = description
+            dhcp6_reservation_entries.append(
+                {
+                    "name": f"{hostname.lower().replace(' ', '_').replace('-', '_')}_v6",
+                    "config": res_config,
+                }
+            )
 
-            resources.append(resource)
-
-        # Generate YAML
-        config = {"resources": resources}
-        return yaml.dump(config, default_flow_style=False, sort_keys=False)
+        return emit_nested_multi_yaml(
+            {
+                "kea.dhcp4.subnets": dhcp4_subnet_entries,
+                "kea.dhcp4.reservations": dhcp4_reservation_entries,
+                "kea.dhcp6.subnets": dhcp6_subnet_entries,
+                "kea.dhcp6.reservations": dhcp6_reservation_entries,
+            }
+        )

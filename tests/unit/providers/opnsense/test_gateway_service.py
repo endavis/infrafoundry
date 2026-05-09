@@ -649,7 +649,8 @@ class TestExportToYaml:
         client.request.return_value = {"rows": []}
         svc = GatewayService(client)
         text = svc.export_to_yaml()
-        assert "resources: []" in text
+        # Nested format: empty leaf list at opnsense.routing.gateways.
+        assert "gateways: []" in text
 
 
 class TestLiveToExportConfig:

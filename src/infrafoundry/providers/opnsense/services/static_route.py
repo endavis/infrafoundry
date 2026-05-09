@@ -72,10 +72,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import yaml
-
 from infrafoundry.core.provider import ResourceConfig
 
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # Controller base for all static-route CRUD + reconfigure endpoints.
@@ -523,20 +522,23 @@ class StaticRouteService(BaseService):
         OPNsense has no name field — the operator can rename freely after
         import; identity is the tuple, not the name.
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); routes land at ``opnsense.routing.static`` as a
+        YAML sequence.
+
         Returns:
-            YAML string with ``provider/type/name/config`` entries.
+            YAML string with the nested ``opnsense:`` namespace and a
+            ``routing.static`` list leaf.
         """
         live = self.search()
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "static_routes",
                 "name": _synthesize_name(route),
                 "config": _live_to_export_config(self.get(route.uuid)),
             }
             for route in live
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("routing.static", entries)
 
 
 # ---------------------------------------------------------------------------

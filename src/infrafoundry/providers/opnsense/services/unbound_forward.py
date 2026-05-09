@@ -68,10 +68,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import yaml
-
 from infrafoundry.core.provider import ResourceConfig
 
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # Allowed values for the ``type`` discriminator.
@@ -589,20 +588,23 @@ class UnboundForwardService(BaseService):
         — the operator can rename freely after import; identity is the
         tuple, not the name.
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); forwards land at ``opnsense.unbound.forwards`` as
+        a YAML sequence.
+
         Returns:
-            YAML string with ``provider/type/name/config`` entries.
+            YAML string with the nested ``opnsense:`` namespace and an
+            ``unbound.forwards`` list leaf.
         """
         live = self.search()
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "unbound_forward",
                 "name": _synthesize_name(forward),
                 "config": _live_to_export_config(self.get(forward.uuid)),
             }
             for forward in live
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("unbound.forwards", entries)
 
 
 # ---------------------------------------------------------------------------

@@ -56,10 +56,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import yaml
-
 from infrafoundry.core.provider import ResourceConfig
 
+from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # Allowed values for the ``ipprotocol`` discriminator.
@@ -609,21 +608,24 @@ class GatewayService(BaseService):
         we issue a ``getGateway/<uuid>`` to capture the option-dict-only
         fields (``interface``, ``ipprotocol``) at full fidelity.
 
+        Output is the nested ``opnsense:`` schema defined by ADR-0016
+        (#793 Phase 4); gateways land at ``opnsense.routing.gateways`` as
+        a YAML sequence.
+
         Returns:
-            YAML string with ``provider/type/name/config`` entries.
+            YAML string with the nested ``opnsense:`` namespace and a
+            ``routing.gateways`` list leaf.
         """
         live = self.search()
         managed = [g for g in live if g.is_managed]
-        resources = [
+        entries = [
             {
-                "provider": "opnsense",
-                "type": "gateways",
                 "name": g.name,
                 "config": _live_to_export_config(self.get(g.uuid)),
             }
             for g in managed
         ]
-        return yaml.safe_dump({"resources": resources}, sort_keys=False)
+        return emit_nested_list_yaml("routing.gateways", entries)
 
 
 # ---------------------------------------------------------------------------

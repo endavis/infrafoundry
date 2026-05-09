@@ -1067,6 +1067,8 @@ class TestApplyDiffResult:
 
 
 class TestExportToYaml:
+    """Nested ``opnsense:`` schema per ADR-0016 (#793 Phase 4)."""
+
     def test_round_trip_structure(self) -> None:
         client = MagicMock()
         client.request.return_value = {
@@ -1088,8 +1090,9 @@ class TestExportToYaml:
         service = InterfaceAssignmentService(client)
         rendered = service.export_to_yaml()
         parsed = yaml.safe_load(rendered)
-        assert "resources" in parsed
-        names = {r["name"] for r in parsed["resources"]}
+        # Nested format: assignments at opnsense.interfaces.assignments.
+        assignments = parsed["opnsense"]["interfaces"]["assignments"]
+        names = {r["name"] for r in assignments}
         assert names == {"lan", "wan"}
 
     def test_export_with_no_assignments(self) -> None:
@@ -1097,7 +1100,7 @@ class TestExportToYaml:
         client.request.return_value = {"rows": []}
         service = InterfaceAssignmentService(client)
         parsed = yaml.safe_load(service.export_to_yaml())
-        assert parsed == {"resources": []}
+        assert parsed == {"opnsense": {"interfaces": {"assignments": []}}}
 
     def test_export_skips_unassigned_interfaces(self) -> None:
         client = MagicMock()
@@ -1106,4 +1109,5 @@ class TestExportToYaml:
         }
         service = InterfaceAssignmentService(client)
         parsed = yaml.safe_load(service.export_to_yaml())
-        assert len(parsed["resources"]) == 1
+        assignments = parsed["opnsense"]["interfaces"]["assignments"]
+        assert len(assignments) == 1

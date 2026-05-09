@@ -1654,7 +1654,8 @@ class TestExportToYaml:
         client.request.return_value = {"rows": []}
         svc = NATRuleService(client)
         text = svc.export_to_yaml()
-        assert "resources: []" in text
+        # Nested format: empty leaf list at opnsense.firewall.nat.
+        assert "nat: []" in text
 
 
 # ---------------------------------------------------------------------------
