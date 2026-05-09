@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778337425911,
+  "lastUpdate": 1778337540901,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8277,6 +8277,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000029825757196695966",
             "extra": "mean: 127.34167147438721 usec\nrounds: 1872"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f08c9090fc22e90c8fa704d49e4419158e0c8e1d",
+          "message": "refactor: add nested-format YAML support to direct-OPNsense loader (#793 Phase 2) (merges PR #796, addresses #793)\n\nrefactor: add nested-format YAML support to direct-OPNsense loader\n\nAdds nested-YAML parsing support to the loader (and provider-centric /\nresource-centric variants) so YAML files using the new opnsense.<plugin>.<surface>\nhierarchy from ADR-0016 are accepted alongside the existing flat formats.\n\nDetection: a top-level `opnsense:` dict key triggers nested parsing. The\nloader walks the tree, validates each leaf path against DOTTED_RESOURCE_SHAPES\n(introduced here), and emits ResourceConfig per leaf:\n  - dict leaf at a registered singleton path: one ResourceConfig with\n    name=\"settings\"\n  - list leaf at a registered list path: one ResourceConfig per entry\n  - shape mismatch / unknown path / malformed leaf: clear error\n\nPre-registers the future singleton/list paths from in-flight feature\nissues #786-#792 (firewall.log, tailscale.*, radvd, cron.jobs, acmeclient.*,\nmonit.*, hostwatch) so operator YAML and tests can land alongside each\ncomponent without a follow-up loader update.\n\nMixed nested+flat formats in one file are rejected with a clear error\nmatching the AGENTS.md no-silent-failures stance.\n\nAdds 42 unit tests across 11 classes covering singleton/list/mixed/empty\nshapes, unknown paths, shape mismatches, malformed leaves, list-entry\nvalidation, format ambiguity, backwards-compat, and direct-helper calls.\n\nExisting flat-format parsing path is untouched; flat YAML continues to\nwork via the STEM_TO_DOTTED shim from Phase 1.\n\nAddresses #793.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-09T15:38:35+01:00",
+          "tree_id": "4236e3b1a71b4856c657f1f0db0aacab0816826f",
+          "url": "https://github.com/endavis/infrafoundry/commit/f08c9090fc22e90c8fa704d49e4419158e0c8e1d"
+        },
+        "date": 1778337539917,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9233.096045538172,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001965527249810555",
+            "extra": "mean: 108.30603245844529 usec\nrounds: 2095"
           }
         ]
       }
