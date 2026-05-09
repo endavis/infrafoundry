@@ -38,6 +38,10 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+
+# Cross-reference target type for the virtual-IP `interface` field.
+_MANAGED_INTERFACE_TYPE = "interfaces.assignments"
 
 # Allowed values for the ``mode`` discriminator. The issue body's draft
 # was wrong; the live probe is authoritative.
@@ -69,6 +73,7 @@ class VirtualIPValidator:
         virtual_ips: list[ResourceConfig],
         managed_interface_names: set[str],
         existing_interfaces: dict[str, Any],
+        index: XRefIndex | None = None,
     ) -> None:
         """Validate virtual-IP resources.
 
@@ -79,6 +84,10 @@ class VirtualIPValidator:
                 YAML.
             existing_interfaces: Live interface map from
                 ``OPNsenseValidator._get_existing_interfaces``.
+            index: Optional dotted-type cross-reference index (#793).
+                When provided, the ``interface`` field accepts dotted-
+                path forms in addition to bare names. ``None`` falls
+                back to bare-name lookup only.
         """
         seen_keys: dict[tuple[str, str, str, str], str] = {}
         for vip in virtual_ips:
@@ -87,6 +96,7 @@ class VirtualIPValidator:
                 managed_interface_names=managed_interface_names,
                 existing_interfaces=existing_interfaces,
                 seen_keys=seen_keys,
+                index=index,
             )
 
     def _validate_one(
@@ -96,6 +106,7 @@ class VirtualIPValidator:
         managed_interface_names: set[str],
         existing_interfaces: dict[str, Any],
         seen_keys: dict[tuple[str, str, str, str], str],
+        index: XRefIndex | None,
     ) -> None:
         """Run all checks for a single virtual-IP entry."""
         mode = self._validate_mode(vip)
@@ -103,6 +114,7 @@ class VirtualIPValidator:
             vip,
             managed_interface_names=managed_interface_names,
             existing_interfaces=existing_interfaces,
+            index=index,
         )
         address = self._validate_address(vip)
         self._validate_network(vip, address)
@@ -159,6 +171,7 @@ class VirtualIPValidator:
         *,
         managed_interface_names: set[str],
         existing_interfaces: dict[str, Any],
+        index: XRefIndex | None,
     ) -> str | None:
         """Validate the ``interface`` cross-reference. Returns the value or None."""
         interface = vip.config.get("interface")
@@ -178,6 +191,32 @@ class VirtualIPValidator:
                 level=ValidationLevel.ERROR,
             )
             return None
+
+        # Dotted-form resolution (#793). The xref index always wins
+        # when its lookup matches; otherwise fall through to bare-name
+        # checks for backward compatibility with the flat schema.
+        # ``current_plugin`` is the first segment of the referencing
+        # vip's type (e.g. ``interfaces`` for ``interfaces.virtual_ips``).
+        if index is not None and "." in interface:
+            current_plugin = vip.type.split(".", 1)[0] if "." in vip.type else None
+            resolved = resolve_xref(
+                interface,
+                expected_type=_MANAGED_INTERFACE_TYPE,
+                index=index,
+                current_plugin=current_plugin,
+            )
+            if resolved is not None:
+                self.report.add_check(
+                    check_name=f"virtual_ip_{vip.name}_interface",
+                    passed=True,
+                    message=(
+                        f"Interface '{interface}' resolved (via dotted-path) to "
+                        f"'{resolved.name}' for virtual_ip '{vip.name}'"
+                    ),
+                    level=ValidationLevel.INFO,
+                )
+                return resolved.name
+
         if interface in managed_interface_names or interface in existing_interfaces:
             self.report.add_check(
                 check_name=f"virtual_ip_{vip.name}_interface",

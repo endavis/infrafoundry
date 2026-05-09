@@ -23,6 +23,10 @@ from __future__ import annotations
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+
+# Cross-reference target type for the host-alias `host` field.
+_MANAGED_HOST_OVERRIDE_TYPE = "unbound.host_overrides"
 
 
 class UnboundHostAliasValidator:
@@ -41,6 +45,7 @@ class UnboundHostAliasValidator:
         host_aliases: list[ResourceConfig],
         managed_host_override_names: set[str],
         existing_host_override_names: set[str],
+        index: XRefIndex | None = None,
     ) -> None:
         """Validate Unbound host-alias resources.
 
@@ -52,6 +57,11 @@ class UnboundHostAliasValidator:
                 returned by OPNsense's ``searchHostOverride`` (the
                 ``hostname.domain`` form, plus the bare hostname for
                 short-name references).
+            index: Optional dotted-type cross-reference index (#793).
+                When provided, the ``host`` field accepts dotted-path
+                forms like ``unbound.host_overrides.<name>`` in
+                addition to bare names. ``None`` falls back to bare-
+                name lookup only.
         """
         seen_keys: dict[tuple[str, str], str] = {}
         for alias in host_aliases:
@@ -60,6 +70,7 @@ class UnboundHostAliasValidator:
                 managed_host_override_names=managed_host_override_names,
                 existing_host_override_names=existing_host_override_names,
                 seen_keys=seen_keys,
+                index=index,
             )
 
     def _validate_one(
@@ -69,12 +80,14 @@ class UnboundHostAliasValidator:
         managed_host_override_names: set[str],
         existing_host_override_names: set[str],
         seen_keys: dict[tuple[str, str], str],
+        index: XRefIndex | None,
     ) -> None:
         """Run all checks for a single host-alias entry."""
         host = self._validate_host(
             alias,
             managed_host_override_names=managed_host_override_names,
             existing_host_override_names=existing_host_override_names,
+            index=index,
         )
         hostname = self._validate_hostname(alias)
         self._validate_domain(alias)
@@ -95,8 +108,19 @@ class UnboundHostAliasValidator:
         *,
         managed_host_override_names: set[str],
         existing_host_override_names: set[str],
+        index: XRefIndex | None,
     ) -> str | None:
-        """Validate the ``host`` cross-reference. Returns the value or None."""
+        """Validate the ``host`` cross-reference. Returns the value or None.
+
+        The ``host`` field accepts the three forms in #793 (bare name,
+        in-plugin relative ``host_overrides.<name>``, cross-plugin
+        absolute ``unbound.host_overrides.<name>``). On a dotted miss
+        we fall back to bare-name lookup so the live ``hostname.domain``
+        form (which itself contains a dot) keeps validating against
+        the existing host-override set without confusion — that string
+        always passes the ``"." in host`` check but the resolver miss
+        is non-fatal.
+        """
         host = alias.config.get("host")
         if host is None:
             self.report.add_check(
@@ -114,6 +138,33 @@ class UnboundHostAliasValidator:
                 level=ValidationLevel.ERROR,
             )
             return None
+
+        # Dotted-form resolution (#793). The xref index always wins
+        # when its lookup matches; otherwise we fall back to bare-name
+        # checks so the live ``hostname.domain`` form (which has a dot)
+        # still resolves against ``existing_host_override_names``.
+        # ``current_plugin`` is the first segment of the referencing
+        # alias's type (e.g. ``unbound`` for ``unbound.host_aliases``).
+        if index is not None and "." in host:
+            current_plugin = alias.type.split(".", 1)[0] if "." in alias.type else None
+            resolved = resolve_xref(
+                host,
+                expected_type=_MANAGED_HOST_OVERRIDE_TYPE,
+                index=index,
+                current_plugin=current_plugin,
+            )
+            if resolved is not None:
+                self.report.add_check(
+                    check_name=f"unbound_host_alias_{alias.name}_host",
+                    passed=True,
+                    message=(
+                        f"Host '{host}' resolved (via dotted-path) to "
+                        f"'{resolved.name}' for unbound_host_alias '{alias.name}'"
+                    ),
+                    level=ValidationLevel.INFO,
+                )
+                return resolved.name
+
         if host in managed_host_override_names or host in existing_host_override_names:
             self.report.add_check(
                 check_name=f"unbound_host_alias_{alias.name}_host",

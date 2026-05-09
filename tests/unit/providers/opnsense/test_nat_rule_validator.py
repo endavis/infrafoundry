@@ -717,3 +717,96 @@ class TestEdgeCases:
         assert "nat_rule_b_interface" in names
         assert "nat_rule_d_interface" in names
         assert "nat_rule_c_interface" in names
+
+
+# ---------------------------------------------------------------------------
+# Dotted-path cross-references (#793) — forward-compat
+# ---------------------------------------------------------------------------
+
+
+class TestDottedPathXRefs:
+    """Forward-compat tests for the dotted-path resolver. Bare-name
+    behaviour (``index=None``) is unchanged — covered by the test
+    classes above. These tests confirm the new dotted forms are
+    accepted when an ``index`` is supplied."""
+
+    def test_cross_plugin_absolute_alias_in_target_resolves(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        admins = ResourceConfig(
+            name="vip_pool",
+            type="firewall.aliases",
+            provider="opnsense",
+            config={"type": "host"},
+        )
+        index = build_xref_index([admins])
+        validator.validate(
+            [_outbound("ok", target="firewall.aliases.vip_pool")],
+            alias_names={"vip_pool"},
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+            index=index,
+        )
+        # No warning should appear on target.
+        assert not [c for c in report.results if c.check_name == "nat_rule_ok_target"]
+
+    def test_in_plugin_relative_alias_resolves(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        alias = ResourceConfig(
+            name="admins",
+            type="firewall.aliases",
+            provider="opnsense",
+            config={"type": "host"},
+        )
+        index = build_xref_index([alias])
+        # NAT rule type is ``firewall.nat`` → current_plugin="firewall"
+        # → ``aliases.admins`` resolves to ``firewall.aliases.admins``.
+        validator.validate(
+            [_outbound("ok", source_net="aliases.admins")],
+            alias_names={"admins"},
+            interface_assignment_names=set(),
+            existing_interfaces={"wan": {}},
+            existing_aliases={},
+            index=index,
+        )
+        assert not [c for c in report.results if c.check_name == "nat_rule_ok_source_net"]
+
+    def test_cross_plugin_absolute_interface_resolves(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        iface = ResourceConfig(
+            name="wan",
+            type="interfaces.assignments",
+            provider="opnsense",
+            config={"name": "wan"},
+        )
+        index = build_xref_index([iface])
+        validator.validate(
+            [_outbound("ok", interface="interfaces.assignments.wan")],
+            alias_names=set(),
+            interface_assignment_names={"wan"},
+            existing_interfaces={},
+            existing_aliases={},
+            index=index,
+        )
+        assert not _failures(report, "nat_rule_ok_interface")
+
+    def test_index_none_preserves_legacy_behaviour(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            [_outbound("ok", interface="wan")],
+            alias_names=set(),
+            interface_assignment_names={"wan"},
+            existing_interfaces={},
+            existing_aliases={},
+        )
+        assert not _failures(report, "nat_rule_ok_interface")

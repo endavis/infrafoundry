@@ -1098,3 +1098,76 @@ class TestEdgeCases:
             existing_interfaces={},
         )
         assert _failures(report, "virtual_ip_bad_address")
+
+
+# ---------------------------------------------------------------------------
+# Dotted-path cross-references (#793) — forward-compat
+# ---------------------------------------------------------------------------
+
+
+class TestDottedPathXRefs:
+    """Forward-compat tests for the dotted-path resolver. Bare-name
+    behaviour (``index=None``) is unchanged. Validating dotted refs
+    requires an ``index``."""
+
+    def test_cross_plugin_absolute_interface_resolves(
+        self, validator: VirtualIPValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        iface = ResourceConfig(
+            name="lan",
+            type="interfaces.assignments",
+            provider="opnsense",
+            config={"name": "lan"},
+        )
+        index = build_xref_index([iface])
+        validator.validate(
+            [_ipalias("ok", interface="interfaces.assignments.lan")],
+            managed_interface_names={"lan"},
+            existing_interfaces={},
+            index=index,
+        )
+        passed = [
+            c for c in report.results if c.check_name == "virtual_ip_ok_interface" and c.passed
+        ]
+        assert passed
+
+    def test_in_plugin_relative_interface_resolves(
+        self, validator: VirtualIPValidator, report: ValidationReport
+    ) -> None:
+        from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+
+        iface = ResourceConfig(
+            name="lan",
+            type="interfaces.assignments",
+            provider="opnsense",
+            config={"name": "lan"},
+        )
+        index = build_xref_index([iface])
+        # Virtual IP type ``interfaces.virtual_ips`` → current_plugin=
+        # "interfaces" → ``assignments.lan`` resolves to
+        # ``interfaces.assignments.lan``.
+        validator.validate(
+            [_ipalias("ok", interface="assignments.lan")],
+            managed_interface_names={"lan"},
+            existing_interfaces={},
+            index=index,
+        )
+        passed = [
+            c for c in report.results if c.check_name == "virtual_ip_ok_interface" and c.passed
+        ]
+        assert passed
+
+    def test_index_none_preserves_legacy_behaviour(
+        self, validator: VirtualIPValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            [_ipalias("ok")],
+            managed_interface_names={"lan"},
+            existing_interfaces={},
+        )
+        passed = [
+            c for c in report.results if c.check_name == "virtual_ip_ok_interface" and c.passed
+        ]
+        assert passed

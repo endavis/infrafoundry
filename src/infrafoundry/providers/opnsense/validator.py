@@ -27,6 +27,7 @@ from infrafoundry.providers.opnsense.validators import (
     UnboundValidator,
     VirtualIPValidator,
     VLANValidator,
+    build_xref_index,
 )
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -183,6 +184,13 @@ class OPNsenseValidator:
         # Collect resources by type
         resource_refs = self._collect_resource_references(resources)
 
+        # Build the dotted-type cross-reference index once (#793). The
+        # nested-dict shape gives O(1) lookup per resolver call inside
+        # each per-resource validator. Validators that haven't adopted
+        # the resolver yet ignore this argument; that's fine — the
+        # parameter is optional and additive.
+        xref_index = build_xref_index(resources)
+
         # Validate against live API
         try:
             # Get existing aliases from OPNsense
@@ -209,6 +217,7 @@ class OPNsenseValidator:
                 existing_aliases,
                 existing_gateways,
                 managed_gateways=resource_refs["gateways"],
+                index=xref_index,
             )
             self.vlan_validator.validate(
                 resource_refs["vlans"],
@@ -225,6 +234,7 @@ class OPNsenseValidator:
                 resource_refs["interface_assignment_names"],
                 existing_interfaces,
                 existing_aliases,
+                index=xref_index,
             )
             self.gateway_validator.validate(
                 resource_refs["gateways"],
@@ -236,17 +246,20 @@ class OPNsenseValidator:
                 resource_refs["gateways"],
                 resource_refs["gateway_names"],
                 existing_gateways,
+                index=xref_index,
             )
             self.virtual_ip_validator.validate(
                 resource_refs["virtual_ips"],
                 resource_refs["interface_assignment_names"],
                 existing_interfaces,
+                index=xref_index,
             )
             self.unbound_validator.validate(resource_refs["unbound_host_overrides"])
             self.unbound_host_alias_validator.validate(
                 resource_refs["unbound_host_aliases"],
                 resource_refs["unbound_host_override_names"],
                 existing_unbound_host_overrides,
+                index=xref_index,
             )
             self.unbound_forward_validator.validate(resource_refs["unbound_forwards"])
             self.resource_name_validator.validate(resources)

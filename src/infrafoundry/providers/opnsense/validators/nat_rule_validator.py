@@ -39,6 +39,13 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+
+# Dotted types referenced by NAT-rule cross-reference fields. Pulled
+# out as constants so the bare-name fallback and the resolver call
+# agree on the target type.
+_MANAGED_ALIAS_TYPE = "firewall.aliases"
+_MANAGED_INTERFACE_TYPE = "interfaces.assignments"
 
 # OPNsense built-in net/target keywords commonly accepted in NAT rules. The
 # set is intentionally conservative — unknown values surface as warnings
@@ -78,6 +85,7 @@ class NATRuleValidator:
         interface_assignment_names: set[str],
         existing_interfaces: dict[str, Any],
         existing_aliases: dict[str, Any],
+        index: XRefIndex | None = None,
     ) -> None:
         """Validate NAT-rule resources.
 
@@ -90,6 +98,10 @@ class NATRuleValidator:
                 ``OPNsenseValidator._get_existing_interfaces``.
             existing_aliases: Live alias map from
                 ``OPNsenseValidator._get_existing_aliases``.
+            index: Optional dotted-type cross-reference index (#793).
+                When provided, alias / interface fields accept dotted-
+                path forms in addition to bare names. ``None`` falls
+                back to bare-name lookup only.
         """
         for rule in nat_rules:
             self._validate_one(
@@ -98,6 +110,7 @@ class NATRuleValidator:
                 interface_assignment_names=interface_assignment_names,
                 existing_interfaces=existing_interfaces,
                 existing_aliases=existing_aliases,
+                index=index,
             )
 
     def _validate_one(
@@ -108,6 +121,7 @@ class NATRuleValidator:
         interface_assignment_names: set[str],
         existing_interfaces: dict[str, Any],
         existing_aliases: dict[str, Any],
+        index: XRefIndex | None,
     ) -> None:
         """Run all checks for a single NAT-rule entry."""
         kind = self._validate_kind(rule)
@@ -120,6 +134,7 @@ class NATRuleValidator:
             rule,
             interface_assignment_names=interface_assignment_names,
             existing_interfaces=existing_interfaces,
+            index=index,
         )
         if kind == "outbound":
             self._validate_outbound_required(rule)
@@ -128,18 +143,21 @@ class NATRuleValidator:
                 "source_net",
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
+                index=index,
             )
             self._validate_net_field(
                 rule,
                 "destination_net",
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
+                index=index,
             )
             self._validate_net_field(
                 rule,
                 "target",
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
+                index=index,
             )
         elif kind == "one_to_one":
             self._validate_one_to_one_required(rule)
@@ -148,12 +166,14 @@ class NATRuleValidator:
                 "source_net",
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
+                index=index,
             )
             self._validate_net_field(
                 rule,
                 "destination_net",
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
+                index=index,
             )
             self._validate_one_to_one_type(rule)
             self._validate_natreflection(rule, kind="one_to_one")
@@ -164,18 +184,21 @@ class NATRuleValidator:
                 "source_net",
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
+                index=index,
             )
             self._validate_net_field(
                 rule,
                 "destination_net",
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
+                index=index,
             )
             self._validate_net_field(
                 rule,
                 "target",
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
+                index=index,
             )
             self._validate_pass_action(rule)
             self._validate_poolopts(rule)
@@ -300,6 +323,7 @@ class NATRuleValidator:
         *,
         interface_assignment_names: set[str],
         existing_interfaces: dict[str, Any],
+        index: XRefIndex | None,
     ) -> None:
         interface = rule.config.get("interface")
         if interface is None:
@@ -313,11 +337,28 @@ class NATRuleValidator:
                 level=ValidationLevel.ERROR,
             )
             return
-        if interface in interface_assignment_names or interface in existing_interfaces:
+
+        # Dotted-form resolution (#793). On a hit, fall through to the
+        # bare-name flow with the resolved canonical name so live-
+        # interface lookups still work consistently. ``current_plugin``
+        # is the first segment of the referencing rule's type.
+        bare_name = interface
+        if index is not None and "." in interface:
+            current_plugin = rule.type.split(".", 1)[0] if "." in rule.type else None
+            resolved = resolve_xref(
+                interface,
+                expected_type=_MANAGED_INTERFACE_TYPE,
+                index=index,
+                current_plugin=current_plugin,
+            )
+            if resolved is not None:
+                bare_name = resolved.name
+
+        if bare_name in interface_assignment_names or bare_name in existing_interfaces:
             self.report.add_check(
                 check_name=f"nat_rule_{rule.name}_interface",
                 passed=True,
-                message=(f"Interface '{interface}' resolved for nat_rule '{rule.name}'"),
+                message=(f"Interface '{bare_name}' resolved for nat_rule '{rule.name}'"),
                 level=ValidationLevel.INFO,
             )
             return
@@ -342,6 +383,7 @@ class NATRuleValidator:
         *,
         alias_names: set[str],
         existing_aliases: dict[str, Any],
+        index: XRefIndex | None,
     ) -> None:
         if field_name not in rule.config:
             return
@@ -361,9 +403,31 @@ class NATRuleValidator:
             # Empty is allowed for optional fields; the per-kind required
             # check elsewhere catches mandatory fields with no value.
             return
-        if value in _NET_KEYWORDS or value in alias_names or value in existing_aliases:
+
+        # Dotted-form alias resolution (#793). On a hit, treat as alias
+        # match. The resolved canonical name is checked against
+        # ``alias_names`` for parity with the bare-name flow.
+        # ``current_plugin`` is the first segment of the referencing
+        # rule's type.
+        bare_value = value
+        if index is not None and "." in value:
+            current_plugin = rule.type.split(".", 1)[0] if "." in rule.type else None
+            resolved = resolve_xref(
+                value,
+                expected_type=_MANAGED_ALIAS_TYPE,
+                index=index,
+                current_plugin=current_plugin,
+            )
+            if resolved is not None:
+                bare_value = resolved.name
+
+        if (
+            bare_value in _NET_KEYWORDS
+            or bare_value in alias_names
+            or bare_value in existing_aliases
+        ):
             return
-        if _looks_like_ip_or_cidr(value):
+        if _looks_like_ip_or_cidr(bare_value):
             return
         # Soft warning — new OPNsense versions may add keywords; don't
         # block a plan on an unknown one.

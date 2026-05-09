@@ -29,6 +29,12 @@ import ipaddress
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+
+# All xref lookups for the opnsense provider use this dotted type for
+# managed gateways. Pulled out as a constant so the bare-name fallback
+# and the resolver call agree on the target type.
+_MANAGED_GATEWAY_TYPE = "routing.gateways"
 
 
 class StaticRouteValidator:
@@ -48,6 +54,7 @@ class StaticRouteValidator:
         managed_gateways: list[ResourceConfig],
         gateway_names: set[str],
         existing_gateways: set[str],
+        index: XRefIndex | None = None,
     ) -> None:
         """Validate static-route resources.
 
@@ -59,6 +66,12 @@ class StaticRouteValidator:
             gateway_names: Set of managed gateway names declared in YAML.
             existing_gateways: Set of live gateway names returned by
                 OPNsense's ``searchGateway`` (managed + dynamic).
+            index: Optional dotted-type cross-reference index (#793).
+                When provided, the gateway field accepts dotted-path
+                forms like ``routing.gateways.WAN_GW`` in addition to
+                bare names. ``None`` falls back to bare-name lookup
+                only — preserving the pre-#793 behaviour for callers
+                that haven't adopted the new resolver yet.
         """
         gateway_protocols = _index_managed_gateway_protocols(managed_gateways)
         for route in static_routes:
@@ -67,6 +80,7 @@ class StaticRouteValidator:
                 gateway_names=gateway_names,
                 existing_gateways=existing_gateways,
                 gateway_protocols=gateway_protocols,
+                index=index,
             )
 
     def _validate_one(
@@ -76,6 +90,7 @@ class StaticRouteValidator:
         gateway_names: set[str],
         existing_gateways: set[str],
         gateway_protocols: dict[str, str],
+        index: XRefIndex | None,
     ) -> None:
         """Run all checks for a single static-route entry."""
         network = self._validate_network(route)
@@ -83,6 +98,7 @@ class StaticRouteValidator:
             route,
             gateway_names=gateway_names,
             existing_gateways=existing_gateways,
+            index=index,
         )
         if network is not None and gateway is not None:
             self._validate_protocol_match(route, network, gateway, gateway_protocols)
@@ -140,8 +156,27 @@ class StaticRouteValidator:
         *,
         gateway_names: set[str],
         existing_gateways: set[str],
+        index: XRefIndex | None,
     ) -> str | None:
-        """Validate the ``gateway`` cross-reference. Returns the value or None."""
+        """Validate the ``gateway`` cross-reference. Returns the value or None.
+
+        The ``gateway`` field accepts three forms (#793):
+
+        - bare name (e.g. ``WAN_GW``) — looked up first via the dotted
+          resolver against ``routing.gateways`` (when ``index`` is
+          provided), then via the pre-loaded ``gateway_names`` set,
+          then against the live ``existing_gateways`` set.
+        - in-plugin relative (e.g. ``gateways.WAN_GW``) — resolved by
+          ``resolve_xref`` with ``current_plugin`` defaulted to
+          ``opnsense``.
+        - cross-plugin absolute (e.g. ``routing.gateways.WAN_GW``) —
+          resolved directly by ``resolve_xref``.
+
+        On a dotted miss we still fall back to bare-name lookup so a
+        flat-format YAML (no dots) keeps validating identically. The
+        resolved value (the bare name) is returned because downstream
+        protocol-match logic keys off the bare gateway name.
+        """
         gateway = route.config.get("gateway")
         if gateway is None:
             self.report.add_check(
@@ -159,14 +194,44 @@ class StaticRouteValidator:
                 level=ValidationLevel.ERROR,
             )
             return None
-        if gateway in gateway_names or gateway in existing_gateways:
+
+        # Dotted-form resolution (#793). On a hit we still return the
+        # *bare* gateway name so the protocol-match check keys off the
+        # canonical name in ``gateway_names`` / ``existing_gateways``.
+        # ``current_plugin`` is the first dotted segment of the
+        # referencing resource's type (e.g. ``routing`` for
+        # ``routing.static``) so an in-plugin relative ``gateways.<name>``
+        # resolves to ``routing.gateways.<name>``.
+        bare_name = gateway
+        if index is not None and "." in gateway:
+            current_plugin = route.type.split(".", 1)[0] if "." in route.type else None
+            resolved = resolve_xref(
+                gateway,
+                expected_type=_MANAGED_GATEWAY_TYPE,
+                index=index,
+                current_plugin=current_plugin,
+            )
+            if resolved is not None:
+                bare_name = resolved.name
+                self.report.add_check(
+                    check_name=f"static_route_{route.name}_gateway",
+                    passed=True,
+                    message=(
+                        f"Gateway '{gateway}' resolved (via dotted-path) to "
+                        f"'{bare_name}' for static_route '{route.name}'"
+                    ),
+                    level=ValidationLevel.INFO,
+                )
+                return bare_name
+
+        if bare_name in gateway_names or bare_name in existing_gateways:
             self.report.add_check(
                 check_name=f"static_route_{route.name}_gateway",
                 passed=True,
-                message=f"Gateway '{gateway}' resolved for static_route '{route.name}'",
+                message=f"Gateway '{bare_name}' resolved for static_route '{route.name}'",
                 level=ValidationLevel.INFO,
             )
-            return gateway
+            return bare_name
         self.report.add_check(
             check_name=f"static_route_{route.name}_gateway",
             passed=False,
