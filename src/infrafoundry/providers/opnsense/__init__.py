@@ -226,6 +226,13 @@ class OPNsenseProvider(
         from .components.kea_dhcp6_subnet import KeaDHCPv6SubnetManager
         from .components.nat_rule import NATRuleManager
         from .components.static_route import StaticRouteManager
+        from .components.system_dns import SystemDnsManager
+        from .components.system_firmware import SystemFirmwareManager
+        from .components.system_hostname import SystemHostnameManager
+        from .components.system_remotebackup import SystemRemoteBackupManager
+        from .components.system_ssh import SystemSshManager
+        from .components.system_tuning import SystemTuningManager
+        from .components.system_webgui import SystemWebguiManager
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
         from .components.unbound_host_override import UnboundHostOverrideManager
@@ -233,10 +240,14 @@ class OPNsenseProvider(
         from .components.vlan import VlanManager
 
         # Iteration order matches Python dict insertion order (preserved by
-        # ``OPNsenseDirectRunner``). DHCPv4/DHCPv6 subnets must be applied
-        # before reservations because reservations resolve their subnet UUID
-        # via ``search_dhcpv4_subnets`` / ``search_dhcpv6_subnets`` at apply
-        # time — a brand-new subnet must exist on the box before its
+        # ``OPNsenseDirectRunner``). ``system.*`` singletons run first so
+        # that ``system.firmware`` (#806's keystone) installs contrib
+        # plugins before any subsequent component depends on the
+        # plugin-installed controllers (e.g., ``os-acme-client`` for #790,
+        # ``os-openvpn-legacy`` for #808). DHCPv4/DHCPv6 subnets must be
+        # applied before reservations because reservations resolve their
+        # subnet UUID via ``search_dhcpv4_subnets`` / ``search_dhcpv6_subnets``
+        # at apply time — a brand-new subnet must exist on the box before its
         # reservations can reference it. Aliases are applied before
         # ``nat_rules`` and ``firewall_rules`` so the alias names those
         # rules reference exist on the box first (#775).
@@ -244,6 +255,13 @@ class OPNsenseProvider(
         # so a brand-new override exists on the box before any aliases
         # reference it (#776).
         return {
+            "system.hostname": SystemHostnameManager,
+            "system.dns": SystemDnsManager,
+            "system.ssh": SystemSshManager,
+            "system.webgui": SystemWebguiManager,
+            "system.firmware": SystemFirmwareManager,
+            "system.remotebackup": SystemRemoteBackupManager,
+            "system.tuning": SystemTuningManager,
             "interfaces.vlans": VlanManager,
             "interfaces.assignments": InterfaceAssignmentManager,
             "firewall.aliases": AliasManager,
