@@ -17,6 +17,7 @@
 **Amended:** 2026-05-08 (#777, #778) — `kea_dhcp4` per-component decision recorded (stock direct-REST against the existing `kea/dhcpv4/*` controller, now driven by `KeaDHCPv4SubnetManager` and `KeaDHCPv4ReservationManager` on `OPNsenseDirectRunner` instead of the legacy terraform write path via `browningluke/opnsense`). Finalization hook key renamed from `kea_dhcp6_reconfigure` to `kea_reconfigure` and shared across all four Kea managers (DHCPv4 + DHCPv6, subnet + reservation). After this amendment, `dhcp_static_maps` is the only OPNsense component still on the terraform write path — closes the cutover-unblock series for OPNsense (companion: #775 firewall_alias, #776 unbound_host_override, #758 kea_dhcp6).
 **Amended:** 2026-05-08 (#782) — `dhcp_static_maps` retired (deletion, not migration). The legacy template `dhcp_static_maps.tf.j2` referenced `opnsense_dhcpv4_static_map`, a terraform resource that never existed in `browningluke/opnsense`; the surface had no working apply path. After #777/#778, `kea_reservation` direct-API supersedes `dhcp_static_maps` for every operational use case (MAC-bound static IP, hostname, description). The template, the `_generate_dhcp_static_maps_terraform` provider method, the `dhcp_static_maps` entry in `get_resource_types()` / `get_terraform_resource_types()` / `get_dependencies()`, the `DHCPValidator` and its tests, and the `dhcp_static_maps` fixtures in test_advanced_workflows / test_import_blocks are all deleted. **`OPNsenseProvider.get_terraform_resource_types()` now returns an empty mapping — every OPNsense component flows through `OPNsenseDirectRunner`.**
 **Amended:** 2026-05-09 (#802) — Kea reservation operator schema dual-form acceptance recorded (both `kea.dhcp4.reservations` and `kea.dhcp6.reservations`). Reservations now accept `subnet_ref: <managed kea.dhcp{4,6}.subnets name>` (preferred — what the framework's blueprints emit) in addition to the existing `subnet: <CIDR>` literal form. Resolution is a two-step lookup: a new `KeaReservationValidator` flags missing / wrong-version / disagree cases at plan time using the shared `_xref` resolver from #793, and the `KeaDHCPv{4,6}ReservationManager` translates `subnet_ref` → CIDR at plan/apply/destroy time before the existing CIDR → live UUID lookup. The runner gains a generic opt-in `SIBLING_RESOURCE_TYPE` ClassVar marker mechanism (the kea reservation managers declare `kea.dhcp{4,6}.subnets`) so the runner threads the matching sibling resource slice as a `sibling_resources` kwarg without changing the signatures of managers that don't opt in. Regression fix: PR #781 retired the terraform write path for DHCPv4 reservations, which had previously resolved `subnet_ref` → kea subnet UUID inside the deleted Jinja template; no equivalent name→CIDR step was added at the time, so every operator reservation using the documented `subnet_ref` schema raised `ReferenceValidationError` until #802 added it back.
+**Amended:** 2026-05-10 (#806) — Seven `opnsense.system.*` singleton per-component decisions recorded: `system.hostname`, `system.dns`, `system.ssh`, `system.webgui`, `system.firmware` (keystone — install-missing-only plugin behavior; never auto-removes; unblocks #790 acmeclient and #808 openvpn-legacy by installing `os-acme-client`, `os-dmidecode`, `os-gdrive-backup`, `os-openvpn-legacy`, `os-smart` on the cutover target), `system.remotebackup` (second direct-API surface to carry secret-bearing fields after `virtual_ips` from #723; trigger for the new `validators/_secrets.py` helper enforcing `secret://env_secrets/...` URIs at plan time for `gdrive_password` / `gdrive_p12_key`), and `system.tuning` (optional 7th — empty on both source and target boxes today; included so future operator sysctl tweaks have a typed home). All seven are dict-shape singletons under the nested `opnsense:` namespace from ADR-0016; the loader's `DOTTED_RESOURCE_SHAPES` map is extended for each. New shared scaffolding `components/_singleton.py` (`SingletonDiff`, `diff_singleton`, `enforce_singleton`) is reusable by upcoming singletons in #786, #787, #788, #790, #791, #792.
 **Status:** Accepted
 
 ## Status
@@ -254,6 +255,89 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Path-B over Path-A:** same trade-off as #758. Path B (manager split + shared `kea_reconfigure` finalization hook) chosen because the DHCPv4 managers slot cleanly into the existing dispatch table and reuse the same hook the DHCPv6 managers already declared.
 
 **Rollback strategy:** Same as the rest of §1's default mechanism — per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. No transactional rollback.
+
+### `system.hostname` (#806, 2026-05-10)
+
+**Mechanism:** Stock direct-REST against `system/general/*` (default §1 path). New singleton component manager `SystemHostnameManager` (in `components/system_hostname.py`) drives `OPNsenseDirectRunner` for hostname/domain/timezone/language drift. First of the 7 `opnsense.system.*` singletons added in #806, all sharing the new `_singleton.py` helper (`SingletonDiff`, `diff_singleton`, `enforce_singleton`).
+
+- **Endpoints:** `GET system/general/get` / `POST system/general/set`. Wrapped via the new `SystemClient` class in `api_client.py` alongside the other `system.*` endpoints.
+- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`. The nested-namespace loader emits exactly one `ResourceConfig` per dict-shape path under `opnsense.system.hostname` (`DOTTED_RESOURCE_SHAPES["system.hostname"] == "dict"`).
+- **Wire schema:** flat `{hostname, domain, timezone, language}` mapping. `extract_hostname_fields` tolerates either `{"general": {...}}` (modern MVC) or `{"system": {"general": {...}}}` envelope. The DNS sub-fields in the same XML block are owned by `system.dns` so the operator can manage hostname and DNS independently.
+- **Validator scope:** `SystemHostnameValidator` (pure-check, never mutates). Type-checks hostname/domain/timezone/language as strings; hostname must match a permissive RFC-952/1123 pattern; bogus values surface at plan time.
+- **Rollback strategy:** Same as §1's default — per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. No transactional rollback.
+- **Cross-reference notes:** None. Self-contained singleton with no `SIBLING_RESOURCE_TYPE`.
+
+### `system.dns` (#806, 2026-05-10)
+
+**Mechanism:** Stock direct-REST sharing the `system/general/*` controller with `system.hostname` — the same XML block in OPNsense's config carries both surfaces, but the InfraFoundry component split keeps them as independent singletons so an operator can edit DNS resolvers without touching hostname.
+
+- **Endpoints:** `GET system/general/get` / `POST system/general/set` (shared with hostname; the diff engine writes only the DNS slice keys).
+- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`.
+- **Wire schema:** `{dns_servers: list[str], dns_allow_override: str_bool, dns_allow_override_exclude: list[str], dns_gateways: dict[str, str]}`. The wire form on the API is comma-joined for repeating XML scalars; `_coerce_list` normalizes either a comma-string or a list. `dns_gateways` are the 8 per-resolver gateway selectors (`dns1gw`…`dns8gw`); `extract_dns_fields` drops empty/`"none"` slots so the diff doesn't fire on every plan.
+- **Validator scope:** `SystemDnsValidator`. Validates DNS server entries are parseable IPs (v4 or v6), `dns_allow_override` is bool/`"0"`/`"1"`, exclude list is a list of strings, gateways is a dict or list.
+- **Rollback strategy:** Same as §1's default.
+- **Cross-reference notes:** None. The `dns_gateways` map names are validated only as strings (a follow-up could resolve them against `routing.gateways` at plan time, but the legacy terraform path didn't either, so keeping parity for now).
+
+### `system.ssh` (#806, 2026-05-10)
+
+**Mechanism:** Stock direct-REST against `system/settings/*` (the SSH and WebGUI surfaces share that controller; this manager only writes the `ssh` subkey).
+
+- **Endpoints:** `GET system/settings/get` / `POST system/settings/set` (subkey `ssh`). Wrapped as `SystemClient.get_system_settings` / `set_system_settings`.
+- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`.
+- **Wire schema:** flat `{enabled, group, noauto, interfaces, kex, ciphers, macs, keys, keysig, rekeylimit}`. `enabled` is the OPNsense string sentinel (`"enabled"` / `""`). `interfaces` is comma-joined on the wire; `_coerce_list` normalizes either a comma-string or a list.
+- **Validator scope:** `SystemSshValidator`. Type-checks the simple string fields; `interfaces` accepts list-of-strings or a comma-joined string.
+- **Rollback strategy:** Same as §1's default.
+- **Cross-reference notes:** None. The `interfaces` list members are validated only as strings (a follow-up could resolve them against `interfaces.assignments` at plan time).
+
+### `system.webgui` (#806, 2026-05-10)
+
+**Mechanism:** Stock direct-REST against `system/settings/*` (subkey `webgui` — shared controller with `system.ssh`).
+
+- **Endpoints:** `GET system/settings/get` / `POST system/settings/set` (subkey `webgui`).
+- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`.
+- **Wire schema:** `{protocol: "http"|"https", port: int_string, ssl_certref: cert_uuid, ssl_ciphers, interfaces, compression}`. The XML form uses kebab-case keys (`ssl-certref`, `ssl-ciphers`); `extract_webgui_fields` tolerates either kebab- or snake-case so the diff is stable across OPNsense versions.
+- **Validator scope:** `SystemWebguiValidator`. Validates `protocol ∈ {"http","https"}`, `port` is an int 1..65535, plain string fields are strings, `interfaces` is list or comma-joined string. `ssl_certificate_ref` cross-reference resolution is deferred to a TODO comment (depends on the trust-system surface scheduled in #807).
+- **Rollback strategy:** Same as §1's default. **Operator caution:** writing a bad `protocol`/`port`/`ssl_certref` can lock the operator out of the GUI; the validator's checks are the first line of defense.
+- **Cross-reference notes:** `ssl_certificate_ref` would resolve against the trust-system cert collection once #807 ships. Today the validator only type-checks the string.
+
+### `system.firmware` (#806 keystone, 2026-05-10)
+
+**Mechanism:** **Asymmetric direct-REST** — read via `firmware/info`, write via `firmware/install/<plugin_name>` (one POST per missing plugin). This is the **keystone** of #806: without `firmware.plugins` automating the install of contrib plugins, the modern controllers for follow-up issues (#790 AcmeClient, #808 OpenVPN-legacy) don't exist on the cutover target and `infra apply` for those issues silently no-ops with 404s.
+
+- **Endpoints:** `GET firmware/info`, `POST firmware/install/<plugin_name>`, `POST firmware/lock/<plugin_name>` (pin), `POST firmware/remove/<plugin_name>` (**apply path NEVER calls** — see semantics below).
+- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`. Each installed plugin gets its own `ResourceOutcome` row with `action="add"` and `resource_name=<plugin_name>` so the runner's apply summary surfaces install counts.
+- **Wire schema:** `{plugins: list[str], mirror: str, flavour: str}`. The XML form is comma-joined for `plugins`; `build_desired_plugin_list` accepts either a comma-string or a list.
+- **Apply semantics (per the #806 user decision, 2026-05-10):**
+  - **Install-missing only.** Plugins in YAML but not on the box are installed, one POST per name.
+  - **Extras → warning, never removed.** Plugins on the box but not in YAML are logged at WARNING level only — `remove_plugin` is **never called** from the apply path. Deliberate safety departure from the usual "live state == YAML state" symmetry: an operator who forgot to declare `os-tailscale` in YAML must not lose Tailscale on the next apply.
+  - **Settings drift surfaced but not auto-written.** `mirror` / `flavour` drift is reported at WARNING level; the operator acts via the GUI or a follow-up. The XML-only inference for #806 doesn't confirm a writable settings endpoint and the keystone use case is plugin install.
+  - **Destroy is a no-op.** Don't auto-uninstall.
+- **Validator scope:** `SystemFirmwareValidator`. Validates `plugins` is a list of non-empty strings; warns (does not error) when a plugin name doesn't match the `os-<slug>` convention (operator may legitimately install non-`os-*` packages). Plain settings fields are type-checked.
+- **Rollback strategy:** Per-plugin install failures are reported by OPNsense's `firmware/install/*` synchronous response; failures fail the apply loud. No transactional rollback (an install that succeeded before another failed is not auto-removed). Plugin uninstalls are an explicit operator action.
+- **Cross-reference notes:** This component **is itself the cross-reference resolver** for follow-up issues — installing `os-acme-client` here unblocks #790, installing `os-openvpn-legacy` unblocks #808.
+
+### `system.remotebackup` (#806, 2026-05-10)
+
+**Mechanism:** Stock direct-REST against the modern `gdrivebackup/settings/*` MVC controller. **Second direct-API surface** (after `virtual_ips` from #723) to carry secret-bearing fields — the trigger for the secret-required validator pattern in `validators/_secrets.py`.
+
+- **Endpoints:** `GET gdrivebackup/settings/get` / `POST gdrivebackup/settings/set`.
+- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`.
+- **Wire schema:** OPNsense's wire form uses CamelCase (`GDriveEnabled`, `GDriveEmail`, `GDriveBackupCount`, `GDrivePassword`, `GDriveP12key`, `GDriveFolderID`, `GDrivePrefixHostname`); InfraFoundry YAML uses snake_case. Translation lives at the apply boundary in `_build_wire_payload`, leaving the diff side untouched. `extract_remotebackup_fields` tolerates `{"gdrivebackup": {"general": {...}}}`, `{"general": {...}}`, and a flat layout.
+- **Secrets:** `gdrive_password` and `gdrive_p12_key` MUST be `secret://env_secrets/<dotted/path>` URIs in YAML; literal plaintext is rejected at plan time by `SystemRemoteBackupValidator` via `_secrets.is_secret_reference()`. The manager resolves the URIs to plaintext at apply time via `SecretResolver` (mirrors `VirtualIPManager._resolve_and_parse`), then hands the resolved `ResourceConfig` to the service. `export_to_yaml` redacts both fields with placeholder `secret://` URIs so migrated YAML is safe to commit.
+- **Validator scope:** `SystemRemoteBackupValidator`. Enforces secret-required for the two credential fields; type-checks plain string fields; validates `gdrive_backup_count` is int-like.
+- **Rollback strategy:** Same as §1's default.
+- **Cross-reference notes:** None. Self-contained singleton.
+
+### `system.tuning` (#806 optional 7th, 2026-05-10)
+
+**Mechanism:** Stock direct-REST against `diagnostics/system/sysctl/*` MVC controller. Empty on both source and target boxes today; included in the #806 scaffold so future operator sysctl tweaks have a typed home rather than living as untyped YAML metadata.
+
+- **Endpoints:** `GET diagnostics/system/sysctl/get` / `POST diagnostics/system/sysctl/set`.
+- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`.
+- **Wire schema:** `{items: list[{tunable, value, descr}]}`. The MVC controller returns items either as a list of dicts or as a dict keyed by UUID; `_coerce_items` normalizes both to a sorted list so equality is stable across calls.
+- **Validator scope:** `SystemTuningValidator`. Validates `items` is a list of dicts; each entry's `tunable` must be a non-empty string, `value` must be a scalar (str/int/bool/float), `descr` (optional) must be a string.
+- **Rollback strategy:** Same as §1's default. Empty on the cutover target so first apply with new tunables exercises the path.
+- **Cross-reference notes:** None.
 
 ### `dhcp_static_maps` — retired (#782, 2026-05-08)
 

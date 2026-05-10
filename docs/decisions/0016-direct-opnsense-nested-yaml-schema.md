@@ -1,6 +1,7 @@
 # ADR-0016: Direct-OPNsense Nested YAML Schema Convention
 
 **Date:** 2026-05-08
+**Amended:** 2026-05-10 (#806) — First production validation of the singleton structural-discrimination claim. Issue #806 ships seven `opnsense.system.*` dict-shape singletons (`hostname`, `dns`, `ssh`, `webgui`, `firmware`, `remotebackup`, `tuning`) under the nested namespace. The loader's `DOTTED_RESOURCE_SHAPES` map is extended for each; the new shared scaffolding `components/_singleton.py` (`SingletonDiff`, `diff_singleton`, `enforce_singleton`) is reusable for upcoming singletons in #786, #787, #788, #790, #791, #792. The `name: settings` sentinel pattern remains obviated as described in §"Schema shape — illustrative example".
 **Status:** Accepted
 
 ## Status

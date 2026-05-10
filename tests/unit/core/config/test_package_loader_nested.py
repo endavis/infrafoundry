@@ -119,6 +119,30 @@ class TestParseNestedSingleton:
         resources[0].config["log_default_block"] = True
         assert original == {"log_default_block": False}
 
+    def test_system_hostname_singleton_round_trip(self, temp_dir):
+        """``opnsense.system.hostname`` (#806) emits exactly one settings resource.
+
+        Round-trip check: the nested YAML dict at ``opnsense.system.hostname``
+        becomes one ``ResourceConfig`` with ``type="system.hostname"``,
+        ``name="settings"``, and the dict carried verbatim as ``.config``.
+        Confirms the seven ``system.*`` singletons added in #806 work
+        through the nested-format loader.
+        """
+        loader = PackageLoader(temp_dir)
+        hostname_config = {
+            "hostname": "opnsense-a",
+            "domain": "endavis.net",
+            "timezone": "Etc/UTC",
+            "language": "en_US",
+        }
+        data = {"opnsense": {"system": {"hostname": hostname_config}}}
+        resources = loader._parse_resources_from_data(data, "system.yaml", "opnsense")
+        assert len(resources) == 1
+        assert resources[0].name == "settings"
+        assert resources[0].type == "system.hostname"
+        assert resources[0].provider == "opnsense"
+        assert resources[0].config == hostname_config
+
 
 @pytest.mark.unit
 class TestParseNestedList:
