@@ -213,7 +213,7 @@ def _build_wire_payload(snake_payload: dict[str, Any]) -> dict[str, Any]:
         "gdrive_enabled": "GDriveEnabled",
         "gdrive_email": "GDriveEmail",
         "gdrive_backup_count": "GDriveBackupCount",
-        "gdrive_password": "GDrivePassword",
+        "gdrive_password": "GDrivePassword",  # nosec B105 -- snake->Camel field-name map, not a password literal
         "gdrive_p12_key": "GDriveP12key",
         "gdrive_folder_id": "GDriveFolderID",
         "gdrive_prefix_hostname": "GDrivePrefixHostname",
