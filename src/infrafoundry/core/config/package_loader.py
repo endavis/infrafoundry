@@ -92,6 +92,18 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "monit.tests": "list",
     # #792 hostwatch (singleton; subshape verified at component-land time)
     "hostwatch": "dict",
+    # #806 system core (singletons). Each is a self-contained
+    # ``opnsense.system.<surface>`` namespace mapping a chunk of the
+    # OPNsense ``<system>`` block in ``config.xml`` to a singleton
+    # ``ResourceConfig`` with ``name="settings"``. Per ADR-0016 these are
+    # all ``"dict"`` because each surface is a global per-box setting.
+    "system.hostname": "dict",
+    "system.dns": "dict",
+    "system.ssh": "dict",
+    "system.webgui": "dict",
+    "system.firmware": "dict",
+    "system.remotebackup": "dict",
+    "system.tuning": "dict",
 }
 
 # Set of dotted resource-type paths recognised under the nested ``opnsense:``

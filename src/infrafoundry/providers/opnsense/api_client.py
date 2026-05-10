@@ -644,3 +644,180 @@ class KeaClient:
             Response with 'status' field (should be 'ok')
         """
         return self.client.request("POST", "kea/service/reconfigure")
+
+
+class SystemClient:
+    """OPNsense ``<system>`` block API operations (#806).
+
+    Wraps :class:`OPNsenseClient` with one ``get_*_settings`` /
+    ``set_*_settings`` pair per ``opnsense.system.*`` singleton surface
+    plus the firmware plugin install/lock/remove verbs. Each pair lines
+    up with a singleton component manager declared in
+    ``OPNsenseProvider.get_direct_api_resource_types()``.
+
+    Endpoint shapes are based on the XML structure of the source box
+    (recorded in ``tmp/agents/claude/probe-806.md``) and the standard
+    OPNsense REST conventions ``/api/<module>/<controller>/<verb>``. The
+    operator should re-verify endpoint shapes via a live probe after the
+    cutover.
+
+    Args:
+        client: ``OPNsenseClient`` instance for making authenticated requests.
+    """
+
+    def __init__(self, client: OPNsenseClient) -> None:
+        """Initialize SystemClient with an OPNsense client wrapper."""
+        self.client = client
+
+    # ------------------------------------------------------------------
+    # system.hostname (and shared with system.dns; see services for split)
+    # ------------------------------------------------------------------
+
+    def get_general_settings(self) -> dict[str, Any]:
+        """Fetch the OPNsense system general settings (hostname/domain/dns).
+
+        Returns:
+            Raw API response. The wire envelope is typically nested under
+            ``{"general": {...}}`` or ``{"system": {"general": {...}}}`` —
+            services normalize either shape via ``extract_*_fields``.
+        """
+        return self.client.request("GET", "system/general/get")
+
+    def set_general_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Update OPNsense system general settings.
+
+        Args:
+            settings: Settings payload, typically wrapped in a ``general``
+                or ``system.general`` envelope (matches the GET shape).
+
+        Returns:
+            Response with ``result`` field (e.g., ``"saved"``).
+        """
+        return self.client.request("POST", "system/general/set", data=settings)
+
+    # ------------------------------------------------------------------
+    # system.ssh / system.webgui (shared system/settings controller)
+    # ------------------------------------------------------------------
+
+    def get_system_settings(self) -> dict[str, Any]:
+        """Fetch the OPNsense system settings (ssh + webgui subkeys).
+
+        Returns:
+            Raw API response. Subkeys ``ssh`` and ``webgui`` are read by
+            the per-surface services.
+        """
+        return self.client.request("GET", "system/settings/get")
+
+    def set_system_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Update OPNsense system settings.
+
+        Args:
+            settings: Payload for the ssh/webgui sub-blocks. The caller is
+                responsible for wrapping under the correct envelope.
+
+        Returns:
+            Response with ``result`` field.
+        """
+        return self.client.request("POST", "system/settings/set", data=settings)
+
+    # ------------------------------------------------------------------
+    # system.firmware
+    # ------------------------------------------------------------------
+
+    def get_firmware_info(self) -> dict[str, Any]:
+        """Fetch firmware/plugin info: version + installed plugins/packages.
+
+        Returns:
+            Raw API response. Notable fields:
+            - ``plugin``: list of installed/known plugins with ``installed`` flag.
+            - ``package``: list of installed/known packages.
+            - ``product_*``: version metadata.
+        """
+        return self.client.request("GET", "firmware/info")
+
+    def install_plugin(self, name: str) -> dict[str, Any]:
+        """Install a single OPNsense plugin (e.g., ``os-acme-client``).
+
+        Args:
+            name: Plugin name. Usually starts with ``os-`` for community
+                / contrib plugins.
+
+        Returns:
+            API response (typically a job-acknowledgement payload).
+        """
+        return self.client.request("POST", f"firmware/install/{name}")
+
+    def remove_plugin(self, name: str) -> dict[str, Any]:
+        """Remove an OPNsense plugin.
+
+        Provided for symmetry with ``install_plugin``; the apply-path of
+        :class:`SystemFirmwareManager` does **NOT** call this — extras
+        are warned about, not removed (operator decision per #806).
+
+        Args:
+            name: Plugin name to remove.
+
+        Returns:
+            API response.
+        """
+        return self.client.request("POST", f"firmware/remove/{name}")
+
+    def lock_plugin(self, name: str) -> dict[str, Any]:
+        """Pin a plugin to its current version (no auto-upgrade).
+
+        Args:
+            name: Plugin name to lock.
+
+        Returns:
+            API response.
+        """
+        return self.client.request("POST", f"firmware/lock/{name}")
+
+    # ------------------------------------------------------------------
+    # system.remotebackup (gdrivebackup MVC)
+    # ------------------------------------------------------------------
+
+    def get_remotebackup_settings(self) -> dict[str, Any]:
+        """Fetch OPNsense remote-backup (Google Drive) settings.
+
+        Returns:
+            Raw API response. The wire envelope is typically
+            ``{"gdrivebackup": {"general": {...}}}`` (modern MVC) or
+            ``{"general": {...}}`` — services normalize either shape.
+        """
+        return self.client.request("GET", "gdrivebackup/settings/get")
+
+    def set_remotebackup_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Update OPNsense remote-backup (Google Drive) settings.
+
+        Args:
+            settings: Payload (envelope matches the GET shape).
+
+        Returns:
+            Response with ``result`` field.
+        """
+        return self.client.request("POST", "gdrivebackup/settings/set", data=settings)
+
+    # ------------------------------------------------------------------
+    # system.tuning (sysctl tunables)
+    # ------------------------------------------------------------------
+
+    def get_tuning_settings(self) -> dict[str, Any]:
+        """Fetch OPNsense system-tuning (sysctl) settings.
+
+        Returns:
+            Raw API response. The MVC ``sysctl`` controller exposes
+            ``get`` for the current ``items`` collection.
+        """
+        return self.client.request("GET", "diagnostics/system/sysctl/get")
+
+    def set_tuning_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Update OPNsense system-tuning (sysctl) settings.
+
+        Args:
+            settings: Payload of sysctl items to set.
+
+        Returns:
+            Response with ``result`` field.
+        """
+        return self.client.request("POST", "diagnostics/system/sysctl/set", data=settings)
