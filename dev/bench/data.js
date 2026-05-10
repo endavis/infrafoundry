@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778342754668,
+  "lastUpdate": 1778421185703,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8463,6 +8463,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00008217095606594933",
             "extra": "mean: 156.91859994149127 usec\nrounds: 5"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a06cd93e8a3f4a1c484eb300791e0ea824fa6c7e",
+          "message": "feat: add opnsense.system.* direct-API singletons (cutover hard blocker) (merges PR #809, addresses #806)\n\n* feat: add opnsense.system.* direct-API singletons (cutover hard blocker)\n\nAdds seven dict-shape singletons under the nested opnsense namespace\n(hostname, dns, ssh, webgui, firmware, remotebackup, tuning) per\nADR-0016 structural discrimination. firmware.plugins is the keystone:\ninstall-missing-only behavior unblocks #790 (acmeclient) and #808\n(legacy openvpn) which depend on plugins absent from opnsense-a today.\nIntroduces components/_singleton.py scaffold (enforce_singleton,\ndiff_singleton, SingletonDiff) reusable for upcoming #786, #787, #788,\n#790, #791, #792. New validators/_secrets.py enforces secret://\nreferences for gdrive_password / gdrive_p12_key on system.remotebackup.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* chore: silence bandit B105 false positive on snake->Camel field map\n\nBandit flagged the dict literal \"gdrive_password\": \"GDrivePassword\" as a\nhardcoded password. The value is the OPNsense wire-side field name, not\na credential. Same pattern in services/system_remotebackup.py:52 already\ncarries # nosec B105.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-10T14:52:30+01:00",
+          "tree_id": "d3fbcc8f4a0cdda9a5f14eaa9b46d44f95146196",
+          "url": "https://github.com/endavis/infrafoundry/commit/a06cd93e8a3f4a1c484eb300791e0ea824fa6c7e"
+        },
+        "date": 1778421184479,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6273.918538126432,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003544226796664348",
+            "extra": "mean: 159.39001979752004 usec\nrounds: 2273"
           }
         ]
       }
