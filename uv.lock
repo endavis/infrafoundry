@@ -1026,7 +1026,7 @@ requires-dist = [
     { name = "pip-licenses", marker = "extra == 'security'", specifier = ">=4.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.6.0" },
     { name = "pydantic", specifier = ">=2.13.3" },
-    { name = "pyinfra", specifier = ">=3.5.1" },
+    { name = "pyinfra", specifier = ">=3.8.0" },
     { name = "pyproject-fmt", marker = "extra == 'dev'", specifier = ">=2.21.2" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.409" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.3" },
@@ -2090,7 +2090,7 @@ wheels = [
 
 [[package]]
 name = "pyinfra"
-version = "3.7"
+version = "3.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -2102,10 +2102,11 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
     { name = "typeguard" },
+    { name = "types-paramiko" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/2b/49eeb9000a66157f7cda8b5b4871e1e496f1fb42fd1b94290ee5efb9a3cb/pyinfra-3.7.tar.gz", hash = "sha256:2f8eeee84d4d90c5ee57300ae6673b58237117605cca6b0cffde29f0b2517d4b", size = 599054, upload-time = "2026-03-12T10:55:35.972Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/57/95df8eb3decd127802fe9b5b19c0e00fa77374b2ff1ea9e23c4f108035dd/pyinfra-3.8.0.tar.gz", hash = "sha256:a00562c9cb87d8a911c9d08035885f341bb423a93488ebd2e1fce594b104c0e2", size = 651818, upload-time = "2026-05-04T12:26:18.376Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a4/6d/246168fe781009d32199fb7553a9a462e298d17f6e49accedf3b16c65346/pyinfra-3.7-py3-none-any.whl", hash = "sha256:9208de3f4479ad80509db51da874445017987818dba8a36c808f56ce1451b34c", size = 267074, upload-time = "2026-03-12T10:55:34.518Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/3d/744ef64322068c264425e7491c566bc63575ca5f304ed08e46e7210741f7/pyinfra-3.8.0-py3-none-any.whl", hash = "sha256:023ae01ef1326b670f88ef77b28b2a83039ef1551faa554a74cbd50ba923aba4", size = 299052, upload-time = "2026-05-04T12:26:19.726Z" },
 ]
 
 [[package]]
@@ -2920,6 +2921,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/dd/47/2544dc4272982264d339a7011839cba8f76a5af2e9a9f266fc2e630fb8a1/types_boto3-1.43.2.tar.gz", hash = "sha256:4b9d93e4a9c392404305ecd9e23ff872e1d117f82b00f5d884a7c050003f5b4b", size = 102930, upload-time = "2026-05-01T20:31:10.631Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b4/b6/52dcb749af82a70ff5d19e23e5099e23b526f92b5169e79de1a141584258/types_boto3-1.43.2-py3-none-any.whl", hash = "sha256:174287bb72cd8adbe2edf197af018a874ab7ffe2b839dca53e16dd3d8a37bd43", size = 70547, upload-time = "2026-05-01T20:31:06.353Z" },
+]
+
+[[package]]
+name = "types-paramiko"
+version = "4.0.0.20260508"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/05/e4/4ab4df17433a3c576ee3f0c11b74038b5ac19b618cae4eda0a461510e8f6/types_paramiko-4.0.0.20260508.tar.gz", hash = "sha256:3a00f0847fc4097ec99cfa53dca566169a50baefc93e2cace624642edec32bc1", size = 29167, upload-time = "2026-05-08T04:51:11.562Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ba/7d/f3661f4b69ca8b104e871151b419ee8495945895a9a6bc8bbff40c142b25/types_paramiko-4.0.0.20260508-py3-none-any.whl", hash = "sha256:a4389857b497b8eef8159cbf21dbd76c471c8d388acb2bca376c5ff023daa306", size = 38784, upload-time = "2026-05-08T04:51:10.357Z" },
 ]
 
 [[package]]
