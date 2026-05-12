@@ -2,6 +2,7 @@
 
 **Date:** 2026-05-08
 **Amended:** 2026-05-10 (#806) — First production validation of the singleton structural-discrimination claim. Issue #806 ships seven `opnsense.system.*` dict-shape singletons (`hostname`, `dns`, `ssh`, `webgui`, `firmware`, `remotebackup`, `tuning`) under the nested namespace. The loader's `DOTTED_RESOURCE_SHAPES` map is extended for each; the new shared scaffolding `components/_singleton.py` (`SingletonDiff`, `diff_singleton`, `enforce_singleton`) is reusable for upcoming singletons in #786, #787, #788, #790, #791, #792. The `name: settings` sentinel pattern remains obviated as described in §"Schema shape — illustrative example".
+**Amended:** 2026-05-12 (#788) — Second production singleton ships under the nested namespace: `opnsense.radvd` registers in `DOTTED_RESOURCE_SHAPES` as a dict-shape singleton with a hybrid YAML-singleton/wire-list pattern (operator authors a single dict whose `interfaces` mapping carries one inner mapping per interface; the wire stores per-UUID records). Unlike #806's seven `opnsense.system.*` singletons (which use `components/_singleton.py`'s `SingletonDiff` for whole-record install/update), `radvd` requires a custom dict-of-dicts diff to reconcile the per-interface inner mapping against the wire's per-UUID records — full-reconcile semantics including DELETE for interfaces missing from YAML. Confirms the structural-discrimination claim holds for singletons whose internal shape diverges from a flat scalar dict.
 **Status:** Accepted
 
 ## Status

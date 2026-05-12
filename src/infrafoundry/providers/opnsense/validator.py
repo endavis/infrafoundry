@@ -21,6 +21,7 @@ from infrafoundry.providers.opnsense.validators import (
     InterfaceAssignmentValidator,
     KeaReservationValidator,
     NATRuleValidator,
+    RadvdValidator,
     ResourceNameValidator,
     StaticRouteValidator,
     UnboundForwardValidator,
@@ -92,6 +93,7 @@ class OPNsenseValidator:
         self.unbound_host_alias_validator = UnboundHostAliasValidator(report)
         self.unbound_forward_validator = UnboundForwardValidator(report)
         self.kea_reservation_validator = KeaReservationValidator(report)
+        self.radvd_validator = RadvdValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -271,6 +273,11 @@ class OPNsenseValidator:
                 resource_refs["kea_dhcp6_subnet_names"],
                 index=xref_index,
             )
+            self.radvd_validator.validate(
+                resource_refs["radvd"],
+                resource_refs["interface_assignment_names"],
+                existing_interfaces,
+            )
             self.resource_name_validator.validate(resources)
 
         except Exception as exc:
@@ -307,6 +314,7 @@ class OPNsenseValidator:
         kea_dhcp6_reservations = [r for r in resources if r.type == "kea.dhcp6.reservations"]
         kea_dhcp4_subnets = [r for r in resources if r.type == "kea.dhcp4.subnets"]
         kea_dhcp6_subnets = [r for r in resources if r.type == "kea.dhcp6.subnets"]
+        radvd = [r for r in resources if r.type == "radvd"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}
@@ -348,6 +356,7 @@ class OPNsenseValidator:
             "kea_dhcp6_subnets": kea_dhcp6_subnets,
             "kea_dhcp4_subnet_names": kea_dhcp4_subnet_names,
             "kea_dhcp6_subnet_names": kea_dhcp6_subnet_names,
+            "radvd": radvd,
         }
 
     def _get_existing_aliases(

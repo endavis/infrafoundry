@@ -17,6 +17,7 @@ from infrafoundry.providers.opnsense.validators.kea_reservation_validator import
     KeaReservationValidator,
 )
 from infrafoundry.providers.opnsense.validators.nat_rule_validator import NATRuleValidator
+from infrafoundry.providers.opnsense.validators.radvd_validator import RadvdValidator
 from infrafoundry.providers.opnsense.validators.resource_name_validator import (
     ResourceNameValidator,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "InterfaceAssignmentValidator",
     "KeaReservationValidator",
     "NATRuleValidator",
+    "RadvdValidator",
     "ResourceNameValidator",
     "StaticRouteValidator",
     "UnboundForwardValidator",
