@@ -225,6 +225,7 @@ class OPNsenseProvider(
         from .components.kea_dhcp6_reservation import KeaDHCPv6ReservationManager
         from .components.kea_dhcp6_subnet import KeaDHCPv6SubnetManager
         from .components.nat_rule import NATRuleManager
+        from .components.radvd import RadvdManager
         from .components.static_route import StaticRouteManager
         from .components.system_dns import SystemDnsManager
         from .components.system_firmware import SystemFirmwareManager
@@ -277,6 +278,7 @@ class OPNsenseProvider(
             "kea.dhcp4.reservations": KeaDHCPv4ReservationManager,
             "kea.dhcp6.subnets": KeaDHCPv6SubnetManager,
             "kea.dhcp6.reservations": KeaDHCPv6ReservationManager,
+            "radvd": RadvdManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -312,6 +314,7 @@ class OPNsenseProvider(
         return {
             "kea_reconfigure": self._reconfigure_kea,
             "unbound_reconfigure": self._reconfigure_unbound,
+            "radvd_reconfigure": self._reconfigure_radvd,
         }
 
     def _reconfigure_kea(self, env_name: str) -> None:
@@ -351,6 +354,24 @@ class OPNsenseProvider(
         from .services.unbound_host_override import UnboundHostOverrideService
 
         service = UnboundHostOverrideService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
+    def _reconfigure_radvd(self, env_name: str) -> None:
+        """Reconfigure the radvd daemon after any radvd record mutation (#788).
+
+        Used by :meth:`get_finalization_hooks` so the OPNsense direct-API
+        runner can fire a single ``radvd/service/reconfigure`` call after
+        the per-interface adds/updates/deletes from
+        :class:`RadvdManager.apply` have completed. Hook errors propagate,
+        failing the apply.
+
+        Args:
+            env_name: Active environment name (matches the runner's hook
+                contract — ``hook(env_name) -> None``).
+        """
+        from .services.radvd import RadvdService
+
+        service = RadvdService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
     # All OPNsense components are now managed by ``OPNsenseDirectRunner``

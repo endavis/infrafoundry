@@ -110,6 +110,47 @@ class TestParseNestedSingleton:
         assert resources[0].type == "radvd"
         assert resources[0].config == {"interfaces": ["lan"], "ra_lifetime": 1800}
 
+    def test_radvd_singleton_multi_interface_round_trip(self, temp_dir):
+        """``opnsense.radvd`` carries a multi-interface inner mapping (#788).
+
+        The operator-facing shape is a dict-shape singleton whose
+        ``interfaces`` mapping holds one inner mapping per interface
+        (e.g. ``opt1``, ``opt2``, ``opt6``). Verifies the loader carries
+        the nested mapping verbatim into a single ``radvd`` ``ResourceConfig``.
+        """
+        loader = PackageLoader(temp_dir)
+        radvd_config = {
+            "interfaces": {
+                "opt1": {
+                    "mode": "assist",
+                    "priority": "medium",
+                    "min_interval": 200,
+                    "max_interval": 600,
+                    "routes": ["fd00:3742:10:1::/64"],
+                },
+                "opt2": {
+                    "mode": "assist",
+                    "priority": "medium",
+                    "routes": ["fd00:3742:20:1::/64"],
+                },
+                "opt6": {
+                    "mode": "assist",
+                    "priority": "medium",
+                    "routes": ["fd00:3742:40:1::/64"],
+                },
+            },
+        }
+        data = {"opnsense": {"radvd": radvd_config}}
+        resources = loader._parse_resources_from_data(data, "radvd.yaml", "opnsense")
+        assert len(resources) == 1
+        assert resources[0].name == "settings"
+        assert resources[0].type == "radvd"
+        assert resources[0].provider == "opnsense"
+        assert resources[0].config == radvd_config
+        # All three interfaces preserved with their inner field maps.
+        assert set(resources[0].config["interfaces"].keys()) == {"opt1", "opt2", "opt6"}
+        assert resources[0].config["interfaces"]["opt1"]["routes"] == ["fd00:3742:10:1::/64"]
+
     def test_singleton_config_is_a_copy(self, temp_dir):
         """Mutating the emitted ``config`` does not leak into source data."""
         loader = PackageLoader(temp_dir)
