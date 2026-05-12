@@ -821,3 +821,108 @@ class SystemClient:
             Response with ``result`` field.
         """
         return self.client.request("POST", "diagnostics/system/sysctl/set", data=settings)
+
+
+class RadvdClient:
+    """OPNsense ``radvd`` (IPv6 Router Advertisement) MVC API operations (#788).
+
+    Wraps :class:`OPNsenseClient` with the per-entry CRUD verbs the modern
+    radvd controller exposes. Endpoint shapes verified live against
+    ``opnsense-a`` (2026-05-10 probe captured in
+    ``tmp/agents/claude/probe-788.md``):
+
+    - ``GET radvd/settings/get`` — bulk read (``{"radvd": {"entries": [...]}}``).
+    - ``POST radvd/settings/searchEntry`` — paginated list (``{"rows": [...]}``).
+    - ``GET radvd/settings/getEntry/<uuid>`` — single record.
+    - ``POST radvd/settings/addEntry`` — create.
+    - ``POST radvd/settings/setEntry/<uuid>`` — update.
+    - ``POST radvd/settings/delEntry/<uuid>`` — delete.
+    - ``POST radvd/service/reconfigure`` — apply pending changes.
+    - ``GET radvd/service/status`` — daemon health.
+
+    Args:
+        client: ``OPNsenseClient`` instance for making authenticated requests.
+    """
+
+    def __init__(self, client: OPNsenseClient) -> None:
+        """Initialize RadvdClient with an OPNsense client wrapper."""
+        self.client = client
+
+    def search_records(self) -> list[dict[str, Any]]:
+        """Search for all radvd per-interface entries.
+
+        Returns:
+            List of entry dictionaries (each carrying ``uuid`` plus the
+            wire schema fields). Empty list when no entries exist.
+        """
+        response = self.client.request("POST", "radvd/settings/searchEntry")
+        return cast(list[dict[str, Any]], response.get("rows", []))
+
+    def get_record(self, uuid: str) -> dict[str, Any]:
+        """Fetch a specific radvd entry by UUID.
+
+        Args:
+            uuid: Entry UUID.
+
+        Returns:
+            Entry configuration dictionary (wire envelope).
+        """
+        return self.client.request("GET", f"radvd/settings/getEntry/{uuid}")
+
+    def add_record(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Create a new radvd entry.
+
+        Args:
+            payload: Wire payload wrapped under ``"entry"``.
+
+        Returns:
+            API response (typically ``{"result": "saved", "uuid": "..."}``).
+        """
+        return self.client.request("POST", "radvd/settings/addEntry", data=payload)
+
+    def set_record(self, uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Update an existing radvd entry.
+
+        Args:
+            uuid: Entry UUID.
+            payload: Wire payload wrapped under ``"entry"``.
+
+        Returns:
+            API response (typically ``{"result": "saved"}``).
+        """
+        return self.client.request("POST", f"radvd/settings/setEntry/{uuid}", data=payload)
+
+    def del_record(self, uuid: str) -> dict[str, Any]:
+        """Delete a radvd entry.
+
+        Args:
+            uuid: Entry UUID.
+
+        Returns:
+            API response.
+        """
+        return self.client.request("POST", f"radvd/settings/delEntry/{uuid}")
+
+    def reconfigure(self) -> dict[str, Any]:
+        """Reconfigure the radvd daemon to apply pending changes.
+
+        Returns:
+            API response (typically ``{"status": "ok"}``).
+        """
+        return self.client.request("POST", "radvd/service/reconfigure")
+
+    def get_service_status(self) -> dict[str, Any]:
+        """Fetch radvd daemon status.
+
+        Returns:
+            API response (typically ``{"status": "running" | "stopped" | "unknown"}``).
+        """
+        return self.client.request("GET", "radvd/service/status")
+
+    def get_settings(self) -> dict[str, Any]:
+        """Bulk read of all radvd entries via the settings/get endpoint.
+
+        Returns:
+            ``{"radvd": {"entries": [...]}}`` envelope.
+        """
+        return self.client.request("GET", "radvd/settings/get")
