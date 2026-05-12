@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778421185703,
+  "lastUpdate": 1778599139867,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8494,6 +8494,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003544226796664348",
             "extra": "mean: 159.39001979752004 usec\nrounds: 2273"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d4f2c7647b31481def52f799193f5c5d77052808",
+          "message": "feat: add opnsense.radvd direct-API resource (cutover blocker for IPv6 RAs) (merges PR #820, addresses #788)\n\nImplements the modern OPNsense radvd MVC controller as a dict-shape\nsingleton at YAML level with per-interface UUID records on the wire\n(hybrid pattern, second after #806). Full reconcile: interfaces in\nlive state but absent from YAML are deleted (safe; no data loss).\n\nProbe confirmed verb suffix is *Entry (not *Item per the issue body\nguess) and wire fields are CamelCase (MinRtrAdvInterval / RDNSS /\nDNSSL etc.); operator-facing YAML uses snake_case with translation at\nthe apply boundary. No global enabled toggle; per-entry enabled is the\nonly switch. mode enum: router/unmanaged/managed/assist/stateless.\n\nNew radvd_reconfigure finalization hook fires /api/radvd/service/\nreconfigure once per apply when any radvd record mutated.\n\nUnblocks IPv6 RA emission for the cutover sequence: opt1/opt2/opt3/opt6\n(Infra/PT/Tailscale-infra/Apps VLANs) get RAs on opnsense-a after apply.\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-12T16:18:16+01:00",
+          "tree_id": "bd19f82ea43fc556100bb6c65a2acc42db98974c",
+          "url": "https://github.com/endavis/infrafoundry/commit/d4f2c7647b31481def52f799193f5c5d77052808"
+        },
+        "date": 1778599138618,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7268.688394778635,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010961124712018397",
+            "extra": "mean: 137.57640246599877 usec\nrounds: 2271"
           }
         ]
       }
