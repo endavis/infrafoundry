@@ -110,4 +110,8 @@ coverage.xml
 
 # AI agent settings originals
 .gemini/settings.json.orig
+
+# AI agent local state
+.claude/scheduled_tasks.lock
+
 endavis-infra

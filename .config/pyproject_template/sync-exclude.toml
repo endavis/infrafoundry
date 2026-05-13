@@ -1,0 +1,55 @@
+# pyproject-template sync-exclude list
+#
+# Upstream files we intentionally do not adopt. Patterns are glob expressions
+# (fnmatch.fnmatch) matched against upstream-relative posix paths and consumed
+# by tools/pyproject_template/check_template_updates.py.
+#
+# Entries here mirror the "Category 1 — Template-skeleton files (never adopt)"
+# section of docs/development/pyproject-template-divergences.md. Category 2
+# (InfraFoundry-only files) needs no entries — those files do not exist in the
+# upstream tree, so they never surface in the comparison. Category 3 files
+# (hand-merge) are deliberately NOT excluded; reviewers must reconcile them
+# on each sync.
+#
+# Note on tests/template/: upstream's `tests/template/` exists in our tree and
+# we adopt the test files that exercise tools/ modules we keep. This file
+# does NOT blanket-exclude that directory; individual file decisions surface
+# as drift. The divergences doc's blanket "tests/template/ — never adopt"
+# statement is incorrect and is being corrected in a separate docs PR.
+
+exclude = [
+    # Skeleton source code
+    "src/package_name/**",
+    "examples/api/**",
+    "examples/basic_usage.py",
+    "examples/advanced_usage.py",
+    "examples/cli_usage.py",
+
+    # Skeleton tests (placeholder-package tests, not template-tool tests)
+    "tests/test_cli.py",
+    "tests/test_core.py",
+    "tests/test_logging.py",
+    "tests/test_example.py",
+    "tests/benchmarks/test_bench_core.py",
+    "tests/benchmarks/test_bench_logging.py",
+
+    # Skeleton / template-meta documentation
+    "docs/examples/api.md",
+    "docs/examples/add-a-feature.md",
+    "docs/usage/basics.md",
+    "docs/usage/cli.md",
+    "docs/reference/api.md",
+    "docs/template/**",
+    "docs/deployment/development.md",
+    "docs/deployment/production.md",
+    "docs/getting-started/installation.md",
+    "docs/development/extensions.md",
+    "docs/development/install-tools-framework.md",
+    "docs/development/tooling-roles.md",
+    "docs/development/github-repository-settings.md",
+    "docs/development/dependabot-automerge.md",
+    "docs/TABLE_OF_CONTENTS.md",
+
+    # InfraFoundry ships its own license; never overwrite.
+    "LICENSE",
+]

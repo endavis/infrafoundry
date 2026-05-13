@@ -847,7 +847,7 @@ class TestYesFlagBehavior:
             main(["--yes", "sync"])
 
             mock_run_action.assert_called_once_with(
-                5, mock_manager, False, yes=True, cleanup_mode=None
+                5, mock_manager, False, yes=True, cleanup_mode=None, show_excluded=False
             )
 
     def test_sync_with_yes_skips_prompt(self, tmp_path: Path) -> None:
