@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778688364852,
+  "lastUpdate": 1778711471059,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8587,6 +8587,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007709713154646033",
             "extra": "mean: 103.02493222688491 usec\nrounds: 2169"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e688c9583c48a93b7f66be20394bc375a9671cbe",
+          "message": "chore: add sync-exclude mechanism for downstream template drift (merges PR #826, addresses #823)\n\nPorts the sync-exclude mechanism from pyproject-template PR #507:\n\n- tools/pyproject_template/check_template_updates.py: add\n  SYNC_EXCLUDE_FILE constant, load_sync_excludes() loader,\n  --show-excluded CLI flag. compare_files() now returns a tuple\n  (different, excluded) so excluded files are reported on a\n  separate summary line and never pollute actionable drift.\n- tools/pyproject_template/manage.py: plumb --show-excluded through\n  run_action, action_check_updates, and the --update-only branch.\n- tests/template/test_check_template_updates.py (new): 13 tests\n  covering loader edge cases, glob/exact matching, hardcoded-skip\n  precedence, and excludes= parameter override.\n- tests/template/test_pyproject_template_main.py: update one mock\n  assertion for the show_excluded=False kwarg.\n- .config/pyproject_template/sync-exclude.toml (new): encode 27 glob\n  patterns from divergences-doc category 1. Category 2 files don't\n  exist upstream; Category 3 stays in actionable drift by design.\n- .gitignore: ignore .claude/scheduled_tasks.lock (Claude Code\n  local-state file, was untracked).\n\ntests/template/** is intentionally NOT excluded — we keep many\nupstream template tests for tools/ modules we use. The blanket\n\"never adopt tests/template/\" claim in the divergences doc is\nwrong; correction tracked for a separate docs PR.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-13T23:29:44+01:00",
+          "tree_id": "4f1d0f59946f6c23a69a90b3748c6771c6c6d438",
+          "url": "https://github.com/endavis/infrafoundry/commit/e688c9583c48a93b7f66be20394bc375a9671cbe"
+        },
+        "date": 1778711469890,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6015.53502086853,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003064376524642704",
+            "extra": "mean: 166.2362527241374 usec\nrounds: 2386"
           }
         ]
       }
