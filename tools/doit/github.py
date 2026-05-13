@@ -532,20 +532,23 @@ def _get_pr_info(pr_number: str | None, console: "ConsoleType") -> dict[str, Any
 def _extract_linked_issues(body: str) -> list[str]:
     """Extract linked issue numbers from PR body.
 
-    Looks for patterns like:
-    - Addresses #123
+    Matches only ``Addresses #N`` tokens that appear at the start of a line
+    with the exact capitalization ``Addresses``. Mid-sentence references,
+    lowercase ``addresses``, and other capitalizations are intentionally
+    ignored so that scope-mentions inside prose do not get parsed as
+    real links.
 
     Args:
         body: PR body text
 
     Returns:
-        List of issue numbers referenced with "Addresses"
+        List of issue numbers referenced with "Addresses" at line start
     """
     seen: set[str] = set()
     result: list[str] = []
 
-    pattern = r"addresses\s+#(\d+)"
-    for match in re.finditer(pattern, body, re.IGNORECASE):
+    pattern = r"^Addresses\s+#(\d+)"
+    for match in re.finditer(pattern, body, re.MULTILINE):
         issue = match.group(1)
         if issue not in seen:
             seen.add(issue)
