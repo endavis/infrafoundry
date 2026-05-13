@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778711471059,
+  "lastUpdate": 1778716114730,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8618,6 +8618,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003064376524642704",
             "extra": "mean: 166.2362527241374 usec\nrounds: 2386"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ec8bedce09d0a7ad8b537ac91e734b52c9e9dd99",
+          "message": "docs: update divergences doc for sync-exclude mechanism (merges PR #827, addresses #823)\n\nThe \"future improvement\" mentioned in the How-to-update section now\nexists at .config/pyproject_template/sync-exclude.toml (introduced\nin PR #826). Update the doc to reference the mechanism and require\nCategory 1 changes to land in both files within the same PR.\n\nAlso fix the `tests/template/` entry under Skeleton tests: the\ndirectory is NOT blanket-skipped. We actively keep tests from it\nthat cover modules we ship (e.g., tools/pyproject_template/*,\ntools/doit/*). Replace the blanket line with a per-file policy note.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T00:47:53+01:00",
+          "tree_id": "bcbce389687f42c2cb1246181a0f4f293b26d7b8",
+          "url": "https://github.com/endavis/infrafoundry/commit/ec8bedce09d0a7ad8b537ac91e734b52c9e9dd99"
+        },
+        "date": 1778716113460,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7266.055701663466,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010528161926937699",
+            "extra": "mean: 137.62625020491703 usec\nrounds: 2442"
           }
         ]
       }
