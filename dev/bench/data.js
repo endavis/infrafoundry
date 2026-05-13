@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778599139867,
+  "lastUpdate": 1778680872012,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8525,6 +8525,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010961124712018397",
             "extra": "mean: 137.57640246599877 usec\nrounds: 2271"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "251592948a8095ea131d3df1587ccd59b9ba8ae5",
+          "message": "chore(deps): bump github/codeql-action from 3 to 4 (merges PR #690)\n\n* chore(deps): bump github/codeql-action from 3 to 4\n\nBumps [github/codeql-action](https://github.com/github/codeql-action) from 3 to 4.\n- [Release notes](https://github.com/github/codeql-action/releases)\n- [Changelog](https://github.com/github/codeql-action/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/github/codeql-action/compare/v3...v4)\n\n---\nupdated-dependencies:\n- dependency-name: github/codeql-action\n  dependency-version: '4'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\n\n* test: align codeql-action assertions with v4 bump\n\nThe dependabot bump of github/codeql-action from v3 to v4 moves the\nworkflow's pinned version. The test was pinning v3 in its assertions\nand method names; update to v4 so the pin assertion matches the new\nintended version. Mirrors the upstream pyproject-template test update.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\nCo-authored-by: Eric Davis <6662995+endavis@users.noreply.github.com>\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-13T15:00:33+01:00",
+          "tree_id": "9394cf1c5c56248d256c5dd08695e2d455f10212",
+          "url": "https://github.com/endavis/infrafoundry/commit/251592948a8095ea131d3df1587ccd59b9ba8ae5"
+        },
+        "date": 1778680871474,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6365.811742342509,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000031947398196078715",
+            "extra": "mean: 157.08915696461 usec\nrounds: 1924"
           }
         ]
       }
