@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778680872012,
+  "lastUpdate": 1778688364852,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8556,6 +8556,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000031947398196078715",
             "extra": "mean: 157.08915696461 usec\nrounds: 1924"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "89e7f70909652ca7da738fe549d2ac96fefdf9d7",
+          "message": "fix: anchor Addresses regex in pr_merge to start of line (merges PR #825, addresses #823)\n\nThe _extract_linked_issues parser used by `doit pr_merge` matched\n`addresses #N` anywhere in a PR body case-insensitively, which caused\nmid-sentence references and prose mentions to be parsed as real\nissue links — polluting the merge subject and the --auto-close list.\n\nAnchor to start of line and require exact capitalization\n(`^Addresses #N`), matching the convention the project already\ndocuments. Ports the regex + test changes from\npyproject-template PR #544.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-13T17:05:27+01:00",
+          "tree_id": "1126f537a375828b51768d2ea0d940c38250ec88",
+          "url": "https://github.com/endavis/infrafoundry/commit/89e7f70909652ca7da738fe549d2ac96fefdf9d7"
+        },
+        "date": 1778688364201,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9706.388331299911,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007709713154646033",
+            "extra": "mean: 103.02493222688491 usec\nrounds: 2169"
           }
         ]
       }
