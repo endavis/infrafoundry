@@ -19,9 +19,14 @@ Edit it in a **separate PR** with a `docs:` commit. Do not silently expand the
 skip-list inside a sync PR — that hides the decision. The divergence list is a
 deliberate policy artifact; additions deserve review on their own merits.
 
-A programmatic skip-list in `.config/pyproject_template/settings.toml` is a
-future improvement that would let tooling enforce these decisions. Until that
-lands, this doc is the MVP — a human reference consulted during sync-PR review.
+The programmatic skip-list lives at
+`.config/pyproject_template/sync-exclude.toml` and is consumed by
+`manage.py check` to silence Category 1 entries from the actionable drift
+list. **Category 1 changes must land in both that toml file and this doc in
+the same PR**, so the human-readable rationale stays in lockstep with the
+machine-readable rules. (The mechanism uses a separate file from
+`settings.toml` because `SettingsManager.save()` rewrites that one on every
+sync and would clobber user-managed entries.)
 
 > **Scope note:** by omission, every file not mentioned in one of the three
 > categories below is adopted verbatim from upstream. There is no explicit
@@ -33,6 +38,11 @@ These files exist upstream as part of the generic skeleton a new project would
 start from. InfraFoundry is a real project with its own package structure,
 tests, and documentation; upstream changes to these files should always be
 skipped.
+
+The entries below are encoded as glob patterns in
+`.config/pyproject_template/sync-exclude.toml` so `manage.py check` reports
+them on a separate "Skipped per project policy" summary line and does not
+include them in actionable drift.
 
 ### Skeleton source code
 - `src/package_name/` — skeleton package. InfraFoundry's package lives at
@@ -48,8 +58,15 @@ skipped.
 - `tests/benchmarks/test_bench_core.py`,
   `tests/benchmarks/test_bench_logging.py` — benchmarks for the skeleton
   package.
-- `tests/template/` — tests upstream runs against the template itself (bootstrap,
-  cleanup, doit helpers). Not relevant once bootstrapped.
+
+> **Note on `tests/template/`:** this directory is **not** blanket-skipped.
+> Upstream uses it for tests that exercise the `tools/pyproject_template/*`
+> and `tools/doit/*` modules — modules we keep and use. Tests in this
+> directory are evaluated per-file: skeleton-package tests (listed above)
+> stay out of the tree; tests that cover modules we ship are adopted.
+> Upstream additions to this directory surface as actionable drift in
+> `manage.py check` and require an explicit per-file adopt-or-exclude
+> decision.
 
 ### Skeleton documentation
 - `docs/examples/api.md`, `docs/examples/add-a-feature.md` — skeleton example
