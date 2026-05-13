@@ -170,23 +170,23 @@ class TestAnalyzeJob:
         assert checkout_steps, "expected an actions/checkout step"
         assert checkout_steps[0]["uses"] == "actions/checkout@v6"
 
-    def test_analyze_uses_codeql_init_v3(self) -> None:
-        """``github/codeql-action/init`` should be pinned to ``@v3``."""
+    def test_analyze_uses_codeql_init_v4(self) -> None:
+        """``github/codeql-action/init`` should be pinned to ``@v4``."""
         steps = _analyze_steps()
         init_steps = [
             s for s in steps if s.get("uses", "").startswith("github/codeql-action/init@")
         ]
         assert init_steps, "expected a github/codeql-action/init step"
-        assert init_steps[0]["uses"] == "github/codeql-action/init@v3"
+        assert init_steps[0]["uses"] == "github/codeql-action/init@v4"
 
-    def test_analyze_uses_codeql_analyze_v3(self) -> None:
-        """``github/codeql-action/analyze`` should be pinned to ``@v3``."""
+    def test_analyze_uses_codeql_analyze_v4(self) -> None:
+        """``github/codeql-action/analyze`` should be pinned to ``@v4``."""
         steps = _analyze_steps()
         analyze_steps = [
             s for s in steps if s.get("uses", "").startswith("github/codeql-action/analyze@")
         ]
         assert analyze_steps, "expected a github/codeql-action/analyze step"
-        assert analyze_steps[0]["uses"] == "github/codeql-action/analyze@v3"
+        assert analyze_steps[0]["uses"] == "github/codeql-action/analyze@v4"
 
     def test_analyze_init_passes_matrix_language(self) -> None:
         """The init step must receive the matrix language via ``with.languages``."""
