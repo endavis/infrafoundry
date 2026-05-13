@@ -288,6 +288,7 @@ def run_action(
     *,
     yes: bool = False,
     cleanup_mode: str | None = None,
+    show_excluded: bool = False,
 ) -> int:
     """Run the selected action."""
     if action == 1:
@@ -295,7 +296,7 @@ def run_action(
     elif action == 2:
         return action_configure(manager, dry_run, yes=yes)
     elif action == 3:
-        return action_check_updates(manager, dry_run)
+        return action_check_updates(manager, dry_run, show_excluded=show_excluded)
     elif action == 4:
         return action_repo_settings(manager, dry_run)
     elif action == 5:
@@ -413,7 +414,9 @@ def action_create_project(manager: SettingsManager, dry_run: bool, *, yes: bool 
         return 1
 
 
-def action_check_updates(manager: SettingsManager, dry_run: bool) -> int:
+def action_check_updates(
+    manager: SettingsManager, dry_run: bool, *, show_excluded: bool = False
+) -> int:
     """Check for template updates (comparison only, does not modify files)."""
     Logger.header("Checking for Template Updates")
 
@@ -421,6 +424,7 @@ def action_check_updates(manager: SettingsManager, dry_run: bool) -> int:
         skip_changelog=True,
         keep_template=True,  # Keep template so user can run diff commands
         dry_run=dry_run,
+        show_excluded=show_excluded,
     )
 
     # Show commit history link if we have a sync point (after the review section)
@@ -837,6 +841,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Only check for updates (CI-friendly, fails if can't auto-detect)",
     )
+    parser.add_argument(
+        "--show-excluded",
+        action="store_true",
+        help="With 'check': list paths skipped via .config/pyproject_template/sync-exclude.toml",
+    )
 
     return parser.parse_args(argv)
 
@@ -862,7 +871,12 @@ def main(argv: list[str] | None = None) -> int:
         if action:
             cleanup_mode = getattr(args, "cleanup_mode", None)
             return run_action(
-                action, manager, args.dry_run, yes=args.yes, cleanup_mode=cleanup_mode
+                action,
+                manager,
+                args.dry_run,
+                yes=args.yes,
+                cleanup_mode=cleanup_mode,
+                show_excluded=args.show_excluded,
             )
         return 1
 
@@ -871,7 +885,7 @@ def main(argv: list[str] | None = None) -> int:
         if not manager.settings.is_configured():
             Logger.error("Cannot auto-detect settings. Run interactively first.")
             return 1
-        return action_check_updates(manager, args.dry_run)
+        return action_check_updates(manager, args.dry_run, show_excluded=args.show_excluded)
 
     # Handle --yes (non-interactive mode)
     if args.yes:
