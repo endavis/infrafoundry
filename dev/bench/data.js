@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778723034690,
+  "lastUpdate": 1778724157603,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8866,6 +8866,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016888092951701005",
             "extra": "mean: 108.2672587433076 usec\nrounds: 2802"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "81cafeba240ccbc6284a304d24d5a9d8bb27833a",
+          "message": "refactor: jump to final-state AI workflow (multi-* + self-action + ghi-* rename) (merges PR #835, addresses #823)\n\nBundles upstream pyproject-template PRs #491, #539, #541, #563, #564,\n#565 into a single transition to the final workflow command layout\ninstead of passing through the intermediate ghissue-* rename state.\n\nLayout transformation:\n\n- /multi-plan, /multi-review, /multi-adversarial-review: new\n  multi-agent orchestrators across all 4 CLIs.\n- /<ai>:<action> self-action commands: each CLI gets its own\n  subdirectory (.claude/commands/claude/, .gemini/commands/gemini/,\n  .copilot/commands/copilot/, .agents/skills/codex-*/) with plan,\n  implement, review, adversarial-review.\n- /ghi-finalize, /ghi-status (Claude only): replaces /finalize and\n  /where-am-i. ghi-finalize ships across all 4 CLIs.\n- /checkpoint, /restore converted from .md to .toml in\n  .gemini/commands/.\n- Retired: /plan-issue, /implement, /finalize, /close-issue,\n  /plan-both, /review-both, /gemini-review, /where-am-i from\n  .claude/commands/; /plan-issue, /review-pr from\n  .gemini/commands/; plan-issue/, implement/, finalize/ skills\n  from .agents/skills/.\n\nSupporting changes:\n\n- .gemini/settings.json: final skills.disabled list (22 entries),\n  general.defaultApprovalMode = auto_edit, security.* options\n  from folded-in #491.\n- AGENTS.md: AI Config Directories section updated for self-action,\n  multi-orchestrators, final command names.\n- docs/development/AI_SETUP.md: agent comparison table and Codex\n  parity section updated to reference final command names.\n- docs/development/ai/slash-commands.md + first-5-minutes.md:\n  replaced with upstream final-state versions.\n- tests/template/test_ai_agent_assets.py: updated for the final\n  asset layout.\n\nChose single-PR transition over the upstream 3-PR split (#563, #564,\n#565) because we never adopted the intermediate ghissue-* prefix\nstate -- splitting would create files only to delete them within\ndays. doit check passes; 11/11 AI agent assets and 51/51 delegation\nmatrix tests pass.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T03:02:11+01:00",
+          "tree_id": "5a9326f51c956b65e9663e5b1d58569332f5593c",
+          "url": "https://github.com/endavis/infrafoundry/commit/81cafeba240ccbc6284a304d24d5a9d8bb27833a"
+        },
+        "date": 1778724157070,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6559.040542102314,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000029616215488207934",
+            "extra": "mean: 152.46132320436587 usec\nrounds: 2172"
           }
         ]
       }
