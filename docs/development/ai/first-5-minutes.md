@@ -146,5 +146,9 @@ Run `/where-am-i`. It is read-only, has no side effects, and will tell you the c
 - [AI Agent Setup](../AI_SETUP.md) — per-CLI configuration, permissions, and hooks.
 - [Architectural Conventions](architectural-conventions.md) — imperative rules for AI-generated code.
 - [AGENTS.md](../../../AGENTS.md) — universal context file and workflow reference.
+- [`.claude/rules/` scaffold](../../../.claude/rules/README.md) — per-stack rule-file pattern for downstream consumers who need narrow, skill-gated self-checks beyond what `AGENTS.md` covers.
+- [`.gemini/rules/` scaffold](../../../.gemini/rules/README.md) — per-stack rule-file pattern for Gemini CLI (mirrors `.claude/rules/`).
+- [`.github/instructions/` scaffold](../../../.github/instructions/README.md) — per-stack instruction-file pattern for GitHub Copilot CLI.
+- [`.agents/skills/` scaffold](../../../.agents/skills/README.md) — per-stack skill-file pattern for Codex CLI.
 - <!-- TODO: wire this link up properly when #342 lands -->
   For an end-to-end example of the *coding* side of a feature (creating a module, CLI subcommand, tests, and docs), see [the add-a-feature example](../../examples/add-a-feature.md) (tracked in [#342](https://github.com/endavis/pyproject-template/issues/342)).
