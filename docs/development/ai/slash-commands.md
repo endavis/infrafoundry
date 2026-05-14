@@ -49,6 +49,12 @@ Gemini commands under `.gemini/commands/` are **output-only**: Gemini does not p
 
 Entries are alphabetical. Each one names the command, its arguments, what it does, its position in the workflow, and any design note worth knowing.
 
+### `/checkpoint [slug]`
+
+**Args:** optional kebab-case slug describing the topic. **Source:** `.claude/commands/checkpoint.md` (and `.gemini/commands/checkpoint.md`).
+
+Captures a paste-ready resumption prompt to `tmp/checkpoints/{inv_epoch}-{slug}.md` so the user (or a future agent session via `/restore`) can pick up where they left off without re-reading the current conversation. Filename prefix is monotonically decreasing in time so `ls` shows newest first. **Cross-agent portability:** `tmp/checkpoints/` is intentionally shared (not per-agent) so a checkpoint written by Claude can be restored in Gemini or Codex and vice versa — the documented exception to the `tmp/agents/<agent-type>/` rule in `AGENTS.md`. **Workflow position:** any time, independent of the issue lifecycle. **Design note:** checkpoints are immutable once written; verify referenced issues/PRs are still current before acting on stale references.
+
 ### `/close-issue <n>`
 
 **Args:** issue number. **Source:** `.claude/commands/close-issue.md`.
@@ -85,6 +91,16 @@ Dual-agent replacement for `/plan-issue`. Validates the issue, warns if plan com
 **Args:** issue number. **Source:** `.claude/commands/plan-issue.md`.
 
 Runs in the main conversation context (not a subagent) so the user can ask questions and refine the plan interactively. Enters plan mode, validates the issue, warns if a plan comment already exists, reads `AGENTS.md` and `.claude/CLAUDE.md`, fetches issue details, explores the codebase, and drafts a plan with the standard sections (Overview, Files to Create/Modify, Test Plan, Documentation, Validation). It iterates inside plan mode with `AskUserQuestion` until the user approves, then exits plan mode and posts the approved plan as an issue comment. **Workflow position:** first step of the single-agent workflow. **Design note:** plan mode is preserved throughout iteration; exiting plan mode means "post the approved plan", nothing more.
+
+### `/restore [slug]`
+
+**Args:** optional kebab-case slug to filter by. **Source:** `.claude/commands/restore.md` (and `.gemini/commands/restore.md`).
+
+Loads a previously captured checkpoint prompt from `tmp/checkpoints/` and continues the work it describes. If no slug is given, picks the lexically first file (newest). The file's contents are treated as the initial user instruction for the new session. **Workflow position:** at the start of a session resuming earlier work. **Design note:** the companion `/checkpoint` writes the file — together they form the save/load pair.
+
+### Auto-checkpoint (PreCompact / SessionStart hooks)
+
+Two lifecycle hooks complement `/checkpoint` and `/restore` to automate the pause/resume pattern for the most common context-loss event: autocompact firing mid-task. The `PreCompact` hook synthesizes a checkpoint to `tmp/checkpoints/{inv_epoch}-auto-precompact.md` before compaction; the `SessionStart` hook (matcher `compact|resume`) injects the newest auto-precompact file into the new session automatically. Auto-precompact files share the same convention and directory as manual `/checkpoint` files, so `/restore auto-precompact` also works. Set `CLAUDE_NO_AUTO_RESTORE=1` to opt out of the auto-restore; set `CLAUDE_RESTORE_ANY=1` to widen the restore glob to any `*.md` checkpoint. See [Auto-Checkpoint and Session-Restore Hooks](auto-checkpoint-hook.md).
 
 ### `/review-both`
 
@@ -141,4 +157,5 @@ GitHub Copilot CLI automatically discovers project skills from `.claude/commands
 - [Architectural Conventions](architectural-conventions.md) — imperative rules for AI-generated code.
 - [AI Enforcement Principles](enforcement-principles.md) — how this template enforces rules in code, not just instructions.
 - [AI Command Blocking](command-blocking.md) — tool-level hooks that block dangerous commands.
+- [Auto-Checkpoint and Session-Restore Hooks](auto-checkpoint-hook.md) — PreCompact and SessionStart hooks that automate the `/checkpoint` ↔ `/restore` pair around autocompact.
 - [AGENTS.md](../../../AGENTS.md) — universal context file and workflow reference.
