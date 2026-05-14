@@ -22,7 +22,7 @@ This template is designed primarily for **Claude Code**, which is the only agent
 
 | Agent | Permission model | Hooks support | Slash commands | LSP | Dual-agent role |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Codex CLI** | TOML approval policies (`.codex/config.toml`) | Project-level `tools/hooks/ai/` apply via shell | None shipped | Not documented | Standalone alternative (not part of dual-agent flow) |
+| **Codex CLI** | TOML approval policies (`.codex/config.toml`) plus repo skills (`.agents/skills/`) | Project-level `tools/hooks/ai/` apply via Codex hooks | Built-in only; repo workflow uses skills | Not documented | Standalone alternative (not part of dual-agent flow) |
 | **Gemini CLI** | JSON allowlists + lifecycle hooks (`.gemini/settings.json`) | Project-level hooks apply; Gemini lifecycle hooks supported | 2 output-only (`/plan-issue`, `/review-pr`) | Not documented | Second-opinion reviewer / planner in dual-agent flow |
 | **GitHub Copilot CLI** | JSON hook config (`.github/hooks/copilot-hooks.json`) | Project-level hooks apply; Copilot `preToolUse` hook wired | Auto-discovers from `.claude/commands/` | Not documented | Standalone alternative (auto-discovers Claude commands) |
 | **Claude Code** | Layered permissions (`.claude/settings.local.json` + `.claude/settings.json` PreToolUse hooks) | Project-level hooks plus Claude PreToolUse hooks | 8 (`plan-issue`, `implement`, `finalize`, `close-issue`, `plan-both`, `review-both`, `gemini-review`, `where-am-i`) | Supported | Primary orchestrator in single-agent and dual-agent flows |
@@ -60,7 +60,7 @@ codex
 - [Configuring Codex](https://developers.openai.com/codex/local-config/)
 - [Codex Security Guide](https://developers.openai.com/codex/security/)
 
-**Codex parity status:** Codex ships no slash commands in this template — `.codex/` contains only `config.toml`. LSP integration is not documented for Codex here. Codex is not part of the dual-agent workflow (Claude and Gemini are); it works as a standalone alternative for contributors who prefer the OpenAI CLI. The project-level hooks under `tools/hooks/ai/` still apply to Codex — see [Command Blocking](ai/command-blocking.md). For the broader slash-command and dual-agent picture, see [Slash Commands and Workflows](ai/slash-commands.md).
+**Codex parity status:** Codex does not use repo-defined slash commands in this template. Instead, it uses repo-scoped workflow skills checked into `.agents/skills/` and invoked through Codex's built-in skill surface such as `/skills` or explicit mentions like `$plan-issue`, `$implement`, and `$finalize`. LSP integration is not documented for Codex here. Codex is not part of the dual-agent workflow (Claude and Gemini are); it works as a standalone alternative for contributors who prefer the OpenAI CLI. The shared dangerous-command hook at `tools/hooks/ai/block-dangerous-commands.py` applies to Codex via `.codex/config.toml`, and the approval-policy rules remain a secondary defense layer. For the broader workflow picture, see [Slash Commands and Workflows](ai/slash-commands.md).
 
 ### 2. Gemini CLI (Google)
 
@@ -266,12 +266,24 @@ When using this template for a new project:
 
 **Codex CLI** (`.codex/config.toml`):
 ```toml
-[[approval_policy]]
+approval_policy = "untrusted"
+
+[features]
+codex_hooks = true
+
+[[hooks.PreToolUse]]
+matcher = "^Bash$"
+
+[[hooks.PreToolUse.hooks]]
 type = "command"
-pattern = "^your-command\\b"
-action = "allow"
-reason = "Description of command"
+command = 'python3 "$(git rev-parse --show-toplevel)/tools/hooks/ai/block-dangerous-commands.py"'
+timeout = 30
+statusMessage = "Checking Bash command"
 ```
+
+Use the shared hook script to control dangerous command patterns. The older
+`[[approval_policy]]` command-rule examples are not part of the current Codex
+config schema.
 
 **Gemini CLI** (`.gemini/settings.json`):
 ```json

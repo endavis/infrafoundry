@@ -149,11 +149,22 @@ EOF
 
 `.codex/config.toml`:
 ```toml
-[hooks]
-pre_tool_use = "python3 tools/hooks/ai/block-dangerous-commands.py"
+approval_policy = "untrusted"
+
+[features]
+codex_hooks = true
+
+[[hooks.PreToolUse]]
+matcher = "^Bash$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = 'python3 "$(git rev-parse --show-toplevel)/tools/hooks/ai/block-dangerous-commands.py"'
+timeout = 30
+statusMessage = "Checking Bash command"
 ```
 
-Codex also keeps `approval_policy` deny rules as a secondary defense layer. See `.codex/config.toml` for the full configuration.
+Codex uses the shared hook as the primary defense layer. Project docs should not rely on the obsolete `[[approval_policy]]` command-rule format.
 
 ### Testing
 
