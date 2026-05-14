@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778794925360,
+  "lastUpdate": 1778801402257,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9083,6 +9083,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013028499495230353",
             "extra": "mean: 105.60762988917024 usec\nrounds: 2710"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "871d6c32031582b44c48b67f253cf4692eecbf44",
+          "message": "chore: bump urllib3 to 2.7.0 to clear pip-audit CVEs (merges PR #845, addresses #823)\n\nAdopts upstream endavis/pyproject-template#577. Bumps urllib3\nfrom 2.6.3 to 2.7.0 via `uv lock --upgrade-package urllib3`.\n\nPartially advances issue #839 (CVE bumps + add audit gate).\nThe remaining 7 CVEs in #839 (cryptography, lxml, paramiko,\npygments, pyjwt) and the audit-gating work still need to be\ndone in that issue's eventual PR.\n\ndoit check passes locally.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-15T00:29:32+01:00",
+          "tree_id": "e37970652cf9dd8c5d77ec71af3fc9ccb619d5c8",
+          "url": "https://github.com/endavis/infrafoundry/commit/871d6c32031582b44c48b67f253cf4692eecbf44"
+        },
+        "date": 1778801400924,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7372.8266244952265,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000924530024537778",
+            "extra": "mean: 135.63319075992297 usec\nrounds: 2684"
           }
         ]
       }
