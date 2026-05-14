@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778717663643,
+  "lastUpdate": 1778718246235,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8680,6 +8680,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014025160054990443",
             "extra": "mean: 138.6659983390516 usec\nrounds: 2409"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c105eef36c5443c7903a9dc75605ab297c309d1a",
+          "message": "feat: enable bash-ban-raw-tools hook (merges PR #829, addresses #823)\n\nPorts the bash-ban-raw-tools hook from pyproject-template PR #534:\n\n- tools/hooks/ai/bash-ban-raw-tools.py: PreToolUse hook for the Bash\n  tool that blocks `cat`, `head`, `tail`, `find`, `grep`, `rg`, `wc`\n  (and `... | head` / `... | tail` truncators), stderr-reporting the\n  native-tool replacement. mtime-based /tmp/bash-raw-unlock escape\n  hatch with a 10-minute window.\n- tests/test_bash_ban_raw_tools.py: 19 cases — allow lists, all\n  seven banned leads, piped truncators, fresh/stale/missing unlock,\n  stderr reason content.\n- .claude/settings.json: wire the hook as a second entry under the\n  existing PreToolUse Bash matcher, alongside block-dangerous-commands.\n\nUpstream ships the hook disabled-by-default; we enable it in committed\nsettings because the project already mandates \"prefer native file\ntools over raw shell\" in AGENTS.md, and the hook is the enforcement\nmechanism for that rule.\n\nDoc cross-reference in upstream's command-blocking.md points to\ntoken-efficiency-add-ons.md, which doesn't exist locally yet — that\nfile (and the cross-reference) will land with upstream #520 in Phase E.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T01:23:36+01:00",
+          "tree_id": "9c0f625f0e3814e9dd04b8dc99e872f8c49758b7",
+          "url": "https://github.com/endavis/infrafoundry/commit/c105eef36c5443c7903a9dc75605ab297c309d1a"
+        },
+        "date": 1778718245078,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6470.446304835776,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000029098961086328484",
+            "extra": "mean: 154.54884452910713 usec\nrounds: 2367"
           }
         ]
       }
