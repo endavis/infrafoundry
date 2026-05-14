@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, edited, synchronize]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   validate-pr-title:
     name: Validate PR Title Format
@@ -14,7 +18,7 @@ jobs:
         with:
           script: |
             const title = context.payload.pull_request.title;
-            const pattern = /^(feat|fix|refactor|docs|test|chore|ci|perf)(\(.+\))?:\s.+$/;
+            const pattern = /^(feat|fix|refactor|docs|test|chore|ci|perf|release)(\(.+\))?:\s.+$/;
 
             if (!pattern.test(title)) {
               core.setFailed(
@@ -22,11 +26,12 @@ jobs:
                 '   <type>: <subject>\n' +
                 '   or\n' +
                 '   <type>(<scope>): <subject>\n\n' +
-                'Valid types: feat, fix, refactor, docs, test, chore, ci, perf\n\n' +
+                'Valid types: feat, fix, refactor, docs, test, chore, ci, perf, release\n\n' +
                 'Examples:\n' +
-                '  ✅ feat: add CloudFlare provider\n' +
-                '  ✅ fix(opnsense): handle null response\n' +
-                '  ✅ docs: update provider implementation guide\n\n' +
+                '  ✅ feat: add user authentication\n' +
+                '  ✅ fix(api): handle null response\n' +
+                '  ✅ docs: update installation guide\n' +
+                '  ✅ release: v0.1.0a0\n\n' +
                 `Current title: "${title}"`
               );
             } else {
@@ -64,7 +69,7 @@ jobs:
               /^\.github\//,  // GitHub config files (workflows, issue templates, etc.)
               /^\.claude\//,  // Claude configuration
               /^\.pre-commit-config\.ya?ml$/,  // Pre-commit hooks configuration
-              /^example-config\/.*\.md$/
+              /^examples\/.*\.md$/
             ];
 
             const isDocsOnly = files.data.every(file =>
