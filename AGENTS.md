@@ -433,15 +433,19 @@ Each supported AI CLI has a dedicated config directory at the repo root:
 | CLI | Config Directory | Notes |
 | :--- | :--- | :--- |
 | Claude Code | `.claude/` | Commands, agents, rules, settings. Primary source of slash commands. |
-| Gemini CLI | `.gemini/` | Commands, settings, and `rules/` subdirectory for per-stack rule files. Output-only commands (orchestrated by Claude). |
+| Gemini CLI | `.gemini/` | Commands, settings, and `rules/` subdirectory for per-stack rule files. Supports a standalone workflow (`/gemini:plan`, `/gemini:implement`, `/ghi-finalize`) and multi-agent orchestration flows. |
 | GitHub Copilot CLI | `.copilot/` | Config directory. Skills auto-discovered from `.claude/commands/`. Hook wired in `.github/hooks/copilot-hooks.json`. Per-stack instruction files live in `.github/instructions/` (Copilot-native; Claude/Gemini cannot read them). See `.github/instructions/README.md`. |
 | Codex CLI | `.codex/`, `.agents/skills/` | `config.toml` for approvals/hooks plus repo-scoped skills for the Codex workflow. No custom slash commands. Rule-shaped skills live in `.agents/skills/<name>/SKILL.md`; the `description:` frontmatter is the skill-gate trigger. See `.agents/skills/README.md`. |
 
-Copilot CLI does **not** need a `commands/` subdirectory: it discovers skills from `.claude/commands/` automatically, so the full workflow (`/plan-issue`, `/implement`, `/finalize`, etc.) works out of the box.
+Copilot CLI ships self-action commands in `.copilot/commands/copilot/` (`/copilot:plan`, `/copilot:implement`, `/copilot:review`, `/copilot:adversarial-review`) and cross-agent bridge commands in `.copilot/commands/<target>/`. It also auto-discovers some commands from `.claude/commands/` (e.g. `/ghi-finalize`, `/ghi-status`).
 
-Codex CLI does **not** use repo-defined slash commands in this template. Its repo-native workflow is provided through checked-in skills under `.agents/skills/`, invoked with built-in Codex skill selection such as `/skills` or explicit mentions like `$plan-issue`.
+Gemini CLI ships standalone implementations of `/gemini:plan`, `/gemini:implement`, `/gemini:review`, `/gemini:adversarial-review`, and `/ghi-finalize` under `.gemini/commands/gemini/` and `.gemini/commands/`. They share the GitHub-artifact contract (plan comment header `## Implementation Plan for #<n>: <title>`, `<type>/<n>-<slug>` branch names, `Addresses #<n>` PR body) with the Claude versions, so users can switch agents mid-workflow without losing state.
 
-**Cross-agent delegation matrix:** in addition to self-action commands, every agent can delegate `plan`, `implement`, `review`, and `adversarial-review` to any of the other three via `<target>:<action>` commands (`/codex:plan 42` from Claude, `$delegate-gemini-implement 42` from Codex, etc.). Bridge files live under `.claude/commands/<target>/`, `.gemini/commands/<target>/`, `.copilot/commands/<target>/`, and `.agents/skills/delegate-<target>-<action>/`. See [Cross-Agent Delegation Matrix](docs/development/ai/cross-agent-delegation.md).
+Codex CLI does **not** use repo-defined slash commands in this template. Its repo-native workflow is provided through checked-in skills under `.agents/skills/`, invoked with built-in Codex skill selection such as `/skills` or explicit mentions like `$codex-plan`. Rule-shaped skills (per-stack self-check checklists) follow the same discipline as `.claude/rules/`, `.gemini/rules/`, and `.github/instructions/` — ≤30 lines, numbered self-checks, observed-failures footer — with the key distinction that the `description:` frontmatter field acts as the skill-gate trigger instead of an import directive or glob. See `.agents/skills/README.md`.
+
+**Self-action and cross-agent delegation matrix:** every agent can act on itself via `/<ai>:<action>` (self-action: `/claude:plan 42`, `$codex-implement 42`, etc.) or delegate to any other agent via the same `<target>:<action>` naming. Self-action files live in `.<ai>/commands/<ai>/` (or `.agents/skills/codex-<action>/` for Codex). Cross-agent bridges live under `.claude/commands/<target>/`, `.gemini/commands/<target>/`, `.copilot/commands/<target>/`, and `.agents/skills/delegate-<target>-<action>/`. See [Cross-Agent Delegation Matrix](docs/development/ai/cross-agent-delegation.md).
+
+**Multi-agent orchestrators (`/multi-*`):** any host agent can also run `/multi-plan <ais...> <issue#>`, `/multi-review <ais...>`, and `/multi-adversarial-review <ais...>` to dispatch a task to **any combination** of agents in parallel and synthesize their outputs. Command files live in `.claude/commands/multi-*.md`, `.gemini/commands/multi-*.toml`, `.copilot/commands/multi-*.md`, and `.agents/skills/multi-*/SKILL.md`.
 
 ### Temporary Files
 

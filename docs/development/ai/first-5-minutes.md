@@ -31,7 +31,7 @@ The rest of this page assumes you have these working.
 
 Launch Claude Code from the repository root. On startup Claude automatically loads `AGENTS.md` (workflow and conventions), `.claude/CLAUDE.md` (Claude-specific rules on top of `AGENTS.md`), and the project hooks under `tools/hooks/ai/` (which block dangerous commands for every agent, not just Claude). You do not need to paste any context — the template is designed so a fresh session already knows the rules.
 
-If you are not sure what state you are in, run `/where-am-i` at any time. It inspects the branch, issue state, plan comments, uncommitted changes, unpushed commits, and open PRs, then reports a summary and suggests the next command. It is read-only and safe to run whenever you are unsure.
+If you are not sure what state you are in, run `/ghi-status` at any time (Claude) or the equivalent for your agent. It inspects the branch, issue state, plan comments, uncommitted changes, unpushed commits, and open PRs, then reports a summary and suggests the next command. It is read-only and safe to run whenever you are unsure.
 
 ### 2. Pick an issue
 
@@ -39,9 +39,9 @@ Every change starts from an issue. Either list the open backlog with `gh issue l
 
 For the rest of this walkthrough assume you have picked issue number `42`.
 
-### 3. `/plan-issue 42`
+### 3. `/claude:plan 42`
 
-Run `/plan-issue 42` in the main conversation. Claude enters plan mode, reads `AGENTS.md` and `.claude/CLAUDE.md`, fetches the issue, explores the codebase, and drafts a plan. Plan mode is interactive: Claude will ask questions and iterate with you until you approve the plan. Only on approval does it exit plan mode and post the plan as a comment on the issue with the header `## Implementation Plan for #42: <title>`. That posted comment is the artifact the next command reads.
+Run `/claude:plan 42` in the main conversation. Claude enters plan mode, reads `AGENTS.md` and `.claude/CLAUDE.md`, fetches the issue, explores the codebase, and drafts a plan. Plan mode is interactive: Claude will ask questions and iterate with you until you approve the plan. Only on approval does it exit plan mode and post the plan as a comment on the issue with the header `## Implementation Plan for #42: <title>`. That posted comment is the artifact the next command reads.
 
 What you'll see (illustrative — your plan will look different):
 
@@ -66,21 +66,21 @@ The provider module currently makes a network call on every lookup...
 - `doit check` passes
 ```
 
-Read the comment, discuss revisions in chat if anything is off, and re-run `/plan-issue 42` if you need a fresh pass.
+Read the comment, discuss revisions in chat if anything is off, and re-run `/claude:plan 42` if you need a fresh pass.
 
-### 4. `/implement 42`
+### 4. `/claude:implement 42`
 
-Once the plan comment exists, run `/implement 42`. Claude checks out `main`, pulls, and creates a branch whose type is derived from the issue's labels — for example, a `feature` issue becomes `feat/42-add-caching-layer`. Claude then spawns a subagent via the Task tool. The subagent does the heavy work: re-reads `AGENTS.md`, fetches the plan via `gh api`, creates files, writes tests, and runs `doit check`, fixing failures rather than giving up. The main conversation context receives only the subagent's summary, which keeps your scrollback clean and your context window small.
+Once the plan comment exists, run `/claude:implement 42`. Claude checks out `main`, pulls, and creates a branch whose type is derived from the issue's labels — for example, a `feature` issue becomes `feat/42-add-caching-layer`. Claude then spawns a subagent via the Task tool. The subagent does the heavy work: re-reads `AGENTS.md`, fetches the plan via `gh api`, creates files, writes tests, and runs `doit check`, fixing failures rather than giving up. The main conversation context receives only the subagent's summary, which keeps your scrollback clean and your context window small.
 
 The artifact at the end of this step is an uncommitted working tree on the feature branch. Nothing has been committed yet — that is deliberate.
 
-### 5. (Optional) `/gemini-review`
+### 5. (Optional) `/multi-review claude gemini`
 
-If you have the Gemini CLI installed and want a second opinion on the changes, you can run `/gemini-review` at this point (after a PR exists) or use `/review-both` for a parallel Claude + Gemini review. The template invokes Gemini in an isolated context, captures its stdout, and posts it as a comment on the PR. Gemini never writes to GitHub directly — the orchestrating Claude agent does the posting. Skip this step if you are running single-agent.
+If you have the Gemini CLI installed and want a second opinion on the changes, you can run `/multi-review claude gemini` at this point (after a PR exists). This runs both agents in isolated contexts, posts each review as a separate PR comment, and then synthesizes the findings for you to approve before posting. If you want an adversarial challenge instead of a code review, use `/multi-adversarial-review claude gemini`. Skip this step if you are running single-agent.
 
-### 6. `/finalize`
+### 6. `/ghi-finalize`
 
-Run `/finalize` when you are satisfied with the changes. Claude detects the branch and issue number, spawns a finalization subagent that reviews changed files for doc/ADR updates, runs `doit check` one more time, and drafts both a commit message and a PR body. The main conversation then presents the drafts to you and **waits for explicit approval** before staging files, committing, and running `doit pr`. Nothing gets committed without your go-ahead.
+Run `/ghi-finalize` when you are satisfied with the changes. Claude detects the branch and issue number, spawns a finalization subagent that reviews changed files for doc/ADR updates, runs `doit check` one more time, and drafts both a commit message and a PR body. The main conversation then presents the drafts to you and **waits for explicit approval** before staging files, committing, and running `doit pr`. Nothing gets committed without your go-ahead.
 
 What you'll see (illustrative — your drafts will look different):
 
@@ -118,9 +118,13 @@ Approve, and Claude stages the files, commits, and opens the PR via `doit pr`. T
 
 Merging is never automated. Review the PR yourself, wait for CI to go green, add the `ready-to-merge` label, and merge via `doit pr_merge` (or the GitHub web UI). The `ready-to-merge` label and the Merge Gate action are designed to be a human checkpoint — do not let an agent add that label for you.
 
-### 8. `/close-issue 42`
+### 8. Close the issue
 
-After the PR merges, run `/close-issue 42`. Claude verifies a merged PR references `#42`, updates the task checkboxes in the issue body, posts the closing comment `Addressed in PR #<pr-number>`, and closes the issue. It then scans the PR body and comments for related-issue references (`Addresses`, `Part of`, `Closes`, bare `#N`, and so on) and asks you, one at a time, whether to close each open related issue. It never closes a related issue without per-issue confirmation.
+After the PR merges, close the linked issue. The easiest path is to have merged with `doit pr_merge --auto-close`, which closes the issue and posts a closing comment in one step. If you merged via the web UI, close manually:
+
+```bash
+gh issue close 42 --comment "Addressed in PR #<pr-number>"
+```
 
 That is the full loop.
 
@@ -128,17 +132,17 @@ That is the full loop.
 
 Every step in the flow produces a specific artifact the next step expects:
 
-- `/plan-issue <n>` → a plan comment on the issue with the header `## Implementation Plan for #<n>`
-- `/implement <n>` → a feature branch with an uncommitted working tree
-- `/finalize` → a staged commit plus an open PR referencing `Addresses #<n>`
+- `/<currentai>:plan <n>` → a plan comment on the issue with the header `## Implementation Plan for #<n>`
+- `/<currentai>:implement <n>` → a feature branch with an uncommitted working tree
+- `/ghi-finalize` → a staged commit plus an open PR referencing `Addresses #<n>`
 - Merge → a merged commit on `main` and a closed PR
-- `/close-issue <n>` → a closed issue with updated checkboxes and a closing comment
+- `doit pr_merge --auto-close` (or `gh issue close`) → a closed issue with a closing comment
 
 Knowing the artifact chain is the fastest way to figure out where you are if you get interrupted mid-flow.
 
 ## If you get lost
 
-Run `/where-am-i`. It is read-only, has no side effects, and will tell you the current branch, issue state, plan comment status, uncommitted changes, unpushed commits, open PRs, and the suggested next command. Run it any time you are unsure. For the full command-by-command reference and the dual-agent variants, see [Slash Commands and Workflows](slash-commands.md).
+Run `/ghi-status`. It is read-only, has no side effects, and will tell you the current branch, issue state, plan comment status, uncommitted changes, unpushed commits, open PRs, and the suggested next command. Run it any time you are unsure. For the full command-by-command reference and the dual-agent variants, see [Slash Commands and Workflows](slash-commands.md).
 
 ## See also
 
@@ -146,9 +150,9 @@ Run `/where-am-i`. It is read-only, has no side effects, and will tell you the c
 - [AI Agent Setup](../AI_SETUP.md) — per-CLI configuration, permissions, and hooks.
 - [Architectural Conventions](architectural-conventions.md) — imperative rules for AI-generated code.
 - [AGENTS.md](../../../AGENTS.md) — universal context file and workflow reference.
-- [`.claude/rules/` scaffold](../../../.claude/rules/README.md) — per-stack rule-file pattern for downstream consumers who need narrow, skill-gated self-checks beyond what `AGENTS.md` covers.
-- [`.gemini/rules/` scaffold](../../../.gemini/rules/README.md) — per-stack rule-file pattern for Gemini CLI (mirrors `.claude/rules/`).
-- [`.github/instructions/` scaffold](../../../.github/instructions/README.md) — per-stack instruction-file pattern for GitHub Copilot CLI.
-- [`.agents/skills/` scaffold](../../../.agents/skills/README.md) — per-stack skill-file pattern for Codex CLI.
+- [`.claude/rules/` scaffold](../../../.claude/rules/README.md) — per-stack rule-file pattern for Claude Code.
+- [`.gemini/rules/` scaffold](../../../.gemini/rules/README.md) — per-stack rule-file pattern for Gemini CLI.
+- [`.github/instructions/` scaffold](../../../.github/instructions/README.md) — per-stack instruction-file pattern for GitHub Copilot.
+- [`.agents/skills/` scaffold](../../../.agents/skills/README.md) — per-stack rule-shaped skill pattern for Codex CLI.
 - <!-- TODO: wire this link up properly when #342 lands -->
   For an end-to-end example of the *coding* side of a feature (creating a module, CLI subcommand, tests, and docs), see [the add-a-feature example](../../examples/add-a-feature.md) (tracked in [#342](https://github.com/endavis/pyproject-template/issues/342)).

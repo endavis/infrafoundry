@@ -91,4 +91,4 @@ gh issue comment $ARGUMENTS --body "<approved plan>"
 
 Tell the user:
 - The plan has been posted as a comment on issue #$ARGUMENTS
-- When ready, use `/implement $ARGUMENTS` to start implementation
+- When ready, use `/claude:implement $ARGUMENTS` to start implementation
