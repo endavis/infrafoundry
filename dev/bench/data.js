@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778724157603,
+  "lastUpdate": 1778725919609,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8897,6 +8897,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000029616215488207934",
             "extra": "mean: 152.46132320436587 usec\nrounds: 2172"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "710ec2200a1027023744b7f7e07f266c2bb68158",
+          "message": "ci: sync workflow fixes and dependabot config from upstream (merges PR #836, addresses #823)\n\n* ci: sync workflow fixes and dependabot config from upstream\n\nBundles GitHub Actions workflow and dependabot config improvements\nfrom upstream pyproject-template PRs #493, #495, #497, #504, #561:\n\n- .github/workflows/dependabot-automerge.yml: App token in\n  request-rebase job (#493); broken request-rebase job removed (#497).\n- .github/workflows/pr-checks.yml: least-privilege permissions (#504).\n- .github/workflows/ci.yml: parallelize pytest, reduce matrix-wide\n  job duplication (#561).\n- .github/dependabot.yml: 7-day cooldown on uv updates as a\n  supply-chain hardening measure; security-update PRs bypass the\n  cooldown so CVE patching is not delayed (#495).\n- tests/test_dependabot_automerge_workflow.py: updated assertions\n  matching the removed request-rebase job (#497).\n\ndocs/development/dependabot-automerge.md and\ndocs/development/github-repository-settings.md updates from upstream\nare skipped per divergences-doc category 1 (template-meta docs).\n\nWorkflow and config files aren't in our hand-merge category; replaced\nverbatim with upstream final state. doit check passes; 34/34\ndependabot automerge workflow tests pass.\n\nAddresses #823\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* fix: preserve InfraFoundry-specific ci.yml, port only #561's parallelization\n\nPR #836's first commit replaced ci.yml verbatim with upstream's\ngeneric version, which broke:\n\n- Linux-only matrix (ADR-0001) -- upstream had Windows + macOS too\n- Terraform/OpenTofu/age/sops install steps (InfraFoundry-specific)\n- INFRAFOUNDRY_SKIP_SOPS_CHECK, HYPOTHESIS_PROFILE env vars\n- --cov=infrafoundry flag (upstream used a generic package name)\n- Codecov upload, sparse-checkout for python-versions.json\n\nThe divergences doc didn't flag ci.yml as hand-merge but in practice\nit's deeply InfraFoundry-specific. Restored ci.yml from main and\nported only the surviving pieces of upstream #561:\n\n- Split the single pytest step into \"newest version with coverage\" and\n  \"older versions without coverage\", both with -n auto for parallelism\n  and --ignore=tests/benchmarks/ to skip benchmark runs.\n- Extracted the lint/format/type/security/spell/audit steps into a new\n  parallel `lint` job that invokes them via doit tasks\n  (doit format_check, lint, type_check, security, spell_check, audit).\n- Added the lint job to ci-complete's needs and status check.\n\nFollow-up tracked: add .github/workflows/ci.yml to the divergences\ndoc's category-3 hand-merge table in a separate docs: PR.\n\nAddresses #823\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* docs: add ci.yml to divergences hand-merge table\n\nDocument why .github/workflows/ci.yml is effectively hand-merge,\neven though file paths under .github/workflows/ aren't categorically\nin the divergences-doc table. Caught by PR #836 where verbatim\nadoption of upstream's ci.yml lost the Linux-only matrix (ADR-0001),\nthe Terraform/OpenTofu/age/sops installs, the InfraFoundry env vars,\nthe --cov=infrafoundry flag, the Codecov upload, and the\nsparse-checkout of python-versions.json.\n\nAdds the entry directly on this PR (not a separate docs: PR per the\ndivergences doc's own update rule) at user direction, so the rule\naddition lands atomically with the bug fix that motivated it.\n\nAddresses #823\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* fix: make test_unlock_list_shows_all_locks robust to line-wrapping\n\nThe test asserts the unlock-list output contains a \"YYYY-MM-DD\nHH:MM:SS UTC\" timestamp. The previous regex used literal spaces\nbetween the date, time, and UTC fragments, which doesn't match when\nRich wraps the timestamp across multiple lines.\n\nThe test already sets COLUMNS=200, but Rich's terminal-size probe\ndoesn't honor the env var under pytest-xdist workers (which #561's\nparallelization added to CI). Workers see a narrower effective width\nand Rich auto-sizes the Acquired/Expires columns small enough to\nwrap each timestamp.\n\nSwitch the literal spaces to \\s+ so a wrapped\n\"2026-05-14\\n02:16:49 UTC\" still matches. The test's intent --\ncatch a regression to bare str(datetime) where the time portion is\nabsent -- is preserved because \\s+\\d{2}:\\d{2}:\\d{2}\\s+UTC still\nfails on a date-only output.\n\nAddresses #823\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* fix: assert date + time-with-UTC separately for cell-wrap robustness\n\nThe previous \\s+ fix didn't work: Rich's table renderer doesn't just\nwrap the timestamp on a newline -- it places the date in row 1 of\nthe cell and the time in row 2, with cell border characters (│\nU+2502) and other-row padding between them. \\s+ can't bridge\nnon-whitespace border chars.\n\nSwitch to two separate regex assertions -- one for the date, one for\nthe time-with-literal-UTC. The intent (catch a regression to bare\nstr(datetime) that emits \"+00:00\" instead of \"UTC\") is preserved:\nthe time-with-UTC assertion still fails on str(datetime) output.\n\nLocal pytest -n auto: 6/6 in test_cli_infra_unlock.py pass.\n\nAddresses #823\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T03:31:26+01:00",
+          "tree_id": "6184dbe60408148ccbdf82c9df0d03668811995a",
+          "url": "https://github.com/endavis/infrafoundry/commit/710ec2200a1027023744b7f7e07f266c2bb68158"
+        },
+        "date": 1778725919042,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8715.26202238519,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000021506508089927804",
+            "extra": "mean: 114.74124328465345 usec\nrounds: 1973"
           }
         ]
       }
