@@ -25,6 +25,28 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 90,
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/precompact-checkpoint.py"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/session-resume-restore.py"
+          }
+        ]
+      }
     ]
   }
 }
