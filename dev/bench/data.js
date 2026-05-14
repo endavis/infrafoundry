@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778718246235,
+  "lastUpdate": 1778718876022,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8711,6 +8711,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000029098961086328484",
             "extra": "mean: 154.54884452910713 usec\nrounds: 2367"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e0e13304ba2b84f95c085f5c8f7327f4a326ec98",
+          "message": "feat: add opt-in Claude Max usage helper for statusline (merges PR #830, addresses #823)\n\nPorts the Claude Max usage helper from pyproject-template PR #562:\n\n- tools/statusline/claude-usage.sh (new): queries the Claude Code\n  OAuth /api/oauth/usage beta endpoint and formats 5h/7d\n  utilization as `5h:N% 7d:N%`. 60-second response cache at\n  $XDG_CACHE_HOME/claude-usage.json. Returns `?` on missing\n  credentials, no network, schema change, or curl timeout.\n- tests/test_statusline_claude_usage.py (new): 8 cases covering\n  the fetch + cache + parse paths.\n- .claude/statusline-command.sh: opt-in append driven by\n  CLAUDE_USAGE_STATUSLINE env var. Default statusline output\n  unchanged.\n- docs/development/ai/statusline.md: new \"Opt-In: Claude Max\n  Usage Display\" section with enable instructions, cache\n  behavior, helper requirements, troubleshooting, and the beta-API\n  caveat (endpoint is undocumented; prefer official\n  `claude --usage` when shipped per claude-code#20399).\n\nOperators who want the segment enable it per-environment by\nsetting CLAUDE_USAGE_STATUSLINE=1 in their shell rc. Not enabled\nin committed settings because the helper depends on a Claude Max\nsubscription and an undocumented beta endpoint.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T01:34:03+01:00",
+          "tree_id": "67de636511b9808dfaea37d11cfd488481af5d9b",
+          "url": "https://github.com/endavis/infrafoundry/commit/e0e13304ba2b84f95c085f5c8f7327f4a326ec98"
+        },
+        "date": 1778718874906,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7339.89528910124,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010091400658677116",
+            "extra": "mean: 136.24172561219856 usec\nrounds: 2573"
           }
         ]
       }
