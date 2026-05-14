@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778716114730,
+  "lastUpdate": 1778717663643,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8649,6 +8649,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010528161926937699",
             "extra": "mean: 137.62625020491703 usec\nrounds: 2442"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fa8bef325ba00c7da5a7aea3d80cdbc5cdf27f2d",
+          "message": "feat: adopt session-lifecycle support (/checkpoint, /restore, auto-hooks) (merges PR #828, addresses #823)\n\nPorts the session checkpoint/restore feature from pyproject-template\nPRs #509, #511, and #536:\n\n- tools/hooks/ai/precompact-checkpoint.py: PreCompact hook that\n  synthesizes a checkpoint to tmp/checkpoints/{inv_epoch}-auto-precompact.md\n  before autocompact fires.\n- tools/hooks/ai/session-resume-restore.py: SessionStart hook\n  (matcher compact|resume) that injects the newest auto-precompact\n  checkpoint into the new session.\n- tests/test_hook_*.py: 17 tests covering the two hooks.\n- .claude/commands/{checkpoint,restore}.md: manual save/load slash\n  commands sharing the tmp/checkpoints/ directory with the auto hooks.\n- .gemini/commands/{checkpoint,restore}.md: same content in markdown\n  format (matches our existing .gemini/commands/ format; Phase C will\n  convert all gemini commands to TOML).\n- .claude/settings.json: wire PreCompact + SessionStart hooks\n  (enabled in committed settings per project direction).\n- docs/development/ai/auto-checkpoint-hook.md: new doc covering\n  the auto-hooks design, env vars, and operational notes.\n- AGENTS.md: add tmp/checkpoints/ exception to the Temporary Files\n  rule, parallel to upstream #511's hand-merge change.\n- docs/development/ai/slash-commands.md: add /checkpoint, /restore,\n  and auto-checkpoint hooks sections.\n\n.agents/skills/{checkpoint,restore}/SKILL.md from upstream #511 are\nnot adopted (we have no .agents/skills/ directory yet); deferred.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T01:13:54+01:00",
+          "tree_id": "1dc0f53b1b281169b3f6b21670310ce274592dde",
+          "url": "https://github.com/endavis/infrafoundry/commit/fa8bef325ba00c7da5a7aea3d80cdbc5cdf27f2d"
+        },
+        "date": 1778717662860,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7211.573218943728,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014025160054990443",
+            "extra": "mean: 138.6659983390516 usec\nrounds: 2409"
           }
         ]
       }
