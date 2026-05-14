@@ -1,3 +1,5 @@
+@./AGENTS.md
+
 # Gemini CLI Instructions
 
 ## Context
