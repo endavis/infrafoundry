@@ -1,208 +1,71 @@
-# Claude LSP Setup Guide
+# Claude LSP Setup
 
-This guide explains how to set up Language Server Protocol (LSP) support for Claude Code, enabling fast code navigation and intelligent code understanding.
+This project ships LSP support for Claude Code via the `pyright-lsp@claude-plugins-official` plugin. The LSP server (pyright) gives AI agents go-to-definition, find-references, hover, and workspace symbol search.
 
-## ⚠️ Known Issues
-
-**LSP requests currently hang and do not return responses.** The pyright language server starts successfully but does not respond to LSP protocol requests from Claude Code. This appears to be a bug in the Claude Code LSP integration (released December 2025) or the pyright-lsp plugin.
-
-- ✅ Pyright CLI works perfectly (tested and confirmed)
-- ✅ Configuration is correct and validated
-- ✅ Language server starts successfully
-- ❌ LSP requests hang indefinitely (e.g., `textDocument/definition`)
-
-**Status:** Configuration is ready for when this issue is resolved. For now, use traditional file reading/searching.
-
-If you find that LSP works for you, please report your setup!
-
-## What is LSP?
-
-LSP (Language Server Protocol) provides Claude with semantic code understanding:
-- **Jump to definitions** - Navigate directly to function/class definitions
-- **Find references** - See where symbols are used across the codebase
-- **Type information** - Get instant type hints and signatures
-- **Error detection** - See type errors and diagnostics
-
-With LSP, Claude can navigate code in ~50ms instead of ~45 seconds using traditional text search.
+This file covers **installation only**. For what the `LSP` tool actually exposes, where the noisy stale "errors" after edits come from, and the two opt-ins an agent can flip on itself, see [`docs/development/ai/lsp-tool.md`](../docs/development/ai/lsp-tool.md).
 
 ## Prerequisites
 
-- Claude Code version 2.0.74 or later
-- Python 3.12+ environment
-- This project installed with dev dependencies
+- Claude Code 2.0.74 or later (LSP is enabled by default in 2.0.74+; older versions need `ENABLE_LSP_TOOL=1`)
+- Python 3.12+
+- This project installed with dev dependencies (`uv sync`) — pyright comes in via the dev group
 
-## Installation Steps
+## Install Steps
 
-### 1. Enable LSP Tool
+### 1. Install the plugin
 
-**Option A: Using .envrc.local (Recommended)**
-
-This project uses direnv for environment management:
-
-```bash
-# Copy the example file if you haven't already
-cp .envrc.local.example .envrc.local
-
-# Uncomment the ENABLE_LSP_TOOL line in .envrc.local
-# Change: # export ENABLE_LSP_TOOL=1
-# To:     export ENABLE_LSP_TOOL=1
-
-# direnv will automatically load it when you cd into the project
-```
-
-**Option B: Global Shell Profile**
-
-Alternatively, add this to your shell profile (`~/.bashrc`, `~/.zshrc`, or `~/.profile`):
-
-```bash
-export ENABLE_LSP_TOOL=1
-```
-
-Then reload your shell:
-
-```bash
-source ~/.bashrc  # or ~/.zshrc
-```
-
-### 2. Install Pyright LSP Plugin
-
-In Claude Code, run:
+In Claude Code:
 
 ```
 /plugin install pyright-lsp@claude-plugins-official
 ```
 
-### 3. Install Pyright Language Server
+### 2. Confirm `pyright-langserver` is on PATH
 
-Choose one installation method:
-
-**Via pip (recommended for Python projects):**
-```bash
-pip install pyright
-```
-
-**Via npm:**
-```bash
-npm install -g pyright
-```
-
-**Via Homebrew (macOS):**
-```bash
-brew install pyright
-```
-
-### 4. Verify Installation
-
-Check that pyright is in your PATH:
+`uv sync` installs pyright into `.venv/bin/`. Verify:
 
 ```bash
-pyright --version
+uv run pyright --version
+# → pyright 1.1.x
 ```
 
-Expected output:
+If running outside `uv run`, make sure the venv is on PATH (this project uses direnv).
+
+### 3. (Optional, Claude Code < 2.0.74) Enable the LSP tool
+
+Older Claude Code releases gate the LSP tool behind an env var. Add to `.envrc.local`:
+
+```bash
+export ENABLE_LSP_TOOL=1
 ```
-pyright 1.1.x
-```
+
+Or your shell profile. **Skip this step on 2.0.74+** — the tool is enabled by default.
 
 ## Configuration
 
-This project is already configured for LSP via `pyproject.toml`:
+Already done — `[tool.pyright]` in `pyproject.toml` sets `include`, `exclude`, `pythonVersion`, and the venv path. No additional setup needed.
 
-```toml
-[tool.pyright]
-include = ["src", "tests", "*.py", "tools", ".github"]
-exclude = ["**/__pycache__", "**/.venv", "**/tmp", ...]
-pythonVersion = "3.12"
-typeCheckingMode = "basic"
+## Verifying It Works
+
+Ask an agent to use the `LSP` tool against a known symbol:
+
+```
+Use the LSP tool's goToDefinition on the `greet` symbol in src/.
 ```
 
-No additional configuration needed!
-
-## Testing LSP
-
-Ask Claude to test LSP functionality:
-
-1. **Jump to definition:**
-   ```
-   Jump to the definition of the greet function
-   ```
-
-2. **Find references:**
-   ```
-   Find all references to the __version__ variable
-   ```
-
-3. **Type information:**
-   ```
-   What's the return type of the greet function?
-   ```
-
-If LSP is working, Claude will provide instant, accurate responses with file paths and line numbers.
+A working setup returns the file path and line number near-instantly. A broken setup falls back to `Grep`.
 
 ## Troubleshooting
 
-### "No LSP server available"
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `No LSP server available` | `pyright-langserver` not on PATH | `uv sync`; or `pip install pyright`; or `npm install -g pyright` |
+| `Executable not found in $PATH` | Plugin installed but binary missing | Same as above |
+| Plugin not loading at all | Plugin not installed at user scope | `/plugin install pyright-lsp@claude-plugins-official` then restart Claude Code |
+| Noisy or stale "errors" after every edit | Pyright diagnostic side-channel staleness — working as designed | See [`docs/development/ai/lsp-tool.md`](../docs/development/ai/lsp-tool.md) for the two documented opt-ins |
 
-**Cause:** Pyright binary not found in PATH
+## Related
 
-**Solution:**
-```bash
-# Check if pyright is installed
-which pyright
-
-# If not found, install it
-pip install pyright
-```
-
-### "Executable not found in $PATH"
-
-**Cause:** Pyright language server not installed
-
-**Solution:** Follow step 3 above to install the pyright binary
-
-### LSP not responding
-
-**Cause:** Plugin not installed or ENABLE_LSP_TOOL not set
-
-**Solution:**
-1. Verify environment variable: `echo $ENABLE_LSP_TOOL` (should output "1")
-2. Reinstall plugin: `/plugin install pyright-lsp@claude-plugins-official`
-3. Restart Claude Code
-
-### "pyright-langserver not found"
-
-**Cause:** Some installations use different binary names
-
-**Solution:**
-```bash
-# If installed via npm, it might be:
-which pyright-langserver
-
-# Or try reinstalling via pip
-pip install --force-reinstall pyright
-```
-
-## Performance Benefits
-
-Without LSP:
-- Code navigation: ~45 seconds (requires reading multiple files)
-- High token usage for exploration
-
-With LSP:
-- Code navigation: ~50ms (direct symbol lookup)
-- Minimal token usage for navigation
-- Better type understanding
-- Faster development iterations
-
-## Related Documentation
-
-- [AI_SETUP.md](../docs/development/AI_SETUP.md) - Complete AI development setup
+- [LSP Tool and Diagnostic Noise](../docs/development/ai/lsp-tool.md) — what agents see, why diagnostics arrive stale, and how to opt out
+- [AI Setup](../docs/development/AI_SETUP.md) — broader AI agent setup for this template
 - [Pyright Documentation](https://microsoft.github.io/pyright/)
-- [Claude Code Plugin Docs](https://code.claude.com/docs/en/discover-plugins)
-
-## Need Help?
-
-If you encounter issues:
-1. Check the troubleshooting section above
-2. Verify all prerequisites are met
-3. Open an issue at: https://github.com/username/package_name/issues
