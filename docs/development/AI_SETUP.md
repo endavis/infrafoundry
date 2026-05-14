@@ -80,6 +80,14 @@ Gemini CLI can read `AGENTS.md` (or `GEMINI.md`) from the project root. The conf
 - `ReadFileTool`, `WriteFileTool` - File operations
 - `LSTool`, `GrepTool` - File exploration
 
+#### Token Efficiency
+
+`.gemini/settings.json` ships with a compression default aimed at token efficiency in long sessions, mirroring the Claude tuning:
+
+| Setting | Value | Effect | Rationale |
+| :--- | :--- | :--- | :--- |
+| `chatCompression.contextPercentageThreshold` | `0.5` | Compression triggers at 50% of context window usage. | Reclaims token space earlier to avoid hitting hard context limits in long sessions. |
+
 **Setup:**
 ```bash
 # Gemini CLI automatically uses .gemini/settings.json if present

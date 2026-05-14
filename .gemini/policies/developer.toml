@@ -1,0 +1,4 @@
+[[rule]]
+toolName = "*"
+decision = "ask_user"
+priority = 100
