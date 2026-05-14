@@ -274,11 +274,62 @@ _DOIT_REF_TOC_TEMPLATE_CLEAN_RE = re.compile(
     r"`cleanup`, `template_clean`",
 )
 
+# docs/development/github-repository-settings.md intro paragraph (lines 16-20).
+# Surgical scrub: removes ONLY the broken-link sentence pointing at deleted
+# ``tools/pyproject_template/repo_settings.py``. The trailing space after
+# ``update_all_repo_settings()\.`` is part of the match so the next sentence
+# (``This page documents...``) joins cleanly to the previous newline. The
+# preceding sentence (``Complete reference for the GitHub repository settings
+# this template expects.``) and the doc-purpose sentence both survive.
+_GITHUB_SETTINGS_REPO_SETTINGS_INTRO_RE = re.compile(
+    r"New repositories created from the template are configured automatically by\n"
+    r"\[`repo_settings\.py`\]\(\.\./\.\./tools/pyproject_template/repo_settings\.py\) via\n"
+    r"`update_all_repo_settings\(\)`\. ",
+)
+
+# docs/development/github-repository-settings.md Security Settings paragraph
+# (lines 233-234). Strips the entire paragraph plus its trailing blank line so
+# the table that follows sits directly under the heading. The table is
+# self-explanatory, so removing the prose introduction does not leave a gap.
+_GITHUB_SETTINGS_SECURITY_REPO_SETTINGS_RE = re.compile(
+    r"Security features are configured by `_configure_security_settings\(\)` in\n"
+    r"`repo_settings\.py`\.\n\n",
+)
+
+# docs/development/release-and-automation.md "New projects (bootstrap flow)"
+# paragraph (lines 94-96). REWRITES (not strips) the paragraph: the spawned
+# project does have a ``v0.0.0`` tag (``configure.py`` created it during
+# bootstrap before being deleted), so the user-facing instruction "push it
+# when ready" is still correct — only the broken
+# ``tools/pyproject_template/configure.py`` link needs to go. The lead
+# ``**New projects (bootstrap flow).**`` and the trailing
+# ``git push origin v0.0.0`` code block both survive untouched.
+_RELEASE_AUTO_NEW_PROJECTS_BOOTSTRAP_RE = re.compile(
+    r"\*\*New projects \(bootstrap flow\)\.\*\* `tools/pyproject_template/configure\.py`\n"
+    r"auto-seeds a `v0\.0\.0` tag on the root commit, so nothing else is required —\n"
+    r"only push it when you're ready:\n",
+)
+
+# Markers used by ``check_stale_template_references`` to surface any future
+# regression of the #469 family bug class. Conservative list with zero
+# false-positive risk in a spawned project: every reference to
+# ``tools/pyproject_template/`` is broken once the directory is deleted; the
+# ``template/tools-reference.md`` link is defensive coverage in case the TOC
+# regenerator misses it; ``tools/doit/template_clean`` is namespaced enough
+# that no legitimate file should match. ``bootstrap.py`` is excluded because
+# legitimate ``curl ... bootstrap.py`` reinstall references survive in some
+# docs.
+_STALE_TEMPLATE_MARKERS = (
+    "tools/pyproject_template/",
+    "template/tools-reference.md",
+    "tools/doit/template_clean",
+)
+
 
 def scrub_template_references(root: Path | None = None, dry_run: bool = False) -> list[Path]:
     """Remove user-visible stale references to template-only machinery.
 
-    Applies targeted regex rewrites to three files that retain documentation
+    Applies targeted regex rewrites to five files that retain documentation
     or configuration for template-only tooling after the cleanup phase has
     deleted the files those references point at:
 
@@ -294,11 +345,28 @@ def scrub_template_references(root: Path | None = None, dry_run: bool = False) -
     * ``docs/development/doit-tasks-reference.md`` — removes the
       ``### template_clean`` section and rewrites the TOC table row so the
       remaining ``cleanup`` entry is listed alone.
+    * ``docs/development/github-repository-settings.md`` — strips the
+      broken-link sentence in the intro paragraph that points at
+      ``tools/pyproject_template/repo_settings.py``, and removes the
+      ``Security Settings`` introductory paragraph that names
+      ``_configure_security_settings()`` in the same deleted module.
+    * ``docs/development/release-and-automation.md`` — rewrites the
+      "New projects (bootstrap flow)" paragraph so the broken link to
+      ``tools/pyproject_template/configure.py`` is gone but the user-facing
+      "push the v0.0.0 tag when ready" instruction (and its trailing
+      ``git push origin v0.0.0`` code block) survives untouched.
 
     Patterns are applied blindly; ``re.sub`` is a no-op when nothing matches,
     and the function detects whether a file changed by comparing final
     content to the original. That makes the scrubber idempotent — repeat
     calls and already-scrubbed files record no change.
+
+    Companion helpers in this module handle the cases where a regex per file
+    is the wrong tool: :func:`regenerate_doc_toc` rebuilds
+    ``docs/TABLE_OF_CONTENTS.md`` from the surviving ``docs/`` tree (so all
+    broken ``template/*.md`` links drop out in one pass), and
+    :func:`check_stale_template_references` performs a warn-only post-cleanup
+    sweep that surfaces any future regression of this bug class.
 
     Args:
         root: Project root directory (defaults to cwd).
@@ -369,7 +437,158 @@ def scrub_template_references(root: Path | None = None, dry_run: bool = False) -
                 )
             changed.append(doit_ref)
 
+    # 4. docs/development/github-repository-settings.md — strip the broken
+    #    intro-link sentence and the Security Settings introductory paragraph.
+    github_settings = root / "docs" / "development" / "github-repository-settings.md"
+    if github_settings.is_file():
+        original = github_settings.read_text(encoding="utf-8")
+        new_content = original
+        new_content = _GITHUB_SETTINGS_REPO_SETTINGS_INTRO_RE.sub("", new_content)
+        new_content = _GITHUB_SETTINGS_SECURITY_REPO_SETTINGS_RE.sub("", new_content)
+        if new_content != original:
+            if dry_run:
+                Logger.info(
+                    "Would scrub repo_settings.py references in "
+                    "docs/development/github-repository-settings.md"
+                )
+            else:
+                github_settings.write_text(new_content, encoding="utf-8")
+                Logger.success(
+                    "Removed repo_settings.py references from "
+                    "docs/development/github-repository-settings.md"
+                )
+            changed.append(github_settings)
+
+    # 5. docs/development/release-and-automation.md — rewrite the "New
+    #    projects (bootstrap flow)" paragraph so the broken configure.py link
+    #    is gone but the surrounding instruction and code block survive.
+    release_auto = root / "docs" / "development" / "release-and-automation.md"
+    if release_auto.is_file():
+        original = release_auto.read_text(encoding="utf-8")
+        new_content = _RELEASE_AUTO_NEW_PROJECTS_BOOTSTRAP_RE.sub(
+            "**New projects (bootstrap flow).** A `v0.0.0` tag is auto-seeded on the\n"
+            "root commit during initial setup, so nothing else is required — only push\n"
+            "it when you're ready:\n",
+            original,
+        )
+        if new_content != original:
+            if dry_run:
+                Logger.info(
+                    "Would scrub configure.py references in "
+                    "docs/development/release-and-automation.md"
+                )
+            else:
+                release_auto.write_text(new_content, encoding="utf-8")
+                Logger.success(
+                    "Removed configure.py references from "
+                    "docs/development/release-and-automation.md"
+                )
+            changed.append(release_auto)
+
     return sorted(changed)
+
+
+def regenerate_doc_toc(root: Path | None = None, dry_run: bool = False) -> bool:
+    """Re-run ``tools/generate_doc_toc.py`` to rebuild ``docs/TABLE_OF_CONTENTS.md``.
+
+    The TOC is driven from the surviving ``docs/`` tree, so once
+    ``docs/template/`` is deleted in :class:`CleanupMode.ALL`, simply
+    re-running the generator naturally drops every stale ``template/*.md``
+    reference in one pass — much safer than a per-line regex strip, which
+    would leave behind any future broken ``template/*.md`` link the regex
+    didn't anticipate.
+
+    The generator script returns exit ``0`` (no change) or ``1`` (changes
+    written); both are treated as success. Anything else is logged as a
+    warning and treated as a failure.
+
+    Args:
+        root: Project root directory (defaults to cwd).
+        dry_run: If True, report what would be regenerated but do not invoke
+            the subprocess.
+
+    Returns:
+        True if the TOC was (or would be) regenerated; False if the
+        generator/TOC files are missing, the subprocess failed, or no
+        changes were needed.
+    """
+    if root is None:
+        root = Path.cwd()
+    script = root / "tools" / "generate_doc_toc.py"
+    toc = root / "docs" / "TABLE_OF_CONTENTS.md"
+    if not script.is_file() or not toc.is_file():
+        return False
+    if dry_run:
+        Logger.info("Would regenerate docs/TABLE_OF_CONTENTS.md")
+        return True
+
+    import subprocess  # nosec B404 - local import for invoking generate_doc_toc.py
+
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    # generate_doc_toc.py returns 0 (no change) or 1 (changes written); both
+    # are success. Anything else is a real failure.
+    if result.returncode not in (0, 1):
+        Logger.warning(
+            f"TOC regeneration failed (exit {result.returncode}): {result.stderr.strip()}"
+        )
+        return False
+    if result.returncode == 1:
+        Logger.success("Regenerated docs/TABLE_OF_CONTENTS.md")
+        return True
+    return False
+
+
+def check_stale_template_references(
+    root: Path | None = None,
+) -> list[tuple[Path, int, str]]:
+    """Scan post-cleanup docs and README for known template-only markers.
+
+    A warn-only post-cleanup sweep. Surfaces any future regression of the
+    #469 / #474 bug class (stale references to template-only files that
+    survive the scrubber) in the wizard transcript instead of waiting for a
+    manual grep. Catches arbitrary docs files, not just the targets handled
+    explicitly by :func:`scrub_template_references`.
+
+    The marker list (:data:`_STALE_TEMPLATE_MARKERS`) is conservative — every
+    marker references a path that is guaranteed to be broken once the cleanup
+    deletes its target.
+
+    Args:
+        root: Project root directory (defaults to cwd).
+
+    Returns:
+        List of ``(path, line_no, line_content)`` tuples for any survivors.
+        Empty list when no stale references are found. The caller decides
+        what to do with the result; this function never raises and never
+        modifies any files.
+    """
+    if root is None:
+        root = Path.cwd()
+
+    survivors: list[tuple[Path, int, str]] = []
+    candidates: list[Path] = []
+    docs_dir = root / "docs"
+    if docs_dir.is_dir():
+        candidates.extend(sorted(docs_dir.rglob("*.md")))
+    readme = root / "README.md"
+    if readme.is_file():
+        candidates.append(readme)
+
+    for path in candidates:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for line_no, line in enumerate(text.splitlines(), start=1):
+            if any(marker in line for marker in _STALE_TEMPLATE_MARKERS):
+                survivors.append((path, line_no, line))
+    return survivors
 
 
 def cleanup_template_files(
@@ -423,6 +642,11 @@ def cleanup_template_files(
             # Also report any scrub targets; the return value is discarded
             # here because CleanupResult has no field for it.
             scrub_template_references(root, dry_run=True)
+            # Mirror the live path's TOC regenerate step (read-only under
+            # dry_run). check_stale_template_references is read-only too,
+            # but it's only called in the live path because dry_run already
+            # promises no writes — running it here would just be noise.
+            regenerate_doc_toc(root, dry_run=True)
         return CleanupResult(files_to_delete, dirs_to_delete, [], mkdocs_would_update)
 
     # Delete files
@@ -448,8 +672,21 @@ def cleanup_template_files(
     if mode == CleanupMode.ALL:
         mkdocs_updated = update_mkdocs_nav(root, dry_run=False)
         # Scrub user-visible references (pyproject.toml, README.md,
-        # doit-tasks-reference.md) that still point at now-deleted files.
+        # doit-tasks-reference.md, github-repository-settings.md,
+        # release-and-automation.md) that still point at now-deleted files.
         scrub_template_references(root, dry_run=False)
+        # Regenerate the TOC from the surviving docs/ tree so any broken
+        # template/*.md links naturally drop out (no per-line regex needed).
+        regenerate_doc_toc(root, dry_run=False)
+        # Warn-only regression sweep: surface any stale template references
+        # that survived the targeted scrubs above. Catches future drift in
+        # arbitrary docs files, not just the ones explicitly handled.
+        stale = check_stale_template_references(root)
+        if stale:
+            Logger.warning(f"Stale template references survived cleanup ({len(stale)} hits):")
+            for path, line_no, content in stale:
+                rel = path.relative_to(root) if path.is_relative_to(root) else path
+                print(f"  - {rel}:{line_no}: {content.strip()}")
 
     # Report results
     if deleted_files:
