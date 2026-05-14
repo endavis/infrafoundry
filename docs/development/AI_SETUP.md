@@ -201,7 +201,7 @@ To opt out or tune values for your local environment, override them in `.claude/
 **Cross-references:**
 
 - The 50% autocompact threshold is paired with the PreCompact handoff hook (`tools/hooks/ai/precompact-checkpoint.py`), which serializes session state on compaction so the post-compact continuation can rehydrate it. Both pieces are now active.
-<!-- TBD: link to add-ons walkthrough doc when Phase E.2 of pyproject-template sync (#823) lands the upstream walkthrough. -->
+- For operators who need more aggressive token reduction, see [AI Agent Token-Efficiency Add-Ons](ai/token-efficiency-add-ons.md) — a catalogue of opt-in external tools (RTK, Headroom, Caveman) with tipping-point guidance and trust caveats.
 
 ### 4. GitHub Copilot CLI
 
