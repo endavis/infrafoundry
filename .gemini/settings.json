@@ -24,5 +24,21 @@
   },
   "context": {
     "files": ["AGENTS.md", "GEMINI.md"]
+  },
+  "skills": {
+    "disabled": [
+      "delegate-claude-plan",
+      "delegate-claude-implement",
+      "delegate-claude-review",
+      "delegate-claude-adversarial-review",
+      "delegate-gemini-plan",
+      "delegate-gemini-implement",
+      "delegate-gemini-review",
+      "delegate-gemini-adversarial-review",
+      "delegate-copilot-plan",
+      "delegate-copilot-implement",
+      "delegate-copilot-review",
+      "delegate-copilot-adversarial-review"
+    ]
   }
 }
