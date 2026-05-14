@@ -1,5 +1,5 @@
 ---
-name: implement
+name: codex-implement
 description: Use when implementing an approved GitHub issue plan in this repository from a Codex session. Creates or resumes the issue branch, follows the posted plan comment, writes tests with the change, and finishes with `doit check`.
 ---
 
@@ -13,8 +13,8 @@ Use this skill when the user wants Codex to carry out the repository's implement
 
 Expected prompt shape:
 
-- `$implement implement issue 399`
-- `$implement continue work on issue 399`
+- `$codex-implement implement issue 399`
+- `$codex-implement continue work on issue 399`
 
 If the issue number is missing, ask for it before continuing.
 
@@ -30,7 +30,7 @@ If the issue number is missing, ask for it before continuing.
    ```bash
    gh api repos/{owner}/{repo}/issues/<issue-number>/comments --jq '.[].body' | grep -E "^#+ Implementation Plan for"
    ```
-   - If no plan comment exists, stop and tell the user to run `$plan-issue` first.
+   - If no plan comment exists, stop and tell the user to run `$codex-plan` first.
 
 3. Check the current branch state:
    ```bash
@@ -80,4 +80,4 @@ If the issue number is missing, ask for it before continuing.
    - Fix failures that are part of the issue scope.
    - Do not paper over failing tests by weakening them without user discussion.
 
-10. Summarize what changed, list the changed files, report the validation result, and tell the user the next workflow step is `$finalize`.
+10. Summarize what changed, list the changed files, report the validation result, and tell the user the next workflow step is `$ghi-finalize`.

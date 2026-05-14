@@ -22,7 +22,7 @@ The implementation is delegated to a sub-agent (Task tool) so raw tool output st
    gh api repos/{owner}/{repo}/issues/$ARGUMENTS/comments --jq '.[].body' | grep -E "^#+ Implementation Plan for"
    ```
    - If no plan comment is found, tell the user:
-     > "No implementation plan found for issue #$ARGUMENTS. Run `/plan-issue $ARGUMENTS` first."
+     > "No implementation plan found for issue #$ARGUMENTS. Run `/claude:plan $ARGUMENTS` first."
    - Stop and wait for the user.
 
 3. **Check current branch state:**
@@ -78,4 +78,4 @@ After the agent returns, show the user:
 Tell the user:
 - Review the changes and test as needed
 - Discuss any fixes directly in conversation (no command needed)
-- When satisfied, use `/finalize` to commit and create a PR
+- When satisfied, use `/ghi-finalize` to commit and create a PR

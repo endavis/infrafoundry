@@ -1,5 +1,5 @@
 ---
-name: finalize
+name: ghi-finalize
 description: Use when the implementation and review cycle for a repository issue is complete in a Codex session. Reviews the branch diff, updates docs or ADRs if needed, validates with `doit check`, drafts commit and PR artifacts, and stops for explicit approval before commit or PR creation.
 ---
 
@@ -13,8 +13,8 @@ Use this skill after implementation is complete and the user wants Codex to prep
 
 Expected prompt shape:
 
-- `$finalize finalize this branch`
-- `$finalize prepare the PR for issue 399`
+- `$ghi-finalize finalize this branch`
+- `$ghi-finalize prepare the PR for issue 399`
 
 ## Instructions
 

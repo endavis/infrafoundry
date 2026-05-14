@@ -20,7 +20,7 @@ Based on the branch name, determine the workflow state:
 
 **If on `main`:**
 - No active work in progress
-- Suggest: "Start with `/plan-issue <N>` to plan an issue, or create one with `doit issue`"
+- Suggest: "Start with `/<currentai>:plan <N>` to plan an issue, or create one with `doit issue`"
 
 **If on a feature branch (e.g., `feat/245-description`):**
 1. Extract the issue number from the branch name
@@ -51,12 +51,12 @@ Present a status summary and suggest what to do next:
 
 | State | Suggestion |
 | :--- | :--- |
-| On feature branch, no plan comment | Run `/plan-issue <N>` to create a plan |
-| On feature branch, plan exists, no code changes | Run `/implement <N>` to start implementation |
-| On feature branch, code changes, not committed | Review changes, then run `/finalize` to commit and create PR |
-| On feature branch, committed, no PR | Run `/finalize` to create the PR |
+| On feature branch, no plan comment | Run `/<currentai>:plan <N>` to create a plan |
+| On feature branch, plan exists, no code changes | Run `/<currentai>:implement <N>` to start implementation |
+| On feature branch, code changes, not committed | Review changes, then run `/ghi-finalize` to commit and create PR |
+| On feature branch, committed, no PR | Run `/ghi-finalize` to create the PR |
 | On feature branch, PR exists (open) | PR is open — waiting for review/merge |
-| On feature branch, PR exists (merged) | Run `/close-issue <N>` to close the issue |
+| On feature branch, PR exists (merged) | Run `doit pr_merge --auto-close` or `gh issue close <N>` to close the issue |
 | Issue is already closed | Work complete — switch back to `main` |
 
 ### Output format
@@ -71,5 +71,5 @@ Present a status summary and suggest what to do next:
 - **PR:** None
 
 ## Suggested next step
-Run `/finalize` to commit your changes and create a PR.
+Run `/ghi-finalize` to commit your changes and create a PR.
 ```

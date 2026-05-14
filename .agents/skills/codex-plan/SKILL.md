@@ -1,5 +1,5 @@
 ---
-name: plan-issue
+name: codex-plan
 description: Use when planning work for a GitHub issue in this repository from a Codex session. Drafts an implementation plan, iterates with the user, and posts the approved plan comment with the repo's required header format.
 ---
 
@@ -13,8 +13,8 @@ Use this skill when the user wants a Codex-native equivalent of the repository's
 
 Expected prompt shape:
 
-- `$plan-issue plan issue 399`
-- `$plan-issue create an implementation plan for issue 399`
+- `$codex-plan plan issue 399`
+- `$codex-plan create an implementation plan for issue 399`
 
 If the issue number is missing, ask for it before continuing.
 
@@ -81,4 +81,4 @@ If the issue number is missing, ask for it before continuing.
    gh issue comment <issue-number> --body "<approved plan markdown>"
    ```
 
-9. Tell the user the plan was posted and that the next Codex workflow step is `$implement`.
+9. Tell the user the plan was posted and that the next Codex workflow step is `$codex-implement`.

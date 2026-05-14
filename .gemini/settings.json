@@ -23,10 +23,27 @@
     "showToolCalls": true
   },
   "context": {
-    "files": ["AGENTS.md", "GEMINI.md"]
+    "files": [
+      "AGENTS.md",
+      "GEMINI.md"
+    ]
+  },
+  "general": {
+    "defaultApprovalMode": "auto_edit"
+  },
+  "security": {
+    "enablePermanentToolApproval": true,
+    "autoAddToPolicyByDefault": true
   },
   "skills": {
     "disabled": [
+      "restore",
+      "ghi-finalize",
+      "checkpoint",
+      "codex-plan",
+      "codex-implement",
+      "codex-review",
+      "codex-adversarial-review",
       "delegate-claude-plan",
       "delegate-claude-implement",
       "delegate-claude-review",
@@ -38,7 +55,10 @@
       "delegate-copilot-plan",
       "delegate-copilot-implement",
       "delegate-copilot-review",
-      "delegate-copilot-adversarial-review"
+      "delegate-copilot-adversarial-review",
+      "multi-plan",
+      "multi-review",
+      "multi-adversarial-review"
     ]
   }
 }
