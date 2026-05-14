@@ -18,6 +18,7 @@ Ensures bad code never enters the repository, provides fast feedback loop (secon
 - Issue #128: Align pre-commit, CI, and doit check to use consistent checks
 - Issue #19: Fix resolve pre-commit hook failures in template files
 - Issue #415: Add actionlint hook for GitHub Actions workflow validation
+- Issue #556: Validate uv.lock consistency on pyproject.toml changes
 
 ## Related Documentation
 

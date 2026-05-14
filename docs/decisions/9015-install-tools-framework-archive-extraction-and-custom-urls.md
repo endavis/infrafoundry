@@ -14,6 +14,8 @@ Extend `tools/doit/install_tools.py` with three orthogonal capabilities while pr
 
 Supporting refactors: a private `_get_arch()` helper that maps `platform.machine()` to amd64/arm64 (passthrough for unknowns), and a private `_build_github_release_url()` so the binary path and the new archive path share URL construction.
 
+`extract_binaries` also accepts an optional per-platform `dict[str, list[str]]` keyed by `platform.system().lower()` (same convention as `asset_patterns`), for tools whose archive members differ per OS (e.g., `.exe` suffix on Windows).
+
 ## Rationale
 
 Downstream consumers (e.g., InfraFoundry) need to install five tools, but only direnv-style single binaries from GitHub releases work today. age and sops ship as multi-binary tar.gz archives; terraform and opentofu ship from non-GitHub URLs. Without these extensions every downstream consumer reinvents download/extract code with inconsistent (often missing) security handling.
@@ -41,6 +43,7 @@ The three capabilities are intentionally orthogonal so simple cases stay simple 
 ## Related Issues
 
 - Issue #326: install_tools framework: archive extraction and custom URLs
+- Issue #477: support per-platform `extract_binaries` in install_tool framework
 
 ## Related Documentation
 

@@ -219,7 +219,7 @@ def install_tool(
     asset_patterns: dict[str, str],
     version_cmd: list[str] | None = None,
     post_install_message: str | None = None,
-    extract_binaries: list[str] | None = None,
+    extract_binaries: list[str] | dict[str, list[str]] | None = None,
     url_template: str | None = None,
     prefer_brew: bool = True,
 ) -> None:
@@ -242,6 +242,21 @@ def install_tool(
             a downloaded archive (e.g. ``["age", "age-keygen"]``). When set,
             the download is treated as an archive (`.tar.gz`/`.tgz`/`.zip`)
             and binaries are extracted into the install dir.
+
+            Also accepts a per-platform mapping using the same key
+            convention as ``asset_patterns`` (``platform.system().lower()``
+            values such as ``"linux"``, ``"darwin"``, ``"windows"``).
+            Use this when archive members differ per OS — for example,
+            when Windows builds add a ``.exe`` suffix::
+
+                extract_binaries={
+                    "linux": ["age", "age-keygen"],
+                    "darwin": ["age", "age-keygen"],
+                    "windows": ["age.exe", "age-keygen.exe"],
+                }
+
+            On a platform missing from the dict, the install aborts with
+            the same ``Unsupported OS`` error used for ``asset_patterns``.
         url_template: Optional download URL template with ``{version}``,
             ``{os}``, and ``{arch}`` placeholders. When set, this is used
             instead of building a GitHub release URL from ``asset_patterns``.
@@ -281,7 +296,14 @@ def install_tool(
             sys.exit(1)
 
         if extract_binaries:
-            download_and_extract_archive(url, extract_binaries, get_install_dir())
+            if isinstance(extract_binaries, dict):
+                if system not in extract_binaries:
+                    print(f"Unsupported OS for {name}: {system}")
+                    sys.exit(1)
+                resolved_binaries = extract_binaries[system]
+            else:
+                resolved_binaries = extract_binaries
+            download_and_extract_archive(url, resolved_binaries, get_install_dir())
         else:
             if url_template is not None:
                 install_dir = get_install_dir()
@@ -308,7 +330,7 @@ def create_install_task(
     asset_patterns: dict[str, str],
     version_cmd: list[str] | None = None,
     post_install_message: str | None = None,
-    extract_binaries: list[str] | None = None,
+    extract_binaries: list[str] | dict[str, list[str]] | None = None,
     url_template: str | None = None,
     prefer_brew: bool = True,
 ) -> dict[str, Any]:
@@ -325,7 +347,10 @@ def create_install_task(
         version_cmd: Command list for version check. Defaults to [name, "--version"].
         post_install_message: Optional message printed after installation.
         extract_binaries: Optional list of binary basenames to extract from
-            a downloaded archive. See :func:`install_tool`.
+            a downloaded archive, or a per-platform mapping keyed by
+            ``platform.system().lower()`` (e.g. ``{"linux": ["age"],
+            "windows": ["age.exe"]}``) when archive members differ per OS.
+            See :func:`install_tool`.
         url_template: Optional download URL template with ``{version}``,
             ``{os}``, ``{arch}`` placeholders. See :func:`install_tool`.
         prefer_brew: Use brew on macOS when True (default). See
