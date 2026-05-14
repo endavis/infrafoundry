@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778774082524,
+  "lastUpdate": 1778777510567,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9021,6 +9021,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010735279771782445",
             "extra": "mean: 137.12226345979693 usec\nrounds: 2266"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e56b2e38d5f72edda6e7acf1a7c905718de44fa2",
+          "message": "docs: clarify GitHub App vs PAT setup and credential scope in CONTRIBUTING.md (merges PR #843, addresses #823)\n\nAdopts upstream endavis/pyproject-template#499. Restructures the\n\"Setting Up Release Permissions\" section of .github/CONTRIBUTING.md\nto fix three confusions in the previous copy:\n\n1. The \"personal vs. organization\" framing was misleading. A GitHub\n   App works equally well on a personal account; the real decision\n   axis is CI-driven vs local-only releases and whether dependabot\n   auto-merge automation is needed.\n\n2. There was no guidance on credential storage scope. Storing\n   RELEASE_APP_ID / RELEASE_APP_PRIVATE_KEY at the environment\n   scope silently breaks the enable-automerge job -- the same\n   failure mode the upstream session debugged for #492 / #493.\n\n3. \"step 5: Update Workflows (if using CI-based releases)\" framed\n   the App credentials as required for CI releases, but\n   release.yml uses PyPI OIDC + GITHUB_TOKEN. The App credentials\n   are only consumed by the dependabot auto-merge workflow today\n   (and any future CI-driven tag-push extension).\n\nChanges:\n- New \"Which path should I use?\" subsection with a decision table\n  and an IMPORTANT callout naming dependabot-automerge as the\n  App-required case.\n- Renamed \"Organization Repositories: GitHub App (Recommended)\"\n  -> \"Recommended: GitHub App\" with a \"use this if you want...\"\n  bullet list and a NOTE callout clarifying release.yml uses OIDC\n  + GITHUB_TOKEN, not the App credentials.\n- Step 4: \"Store Secrets\" -> \"Store Credentials at the Repository\n  Scope\" with a WARNING callout describing the silent empty-string\n  env-scope failure mode.\n- Step 5: \"Update Workflows (if using CI-based releases)\" ->\n  \"Optional: CI-Driven Tag-Push Flow (not used by this template's\n  release.yml)\" with new context paragraphs and a closing\n  paragraph about Ruleset bypass.\n- Renamed \"Personal Repositories: PAT\" -> \"Alternative:\n  Fine-Grained PAT (local-only releases)\" with an explicit\n  use-only-if guard.\n- Removed obsolete \"Store as Secret (for CI-based releases)\" and\n  \"Update Workflows\" PAT-in-CI subsections.\n\nHand-merged per docs/development/pyproject-template-divergences.md\ncategory 3: the section being touched was verbatim-identical to\nupstream's pre-patch state. InfraFoundry-specific\nbranching/commit/workflow content elsewhere in the file is\nuntouched.\n\nSkipped: the 1-line anchor update to docs/development/dependabot\n-automerge.md that #499 also includes -- that file doesn't exist\nlocally (category-1 skip-list).\n\nPre-existing cross-link to flag (not in scope to fix here): line\n493 and the new IMPORTANT callout both point to\n../docs/development/dependabot-automerge.md#required-github-app-\nconfiguration, which is currently in our category-1 skip-list.\nTwo later options: drop the file from the skip-list and adopt it,\nor inline the necessary callouts and drop the cross-links.\n\ndoit check passes locally.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T17:51:10+01:00",
+          "tree_id": "02c8a1b9b13619004f414225e57dd7c084903abf",
+          "url": "https://github.com/endavis/infrafoundry/commit/e56b2e38d5f72edda6e7acf1a7c905718de44fa2"
+        },
+        "date": 1778777509641,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8509.756602047659,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000275337054817631",
+            "extra": "mean: 117.51217417421495 usec\nrounds: 1665"
           }
         ]
       }
