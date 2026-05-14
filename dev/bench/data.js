@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778718876022,
+  "lastUpdate": 1778720402428,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8742,6 +8742,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010091400658677116",
             "extra": "mean: 136.24172561219856 usec\nrounds: 2573"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8117440d7fb63a6b5f493ddd4396a20852eb1aa0",
+          "message": "feat: establish rules-as-imports pattern across all four AI CLIs (merges PR #831, addresses #823)\n\nPorts the per-stack rules/instructions/skills scaffolds from upstream\npyproject-template PRs #525, #543, #546, #547, and #553. Sets up a\nparallel structure across all four supported AI CLIs:\n\n- .claude/rules/README.md (new): pattern doc for Claude Code rule\n  files, imported into .claude/CLAUDE.md via @-import.\n- .gemini/rules/README.md (new, post-#553 state): same pattern for\n  Gemini CLI with per-file @-imports.\n- .github/instructions/README.md (new, post-#553 state): Copilot-\n  native equivalent — instruction files at .github/instructions/\n  NAME.instructions.md with applyTo: '<glob>' frontmatter.\n- .agents/skills/README.md (new, post-#553 state): Codex-native\n  equivalent — SKILL.md files with description: frontmatter as\n  skill-gate trigger.\n- .claude/CLAUDE.md: placeholder @-import comment for future rule\n  files.\n- GEMINI.md: add @./AGENTS.md import at the top.\n- AGENTS.md: AI Config Directories table updated with rules,\n  instructions/, and skills/ references for each CLI.\n- .copilot/README.md: new \"Per-Stack Instructions\" section\n  explaining the .github/instructions/ pattern.\n- docs/development/ai/first-5-minutes.md: See-also links to all\n  four scaffold READMEs.\n\nPulls #546 and #547 forward from Phase E since #553 (in Phase C)\nmodifies the READMEs they introduce.\n\nSkipped from upstream's PRs:\n- docs/development/AI_SETUP.md updates — reference /ghissue-*\n  commands we don't have until C.5 (renamed to /ghi-* there).\n- docs/development/ai/token-efficiency-add-ons.md — missing locally;\n  lands with #520 in Phase E.\n\nUsed post-#553 state for the four READMEs (not latest upstream) to\navoid pulling forward example references that come from C.5 (#564).\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T01:59:21+01:00",
+          "tree_id": "0245648933534209b01e07e92f54d2c69d528ac5",
+          "url": "https://github.com/endavis/infrafoundry/commit/8117440d7fb63a6b5f493ddd4396a20852eb1aa0"
+        },
+        "date": 1778720401075,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6429.801920897971,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000031580827035276234",
+            "extra": "mean: 155.52578637762176 usec\nrounds: 2261"
           }
         ]
       }
