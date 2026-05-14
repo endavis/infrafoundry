@@ -191,6 +191,24 @@ repos:
         always_run: true
         stages: [pre-commit]
 
+      # Validate uv.lock is in sync with pyproject.toml when pyproject.toml is staged
+      - id: uv-lock-check
+        name: Validate uv.lock matches pyproject.toml
+        entry: |
+          bash -c '
+          uv lock --check || {
+            echo ""
+            echo "❌ ERROR: uv.lock is out of sync with pyproject.toml"
+            echo ""
+            echo "Run: uv lock"
+            echo "Then re-stage: git add uv.lock"
+            exit 1
+          }'
+        language: system
+        pass_filenames: false
+        files: ^pyproject\.toml$
+        stages: [pre-commit]
+
       # Auto-sync dependencies when uv.lock changes after git pull
       - id: uv-sync-on-pull
         name: Auto uv sync after pull (lock changed)
