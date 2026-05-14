@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778720402428,
+  "lastUpdate": 1778721108941,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8773,6 +8773,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000031580827035276234",
             "extra": "mean: 155.52578637762176 usec\nrounds: 2261"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5050a4f97fc57126fe34774f599bef2f2296b388",
+          "message": "feat: add Codex CLI workflow skills (merges PR #832, addresses #823)\n\nPorts Codex CLI workflow skills from pyproject-template PR #482:\n\n- .agents/skills/plan-issue/SKILL.md (new): Codex skill that posts\n  an approved plan comment with the standard header.\n- .agents/skills/implement/SKILL.md (new): Codex skill that creates\n  or resumes an issue branch, runs doit check, and reports back.\n- .agents/skills/finalize/SKILL.md (new): Codex skill that drafts\n  commit and PR artifacts and uses doit pr after explicit user\n  approval.\n- tests/template/test_ai_agent_assets.py (new): 6 tests verifying\n  skill files exist and follow the expected structure.\n- .codex/config.toml: major slim (169 -> 54 lines). Migrates to the\n  current Codex config schema and removes per-pattern\n  approval_policy rules in favor of the shared\n  block-dangerous-commands.py hook.\n- AGENTS.md: new paragraph clarifying Codex uses repo-scoped\n  skills, not slash commands.\n- docs/development/AI_SETUP.md (3 hunks): Codex row in the agent\n  comparison table, parity status text, and the config.toml\n  example snippet all updated for the new schema and skills\n  workflow.\n- docs/development/ai/slash-commands.md: Codex section rewrite\n  describing the skill-based workflow.\n- docs/development/ai/command-blocking.md: config.toml snippet\n  updated to new schema.\n- docs/development/ai/enforcement-principles.md: dangerous-command\n  table updated -- Codex now uses Hook + Config (was Config-only).\n\nThe 3 SKILL.md files keep their original #482 names (plan-issue,\nimplement, finalize). C.5 (#564) renames them to codex-plan,\ncodex-implement, ghi-finalize -- that rename lands when we sync\nthe /multi-* refactor.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T02:11:06+01:00",
+          "tree_id": "0369cfe97fb64fa35be443a4e4852c2d561726fe",
+          "url": "https://github.com/endavis/infrafoundry/commit/5050a4f97fc57126fe34774f599bef2f2296b388"
+        },
+        "date": 1778721107391,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7294.365079257156,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009814218479978219",
+            "extra": "mean: 137.09212373311016 usec\nrounds: 2368"
           }
         ]
       }
