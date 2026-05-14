@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778725919609,
+  "lastUpdate": 1778727265632,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8928,6 +8928,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000021506508089927804",
             "extra": "mean: 114.74124328465345 usec\nrounds: 1973"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d1f52793d9248715460e48e3d5ed60ee7509b6eb",
+          "message": "chore: sync doit/* and pyproject_template tooling improvements (merges PR #837, addresses #823)\n\n* chore: sync doit/* and pyproject_template tooling improvements\n\nBundles upstream pyproject-template tooling improvements:\n\n- #502: tools/pyproject_template/cleanup.py update. Doc-target\n  changes (github-repository-settings.md, release-and-automation.md,\n  TABLE_OF_CONTENTS.md) skipped per divergences-doc skip-list.\n\n- #505: tools/doit/release.py runtime PyPI-name resolution.\n  Adds _get_pypi_name_from_pyproject() that reads project.name\n  from pyproject.toml at runtime; substitutes it into the\n  \"Check TestPyPI/PyPI\" URL printouts in both the release-PR\n  flow and the release-tag flow (preserves InfraFoundry's\n  release-PR divergence).\n\n- #545: install_check_or_skip in base.py/git.py/security.py\n  replaces the previous \"|| echo 'X not installed'\" swallow.\n  Failure modes now propagate as expected; pre-existing security\n  findings surface that the old swallow hid. Each surfaced\n  finding suppressed inline with a justification:\n  * tools/doit/install_tools.py:406 -- # nosec B605\n    (subprocess.getoutput on a verified binary name)\n  * tools/opnsense-parser.py:9 -- # nosec B405\n    (xml.etree.ElementTree for local user-controlled config)\n  * tools/opnsense-parser.py:22 -- # nosec B314 (same)\n  * tools/opnsense-parser.py:437 -- # nosec B105\n    (literal \"REDACTED\" placeholder, not a real password)\n\n- #555: tools/doit/github.py retry mechanism for transient\n  gh subprocess failures (HTTP 5xx, connection errors, etc.).\n  Configurable via DOIT_GH_RETRIES / DOIT_GH_BACKOFF_BASE env\n  vars. Removed an unused `# noqa: ANN401` that our ruff config\n  doesn't enable.\n\n- #571: tools/doit/quality.py docstring update. The \"audit in\n  task_check\" change is deferred -- pre-existing CVEs in\n  transitive dependencies (cryptography, lxml, paramiko,\n  pygments, pyjwt, urllib3) need bumping in a separate PR\n  before audit can gate doit check. Inline note added.\n\nSkipped:\n- README.md update from #571 -- hand-merge, deferred.\n- docs/usage/basics.md from #571 -- in skip-list.\n- All upstream test files from D.2 PRs (test_doit_release.py,\n  test_doit_quality.py, test_doit_base.py, test_doit_git.py,\n  test_doit_security.py, broader test_doit_github.py) -- they\n  reference upstream's mock_subprocess fixture we don't have;\n  deferred to a \"tooling test coverage\" follow-up PR.\n\ndoit check passes locally (without audit, per the deferral above).\n\nAddresses #823\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* ci: mark dependency audit step as continue-on-error\n\nD.1's lint job split (PR #836, adapting upstream #561) added a\n\"Run dependency audit\" step running `uv run doit audit` without\ncontinue-on-error. Before the split, the old in-test-job audit step\nhad continue-on-error: true, so transitive-dep CVEs only printed\nwarnings -- they didn't fail the build.\n\nD.2's tools/doit/security.py change (#545 install_check_or_skip)\nremoved the `|| echo` swallow inside `doit audit`, so the audit step\nnow propagates pip-audit's non-zero exit when CVEs are present.\nCombined with the missing continue-on-error, the lint job fails on\nevery PR.\n\nRestore continue-on-error: true so the audit output stays visible in\nCI logs but doesn't gate merges. The proper fix -- bumping the\naffected transitive deps (cryptography, lxml, paramiko, pygments,\npyjwt, urllib3) and then dropping continue-on-error -- is tracked in\n#839.\n\nAddresses #823\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T03:53:51+01:00",
+          "tree_id": "aba516f9845aa071fcdabc6b464b7c826aaacfac",
+          "url": "https://github.com/endavis/infrafoundry/commit/d1f52793d9248715460e48e3d5ed60ee7509b6eb"
+        },
+        "date": 1778727264507,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7188.504706755847,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013960022691118907",
+            "extra": "mean: 139.11098911296355 usec\nrounds: 2480"
           }
         ]
       }
