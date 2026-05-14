@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778801402257,
+  "lastUpdate": 1778803116921,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9114,6 +9114,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000924530024537778",
             "extra": "mean: 135.63319075992297 usec\nrounds: 2684"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "34875c7a75b63c53b920a24d37dfc987e59468de",
+          "message": "refactor: remove piped-truncator block from bash-ban-raw-tools hook (merges PR #846, addresses #823)\n\nAdopts upstream endavis/pyproject-template#579. The piped-truncator\nblock (`... | head`, `... | tail`) was over-blocking a legitimate\nshell pipeline pattern -- there is no native-tool replacement for\nstreaming a pipe through head/tail (e.g. `grep foo | head -20` to\npeek at the first matches without buffering the full result).\n\nOnly file-read mode (leading head/tail) belongs in the ban; that\ncase has a clear native replacement (Read).\n\nChanges:\n- tools/hooks/ai/bash-ban-raw-tools.py: drop PIPE_TRUNCATORS set,\n  find_banned_pipe() function, and its main() invocation.\n  -22 LOC.\n- tests/test_bash_ban_raw_tools.py: replace test_piped_truncator\n  _exits_2 with test_piped_truncator_is_allowed (same parametrize\n  cases, exit code 0). Reorder section dividers accordingly.\n\nDoc change in upstream #579 (one-line removal in\ndocs/development/ai/token-efficiency-add-ons.md) does not apply\nlocally -- our copy of that file was written from upstream #520's\ncontent in PR #844 (Phase E.2), before the bash-ban-raw-tools\nsection was added upstream. The full bash-ban section + the\nintermediate per-stack-rules section + the deliberately-omitted\nCBM and context-mode sections (per #823 directive) are missing\nlocally; refreshing the doc to upstream HEAD is a separate scope\nnot bundled here.\n\ndoit check passes locally.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-15T00:58:02+01:00",
+          "tree_id": "8527447c00dffcd1071c457077ccf1e903f5483b",
+          "url": "https://github.com/endavis/infrafoundry/commit/34875c7a75b63c53b920a24d37dfc987e59468de"
+        },
+        "date": 1778803115731,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7172.433377692663,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015049070717613529",
+            "extra": "mean: 139.4226962233137 usec\nrounds: 2436"
           }
         ]
       }
