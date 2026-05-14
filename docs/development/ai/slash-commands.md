@@ -128,7 +128,17 @@ Invoked by Claude's `/review-both` and `/gemini-review` commands via `gemini -p 
 
 ## Codex
 
-The `.codex/` directory contains only `config.toml`, which configures command approval policies for the Codex CLI. No slash commands ship for Codex. The dual-agent workflow in this template targets Claude and Gemini.
+Codex does not use repo-defined slash commands in this template. Instead, the Codex workflow is provided through **repo-scoped skills** under `.agents/skills/`, which Codex can invoke through its built-in `/skills` browser or explicit mentions such as `$plan-issue`, `$implement`, and `$finalize`.
+
+**Workflow coverage:** the checked-in Codex skills cover planning, implementation, and finalization through PR creation. They preserve the same repo artifact contract used by the Claude flow:
+
+- `$plan-issue` posts the approved plan comment with the header `## Implementation Plan for #<n>: <title>`
+- `$implement` creates or resumes the issue branch and finishes with `doit check`
+- `$finalize` drafts the commit and PR artifacts and uses `doit pr` after explicit approval
+
+**Config and safety:** `.codex/config.toml` still configures approvals and hook wiring for Codex. The shared dangerous-command hook at `tools/hooks/ai/block-dangerous-commands.py` applies to Codex, and the approval-policy deny rules remain a secondary defense layer.
+
+**Out of scope for Codex in this template:** no repo-defined custom slash commands, no dual-agent orchestration, and no Codex-specific close-issue automation.
 
 ## Copilot
 
