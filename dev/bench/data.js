@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778727265632,
+  "lastUpdate": 1778773231370,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8959,6 +8959,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013960022691118907",
             "extra": "mean: 139.11098911296355 usec\nrounds: 2480"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "917e06c558f226a09a0fc155f5d25ca93bb9e042",
+          "message": "chore: sync per-platform extract_binaries + uv-lock-check pre-commit hook (merges PR #840, addresses #823)\n\nBundles upstream pyproject-template improvements:\n\n- endavis/pyproject-template#506: per-platform extract_binaries in\n  install_tool framework. Widens extract_binaries on install_tool()\n  and create_install_task() from list[str] | None to\n  list[str] | dict[str, list[str]] | None. When passed a dict, the\n  current platform.system().lower() value selects the binary list;\n  missing-platform aborts with the same \"Unsupported OS\" error used\n  for asset_patterns. Backward compatible -- list[str] callers\n  unchanged. Docstring extended with example. ADR-9015 updated with\n  the new shape and Issue #477 link.\n\n- endavis/pyproject-template#557: uv-lock-check pre-commit hook.\n  Runs `uv lock --check` only when pyproject.toml is staged\n  (files: ^pyproject\\.toml$); fails with a clear remediation message\n  if uv.lock is out of sync. ADR-9009 updated with Issue #556 link.\n\nHand-merged per docs/development/pyproject-template-divergences.md\ncategory 3:\n- tools/doit/install_tools.py preserves _install_age,\n  _install_terraform, _install_opentofu, _install_ansible,\n  _install_hashicorp_zip, the # nosec B605 from PR #837, and all\n  task_install_* definitions.\n- .pre-commit-config.yaml preserves all InfraFoundry hooks\n  (check-branch-name, no-commit-to-main, no-local-config,\n  protect-dynamic-version, generate-doc-toc, uv-sync-on-pull,\n  uv-sync-on-checkout). New uv-lock-check hook inserted between\n  protect-dynamic-version and uv-sync-on-pull.\n\nSkipped/deferred:\n- tests/template/test_doit_install_tools.py (3 new tests in #506) --\n  file does not exist locally; depends on the mock_subprocess fixture\n  also tracked in #838. Will be ported when that issue lands.\n- docs/development/install-tools-framework.md (29 LOC in #506) --\n  category-1 skip-list per pyproject-template-divergences.md.\n- docs/development/{ci-cd-testing,doit-tasks-reference}.md table-row\n  updates from #557 -- our local versions diverged earlier and don't\n  contain the upstream pre-commit-hook tables. A follow-up doc-parity\n  issue will track bringing those tables in (separate `docs:` PR per\n  the divergences-doc update rule).\n\ndoit check passes locally.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T16:39:52+01:00",
+          "tree_id": "8fa7044f2df0990d5f359fb9b9af6b23dad3bb20",
+          "url": "https://github.com/endavis/infrafoundry/commit/917e06c558f226a09a0fc155f5d25ca93bb9e042"
+        },
+        "date": 1778773230241,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12048.83167317079,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000012903208320730381",
+            "extra": "mean: 82.99559883691515 usec\nrounds: 2408"
           }
         ]
       }
