@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778777510567,
+  "lastUpdate": 1778794925360,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9052,6 +9052,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000275337054817631",
             "extra": "mean: 117.51217417421495 usec\nrounds: 1665"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f6547c2ca3995fbbf7a53e34cd47867dc26d1d92",
+          "message": "docs: add AI agent token-efficiency add-ons walkthrough and LSP guide (merges PR #844, addresses #823)\n\nBundles upstream pyproject-template improvements:\n\n- endavis/pyproject-template#520: token-efficiency add-ons\n  walkthrough. New docs/development/ai/token-efficiency-add-ons.md\n  covering RTK (shell-output compression), Headroom (MITM proxy),\n  and Caveman (per-turn style injection) -- each with tipping-point\n  guidance, per-CLI applicability, install snippets, and trust\n  caveats. AI_SETUP.md cross-link added.\n\n  Two local edits per #823 direction:\n  * One-sentence cbm-session-reminder mention dropped from\n    \"Session-survival of project rules\" -- CBM and context-mode\n    work tracks in evaluation issue #824, not in this PR.\n  * Cross-reference to upstream \"#513\" PreCompact hook tracker\n    rewritten to point at our actual local hook\n    (tools/hooks/ai/precompact-checkpoint.py, shipped in PR #828).\n    Bare #513 would auto-link to InfraFoundry's unrelated\n    PR #513 (aiqum blueprint refactor).\n\n- endavis/pyproject-template#567: AI agent LSP guide. New\n  docs/development/ai/lsp-tool.md adopted verbatim. Documents the\n  nine LSP tool operations (none of them return diagnostics), the\n  separate pyright diagnostic side channel that auto-injects into\n  context after Edit/Write, and two opt-outs (PostToolUse sleep\n  hook in .claude/settings.local.json; or typeCheckingMode = \"off\"\n  in pyproject.toml). Default stance: LSP stays on.\n\n- endavis/pyproject-template#567: .claude/lsp-setup.md upstream\n  rewrite adopted (-170/+33). Replaces our local stale\n  \"Known Issues: LSP requests currently hang and do not return\n  responses\" section -- upstream PR body explicitly notes that's\n  no longer the failure mode in Claude Code 2.0.74+. New file is\n  install-only and points at lsp-tool.md for everything else.\n\n- endavis/pyproject-template#520 + #567: mkdocs.yml hand-merge\n  inserts two nav entries (LSP Tool and Diagnostics,\n  Token-Efficiency Add-Ons) under the AI: block after\n  Command Blocking. InfraFoundry-specific nav (Providers/Runners/\n  Configuration) untouched.\n\nSkipped: docs/TABLE_OF_CONTENTS.md updates from both upstream PRs\n(category-1 skeleton TOC; mkdocs nav supersedes).\n\nHand-merge spot-check per category 3: mkdocs.yml preserves the\nInfraFoundry nav tree.\n\ndoit check passes locally.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T22:41:30+01:00",
+          "tree_id": "14934d3d6e27431a640e9c9c10eadf4a9b134c82",
+          "url": "https://github.com/endavis/infrafoundry/commit/f6547c2ca3995fbbf7a53e34cd47867dc26d1d92"
+        },
+        "date": 1778794923911,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9469.012807592107,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013028499495230353",
+            "extra": "mean: 105.60762988917024 usec\nrounds: 2710"
           }
         ]
       }
