@@ -1,6 +1,7 @@
 """Base utilities and configuration for doit tasks."""
 
 import os
+import shlex
 import subprocess  # nosec B404 - subprocess is required to run doit sub-tasks
 import sys
 from collections.abc import Mapping
@@ -57,6 +58,40 @@ def optional_root_files(*names: str) -> str:
     if not survivors:
         return ""
     return " " + " ".join(survivors)
+
+
+def install_check_or_skip(package: str, hint: str) -> str:
+    """Build a shell prefix that gates a doit action on ``package`` being installed.
+
+    Emits a shell snippet that exits 0 with ``hint`` printed when
+    ``uv pip show <package>`` reports the package missing, and otherwise lets
+    the rest of the action run so its real exit code reaches the operator
+    unmasked. Replaces the ``cmd || echo 'not installed'`` pattern, which
+    always swallowed real failures by exiting 0 regardless of why ``cmd``
+    failed. See issue #527.
+
+    The emitted snippet uses the form::
+
+        uv pip show <package> >/dev/null 2>&1 || { echo <hint>; exit 0; };
+
+    If ``uv pip show`` succeeds (package present), the brace group is skipped
+    and the caller's real command runs; its exit code propagates unmasked.
+    If ``uv pip show`` fails (package absent), the brace group prints the hint
+    and ``exit 0`` terminates the shell before the real command is reached.
+
+    Args:
+        package: The package name as known to ``uv pip show`` (e.g.
+            ``"bandit"``, ``"commitizen"``, ``"cyclonedx-bom"``).
+        hint: Human-readable install instruction printed when the package is
+            absent (e.g. ``"bandit not installed. Run: uv sync --extra
+            security"``). Shell-quoted via ``shlex.quote`` so embedded spaces
+            and special characters are safe.
+
+    Returns:
+        A shell fragment ending with ``"; "`` suitable for prepending to the
+        rest of a doit action string via plain string concatenation.
+    """
+    return f"uv pip show {package} >/dev/null 2>&1 || {{ echo {shlex.quote(hint)}; exit 0; }}; "
 
 
 def _child_env(env: Mapping[str, str] | None) -> dict[str, str]:

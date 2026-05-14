@@ -4,11 +4,19 @@ from typing import Any
 
 from doit.tools import title_with_actions
 
+from .base import install_check_or_skip
+
 
 def task_commit() -> dict[str, Any]:
     """Interactive commit with commitizen (ensures conventional commit format)."""
     return {
-        "actions": ["uv run cz commit || echo 'commitizen not installed. Run: uv sync'"],
+        "actions": [
+            install_check_or_skip(
+                "commitizen",
+                "commitizen not installed. Run: uv sync",
+            )
+            + "uv run cz commit"
+        ],
         "title": title_with_actions,
     }
 
@@ -16,7 +24,13 @@ def task_commit() -> dict[str, Any]:
 def task_bump() -> dict[str, Any]:
     """Bump version automatically based on conventional commits."""
     return {
-        "actions": ["uv run cz bump || echo 'commitizen not installed. Run: uv sync'"],
+        "actions": [
+            install_check_or_skip(
+                "commitizen",
+                "commitizen not installed. Run: uv sync",
+            )
+            + "uv run cz bump"
+        ],
         "title": title_with_actions,
     }
 
@@ -24,7 +38,13 @@ def task_bump() -> dict[str, Any]:
 def task_changelog() -> dict[str, Any]:
     """Generate CHANGELOG from conventional commits."""
     return {
-        "actions": ["uv run cz changelog || echo 'commitizen not installed. Run: uv sync'"],
+        "actions": [
+            install_check_or_skip(
+                "commitizen",
+                "commitizen not installed. Run: uv sync",
+            )
+            + "uv run cz changelog"
+        ],
         "title": title_with_actions,
     }
 
