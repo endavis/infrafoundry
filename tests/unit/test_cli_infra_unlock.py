@@ -90,9 +90,24 @@ def test_unlock_list_shows_all_locks(cli_runner, mock_orchestrator):
     assert "active" in result.output
     assert "expired" in result.output
     # Timestamps must render with full HH:MM:SS UTC, not be truncated to a date.
-    # The pattern is enforced so a regression to bare str(datetime) (which gets
-    # truncated by rich's column auto-sizing) is caught.
-    assert re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC", result.output)
+    # We assert the date and time-with-UTC fragments separately because Rich's
+    # table renderer wraps the timestamp across two cell rows when the column
+    # auto-sizes narrower than the timestamp width — e.g. under pytest-xdist
+    # workers where COLUMNS=200 isn't honored by Rich's terminal-size probe.
+    # In the wrapped case the rendered output looks like:
+    #
+    #     │ 2026-05-14        │ ...
+    #     │ 02:24:11 UTC      │ ...
+    #
+    # so the date and time are separated by table border characters (│) and
+    # other-row padding, not just whitespace — a single contiguous regex can't
+    # bridge that without binding the test to Rich's internal rendering.
+    #
+    # The second assertion is load-bearing for the regression we care about:
+    # a bare str(datetime) (e.g. "2026-05-14 02:24:11.123456+00:00") emits
+    # "+00:00" instead of literal "UTC", so the time-with-UTC pattern fails.
+    assert re.search(r"\d{4}-\d{2}-\d{2}", result.output)
+    assert re.search(r"\d{2}:\d{2}:\d{2}\s+UTC", result.output)
 
 
 def test_unlock_nonexistent_env_reports_no_lock(cli_runner, mock_orchestrator):

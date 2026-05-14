@@ -7,9 +7,6 @@ name: Dependabot Auto-merge
 on:
   pull_request_target:
     types: [opened, reopened, synchronize, ready_for_review]
-  schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
 
 permissions:
   pull-requests: write
@@ -227,62 +224,3 @@ jobs:
               issue_number: prNumber,
               body,
             });
-
-  request-rebase:
-    name: Request dependabot rebase for stale PRs
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - name: Find stale dependabot PRs and request rebase
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              per_page: 100,
-            });
-
-            const oneHourAgo = Date.now() - 60 * 60 * 1000;
-
-            for (const pr of prs) {
-              if (!pr.user || pr.user.login !== 'dependabot[bot]') continue;
-
-              const labels = (pr.labels || []).map(l => l.name);
-              if (!labels.includes('ready-to-merge')) continue;
-
-              // Fetch fresh PR to get mergeable_state.
-              const { data: fresh } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pr.number,
-              });
-              if (fresh.mergeable_state !== 'behind') continue;
-
-              // Skip if @dependabot rebase was requested in the last hour.
-              const { data: comments } = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr.number,
-                per_page: 100,
-              });
-              const recentRebase = comments.some(c =>
-                c.body && c.body.includes('@dependabot rebase') &&
-                new Date(c.created_at).getTime() > oneHourAgo
-              );
-              if (recentRebase) {
-                core.info(`PR #${pr.number}: recent rebase request; skipping`);
-                continue;
-              }
-
-              core.info(`PR #${pr.number}: requesting @dependabot rebase`);
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr.number,
-                body: '@dependabot rebase',
-              });
-            }
