@@ -1,4 +1,6 @@
 @../AGENTS.md
+<!-- Uncomment when you add rule files. See .claude/rules/README.md for the pattern. -->
+<!-- @./rules/*.md -->
 
 # BASIC CLAUDE INSTRUCTIONS
 

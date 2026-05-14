@@ -432,10 +432,10 @@ Each supported AI CLI has a dedicated config directory at the repo root:
 
 | CLI | Config Directory | Notes |
 | :--- | :--- | :--- |
-| Claude Code | `.claude/` | Commands, agents, settings. Primary source of slash commands. |
-| Gemini CLI | `.gemini/` | Commands and settings. Output-only commands (orchestrated by Claude). |
-| GitHub Copilot CLI | `.copilot/` | Config directory. Skills auto-discovered from `.claude/commands/`. Hook wired in `.github/hooks/copilot-hooks.json`. |
-| Codex CLI | `.codex/` | `config.toml` only (command approval policies). No slash commands. |
+| Claude Code | `.claude/` | Commands, agents, rules, settings. Primary source of slash commands. |
+| Gemini CLI | `.gemini/` | Commands, settings, and `rules/` subdirectory for per-stack rule files. Output-only commands (orchestrated by Claude). |
+| GitHub Copilot CLI | `.copilot/` | Config directory. Skills auto-discovered from `.claude/commands/`. Hook wired in `.github/hooks/copilot-hooks.json`. Per-stack instruction files live in `.github/instructions/` (Copilot-native; Claude/Gemini cannot read them). See `.github/instructions/README.md`. |
+| Codex CLI | `.codex/`, `.agents/skills/` | `config.toml` for approvals/hooks plus repo-scoped skills for the Codex workflow. No custom slash commands. Rule-shaped skills live in `.agents/skills/<name>/SKILL.md`; the `description:` frontmatter is the skill-gate trigger. See `.agents/skills/README.md`. |
 
 Copilot CLI does **not** need a `commands/` subdirectory: it discovers skills from `.claude/commands/` automatically, so the full workflow (`/plan-issue`, `/implement`, `/finalize`, etc.) works out of the box.
 
