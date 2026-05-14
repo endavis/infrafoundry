@@ -439,6 +439,8 @@ Each supported AI CLI has a dedicated config directory at the repo root:
 
 Copilot CLI does **not** need a `commands/` subdirectory: it discovers skills from `.claude/commands/` automatically, so the full workflow (`/plan-issue`, `/implement`, `/finalize`, etc.) works out of the box.
 
+Codex CLI does **not** use repo-defined slash commands in this template. Its repo-native workflow is provided through checked-in skills under `.agents/skills/`, invoked with built-in Codex skill selection such as `/skills` or explicit mentions like `$plan-issue`.
+
 ### Temporary Files
 
 AI agents **must never** write temporary files to generic locations like `/tmp/`. Instead, use the project-scoped directory:
