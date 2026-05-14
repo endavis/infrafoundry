@@ -403,7 +403,9 @@ def _install_hashicorp_zip(
     version = get_latest_github_release(repo)
 
     if shutil.which(binary_name):
-        version_json = subprocess.getoutput(f"{binary_name} version -json")
+        # B605: binary_name is a hardcoded tool name verified via shutil.which()
+        # before invocation; no user input flows into the command string.
+        version_json = subprocess.getoutput(f"{binary_name} version -json")  # nosec B605
         try:
             current = json.loads(version_json)["terraform_version"]
             if current == version:

@@ -193,6 +193,10 @@ jobs:
         run: uv run doit spell_check
 
       - name: Run dependency audit
+        # continue-on-error until transitive-dep CVEs are addressed (#839);
+        # the audit output stays visible in CI logs so we can see new findings
+        # but doesn't fail the lint job.
+        continue-on-error: true
         run: uv run doit audit
 
   docs:

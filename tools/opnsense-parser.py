@@ -6,7 +6,7 @@ Parses OPNsense config.xml backup and generates InfraFoundry YAML configurations
 """
 
 import argparse
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 - parses local user-controlled OPNsense config.xml
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,8 @@ class OPNsenseParser:
     def __init__(self, config_path: Path) -> None:
         """Initialize parser with config file path."""
         self.config_path = config_path
-        self.tree = ET.parse(config_path)
+        # B314: input is a user-supplied local OPNsense config.xml export, not network-fetched.
+        self.tree = ET.parse(config_path)  # nosec B314
         self.root = self.tree.getroot()
 
     def parse_interfaces(self) -> dict[str, Any]:
@@ -434,7 +435,8 @@ class OPNsenseParser:
                 "digest": self._get_text(client, "digest", "SHA512"),
                 "vpn_id": self._get_text(client, "vpnid"),
                 "auth_user": self._get_text(client, "auth_user", "REDACTED"),
-                "auth_pass": "REDACTED",  # Never export passwords
+                # B105: literal "REDACTED" is intentional — passwords are stripped from export.
+                "auth_pass": "REDACTED",  # nosec B105 - never export passwords
             }
 
             # Custom options
