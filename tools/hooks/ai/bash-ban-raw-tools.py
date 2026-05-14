@@ -7,7 +7,6 @@ should be using native file tools for instead (Read, Grep, Glob, Edit, Write).
 
 Blocks:
   - Leading banned commands: cat, head, tail, find, grep, rg, wc
-  - Piped truncators: ... | head, ... | tail (regardless of args)
 
 Escape hatch:
   Touch /tmp/bash-raw-unlock (or the configured UNLOCK_FILE) to allow banned
@@ -31,9 +30,6 @@ from pathlib import Path
 
 # Commands that AI agents should never use via Bash when native tools are available
 BANNED_COMMANDS: frozenset[str] = frozenset({"cat", "head", "tail", "find", "grep", "rg", "wc"})
-
-# Commands that are banned when they appear after a pipe (regardless of arguments)
-PIPE_TRUNCATORS: frozenset[str] = frozenset({"head", "tail"})
 
 # Escape hatch: touch this file to allow banned commands for UNLOCK_WINDOW_SECONDS
 UNLOCK_FILE: str = "/tmp/bash-raw-unlock"  # nosec B108 - well-known path is intentional; operators must be able to touch it from any shell. Configurable via this constant.
@@ -86,18 +82,6 @@ def find_banned_leading(tokens: list[str]) -> str | None:
     return None
 
 
-def find_banned_pipe(tokens: list[str]) -> str | None:
-    """
-    Scan for a pipe token immediately followed by a PIPE_TRUNCATOR.
-
-    Returns the truncator name if found, else None.
-    """
-    for i, token in enumerate(tokens):
-        if token == "|" and i + 1 < len(tokens) and tokens[i + 1] in PIPE_TRUNCATORS:  # nosec B105 - "|" is the shell pipe character, not a credential.
-            return tokens[i + 1]
-    return None
-
-
 def _build_reason(offending: str) -> str:
     """Build a human-readable block reason for the given offending command."""
     suggestion = _SUGGESTIONS.get(offending, "a native tool")
@@ -139,12 +123,6 @@ def main() -> int:
 
     # Check for banned leading command
     offending = find_banned_leading(tokens)
-    if offending is not None:
-        print(_build_reason(offending), file=sys.stderr)
-        return 2
-
-    # Check for banned pipe-truncator
-    offending = find_banned_pipe(tokens)
     if offending is not None:
         print(_build_reason(offending), file=sys.stderr)
         return 2

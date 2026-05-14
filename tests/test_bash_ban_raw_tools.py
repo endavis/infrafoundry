@@ -109,6 +109,26 @@ def test_banned_word_as_non_leading_non_pipe_token_is_allowed(
     assert exc_info.value.code == 0
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        "ls | head",
+        "ls | tail -100",
+        "cmd | head -n 5",
+    ],
+)
+def test_piped_truncator_is_allowed(
+    hook: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+) -> None:
+    """Piped truncators (``... | head``, ``... | tail``) are allowed — no native replacement."""
+    _set_stdin(monkeypatch, _bash_payload(command))
+    with pytest.raises(SystemExit) as exc_info:
+        sys.exit(hook.main())
+    assert exc_info.value.code == 0
+
+
 # ---------------------------------------------------------------------------
 # Block: banned leading commands
 # ---------------------------------------------------------------------------
@@ -132,31 +152,6 @@ def test_banned_leading_command_exits_2(
     command: str,
 ) -> None:
     """Each banned leading command is blocked with exit code 2."""
-    _set_stdin(monkeypatch, _bash_payload(command))
-    with pytest.raises(SystemExit) as exc_info:
-        sys.exit(hook.main())
-    assert exc_info.value.code == 2
-
-
-# ---------------------------------------------------------------------------
-# Block: piped truncators
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "ls | head",
-        "ls | tail -100",
-        "cmd | head -n 5",
-    ],
-)
-def test_piped_truncator_exits_2(
-    hook: types.ModuleType,
-    monkeypatch: pytest.MonkeyPatch,
-    command: str,
-) -> None:
-    """Piped truncators (``... | head``, ``... | tail``) are blocked with exit code 2."""
     _set_stdin(monkeypatch, _bash_payload(command))
     with pytest.raises(SystemExit) as exc_info:
         sys.exit(hook.main())
