@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778721108941,
+  "lastUpdate": 1778721804517,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8804,6 +8804,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009814218479978219",
             "extra": "mean: 137.09212373311016 usec\nrounds: 2368"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "71fc980af8cdced23e9ce524332bbbc29cecc76f",
+          "message": "feat: migrate Gemini to Policy Engine + add token-efficiency settings (merges PR #833, addresses #823)\n\nPorts the Gemini Policy Engine migration (#529) and token-efficiency\nsettings (#542) from pyproject-template:\n\n- .gemini/policies/developer.toml (new, 4 lines): single ask_user\n  rule covering all tool calls. Replaces the previous tools.allowed\n  whitelist with prompt-driven trust.\n- .gemini/settings.json: remove the 27-line tools block (allowed\n  shell commands + core tool list + sandbox flag). Gemini now\n  defers to the policy engine. Add\n  chatCompression.contextPercentageThreshold = 0.5 so chat history\n  compresses at 50% context utilization to reclaim token space\n  earlier in long sessions, mirroring the Claude tuning.\n- docs/development/AI_SETUP.md: new \"Token Efficiency\" subsection\n  documenting the chatCompression setting with a rationale table.\n\ntoken-efficiency-add-ons.md update from #542 deferred — that file\ndoesn't exist locally yet; lands with #520 in Phase E.\n\nBehavior change: Gemini sessions will prompt the user before each\ntool call rather than auto-allow a fixed whitelist. To restore\nallowlist behavior, add additive [[rule]] entries with\ndecision = \"allow\" and priority < 100.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T02:22:51+01:00",
+          "tree_id": "68836679976315f809a862dcf2c7ed4a91092e93",
+          "url": "https://github.com/endavis/infrafoundry/commit/71fc980af8cdced23e9ce524332bbbc29cecc76f"
+        },
+        "date": 1778721802906,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7830.164306344137,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003173847697274163",
+            "extra": "mean: 127.7112408981996 usec\nrounds: 1648"
           }
         ]
       }
