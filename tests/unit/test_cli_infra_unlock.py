@@ -92,7 +92,15 @@ def test_unlock_list_shows_all_locks(cli_runner, mock_orchestrator):
     # Timestamps must render with full HH:MM:SS UTC, not be truncated to a date.
     # The pattern is enforced so a regression to bare str(datetime) (which gets
     # truncated by rich's column auto-sizing) is caught.
-    assert re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC", result.output)
+    #
+    # \s+ instead of a literal space between the date, time, and UTC fragments
+    # because Rich wraps the timestamp across multiple lines when the table is
+    # auto-sized narrower than the timestamp width (e.g. under pytest-xdist
+    # workers where COLUMNS=200 isn't honored by Rich's terminal-size probe).
+    # \s matches \n, so a wrapped "2026-05-14\n02:16:49 UTC" still matches and
+    # the assertion's intent — "the full date+time+UTC fragment is present in
+    # output, not a truncated str(datetime)" — is preserved.
+    assert re.search(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+UTC", result.output)
 
 
 def test_unlock_nonexistent_env_reports_no_lock(cli_runner, mock_orchestrator):
