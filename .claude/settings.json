@@ -11,6 +11,10 @@
           {
             "type": "command",
             "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/block-dangerous-commands.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/bash-ban-raw-tools.py"
           }
         ]
       }
