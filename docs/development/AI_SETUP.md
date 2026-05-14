@@ -163,6 +163,46 @@ claude
 
 For complete setup instructions and troubleshooting, see `.claude/lsp-setup.md` in the repository root.
 
+#### Environment Variables
+
+`.claude/settings.json` ships an `env` block with three Claude Code defaults aimed at token efficiency and session survival on long-running work. These propagate to downstream consumers via the template-sync mechanism, so all projects derived from this template inherit the same defaults.
+
+| Var | Value | Effect | Risk |
+| :--- | :--- | :--- | :--- |
+| `ENABLE_PROMPT_CACHING_1H` | `1` | Extends prompt cache TTL from 5 minutes to 1 hour. Cuts cost on repeated reads of the same context within a session. | None — pure efficiency flag. |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `50` | Auto-compaction triggers at 50% of the context window instead of the default (~92%). Sessions compact earlier, leaving more headroom for the post-compact continuation. | Mitigated by the PreCompact handoff hook (already enabled — see PR #828). |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | `claude-sonnet-4-6` | Subagents (e.g. those spawned by `/implement`) default to Sonnet 4.6 instead of inheriting the parent's Opus model. | Subagent output quality drops below Opus on hard reasoning tasks. Mitigate per-agent (see below). |
+
+**Per-agent model overrides:**
+
+`CLAUDE_CODE_SUBAGENT_MODEL` is a default. Any agent file under `.claude/agents/` that declares an explicit `model:` in its YAML frontmatter wins:
+
+```yaml
+---
+name: high-stakes-reviewer
+model: claude-opus-4-7   # overrides the env-var default for this agent only
+---
+```
+
+Agents without a `model:` line inherit the env-var default. This template's `.claude/agents/implement-worker.md` deliberately does not override — implement-worker runs on Sonnet 4.6 as an explicit cost/quality trade-off. Future high-stakes subagents (e.g. design review, security review) can opt into Opus on a per-file basis.
+
+**Per-developer overrides:**
+
+To opt out or tune values for your local environment, override them in `.claude/settings.local.json` (already gitignored, used elsewhere in this template for personal config). Example:
+
+```json
+{
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "75"
+  }
+}
+```
+
+**Cross-references:**
+
+- The 50% autocompact threshold is paired with the PreCompact handoff hook (`tools/hooks/ai/precompact-checkpoint.py`), which serializes session state on compaction so the post-compact continuation can rehydrate it. Both pieces are now active.
+<!-- TBD: link to add-ons walkthrough doc when Phase E.2 of pyproject-template sync (#823) lands the upstream walkthrough. -->
+
 ### 4. GitHub Copilot CLI
 
 **Configuration:** `.copilot/` directory
