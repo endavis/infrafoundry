@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778773231370,
+  "lastUpdate": 1778774082524,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8990,6 +8990,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000012903208320730381",
             "extra": "mean: 82.99559883691515 usec\nrounds: 2408"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "933bc3cb40e0784fea1371abd4495ca925d0aeae",
+          "message": "chore: add Claude Code env-var defaults for token efficiency (merges PR #842, addresses #823)\n\nAdopts upstream endavis/pyproject-template#519. Adds an `env` block\nto .claude/settings.json with three Claude Code defaults aimed at\ntoken efficiency and session survival on long-running work:\n\n- ENABLE_PROMPT_CACHING_1H=1 -- extends prompt cache TTL from 5 min\n  to 1 hour. Pure efficiency, no behaviour change.\n\n- CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50 -- auto-compact triggers at\n  50% of context window instead of ~92%. Pairs with the PreCompact\n  handoff hook we already enabled in PR #828\n  (tools/hooks/ai/precompact-checkpoint.py).\n\n- CLAUDE_CODE_SUBAGENT_MODEL=claude-sonnet-4-6 -- subagents (Agent\n  tool, including implement-worker) default to Sonnet 4.6 instead\n  of inheriting Opus from the parent. Per-agent `model:` frontmatter\n  in .claude/agents/*.md still wins. Our only local agent\n  (implement-worker) has no override -- runs on Sonnet 4.6 as the\n  explicit cost/quality trade-off documented upstream.\n\nHand-merged per docs/development/pyproject-template-divergences.md\ncategory 3: .claude/settings.json preserves all five hook configs\n(PreToolUse Bash -> block-dangerous-commands + bash-ban-raw-tools;\nPostToolUse Edit|Write|MultiEdit -> ruff-fix-on-edit; PreCompact ->\nprecompact-checkpoint; SessionStart compact|resume ->\nsession-resume-restore) and the statusLine.\n\ndocs/development/AI_SETUP.md adopts the upstream\n\"#### Environment Variables\" subsection with two local edits:\n\n- Cross-reference to \"#513\" (upstream PreCompact hook tracker)\n  replaced with \"PR #828\" (where we shipped it locally) and a\n  description of what it does, since bare #513 would auto-link to\n  InfraFoundry's unrelated PR #513 (aiqum blueprint refactor).\n\n- TBD comment for \"#514\" (upstream add-ons walkthrough) reworded to\n  point at Phase E.2 of #823 instead, for the same reason.\n\ndoit check passes locally.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T16:54:04+01:00",
+          "tree_id": "a42d5e5e849cd11e8add5dc7c651414c156f4fee",
+          "url": "https://github.com/endavis/infrafoundry/commit/933bc3cb40e0784fea1371abd4495ca925d0aeae"
+        },
+        "date": 1778774081176,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7292.761764344645,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010735279771782445",
+            "extra": "mean: 137.12226345979693 usec\nrounds: 2266"
           }
         ]
       }
