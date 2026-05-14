@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778721804517,
+  "lastUpdate": 1778723034690,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -8835,6 +8835,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003173847697274163",
             "extra": "mean: 127.7112408981996 usec\nrounds: 1648"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "30e2c1788ca8958fc77be82662befa505f240741",
+          "message": "feat: cross-agent delegation matrix (plan/implement/review across all 4 CLIs) (merges PR #834, addresses #823)\n\nPorts pyproject-template PR #551 -- establishes a /<target>:<action>\ndelegation matrix so any source agent can delegate plan, implement,\nreview, or adversarial-review to any of the other three:\n\n- .agents/skills/delegate-{claude,copilot,gemini}-{plan,implement,\n  review,adversarial-review}/SKILL.md (12 new): Codex-side bridges.\n- .claude/commands/{codex,copilot,gemini}/{plan,implement,review,\n  adversarial-review}.md (12 new): Claude-side bridges.\n- .copilot/commands/{claude,codex,gemini}/{plan,implement,review,\n  adversarial-review}.md (12 new): Copilot-side bridges.\n- .gemini/commands/{claude,codex,copilot}/{plan,implement,review,\n  adversarial-review}.toml (12 new): Gemini-side bridges (TOML format\n  introduces TOML to .gemini/commands/ for the first time; existing\n  .md commands stay .md until C.5).\n- docs/development/ai/cross-agent-delegation.md (new): full design\n  doc -- convention, file layout, prefix mapping (/foo vs $foo), and\n  Gemini conflict mitigation.\n- tests/test_delegation_matrix.py (new): 51 tests verifying every\n  source x target x action cell ships the expected bridge file.\n- .gemini/settings.json: add skills.disabled with 12 delegate-*\n  entries to prevent Gemini's built-in delegate skills from\n  conflicting with the new TOML bridges.\n- AGENTS.md: cross-agent delegation matrix paragraph after the AI\n  Config Directories table.\n- docs/development/ai/slash-commands.md: new \"Cross-agent delegation\n  matrix\" section + see-also link.\n\ndocs/development/AI_SETUP.md updates from #551 deferred to C.5 -- they\nedit the agent comparison table to reference ghissue-* command names\nwe don't have until C.5 renames them to ghi-*.\n\ndocs/TABLE_OF_CONTENTS.md update skipped per divergences-doc skip-list.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-14T02:43:29+01:00",
+          "tree_id": "98636eec0ff71d04b2c8c733a3bdc43338cc9688",
+          "url": "https://github.com/endavis/infrafoundry/commit/30e2c1788ca8958fc77be82662befa505f240741"
+        },
+        "date": 1778723033972,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9236.402690964167,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016888092951701005",
+            "extra": "mean: 108.2672587433076 usec\nrounds: 2802"
           }
         ]
       }
