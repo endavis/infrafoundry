@@ -191,6 +191,13 @@ output="📁 ${dir}"
 [[ -n "$branch" ]] && output+=" | 🔀 ${branch} ${git_status}"
 output+="\n${C_ACCENT}${model}${C_GRAY} | ${ctx}${C_RESET}"
 
+# Opt-in: append Claude Max usage to the model/context line when CLAUDE_USAGE_STATUSLINE=1.
+# See docs/development/ai/statusline.md#opt-in-claude-max-usage-display
+if [[ -n "$CLAUDE_USAGE_STATUSLINE" ]]; then
+    usage=$(bash "$CLAUDE_PROJECT_DIR/tools/statusline/claude-usage.sh" 2>/dev/null)
+    [[ -n "$usage" && "$usage" != "?" ]] && output+="${C_GRAY} | ${usage}${C_RESET}"
+fi
+
 printf '%b\n' "$output"
 
 # Get user's last message (text only, not tool results, skip unhelpful messages)

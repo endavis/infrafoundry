@@ -85,6 +85,55 @@ output="📁 ${dir}"
 [[ -n "$branch" ]] && output+=" | 🔀 ${branch} ${git_status}"
 ```
 
+## Opt-In: Claude Max Usage Display
+
+For Claude Max subscribers, an optional helper at `tools/statusline/claude-usage.sh` displays
+weekly + 5-hour utilization. The default statusline runs the helper only when the
+`CLAUDE_USAGE_STATUSLINE` env var is set, so the default behavior is unchanged.
+
+> **Beta API**: This helper hits an undocumented OAuth endpoint (`/api/oauth/usage`)
+> gated by the `anthropic-beta: oauth-2025-04-20` header. Anthropic may change or remove
+> this endpoint without notice. When the official `claude --usage` flag ships
+> ([anthropics/claude-code#20399](https://github.com/anthropics/claude-code/issues/20399)),
+> prefer it.
+
+### Enable
+
+Set `CLAUDE_USAGE_STATUSLINE=1` in your shell environment:
+
+```bash
+# In ~/.zshrc, ~/.bashrc, or .envrc.local
+export CLAUDE_USAGE_STATUSLINE=1
+```
+
+Restart Claude Code. The statusline appends `5h:N% 7d:N%` to the model/context line.
+To disable temporarily: `unset CLAUDE_USAGE_STATUSLINE` and restart Claude Code.
+
+Example output (helper segment is the trailing portion of the third line):
+
+```
+📁 project | 🐍 .venv | Python: 3.12.12
+@username | 🔀 main (0 files uncommitted, synced 5m ago)
+Claude Opus 4.5 | ▓▓░░░░░░░░ ~10% of 200k tokens | 5h:25% 7d:6%
+```
+
+### Cache behavior
+
+Responses are cached at `${XDG_CACHE_HOME:-~/.cache}/claude-usage.json` for 60 seconds.
+Adjust `MAX_AGE` at the top of the script. To force a refresh: `rm ~/.cache/claude-usage.json`.
+
+### Helper requirements
+
+- Active Claude Code OAuth login (`${CLAUDE_CONFIG_DIR:-~/.claude}/.credentials.json`)
+- `curl` for HTTPS
+- `jq` (already required by base statusline)
+
+### Helper troubleshooting
+
+- **Outputs `?`**: missing/expired credentials, no network, beta endpoint changed schema, or
+  curl timeout (5s). Debug with `bash -x tools/statusline/claude-usage.sh`.
+- **Stale value**: cache has not expired. Delete the cache file or wait 60s.
+
 ## Requirements
 
 - `jq` - JSON processor (used for parsing Claude's input)
