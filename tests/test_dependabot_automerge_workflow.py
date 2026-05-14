@@ -354,14 +354,24 @@ class TestOnTriggers:
         for required in ("opened", "reopened", "synchronize", "ready_for_review"):
             assert required in types, f"pull_request_target.types missing '{required}': {types}"
 
-    def test_schedule_and_workflow_dispatch_retained(self) -> None:
-        """``schedule`` and ``workflow_dispatch`` drive the rebase-requester job,
-        so they must remain triggers on this workflow."""
+    def test_schedule_and_workflow_dispatch_absent(self) -> None:
+        """``schedule`` and ``workflow_dispatch`` must not be triggers on this
+        workflow.
+
+        These triggers previously drove a ``request-rebase`` job that posted
+        ``@dependabot rebase`` on stale PRs. That job was removed in #496
+        because dependabot's command parser rejects all GitHub App actors
+        (upstream issue dependabot/dependabot-core#9147), so the comment
+        could never be accepted. The remaining jobs (``evaluate``,
+        ``enable-automerge``, ``comment-skip``) all gate on
+        ``github.event_name == 'pull_request_target'``, so a schedule or
+        workflow_dispatch tick would just spin up an empty workflow run.
+        """
         workflow = _load_workflow()
         triggers = workflow.get("on") or workflow.get(True)
         assert triggers is not None
-        assert "schedule" in triggers
-        assert "workflow_dispatch" in triggers
+        assert "schedule" not in triggers
+        assert "workflow_dispatch" not in triggers
 
 
 class TestConcurrency:
@@ -382,9 +392,11 @@ class TestConcurrency:
     def test_concurrency_group_keyed_on_pr_number_or_ref(self) -> None:
         """The group key must reference ``pull_request.number`` and ``github.ref``.
 
-        ``pull_request.number`` isolates PR runs from each other;
-        ``github.ref`` is the fallback for schedule/workflow_dispatch runs
-        that have no PR context.
+        ``pull_request.number`` isolates PR runs from each other.
+        ``github.ref`` remains in the expression as a defensive fallback
+        for any future trigger that might lack PR context; today every
+        triggered event is ``pull_request_target`` and always populates
+        ``pull_request.number``.
         """
         workflow = _load_workflow()
         group: str = workflow["concurrency"]["group"]

@@ -13,6 +13,13 @@ updates:
       - "automated"
     commit-message:
       prefix: "chore(deps)"
+    # Defends auto-merge against supply-chain attacks that publish malicious
+    # versions and are yanked within hours-to-days. Security-update PRs
+    # (advisory-driven) bypass cooldown, so CVE patching is not delayed.
+    cooldown:
+      default-days: 7
+      include:
+        - "*"
     groups:
       dev-dependencies:
         patterns:
