@@ -441,6 +441,8 @@ Copilot CLI does **not** need a `commands/` subdirectory: it discovers skills fr
 
 Codex CLI does **not** use repo-defined slash commands in this template. Its repo-native workflow is provided through checked-in skills under `.agents/skills/`, invoked with built-in Codex skill selection such as `/skills` or explicit mentions like `$plan-issue`.
 
+**Cross-agent delegation matrix:** in addition to self-action commands, every agent can delegate `plan`, `implement`, `review`, and `adversarial-review` to any of the other three via `<target>:<action>` commands (`/codex:plan 42` from Claude, `$delegate-gemini-implement 42` from Codex, etc.). Bridge files live under `.claude/commands/<target>/`, `.gemini/commands/<target>/`, `.copilot/commands/<target>/`, and `.agents/skills/delegate-<target>-<action>/`. See [Cross-Agent Delegation Matrix](docs/development/ai/cross-agent-delegation.md).
+
 ### Temporary Files
 
 AI agents **must never** write temporary files to generic locations like `/tmp/`. Instead, use the project-scoped directory:

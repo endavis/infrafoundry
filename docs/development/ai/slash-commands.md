@@ -160,8 +160,25 @@ GitHub Copilot CLI automatically discovers project skills from `.claude/commands
 4. **Decide: subagent or main context?** Delegate to a general-purpose subagent via the Task tool when the command does heavy codebase exploration, writes files, or runs long commands whose output would bloat the main conversation — `.claude/commands/implement.md` is the canonical example. Run in the main context when the user needs to interact step by step (plan mode, iteration, explicit approvals) — `.claude/commands/plan-issue.md` is the canonical example.
 5. **Update this document** when you add or remove a command. The command reference section should list every file under `.claude/commands/` and `.gemini/commands/`.
 
+## Cross-agent delegation matrix
+
+In addition to the self-action commands above, this template ships a `<target>:<action>` matrix that lets any source agent delegate `plan`, `implement`, `review`, or `adversarial-review` to any of the other three. The full design — convention, file layout, prefix mapping (`/foo` vs `$foo` for Codex), Hybrid C runtime behavior, and the `.agents/skills/` ↔ Gemini conflict mitigation — is documented separately:
+
+→ See [Cross-Agent Delegation Matrix](cross-agent-delegation.md).
+
+Quick reference:
+
+```text
+# In Claude Code / Gemini CLI / Copilot CLI:
+/<target>:<action> [args]      # e.g. /codex:plan 42, /gemini:adversarial-review
+
+# In Codex CLI (skills, not slash commands):
+$delegate-<target>-<action> [args]  # e.g. $delegate-claude-implement 42
+```
+
 ## See also
 
+- [Cross-Agent Delegation Matrix](cross-agent-delegation.md) — convention, matrix, and per-host invocation for the `<target>:<action>` family.
 - [First 5 Minutes with an AI Agent](first-5-minutes.md) — narrative onboarding walkthrough showing the workflow end to end.
 - [AI Agent Setup Guide](../AI_SETUP.md) — per-CLI configuration and whitelists.
 - [Architectural Conventions](architectural-conventions.md) — imperative rules for AI-generated code.
