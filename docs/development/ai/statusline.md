@@ -72,6 +72,17 @@ COLOR="blue"
 | slate    | 60        | Dark blue-gray |
 | cyan     | 37        | Bright, tech |
 
+The usage segment (opt-in, see below) uses three additional fixed colors that are independent
+of the `COLOR` theme:
+
+| Field | Variable | ANSI Code | Description |
+|-------|----------|-----------|-------------|
+| Percent value | `C_PCT` | 71 (green) | "value" semantics — current consumption |
+| `@` separator | `C_DIM` | 238 (dark gray) | dim join between percent and time |
+| Reset time | `C_TIME` | 136 (gold) | "schedule" semantics — when the bucket ends |
+
+Edit `.claude/statusline-command.sh` to change these.
+
 ### Removing Features
 
 Comment out or remove lines in the "Build output" section of the script:
@@ -106,7 +117,8 @@ Set `CLAUDE_USAGE_STATUSLINE=1` in your shell environment:
 export CLAUDE_USAGE_STATUSLINE=1
 ```
 
-Restart Claude Code. The statusline appends `5h:N% 7d:N%` to the model/context line.
+Restart Claude Code. The statusline appends `5h:N%@HHMM wk:N%@aaa-HHMM` to the model/context line.
+Times are shown in your local timezone.
 To disable temporarily: `unset CLAUDE_USAGE_STATUSLINE` and restart Claude Code.
 
 Example output (helper segment is the trailing portion of the third line):
@@ -114,7 +126,7 @@ Example output (helper segment is the trailing portion of the third line):
 ```
 📁 project | 🐍 .venv | Python: 3.12.12
 @username | 🔀 main (0 files uncommitted, synced 5m ago)
-Claude Opus 4.5 | ▓▓░░░░░░░░ ~10% of 200k tokens | 5h:25% 7d:6%
+Claude Opus 4.5 | ▓▓░░░░░░░░ ~10% of 200k tokens | 5h:25%@1800 · wk:6%@Mon-2000
 ```
 
 ### Cache behavior
@@ -127,6 +139,7 @@ Adjust `MAX_AGE` at the top of the script. To force a refresh: `rm ~/.cache/clau
 - Active Claude Code OAuth login (`${CLAUDE_CONFIG_DIR:-~/.claude}/.credentials.json`)
 - `curl` for HTTPS
 - `jq` (already required by base statusline)
+- `python3` for ISO-8601 timestamp formatting (already a project dev dependency)
 
 ### Helper troubleshooting
 
