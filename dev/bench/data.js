@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778803474795,
+  "lastUpdate": 1778804115068,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9176,6 +9176,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009994507007972553",
             "extra": "mean: 136.67316666671877 usec\nrounds: 2550"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bad799f4c8789bc2169fdd413c00e75deedd9179",
+          "message": "feat: add human-only env var to permit AI to apply ready-to-merge label (merges PR #848, addresses #823)\n\nAdopts upstream endavis/pyproject-template#575. Adds an opt-in\ngovernance pass: when the human sets ALLOW_AI_READY_TO_MERGE=1\nin the shell that launched the AI CLI, the AI is permitted to\nrun `gh pr edit --add-label ready-to-merge` (and\n`gh issue edit ... --add-label ready-to-merge`). Without the\nopt-in the existing block remains in effect.\n\nThe opt-in is paired with persistence-blocking: any Edit/Write/\nMultiEdit/write_file/replace whose payload contains\nALLOW_AI_READY_TO_MERGE and targets a known persistence file\n(shell rc files, .env*, AI CLI settings files) is blocked. This\ncloses the path by which an AI could self-grant the permission.\n\nBash-side detection requires an actual write operation -- `>`/`>>`\nredirects, `tee`/`cp`/`mv`/`dd`, `sed -i`, or script-interpreter\n`-c`/`-e`/`--command` -- targeting a persistence file. Plain\nmention of the var name (commit messages, `git add` args,\n`grep`/`cat` reads) is allowed.\n\nFiles (4 wholesale-replaced from upstream HEAD ba12770; not in\nany divergences-doc category):\n- tools/hooks/ai/block-dangerous-commands.py: env-var opt-in\n  check, persistence-block check, file-edit context handling.\n- tools/hooks/ai/test_hook.py: 102 tests (env-var opt-in paths,\n  persistence-block per file type, Bash write detection,\n  false-positive guards, all 4 AI CLI tool name variants).\n- docs/development/ai/command-blocking.md: new \"Opt-in:\n  ALLOW_AI_READY_TO_MERGE\" section + \"Env-Var Persistence Blocks\"\n  section; updated Gemini snippet; Codex hook snippet for file\n  edits.\n- docs/decisions/9006-merge-gate-workflow.md: append issue #574\n  to Related Issues.\n\nFiles (4 hand-merged):\n- .claude/settings.json (category 3 spot-check):\n  Preserves env block (D.4) + 5 hook configs (Bash with\n  block-dangerous + bash-ban-raw-tools, PostToolUse Edit|Write|\n  MultiEdit ruff-fix, PreCompact, SessionStart). Adds new\n  Edit|Write|MultiEdit PreToolUse matcher invoking\n  block-dangerous-commands.py.\n- .codex/config.toml: matched upstream pre-#575 verbatim;\n  applied literal patch to insert FILE-EDIT HOOK block before\n  SHELL ENVIRONMENT POLICY.\n- .gemini/settings.json: preserves all our local additions\n  (chatCompression, ui, context, general, security, skills.\n  disabled with 22 entries from C.4 / C.5). Adds new\n  write_file|replace BeforeTool matcher.\n- AGENTS.md (category 3 spot-check): preserves all\n  InfraFoundry-specific content; one-line update to the\n  \"Merge Gate action\" bullet noting the env-var opt-in.\n\nVerification:\n- `doit check` passes locally.\n- `uv run python tools/hooks/ai/test_hook.py` -> 102 passed,\n  0 failed.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-15T01:14:48+01:00",
+          "tree_id": "60fd262b78c733a1358442956a4ef89fa6c30afb",
+          "url": "https://github.com/endavis/infrafoundry/commit/bad799f4c8789bc2169fdd413c00e75deedd9179"
+        },
+        "date": 1778804114410,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9570.682809012915,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000067736723811463306",
+            "extra": "mean: 104.48575299750595 usec\nrounds: 2085"
           }
         ]
       }
