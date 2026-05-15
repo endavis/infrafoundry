@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778804115068,
+  "lastUpdate": 1778804428919,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9207,6 +9207,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000067736723811463306",
             "extra": "mean: 104.48575299750595 usec\nrounds: 2085"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "417b32c40687f51e688f9ca42b8481ebcf4f5ad4",
+          "message": "chore: bump pyproject-template pin to ba12770 (2026-05-14) (merges PR #849, addresses #823)\n\nFinal pin bump for the #823 sync. Bumps from\n7a13c9384b1b94446836eabaa20ca0800d185369 (2026-04-23) to\nba1277055360eb23533ccd7bb9f9fe4a9e46e24d (2026-05-14, current\nupstream HEAD).\n\nAll upstream commits between the old and new pin have been\nadopted by individual phase PRs:\n\nPhase A (#825, #826) -- foundation\nPhase B (#828, #829, #830) -- hooks and session lifecycle\nPhase C (#831, #832, #833, #834, #835) -- AI-agent workflow\nPhase D (#836, #837, #840, #842) -- tooling and CI\nPhase E (#843, #844) -- documentation\nPhase F:\n  F.1 #845 -- urllib3 2.6.3 -> 2.7.0 (upstream #577)\n  F.2 #846 -- bash-ban-raw-tools piped-truncator removal (#579)\n  F.3a #847 -- statusline bucket end times + colors (#581 + #582)\n  F.3 #848 -- ALLOW_AI_READY_TO_MERGE governance opt-in (#575)\n\nOutstanding follow-ups (filed as separate issues, not blocking\nsync closure):\n- #822 -- -h short alias for foundry CLI\n- #824 -- evaluate enabling CBM and context-mode hooks\n- #838 -- port upstream tooling test coverage (mock_subprocess)\n- #839 -- bump remaining 7 CVE-affected transitive deps + add\n  audit gate to doit check (urllib3 already done in F.1)\n- #841 -- reconcile pre-commit-hook table divergence in\n  ci-cd-testing.md and doit-tasks-reference.md\n\ndoit check passes locally.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-15T01:20:03+01:00",
+          "tree_id": "831281fa5d0de6b89fc64998ff4d5e601071ec30",
+          "url": "https://github.com/endavis/infrafoundry/commit/417b32c40687f51e688f9ca42b8481ebcf4f5ad4"
+        },
+        "date": 1778804428332,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8726.512814656275,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022701342406462045",
+            "extra": "mean: 114.59331135347547 usec\nrounds: 2017"
           }
         ]
       }
