@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778803116921,
+  "lastUpdate": 1778803474795,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9145,6 +9145,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015049070717613529",
             "extra": "mean: 139.4226962233137 usec\nrounds: 2436"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f36523aa1724c64c5546212095bfbd91dfeb2ba8",
+          "message": "feat: show usage bucket end times in statusline with semantic colors (merges PR #847, addresses #823)\n\nBundles upstream pyproject-template improvements that close issue\nendavis/pyproject-template#580:\n\n- endavis/pyproject-template#581: bucket end times in the\n  statusline. New output format `5h:N%@HHMM · wk:N%@aaa-HHMM`,\n  showing both current consumption and when each bucket resets,\n  in the user's local timezone. The `7d:` label is renamed to\n  `wk:` to make room for the appended timestamp. Adds python3\n  as a runtime requirement (already a project dev dep).\n\n- endavis/pyproject-template#582: per-field semantic coloring\n  (refinement to #581). The value portion is split into three\n  theme-independent fixed colors:\n    * Percent: ANSI 71 (green)  -- C_PCT, \"value\" semantics\n    * @ separator: ANSI 238 (dark gray)  -- C_DIM, dim join\n    * Reset time: ANSI 136 (gold)  -- C_TIME, \"schedule\" semantics\n  Theme labels (5h:, wk:) stay accent-colored. Graceful fallback\n  branch emits the segment uncolored if the helper output does\n  not match the expected pattern.\n\nFiles (all adopted verbatim from upstream HEAD ba12770; none of\nthem are in any divergences-doc category):\n- tools/statusline/claude-usage.sh: new parse_usage() function\n  + _fmt_ts() helper.\n- .claude/statusline-command.sh: 3 new color vars; bash-regex\n  parse + per-field recoloring; fallback branch.\n- tests/test_statusline_claude_usage.py: new test cases for\n  bucket-end-time parsing, malformed-timestamp fallback.\n- docs/development/ai/statusline.md: per-field color table,\n  updated output-format example, python3 prerequisite.\n\ndoit check passes locally.\n\nAddresses #823\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-15T01:04:04+01:00",
+          "tree_id": "684d48039c82371493494d4cfbc0a315b38f8958",
+          "url": "https://github.com/endavis/infrafoundry/commit/f36523aa1724c64c5546212095bfbd91dfeb2ba8"
+        },
+        "date": 1778803474006,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7316.725180141081,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009994507007972553",
+            "extra": "mean: 136.67316666671877 usec\nrounds: 2550"
           }
         ]
       }
