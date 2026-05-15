@@ -2,8 +2,9 @@
 """
 Claude Code PreToolUse hook to block dangerous command patterns.
 
-This hook intercepts Bash commands before execution and blocks those
-containing dangerous flags that could bypass security controls.
+This hook intercepts Bash commands and file-edit operations before execution
+and blocks those containing dangerous flags or attempting to persist the
+ALLOW_AI_READY_TO_MERGE env var to shell configuration files.
 
 Uses shlex to properly parse shell quoting, then checks for dangerous
 patterns as standalone tokens (not embedded in quoted argument values).
@@ -63,9 +64,89 @@ BLOCKED_WORKFLOW_COMMANDS = {
 GOVERNANCE_LABELS = {
     "ready-to-merge": (
         "The 'ready-to-merge' label is a governance control requiring human approval. "
-        "Add this label manually via 'gh pr edit --add-label ready-to-merge' or the GitHub web UI."
+        "Add this label manually via 'gh pr edit --add-label ready-to-merge' or the GitHub web UI, "
+        "or set ALLOW_AI_READY_TO_MERGE=1 in the shell before launching the AI CLI."
     ),
 }
+
+# Env var name the human can set to allow AI to apply ready-to-merge
+ALLOW_AI_READY_TO_MERGE_VAR = "ALLOW_AI_READY_TO_MERGE"
+
+# Persistence-protected file basenames and path hints.
+# Keys are basenames; values are optional required parent path fragments
+# (if non-empty, the parent directory must contain that fragment).
+ENV_PERSISTENCE_TARGETS: dict[str, str] = {
+    ".bashrc": "",
+    ".zshrc": "",
+    ".profile": "",
+    ".bash_profile": "",
+    ".bash_login": "",
+    ".zshenv": "",
+    "config.fish": ".config/fish",
+    ".envrc": "",
+    ".env": "",
+    ".env.local": "",
+    ".env.development": "",
+    ".env.production": "",
+    "copilot-hooks.json": "",
+}
+
+# Settings files that are only protected when inside a known AI CLI config dir
+_AI_CLI_SETTINGS_TARGETS: dict[str, set[str]] = {
+    "settings.json": {".claude", ".gemini", ".copilot"},
+    "settings.local.json": {".claude", ".gemini", ".copilot"},
+    "config.toml": {".codex"},
+}
+
+
+def _env_truthy(name: str) -> bool:
+    """Return True when env var *name* is set to a truthy value.
+
+    Truthy values (case-insensitive): ``1``, ``true``, ``yes``, ``on``.
+    All other values (including empty string) are falsy.
+    """
+    val = os.environ.get(name, "").strip().lower()
+    return val in {"1", "true", "yes", "on"}
+
+
+def _is_env_persistence_target(path_str: str) -> bool:
+    """Return True when *path_str* points to a file that the AI must not use
+    to persist the ``ALLOW_AI_READY_TO_MERGE`` env var.
+
+    Checks:
+    - Basename + optional parent-path fragment (ENV_PERSISTENCE_TARGETS)
+    - AI CLI settings files only when the immediate parent dir is in the
+      corresponding allow-list (_AI_CLI_SETTINGS_TARGETS)
+    """
+    if not path_str:
+        return False
+
+    try:
+        # Expand ~ so ~/.bashrc comparisons work
+        path = Path(path_str).expanduser()
+    except (ValueError, RuntimeError):
+        return False
+
+    basename = path.name
+    parent = path.parent
+
+    # Check plain persistence targets
+    if basename in ENV_PERSISTENCE_TARGETS:
+        fragment = ENV_PERSISTENCE_TARGETS[basename]
+        if not fragment:
+            return True
+        # Fragment must appear in the parent path string
+        parent_posix = parent.as_posix()
+        if fragment in parent_posix:
+            return True
+
+    # Check AI CLI settings files
+    if basename in _AI_CLI_SETTINGS_TARGETS:
+        allowed_parents = _AI_CLI_SETTINGS_TARGETS[basename]
+        if parent.name in allowed_parents:
+            return True
+
+    return False
 
 
 def tokenize(command: str) -> list[str]:
@@ -290,7 +371,7 @@ def check_governance_labels(tokens: list[str]) -> tuple[bool, str]:
     Check if command attempts to add a governance label.
 
     Governance labels (like 'ready-to-merge') require human approval and
-    should never be added by AI agents.
+    should never be added by AI agents unless ALLOW_AI_READY_TO_MERGE is set.
     """
     tokens_lower = [t.lower() for t in tokens]
 
@@ -308,7 +389,187 @@ def check_governance_labels(tokens: list[str]) -> tuple[bool, str]:
     # Check if any governance label is being added
     for label, reason in GOVERNANCE_LABELS.items():
         if label.lower() in tokens_lower:
+            # Allow bypass when the human has explicitly set the env var
+            if label == "ready-to-merge" and _env_truthy(ALLOW_AI_READY_TO_MERGE_VAR):
+                return False, ""
             return True, reason
+
+    return False, ""
+
+
+# Shell write operators (as standalone tokens after shlex.split)
+_WRITE_REDIRECTS = {">", ">>"}
+
+# Shell commands that write to a file argument
+_WRITE_COMMANDS = {"tee", "cp", "mv", "dd"}
+
+# Script interpreters that can write files via -c/-e/--command
+_INTERPRETER_COMMANDS = {"python", "python3", "perl", "ruby", "node"}
+
+# Subshell separators used to bound a single command segment
+_COMMAND_SEPARATORS = {"&&", "||", ";", "|"}
+
+
+def _bash_writes_to_persistence_target(tokens: list[str]) -> bool:
+    """Return True if the token stream contains a write operation targeting a
+    persistence-protected file.
+
+    Detected patterns:
+    - A:  ``>`` / ``>>`` standalone token followed by a persistence target
+    - B:  ``>foo`` / ``>>foo`` no-space form where ``foo`` is a persistence target
+    - C:  ``tee`` / ``cp`` / ``mv`` / ``dd`` with a persistence target as a
+          positional argument before the next command separator
+    - D:  ``sed -i`` (in-place edit) with a persistence target as a positional
+    - E:  script interpreter (``python``/``python3``/``perl``/``ruby``/``node``)
+          invoked with ``-c`` / ``-e`` / ``--command`` whose script body mentions
+          any persistence-target basename
+    """
+    n = len(tokens)
+    for i, tok in enumerate(tokens):
+        # Pattern A: standalone redirect operator
+        if tok in _WRITE_REDIRECTS:
+            if i + 1 < n and _is_env_persistence_target(tokens[i + 1]):
+                return True
+            continue
+
+        # Pattern B: redirect operator concatenated with target (no whitespace)
+        if tok.startswith(">>") and len(tok) > 2:
+            if _is_env_persistence_target(tok[2:]):
+                return True
+            continue
+        if tok.startswith(">") and len(tok) > 1 and tok[1] not in {"=", ">"}:
+            # Skip ">=" (comparison) and ">>" (already handled)
+            if _is_env_persistence_target(tok[1:]):
+                return True
+            continue
+
+        # Pattern C: write command followed by persistence target as positional
+        if tok in _WRITE_COMMANDS:
+            for j in range(i + 1, n):
+                t = tokens[j]
+                if t in _COMMAND_SEPARATORS:
+                    break
+                if t.startswith("-"):
+                    continue
+                if _is_env_persistence_target(t):
+                    return True
+            continue
+
+        # Pattern D: sed -i (in-place) with persistence target
+        if tok == "sed":
+            has_in_place = False
+            for j in range(i + 1, n):
+                t = tokens[j]
+                if t in _COMMAND_SEPARATORS:
+                    break
+                if t.startswith("-i"):
+                    has_in_place = True
+                    continue
+                if not has_in_place:
+                    continue
+                if t.startswith("-"):
+                    continue
+                if _is_env_persistence_target(t):
+                    return True
+            continue
+
+        # Pattern E: script interpreter with -c/-e/--command and target in body
+        if tok in _INTERPRETER_COMMANDS:
+            cmd_end = n
+            for j in range(i + 1, n):
+                if tokens[j] in _COMMAND_SEPARATORS:
+                    cmd_end = j
+                    break
+            segment = tokens[i + 1 : cmd_end]
+            has_inline = any(
+                t in {"-c", "-e", "--command"} or t.startswith(("-c=", "-e=", "--command="))
+                for t in segment
+            )
+            if not has_inline:
+                continue
+            persistence_basenames = set(ENV_PERSISTENCE_TARGETS) | set(_AI_CLI_SETTINGS_TARGETS)
+            for t in segment:
+                for basename in persistence_basenames:
+                    if basename in t:
+                        return True
+            continue
+
+    return False
+
+
+def check_env_persistence_in_bash(tokens: list[str]) -> tuple[bool, str]:
+    """Block Bash commands that would persist ALLOW_AI_READY_TO_MERGE to a
+    protected file.
+
+    Two conditions must both hold:
+    - The literal string ``ALLOW_AI_READY_TO_MERGE`` appears in any token, AND
+    - The command performs a write operation targeting a persistence-protected
+      file (see :func:`_bash_writes_to_persistence_target` for patterns).
+
+    Plain mention of the var name (e.g., in a commit message, a doc string, or
+    `git add` arguments that reference protected file paths) is NOT a write
+    operation and is allowed.
+    """
+    var_name = ALLOW_AI_READY_TO_MERGE_VAR
+    if not any(var_name in t for t in tokens):
+        return False, ""
+    if not _bash_writes_to_persistence_target(tokens):
+        return False, ""
+    return True, (
+        f"Blocked: AI must not persist {var_name} to shell or project config files. "
+        f"Only a human can set this variable in their environment."
+    )
+
+
+def check_env_persistence_in_file_edit(
+    tool_name: str, tool_input: dict[str, object]
+) -> tuple[bool, str]:
+    """Block file-edit operations (Edit/Write/MultiEdit for Claude/Codex,
+    write_file/replace for Gemini) that would persist ALLOW_AI_READY_TO_MERGE
+    to a protected file.
+
+    Triggers when:
+    - The target file_path is a persistence-protected target, AND
+    - The new content being written contains ALLOW_AI_READY_TO_MERGE.
+    """
+    var_name = ALLOW_AI_READY_TO_MERGE_VAR
+
+    file_path_raw = str(tool_input.get("file_path", "") or "")
+    if not file_path_raw:
+        return False, ""
+
+    if not _is_env_persistence_target(file_path_raw):
+        return False, ""
+
+    # Collect all new content being written
+    new_content_parts: list[str] = []
+
+    tool_lower = tool_name.lower()
+
+    if tool_lower in ("write", "write_file"):
+        # Write/write_file: full file content in 'content' key
+        content = str(tool_input.get("content", "") or "")
+        new_content_parts.append(content)
+
+    elif tool_lower in ("edit", "replace"):
+        # Edit (Claude/Codex) and replace (Gemini): new_string key
+        new_content_parts.append(str(tool_input.get("new_string", "") or ""))
+
+    elif tool_lower == "multiedit":
+        # MultiEdit: edits is a list of {old_string, new_string} dicts
+        edits = tool_input.get("edits", [])
+        if isinstance(edits, list):
+            for edit_item in edits:
+                if isinstance(edit_item, dict):
+                    new_content_parts.append(str(edit_item.get("new_string", "") or ""))
+
+    # Check if any new content contains the env var name
+    combined = "\n".join(new_content_parts)
+    if var_name in combined:
+        return True, (
+            f"Blocked: AI must not persist {var_name} to '{file_path_raw}'. "
+            f"Only a human can set this variable in their environment."
+        )
 
     return False, ""
 
@@ -394,36 +655,44 @@ def check_command(command: str) -> tuple[bool, str]:
     if is_dangerous:
         return True, reason
 
+    # Check for attempts to persist ALLOW_AI_READY_TO_MERGE via Bash
+    is_dangerous, reason = check_env_persistence_in_bash(tokens)
+    if is_dangerous:
+        return True, reason
+
     return False, ""
 
 
-def _parse_input(input_data: dict) -> tuple[str, str]:
+def _parse_input(input_data: dict) -> tuple[str, str, dict]:
     """
-    Parse tool name and command from hook input.
+    Parse tool name, command, and tool_input from hook input.
 
     Handles two input formats:
     - Claude/Gemini: {"tool_name": "Bash", "tool_input": {"command": "..."}}
     - Copilot CLI:   {"toolName": "bash", "toolArgs": "{\"command\":\"...\"}"}
 
     Returns:
-        (tool_name, command) tuple
+        (tool_name, command, tool_input) tuple where tool_input is the full
+        parameter dict (used for file-edit operations).
     """
     # Copilot CLI format uses camelCase keys
     if "toolName" in input_data:
         tool_name = input_data.get("toolName", "")
         tool_args_raw = input_data.get("toolArgs", "{}")
         try:
-            tool_args = (
+            tool_input: dict = (
                 json.loads(tool_args_raw) if isinstance(tool_args_raw, str) else tool_args_raw
             )
         except json.JSONDecodeError:
-            tool_args = {}
-        return tool_name, tool_args.get("command", "")
+            tool_input = {}
+        return tool_name, tool_input.get("command", ""), tool_input
 
     # Claude/Gemini format uses snake_case keys
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})
-    return tool_name, tool_input.get("command", "")
+    if not isinstance(tool_input, dict):
+        tool_input = {}
+    return tool_name, tool_input.get("command", ""), tool_input
 
 
 def _is_copilot_format(input_data: dict) -> bool:
@@ -445,6 +714,41 @@ def _log(entry: dict) -> None:
         pass  # Never fail due to logging
 
 
+_BASH_TOOL_NAMES = frozenset({"Bash", "run_shell_command", "bash"})
+
+# File-edit tool names across all supported AI CLIs
+# Claude/Codex: Edit, Write, MultiEdit
+# Gemini: write_file, replace
+_FILE_EDIT_TOOL_NAMES = frozenset({"Edit", "Write", "MultiEdit", "write_file", "replace"})
+
+
+def _block_response(copilot_format: bool, reason: str, command: str) -> int:
+    """Emit a block response and return the appropriate exit code."""
+    if copilot_format:
+        # Copilot CLI: deny via JSON output to stdout
+        output = json.dumps(
+            {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": (
+                    f"Blocked: {reason}. If intentional, ask the user to run it manually."
+                ),
+            }
+        )
+        print(output)
+        return 0
+    else:
+        # Claude/Gemini: block via exit code 2 + stderr message
+        print(
+            f"BLOCKED: Operation contains dangerous pattern.\n"
+            f"Reason: {reason}\n"
+            f"Operation: {command}\n"
+            f"\n"
+            f"If this is intentional, ask the user to run it manually.",
+            file=sys.stderr,
+        )
+        return 2  # Exit 2 = Block and show stderr to Claude/Gemini
+
+
 def main() -> int:
     """Main entry point."""
     try:
@@ -453,7 +757,7 @@ def main() -> int:
         print(f"Invalid JSON input: {e}", file=sys.stderr)
         return 1
 
-    tool_name, command = _parse_input(input_data)
+    tool_name, command, tool_input = _parse_input(input_data)
     copilot_format = _is_copilot_format(input_data)
 
     _log(
@@ -465,41 +769,22 @@ def main() -> int:
         }
     )
 
-    # Only check shell commands:
-    # - "Bash" for Claude
-    # - "run_shell_command" for Gemini
-    # - "bash" for Copilot CLI
-    if tool_name not in ("Bash", "run_shell_command", "bash"):
-        return 0
-
-    if not command:
-        return 0
-
-    is_dangerous, reason = check_command(command)
-    if is_dangerous:
-        if copilot_format:
-            # Copilot CLI: deny via JSON output to stdout
-            output = json.dumps(
-                {
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": (
-                        f"Blocked: {reason}. If intentional, ask the user to run it manually."
-                    ),
-                }
-            )
-            print(output)
+    # --- Bash / shell command path ---
+    if tool_name in _BASH_TOOL_NAMES:
+        if not command:
             return 0
-        else:
-            # Claude/Gemini: block via exit code 2 + stderr message
-            print(
-                f"BLOCKED: Command contains dangerous pattern.\n"
-                f"Reason: {reason}\n"
-                f"Command: {command}\n"
-                f"\n"
-                f"If this is intentional, ask the user to run it manually.",
-                file=sys.stderr,
-            )
-            return 2  # Exit 2 = Block and show stderr to Claude/Gemini
+        is_dangerous, reason = check_command(command)
+        if is_dangerous:
+            return _block_response(copilot_format, reason, command)
+        return 0
+
+    # --- File-edit tool path (Edit/Write/MultiEdit/write_file/replace) ---
+    if tool_name in _FILE_EDIT_TOOL_NAMES:
+        is_dangerous, reason = check_env_persistence_in_file_edit(tool_name, tool_input)
+        if is_dangerous:
+            file_path = str(tool_input.get("file_path", ""))
+            return _block_response(copilot_format, reason, f"{tool_name} {file_path}")
+        return 0
 
     return 0
 

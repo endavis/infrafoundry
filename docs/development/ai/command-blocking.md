@@ -98,6 +98,15 @@ EOF
             "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/block-dangerous-commands.py"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/block-dangerous-commands.py"
+          }
+        ]
       }
     ]
   }
@@ -110,10 +119,18 @@ EOF
 ```json
 {
   "hooks": {
-    "enabled" : true,
     "BeforeTool": [
       {
         "matcher": "run_shell_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $GEMINI_PROJECT_DIR/tools/hooks/ai/block-dangerous-commands.py"
+          }
+        ]
+      },
+      {
+        "matcher": "write_file|replace",
         "hooks": [
           {
             "type": "command",
@@ -125,6 +142,8 @@ EOF
   }
 }
 ```
+
+Gemini's file-write tools are `write_file` (full-file overwrite, `content` param) and `replace` (string replacement, `old_string`/`new_string` params). Both use `file_path`.
 
 #### Copilot CLI
 
@@ -145,6 +164,8 @@ EOF
 }
 ```
 
+No change needed for Copilot — the hook fires on every tool call (no `matcher` field), so Edit/Write variants are automatically covered.
+
 #### Codex CLI
 
 `.codex/config.toml`:
@@ -162,6 +183,15 @@ type = "command"
 command = 'python3 "$(git rev-parse --show-toplevel)/tools/hooks/ai/block-dangerous-commands.py"'
 timeout = 30
 statusMessage = "Checking Bash command"
+
+[[hooks.PreToolUse]]
+matcher = "^(Edit|Write|MultiEdit)$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = 'python3 "$(git rev-parse --show-toplevel)/tools/hooks/ai/block-dangerous-commands.py"'
+timeout = 30
+statusMessage = "Checking file edit"
 ```
 
 Codex uses the shared hook as the primary defense layer. Project docs should not rely on the obsolete `[[approval_policy]]` command-rule format.
@@ -244,6 +274,58 @@ Some labels are governance controls that require human approval. AI agents are b
 |-------|--------|
 | `ready-to-merge` | Signals human approval that PR is ready for merge. Add manually via `gh pr edit --add-label ready-to-merge` or GitHub web UI. |
 
+##### Opt-in: `ALLOW_AI_READY_TO_MERGE`
+
+A human can grant an AI agent a one-session pass to apply the `ready-to-merge` label by setting an environment variable **before launching the AI CLI**:
+
+```bash
+export ALLOW_AI_READY_TO_MERGE=1
+claude  # or gemini, copilot, codex
+```
+
+The hook reads `os.environ` at hook-startup time (the AI CLI's process environment), so the variable must be set in the shell that launches the AI process — not by any command the AI itself runs. The AI has no path to set or persist this variable; attempts to do so are blocked (see [Env-Var Persistence Blocks](#env-var-persistence-blocks) below).
+
+**Truthy values** (case-insensitive): `1`, `true`, `yes`, `on`. All other values (including empty string or unset) are falsy and preserve the block.
+
+**Threat model:**
+
+- The AI cannot set the variable in `os.environ` of its own parent process.
+- The AI cannot persist the variable by writing to shell rc files, `.envrc`, `.env`, or AI CLI settings files — the hook blocks those writes.
+- Each AI CLI session inherits a fixed snapshot of the environment; a Bash subprocess setting the variable does not affect the hook's already-read `os.environ`.
+- The variable is scoped to a single shell session. Close the terminal (or `unset ALLOW_AI_READY_TO_MERGE`) to revoke the pass.
+
+**To disable:** run `unset ALLOW_AI_READY_TO_MERGE`, or close the shell, or restart the AI CLI without the variable set.
+
+#### Env-Var Persistence Blocks
+
+The hook fires on **Edit**, **Write**, and **MultiEdit** (Claude/Codex) and **write_file**/**replace** (Gemini) in addition to Bash commands. Any operation whose payload contains the literal string `ALLOW_AI_READY_TO_MERGE` **and** whose target is a known persistence file is blocked.
+
+**Protected file basenames** (Bash redirect target or `file_path` argument):
+
+| File | Notes |
+|------|-------|
+| `.bashrc`, `.zshrc`, `.profile`, `.bash_profile`, `.bash_login`, `.zshenv` | Shell init files |
+| `config.fish` | Only when parent path contains `.config/fish` |
+| `.envrc`, `.env`, `.env.local`, `.env.development`, `.env.production` | Project env files |
+| `settings.json`, `settings.local.json` | Only when parent dir is `.claude`, `.gemini`, or `.copilot` |
+| `config.toml` | Only when parent dir is `.codex` |
+| `copilot-hooks.json` | Any path (Copilot's env-injection vector) |
+
+**Example blocked Bash command:**
+
+```bash
+# BLOCKED — AI cannot persist the variable via shell redirect
+echo "export ALLOW_AI_READY_TO_MERGE=1" >> ~/.bashrc
+```
+
+**Example blocked file edit:**
+
+```
+# BLOCKED — AI cannot persist the variable via Edit tool
+Edit ~/.bashrc
+  new_string: "export ALLOW_AI_READY_TO_MERGE=1"
+```
+
 ### Adding New Patterns
 
 Edit `tools/hooks/ai/block-dangerous-commands.py`:
@@ -272,3 +354,4 @@ Then run the test suite to verify.
 - [AI Enforcement Principles](enforcement-principles.md) - Why and how we enforce rules in code
 - [AGENTS.md](../../../AGENTS.md) - AI agent rules including "When Blocked Protocol"
 - [AI Agent Setup](../AI_SETUP.md) - Setting up AI coding assistants
+- [Bash raw-tool ban](token-efficiency-add-ons.md#bash-raw-tool-ban-opt-in) - Opt-in hook that blocks raw shell commands AI agents should use native tools for (`cat`, `head`, `tail`, `find`, `grep`, `rg`, `wc`)
