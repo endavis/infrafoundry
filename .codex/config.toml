@@ -28,6 +28,21 @@ timeout = 30
 statusMessage = "Checking Bash command"
 
 # =============================================================================
+# FILE-EDIT HOOK — Blocks env-var persistence attempts
+# =============================================================================
+# Fires before Edit, Write, and MultiEdit to prevent AI from persisting
+# governance bypass env vars to shell or project config files.
+# See: docs/development/ai/command-blocking.md
+[[hooks.PreToolUse]]
+matcher = "^(Edit|Write|MultiEdit)$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = 'python3 "$(git rev-parse --show-toplevel)/tools/hooks/ai/block-dangerous-commands.py"'
+timeout = 30
+statusMessage = "Checking file edit"
+
+# =============================================================================
 # SHELL ENVIRONMENT POLICY
 # =============================================================================
 [shell_environment_policy]
