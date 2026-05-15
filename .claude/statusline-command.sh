@@ -8,6 +8,9 @@ COLOR="blue"
 C_RESET='\033[0m'
 C_GRAY='\033[38;5;245m'  # explicit gray for default text
 C_BAR_EMPTY='\033[38;5;238m'
+C_DIM="$C_BAR_EMPTY"  # semantic alias for dim separators (e.g., the `@` in usage segment)
+C_PCT='\033[38;5;71m'  # green: percentage values in usage segment (theme-independent)
+C_TIME='\033[38;5;136m'  # gold: reset-time values in usage segment (theme-independent)
 case "$COLOR" in
     orange)   C_ACCENT='\033[38;5;173m' ;;
     blue)     C_ACCENT='\033[38;5;74m' ;;
@@ -195,7 +198,23 @@ output+="\n${C_ACCENT}${model}${C_GRAY} | ${ctx}${C_RESET}"
 # See docs/development/ai/statusline.md#opt-in-claude-max-usage-display
 if [[ -n "$CLAUDE_USAGE_STATUSLINE" ]]; then
     usage=$(bash "$CLAUDE_PROJECT_DIR/tools/statusline/claude-usage.sh" 2>/dev/null)
-    [[ -n "$usage" && "$usage" != "?" ]] && output+="${C_GRAY} | ${usage}${C_RESET}"
+    if [[ -n "$usage" && "$usage" != "?" ]]; then
+        # Parse the helper's plain-text output (5h:N%@HHMM wk:N%@aaa-HHMM) and
+        # rebuild it with per-field colors: labels accent, percent green,
+        # `@` dim, time gold. Middle-dot separator between gauges.
+        if [[ "$usage" =~ ^5h:([0-9]+)%@([^ ]+)\ wk:([0-9]+)%@(.+)$ ]]; then
+            fh_pct="${BASH_REMATCH[1]}"
+            fh_time="${BASH_REMATCH[2]}"
+            wk_pct="${BASH_REMATCH[3]}"
+            wk_time="${BASH_REMATCH[4]}"
+            colored="${C_ACCENT}5h:${C_PCT}${fh_pct}%${C_DIM}@${C_TIME}${fh_time}"
+            colored+="${C_GRAY} · ${C_ACCENT}wk:${C_PCT}${wk_pct}%${C_DIM}@${C_TIME}${wk_time}"
+            output+="${C_GRAY} | ${colored}${C_RESET}"
+        else
+            # Unexpected format from the helper — emit uncolored as a safe fallback.
+            output+="${C_GRAY} | ${usage}${C_RESET}"
+        fi
+    fi
 fi
 
 printf '%b\n' "$output"

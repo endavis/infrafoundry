@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -31,6 +32,11 @@ _STATUSLINE_INPUT = json.dumps(
         "context_window": {"context_window_size": 200000},
     }
 )
+
+# ISO timestamps far in the future so the test is timezone-agnostic for the date
+# part; only HHMM can vary by local TZ offset and that is accepted by the regex.
+_FH_RESETS_AT = "2099-06-15T18:00:00+00:00"
+_WK_RESETS_AT = "2099-06-16T20:00:00+00:00"
 
 
 def _make_env(tmp_path: Path) -> dict[str, str]:
@@ -82,7 +88,10 @@ def test_uses_fresh_cache_skips_network(tmp_path: Path) -> None:
     """Pre-seeded fresh cache is parsed and returned without hitting the network."""
     env = _make_env(tmp_path)
     cache_file = Path(env["XDG_CACHE_HOME"]) / "claude-usage.json"
-    payload = {"five_hour": {"utilization": 42.7}, "seven_day": {"utilization": 7.3}}
+    payload = {
+        "five_hour": {"utilization": 42.7, "resets_at": _FH_RESETS_AT},
+        "seven_day": {"utilization": 7.3, "resets_at": _WK_RESETS_AT},
+    }
     cache_file.write_text(json.dumps(payload), encoding="utf-8")
     # Ensure mtime is current (fresh cache)
     now = time.time()
@@ -96,7 +105,11 @@ def test_uses_fresh_cache_skips_network(tmp_path: Path) -> None:
         timeout=5,
     )
     assert result.returncode == 0
-    assert result.stdout.strip() == "5h:42% 7d:7%"
+    output = result.stdout.strip()
+    # Format: 5h:42%@HHMM wk:7%@aaa-HHMM  (HHMM and aaa vary by runner TZ)
+    assert re.search(r"5h:42%@\d{4} wk:7%@[A-Za-z]{3}-\d{4}", output), (
+        f"Unexpected output: {output!r}"
+    )
 
 
 def test_emits_fallback_on_malformed_cache(tmp_path: Path) -> None:
@@ -136,10 +149,59 @@ def test_emits_fallback_when_token_field_missing(tmp_path: Path) -> None:
     assert result.stdout.strip() == "?"
 
 
+def test_emits_fallback_when_resets_at_missing(tmp_path: Path) -> None:
+    """Fresh cache with utilization but no resets_at fields emits '?'."""
+    env = _make_env(tmp_path)
+    cache_file = Path(env["XDG_CACHE_HOME"]) / "claude-usage.json"
+    payload = {
+        "five_hour": {"utilization": 42.7},
+        "seven_day": {"utilization": 7.3},
+    }
+    cache_file.write_text(json.dumps(payload), encoding="utf-8")
+    now = time.time()
+    os.utime(cache_file, (now, now))
+
+    result = subprocess.run(
+        ["bash", str(SCRIPT)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == "?"
+
+
+def test_emits_fallback_when_resets_at_malformed(tmp_path: Path) -> None:
+    """Fresh cache with unparsable resets_at string emits '?'."""
+    env = _make_env(tmp_path)
+    cache_file = Path(env["XDG_CACHE_HOME"]) / "claude-usage.json"
+    payload = {
+        "five_hour": {"utilization": 42.7, "resets_at": "not-a-date"},
+        "seven_day": {"utilization": 7.3, "resets_at": "also-not-a-date"},
+    }
+    cache_file.write_text(json.dumps(payload), encoding="utf-8")
+    now = time.time()
+    os.utime(cache_file, (now, now))
+
+    result = subprocess.run(
+        ["bash", str(SCRIPT)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == "?"
+
+
 def _seed_fresh_cache(env: dict[str, str]) -> None:
     """Pre-write a parseable, fresh cache so the helper short-circuits curl."""
     cache_file = Path(env["XDG_CACHE_HOME"]) / "claude-usage.json"
-    payload = {"five_hour": {"utilization": 42.7}, "seven_day": {"utilization": 7.3}}
+    payload = {
+        "five_hour": {"utilization": 42.7, "resets_at": _FH_RESETS_AT},
+        "seven_day": {"utilization": 7.3, "resets_at": _WK_RESETS_AT},
+    }
     cache_file.write_text(json.dumps(payload), encoding="utf-8")
     now = time.time()
     os.utime(cache_file, (now, now))
@@ -161,7 +223,12 @@ def test_statusline_invokes_helper_when_env_set(tmp_path: Path) -> None:
         timeout=10,
     )
     assert result.returncode == 0, f"stderr: {result.stderr}"
-    assert "5h:42% 7d:7%" in result.stdout
+    # Both bucket labels must appear; exact times vary by runner TZ.
+    # The wrapper injects a middle-dot separator between gauges.
+    assert "5h:" in result.stdout
+    assert "wk:" in result.stdout
+    assert "7d:" not in result.stdout
+    assert " · " in result.stdout
 
 
 def test_statusline_skips_helper_when_env_unset(tmp_path: Path) -> None:
@@ -181,4 +248,4 @@ def test_statusline_skips_helper_when_env_unset(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, f"stderr: {result.stderr}"
     assert "5h:" not in result.stdout
-    assert "7d:" not in result.stdout
+    assert "wk:" not in result.stdout
