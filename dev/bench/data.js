@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778804428919,
+  "lastUpdate": 1779110545821,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9238,6 +9238,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022701342406462045",
             "extra": "mean: 114.59331135347547 usec\nrounds: 2017"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c220d6fffcbe57e1a54dbefda0cb4aea24617600",
+          "message": "docs: add pre-commit hook reference tables to ci-cd and doit-tasks docs (merges PR #850, addresses #841)\n\nAdopt upstream pyproject-template's pre-commit hook tables verbatim into\ndocs/development/ci-cd-testing.md and docs/development/doit-tasks-reference.md.\nLocal .pre-commit-config.yaml has full parity with the upstream tables, so\nthis introduces no conflicts and future upstream hook additions (e.g., the\nuv-lock-check row from pyproject-template#557) land as clean one-row diffs.\n\nTriage decision recorded in the issue plan comment: Option 1 (adopt verbatim)\nover Option 2 (lock in divergence in pyproject-template-divergences.md).\n\nAddresses #841\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-18T14:21:55+01:00",
+          "tree_id": "c5cb3454395f1eeb5b471fd1d6b48b3ec86a15f0",
+          "url": "https://github.com/endavis/infrafoundry/commit/c220d6fffcbe57e1a54dbefda0cb4aea24617600"
+        },
+        "date": 1779110545205,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6498.114822671437,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000028354762337867434",
+            "extra": "mean: 153.89078637254528 usec\nrounds: 1952"
           }
         ]
       }
