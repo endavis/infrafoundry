@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779110545821,
+  "lastUpdate": 1779118800173,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9269,6 +9269,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000028354762337867434",
             "extra": "mean: 153.89078637254528 usec\nrounds: 1952"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "773d68a3892878b3cbe79cff5a0a9a14a95ee72e",
+          "message": "chore: bump CVE transitive deps and wire audit into doit check (merges PR #852, addresses #839)\n\n* chore: bump CVE transitive deps and wire audit into doit check\n\nClears the audit-gate deferral from PR #837 (pyproject-template sync D.2) by\nbumping the four transitive deps that had released fixes and activating\naudit as part of doit check.\n\nuv.lock bumps:\n  - cryptography 46.0.5 -> 48.0.0  (clears CVE-2026-34073, CVE-2026-39892)\n  - lxml         6.0.2  -> 6.1.0   (clears CVE-2026-41066)\n  - pygments     2.19.2 -> 2.20.0  (clears CVE-2026-4539)\n  - pyjwt        2.11.0 -> 2.12.1  (clears CVE-2026-32597)\n\nparamiko stays at 3.5.1 — no upstream fix for CVE-2026-44405 yet (transitive\nvia pyinfra). Suppressed with --ignore-vuln in tools/doit/security.py;\ntracked in #851 for removal once a fix releases.\n\nWiring:\n  - tools/doit/quality.py: audit inserted between security and spell_check\n    in task_check.task_dep; deferral docstring note removed.\n  - .github/workflows/ci.yml: continue-on-error removed from the audit step\n    so failures gate merges.\n\ndoit check passes end-to-end with the new gate (1 ignored vuln).\n\nAddresses #839\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* chore: bump pymdown-extensions to 10.21.3 to restore docs_build\n\npygments 2.20.0 (bumped in the prior commit on this branch to clear\nCVE-2026-4539) tightened HtmlFormatter so it no longer tolerates\nfilename=None. pymdown-extensions 10.21.0 passes filename=None through to\nthe formatter, which now raises AttributeError mid-build:\n\n  AttributeError: 'NoneType' object has no attribute 'replace'\n\npymdown-extensions 10.21.3 stops passing the None value. uv lock\n--upgrade-package pymdown-extensions resolves cleanly; mkdocs build\nsucceeds again.\n\ndoit check stays green; doit docs_build now succeeds locally.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-18T16:39:16+01:00",
+          "tree_id": "52207cf1f6d4696370ce666278c04690abadaf5e",
+          "url": "https://github.com/endavis/infrafoundry/commit/773d68a3892878b3cbe79cff5a0a9a14a95ee72e"
+        },
+        "date": 1779118798920,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6595.644514432796,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000027087127810704505",
+            "extra": "mean: 151.6152057333849 usec\nrounds: 2372"
           }
         ]
       }
