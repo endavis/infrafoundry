@@ -446,6 +446,27 @@ doit commit
 
 ---
 
+## Pre-commit Hooks
+
+The following hooks run automatically on `git commit`:
+
+| Hook | Purpose |
+|------|---------|
+| `ruff` | Lint and auto-fix Python code |
+| `ruff-format` | Format Python code |
+| `mypy` | Type checking |
+| `bandit` | Security scanning (if installed) |
+| `codespell` | Spell checking |
+| `check-branch-name` | Enforce branch naming convention |
+| `generate-doc-toc` | Update documentation TOC |
+| `no-commit-to-main` | Prevent direct commits to main |
+| `no-local-config` | Prevent committing local config files |
+| `protect-dynamic-version` | Protect version configuration |
+| `uv-lock-check` | Validate `uv.lock` is in sync with `pyproject.toml` when `pyproject.toml` is staged |
+| `conventional-pre-commit` | Enforce conventional commit format |
+
+---
+
 ## Maintenance Tasks
 
 ### `cleanup`
