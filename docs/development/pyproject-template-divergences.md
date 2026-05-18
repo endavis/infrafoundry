@@ -141,6 +141,9 @@ customization a reviewer must verify survived the merge.
 | `dodo.py` | Preserves InfraFoundry-specific task imports. |
 | `mkdocs.yml` | Preserves the InfraFoundry nav tree (Providers, Runners, Configuration, etc.). |
 | `pyproject.toml` | Preserves project name, dependencies, CLI entry points, and mypy/ruff overrides specific to InfraFoundry. |
+| `tests/conftest.py` | Preserves InfraFoundry-specific fixtures (`mock_config_manager`, `mock_config_dir`, sample resource fixtures, etc.) alongside upstream's `mock_subprocess` fixture. |
+| `tests/template/test_doit_quality.py` | Preserves assertions for local-only `lint_blueprints` task_dep and the local mypy target list. |
+| `tests/template/test_doit_security.py` | Preserves the `--ignore-vuln CVE-2026-44405` assertion for the local audit command (tracked in #851). |
 | `tools/doit/quality.py` | Preserves `task_lint_blueprints()` and any sibling blueprint-specific tasks. |
 | `tools/doit/install_tools.py` | Preserves age/sops/terraform/opentofu installer tasks. |
 | `tools/doit/release.py` | Preserves infrafoundry-specific release automation (release-PR flow). |
