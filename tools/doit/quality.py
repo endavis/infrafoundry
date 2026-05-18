@@ -88,13 +88,7 @@ def task_lint_blueprints() -> dict[str, Any]:
 
 
 def task_check() -> dict[str, Any]:
-    """Run all checks (format, lint, type check, security, spelling, test).
-
-    Note: `audit` is intentionally not in this list yet — pre-existing CVEs in
-    transitive dependencies (cryptography, lxml, paramiko, pygments, pyjwt,
-    urllib3) need to be addressed in a separate PR before `audit` can gate
-    `doit check`. Run `doit audit` directly to see them.
-    """
+    """Run all checks (format, lint, type check, security, audit, spelling, test)."""
     return {
         "actions": [success_message],
         "task_dep": [
@@ -103,6 +97,7 @@ def task_check() -> dict[str, Any]:
             "lint_blueprints",
             "type_check",
             "security",
+            "audit",
             "spell_check",
             "test",
         ],

@@ -15,7 +15,9 @@ def task_audit() -> dict[str, Any]:
                 "pip-audit",
                 "pip-audit not installed. Run: uv sync --extra security",
             )
-            + "uv run pip-audit --skip-editable"
+            # CVE-2026-44405: no paramiko fix released yet (transitive via pyinfra).
+            # Tracked in #851 for removal once fix lands.
+            + "uv run pip-audit --skip-editable --ignore-vuln CVE-2026-44405"
         ],
         "title": title_with_actions,
     }
