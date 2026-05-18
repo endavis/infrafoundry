@@ -42,6 +42,60 @@ doit coverage
 - For coverage gates, run `doit coverage` or `pytest --cov=src/infrafoundry --cov-fail-under=69`.
 - Ensure Terraform/Ansible present if touching integration tests.
 
+### Pre-commit Integration
+
+The template includes pre-commit hooks that run automatically:
+
+```bash
+# Install hooks
+doit pre_commit_install
+
+# Run manually on all files
+doit pre_commit_run
+
+# Update hook versions
+uv run pre-commit autoupdate
+```
+
+**Hook stages in `.pre-commit-config.yaml`:**
+
+**Pre-commit stage** (runs on every `git commit`):
+
+| Hook | Purpose |
+|------|---------|
+| `trailing-whitespace` | Remove trailing whitespace |
+| `end-of-file-fixer` | Ensure files end with a newline |
+| `check-yaml` | Validate YAML syntax |
+| `check-added-large-files` | Prevent large files from being committed |
+| `check-toml` | Validate TOML syntax |
+| `check-merge-conflict` | Detect merge conflict markers |
+| `detect-private-key` | Prevent private keys from being committed |
+| `ruff` | Lint and auto-fix Python code |
+| `ruff-format` | Format Python code |
+| `mypy` | Type checking (strict mode, `src/` only) |
+| `bandit` | Security scanning (skipped if not installed) |
+| `codespell` | Spell checking |
+| `actionlint` | Lint GitHub Actions workflow files |
+| `check-branch-name` | Enforce branch naming convention |
+| `generate-doc-toc` | Update documentation TOC when docs change |
+| `no-commit-to-main` | Prevent direct commits to main branch |
+| `no-local-config` | Prevent committing local config files |
+| `protect-dynamic-version` | Protect `dynamic = ["version"]` in `pyproject.toml` |
+| `uv-lock-check` | Validate `uv.lock` is in sync with `pyproject.toml` when `pyproject.toml` is staged |
+
+**Commit-msg stage** (validates commit messages):
+
+| Hook | Purpose |
+|------|---------|
+| `conventional-pre-commit` | Enforce conventional commit format |
+
+**Post-merge / Post-checkout stage** (automatic dependency sync):
+
+| Hook | Purpose |
+|------|---------|
+| `uv-sync-on-pull` | Runs `uv sync --all-extras --dev` when `uv.lock` changes after `git pull` |
+| `uv-sync-on-checkout` | Runs `uv sync --all-extras --dev` when `uv.lock` changes after branch switch |
+
 ## Examples
 
 - **Run specific tests:**
