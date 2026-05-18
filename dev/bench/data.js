@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779118800173,
+  "lastUpdate": 1779121855182,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9300,6 +9300,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000027087127810704505",
             "extra": "mean: 151.6152057333849 usec\nrounds: 2372"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3231182bd91d7b5b3e59a98272c99c6ed5d53ec0",
+          "message": "chore: port upstream tooling test coverage (mock_subprocess + test_doit_*) (merges PR #854, addresses #838)\n\nCloses the test-coverage gap left by PR #837 (D.2 of pyproject-template\nsync), which landed code from upstream PRs #502/#505/#545/#555/#571 but\ndeferred the matching test files. The deferred tests depend on a\nmock_subprocess fixture that lives in upstream's tests/conftest.py and\nwas not previously merged into ours.\n\nSix of the seven deferred files are ported here. test_doit_release.py is\nintentionally deferred to #853 because tools/doit/release.py diverges\nsubstantially (task_release_pr, task_release_dev, validate_merge_commits,\nvalidate_issue_links exist locally; upstream has different helpers).\n\nPorts:\n  - tests/conftest.py: additive merge of Spec + mock_subprocess\n    (13 InfraFoundry fixtures preserved)\n  - tests/template/test_cleanup.py: replaced 875L subset with 1313L\n    upstream verbatim\n  - tests/template/test_doit_github.py: replaced 88L stub with 1316L\n    upstream (uses mock_subprocess)\n  - tests/template/test_doit_base.py: new, verbatim\n  - tests/template/test_doit_git.py: new, verbatim\n  - tests/template/test_doit_security.py: new, 1 adaptation\n    (audit assertion includes --ignore-vuln CVE-2026-44405; tracked in #851)\n  - tests/template/test_doit_quality.py: new with adaptations\n    (lint_blueprints in task_dep; local mypy target; new\n    TestTaskLintBlueprints class)\n\nDivergences doc updated inline with three new category-3 entries\n(one-time port; bundling for review coherence).\n\npytest tests/template/ collects 396 tests, all pass. doit check green.\n\nAddresses #838\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-18T17:30:19+01:00",
+          "tree_id": "631113a72a3bd06d37b0e3bb09a66f8cd3ffbb7d",
+          "url": "https://github.com/endavis/infrafoundry/commit/3231182bd91d7b5b3e59a98272c99c6ed5d53ec0"
+        },
+        "date": 1779121854599,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9823.52922789775,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000661022853450879",
+            "extra": "mean: 101.79640909095167 usec\nrounds: 2134"
           }
         ]
       }
