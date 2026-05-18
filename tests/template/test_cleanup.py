@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -528,6 +529,122 @@ Run tests.
 Build the package.
 """
 
+    # Mirrors the live ``docs/development/github-repository-settings.md`` intro
+    # block (lines 14-22): an H1 heading, the three-sentence intro paragraph
+    # with the broken ``repo_settings.py`` link in the middle, and the next
+    # paragraph that points at the New Project Setup guide.
+    _GITHUB_SETTINGS_WITH_TEMPLATE_REFS = """\
+# GitHub Repository Settings
+
+Complete reference for the GitHub repository settings this template expects.
+New repositories created from the template are configured automatically by
+[`repo_settings.py`](../../tools/pyproject_template/repo_settings.py) via
+`update_all_repo_settings()`. This page documents what each setting is, why
+it is needed, and whether it is set automatically or requires manual action.
+
+For the initial setup workflow, see the [New Project Setup](../template/new-project.md) guide.
+
+## Repository Settings
+
+These are the general repository-level settings applied by
+`configure_repository_settings()`.
+
+| Setting | Value | Purpose |
+| :--- | :--- | :--- |
+| **Default branch** | `main` | Standard branch for PRs and CI |
+
+## Security Settings
+
+Security features are configured by `_configure_security_settings()` in
+`repo_settings.py`.
+
+| Setting | Status | Purpose |
+| :--- | :--- | :--- |
+| **Secret scanning** | Enabled | Detects accidentally committed secrets |
+"""
+
+    # Already-scrubbed equivalent of ``_GITHUB_SETTINGS_WITH_TEMPLATE_REFS``.
+    # The intro paragraph collapses from three sentences to two (sentence 2 is
+    # gone) and the Security Settings introductory paragraph is gone; the
+    # surrounding heading and table sit directly together.
+    _GITHUB_SETTINGS_WITHOUT_TEMPLATE_REFS = """\
+# GitHub Repository Settings
+
+Complete reference for the GitHub repository settings this template expects.
+This page documents what each setting is, why
+it is needed, and whether it is set automatically or requires manual action.
+
+For the initial setup workflow, see the [New Project Setup](../template/new-project.md) guide.
+
+## Repository Settings
+
+These are the general repository-level settings applied by
+`configure_repository_settings()`.
+
+| Setting | Value | Purpose |
+| :--- | :--- | :--- |
+| **Default branch** | `main` | Standard branch for PRs and CI |
+
+## Security Settings
+
+| Setting | Status | Purpose |
+| :--- | :--- | :--- |
+| **Secret scanning** | Enabled | Detects accidentally committed secrets |
+"""
+
+    # Mirrors the live ``docs/development/release-and-automation.md`` block
+    # (lines 88-109): the "Before your first pre-release" subsection plus the
+    # full "New projects (bootstrap flow)" paragraph + code block, followed by
+    # the still-correct "Existing projects" paragraph + code block.
+    _RELEASE_AUTO_WITH_TEMPLATE_REFS = """\
+### Before your first pre-release
+
+`doit release --prerelease=alpha|beta|rc` requires a baseline `v*` tag so
+commitizen has an anchor version to bump from.
+
+**New projects (bootstrap flow).** `tools/pyproject_template/configure.py`
+auto-seeds a `v0.0.0` tag on the root commit, so nothing else is required —
+only push it when you're ready:
+
+```bash
+git push origin v0.0.0
+```
+
+**Existing projects (synced from the template before the auto-seed
+landed).** Seed the baseline tag manually, once per project:
+
+```bash
+git tag v0.0.0 "$(git rev-list --max-parents=0 HEAD | head -1)"
+git push origin v0.0.0
+```
+"""
+
+    # Already-scrubbed equivalent of ``_RELEASE_AUTO_WITH_TEMPLATE_REFS``: the
+    # broken ``configure.py`` link is gone but the lead, the "push it when
+    # ready" instruction, and the trailing code block all survive.
+    _RELEASE_AUTO_WITHOUT_TEMPLATE_REFS = """\
+### Before your first pre-release
+
+`doit release --prerelease=alpha|beta|rc` requires a baseline `v*` tag so
+commitizen has an anchor version to bump from.
+
+**New projects (bootstrap flow).** A `v0.0.0` tag is auto-seeded on the
+root commit during initial setup, so nothing else is required — only push
+it when you're ready:
+
+```bash
+git push origin v0.0.0
+```
+
+**Existing projects (synced from the template before the auto-seed
+landed).** Seed the baseline tag manually, once per project:
+
+```bash
+git tag v0.0.0 "$(git rev-list --max-parents=0 HEAD | head -1)"
+git push origin v0.0.0
+```
+"""
+
     def test_scrubs_pyproject_when_stanza_present(self, tmp_path: Path) -> None:
         """pyproject.toml stanza is removed when present."""
         from tools.pyproject_template.cleanup import scrub_template_references
@@ -769,6 +886,135 @@ Build the package.
         changed = scrub_template_references(tmp_path)
         assert changed == []
 
+    def test_scrubs_github_settings_repo_settings_intro(self, tmp_path: Path) -> None:
+        """Intro paragraph: ONLY the broken-link sentence is removed (#474).
+
+        Surgical scrub. The first sentence (``Complete reference for the
+        GitHub repository settings...``) and the doc-purpose sentence
+        (``This page documents...``) must both survive; only the middle
+        sentence pointing at deleted ``repo_settings.py`` goes away.
+        """
+        from tools.pyproject_template.cleanup import scrub_template_references
+
+        github_settings = tmp_path / "docs" / "development" / "github-repository-settings.md"
+        github_settings.parent.mkdir(parents=True)
+        github_settings.write_text(self._GITHUB_SETTINGS_WITH_TEMPLATE_REFS, encoding="utf-8")
+
+        changed = scrub_template_references(tmp_path)
+
+        new = github_settings.read_text(encoding="utf-8")
+        # The broken-link sentence is gone.
+        assert "tools/pyproject_template/repo_settings.py" not in new
+        assert "update_all_repo_settings()" not in new
+        # The first sentence survives.
+        assert "Complete reference for the GitHub repository settings this template expects." in new
+        # The doc-purpose sentence survives.
+        assert "This page documents what each setting is" in new
+        assert github_settings in changed
+
+    def test_scrubs_github_settings_security_paragraph(self, tmp_path: Path) -> None:
+        """Security Settings intro paragraph + trailing blank line gone (#474).
+
+        The ``## Security Settings`` heading and the table that follows must
+        both survive — the table sits directly under the heading once the
+        prose is removed.
+        """
+        from tools.pyproject_template.cleanup import scrub_template_references
+
+        github_settings = tmp_path / "docs" / "development" / "github-repository-settings.md"
+        github_settings.parent.mkdir(parents=True)
+        github_settings.write_text(self._GITHUB_SETTINGS_WITH_TEMPLATE_REFS, encoding="utf-8")
+
+        scrub_template_references(tmp_path)
+
+        new = github_settings.read_text(encoding="utf-8")
+        # The introductory paragraph is gone.
+        assert "_configure_security_settings()" not in new
+        assert "Security features are configured by" not in new
+        # The heading and the table survive.
+        assert "## Security Settings" in new
+        assert "**Secret scanning**" in new
+        # And the table sits right under the heading (no double blank line).
+        assert "## Security Settings\n\n| Setting" in new
+
+    def test_scrubs_release_automation_new_projects_paragraph(self, tmp_path: Path) -> None:
+        """release-and-automation.md: paragraph rewritten, surroundings intact (#474).
+
+        The lead ``**New projects (bootstrap flow).**`` and the
+        ``git push origin v0.0.0`` code block underneath must survive
+        untouched. Only the broken ``configure.py`` link is removed; the
+        replacement prose still tells the user the v0.0.0 tag exists.
+        """
+        from tools.pyproject_template.cleanup import scrub_template_references
+
+        release_auto = tmp_path / "docs" / "development" / "release-and-automation.md"
+        release_auto.parent.mkdir(parents=True)
+        release_auto.write_text(self._RELEASE_AUTO_WITH_TEMPLATE_REFS, encoding="utf-8")
+
+        changed = scrub_template_references(tmp_path)
+
+        new = release_auto.read_text(encoding="utf-8")
+        # The broken link is gone.
+        assert "tools/pyproject_template/configure.py" not in new
+        # The lead survives (paragraph was rewritten, not stripped).
+        assert "**New projects (bootstrap flow).**" in new
+        # The trailing code block survives untouched.
+        assert "```bash\ngit push origin v0.0.0\n```" in new
+        # The user-facing instruction is preserved with the new wording.
+        assert "auto-seeded on the" in new
+        assert "only push" in new
+        # The unrelated "Existing projects" paragraph + code block survive.
+        assert "**Existing projects (synced from the template before the auto-seed" in new
+        assert release_auto in changed
+
+    def test_scrub_idempotent_for_new_targets(self, tmp_path: Path) -> None:
+        """Second pass on already-scrubbed new-target files is a no-op (#474)."""
+        from tools.pyproject_template.cleanup import scrub_template_references
+
+        github_settings = tmp_path / "docs" / "development" / "github-repository-settings.md"
+        github_settings.parent.mkdir(parents=True)
+        github_settings.write_text(self._GITHUB_SETTINGS_WITH_TEMPLATE_REFS, encoding="utf-8")
+
+        release_auto = tmp_path / "docs" / "development" / "release-and-automation.md"
+        release_auto.write_text(self._RELEASE_AUTO_WITH_TEMPLATE_REFS, encoding="utf-8")
+
+        # First pass: changes expected on both files.
+        first_changed = scrub_template_references(tmp_path)
+        assert github_settings in first_changed
+        assert release_auto in first_changed
+
+        # Snapshot the post-first-pass file contents.
+        snapshots = {path: path.read_text(encoding="utf-8") for path in first_changed}
+
+        # Second pass: nothing changes.
+        second_changed = scrub_template_references(tmp_path)
+        assert second_changed == []
+
+        for path, original in snapshots.items():
+            assert path.read_text(encoding="utf-8") == original
+
+    def test_dry_run_does_not_write_new_targets(self, tmp_path: Path) -> None:
+        """Under dry_run=True the new-target files are reported but not written (#474)."""
+        from tools.pyproject_template.cleanup import scrub_template_references
+
+        github_settings = tmp_path / "docs" / "development" / "github-repository-settings.md"
+        github_settings.parent.mkdir(parents=True)
+        github_settings.write_text(self._GITHUB_SETTINGS_WITH_TEMPLATE_REFS, encoding="utf-8")
+
+        release_auto = tmp_path / "docs" / "development" / "release-and-automation.md"
+        release_auto.write_text(self._RELEASE_AUTO_WITH_TEMPLATE_REFS, encoding="utf-8")
+
+        changed = scrub_template_references(tmp_path, dry_run=True)
+
+        # Both files are reported as would-change.
+        assert github_settings in changed
+        assert release_auto in changed
+        # But nothing was written.
+        assert (
+            github_settings.read_text(encoding="utf-8") == self._GITHUB_SETTINGS_WITH_TEMPLATE_REFS
+        )
+        assert release_auto.read_text(encoding="utf-8") == self._RELEASE_AUTO_WITH_TEMPLATE_REFS
+
 
 class TestCleanupAllDeletesTemplateCleanTask:
     """Regression test for issue #469: ``tools/doit/template_clean.py`` goes away.
@@ -872,3 +1118,195 @@ class TestCleanupAllInvokesScrubber:
 
         # Scrubber must not run under SETUP_ONLY.
         assert pyproject.read_text(encoding="utf-8") == pyproject_content
+
+    def test_all_mode_invokes_regenerate_and_check(self, tmp_path: Path) -> None:
+        """ALL-mode invokes ``regenerate_doc_toc`` AND ``check_stale_template_references`` (#474).
+
+        Mocks both helpers so we don't depend on the real subprocess; asserts
+        that they're each called exactly once. Also asserts the SETUP_ONLY
+        path leaves both helpers untouched.
+        """
+        from tools.pyproject_template import cleanup as cleanup_module
+        from tools.pyproject_template.cleanup import (
+            CleanupMode,
+            cleanup_template_files,
+        )
+
+        # ALL-mode needs at least one deletable file so the function reaches
+        # the post-cleanup helpers.
+        (tmp_path / "bootstrap.py").touch()
+
+        with (
+            patch.object(cleanup_module, "regenerate_doc_toc", return_value=False) as mock_regen,
+            patch.object(
+                cleanup_module, "check_stale_template_references", return_value=[]
+            ) as mock_check,
+        ):
+            cleanup_template_files(CleanupMode.ALL, tmp_path)
+
+        mock_regen.assert_called_once_with(tmp_path, dry_run=False)
+        mock_check.assert_called_once_with(tmp_path)
+
+        # SETUP_ONLY mode must NOT call either helper.
+        (tmp_path / "bootstrap.py").touch()  # recreate (was deleted above)
+        with (
+            patch.object(cleanup_module, "regenerate_doc_toc", return_value=False) as mock_regen2,
+            patch.object(
+                cleanup_module, "check_stale_template_references", return_value=[]
+            ) as mock_check2,
+        ):
+            cleanup_template_files(CleanupMode.SETUP_ONLY, tmp_path)
+
+        mock_regen2.assert_not_called()
+        mock_check2.assert_not_called()
+
+
+class TestRegenerateDocToc:
+    """Tests for ``regenerate_doc_toc`` (issue #474)."""
+
+    def test_returns_false_when_script_missing(self, tmp_path: Path) -> None:
+        """No ``tools/generate_doc_toc.py`` -> return False, no exception."""
+        from tools.pyproject_template.cleanup import regenerate_doc_toc
+
+        # Only a TOC; no generator script.
+        toc = tmp_path / "docs" / "TABLE_OF_CONTENTS.md"
+        toc.parent.mkdir(parents=True)
+        toc.write_text("# TOC\n", encoding="utf-8")
+
+        assert regenerate_doc_toc(tmp_path) is False
+
+    def test_returns_false_when_toc_missing(self, tmp_path: Path) -> None:
+        """No ``docs/TABLE_OF_CONTENTS.md`` -> return False."""
+        from tools.pyproject_template.cleanup import regenerate_doc_toc
+
+        # Only a script; no TOC.
+        script = tmp_path / "tools" / "generate_doc_toc.py"
+        script.parent.mkdir(parents=True)
+        script.write_text("print('hi')\n", encoding="utf-8")
+
+        assert regenerate_doc_toc(tmp_path) is False
+
+    def test_invokes_subprocess_and_reports_change(self, tmp_path: Path) -> None:
+        """Mocked subprocess: exit 1 -> True, exit 0 -> False, exit 2 -> False (warns)."""
+        from tools.pyproject_template.cleanup import regenerate_doc_toc
+
+        # Both files must exist for the function to invoke the subprocess.
+        script = tmp_path / "tools" / "generate_doc_toc.py"
+        script.parent.mkdir(parents=True)
+        script.write_text("print('hi')\n", encoding="utf-8")
+        toc = tmp_path / "docs" / "TABLE_OF_CONTENTS.md"
+        toc.parent.mkdir(parents=True)
+        toc.write_text("# TOC\n", encoding="utf-8")
+
+        # Exit 1 = changes written -> True.
+        completed_changed = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="")
+        with patch("subprocess.run", return_value=completed_changed) as mock_run:
+            assert regenerate_doc_toc(tmp_path) is True
+            mock_run.assert_called_once()
+
+        # Exit 0 = no change -> False (success path, but nothing happened).
+        completed_nochange = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="", stderr=""
+        )
+        with patch("subprocess.run", return_value=completed_nochange):
+            assert regenerate_doc_toc(tmp_path) is False
+
+        # Exit 2 = real failure -> False (warning logged).
+        completed_failed = subprocess.CompletedProcess(
+            args=[], returncode=2, stdout="", stderr="boom"
+        )
+        with patch("subprocess.run", return_value=completed_failed):
+            assert regenerate_doc_toc(tmp_path) is False
+
+    def test_dry_run_does_not_invoke_subprocess(self, tmp_path: Path) -> None:
+        """Under dry_run=True the subprocess is NOT invoked; returns True."""
+        from tools.pyproject_template.cleanup import regenerate_doc_toc
+
+        script = tmp_path / "tools" / "generate_doc_toc.py"
+        script.parent.mkdir(parents=True)
+        script.write_text("print('hi')\n", encoding="utf-8")
+        toc = tmp_path / "docs" / "TABLE_OF_CONTENTS.md"
+        toc.parent.mkdir(parents=True)
+        toc.write_text("# TOC\n", encoding="utf-8")
+
+        with patch("subprocess.run") as mock_run:
+            assert regenerate_doc_toc(tmp_path, dry_run=True) is True
+            mock_run.assert_not_called()
+
+
+class TestCheckStaleTemplateReferences:
+    """Tests for ``check_stale_template_references`` (issue #474)."""
+
+    def test_returns_empty_when_docs_clean(self, tmp_path: Path) -> None:
+        """Clean docs tree (no markers) -> empty list."""
+        from tools.pyproject_template.cleanup import check_stale_template_references
+
+        clean_doc = tmp_path / "docs" / "guide.md"
+        clean_doc.parent.mkdir(parents=True)
+        clean_doc.write_text("# Guide\n\nNothing template-y here.\n", encoding="utf-8")
+
+        assert check_stale_template_references(tmp_path) == []
+
+    def test_detects_pyproject_template_marker_in_docs(self, tmp_path: Path) -> None:
+        """``tools/pyproject_template/`` in a doc -> reported with line number."""
+        from tools.pyproject_template.cleanup import check_stale_template_references
+
+        bad_doc = tmp_path / "docs" / "guide.md"
+        bad_doc.parent.mkdir(parents=True)
+        bad_doc.write_text(
+            "# Guide\n\nSee `tools/pyproject_template/foo.py` for details.\n",
+            encoding="utf-8",
+        )
+
+        survivors = check_stale_template_references(tmp_path)
+        assert len(survivors) == 1
+        path, line_no, content = survivors[0]
+        assert path == bad_doc
+        assert line_no == 3
+        assert "tools/pyproject_template/foo.py" in content
+
+    def test_detects_template_tools_reference_marker(self, tmp_path: Path) -> None:
+        """``template/tools-reference.md`` in a doc -> reported."""
+        from tools.pyproject_template.cleanup import check_stale_template_references
+
+        bad_doc = tmp_path / "docs" / "TABLE_OF_CONTENTS.md"
+        bad_doc.parent.mkdir(parents=True)
+        bad_doc.write_text(
+            "# TOC\n\n- [Tools](template/tools-reference.md)\n",
+            encoding="utf-8",
+        )
+
+        survivors = check_stale_template_references(tmp_path)
+        assert len(survivors) == 1
+        path, _, content = survivors[0]
+        assert path == bad_doc
+        assert "template/tools-reference.md" in content
+
+    def test_skips_missing_docs_directory(self, tmp_path: Path) -> None:
+        """No ``docs/`` directory -> empty list (and README still scanned if present)."""
+        from tools.pyproject_template.cleanup import check_stale_template_references
+
+        # No docs/ at all.
+        assert check_stale_template_references(tmp_path) == []
+
+        # Add a clean README to confirm it's scanned without error.
+        readme = tmp_path / "README.md"
+        readme.write_text("# Hi\nNothing template-y here.\n", encoding="utf-8")
+        assert check_stale_template_references(tmp_path) == []
+
+    def test_scans_readme_at_root(self, tmp_path: Path) -> None:
+        """``README.md`` with a marker is reported."""
+        from tools.pyproject_template.cleanup import check_stale_template_references
+
+        readme = tmp_path / "README.md"
+        readme.write_text(
+            "# Project\n\nRun `tools/doit/template_clean.py --setup` to clean up.\n",
+            encoding="utf-8",
+        )
+
+        survivors = check_stale_template_references(tmp_path)
+        assert len(survivors) == 1
+        path, line_no, content = survivors[0]
+        assert path == readme
+        assert line_no == 3
+        assert "tools/doit/template_clean" in content
