@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779201338453,
+  "lastUpdate": 1779203315281,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9362,6 +9362,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007302809299347249",
             "extra": "mean: 101.13906171203853 usec\nrounds: 1507"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c23bb3c1a5d777b2fee7cf1cb3275f835eb63ad5",
+          "message": "chore: bump idna to 3.15 to clear CVE-2026-45409 (merges PR #858, addresses #857)\n\nPure transitive lockfile bump. idna 3.11 -> 3.15 to clear\nCVE-2026-45409 surfaced by pip-audit (now gated into doit check\nvia PR #852).\n\ndoit check passes green including the audit gate. The 1 remaining\nignored vuln is paramiko CVE-2026-44405 (tracked separately in #851);\nno other change to the audit profile.\n\nSurfaced during work on #855 (deepening test_doit_release.py\ncoverage); that branch is paused and will resume after this merges.\n\nAddresses #857\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-19T16:07:58+01:00",
+          "tree_id": "88f43040b10dccb790707189ad429a9c127c21a2",
+          "url": "https://github.com/endavis/infrafoundry/commit/c23bb3c1a5d777b2fee7cf1cb3275f835eb63ad5"
+        },
+        "date": 1779203314082,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6476.556333303495,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000033963072311670486",
+            "extra": "mean: 154.40304207003325 usec\nrounds: 2686"
           }
         ]
       }
