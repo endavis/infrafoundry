@@ -73,7 +73,7 @@ class TestSecurityTaskGates:
         assert isinstance(action, str)
         assert "uv pip show pip-audit" in action
         assert "pip-audit not installed. Run: uv sync --extra security" in action
-        assert "uv run pip-audit --skip-editable --ignore-vuln CVE-2026-44405" in action
+        assert "uv run pip-audit --skip-editable" in action
         # Bug-fix invariant: the bare-swallow pattern must be gone.
         assert "|| echo 'pip-audit not installed" not in action
 
