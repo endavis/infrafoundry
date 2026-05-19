@@ -73,6 +73,15 @@ file = "infrafoundry.secrets.backends.file:register"
 requires = ["hatchling>=1.29.0", "hatch-vcs>=0.5.0"]
 build-backend = "hatchling.build"
 
+[tool.uv]
+# Override pyinfra 3.8.0's precautionary `paramiko<5` cap so we can pick up
+# paramiko 5.x (which contains the CVE-2026-44405 fix at commit a4489456).
+# Probe (2026-05-18) confirmed pyinfra's SSH connector references only
+# `paramiko.SSHClient` and none of the APIs removed in paramiko 5
+# (DSAKey, GSSAPI, SHA-1 KEX names). Drop this override when pyinfra
+# releases a version that lifts the cap natively.
+override-dependencies = ["paramiko>=5"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/infrafoundry"]
 
