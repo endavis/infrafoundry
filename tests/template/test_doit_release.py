@@ -217,6 +217,62 @@ class TestValidateMergeCommits:
 
         assert validate_merge_commits(_silent_console()) is False
 
+    @pytest.mark.parametrize(
+        "commit_type",
+        ["feat", "fix", "refactor", "docs", "test", "chore", "ci", "perf", "release"],
+    )
+    def test_all_allowed_commit_types_pass(
+        self, monkeypatch: MonkeyPatch, commit_type: str
+    ) -> None:
+        """All nine allowed commit types are accepted by the regex."""
+        _, fake = self._fake_run(
+            describe_returncode=0,
+            describe_stdout="v0.1.0\n",
+            log_stdout=f"abc1234 {commit_type}: add thing (merges PR #1, addresses #2)",
+        )
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+
+        assert validate_merge_commits(_silent_console()) is True
+
+    @pytest.mark.parametrize(
+        "log_stdout",
+        [
+            "abc1234 feat: add thing (merges PR #1, addresses #2, #3)",
+            "abc1234 feat: add thing (merges PR #1, addresses #2, #3, #4, #5)",
+        ],
+    )
+    def test_multi_issue_format_passes(self, monkeypatch: MonkeyPatch, log_stdout: str) -> None:
+        """Multiple ``#N`` references after ``addresses`` are accepted."""
+        _, fake = self._fake_run(
+            describe_returncode=0,
+            describe_stdout="v0.1.0\n",
+            log_stdout=log_stdout,
+        )
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+
+        assert validate_merge_commits(_silent_console()) is True
+
+    @pytest.mark.parametrize(
+        "log_stdout",
+        [
+            "abc1234 feat: add thing",  # missing (merges PR #N)
+            "abc1234 feat: add thing (addresses #1, merges PR #1)",  # wrong order
+            "abc1234 Feat: add thing (merges PR #1)",  # capitalized type
+            "abc1234 banana: add thing (merges PR #1)",  # invalid type
+            "abc1234 feat: add thing (addresses #1)",  # addresses without merges
+        ],
+    )
+    def test_invalid_commit_shapes_fail(self, monkeypatch: MonkeyPatch, log_stdout: str) -> None:
+        """Commit strings that violate the regex convention return False."""
+        _, fake = self._fake_run(
+            describe_returncode=0,
+            describe_stdout="v0.1.0\n",
+            log_stdout=log_stdout,
+        )
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+
+        assert validate_merge_commits(_silent_console()) is False
+
 
 # ---------------------------------------------------------------------------
 # TestValidateIssueLinks — fresh tests (no upstream equivalent)
@@ -459,6 +515,139 @@ class TestTaskReleasePr:
             action()
         assert exc_info.value.code == 1
 
+    def test_cleanup_runs_on_changelog_failure(self, monkeypatch: MonkeyPatch) -> None:
+        """Changelog failure triggers cleanup: checkout main and delete branch."""
+        calls, _ = self._build_happy_fake_run(next_version="1.2.3")
+
+        def fake(
+            cmd: list[str],
+            *_args: object,
+            **_kwargs: object,
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(list(cmd))
+            if cmd[:5] == ["uv", "run", "cz", "changelog", "--incremental"]:
+                raise subprocess.CalledProcessError(1, cmd, "", "boom")
+            stdout = ""
+            if cmd[:3] == ["git", "branch", "--show-current"]:
+                stdout = "main\n"
+            elif cmd[:2] == ["git", "status"]:
+                stdout = ""
+            elif cmd[:2] == ["git", "describe"]:
+                stdout = "v0.1.0\n"
+            elif "--get-next" in cmd:
+                stdout = "1.2.3\n"
+            return _make_completed(cmd, returncode=0, stdout=stdout)
+
+        # Reset calls list since _build_happy_fake_run already appended to it
+        calls.clear()
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+
+        action = task_release_pr()["actions"][0]
+        with pytest.raises(SystemExit):
+            action()
+
+        # Find the index of the failed changelog call
+        changelog_indices = [
+            i
+            for i, c in enumerate(calls)
+            if c[:5] == ["uv", "run", "cz", "changelog", "--incremental"]
+        ]
+        assert len(changelog_indices) == 1
+        failed_idx = changelog_indices[0]
+
+        # Both cleanup calls must appear AFTER the failed changelog call
+        checkout_indices = [i for i, c in enumerate(calls) if c == ["git", "checkout", "main"]]
+        branch_delete_indices = [
+            i for i, c in enumerate(calls) if c == ["git", "branch", "-D", "release/v1.2.3"]
+        ]
+        assert len(checkout_indices) >= 1
+        assert checkout_indices[0] > failed_idx
+        assert len(branch_delete_indices) >= 1
+        assert branch_delete_indices[0] > failed_idx
+
+    def test_cleanup_runs_on_commit_failure(self, monkeypatch: MonkeyPatch) -> None:
+        """Commit failure triggers cleanup: checkout main and delete branch."""
+        calls: list[list[str]] = []
+
+        def fake(
+            cmd: list[str],
+            *_args: object,
+            **_kwargs: object,
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(list(cmd))
+            if cmd[:2] == ["git", "commit"]:
+                raise subprocess.CalledProcessError(1, cmd, "", "boom")
+            stdout = ""
+            if cmd[:3] == ["git", "branch", "--show-current"]:
+                stdout = "main\n"
+            elif cmd[:2] == ["git", "status"]:
+                stdout = ""
+            elif cmd[:2] == ["git", "describe"]:
+                stdout = "v0.1.0\n"
+            elif "--get-next" in cmd:
+                stdout = "1.2.3\n"
+            return _make_completed(cmd, returncode=0, stdout=stdout)
+
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+
+        action = task_release_pr()["actions"][0]
+        with pytest.raises(SystemExit):
+            action()
+
+        # Find the index of the failed commit call
+        commit_indices = [i for i, c in enumerate(calls) if c[:2] == ["git", "commit"]]
+        assert len(commit_indices) >= 1
+        failed_idx = commit_indices[0]
+
+        # Both cleanup calls must appear AFTER the failed commit call
+        checkout_indices = [i for i, c in enumerate(calls) if c == ["git", "checkout", "main"]]
+        branch_delete_indices = [
+            i for i, c in enumerate(calls) if c == ["git", "branch", "-D", "release/v1.2.3"]
+        ]
+        assert len(checkout_indices) >= 1
+        assert checkout_indices[0] > failed_idx
+        assert len(branch_delete_indices) >= 1
+        assert branch_delete_indices[0] > failed_idx
+
+    @pytest.mark.parametrize(
+        "increment,expected",
+        [("major", "MAJOR"), ("minor", "MINOR"), ("patch", "PATCH")],
+    )
+    def test_increment_flag_passthrough(
+        self,
+        monkeypatch: MonkeyPatch,
+        increment: str,
+        expected: str,
+    ) -> None:
+        """The ``--increment`` value is upcased and forwarded to ``cz bump --get-next``."""
+        calls, fake = self._build_happy_fake_run(next_version="1.2.3")
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+
+        action = task_release_pr(increment=increment)["actions"][0]
+        action()  # must not raise
+
+        get_next_calls = [c for c in calls if "--get-next" in c]
+        assert len(get_next_calls) == 1
+        assert ["uv", "run", "cz", "bump", "--get-next", "--increment", expected] == get_next_calls[
+            0
+        ]
+
+    def test_success_summary_prints_next_steps(
+        self, monkeypatch: MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Success path: summary output contains version and next-step instructions."""
+        _, fake = self._build_happy_fake_run(next_version="1.2.3")
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+
+        action = task_release_pr()["actions"][0]
+        action()
+
+        captured = capsys.readouterr().out
+        assert "Release PR for v1.2.3 created!" in captured
+        assert "Next steps:" in captured
+        assert "1. Review and merge the PR." in captured
+        assert "2. After merge, run: doit release_tag" in captured
+
 
 # ---------------------------------------------------------------------------
 # TestTaskReleaseTag — fresh tests (light hybrid coverage)
@@ -625,6 +814,92 @@ class TestTaskReleaseTag:
             action()
         assert exc_info.value.code == 1
 
+    def test_version_extracted_from_branch_when_title_lacks_version(
+        self, monkeypatch: MonkeyPatch
+    ) -> None:
+        """Version falls back to branch name when PR title has no version pattern."""
+        import json as _json
+
+        pr_payload = _json.dumps(
+            [
+                {
+                    "title": "some random title without version",
+                    "mergedAt": "2026-01-01",
+                    "headRefName": "release/v2.0.0",
+                }
+            ]
+        )
+        calls: list[list[str]] = []
+
+        def fake(
+            cmd: list[str],
+            *_args: object,
+            **_kwargs: object,
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(list(cmd))
+            if cmd[:3] == ["git", "branch", "--show-current"]:
+                return _make_completed(cmd, stdout="main\n")
+            if cmd[:2] == ["git", "pull"]:
+                return _make_completed(cmd)
+            if cmd[:2] == ["gh", "pr"]:
+                return _make_completed(cmd, stdout=pr_payload)
+            if cmd[:3] == ["git", "tag", "-l"]:
+                return _make_completed(cmd, stdout="")
+            return _make_completed(cmd)
+
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+
+        action = task_release_tag()["actions"][0]
+        action()  # must not raise — branch fallback fires
+
+        tag_create = [c for c in calls if c[:2] == ["git", "tag"] and len(c) == 3]
+        assert len(tag_create) == 1
+        assert tag_create[0][2] == "v2.0.0"
+
+        push_calls = [c for c in calls if c[:2] == ["git", "push"] and "v2.0.0" in c]
+        assert len(push_calls) == 1
+
+    def test_pypi_url_uses_placeholder_when_pyproject_missing(
+        self,
+        monkeypatch: MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """When pyproject.toml is absent, URLs use the ``package-name`` placeholder."""
+        _, fake = self._build_happy_fake_run(version="1.2.3")
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+        monkeypatch.chdir(tmp_path)  # no pyproject.toml here
+
+        action = task_release_tag()["actions"][0]
+        action()
+
+        captured = capsys.readouterr().out
+        assert "https://test.pypi.org/project/package-name/" in captured
+        assert "https://pypi.org/project/package-name/" in captured
+
+    def test_url_printout_includes_tag_and_resolved_package_name(
+        self,
+        monkeypatch: MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """When pyproject.toml is present, URLs use the resolved package name."""
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "my-pkg"\nversion = "0.1.0"\n',
+            encoding="utf-8",
+        )
+        _, fake = self._build_happy_fake_run(version="1.2.3")
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+        monkeypatch.chdir(tmp_path)
+
+        action = task_release_tag()["actions"][0]
+        action()
+
+        captured = capsys.readouterr().out
+        assert "Release v1.2.3 tagged!" in captured
+        assert "https://test.pypi.org/project/my-pkg/" in captured
+        assert "https://pypi.org/project/my-pkg/" in captured
+
 
 # ---------------------------------------------------------------------------
 # TestTaskReleaseDev — fresh tests (light hybrid coverage)
@@ -720,3 +995,19 @@ class TestTaskReleaseDev:
 
         push_calls = [c for c in calls if c[:2] == ["git", "push"] and "--follow-tags" in c]
         assert len(push_calls) == 1
+
+    def test_off_main_branch_with_no_exits(
+        self, monkeypatch: MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """User enters ``"n"`` at the off-main warning prompt → ``sys.exit(1)``."""
+        _, fake = self._build_happy_fake_run(branch="feature-branch")
+        monkeypatch.setattr("tools.doit.release.subprocess.run", fake)
+        monkeypatch.setattr("builtins.input", lambda _: "n")
+
+        action = task_release_dev()["actions"][0]
+        with pytest.raises(SystemExit) as exc_info:
+            action()
+        assert exc_info.value.code == 1
+
+        captured = capsys.readouterr().out
+        assert "Release cancelled." in captured
