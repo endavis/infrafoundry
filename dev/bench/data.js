@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779203315281,
+  "lastUpdate": 1779204800089,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9393,6 +9393,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000033963072311670486",
             "extra": "mean: 154.40304207003325 usec\nrounds: 2686"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "68d5664b761a6f7f544f86cf54e2d52c6e45cec8",
+          "message": "test: deepen test_doit_release.py coverage (merges PR #859, addresses #855)\n\nAdds the deferred-coverage areas promised in #853's hybrid plan\n(landed at light depth in PR #856): cleanup-path assertions,\n--increment flag passthrough, output-formatting strings, off-main\n\"n\" decline, full validate_merge_commits regex coverage, and\ntask_release_tag edge cases.\n\n10 new test methods, 26 new parametrize cases total. No production\ncode changes; pure additions to the existing test file.\n\nTest counts:\n  - tests/template/test_doit_release.py: 24 -> 50 collected\n  - tests/template/ directory: 420 -> 446\n  - doit check passes green end-to-end (audit gate active)\n\nNo divergences-doc update needed; the existing category-3 entry\nfrom PR #856 (\"Local-flow test file with no upstream equivalent...\")\nstill accurately describes the file.\n\nWork paused mid-flight when doit check surfaced a pre-existing\nidna CVE; that was split into PR #858 (issue #857) per workflow\ndiscipline. After #858 merged this branch was rebased onto main\nand resumed.\n\nAddresses #855\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-19T16:32:39+01:00",
+          "tree_id": "39a181665610a5bda394f28e22c2113ac20329eb",
+          "url": "https://github.com/endavis/infrafoundry/commit/68d5664b761a6f7f544f86cf54e2d52c6e45cec8"
+        },
+        "date": 1779204798677,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9738.977079218985,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004530755081638572",
+            "extra": "mean: 102.68018826472016 usec\nrounds: 2778"
           }
         ]
       }
