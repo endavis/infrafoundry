@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779204800089,
+  "lastUpdate": 1779212818313,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9424,6 +9424,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004530755081638572",
             "extra": "mean: 102.68018826472016 usec\nrounds: 2778"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9181df136bb3f5d19e795393e9623c757a28c973",
+          "message": "chore: override paramiko<5, drop CVE-2026-44405 ignore-vuln (merges PR #860, addresses #851)\n\nCloses #851 by bumping paramiko 3.5.1 -> 5.0.0 (which contains the\nfix for CVE-2026-44405, commit a4489456 in paramiko upstream) and\nremoving the --ignore-vuln workaround introduced in PR #852.\n\nThe natural upgrade path is blocked by pyinfra 3.8.0's declared\n'paramiko<5' cap. A probe (2026-05-19) confirmed the cap is\nprecautionary, not load-bearing:\n  - pyinfra's SSHConnector references only paramiko.SSHClient\n  - none of paramiko 5's removed APIs (DSAKey, GSSAPI, SHA-1 KEX)\n    are referenced anywhere in pyinfra's connector code\n  - all 12 pyinfra-related tests in the suite pass with paramiko 5\n  - pip-audit reports 'No known vulnerabilities found' (0 ignored)\n  - pyinfra CLI works\n\nTo bypass the declared cap, [tool.uv] override-dependencies is added\nto pyproject.toml with a 6-line inline comment documenting the probe\nrationale and a 'drop when pyinfra lifts the cap natively' note.\n\nDivergences-doc cleanup: tests/template/test_doit_security.py was\nlisted in category 3 (PR #854) specifically because of the --ignore-vuln\nassertion. With the flag gone the file is verbatim upstream again, so\nthe row is removed.\n\ndoit check passes clean (audit: No known vulnerabilities found,\n0 ignored).\n\nCaveat: probe did not include a live-SSH integration test against\nreal targets. Based on the source scan the surface area for runtime\nbreakage is essentially zero, but it's not zero-zero.\n\nAddresses #851\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-19T18:46:25+01:00",
+          "tree_id": "89dcbf114ae4cd6e66a804e8234baffeaec099db",
+          "url": "https://github.com/endavis/infrafoundry/commit/9181df136bb3f5d19e795393e9623c757a28c973"
+        },
+        "date": 1779212817159,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7214.865542695549,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010676894337430451",
+            "extra": "mean: 138.60272157288043 usec\nrounds: 2313"
           }
         ]
       }
