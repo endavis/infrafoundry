@@ -144,6 +144,7 @@ customization a reviewer must verify survived the merge.
 | `tests/conftest.py` | Preserves InfraFoundry-specific fixtures (`mock_config_manager`, `mock_config_dir`, sample resource fixtures, etc.) alongside upstream's `mock_subprocess` fixture. |
 | `tests/template/test_doit_quality.py` | Preserves assertions for local-only `lint_blueprints` task_dep and the local mypy target list. |
 | `tests/template/test_doit_security.py` | Preserves the `--ignore-vuln CVE-2026-44405` assertion for the local audit command (tracked in #851). |
+| `tests/template/test_doit_release.py` | Local-flow test file with no upstream equivalent (upstream's version targets a different `task_release` shape; local covers `task_release_pr`, `task_release_tag`, `task_release_dev`, `validate_*` helpers). Tracked in #853. |
 | `tools/doit/quality.py` | Preserves `task_lint_blueprints()` and any sibling blueprint-specific tasks. |
 | `tools/doit/install_tools.py` | Preserves age/sops/terraform/opentofu installer tasks. |
 | `tools/doit/release.py` | Preserves infrafoundry-specific release automation (release-PR flow). |
