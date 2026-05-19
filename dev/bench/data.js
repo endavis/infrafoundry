@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779121855182,
+  "lastUpdate": 1779201338453,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9331,6 +9331,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000661022853450879",
             "extra": "mean: 101.79640909095167 usec\nrounds: 2134"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3094431167d96fda441f792deb405f1c63791d5c",
+          "message": "test: add local-flow tests for tools/doit/release.py (merges PR #856, addresses #853)\n\nCloses the last test-coverage gap from PR #837 (Phase D.2 of\npyproject-template sync). PR #854 ported six of the seven deferred test\nfiles; this PR adds the seventh, written fresh against InfraFoundry's\nlocal release flow rather than transplanted from upstream.\n\nLocal tools/doit/release.py exposes task_release_pr, task_release_tag,\ntask_release_dev, validate_merge_commits, and validate_issue_links —\nnone match upstream's task_release shape. Tests cover happy paths plus\ncritical error branches for all six functions.\n\nNew tests/template/test_doit_release.py (722 lines, 24 tests):\n  - TestGetPypiNameFromPyproject (5, ported verbatim)\n  - TestValidateMergeCommits (4, ported with local-regex adaptation)\n  - TestValidateIssueLinks (3, fresh)\n  - TestTaskReleasePr (5: happy + 4 errors)\n  - TestTaskReleaseTag (4: happy + 3 errors)\n  - TestTaskReleaseDev (3: happy + dirty + off-main warning)\n\nDeeper coverage (cleanup paths, output formatting, --increment\npassthrough, every regex branch) is tracked in #855 (NOT closed here).\n\nmock_subprocess fixture patches tools.doit.github.subprocess.run;\nrelease.py imports subprocess directly, so these tests use\nmonkeypatch.setattr(\"tools.doit.release.subprocess.run\", fake) instead,\nmatching the upstream test file's pattern.\n\nDivergences doc updated inline (one-time port; bundling for review\ncoherence, same as PR #854).\n\npytest tests/template/ now collects 420 tests (up from 396, no\nregressions). doit check green.\n\nAddresses #853\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-19T15:35:06+01:00",
+          "tree_id": "429a620c8d374c675205a824fded2196d58c3b16",
+          "url": "https://github.com/endavis/infrafoundry/commit/3094431167d96fda441f792deb405f1c63791d5c"
+        },
+        "date": 1779201337779,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9887.376677936598,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007302809299347249",
+            "extra": "mean: 101.13906171203853 usec\nrounds: 1507"
           }
         ]
       }
