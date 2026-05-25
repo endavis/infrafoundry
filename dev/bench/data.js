@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779212818313,
+  "lastUpdate": 1779725476108,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9455,6 +9455,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010676894337430451",
             "extra": "mean: 138.60272157288043 usec\nrounds: 2313"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "028be8e44ecec8ec61418dc3eb3b4236b3929417",
+          "message": "chore(deps): bump the dev-dependencies group across 1 directory with 2 updates (merges PR #864)\n\nBumps the dev-dependencies group with 2 updates in the / directory: [mypy](https://github.com/python/mypy) and [ruff](https://github.com/astral-sh/ruff).\n\n\nUpdates `mypy` from 1.20.2 to 2.1.0\n- [Changelog](https://github.com/python/mypy/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/python/mypy/compare/v1.20.2...v2.1.0)\n\nUpdates `ruff` from 0.15.12 to 0.15.13\n- [Release notes](https://github.com/astral-sh/ruff/releases)\n- [Changelog](https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/astral-sh/ruff/compare/0.15.12...0.15.13)\n\n---\nupdated-dependencies:\n- dependency-name: mypy\n  dependency-version: 2.1.0\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n  dependency-group: dev-dependencies\n- dependency-name: ruff\n  dependency-version: 0.15.13\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: dev-dependencies\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-05-25T17:10:48+01:00",
+          "tree_id": "9fccb313f031bb89199bb6d64e125e5ce9379b95",
+          "url": "https://github.com/endavis/infrafoundry/commit/028be8e44ecec8ec61418dc3eb3b4236b3929417"
+        },
+        "date": 1779725475510,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7135.685401872138,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014912157712050044",
+            "extra": "mean: 140.14070739968963 usec\nrounds: 2365"
           }
         ]
       }
