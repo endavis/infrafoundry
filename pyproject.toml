@@ -25,7 +25,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "codespell>=2.2",
-    "commitizen>=4.15.1",
+    "commitizen>=4.16.2",
     "coverage-badge>=1.1.0",
     "hypothesis>=6.152.6",
     "mkdocs-material>=9.5",
