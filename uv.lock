@@ -963,14 +963,14 @@ wheels = [
 
 [[package]]
 name = "hypothesis"
-version = "6.152.7"
+version = "6.152.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "sortedcontainers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/91/dd/19d273652eb20dac15f32bbc484f2f6d51ccd8fe51fdb27da3f85f9017e8/hypothesis-6.152.7.tar.gz", hash = "sha256:741dedcede2ae0f32c32929a5992804b61f2b0400403b6a51a881a2b58482782", size = 468147, upload-time = "2026-05-13T04:19:34.124Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2f/de/7437cb6baa558e7f520fe41ef55bbd944d17351cee299f7993f032a637f1/hypothesis-6.152.11.tar.gz", hash = "sha256:13167fb2fd61710ff9e9ad3fd6ac02bc683c9999a4166c9877b0b0422a908134", size = 472721, upload-time = "2026-05-26T00:15:57.82Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/1e/8222edaee03c37350eaa726213614e343a62f1e56396dd000ad9277bfa3d/hypothesis-6.152.7-py3-none-any.whl", hash = "sha256:c0b17dd428fcb6e962f60315f6f4a77816c72fbb281ce9ba73699dabead5ec82", size = 533802, upload-time = "2026-05-13T04:19:30.635Z" },
+    { url = "https://files.pythonhosted.org/packages/44/63/1ff40142fd3cd641f93e8a1f70c6b9fe24255f6111a137a25f2fcbd4ba71/hypothesis-6.152.11-py3-none-any.whl", hash = "sha256:deffc64bf3c178ca8225ce56926c345e43aacbc3d8b8d6df6f766c514f48e81f", size = 538883, upload-time = "2026-05-26T00:15:54.754Z" },
 ]
 
 [[package]]
@@ -1057,7 +1057,7 @@ requires-dist = [
     { name = "coverage-badge", marker = "extra == 'dev'", specifier = ">=1.1.0" },
     { name = "cyclonedx-bom", marker = "extra == 'security'", specifier = ">=4.0" },
     { name = "doit", specifier = ">=0.36.0" },
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.152.7" },
+    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.152.11" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "mkdocs-material", marker = "extra == 'dev'", specifier = ">=9.5" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'dev'", specifier = ">=1.0.4" },
