@@ -6,6 +6,8 @@ Coverage:
       otherwise; per-field overrides honored individually.
     - Empty-string env vars treated as "unset" (fall back to settings).
     - ``OPNSENSE_VERIFY_SSL`` parsing for the project's full truthy/falsy set.
+    - ``proxy`` resolution: settings value, gated ``OPNSENSE_PROXY`` override,
+      empty / unset normalizing to ``None``.
     - One-time-per-process warning behavior, including suppression and the
       ``reset_warning_state_for_tests`` test affordance.
     - Warning suppressed when override active but resolved URL matches
@@ -23,6 +25,7 @@ from infrafoundry.providers.opnsense.services._credentials import (
     API_SECRET_ENV_VAR,
     API_URL_ENV_VAR,
     GATE_ENV_VAR,
+    PROXY_ENV_VAR,
     VERIFY_SSL_ENV_VAR,
     reset_warning_state_for_tests,
     resolve_credentials,
@@ -37,14 +40,22 @@ def _settings(
     api_key: str = "settings-key",
     api_secret: str = "settings-secret",
     verify_ssl: bool = True,
+    proxy: str | None = None,
 ) -> dict[str, object]:
-    """Build a representative ``provider_settings`` dict for test inputs."""
-    return {
+    """Build a representative ``provider_settings`` dict for test inputs.
+
+    ``proxy`` is omitted from the dict when ``None`` so the helper mirrors a
+    real ``settings.yaml`` that simply leaves the optional key out.
+    """
+    settings: dict[str, object] = {
         "api_url": api_url,
         "api_key": api_key,
         "api_secret": api_secret,
         "verify_ssl": verify_ssl,
     }
+    if proxy is not None:
+        settings["proxy"] = proxy
+    return settings
 
 
 @pytest.fixture(autouse=True)
@@ -65,6 +76,7 @@ def _scrub_env(monkeypatch: pytest.MonkeyPatch) -> None:
         API_KEY_ENV_VAR,
         API_SECRET_ENV_VAR,
         VERIFY_SSL_ENV_VAR,
+        PROXY_ENV_VAR,
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -85,7 +97,7 @@ class TestGateSemantics:
         monkeypatch.setenv(API_URL_ENV_VAR, "https://override.example")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
             result = resolve_credentials(_settings())
-        assert result == ("https://settings.example", "settings-key", "settings-secret", True)
+        assert result == ("https://settings.example", "settings-key", "settings-secret", True, None)
         assert caplog.records == []
 
     @pytest.mark.parametrize("gate_value", ["", "0", "false", "no", "off", "FALSE", "Off"])
@@ -99,7 +111,7 @@ class TestGateSemantics:
         monkeypatch.setenv(API_URL_ENV_VAR, "https://override.example")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
             result = resolve_credentials(_settings())
-        assert result == ("https://settings.example", "settings-key", "settings-secret", True)
+        assert result == ("https://settings.example", "settings-key", "settings-secret", True, None)
         assert caplog.records == []
 
     def test_gate_set_no_overrides_returns_settings(
@@ -112,7 +124,7 @@ class TestGateSemantics:
         monkeypatch.setenv(GATE_ENV_VAR, "1")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
             result = resolve_credentials(_settings())
-        assert result == ("https://settings.example", "settings-key", "settings-secret", True)
+        assert result == ("https://settings.example", "settings-key", "settings-secret", True, None)
         assert caplog.records == []
 
 
@@ -131,7 +143,7 @@ class TestOverrideBehavior:
         monkeypatch.setenv(API_URL_ENV_VAR, "https://mirror.example")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
             result = resolve_credentials(_settings())
-        assert result == ("https://mirror.example", "settings-key", "settings-secret", True)
+        assert result == ("https://mirror.example", "settings-key", "settings-secret", True, None)
         # URL changed → warning fires once and names the resolved URL.
         warnings = [r for r in caplog.records if r.name == CREDENTIALS_LOGGER]
         assert len(warnings) == 1
@@ -146,7 +158,7 @@ class TestOverrideBehavior:
         monkeypatch.setenv(API_KEY_ENV_VAR, "env-key")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
             result = resolve_credentials(_settings())
-        assert result == ("https://settings.example", "env-key", "settings-secret", True)
+        assert result == ("https://settings.example", "env-key", "settings-secret", True, None)
         # URL unchanged → no warning.
         assert [r for r in caplog.records if r.name == CREDENTIALS_LOGGER] == []
 
@@ -159,7 +171,7 @@ class TestOverrideBehavior:
         monkeypatch.setenv(API_SECRET_ENV_VAR, "env-secret")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
             result = resolve_credentials(_settings())
-        assert result == ("https://settings.example", "settings-key", "env-secret", True)
+        assert result == ("https://settings.example", "settings-key", "env-secret", True, None)
         assert [r for r in caplog.records if r.name == CREDENTIALS_LOGGER] == []
 
     def test_verify_ssl_override_only(
@@ -171,7 +183,13 @@ class TestOverrideBehavior:
         monkeypatch.setenv(VERIFY_SSL_ENV_VAR, "false")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
             result = resolve_credentials(_settings(verify_ssl=True))
-        assert result == ("https://settings.example", "settings-key", "settings-secret", False)
+        assert result == (
+            "https://settings.example",
+            "settings-key",
+            "settings-secret",
+            False,
+            None,
+        )
         assert [r for r in caplog.records if r.name == CREDENTIALS_LOGGER] == []
 
     def test_all_four_overrides(
@@ -186,7 +204,7 @@ class TestOverrideBehavior:
         monkeypatch.setenv(VERIFY_SSL_ENV_VAR, "no")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
             result = resolve_credentials(_settings(verify_ssl=True))
-        assert result == ("https://mirror.example", "env-key", "env-secret", False)
+        assert result == ("https://mirror.example", "env-key", "env-secret", False, None)
         warnings = [r for r in caplog.records if r.name == CREDENTIALS_LOGGER]
         assert len(warnings) == 1
         assert warnings[0].getMessage().find("https://mirror.example") != -1
@@ -207,7 +225,7 @@ class TestEmptyEnvFallback:
         monkeypatch.setenv(API_URL_ENV_VAR, "")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
             result = resolve_credentials(_settings())
-        assert result == ("https://settings.example", "settings-key", "settings-secret", True)
+        assert result == ("https://settings.example", "settings-key", "settings-secret", True, None)
         # URL effectively unchanged → no warning.
         assert [r for r in caplog.records if r.name == CREDENTIALS_LOGGER] == []
 
@@ -363,9 +381,9 @@ class TestWarningBehavior:
 
 class TestDefaultsForMissingSettings:
     def test_empty_settings_dict_returns_defaults(self) -> None:
-        # Gate unset; missing keys default to ("", "", "", True).
+        # Gate unset; missing keys default to ("", "", "", True, None).
         result = resolve_credentials({})
-        assert result == ("", "", "", True)
+        assert result == ("", "", "", True, None)
 
     def test_gate_set_with_empty_settings_uses_env_when_present(
         self,
@@ -381,3 +399,61 @@ class TestDefaultsForMissingSettings:
         assert result[2] == ""
         # verify_ssl unset; defaults to True via settings fallback.
         assert result[3] is True
+
+
+# ---------------------------------------------------------------------------
+# Proxy resolution: settings value, gated OPNSENSE_PROXY override, empty -> None
+# ---------------------------------------------------------------------------
+
+
+class TestProxyResolution:
+    def test_proxy_from_settings_without_gate(self) -> None:
+        # ``proxy`` is a plain config field: honored from settings even when
+        # the env-override gate is unset.
+        result = resolve_credentials(_settings(proxy="socks5://127.0.0.1:1080"))
+        assert result[4] == "socks5://127.0.0.1:1080"
+
+    def test_proxy_absent_resolves_to_none(self) -> None:
+        result = resolve_credentials(_settings())
+        assert result[4] is None
+
+    def test_empty_proxy_setting_resolves_to_none(self) -> None:
+        result = resolve_credentials(_settings(proxy=""))
+        assert result[4] is None
+
+    def test_proxy_env_override_when_gated(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv(GATE_ENV_VAR, "1")
+        monkeypatch.setenv(PROXY_ENV_VAR, "http://proxy:3128")
+        result = resolve_credentials(_settings(proxy="socks5://127.0.0.1:1080"))
+        assert result[4] == "http://proxy:3128"
+
+    def test_proxy_env_ignored_when_gate_unset(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Gate unset -> OPNSENSE_PROXY is not consulted; settings value wins.
+        monkeypatch.setenv(PROXY_ENV_VAR, "http://env-proxy:3128")
+        result = resolve_credentials(_settings(proxy="socks5://127.0.0.1:1080"))
+        assert result[4] == "socks5://127.0.0.1:1080"
+
+    def test_empty_proxy_env_falls_back_to_settings_when_gated(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv(GATE_ENV_VAR, "1")
+        monkeypatch.setenv(PROXY_ENV_VAR, "")
+        result = resolve_credentials(_settings(proxy="socks5://127.0.0.1:1080"))
+        assert result[4] == "socks5://127.0.0.1:1080"
+
+    def test_proxy_env_only_when_gated(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # No proxy in settings; gated env var provides it.
+        monkeypatch.setenv(GATE_ENV_VAR, "1")
+        monkeypatch.setenv(PROXY_ENV_VAR, "http://proxy:3128")
+        result = resolve_credentials(_settings())
+        assert result[4] == "http://proxy:3128"

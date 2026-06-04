@@ -26,7 +26,21 @@ class OPNsenseClient:
         base_url: str,
         verify_ssl: bool = True,
         timeout: int = 30,
+        proxy: str | None = None,
     ) -> None:
+        """Initialize the OPNsense API client wrapper.
+
+        Args:
+            api_key: API key for HTTP Basic Auth.
+            api_secret: API secret for HTTP Basic Auth.
+            base_url: Base URL of the OPNsense instance.
+            verify_ssl: Whether to verify TLS certificates.
+            timeout: Per-request timeout in seconds.
+            proxy: Optional proxy URL to route API traffic through (e.g.
+                ``http://proxy:3128`` or ``socks5://127.0.0.1:1080``). ``None``
+                (the default) connects directly. SOCKS proxies require the
+                ``socksio`` package (the ``infrafoundry[socks]`` extra).
+        """
         self._base_url = base_url
         self.client = OpenAPIOPNsenseClient(
             base_url=base_url,
@@ -34,6 +48,7 @@ class OPNsenseClient:
             api_secret=api_secret,
             verify_ssl=verify_ssl,
             timeout=timeout,
+            proxy=proxy,
             auto_detect_version=False,
         )
 
