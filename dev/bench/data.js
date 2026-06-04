@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779725476108,
+  "lastUpdate": 1780583087713,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9486,6 +9486,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014912157712050044",
             "extra": "mean: 140.14070739968963 usec\nrounds: 2365"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e0957d71c5572157f876cc450872e1a6387aba1",
+          "message": "chore(deps): bump pyjwt to 2.13.0 (merges PR #881, addresses #880)\n\nBump the transitive pyjwt (via azure-identity -> msal[crypto]) from 2.12.1\nto 2.13.0 to clear 4 known advisories (PYSEC-2026-175/177/178/179, all fixed\nin 2.13.0). Lock-only change — msal's constraint permits <3, so no pyproject\nedit and no new direct dependency. `doit audit` (run in the CI lint job) now\nreports no known vulnerabilities.\n\nCo-authored-by: Claude Opus 4.8 <noreply@anthropic.com>",
+          "timestamp": "2026-06-04T15:24:10+01:00",
+          "tree_id": "4bf77942b3efe197ba945a8b647cbacdff1da2f4",
+          "url": "https://github.com/endavis/infrafoundry/commit/4e0957d71c5572157f876cc450872e1a6387aba1"
+        },
+        "date": 1780583086493,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7112.720710969918,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001017104362764809",
+            "extra": "mean: 140.59317673723703 usec\nrounds: 3310"
           }
         ]
       }
