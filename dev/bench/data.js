@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780583435688,
+  "lastUpdate": 1780592951108,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9548,6 +9548,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001004249611577756",
             "extra": "mean: 136.14190369112725 usec\nrounds: 2357"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d5730e5756b8ca341c2ec7541af45389b19dd3d2",
+          "message": "fix: firewall_rule statetype + silent addRule failures on newer os-firewall (merges PR #883, addresses #882)\n\nNewer OPNsense os-firewall versions (e.g. opnsense-a, 26.1.x) require a\nnon-empty `statetype` and accept only the OptionField KEYS (keep / sloppy /\nmodulate / synproxy / none) -- rejecting both the empty default and the\ndisplay labels (\"keep state\") that firewall_rule serialized verbatim. Rules\nsilently never persisted because apply_diff counted desired adds without\nchecking the addRule result.\n\n- to_payload maps every accepted statetype input (option keys, legacy display\n  labels, and empty) to the wire option key; empty / unspecified -> \"keep\"\n  (the os-firewall model default). The diff already normalizes live values to\n  keys (_normalize_field), so desired == live stays churn-free.\n- STATETYPE_CHOICES now accepts both option keys and the legacy labels, so\n  existing YAML keeps validating (backward compatible).\n- apply_diff raises APIError (surfacing the API validations) when an\n  add/update/delete returns result=\"failed\", instead of reporting a phantom\n  mutation.\n\nOlder os-firewall (the prod box) tolerated the empty/label form, so the\nexisting RFC4890 rule is unaffected apart from a one-time, behaviorally\nidentical statetype reconciliation to \"keep\".\n\nCo-authored-by: Claude Opus 4.8 <noreply@anthropic.com>",
+          "timestamp": "2026-06-04T18:08:35+01:00",
+          "tree_id": "64d70c1c5bb26bd5b0abef5763a3ddbb228e699d",
+          "url": "https://github.com/endavis/infrafoundry/commit/d5730e5756b8ca341c2ec7541af45389b19dd3d2"
+        },
+        "date": 1780592950131,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7084.262970329518,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011231808488759784",
+            "extra": "mean: 141.1579446144538 usec\nrounds: 2293"
           }
         ]
       }
