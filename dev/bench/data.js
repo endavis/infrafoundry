@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780583087713,
+  "lastUpdate": 1780583435688,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9517,6 +9517,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001017104362764809",
             "extra": "mean: 140.59317673723703 usec\nrounds: 3310"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "03c6dda6aec81db8d0141e3f1b2a62f434d30313",
+          "message": "feat: support proxy configuration for the OPNsense provider (merges PR #879, addresses #878)\n\nAdd an optional `proxy` setting so the OPNsense API client can be routed\nthrough an HTTP or SOCKS proxy — needed to reach boxes only accessible via\nan SSH tunnel/bastion.\n\n- Bump opnsense-openapi to >=0.5.0 (adds the client `proxy` parameter).\n- OPNsenseClient wrapper gains a `proxy` argument, forwarded to the client.\n- resolve_credentials() resolves `proxy` from provider_settings.opnsense.proxy\n  with a gated OPNSENSE_PROXY override (same gate/precedence as #741);\n  empty/unset normalizes to None. Now returns a 5-tuple.\n- Add optional `socks` extra (infrafoundry[socks] -> socksio) for SOCKS\n  proxies; HTTP/HTTPS CONNECT proxies need nothing extra.\n- Document the setting in ADR-0014 and the box-to-box runbook.\n\nCo-authored-by: Claude Opus 4.8 <noreply@anthropic.com>",
+          "timestamp": "2026-06-04T15:29:57+01:00",
+          "tree_id": "79d420b794dd585f330e3760781b184af3727eb4",
+          "url": "https://github.com/endavis/infrafoundry/commit/03c6dda6aec81db8d0141e3f1b2a62f434d30313"
+        },
+        "date": 1780583434236,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7345.277044669186,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001004249611577756",
+            "extra": "mean: 136.14190369112725 usec\nrounds: 2357"
           }
         ]
       }
