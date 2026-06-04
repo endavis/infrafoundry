@@ -11,9 +11,9 @@ place — high blast radius, easy to forget to revert — or duplicate the env
 directory.
 
 This helper lets the operator export ``OPNSENSE_API_URL`` /
-``OPNSENSE_API_KEY`` / ``OPNSENSE_API_SECRET`` / ``OPNSENSE_VERIFY_SSL`` and
-have the same env's plan/apply target the override box, without touching
-``settings.yaml``. To prevent a forgotten direnv shell from silently
+``OPNSENSE_API_KEY`` / ``OPNSENSE_API_SECRET`` / ``OPNSENSE_VERIFY_SSL`` /
+``OPNSENSE_PROXY`` and have the same env's plan/apply target the override
+box, without touching ``settings.yaml``. To prevent a forgotten direnv shell from silently
 mass-applying to the wrong box, the override is **opt-in** via
 ``INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1``: without the gate, behavior is
 unchanged from before.
@@ -85,6 +85,7 @@ API_URL_ENV_VAR = "OPNSENSE_API_URL"
 API_KEY_ENV_VAR = "OPNSENSE_API_KEY"
 API_SECRET_ENV_VAR = "OPNSENSE_API_SECRET"  # nosec B105
 VERIFY_SSL_ENV_VAR = "OPNSENSE_VERIFY_SSL"
+PROXY_ENV_VAR = "OPNSENSE_PROXY"
 
 # The falsy set used for both the gate and ``OPNSENSE_VERIFY_SSL`` parsing.
 # Matches the project convention from
@@ -146,15 +147,15 @@ def _parse_verify_ssl(env_value: str, default: bool) -> bool:
 
 def resolve_credentials(
     provider_settings: dict[str, Any],
-) -> tuple[str, str, str, bool]:
+) -> tuple[str, str, str, bool, str | None]:
     """Resolve OPNsense client credentials, honoring env-var overrides if gated.
 
     When ``INFRAFOUNDRY_ALLOW_ENV_OVERRIDE`` is set to a truthy value, each
-    of the four credential fields is resolved env-FIRST: a non-empty
-    ``OPNSENSE_*`` env var wins, otherwise the corresponding
-    ``provider_settings`` key is used. When the gate is unset (or set to a
-    falsy value), behavior is unchanged from before this helper existed:
-    every field is read straight from ``provider_settings``.
+    of the five fields (the four credentials plus the optional ``proxy``) is
+    resolved env-FIRST: a non-empty ``OPNSENSE_*`` env var wins, otherwise the
+    corresponding ``provider_settings`` key is used. When the gate is unset (or
+    set to a falsy value), behavior is unchanged from before this helper
+    existed: every field is read straight from ``provider_settings``.
 
     If override is active and the resolved ``api_url`` differs from
     ``provider_settings.get("api_url")``, a one-time-per-process warning
@@ -164,21 +165,29 @@ def resolve_credentials(
         provider_settings: The OPNsense entry of the env's
             ``provider_settings`` dict (i.e.,
             ``env_config.get_provider_settings("opnsense")``). Expected keys
-            are ``api_url``, ``api_key``, ``api_secret``, ``verify_ssl``;
-            missing keys default to empty string (``api_url``,
-            ``api_key``, ``api_secret``) or ``True`` (``verify_ssl``).
+            are ``api_url``, ``api_key``, ``api_secret``, ``verify_ssl``,
+            and optional ``proxy``; missing keys default to empty string
+            (``api_url``, ``api_key``, ``api_secret``, ``proxy``) or ``True``
+            (``verify_ssl``).
 
     Returns:
-        Tuple ``(api_url, api_key, api_secret, verify_ssl)`` ready to pass
-        to ``OPNsenseClient(...)``.
+        Tuple ``(api_url, api_key, api_secret, verify_ssl, proxy)`` ready to
+        pass to ``OPNsenseClient(...)``. ``proxy`` is ``None`` when unset.
     """
     settings_url = str(provider_settings.get("api_url", ""))
     settings_key = str(provider_settings.get("api_key", ""))
     settings_secret = str(provider_settings.get("api_secret", ""))
     settings_verify = bool(provider_settings.get("verify_ssl", True))
+    settings_proxy = str(provider_settings.get("proxy") or "")
 
     if not _gate_active():
-        return (settings_url, settings_key, settings_secret, settings_verify)
+        return (
+            settings_url,
+            settings_key,
+            settings_secret,
+            settings_verify,
+            settings_proxy or None,
+        )
 
     api_url = _env_or_default(API_URL_ENV_VAR, settings_url)
     api_key = _env_or_default(API_KEY_ENV_VAR, settings_key)
@@ -187,11 +196,12 @@ def resolve_credentials(
         os.environ.get(VERIFY_SSL_ENV_VAR, ""),
         settings_verify,
     )
+    proxy = _env_or_default(PROXY_ENV_VAR, settings_proxy)
 
     if api_url != settings_url:
         _warn_once_about_redirect(api_url)
 
-    return (api_url, api_key, api_secret, verify_ssl)
+    return (api_url, api_key, api_secret, verify_ssl, proxy or None)
 
 
 def _warn_once_about_redirect(resolved_url: str) -> None:

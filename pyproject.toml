@@ -15,7 +15,7 @@ dependencies = [
     "ansible>=13.7.0",
     "requests>=2.34.2",
     "sqlalchemy>=2.0.50",
-    "opnsense-openapi>=0.4.0",
+    "opnsense-openapi>=0.5.0",
     "pyinfra>=3.8.0",
     "boto3>=1.43.14",
     "azure-identity>=1.15.0",
@@ -52,6 +52,12 @@ security = [
     "bandit>=1.7",
     "pip-licenses>=4.0",
     "cyclonedx-bom>=4.0",
+]
+# Optional SOCKS proxy support for the OPNsense provider's `proxy` setting
+# (httpx requires the `socksio` package to handle `socks5://` proxy URLs).
+# Install with `infrafoundry[socks]`. HTTP/HTTPS CONNECT proxies need nothing extra.
+socks = [
+    "socksio>=1.0.0",
 ]
 
 [project.scripts]
