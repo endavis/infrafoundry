@@ -35,8 +35,8 @@ class BaseService(ABC):  # noqa: B024
         Resolves credentials via ``resolve_credentials`` so that, when
         ``INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1`` is set, ``OPNSENSE_API_URL``
         / ``OPNSENSE_API_KEY`` / ``OPNSENSE_API_SECRET`` /
-        ``OPNSENSE_VERIFY_SSL`` env vars take precedence over
-        ``settings.yaml``. See
+        ``OPNSENSE_VERIFY_SSL`` / ``OPNSENSE_PROXY`` env vars take precedence
+        over ``settings.yaml``. See
         ``infrafoundry.providers.opnsense.services._credentials`` and
         ADR-0014 §"Secrets handling" → "Runtime credential resolution".
 
@@ -62,12 +62,13 @@ class BaseService(ABC):  # noqa: B024
                 f"No {provider_name} provider settings found for environment {env_name}"
             )
 
-        api_url, api_key, api_secret, verify_ssl = resolve_credentials(provider_settings)
+        api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(provider_settings)
         client = OPNsenseClient(
             api_key=api_key,
             api_secret=api_secret,
             base_url=api_url,
             verify_ssl=verify_ssl,
+            proxy=proxy,
         )
 
         return cls(client)
