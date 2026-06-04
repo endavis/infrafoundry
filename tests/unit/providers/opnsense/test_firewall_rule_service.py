@@ -1240,3 +1240,73 @@ class TestExportToYaml:
         # Hyphenated wire keys must NOT leak into the YAML output.
         assert "state-policy:" not in text
         assert "max-src-conn:" not in text
+
+
+class TestStatetypeWireKey:
+    """``statetype`` serializes to the os-firewall option KEY (#882)."""
+
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ("", "keep"),
+            ("keep", "keep"),
+            ("keep state", "keep"),
+            ("sloppy", "sloppy"),
+            ("sloppy state", "sloppy"),
+            ("modulate state", "modulate"),
+            ("synproxy state", "synproxy"),
+            ("none", "none"),
+            ("no state", "none"),
+        ],
+    )
+    def test_statetype_serialized_as_option_key(self, value: str, expected: str) -> None:
+        inner = _rule("r", statetype=value).to_payload()["rule"]
+        assert inner["statetype"] == expected
+
+    def test_empty_statetype_defaults_to_keep(self) -> None:
+        # Newer os-firewall requires a non-empty statetype; an unspecified
+        # value must still serialize to a valid option key.
+        assert _rule("r").to_payload()["rule"]["statetype"] == "keep"
+
+    def test_loader_accepts_option_keys_and_labels(self) -> None:
+        cfgs = firewall_rule_configs_from_resources(
+            [
+                _resource("by_key", {"interface": "lan", "statetype": "keep"}),
+                _resource("by_label", {"interface": "lan", "statetype": "keep state"}),
+            ]
+        )
+        assert [c.to_payload()["rule"]["statetype"] for c in cfgs] == ["keep", "keep"]
+
+
+class TestApplyDiffSurfacesFailures:
+    """``apply_diff`` raises on a failed write instead of counting a phantom (#882)."""
+
+    def test_failed_add_raises_apierror(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        svc = FirewallRuleService(MagicMock())
+        monkeypatch.setattr(
+            svc,
+            "add",
+            MagicMock(
+                return_value={
+                    "result": "failed",
+                    "validations": {"rule.statetype": "A value is required."},
+                }
+            ),
+        )
+        with pytest.raises(APIError, match="did not persist"):
+            svc.apply_diff(Diff(adds=[_rule("r")]))
+
+    def test_failed_delete_raises_apierror(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        svc = FirewallRuleService(MagicMock())
+        monkeypatch.setattr(svc, "delete", MagicMock(return_value={"result": "failed"}))
+        with pytest.raises(APIError, match="did not persist"):
+            svc.apply_diff(Diff(deletes=[_live("u1", "r")]))
+
+    def test_saved_add_succeeds_and_applies(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        svc = FirewallRuleService(MagicMock())
+        monkeypatch.setattr(svc, "add", MagicMock(return_value={"result": "saved", "uuid": "u1"}))
+        apply_changes = MagicMock(return_value={"status": "ok"})
+        monkeypatch.setattr(svc, "apply_changes", apply_changes)
+        counts = svc.apply_diff(Diff(adds=[_rule("r")]))
+        assert counts == {"created": 1, "updated": 0, "deleted": 0}
+        apply_changes.assert_called_once()

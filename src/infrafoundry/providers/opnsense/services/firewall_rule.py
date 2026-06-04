@@ -80,14 +80,28 @@ ACTION_CHOICES: tuple[str, ...] = ("pass", "block", "reject")
 DIRECTION_CHOICES: tuple[str, ...] = ("in", "out", "any")
 IPPROTOCOL_CHOICES: tuple[str, ...] = ("inet", "inet6", "inet46")
 STATE_POLICY_CHOICES: tuple[str, ...] = ("", "default", "if-bound", "floating")
-STATETYPE_CHOICES: tuple[str, ...] = (
-    "",
-    "keep state",
-    "sloppy state",
-    "modulate state",
-    "synproxy state",
-    "none",
-)
+# os-firewall's ``statetype`` is an OptionField whose WIRE value is the option
+# KEY (``keep`` / ``sloppy`` / ``modulate`` / ``synproxy`` / ``none``). Newer
+# os-firewall versions REQUIRE a non-empty value and reject the display labels;
+# older versions tolerated ``""`` and the labels. Map every accepted operator
+# input — option keys, legacy display labels, and empty — to the wire key;
+# empty / unspecified defaults to ``keep`` (the OPNsense model default). See #882.
+_STATETYPE_TO_KEY: dict[str, str] = {
+    "": "keep",
+    "keep": "keep",
+    "keep state": "keep",
+    "sloppy": "sloppy",
+    "sloppy state": "sloppy",
+    "modulate": "modulate",
+    "modulate state": "modulate",
+    "synproxy": "synproxy",
+    "synproxy state": "synproxy",
+    "none": "none",
+    "no state": "none",
+}
+# Accepted operator inputs for ``statetype`` (option keys + legacy labels +
+# empty); validated before normalization to the wire key.
+STATETYPE_CHOICES: tuple[str, ...] = tuple(_STATETYPE_TO_KEY)
 
 # Wire-key serialization kinds for ``_PAYLOAD_FIELD_MAP`` entries. ``str``
 # fields pass through; ``bool`` fields become ``"0"``/``"1"``; ``int``
@@ -271,8 +285,11 @@ class FirewallRuleConfig:
             destination_port: Port (or empty).
 
         State:
-            statetype: ``""`` / ``"keep state"`` / ``"sloppy state"`` /
-                ``"modulate state"`` / ``"synproxy state"`` / ``"none"``.
+            statetype: pf state-tracking mode. Accepts the os-firewall option
+                key (``keep`` / ``sloppy`` / ``modulate`` / ``synproxy`` /
+                ``none``) or the legacy display label (``"keep state"`` …);
+                empty / unspecified defaults to ``keep``. Always serialized as
+                the option key on the wire (#882).
             state_policy: ``""`` / ``"default"`` / ``"if-bound"`` /
                 ``"floating"``. Wire key is ``state-policy``.
             statetimeout: Custom state timeout (string).
@@ -422,6 +439,11 @@ class FirewallRuleConfig:
             value: Any = getattr(self, attr)
             if attr == "description":
                 value = self.encoded_description()
+            if attr == "statetype":
+                # Emit the os-firewall OptionField KEY (required, non-empty on
+                # newer versions); map legacy labels / empty to the key (#882).
+                inner[wire_key] = _STATETYPE_TO_KEY.get(str(value), "keep")
+                continue
             if kind == "bool":
                 inner[wire_key] = _bool_str(bool(value))
             elif kind == "int":
@@ -560,6 +582,37 @@ def _normalize_field(value: Any) -> str:
                 return str(option_key)
         return ""
     return str(value)
+
+
+def _ensure_api_ok(response: dict[str, Any], *, op: str, name: str) -> None:
+    """Raise if an os-firewall ``firewall/filter`` write was rejected.
+
+    OPNsense returns HTTP 200 with ``{"result": "failed", "validations":
+    {...}}`` when a rule payload is rejected (e.g. an invalid ``statetype``).
+    The diff dispatcher must surface that instead of counting a phantom
+    mutation — the silent failure that masked #882 (apply reported
+    ``applied 1 adds`` while ``searchRule`` stayed empty). Success values
+    differ per verb (``addRule``/``setRule`` → ``"saved"``; ``delRule`` →
+    ``"deleted"``), so we treat anything other than an explicit ``"failed"``
+    as success rather than matching exact success strings.
+
+    Args:
+        response: Raw ``addRule`` / ``setRule`` / ``delRule`` response.
+        op: Operation name for the error message (``add`` / ``update`` / ``delete``).
+        name: Rule name (or uuid) for the error message.
+
+    Raises:
+        APIError: If ``response["result"] == "failed"``.
+    """
+    if response.get("result") != "failed":
+        return
+    validations = response.get("validations")
+    detail = f" validations={validations}" if validations else ""
+    raise APIError(
+        f"firewall_rule {op} for {name!r} did not persist: result='failed'{detail}",
+        response=str(response),
+        provider="opnsense",
+    )
 
 
 def _normalize_categories(value: Any) -> set[str]:
@@ -1004,15 +1057,19 @@ class FirewallRuleService(BaseService):
         deleted = 0
 
         for rule in diff.adds:
-            self.add(rule)
+            _ensure_api_ok(self.add(rule), op="add", name=rule.name)
             created += 1
 
         for live_rule, want in diff.updates:
-            self.update(live_rule.uuid, want)
+            _ensure_api_ok(self.update(live_rule.uuid, want), op="update", name=want.name)
             updated += 1
 
         for live_rule in diff.deletes:
-            self.delete(live_rule.uuid)
+            _ensure_api_ok(
+                self.delete(live_rule.uuid),
+                op="delete",
+                name=live_rule.managed_name or live_rule.uuid,
+            )
             deleted += 1
 
         if created or updated or deleted:
