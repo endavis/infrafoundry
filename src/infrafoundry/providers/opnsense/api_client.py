@@ -838,6 +838,86 @@ class SystemClient:
         return self.client.request("POST", "diagnostics/system/sysctl/set", data=settings)
 
 
+class TailscaleClient:
+    """OPNsense Tailscale plugin API operations (#787).
+
+    Wraps :class:`OPNsenseClient` with the get/set verbs the
+    ``os-tailscale`` plugin's ``tailscale/settings`` and
+    ``tailscale/authentication`` controllers expose. Endpoint shapes
+    verified live against ``opnsense-a`` (2026-05-25 probe captured in
+    ``tmp/agents/claude/probe-787-findings.md``):
+
+    - ``GET tailscale/settings/get`` — full settings block incl.
+      embedded ``subnets.subnet4`` list.
+    - ``POST tailscale/settings/set`` — write settings (and subnets).
+    - ``GET tailscale/authentication/get`` — auth block (loginServer,
+      preAuthKey).
+    - ``POST tailscale/authentication/set`` — write auth.
+    - ``POST tailscale/service/reconfigure`` — apply pending changes.
+
+    There is **no** per-subnet CRUD endpoint; subnets are an embedded
+    list inside the settings response and are written as a full-replace
+    via ``tailscale/settings/set``.
+
+    Args:
+        client: ``OPNsenseClient`` instance for making authenticated requests.
+    """
+
+    def __init__(self, client: OPNsenseClient) -> None:
+        """Initialize TailscaleClient with an OPNsense client wrapper."""
+        self.client = client
+
+    def get_settings(self) -> dict[str, Any]:
+        """Fetch the full tailscale settings block.
+
+        Returns:
+            ``{"settings": {...}}`` envelope, including the embedded
+            ``subnets.subnet4`` list.
+        """
+        return self.client.request("GET", "tailscale/settings/get")
+
+    def set_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Write tailscale settings (including subnets when present).
+
+        Args:
+            payload: Settings payload wrapped under ``"settings"``.
+                Example: ``{"settings": {"enabled": "1", ...}}``.
+
+        Returns:
+            Response (typically ``{"result": "saved"}``).
+        """
+        return self.client.request("POST", "tailscale/settings/set", data=payload)
+
+    def get_authentication(self) -> dict[str, Any]:
+        """Fetch the tailscale authentication block.
+
+        Returns:
+            ``{"authentication": {"loginServer": "...", "preAuthKey": "..."}}``
+            envelope.
+        """
+        return self.client.request("GET", "tailscale/authentication/get")
+
+    def set_authentication(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Write tailscale authentication settings.
+
+        Args:
+            payload: Auth payload wrapped under ``"authentication"``.
+                Example: ``{"authentication": {"loginServer": "...", "preAuthKey": "..."}}``.
+
+        Returns:
+            Response (typically ``{"result": "saved"}``).
+        """
+        return self.client.request("POST", "tailscale/authentication/set", data=payload)
+
+    def reconfigure(self) -> dict[str, Any]:
+        """Reconfigure the tailscale daemon to apply pending changes.
+
+        Returns:
+            API response (typically ``{"status": "ok"}``).
+        """
+        return self.client.request("POST", "tailscale/service/reconfigure")
+
+
 class RadvdClient:
     """OPNsense ``radvd`` (IPv6 Router Advertisement) MVC API operations (#788).
 

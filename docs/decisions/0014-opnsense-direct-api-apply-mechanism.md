@@ -354,6 +354,42 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Rollback strategy:** Per-record write failures surface in the OPNsense response (`{"result": "failed"}`) and raise `InvalidConfigurationError`, failing the apply loud. No transactional rollback — successful per-record writes that landed before a later failure stay applied. `radvd/service/reconfigure` runs once per apply via the finalization hook regardless of which subset of records changed.
 - **Cross-reference notes:** Each `interfaces.<key>` (e.g. `opt1`, `opt2`, `opt6`) must reference either a managed `interfaces.assignments[].name` OR a live OPNsense interface. Live-only references pass with INFO (operator can declare an RA on a live-only interface during incremental rollout). The legacy `<dhcpdv6>/<optN>/<ra*>` source-XML data on the source box (`endavis-infra/docs/opnsense/config-OPNsense.endavis.net-20260504234318.xml` lines 5655–5755) is read-only reference for migration values; cutover target uses the modern controller, source box's legacy data is not managed.
 
+### `tailscale.settings` (#787, 2026-05-25)
+
+**Mechanism:** Stock direct-REST against `tailscale/settings/*` (default §1 path). New singleton component manager `TailscaleSettingsManager` (in `components/tailscale_settings.py`) drives `OPNsenseDirectRunner` for Tailscale daemon configuration drift. All three tailscale managers (#787) share the `tailscale_reconfigure` finalization hook — the fourth hook key after `kea_reconfigure`, `unbound_reconfigure`, and `radvd_reconfigure`.
+
+- **Endpoints:** `GET tailscale/settings/get` / `POST tailscale/settings/set`. `POST tailscale/settings/set` is a full-replace endpoint — posting a partial payload clobbers unrelated fields including the embedded `settings.subnets.subnet4` list. The `apply_settings_patch(patch)` helper in `TailscaleService` performs a read-modify-write (GET → deep_merge → POST) so `tailscale.settings` apply never clobbers the subnets list even if `tailscale.subnets` was applied separately.
+- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`. The nested-namespace loader emits exactly one `ResourceConfig` per dict-shape path under `opnsense.tailscale.settings` (`DOTTED_RESOURCE_SHAPES["tailscale.settings"] == "dict"`).
+- **Wire schema:** 9 scalar fields. Boolean fields (`enable`, `accept_dns`, `advertise_exit_node`, `accept_subnet_routes`, `enable_ssh`) are OPNsense string booleans (`"0"`/`"1"`). `login_timeout` and `listen_port` are string-encoded integers. `use_exit_node` is an optional string (empty = no exit node). `enable_snat` is **inverted** on the wire — YAML `enable_snat: true` maps to wire `disableSNAT: "0"` and vice versa.
+- **Validator scope:** `TailscaleSettingsValidator` (pure-check, never mutates `resource.config`). Type-checks all 9 fields; `login_timeout` must be a positive integer; `listen_port` must be an integer 1-65535; `use_exit_node` must be a string or None; all boolean-ish fields accept `true`/`false`/`0`/`1`/`yes`/`no`/`on`/`off`.
+- **Rollback strategy:** Same as §1's default — per-call server-side validation; OPNsense's auto-snapshot in `/conf/backup/` is the residual safety net. No transactional rollback.
+- **Cross-reference notes:** `apply_settings_patch` is shared with `tailscale.subnets`. The three tailscale managers share `FINALIZATION_HOOK = "tailscale_reconfigure"` — exactly one `tailscale/service/reconfigure` call fires per apply regardless of how many tailscale components changed state.
+
+### `tailscale.auth` (#787, 2026-05-25)
+
+**Mechanism:** Stock direct-REST against `tailscale/authentication/*` (default §1 path, separate endpoint from `tailscale/settings/*`). New singleton component manager `TailscaleAuthManager` (in `components/tailscale_auth.py`). The auth endpoint is independent of the settings endpoint — `TailscaleAuthManager.apply()` calls `set_authentication()` directly, NOT `apply_settings_patch`.
+
+- **Endpoints:** `GET tailscale/authentication/get` / `POST tailscale/authentication/set`.
+- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"auth": "global"}`.
+- **Wire schema:** `login_server` (string; empty = use default Tailscale control plane) and `pre_auth_key` (write-only string; empty string on GET always). Wire keys are camelCase (`loginServer`, `preAuthKey`) under the `authentication` envelope.
+- **`pre_auth_key` write-only behavior:** OPNsense's `tailscale/authentication/get` always returns an empty string for `pre_auth_key` regardless of whether a key was previously set. Therefore any YAML value triggers a diff (desired != live) and the manager re-applies the key on every apply where a YAML value is set. This is **intentional** — it is the only mechanism to ensure the pre-auth key gets applied on box cutover. Operators who set `pre_auth_key` in YAML should expect an `update` outcome on every apply.
+- **Secret handling:** `pre_auth_key` SHOULD be a `secret://env_secrets/<dotted/path>` URI. `TailscaleAuthValidator` emits a WARNING (not ERROR) when a plaintext value is detected (via `is_secret_reference()` from `validators/_secrets.py`) — not an error because some operators deliberately use env-var injection or accept the risk. Plaintext detection is a best-effort check against the `secret://` prefix convention.
+- **Validator scope:** `TailscaleAuthValidator`. Type-checks `login_server` (string) and `pre_auth_key` (string); emits WARNING for plaintext `pre_auth_key` values.
+- **Rollback strategy:** Same as §1's default.
+- **Cross-reference notes:** The `tailscale_reconfigure` hook is shared with `tailscale.settings` and `tailscale.subnets`.
+
+### `tailscale.subnets` (#787, 2026-05-25)
+
+**Mechanism:** **List-shape, embedded-list write** — no per-subnet CRUD endpoint exists. The subnets to advertise are stored as an embedded list at `settings.subnets.subnet4` inside the `tailscale/settings/get` response. New list-shape component manager `TailscaleSubnetsManager` (in `components/tailscale_subnets.py`) drives `OPNsenseDirectRunner` for advertised-subnet drift. Deliberate departure from the standard CRUD-per-resource pattern — the wire surface dictates the approach.
+
+- **Endpoints:** `GET tailscale/settings/get` (read embedded list), `POST tailscale/settings/set` (full-replace via `apply_settings_patch` read-modify-write). No per-subnet `add`/`del` verbs exist.
+- **Identity:** one `ResourceConfig` per CIDR in YAML (`DOTTED_RESOURCE_SHAPES["tailscale.subnets"] == "list"`). `get_resource_ids()` returns `{f"subnets.{cidr}": cidr for cidr in live_cidrs}` — the CIDR itself is the stable identity (no OPNsense UUID).
+- **Diff shape:** `_TailscaleSubnetsDiff` (module-private). Sorted-set comparison produces `adds` (desired - live) and `deletes` (live - desired); `updates` is always empty (CIDRs are atomic). `add_only=True` suppresses deletes, and the apply path unions live with desired so no existing subnets are removed.
+- **Apply semantics:** `apply_settings_patch(wire)` performs GET → `_deep_merge` → POST. The merged payload writes the final CIDR list under `settings.subnets.subnet4` while preserving all scalar settings fields from the live GET response. Each added CIDR produces a `ResourceOutcome(action="add")` and each removed CIDR produces a `ResourceOutcome(action="delete")` — the runner's apply summary surfaces counts correctly.
+- **Validator scope:** `TailscaleSubnetsValidator`. Validates each resource's `cidr` field using `ipaddress.ip_network(cidr, strict=False)` (accepts host bits set; strict=False means `192.168.1.1/24` normalizes to `192.168.1.0/24`); checks for duplicate CIDRs in the resource list.
+- **Rollback strategy:** Same as §1's default. The `tailscale/settings/set` POST is atomic on the OPNsense side; a failure response leaves the prior state intact.
+- **Cross-reference notes:** `apply_settings_patch` is shared with `tailscale.settings` (both write through `tailscale/settings/set`). The `tailscale_reconfigure` hook is shared across all three tailscale managers.
+
 ### `dhcp_static_maps` — retired (#782, 2026-05-08)
 
 **Mechanism: deletion, not migration.** `dhcp_static_maps` was the legacy ISC DHCP static-mapping resource type, intended to be backed by the terraform resource `opnsense_dhcpv4_static_map`. Live audit during the cutover-unblock series (#766) confirmed that resource never existed in the `browningluke/opnsense` provider; the surface had no working apply path under any provider version the project pinned.
@@ -387,6 +423,8 @@ The first registered hook is `kea_reconfigure`, declared on all four Kea manager
 A second hook, `unbound_reconfigure` (#776), is declared on all three Unbound managers — `UnboundHostOverrideManager`, `UnboundHostAliasManager`, and `UnboundForwardManager`. The OPNsense Unbound service's reconfigure verb (`unbound/service/reconfigure`) is shared across every Unbound-managed component, so coalescing the hook key across all three managers produces exactly one reconfigure call per apply when any of the three changed state. Before #776 each manager called `service.reconfigure()` inline from its `apply` body, which produced up to three reconfigure calls in a multi-unbound apply; the retrofit removes the inline calls and lets the runner's hook plumbing coalesce them.
 
 A third hook, `radvd_reconfigure` (#788), is declared on `RadvdManager`. The radvd controller has its own reconfigure verb (`radvd/service/reconfigure`); since `radvd` is a single dotted resource type the hook only ever has one declarer, but the same hook plumbing is reused for symmetry and so future radvd-adjacent components (e.g., a hypothetical IPv6 prefix-delegation manager) can join the key.
+
+A fourth hook, `tailscale_reconfigure` (#787), is declared on all three Tailscale managers — `TailscaleSettingsManager`, `TailscaleAuthManager`, and `TailscaleSubnetsManager`. The Tailscale service's reconfigure verb (`tailscale/service/reconfigure`) is shared; coalescing the hook key across all three managers produces exactly one reconfigure call per apply when any of the three changed state. This mirrors the `unbound_reconfigure` pattern: three managers → one hook key → one post-apply call.
 
 Future components with shared post-apply work register their own key here.
 

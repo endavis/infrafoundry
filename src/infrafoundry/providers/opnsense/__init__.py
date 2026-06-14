@@ -234,6 +234,9 @@ class OPNsenseProvider(
         from .components.system_ssh import SystemSshManager
         from .components.system_tuning import SystemTuningManager
         from .components.system_webgui import SystemWebguiManager
+        from .components.tailscale_auth import TailscaleAuthManager
+        from .components.tailscale_settings import TailscaleSettingsManager
+        from .components.tailscale_subnets import TailscaleSubnetsManager
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
         from .components.unbound_host_override import UnboundHostOverrideManager
@@ -279,6 +282,9 @@ class OPNsenseProvider(
             "kea.dhcp6.subnets": KeaDHCPv6SubnetManager,
             "kea.dhcp6.reservations": KeaDHCPv6ReservationManager,
             "radvd": RadvdManager,
+            "tailscale.settings": TailscaleSettingsManager,
+            "tailscale.auth": TailscaleAuthManager,
+            "tailscale.subnets": TailscaleSubnetsManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -315,6 +321,7 @@ class OPNsenseProvider(
             "kea_reconfigure": self._reconfigure_kea,
             "unbound_reconfigure": self._reconfigure_unbound,
             "radvd_reconfigure": self._reconfigure_radvd,
+            "tailscale_reconfigure": self._reconfigure_tailscale,
         }
 
     def _reconfigure_kea(self, env_name: str) -> None:
@@ -372,6 +379,24 @@ class OPNsenseProvider(
         from .services.radvd import RadvdService
 
         service = RadvdService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
+    def _reconfigure_tailscale(self, env_name: str) -> None:
+        """Reconfigure the tailscale daemon after any tailscale mutation (#787).
+
+        Used by :meth:`get_finalization_hooks` so the OPNsense direct-API
+        runner can fire a single ``tailscale/service/reconfigure`` call after
+        any of the three tailscale managers (:class:`TailscaleSettingsManager`,
+        :class:`TailscaleAuthManager`, :class:`TailscaleSubnetsManager`) have
+        applied. Hook errors propagate, failing the apply.
+
+        Args:
+            env_name: Active environment name (matches the runner's hook
+                contract — ``hook(env_name) -> None``).
+        """
+        from .services.tailscale import TailscaleService
+
+        service = TailscaleService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
     # All OPNsense components are now managed by ``OPNsenseDirectRunner``
