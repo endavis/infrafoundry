@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781703144883,
+  "lastUpdate": 1781704651261,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9610,6 +9610,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007308471719470526",
             "extra": "mean: 102.70802470359435 usec\nrounds: 2024"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "199479316d281d404119b7eca48291d9cb1ed38d",
+          "message": "chore(deps): bump codecov/codecov-action from 6 to 7 (merges PR #885)\n\nBumps [codecov/codecov-action](https://github.com/codecov/codecov-action) from 6 to 7.\n- [Release notes](https://github.com/codecov/codecov-action/releases)\n- [Changelog](https://github.com/codecov/codecov-action/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/codecov/codecov-action/compare/v6...v7)\n\n---\nupdated-dependencies:\n- dependency-name: codecov/codecov-action\n  dependency-version: '7'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-06-17T14:56:58+01:00",
+          "tree_id": "320b5b0fed5835646fd9ad6366988bf8a44d35ac",
+          "url": "https://github.com/endavis/infrafoundry/commit/199479316d281d404119b7eca48291d9cb1ed38d"
+        },
+        "date": 1781704650425,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7145.84077537659,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013998944766234215",
+            "extra": "mean: 139.94154521968053 usec\nrounds: 1935"
           }
         ]
       }
