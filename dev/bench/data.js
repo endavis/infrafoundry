@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781704651261,
+  "lastUpdate": 1781706350197,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9641,6 +9641,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013998944766234215",
             "extra": "mean: 139.94154521968053 usec\nrounds: 1935"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dae59800b06c09b113c44c20ba92c4e6076355db",
+          "message": "chore(deps): bump ansible from 13.7.0 to 14.0.0 (merges PR #900)\n\nBumps [ansible](https://github.com/ansible-community/ansible-build-data) from 13.7.0 to 14.0.0.\n- [Changelog](https://github.com/ansible-community/ansible-build-data/blob/main/docs/release-process.md)\n- [Commits](https://github.com/ansible-community/ansible-build-data/compare/13.7.0...14.0.0)\n\n---\nupdated-dependencies:\n- dependency-name: ansible\n  dependency-version: 14.0.0\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-06-17T15:25:16+01:00",
+          "tree_id": "9ef512d94705f0b4e5e0f1461b28d36b490f9eb5",
+          "url": "https://github.com/endavis/infrafoundry/commit/dae59800b06c09b113c44c20ba92c4e6076355db"
+        },
+        "date": 1781706349206,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7129.338447436923,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011445623689443484",
+            "extra": "mean: 140.26546886121127 usec\nrounds: 2248"
           }
         ]
       }
