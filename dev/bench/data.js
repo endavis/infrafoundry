@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780592951108,
+  "lastUpdate": 1781703144883,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9579,6 +9579,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011231808488759784",
             "extra": "mean: 141.1579446144538 usec\nrounds: 2293"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "47a793885c5846ccf92e31d3f48c98506555278e",
+          "message": "chore(deps): bump cryptography to 48.0.1 (fixes GHSA-537c-gmf6-5ccf) (merges PR #903, addresses #902)\n\ncryptography 48.0.0 is flagged by pip-audit (GHSA-537c-gmf6-5ccf), fixed in 48.0.1. It is a locked transitive dependency (azure-identity, paramiko, pyjwt[crypto], etc.), so the dependency-audit step failed on all open PRs and on main. Bump the lockfile to 48.0.1, staying on 48.x to avoid the unrelated 49.0.0 major release.\n\nAddresses #902\n\nCo-authored-by: Claude Opus 4.8 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-06-17T14:31:41+01:00",
+          "tree_id": "2bf191414dece2e1b81c08e24717f66b232ce330",
+          "url": "https://github.com/endavis/infrafoundry/commit/47a793885c5846ccf92e31d3f48c98506555278e"
+        },
+        "date": 1781703143412,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9736.33757328997,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007308471719470526",
+            "extra": "mean: 102.70802470359435 usec\nrounds: 2024"
           }
         ]
       }
