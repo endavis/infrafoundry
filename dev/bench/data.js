@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781787543470,
+  "lastUpdate": 1781798062859,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9734,6 +9734,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000037419022812632976",
             "extra": "mean: 112.18423529450493 usec\nrounds: 34"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8dc79af22dca16f5bc3e336ba5656d919e7c9c01",
+          "message": "feat: add cron_jobs resource type for OPNsense scheduled jobs (merges PR #907, addresses #789)\n\nCo-authored-by: Claude Opus 4.8 <noreply@anthropic.com>",
+          "timestamp": "2026-06-18T16:53:54+01:00",
+          "tree_id": "d1a6dee9152a24a36928be6f52eb503b28afd8a5",
+          "url": "https://github.com/endavis/infrafoundry/commit/8dc79af22dca16f5bc3e336ba5656d919e7c9c01"
+        },
+        "date": 1781798062104,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9844.03956403295,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006257851466535558",
+            "extra": "mean: 101.58431338021924 usec\nrounds: 1988"
           }
         ]
       }
