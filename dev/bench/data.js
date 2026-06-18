@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781706350197,
+  "lastUpdate": 1781782165017,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9672,6 +9672,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011445623689443484",
             "extra": "mean: 140.26546886121127 usec\nrounds: 2248"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "abfa3ad11f6d2f7d2bc022f985e173950f1677c3",
+          "message": "fix: exclude server-computed fields from firewall_rule diff (merges PR #904, addresses #884)\n\nOPNsense auto-computes sort_order and prio_group on save; the operator never sets them, so to_payload emits empty defaults. _needs_update compared those empties against the live server-assigned values and reported a phantom update on every plan/apply. Add _DIFF_IGNORED_FIELDS and skip those keys in the diff comparison; to_payload is unchanged so the box keeps managing them.\n\nCo-authored-by: Claude Opus 4.8 <noreply@anthropic.com>",
+          "timestamp": "2026-06-18T12:28:54+01:00",
+          "tree_id": "27e5725210980637349a5f342cbccb298cce8727",
+          "url": "https://github.com/endavis/infrafoundry/commit/abfa3ad11f6d2f7d2bc022f985e173950f1677c3"
+        },
+        "date": 1781782164450,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6104.2484407093225,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003730809595339989",
+            "extra": "mean: 163.82033098964078 usec\nrounds: 1849"
           }
         ]
       }
