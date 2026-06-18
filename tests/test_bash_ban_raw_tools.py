@@ -45,6 +45,22 @@ def hook() -> Iterator[types.ModuleType]:
         sys.modules.pop("bash_ban_raw_tools", None)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_unlock_file(
+    hook: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Neutralize the global /tmp/bash-raw-unlock escape hatch for every test.
+
+    Points UNLOCK_FILE at a nonexistent path so is_unlocked() is deterministically
+    False regardless of developer-machine state (#905). Tests that exercise the
+    escape hatch re-point UNLOCK_FILE explicitly; their monkeypatch runs after this
+    fixture and takes precedence.
+    """
+    monkeypatch.setattr(hook, "UNLOCK_FILE", str(tmp_path / "nonexistent-unlock"))
+
+
 def _set_stdin(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
     """Replace ``sys.stdin`` with a StringIO containing *payload*."""
     monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
