@@ -6,6 +6,7 @@ from infrafoundry.providers.opnsense.validators._xref import (
     resolve_xref,
 )
 from infrafoundry.providers.opnsense.validators.alias_validator import AliasValidator
+from infrafoundry.providers.opnsense.validators.cron_jobs_validator import CronJobsValidator
 from infrafoundry.providers.opnsense.validators.firewall_rule_validator import (
     FirewallRuleValidator,
 )
@@ -39,6 +40,7 @@ from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValida
 
 __all__ = [
     "AliasValidator",
+    "CronJobsValidator",
     "FirewallRuleValidator",
     "GatewayValidator",
     "InterfaceAssignmentValidator",

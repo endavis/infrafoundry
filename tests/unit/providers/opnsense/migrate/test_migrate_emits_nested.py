@@ -911,8 +911,98 @@ class TestMigrateKeaDHCPEmitsNested:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# 16. cron.jobs -- CronJobsManager (#789)
+# ---------------------------------------------------------------------------
+
+
+class TestMigrateCronJobsEmitsNested:
+    SERVICE_PATH = "infrafoundry.providers.opnsense.components.cron_jobs.CronJobsService"
+
+    def test_cron_jobs_emit_nested(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense.components.cron_jobs import CronJobsManager
+        from infrafoundry.providers.opnsense.services.cron_jobs import (
+            CronJobsService,
+            LiveCronJob,
+        )
+
+        live_job = LiveCronJob(
+            uuid="uuid-1",
+            managed_name="acme-renew",
+            description="[infrafoundry:acme-renew]",
+            origin="AcmeClient",
+            raw={
+                "uuid": "uuid-1",
+                "description": "[infrafoundry:acme-renew]",
+                "enabled": "1",
+                "minutes": "0",
+                "hours": "2",
+                "days": "*",
+                "months": "*",
+                "weekdays": "*",
+                "who": "root",
+                "command": "acmeclient cron-auto-renew",
+                "parameters": "",
+                "origin": "AcmeClient",
+            },
+        )
+        # Use a real service so export_to_yaml exercises the real emit path.
+        service = CronJobsService(MagicMock())
+        with patch.object(service, "search", return_value=[live_job]):
+            manager = CronJobsManager(tmp_path)
+            with patch(self.SERVICE_PATH) as svc_cls:
+                svc_cls.from_environment.return_value = service
+                yaml_text = manager.migrate("test-env")
+
+        leaf = _assert_nested_path_present(yaml_text, "cron.jobs", expected_shape="list")
+        assert len(leaf) == 1
+        assert leaf[0]["name"] == "acme-renew"
+        _assert_no_flat_resources_key(yaml_text)
+
+        parsed = _round_trip(yaml_text, "cron_jobs.yaml")
+        assert [(r.name, r.type) for r in parsed] == [("acme-renew", "cron.jobs")]
+
+    def test_cron_jobs_unmanaged_excluded(self, tmp_path: Path) -> None:
+        """Unmanaged live jobs (no identity suffix) are NOT exported."""
+        from infrafoundry.providers.opnsense.components.cron_jobs import CronJobsManager
+        from infrafoundry.providers.opnsense.services.cron_jobs import (
+            CronJobsService,
+            LiveCronJob,
+        )
+
+        unmanaged = LiveCronJob(
+            uuid="uuid-unmanaged",
+            managed_name=None,
+            description="unmanaged box cron",
+            origin="OPNsense",
+            raw={
+                "uuid": "uuid-unmanaged",
+                "description": "unmanaged box cron",
+                "enabled": "1",
+                "minutes": "5",
+                "hours": "*",
+                "days": "*",
+                "months": "*",
+                "weekdays": "*",
+                "who": "root",
+                "command": "/usr/local/sbin/whatever",
+                "parameters": "",
+                "origin": "OPNsense",
+            },
+        )
+        service = CronJobsService(MagicMock())
+        with patch.object(service, "search", return_value=[unmanaged]):
+            manager = CronJobsManager(tmp_path)
+            with patch(self.SERVICE_PATH) as svc_cls:
+                svc_cls.from_environment.return_value = service
+                yaml_text = manager.migrate("test-env")
+
+        leaf = _assert_nested_path_present(yaml_text, "cron.jobs", expected_shape="list")
+        assert leaf == []
+
+
 class TestDottedTypeRegistrySanity:
-    """The 14 phase-1 list-shape resource types are all accounted for."""
+    """The 15 list-shape resource types (phase-1 + cron.jobs) are all accounted for."""
 
     EXPECTED_LIST_TYPES: tuple[str, ...] = (
         "interfaces.vlans",
@@ -930,6 +1020,7 @@ class TestDottedTypeRegistrySanity:
         "kea.dhcp4.reservations",
         "kea.dhcp6.subnets",
         "kea.dhcp6.reservations",
+        "cron.jobs",
     )
 
     def test_each_phase_1_dotted_type_registered_as_list(self) -> None:
