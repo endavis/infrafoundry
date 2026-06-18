@@ -176,6 +176,12 @@ _PAYLOAD_FIELD_MAP: tuple[tuple[str, str, _FieldKind], ...] = (
     ("allowopts", "allowopts", "bool"),
 )
 
+# Wire keys OPNsense auto-/server-computes (operator never sets them).
+# to_payload emits empty defaults for these, so they would otherwise force
+# a phantom update on every diff. Excluded from _needs_update only — they
+# are still sent on setRule (the box recomputes them harmlessly). See #884.
+_DIFF_IGNORED_FIELDS: frozenset[str] = frozenset({"sort_order", "prio_group"})
+
 
 class OpnsenseDriftError(InfraFoundryError):
     """A managed rule's identity tag is malformed on the live box.
@@ -556,9 +562,17 @@ def compute_diff(
 
 
 def _needs_update(have: LiveFirewallRule, want: FirewallRuleConfig) -> bool:
-    """Return True if the live row's fields differ from the desired payload."""
+    """Return True if the live row's fields differ from the desired payload.
+
+    Fields in ``_DIFF_IGNORED_FIELDS`` (``sort_order``, ``prio_group``) are
+    skipped: OPNsense auto-computes them on save, so comparing the live
+    server-assigned value against the empty default ``to_payload`` emits
+    would force a spurious update on every run (#884).
+    """
     payload = want.to_payload()["rule"]
     for key, want_value in payload.items():
+        if key in _DIFF_IGNORED_FIELDS:
+            continue
         have_value = _normalize_field(have.raw.get(key))
         if str(want_value) != have_value:
             return True
