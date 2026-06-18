@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781782165017,
+  "lastUpdate": 1781787543470,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9703,6 +9703,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003730809595339989",
             "extra": "mean: 163.82033098964078 usec\nrounds: 1849"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "451d71cdd3212a13da450e8380ceec7d7a99b7b3",
+          "message": "test: isolate test_bash_ban_raw_tools from the global unlock file (merges PR #906, addresses #905)\n\nThe 7 parametrized test_banned_leading_command_exits_2 cases called the hook's main() without neutralizing UNLOCK_FILE, so is_unlocked() read the real /tmp/bash-raw-unlock escape hatch. When that file was fresh the hook allowed banned commands (exit 0) instead of blocking (exit 2), so the cases failed locally on developer machines while passing in CI. Add a module-wide autouse fixture that points UNLOCK_FILE at a nonexistent tmp path, making is_unlocked() deterministically False; the escape-hatch tests still override it explicitly.\n\nCo-authored-by: Claude Opus 4.8 <noreply@anthropic.com>",
+          "timestamp": "2026-06-18T13:58:30+01:00",
+          "tree_id": "15f47ba3de67215be1426f7136b7a7da365f8a2b",
+          "url": "https://github.com/endavis/infrafoundry/commit/451d71cdd3212a13da450e8380ceec7d7a99b7b3"
+        },
+        "date": 1781787542346,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8913.908423717558,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000037419022812632976",
+            "extra": "mean: 112.18423529450493 usec\nrounds: 34"
           }
         ]
       }
