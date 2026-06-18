@@ -16,6 +16,7 @@ from infrafoundry.core.types import OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense.validators import (
+    CronJobsValidator,
     FirewallRuleValidator,
     GatewayValidator,
     InterfaceAssignmentValidator,
@@ -94,6 +95,7 @@ class OPNsenseValidator:
         self.unbound_forward_validator = UnboundForwardValidator(report)
         self.kea_reservation_validator = KeaReservationValidator(report)
         self.radvd_validator = RadvdValidator(report)
+        self.cron_jobs_validator = CronJobsValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -278,6 +280,7 @@ class OPNsenseValidator:
                 resource_refs["interface_assignment_names"],
                 existing_interfaces,
             )
+            self.cron_jobs_validator.validate(resource_refs["cron_jobs"])
             self.resource_name_validator.validate(resources)
 
         except Exception as exc:
@@ -315,6 +318,7 @@ class OPNsenseValidator:
         kea_dhcp4_subnets = [r for r in resources if r.type == "kea.dhcp4.subnets"]
         kea_dhcp6_subnets = [r for r in resources if r.type == "kea.dhcp6.subnets"]
         radvd = [r for r in resources if r.type == "radvd"]
+        cron_jobs = [r for r in resources if r.type == "cron.jobs"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}
@@ -357,6 +361,7 @@ class OPNsenseValidator:
             "kea_dhcp4_subnet_names": kea_dhcp4_subnet_names,
             "kea_dhcp6_subnet_names": kea_dhcp6_subnet_names,
             "radvd": radvd,
+            "cron_jobs": cron_jobs,
         }
 
     def _get_existing_aliases(

@@ -941,3 +941,99 @@ class RadvdClient:
             ``{"radvd": {"entries": [...]}}`` envelope.
         """
         return self.client.request("GET", "radvd/settings/get")
+
+
+class CronClient:
+    """OPNsense ``cron`` (scheduled jobs) MVC API operations (#789).
+
+    Wraps :class:`OPNsenseClient` with the per-job CRUD verbs the
+    ``cron/settings/`` controller exposes. Endpoint shapes are based on the
+    expected OPNsense core-cron MVC surface; adjust the path constants
+    below if the live box uses a different prefix.
+
+    Endpoints (expected):
+
+    - ``POST cron/settings/searchJobs`` — paginated list (``{"rows": [...]}``)
+    - ``GET cron/settings/getJob/<uuid>`` — single job record.
+    - ``POST cron/settings/addJob`` — create.
+    - ``POST cron/settings/setJob/<uuid>`` — update.
+    - ``POST cron/settings/delJob/<uuid>`` — delete.
+    - ``POST cron/service/reconfigure`` — apply pending changes.
+
+    Args:
+        client: ``OPNsenseClient`` instance for making authenticated requests.
+    """
+
+    _SEARCH = "cron/settings/searchJobs"
+    _GET = "cron/settings/getJob/{uuid}"
+    _ADD = "cron/settings/addJob"
+    _SET = "cron/settings/setJob/{uuid}"
+    _DEL = "cron/settings/delJob/{uuid}"
+    _RECONFIGURE = "cron/service/reconfigure"
+
+    def __init__(self, client: OPNsenseClient) -> None:
+        """Initialize CronClient with an OPNsense client wrapper."""
+        self.client = client
+
+    def search_jobs(self) -> list[dict[str, Any]]:
+        """Search for all scheduled cron jobs.
+
+        Returns:
+            List of job dictionaries (each carrying ``uuid`` plus the
+            wire schema fields). Empty list when no jobs exist.
+        """
+        response = self.client.request("POST", self._SEARCH)
+        return cast(list[dict[str, Any]], response.get("rows", []))
+
+    def get_job(self, uuid: str) -> dict[str, Any]:
+        """Fetch a specific cron job by UUID.
+
+        Args:
+            uuid: Job UUID.
+
+        Returns:
+            Job configuration dictionary (wire envelope).
+        """
+        return self.client.request("GET", self._GET.format(uuid=uuid))
+
+    def add_job(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Create a new cron job.
+
+        Args:
+            payload: Wire payload wrapped under ``"job"``.
+
+        Returns:
+            API response (typically ``{"result": "saved", "uuid": "..."}``).
+        """
+        return self.client.request("POST", self._ADD, data=payload)
+
+    def set_job(self, uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Update an existing cron job.
+
+        Args:
+            uuid: Job UUID.
+            payload: Wire payload wrapped under ``"job"``.
+
+        Returns:
+            API response (typically ``{"result": "saved"}``).
+        """
+        return self.client.request("POST", self._SET.format(uuid=uuid), data=payload)
+
+    def del_job(self, uuid: str) -> dict[str, Any]:
+        """Delete a cron job.
+
+        Args:
+            uuid: Job UUID.
+
+        Returns:
+            API response.
+        """
+        return self.client.request("POST", self._DEL.format(uuid=uuid))
+
+    def reconfigure(self) -> dict[str, Any]:
+        """Reconfigure the cron service to apply pending changes.
+
+        Returns:
+            API response (typically ``{"status": "ok"}``).
+        """
+        return self.client.request("POST", self._RECONFIGURE)

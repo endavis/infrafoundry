@@ -112,6 +112,7 @@ class OPNsenseProvider(
         from infrafoundry.core.extractors import register_extractor
 
         from .components.alias import AliasManager
+        from .components.cron_jobs import CronJobsManager
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
@@ -139,6 +140,7 @@ class OPNsenseProvider(
             ("unbound.forwards", UnboundForwardManager),
             ("kea_dhcp", KeaDHCPManager),
             ("isc_to_kea", ISCToKeaMigrationManager),
+            ("cron.jobs", CronJobsManager),
         ]
         for resource_type, manager_class in components:
             register_extractor(
@@ -217,6 +219,7 @@ class OPNsenseProvider(
             ``get_resource_ids``) each manager must expose.
         """
         from .components.alias import AliasManager
+        from .components.cron_jobs import CronJobsManager
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
@@ -279,6 +282,7 @@ class OPNsenseProvider(
             "kea.dhcp6.subnets": KeaDHCPv6SubnetManager,
             "kea.dhcp6.reservations": KeaDHCPv6ReservationManager,
             "radvd": RadvdManager,
+            "cron.jobs": CronJobsManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -315,6 +319,7 @@ class OPNsenseProvider(
             "kea_reconfigure": self._reconfigure_kea,
             "unbound_reconfigure": self._reconfigure_unbound,
             "radvd_reconfigure": self._reconfigure_radvd,
+            "cron_reconfigure": self._reconfigure_cron,
         }
 
     def _reconfigure_kea(self, env_name: str) -> None:
@@ -372,6 +377,23 @@ class OPNsenseProvider(
         from .services.radvd import RadvdService
 
         service = RadvdService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
+    def _reconfigure_cron(self, env_name: str) -> None:
+        """Reconfigure the cron daemon after any cron-job mutation (#789).
+
+        Used by :meth:`get_finalization_hooks` so the OPNsense direct-API
+        runner can fire a single ``cron/service/reconfigure`` call after
+        :class:`CronJobsManager.apply` has completed. Hook errors propagate,
+        failing the apply.
+
+        Args:
+            env_name: Active environment name (matches the runner's hook
+                contract — ``hook(env_name) -> None``).
+        """
+        from .services.cron_jobs import CronJobsService
+
+        service = CronJobsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
     # All OPNsense components are now managed by ``OPNsenseDirectRunner``
