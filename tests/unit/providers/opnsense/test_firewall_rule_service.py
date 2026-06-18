@@ -470,6 +470,53 @@ class TestComputeDiffUpdates:
         diff = compute_diff([rule], [live])
         assert diff.is_empty
 
+    def test_no_update_when_only_server_computed_fields_differ(self) -> None:
+        # Regression for #884: sort_order and prio_group are server-computed by
+        # OPNsense. to_payload emits "" for both; the live row carries realistic
+        # server values. Without the _DIFF_IGNORED_FIELDS exclusion this forces
+        # a phantom update on every run.
+        rule = _rule("foo", interface="lan")
+        payload_inner = rule.to_payload()["rule"]
+        live_raw: dict[str, Any] = {
+            "uuid": "u1",
+            **payload_inner,
+            "sort_order": "200000.0000100",  # server-assigned
+            "prio_group": "200000",  # server-assigned
+        }
+        live = LiveFirewallRule(
+            uuid="u1",
+            managed_name="foo",
+            description="",
+            raw=live_raw,
+        )
+        diff = compute_diff([rule], [live])
+        assert diff.is_empty
+
+    def test_update_still_detected_with_server_computed_fields(self) -> None:
+        # Negative control: server-computed fields present in the live row but
+        # one real field (action) diverges from desired — exactly one update
+        # must be reported. Proves the exclusion is scoped to sort_order /
+        # prio_group and does not mask genuine changes.
+        rule = _rule("foo", interface="lan", action="pass")
+        payload_inner = rule.to_payload()["rule"]
+        live_raw: dict[str, Any] = {
+            "uuid": "u1",
+            **payload_inner,
+            "sort_order": "200000.0000100",
+            "prio_group": "200000",
+            "action": "block",  # diverges from desired "pass"
+        }
+        live = LiveFirewallRule(
+            uuid="u1",
+            managed_name="foo",
+            description="",
+            raw=live_raw,
+        )
+        diff = compute_diff([rule], [live])
+        assert len(diff.updates) == 1
+        assert len(diff.adds) == 0
+        assert len(diff.deletes) == 0
+
 
 class TestComputeDiffDeletes:
     def test_managed_live_with_no_desired_is_deleted(self) -> None:
