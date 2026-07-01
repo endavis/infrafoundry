@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781798062859,
+  "lastUpdate": 1782900716081,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9765,6 +9765,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006257851466535558",
             "extra": "mean: 101.58431338021924 usec\nrounds: 1988"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ab65500644bb46e22875edc439f9642427fdf57e",
+          "message": "chore(deps): bump msgpack to 1.2.1 to resolve GHSA-6v7p-g79w-8964 (merges PR #925, addresses #924)\n\nchore(deps): bump msgpack from 1.1.2 to 1.2.1 to resolve GHSA-6v7p-g79w-8964\n\nmsgpack 1.1.2 is vulnerable to GHSA-6v7p-g79w-8964: reusing the Unpacker after an error can crash the process with a SEGV, enabling a DoS when unpacking untrusted input. Fixed in 1.2.1.\n\nmsgpack is a transitive dependency (pip-audit[filecache] -> cachecontrol -> msgpack) of the security extra. cachecontrol already permits msgpack>=0.5.2,<2.0.0, so this is a lockfile-only bump with no pyproject.toml change needed. Restores a green `doit check` audit gate.\n\nCo-authored-by: Claude Opus 4.8 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-07-01T11:11:25+01:00",
+          "tree_id": "dbe89e20e54b846b43cc0d4b4c8edd1ba117882e",
+          "url": "https://github.com/endavis/infrafoundry/commit/ab65500644bb46e22875edc439f9642427fdf57e"
+        },
+        "date": 1782900715302,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9809.956592185468,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000808639613723292",
+            "extra": "mean: 101.93725024192175 usec\nrounds: 2070"
           }
         ]
       }
