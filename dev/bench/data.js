@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782900716081,
+  "lastUpdate": 1782901349188,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9796,6 +9796,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000808639613723292",
             "extra": "mean: 101.93725024192175 usec\nrounds: 2070"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "be31fa0b1fbab4a3475bf5043cbe91e8223e9f82",
+          "message": "chore(deps): bump actions/cache from 5 to 6 (merges PR #915)\n\nBumps [actions/cache](https://github.com/actions/cache) from 5 to 6.\n- [Release notes](https://github.com/actions/cache/releases)\n- [Changelog](https://github.com/actions/cache/blob/main/RELEASES.md)\n- [Commits](https://github.com/actions/cache/compare/v5...v6)\n\n---\nupdated-dependencies:\n- dependency-name: actions/cache\n  dependency-version: '6'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-07-01T11:21:31+01:00",
+          "tree_id": "32665d8fbf0348187dbc279fc5126f9f1ac899d9",
+          "url": "https://github.com/endavis/infrafoundry/commit/be31fa0b1fbab4a3475bf5043cbe91e8223e9f82"
+        },
+        "date": 1782901347969,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7835.558372017586,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003216442676751132",
+            "extra": "mean: 127.62332338320758 usec\nrounds: 201"
           }
         ]
       }
