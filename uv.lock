@@ -1125,7 +1125,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.21" },
     { name = "socksio", marker = "extra == 'socks'", specifier = ">=1.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.51" },
-    { name = "types-boto3", marker = "extra == 'dev'", specifier = ">=1.43.40" },
+    { name = "types-boto3", marker = "extra == 'dev'", specifier = ">=1.43.46" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.33.0.20260712" },
     { name = "vulture", marker = "extra == 'dev'", specifier = ">=2.0" },
@@ -3010,15 +3010,15 @@ wheels = [
 
 [[package]]
 name = "types-boto3"
-version = "1.43.40"
+version = "1.43.46"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore-stubs" },
     { name = "types-s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a8/dd/63698e6469066b8f917db1f51ba7b135004aa1c2fa61e7ac0b4ee47af897/types_boto3-1.43.40.tar.gz", hash = "sha256:51c2416e23a63222f4e2e2b98b21cc175732c07e56c406932ce57a3e43a3229b", size = 103150, upload-time = "2026-07-03T01:56:39.777Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c9/b4/af4343f66f44c2c378e1c4a91c0fdb9e6935aea5d4d2483f8fb2812a3d91/types_boto3-1.43.46.tar.gz", hash = "sha256:3b8473a1074250af2331c1f9b1069ec08b6b8397d867ad37ddb3b72e6c50e62c", size = 103539, upload-time = "2026-07-10T19:53:47.026Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/58/713bb769f474fea54bd92dbe9e4ea4aee01db3f56bdc8fc65e4904a94794/types_boto3-1.43.40-py3-none-any.whl", hash = "sha256:aa16c8e8d68a7ae46642e2e2c07936ff0c1b6b07527ae4fc54e97e1383e2f347", size = 70672, upload-time = "2026-07-03T01:56:36.022Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/ec/e309f95f1dc54006fd36eb4eecc853bce3f788963d62def2395161ed622b/types_boto3-1.43.46-py3-none-any.whl", hash = "sha256:a58648eed2168fc08a9966c7ff0d21ce31450803d600535f3abbef03aac19ccc", size = 70877, upload-time = "2026-07-10T19:53:44.012Z" },
 ]
 
 [[package]]
