@@ -42,7 +42,7 @@ dev = [
     "radon>=6.0",
     "ruff>=0.15.21",
     "types-PyYAML>=6.0.0",
-    "types-boto3>=1.43.40",
+    "types-boto3>=1.43.46",
     "types-requests>=2.33.0.20260712",
     "vulture>=2.0",
 ]
