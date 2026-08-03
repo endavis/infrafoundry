@@ -51,7 +51,7 @@ security = [
     "pip-audit>=2.10.1",
     "bandit>=1.7",
     "pip-licenses>=4.0",
-    "cyclonedx-bom>=4.0",
+    "cyclonedx-bom>=7.3.1",
 ]
 # Optional SOCKS proxy support for the OPNsense provider's `proxy` setting
 # (httpx requires the `socksio` package to handle `socks5://` proxy URLs).
