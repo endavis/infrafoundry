@@ -47,7 +47,7 @@ dev = [
     "vulture>=2.0",
 ]
 security = [
-    "pip>=26.1.2",
+    "pip>=26.2",
     "pip-audit>=2.10.1",
     "bandit>=1.7",
     "pip-licenses>=4.0",
