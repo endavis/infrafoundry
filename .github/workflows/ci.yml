@@ -28,7 +28,7 @@ jobs:
       oldest: ${{ steps.pv.outputs.oldest }}
       newest: ${{ steps.pv.outputs.newest }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: |
             .github/python-versions.json
@@ -86,7 +86,7 @@ jobs:
       HYPOTHESIS_PROFILE: ci
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -156,7 +156,7 @@ jobs:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -203,7 +203,7 @@ jobs:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:

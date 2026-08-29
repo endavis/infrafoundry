@@ -18,7 +18,7 @@ jobs:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Check for benchmark tests
         id: check-benchmarks
