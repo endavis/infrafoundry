@@ -30,7 +30,7 @@ jobs:
             echo "::notice::No benchmark tests found at tests/benchmarks/; skipping benchmark workflow."
           fi
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         if: steps.check-benchmarks.outputs.exists == 'true'
         with:
           python-version: "3.14"
