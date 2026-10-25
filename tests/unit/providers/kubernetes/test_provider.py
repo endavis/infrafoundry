@@ -606,7 +606,7 @@ class TestBuildDependencyRefs:
 
     def test_all_types_have_entries(self, provider: KubernetesProvider) -> None:
         """Test that all resource types from get_dependencies() appear in result."""
-        resources_by_type = {}
+        resources_by_type: dict[str, Any] = {}
         refs = provider._build_dependency_refs(resources_by_type)
         deps = provider.get_dependencies()
         for resource_type in deps:

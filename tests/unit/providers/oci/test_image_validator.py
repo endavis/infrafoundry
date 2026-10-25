@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -23,7 +25,7 @@ def validator(report: ValidationReport) -> ImageValidator:
 
 def _instance(name: str, image_ocid: str = "") -> ResourceConfig:
     """Helper to create an instance resource config."""
-    config: dict = {"shape": "VM.Standard.A1.Flex", "subnet": "my-subnet"}
+    config: dict[str, Any] = {"shape": "VM.Standard.A1.Flex", "subnet": "my-subnet"}
     if image_ocid:
         config["image_ocid"] = image_ocid
     return ResourceConfig(name=name, type="instance", provider="oci", config=config)

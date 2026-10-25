@@ -1,15 +1,15 @@
 """Unit tests for ESXi EsxiConfigExporter."""
 
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from infrafoundry.core.types import EnvironmentData
 from infrafoundry.providers.esxi.exporter import EsxiConfigExporter
 
 
 @pytest.fixture
-def env_config() -> dict[str, Any]:
+def env_config() -> EnvironmentData:
     """Create a test environment config."""
     return {
         "provider_settings": {
@@ -27,7 +27,7 @@ def env_config() -> dict[str, Any]:
 
 
 @pytest.fixture
-def exporter(env_config: dict[str, Any]) -> EsxiConfigExporter:
+def exporter(env_config: EnvironmentData) -> EsxiConfigExporter:
     """Create an EsxiConfigExporter instance."""
     return EsxiConfigExporter(env_config)
 
@@ -78,7 +78,9 @@ class TestExport:
         assert any("vms" in k for k in exports)
 
     @patch.object(EsxiConfigExporter, "_ssh_command")
-    def test_export_with_host_filter(self, mock_ssh: MagicMock, env_config: dict[str, Any]) -> None:
+    def test_export_with_host_filter(
+        self, mock_ssh: MagicMock, env_config: EnvironmentData
+    ) -> None:
         """Should filter to specific host."""
         env_config["provider_settings"]["esxi"]["hosts"]["esxi-02"] = {"hostname": "192.168.1.11"}
         exporter = EsxiConfigExporter(env_config)

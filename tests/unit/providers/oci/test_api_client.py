@@ -8,6 +8,7 @@ import pytest
 import requests
 
 from infrafoundry.core.exceptions import APIError, ConfigurationError
+from infrafoundry.core.types import OCIProviderSettings
 from infrafoundry.providers.oci.api_client import OCIClient
 
 
@@ -224,7 +225,7 @@ class TestFromProviderSettings:
 
     def test_extracts_fields(self, rsa_key_path: Any) -> None:
         """Creates client with correct fields from settings."""
-        settings = {
+        settings: OCIProviderSettings = {
             "tenancy_ocid": "ocid1.tenancy.oc1..test",
             "user_ocid": "ocid1.user.oc1..test",
             "private_key_path": rsa_key_path,
@@ -239,7 +240,7 @@ class TestFromProviderSettings:
 
     def test_missing_key_raises(self) -> None:
         """Raises ConfigurationError when key path is invalid."""
-        settings = {
+        settings: OCIProviderSettings = {
             "tenancy_ocid": "t",
             "user_ocid": "u",
             "private_key_path": "/nonexistent",

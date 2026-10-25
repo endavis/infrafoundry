@@ -39,22 +39,22 @@ class TestOutputFormat:
 
     def test_text_format(self) -> None:
         """TEXT format should be 'text'."""
-        assert OutputFormat.TEXT == "text"
+        assert OutputFormat.TEXT == "text"  # type: ignore[comparison-overlap]
         assert OutputFormat.TEXT.value == "text"
 
     def test_json_format(self) -> None:
         """JSON format should be 'json'."""
-        assert OutputFormat.JSON == "json"
+        assert OutputFormat.JSON == "json"  # type: ignore[comparison-overlap]
         assert OutputFormat.JSON.value == "json"
 
     def test_yaml_format(self) -> None:
         """YAML format should be 'yaml'."""
-        assert OutputFormat.YAML == "yaml"
+        assert OutputFormat.YAML == "yaml"  # type: ignore[comparison-overlap]
         assert OutputFormat.YAML.value == "yaml"
 
     def test_table_format(self) -> None:
         """TABLE format should be 'table'."""
-        assert OutputFormat.TABLE == "table"
+        assert OutputFormat.TABLE == "table"  # type: ignore[comparison-overlap]
         assert OutputFormat.TABLE.value == "table"
 
     def test_format_from_string(self) -> None:

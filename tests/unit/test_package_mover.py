@@ -76,7 +76,7 @@ def _create_package(
         pkg_dir = envs_dir / env_name / package_name
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
-    manifest: dict = {"name": package_name}
+    manifest: dict[str, Any] = {"name": package_name}
     if provider:
         manifest["provider"] = provider
     if resources:
@@ -86,7 +86,7 @@ def _create_package(
     return pkg_dir
 
 
-def _create_resource_file(pkg_dir: Path, filename: str, resources: list[dict]) -> None:
+def _create_resource_file(pkg_dir: Path, filename: str, resources: list[dict[str, Any]]) -> None:
     """Create a resource YAML file with provider-centric format."""
     stem = Path(filename).stem
     data = {stem: resources}

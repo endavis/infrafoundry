@@ -237,6 +237,7 @@ class TestPlanOrchestrator:
             # Check deployment was marked as failed
             deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].status == DeploymentStatus.FAILED
+            assert deployments[0].error_message is not None
             assert "Terraform failed" in deployments[0].error_message
 
     def test_plan_emits_failure_event(self, orchestrator: Orchestrator) -> None:
@@ -285,6 +286,7 @@ class TestPlanOrchestrator:
             # message propagated into the deployment record.
             deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].status == DeploymentStatus.FAILED
+            assert deployments[0].error_message is not None
             assert "boom" in deployments[0].error_message
 
     def test_plan_runner_returning_success_false_emits_plan_failed_event(
@@ -892,4 +894,5 @@ class TestWorkflowStateManagement:
 
             deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].dry_run is True
+            assert deployments[0].extra_data is not None
             assert "resource_filter" in deployments[0].extra_data

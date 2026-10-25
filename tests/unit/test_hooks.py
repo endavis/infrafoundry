@@ -354,6 +354,7 @@ class TestHookManager:
             )
 
         assert exc_info.value.result.timed_out is True
+        assert exc_info.value.result.error_message is not None
         assert "Timeout" in exc_info.value.result.error_message
 
     def test_execute_resource_hooks(

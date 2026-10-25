@@ -23,19 +23,19 @@ def provider(tmp_path: Path) -> EsxiProvider:
 
 def _make_vswitch(name: str = "vSwitch1", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a vswitch ResourceConfig."""
-    config: dict = {"host": "esxi-01", **config_overrides}
+    config: dict[str, Any] = {"host": "esxi-01", **config_overrides}
     return ResourceConfig(name=name, type="vswitch", provider="esxi", config=config)
 
 
 def _make_portgroup(name: str = "pg-mgmt", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a portgroup ResourceConfig."""
-    config: dict = {"host": "esxi-01", "vswitch": "vSwitch1", **config_overrides}
+    config: dict[str, Any] = {"host": "esxi-01", "vswitch": "vSwitch1", **config_overrides}
     return ResourceConfig(name=name, type="portgroup", provider="esxi", config=config)
 
 
 def _make_vm(name: str = "test-vm", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a VM ResourceConfig."""
-    config: dict = {"host": "esxi-01", "name": name, **config_overrides}
+    config: dict[str, Any] = {"host": "esxi-01", "name": name, **config_overrides}
     return ResourceConfig(name=name, type="vm", provider="esxi", config=config)
 
 

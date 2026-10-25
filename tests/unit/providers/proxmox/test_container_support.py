@@ -27,7 +27,7 @@ def provider(tmp_path: Path) -> ProxmoxProvider:
 
 def _make_ct(name: str = "test-ct", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a container ResourceConfig with sensible defaults."""
-    config: dict = {
+    config: dict[str, Any] = {
         "name": name,
         "target_node": "pve01",
         **config_overrides,

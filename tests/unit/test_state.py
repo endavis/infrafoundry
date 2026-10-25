@@ -66,7 +66,7 @@ class TestStateManager:
             user="testuser",
             commit_sha="abc123",
             dry_run=False,
-            metadata={"key": "value"},
+            metadata={"key": "value"},  # type: ignore[arg-type]
         )
 
         assert deployment_id is not None
@@ -95,6 +95,7 @@ class TestStateManager:
 
         with state_manager.SessionLocal() as session:
             deployment = session.query(Deployment).filter_by(id=deployment_id).first()
+            assert deployment is not None
             assert deployment.environment == "prod"
             assert deployment.command == "plan"
             assert deployment.user is None
@@ -115,6 +116,7 @@ class TestStateManager:
 
         with state_manager.SessionLocal() as session:
             deployment = session.query(Deployment).filter_by(id=deployment_id).first()
+            assert deployment is not None
             assert deployment.status == DeploymentStatus.COMPLETED
             assert deployment.completed_at is not None
 
@@ -134,6 +136,7 @@ class TestStateManager:
 
         with state_manager.SessionLocal() as session:
             deployment = session.query(Deployment).filter_by(id=deployment_id).first()
+            assert deployment is not None
             assert deployment.status == DeploymentStatus.FAILED
             assert deployment.error_message == error_msg
             assert deployment.completed_at is not None
@@ -153,7 +156,7 @@ class TestStateManager:
             name="web-01",
             state=ResourceState.CREATING,
             config={"cores": 4, "memory": 8192},
-            metadata={"tags": {"env": "dev"}},
+            metadata={"tags": {"env": "dev"}},  # type: ignore[arg-type]
         )
 
         assert resource is not None
@@ -193,6 +196,7 @@ class TestStateManager:
             provider="proxmox",
             name="web-01",
         )
+        assert updated is not None
         assert updated.state == ResourceState.ACTIVE
         assert updated.terraform_id == "proxmox_vm.web_01"
 
@@ -355,7 +359,7 @@ class TestStateManager:
             event_type="resource_created",
             resource_name="web-01",
             message="VM created successfully",
-            metadata={"duration": "45s"},
+            metadata={"duration": "45s"},  # type: ignore[arg-type]
         )
 
         # Verify event was created by querying directly

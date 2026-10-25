@@ -1,5 +1,8 @@
 """Unit tests for environment configuration diff utilities."""
 
+from typing import cast
+
+from infrafoundry.core.config.config_manager import ConfigManager
 from infrafoundry.core.config.diff import diff_environments
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
@@ -33,7 +36,7 @@ def test_diff_environments_no_changes() -> None:
         {"dev": [], "prod": []},
     )
 
-    result = diff_environments(manager, "dev", "prod")
+    result = diff_environments(cast(ConfigManager, manager), "dev", "prod")
 
     assert result.is_empty()
     assert result.settings_changes == []
@@ -71,7 +74,7 @@ def test_diff_environments_settings_and_resources() -> None:
         {"dev": dev_resources, "prod": prod_resources},
     )
 
-    result = diff_environments(manager, "dev", "prod")
+    result = diff_environments(cast(ConfigManager, manager), "dev", "prod")
 
     assert not result.is_empty()
     assert any("description" in change for change in result.settings_changes)
@@ -100,12 +103,16 @@ def test_diff_environments_provider_filter() -> None:
         {"dev": dev_resources, "prod": prod_resources},
     )
 
-    result = diff_environments(manager, "dev", "prod", provider_filter="opnsense")
+    result = diff_environments(
+        cast(ConfigManager, manager), "dev", "prod", provider_filter="opnsense"
+    )
     assert result.resources_changed == []
     assert result.resources_added == []
     assert result.resources_removed == []
 
-    result_proxmox = diff_environments(manager, "dev", "prod", provider_filter="proxmox")
+    result_proxmox = diff_environments(
+        cast(ConfigManager, manager), "dev", "prod", provider_filter="proxmox"
+    )
     assert result_proxmox.resources_changed == ["proxmox:vm-dev"]
 
 
@@ -126,7 +133,7 @@ def test_diff_environments_same_name_different_type() -> None:
         {"dev": dev_resources, "prod": prod_resources},
     )
 
-    result = diff_environments(manager, "dev", "prod")
+    result = diff_environments(cast(ConfigManager, manager), "dev", "prod")
 
     # Same name/provider but different type should be marked as changed
     assert result.resources_changed == ["proxmox:web-server"]
@@ -148,7 +155,7 @@ def test_diff_environments_empty_resources() -> None:
         {"empty": [], "prod": prod_resources},
     )
 
-    result = diff_environments(manager, "empty", "prod")
+    result = diff_environments(cast(ConfigManager, manager), "empty", "prod")
 
     assert result.resources_added == ["proxmox:vm-prod"]
     assert result.resources_removed == []
@@ -165,7 +172,7 @@ def test_diff_environments_both_empty() -> None:
         {"empty-a": [], "empty-b": []},
     )
 
-    result = diff_environments(manager, "empty-a", "empty-b")
+    result = diff_environments(cast(ConfigManager, manager), "empty-a", "empty-b")
 
     assert result.is_empty()
     assert result.resources_added == []
@@ -186,4 +193,4 @@ def test_diff_environments_nonexistent_environment() -> None:
 
     # Should raise KeyError when trying to load nonexistent environment
     with pytest.raises(KeyError):
-        diff_environments(manager, "nonexistent", "dev")
+        diff_environments(cast(ConfigManager, manager), "nonexistent", "dev")

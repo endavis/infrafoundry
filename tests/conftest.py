@@ -74,7 +74,7 @@ def mock_subprocess() -> Iterator[MagicMock]:
                         result = spec(cmd)
                         if isinstance(result, BaseException):
                             raise result
-                        return result  # type: ignore[return-value]
+                        return result
                     return MagicMock(
                         returncode=spec.get("returncode", 0),
                         stdout=spec.get("stdout", ""),

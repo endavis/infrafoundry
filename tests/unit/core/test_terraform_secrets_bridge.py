@@ -14,6 +14,7 @@ than silently returning an empty value at terraform invocation time.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -46,7 +47,7 @@ class _BridgeHarness(TerraformGeneratorMixin):
         self.terraform_dir = Path("/nonexistent/terraform")
         self._env_config = env_config
 
-    def _load_environment_config(self) -> EnvironmentConfig | None:  # type: ignore[override]
+    def _load_environment_config(self) -> EnvironmentConfig | None:
         return self._env_config
 
     def _write_terraform_file(self, filename: str, content: str) -> None:  # pragma: no cover
@@ -54,7 +55,7 @@ class _BridgeHarness(TerraformGeneratorMixin):
 
 
 def _make_env(
-    *, secrets: dict | None = None, provider_settings: dict | None = None
+    *, secrets: dict[str, Any] | None = None, provider_settings: dict[str, Any] | None = None
 ) -> EnvironmentConfig:
     """Build a minimal EnvironmentConfig with optional secrets/settings."""
     return EnvironmentConfig(
@@ -65,7 +66,7 @@ def _make_env(
 
 
 def _resource(name: str, terraform_secrets: list[str] | None = None) -> ResourceConfig:
-    config: dict = {}
+    config: dict[str, Any] = {}
     if terraform_secrets is not None:
         config["terraform_secrets"] = terraform_secrets
     return ResourceConfig(name=name, type="instance", provider="test", config=config)

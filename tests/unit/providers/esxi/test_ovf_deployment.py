@@ -23,7 +23,7 @@ def provider(tmp_path: Path) -> EsxiProvider:
 
 def _make_ovf_deployment(name: str = "ontap-node-01", **config_overrides: Any) -> ResourceConfig:
     """Helper to create an ovf_deployment ResourceConfig."""
-    config: dict = {
+    config: dict[str, Any] = {
         "host": "esxi-01",
         "ovf_source": "/path/to/vsim.ovf",
         "disk_store": "datastore1",

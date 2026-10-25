@@ -27,7 +27,7 @@ def provider(tmp_path: Path) -> ProxmoxProvider:
 
 def _make_storage(name: str = "test-storage", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a storage ResourceConfig with sensible defaults."""
-    config: dict = {
+    config: dict[str, Any] = {
         "name": name,
         **config_overrides,
     }

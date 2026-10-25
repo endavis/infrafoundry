@@ -38,7 +38,7 @@ def snippet_dir(tmp_path: Path) -> Path:
 
 def _make_vm(name: str = "test-vm", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a VM ResourceConfig."""
-    config: dict = {
+    config: dict[str, Any] = {
         "name": name,
         "target_node": "pve01",
         **config_overrides,

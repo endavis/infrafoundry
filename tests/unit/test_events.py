@@ -664,9 +664,9 @@ class TestPackageEventsIntegration:
 
         # Spy on load_config
         original_load_config = event_manager.load_config
-        load_config_calls: list[dict] = []
+        load_config_calls: list[dict[str, Any]] = []
 
-        def spy_load_config(config: dict) -> None:
+        def spy_load_config(config: dict[str, Any]) -> None:
             load_config_calls.append(config)
             original_load_config(config)
 
@@ -1266,7 +1266,7 @@ class TestScriptHandlerOutputs:
         script = env_dir / "run.sh"
         script.write_text(script_content)
         script.chmod(script.stat().st_mode | stat.S_IEXEC)
-        config: dict = {"script": "run.sh"}
+        config: dict[str, Any] = {"script": "run.sh"}
         if outputs is not None:
             config["outputs"] = outputs
         handler = ScriptHandler(config, config_base_dir=tmp_path)

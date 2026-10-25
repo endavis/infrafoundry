@@ -1,7 +1,7 @@
 """Unit tests for KubernetesValidator (composition orchestrator)."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -53,7 +53,7 @@ class TestKubernetesValidatorProtocol:
 
     def test_implements_provider_validator_protocol(self, validator: KubernetesValidator) -> None:
         """Test that KubernetesValidator implements ProviderValidator protocol."""
-        assert isinstance(validator, ProviderValidator)
+        assert isinstance(cast(object, validator), ProviderValidator)
         assert hasattr(validator, "env_config")
         assert hasattr(validator, "report")
         assert hasattr(validator, "validate_connectivity")
@@ -148,7 +148,7 @@ class TestKubernetesValidatorConnectivity:
     ) -> None:
         """Test that connectivity delegates to KubeconfigValidator."""
         validator = KubernetesValidator(mock_env_config, validation_report)
-        validator.kubeconfig_validator.validate = MagicMock()
+        validator.kubeconfig_validator.validate = MagicMock()  # type: ignore[method-assign]
         validator.validate_connectivity()
         validator.kubeconfig_validator.validate.assert_called_once_with("/path/to/kubeconfig", None)
 
@@ -166,7 +166,7 @@ class TestKubernetesValidatorConnectivity:
             },
         )
         validator = KubernetesValidator(env_config, validation_report)
-        validator.kubeconfig_validator.validate = MagicMock()
+        validator.kubeconfig_validator.validate = MagicMock()  # type: ignore[method-assign]
         validator.validate_connectivity()
         validator.kubeconfig_validator.validate.assert_called_once_with(
             "/path/to/kubeconfig", "my-context"
@@ -281,7 +281,7 @@ class TestKubernetesValidatorReferences:
         self, validator: KubernetesValidator, validation_report: ValidationReport
     ) -> None:
         """Test that Helm validation runs regardless of connectivity."""
-        validator.helm_validator.validate = MagicMock()
+        validator.helm_validator.validate = MagicMock()  # type: ignore[method-assign]
         resources = [
             ResourceConfig(
                 provider="kubernetes",
@@ -297,8 +297,8 @@ class TestKubernetesValidatorReferences:
         self, validator: KubernetesValidator, validation_report: ValidationReport
     ) -> None:
         """Test that API-based checks are skipped when not connected."""
-        validator.namespace_validator.validate = MagicMock()
-        validator.crd_validator.validate = MagicMock()
+        validator.namespace_validator.validate = MagicMock()  # type: ignore[method-assign]
+        validator.crd_validator.validate = MagicMock()  # type: ignore[method-assign]
         resources = [
             ResourceConfig(
                 provider="kubernetes",
@@ -327,8 +327,8 @@ class TestKubernetesValidatorReferences:
             connected=True,
         )
         validator.kubeconfig_validator._connection_info = conn
-        validator.namespace_validator.validate = MagicMock()
-        validator.crd_validator.validate = MagicMock()
+        validator.namespace_validator.validate = MagicMock()  # type: ignore[method-assign]
+        validator.crd_validator.validate = MagicMock()  # type: ignore[method-assign]
 
         resources = [
             ResourceConfig(

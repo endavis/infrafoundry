@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import yaml
 from click.testing import CliRunner
 
+from infrafoundry.cli.commands.doctor_utils import CheckResult
 from infrafoundry.cli.main import main
 
 # Patch targets (on the config/doctor module namespace)
@@ -45,21 +46,21 @@ def temp_config_dir(tmp_path: Path) -> Path:
     return config_dir
 
 
-def _ok(name: str, message: str = "OK") -> MagicMock:
+def _ok(name: str, message: str = "OK") -> CheckResult:
     """Build a mock CheckResult with ok status."""
     from infrafoundry.cli.commands.doctor_utils import CheckResult
 
     return CheckResult(name=name, status="ok", message=message)
 
 
-def _error(name: str, message: str = "Failed") -> MagicMock:
+def _error(name: str, message: str = "Failed") -> CheckResult:
     """Build a mock CheckResult with error status."""
     from infrafoundry.cli.commands.doctor_utils import CheckResult
 
     return CheckResult(name=name, status="error", message=message, suggestion="Fix it")
 
 
-def _warning(name: str, message: str = "Warn") -> MagicMock:
+def _warning(name: str, message: str = "Warn") -> CheckResult:
     """Build a mock CheckResult with warning status."""
     from infrafoundry.cli.commands.doctor_utils import CheckResult
 

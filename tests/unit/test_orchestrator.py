@@ -2,8 +2,8 @@
 
 import os
 from pathlib import Path
-from typing import Any
-from unittest.mock import Mock, patch
+from typing import Any, cast
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -556,7 +556,7 @@ class TestOrchestratorLocking:
             captured["lock"] = orchestrator.state_manager.get_lock("dev")
             return {}
 
-        orchestrator.apply_orchestrator.apply.side_effect = record_apply
+        cast(MagicMock, orchestrator.apply_orchestrator.apply).side_effect = record_apply
 
         orchestrator.apply("dev", auto_approve=True)
 
@@ -565,7 +565,7 @@ class TestOrchestratorLocking:
 
     def test_apply_releases_lock_on_failure(self, tmp_path: Path) -> None:
         orchestrator = self._make_orchestrator(tmp_path)
-        orchestrator.apply_orchestrator.apply.side_effect = RuntimeError("boom")
+        cast(MagicMock, orchestrator.apply_orchestrator.apply).side_effect = RuntimeError("boom")
 
         with pytest.raises(RuntimeError, match="boom"):
             orchestrator.apply("dev", auto_approve=True)
@@ -595,7 +595,7 @@ class TestOrchestratorLocking:
             captured["lock"] = orchestrator.state_manager.get_lock("dev")
             return {}
 
-        orchestrator.destroy_orchestrator.destroy.side_effect = record_destroy
+        cast(MagicMock, orchestrator.destroy_orchestrator.destroy).side_effect = record_destroy
 
         orchestrator.destroy("dev", auto_approve=True)
 
@@ -607,13 +607,13 @@ class TestOrchestratorLocking:
 
         orchestrator = self._make_orchestrator(tmp_path)
 
-        captured: dict = {}
+        captured: dict[str, Any] = {}
 
         def record_apply(**kwargs: Any) -> dict[str, Any]:
             captured["lock"] = orchestrator.state_manager.get_lock("dev")
             return {}
 
-        orchestrator.apply_orchestrator.apply.side_effect = record_apply
+        cast(MagicMock, orchestrator.apply_orchestrator.apply).side_effect = record_apply
 
         orchestrator.apply("dev", auto_approve=True)
 
@@ -637,4 +637,4 @@ class TestOrchestratorLocking:
 
         result = orchestrator.plan("dev")
         assert result == {}
-        orchestrator.plan_orchestrator.plan.assert_called_once()
+        cast(MagicMock, orchestrator.plan_orchestrator.plan).assert_called_once()

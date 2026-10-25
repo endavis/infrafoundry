@@ -43,7 +43,7 @@ def _storage(name: str, **config: Any) -> ResourceConfig:
 
 def _vm(name: str, **config: Any) -> ResourceConfig:
     """Build a minimal Proxmox VM ResourceConfig for testing."""
-    base: dict = {
+    base: dict[str, Any] = {
         "name": name,
         "target_node": "pve1",
         "vmid": 200,
@@ -55,7 +55,7 @@ def _vm(name: str, **config: Any) -> ResourceConfig:
 
 def _container(name: str, **config: Any) -> ResourceConfig:
     """Build a minimal Proxmox LXC container ResourceConfig for testing."""
-    base: dict = {
+    base: dict[str, Any] = {
         "name": name,
         "target_node": "pve1",
         "vmid": 300,

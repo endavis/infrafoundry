@@ -27,7 +27,7 @@ def validator(report: MagicMock) -> OvfDeploymentValidator:
 
 def _make_ovf_deployment(name: str = "ontap-node-01", **config_overrides: Any) -> ResourceConfig:
     """Create an ovf_deployment resource."""
-    config: dict = {
+    config: dict[str, Any] = {
         "host": "esxi-01",
         "ovf_source": "/path/to/vsim.ovf",
         "disk_store": "datastore1",

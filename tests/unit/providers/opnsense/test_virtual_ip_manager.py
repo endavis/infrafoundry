@@ -93,7 +93,7 @@ def _vip(name: str, **overrides: Any) -> VirtualIPConfig:
     return VirtualIPConfig(
         name=name,
         interface=overrides.get("interface", "lan"),
-        mode=overrides.get("mode", "ipalias"),  # type: ignore[arg-type]
+        mode=overrides.get("mode", "ipalias"),
         address=overrides.get("address", "10.0.0.10"),
         network=overrides.get("network", "24"),
         description=overrides.get("description", ""),

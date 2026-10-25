@@ -93,7 +93,9 @@ class TestEnvironmentLock:
                 timeout=5,
                 poll_interval=0.1,
             ):
-                assert state_manager.get_lock("dev").locked_by == "me@h:1"
+                lock = state_manager.get_lock("dev")
+                assert lock is not None
+                assert lock.locked_by == "me@h:1"
         finally:
             t.join()
         assert state_manager.get_lock("dev") is None
@@ -179,7 +181,7 @@ class TestEnvironmentLockHeartbeat:
             calls.append((env_name, locked_by))
             return original(env_name, locked_by, new_expires_at)
 
-        state_manager.extend_lock = recording_extend  # type: ignore[method-assign]
+        state_manager.extend_lock = recording_extend  # type: ignore[method-assign, assignment]
         try:
             with environment_lock(state_manager, "dev", ttl=3, locked_by="me@h:1"):
                 time.sleep(1.3)
@@ -195,7 +197,7 @@ class TestEnvironmentLockHeartbeat:
         ev = RecordingEventManager()
         original = state_manager.extend_lock
         state_manager.extend_lock = (  # type: ignore[method-assign]
-            lambda env_name, locked_by, new_expires_at: False
+            lambda env_name, locked_by, new_expires_at: False  # type: ignore[assignment]
         )
         try:
             with environment_lock(
@@ -226,7 +228,7 @@ class TestEnvironmentLockHeartbeat:
                 return False  # transient failure
             return original(env_name, locked_by, new_expires_at)
 
-        state_manager.extend_lock = flaky_extend  # type: ignore[method-assign]
+        state_manager.extend_lock = flaky_extend  # type: ignore[method-assign, assignment]
         try:
             with environment_lock(
                 state_manager,

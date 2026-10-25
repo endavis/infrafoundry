@@ -68,7 +68,7 @@ class TestValidateConnectivity:
 
     def test_missing_credentials_returns_early(self, validator: ProxmoxValidator) -> None:
         """Returns early when credentials are missing."""
-        validator.api_validator.get_credentials = MagicMock(return_value=None)
+        validator.api_validator.get_credentials = MagicMock(return_value=None)  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -86,10 +86,10 @@ class TestValidateConnectivity:
             },
         )
         validator = ProxmoxValidator(env_config, report)
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={"api_url": "https://pve.example.com:8006/api2/json", "node": "pve1"}
         )
-        validator.api_validator.add_error = MagicMock()
+        validator.api_validator.add_error = MagicMock()  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -108,10 +108,10 @@ class TestValidateConnectivity:
         mock_response.json.return_value = {"data": {"version": "8.1"}}
         mock_get.return_value = mock_response
 
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={"api_url": "https://pve.example.com:8006/api2/json", "node": "pve1"}
         )
-        validator.api_validator.add_success = MagicMock()
+        validator.api_validator.add_success = MagicMock()  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -121,10 +121,10 @@ class TestValidateConnectivity:
 
     def test_api_error_reports_error(self, validator: ProxmoxValidator) -> None:
         """Reports error when API call fails."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={"api_url": "https://pve.example.com:8006/api2/json", "node": "pve1"}
         )
-        validator.api_validator.add_error = MagicMock()
+        validator.api_validator.add_error = MagicMock()  # type: ignore[method-assign]
 
         with patch.object(
             ProxmoxClient, "from_provider_settings", return_value=MagicMock()
@@ -194,7 +194,7 @@ class TestValidateReferences:
         """Exceptions during validation are caught and reported."""
         mock_client = MagicMock(spec=ProxmoxClient)
         mock_client.get_json.side_effect = RuntimeError("unexpected")
-        validator.api_validator.handle_validation_exception = MagicMock()
+        validator.api_validator.handle_validation_exception = MagicMock()  # type: ignore[method-assign]
 
         with patch.object(ProxmoxClient, "from_provider_settings", return_value=mock_client):
             validator.validate_references(
@@ -442,6 +442,7 @@ class TestGetClusterVMs:
 
         result = validator._get_cluster_vms(mock_client)
 
+        assert result is not None
         assert len(result) == 2
         assert result[0]["vmid"] == 100
 

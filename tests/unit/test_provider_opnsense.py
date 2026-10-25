@@ -3,6 +3,7 @@
 import warnings
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -78,7 +79,7 @@ class TestOPNsenseProviderMigrate:
         """``migrate_kea_dhcp`` returns the registry extractor's YAML."""
         from infrafoundry.core.extractors import get_extractor
 
-        extractor = get_extractor("opnsense", "kea_dhcp")
+        extractor: Any = get_extractor("opnsense", "kea_dhcp")
 
         with (
             patch.object(extractor.manager_class, "__init__", return_value=None),
@@ -100,7 +101,7 @@ class TestOPNsenseProviderMigrate:
         """``migrate_kea_dhcp`` propagates errors from the manager."""
         from infrafoundry.core.extractors import get_extractor
 
-        extractor = get_extractor("opnsense", "kea_dhcp")
+        extractor: Any = get_extractor("opnsense", "kea_dhcp")
 
         with (
             patch.object(extractor.manager_class, "__init__", return_value=None),

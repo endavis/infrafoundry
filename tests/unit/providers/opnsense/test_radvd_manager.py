@@ -95,7 +95,7 @@ def _make_service_mock(
 
     def _build_desired(resource: ResourceConfig) -> dict[str, dict[str, Any]]:
         # Mirror the real service: pull interfaces mapping, fill defaults.
-        return RadvdService.build_desired_interface_records(service, resource)  # type: ignore[arg-type]
+        return RadvdService.build_desired_interface_records(service, resource)
 
     service.build_desired_interface_records.side_effect = lambda r: (
         RadvdService.build_desired_interface_records(service, r)

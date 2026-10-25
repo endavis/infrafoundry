@@ -1,6 +1,7 @@
 """Unit tests for BlueprintValidator."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -22,12 +23,12 @@ def _write_template(directory: Path, filename: str, content: str) -> None:
 def _make_resolved(
     tmp_path: Path,
     name: str = "test-bp",
-    defaults: dict | None = None,
+    defaults: dict[str, Any] | None = None,
     resources: list[str] | None = None,
-    providers: dict | None = None,
-) -> dict:
+    providers: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build a resolved-blueprint dict suitable for BlueprintValidator."""
-    result: dict = {
+    result: dict[str, Any] = {
         "name": name,
         "description": "test blueprint",
         "version": "1.0.0",

@@ -27,7 +27,7 @@ def provider(tmp_path: Path) -> ProxmoxProvider:
 
 def _make_vm(name: str = "test-vm", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a VM ResourceConfig with sensible defaults."""
-    config: dict = {
+    config: dict[str, Any] = {
         "name": name,
         "target_node": "pve01",
         **config_overrides,

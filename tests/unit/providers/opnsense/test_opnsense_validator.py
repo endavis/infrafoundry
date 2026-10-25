@@ -66,7 +66,7 @@ class TestValidateConnectivity:
 
     def test_missing_credentials_returns_early(self, validator: OPNsenseValidator) -> None:
         """Returns early when credentials are missing."""
-        validator.api_validator.get_credentials = MagicMock(return_value=None)
+        validator.api_validator.get_credentials = MagicMock(return_value=None)  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -74,7 +74,7 @@ class TestValidateConnectivity:
 
     def test_api_200_reports_success(self, validator: OPNsenseValidator) -> None:
         """Reports success on 200 response."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "api_url": "https://opnsense.example.com",
                 "api_key": "key",
@@ -84,8 +84,8 @@ class TestValidateConnectivity:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"product_version": "24.7"}
-        validator.api_validator.api_request = MagicMock(return_value=mock_response)
-        validator.api_validator.add_success = MagicMock()
+        validator.api_validator.api_request = MagicMock(return_value=mock_response)  # type: ignore[method-assign]
+        validator.api_validator.add_success = MagicMock()  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -93,7 +93,7 @@ class TestValidateConnectivity:
 
     def test_api_200_without_version(self, validator: OPNsenseValidator) -> None:
         """Reports success without version when not in response."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "api_url": "https://opnsense.example.com",
                 "api_key": "key",
@@ -103,8 +103,8 @@ class TestValidateConnectivity:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {}
-        validator.api_validator.api_request = MagicMock(return_value=mock_response)
-        validator.api_validator.add_success = MagicMock()
+        validator.api_validator.api_request = MagicMock(return_value=mock_response)  # type: ignore[method-assign]
+        validator.api_validator.add_success = MagicMock()  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -112,7 +112,7 @@ class TestValidateConnectivity:
 
     def test_api_401_reports_auth_error(self, validator: OPNsenseValidator) -> None:
         """Reports authentication error on 401."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "api_url": "https://opnsense.example.com",
                 "api_key": "key",
@@ -121,8 +121,8 @@ class TestValidateConnectivity:
         )
         mock_response = MagicMock()
         mock_response.status_code = 401
-        validator.api_validator.api_request = MagicMock(return_value=mock_response)
-        validator.api_validator.add_error = MagicMock()
+        validator.api_validator.api_request = MagicMock(return_value=mock_response)  # type: ignore[method-assign]
+        validator.api_validator.add_error = MagicMock()  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -131,7 +131,7 @@ class TestValidateConnectivity:
 
     def test_api_500_reports_warning(self, validator: OPNsenseValidator) -> None:
         """Reports warning on 500 response."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "api_url": "https://opnsense.example.com",
                 "api_key": "key",
@@ -140,8 +140,8 @@ class TestValidateConnectivity:
         )
         mock_response = MagicMock()
         mock_response.status_code = 500
-        validator.api_validator.api_request = MagicMock(return_value=mock_response)
-        validator.api_validator.add_error = MagicMock()
+        validator.api_validator.api_request = MagicMock(return_value=mock_response)  # type: ignore[method-assign]
+        validator.api_validator.add_error = MagicMock()  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -150,16 +150,16 @@ class TestValidateConnectivity:
 
     def test_request_failure_returns_early(self, validator: OPNsenseValidator) -> None:
         """Returns early when API request fails entirely."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "api_url": "https://opnsense.example.com",
                 "api_key": "key",
                 "api_secret": "secret",
             }
         )
-        validator.api_validator.api_request = MagicMock(return_value=None)
-        validator.api_validator.add_success = MagicMock()
-        validator.api_validator.add_error = MagicMock()
+        validator.api_validator.api_request = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.api_validator.add_success = MagicMock()  # type: ignore[method-assign]
+        validator.api_validator.add_error = MagicMock()  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -172,20 +172,20 @@ class TestValidateReferences:
 
     def test_missing_credentials_returns_early(self, validator: OPNsenseValidator) -> None:
         """Returns early when credentials are missing."""
-        validator.api_validator.get_credentials = MagicMock(return_value=None)
+        validator.api_validator.get_credentials = MagicMock(return_value=None)  # type: ignore[method-assign]
 
         validator.validate_references([])
 
     def test_delegates_to_specialized_validators(self, validator: OPNsenseValidator) -> None:
         """Delegates to all specialized validators."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "api_url": "https://opnsense.example.com",
                 "api_key": "key",
                 "api_secret": "secret",
             }
         )
-        validator.api_validator.fetch_json = MagicMock(return_value=None)
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
         validator.firewall_rule_validator = MagicMock()
         validator.vlan_validator = MagicMock()
         validator.unbound_validator = MagicMock()
@@ -206,15 +206,15 @@ class TestValidateReferences:
 
     def test_exception_caught_gracefully(self, validator: OPNsenseValidator) -> None:
         """Exceptions during validation are caught and reported."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "api_url": "https://opnsense.example.com",
                 "api_key": "key",
                 "api_secret": "secret",
             }
         )
-        validator.api_validator.fetch_json = MagicMock(side_effect=RuntimeError("unexpected"))
-        validator.api_validator.handle_validation_exception = MagicMock()
+        validator.api_validator.fetch_json = MagicMock(side_effect=RuntimeError("unexpected"))  # type: ignore[method-assign]
+        validator.api_validator.handle_validation_exception = MagicMock()  # type: ignore[method-assign]
 
         validator.validate_references(
             [
@@ -308,7 +308,7 @@ class TestGetExistingAliases:
 
     def test_success_returns_aliases(self, validator: OPNsenseValidator) -> None:
         """Returns alias dict on successful API call."""
-        validator.api_validator.fetch_json = MagicMock(
+        validator.api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "rows": [
                     {"name": "alias1", "type": "host"},
@@ -324,7 +324,7 @@ class TestGetExistingAliases:
 
     def test_api_failure_returns_empty(self, validator: OPNsenseValidator) -> None:
         """Returns empty dict on API failure."""
-        validator.api_validator.fetch_json = MagicMock(return_value=None)
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
 
         result = validator._get_existing_aliases("https://opn.example.com", "key", "secret")
 
@@ -332,7 +332,7 @@ class TestGetExistingAliases:
 
     def test_skips_rows_without_name(self, validator: OPNsenseValidator) -> None:
         """Skips rows that don't have a name field."""
-        validator.api_validator.fetch_json = MagicMock(
+        validator.api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
             return_value={"rows": [{"name": "alias1"}, {"type": "host"}]}
         )
 
@@ -347,7 +347,7 @@ class TestGetExistingInterfaces:
 
     def test_success_with_dict_format(self, validator: OPNsenseValidator) -> None:
         """Returns interfaces from dict format."""
-        validator.api_validator.fetch_json = MagicMock(
+        validator.api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "lan": {"device": "igc0", "if_type": "ethernet"},
                 "wan": {"device": "igc1", "if_type": "ethernet"},
@@ -361,7 +361,7 @@ class TestGetExistingInterfaces:
 
     def test_success_with_list_format(self, validator: OPNsenseValidator) -> None:
         """Returns interfaces from list format."""
-        validator.api_validator.fetch_json = MagicMock(
+        validator.api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
             return_value=[
                 {"name": "lan", "device": "igc0"},
                 {"name": "wan", "device": "igc1"},
@@ -375,7 +375,7 @@ class TestGetExistingInterfaces:
 
     def test_api_failure_returns_empty(self, validator: OPNsenseValidator) -> None:
         """Returns empty dict on API failure."""
-        validator.api_validator.fetch_json = MagicMock(return_value=None)
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
 
         result = validator._get_existing_interfaces("https://opn.example.com", "key", "secret")
 

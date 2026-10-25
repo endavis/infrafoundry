@@ -5,7 +5,7 @@ import stat
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Never
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -332,7 +332,7 @@ class TestSecretManager:
 
     def test_temporary_export_cleans_up_on_exception(
         self, temp_secrets_dir: Path, mock_provider: MagicMock
-    ) -> Never:
+    ) -> None:
         """Test that temporary_export cleans up even when an exception occurs."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider

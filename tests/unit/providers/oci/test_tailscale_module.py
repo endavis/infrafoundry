@@ -10,7 +10,7 @@ reference the right ``var.<sanitized>`` for auth, declare the
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -37,7 +37,9 @@ def provider(tmp_dirs: Any) -> OCIProvider:
     return p
 
 
-def _instance(name: str, *, tailscale: dict | None = None, **extra_config: Any) -> ResourceConfig:
+def _instance(
+    name: str, *, tailscale: dict[str, Any] | None = None, **extra_config: Any
+) -> ResourceConfig:
     """Build a minimal OCI instance ResourceConfig with optional tailscale block."""
     config = {
         "shape": "VM.Standard.A1.Flex",
@@ -51,7 +53,7 @@ def _instance(name: str, *, tailscale: dict | None = None, **extra_config: Any) 
 
 
 def _read_tf(output_dir: Any, filename: str) -> str:
-    return (output_dir / "test" / "terraform" / "oci" / filename).read_text()
+    return cast("str", (output_dir / "test" / "terraform" / "oci" / filename).read_text())
 
 
 class TestOCITailscaleAuthKey:

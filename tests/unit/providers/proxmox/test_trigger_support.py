@@ -27,7 +27,7 @@ def provider(tmp_path: Path) -> ProxmoxProvider:
 
 def _make_trigger(name: str = "test-trigger", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a trigger ResourceConfig."""
-    config: dict = {**config_overrides}
+    config: dict[str, Any] = {**config_overrides}
     return ResourceConfig(name=name, type="trigger", provider="proxmox", config=config)
 
 

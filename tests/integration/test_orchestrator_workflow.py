@@ -22,7 +22,7 @@ def mock_secret_manager(mock_secrets_dir: Any) -> SecretManager:
     ):
         manager = SecretManager(env_name="dev", secrets_dir=mock_secrets_dir)
         # Mock decrypt to return simple data
-        manager.decrypt_file = MagicMock(return_value={"api_token": "test-token"})
+        manager.decrypt_file = MagicMock(return_value={"api_token": "test-token"})  # type: ignore[method-assign]
         return manager
 
 

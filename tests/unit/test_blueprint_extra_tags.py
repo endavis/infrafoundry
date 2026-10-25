@@ -5,7 +5,7 @@ merge hardcoded tags with the extra_tags variable.
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import jinja2
 import pytest
@@ -43,7 +43,7 @@ def _render_tag_expression(base_tags: list[str], extra_tags: list[str]) -> list[
     template = env.from_string(template_str)
     rendered = template.render(base=base_tags, extra=extra_tags)
     data = yaml.safe_load(rendered)
-    return data["tags"]
+    return cast("list[str]", data["tags"])
 
 
 @pytest.mark.unit

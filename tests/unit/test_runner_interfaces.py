@@ -1,6 +1,7 @@
 """Unit tests for runner interface segregation."""
 
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
 from infrafoundry.core.protocols import (
     Applyable,
@@ -21,11 +22,11 @@ class TestTerraformRunnerInterfaces:
     def test_implements_all_protocols(self) -> None:
         """TerraformRunner should implement all runner protocols."""
         runner = TerraformRunner()
-        assert isinstance(runner, Plannable)
-        assert isinstance(runner, Applyable)
-        assert isinstance(runner, Destroyable)
-        assert isinstance(runner, StateAware)
-        assert isinstance(runner, DriftDetectable)
+        assert isinstance(cast(object, runner), Plannable)
+        assert isinstance(cast(object, runner), Applyable)
+        assert isinstance(cast(object, runner), Destroyable)
+        assert isinstance(cast(object, runner), StateAware)
+        assert isinstance(cast(object, runner), DriftDetectable)
 
 
 class TestAnsibleRunnerInterfaces:
@@ -34,15 +35,15 @@ class TestAnsibleRunnerInterfaces:
     def test_implements_core_protocols(self) -> None:
         """AnsibleRunner should implement core operations."""
         runner = AnsibleRunner()
-        assert isinstance(runner, Plannable)  # via check mode
-        assert isinstance(runner, Applyable)
+        assert isinstance(cast(object, runner), Plannable)  # via check mode
+        assert isinstance(cast(object, runner), Applyable)
 
     def test_does_not_implement_unsupported_protocols(self) -> None:
         """AnsibleRunner should NOT implement unsupported operations."""
         runner = AnsibleRunner()
-        assert not isinstance(runner, Destroyable)
-        assert not isinstance(runner, StateAware)
-        assert not isinstance(runner, DriftDetectable)
+        assert not isinstance(cast(object, runner), Destroyable)
+        assert not isinstance(cast(object, runner), StateAware)
+        assert not isinstance(cast(object, runner), DriftDetectable)
 
 
 class TestPyInfraRunnerInterfaces:
@@ -51,15 +52,15 @@ class TestPyInfraRunnerInterfaces:
     def test_implements_core_protocols(self) -> None:
         """PyInfraRunner should implement core operations."""
         runner = PyInfraRunner()
-        assert isinstance(runner, Plannable)  # via dry-run
-        assert isinstance(runner, Applyable)
+        assert isinstance(cast(object, runner), Plannable)  # via dry-run
+        assert isinstance(cast(object, runner), Applyable)
 
     def test_does_not_implement_unsupported_protocols(self) -> None:
         """PyInfraRunner should NOT implement unsupported operations."""
         runner = PyInfraRunner()
-        assert not isinstance(runner, Destroyable)
-        assert not isinstance(runner, StateAware)
-        assert not isinstance(runner, DriftDetectable)
+        assert not isinstance(cast(object, runner), Destroyable)
+        assert not isinstance(cast(object, runner), StateAware)
+        assert not isinstance(cast(object, runner), DriftDetectable)
 
 
 class TestBaseRunnerInterfaces:
@@ -69,13 +70,14 @@ class TestBaseRunnerInterfaces:
         """BaseRunner should not implement optional protocols by default."""
 
         class ConcreteRunner(BaseRunner):
+            @property
             def tool_name(self) -> str:
                 return "test"
 
             def is_available(self) -> bool:
                 return True
 
-            def initialize(self, wd: Any, **kw: Any) -> dict[str, Any]:
+            def initialize(self, working_dir: Path, **kwargs: Any) -> dict[str, Any]:
                 return {}
 
             def run(self, p: Any, c: Any, a: Any = False) -> dict[str, Any]:
@@ -83,8 +85,8 @@ class TestBaseRunnerInterfaces:
 
         runner = ConcreteRunner()
 
-        assert not isinstance(runner, Plannable)
-        assert not isinstance(runner, Applyable)
-        assert not isinstance(runner, Destroyable)
-        assert not isinstance(runner, StateAware)
-        assert not isinstance(runner, DriftDetectable)
+        assert not isinstance(cast(object, runner), Plannable)
+        assert not isinstance(cast(object, runner), Applyable)
+        assert not isinstance(cast(object, runner), Destroyable)
+        assert not isinstance(cast(object, runner), StateAware)
+        assert not isinstance(cast(object, runner), DriftDetectable)

@@ -1,5 +1,6 @@
 """Unit tests for ESXi PortgroupReferenceValidator."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -34,10 +35,10 @@ def _make_portgroup(name: str, host: str = "esxi-01") -> ResourceConfig:
 
 
 def _make_vm(
-    name: str, network: list | dict | None = None, host: str = "esxi-01"
+    name: str, network: list[Any] | dict[str, Any] | None = None, host: str = "esxi-01"
 ) -> ResourceConfig:
     """Create a VM resource."""
-    config: dict = {"host": host, "name": name}
+    config: dict[str, Any] = {"host": host, "name": name}
     if network is not None:
         config["network"] = network
     return ResourceConfig(name=name, type="vm", provider="esxi", config=config)

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from rich.panel import Panel
+from rich.text import Text
 
 from infrafoundry.core.warnings import (
     ENV_VAR,
@@ -214,6 +215,7 @@ def test_render_warnings_panel_groups_by_source() -> None:
     assert "Warnings" in title
     assert "3" in title
     # Body groups by source. Render the Text object to plain to inspect.
+    assert isinstance(printed.renderable, Text)
     rendered_body = printed.renderable.plain
     assert "handler-a" in rendered_body
     assert "handler-b" in rendered_body

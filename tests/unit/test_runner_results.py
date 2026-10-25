@@ -11,7 +11,7 @@ from infrafoundry.core.runner_results import raise_on_runner_failure
 def test_raise_on_runner_failure_no_op_on_success() -> None:
     """A successful run_result returns None and raises nothing."""
     result = {"success": True, "output": "ok"}
-    assert raise_on_runner_failure(result, provider_name="proxmox", phase="apply") is None
+    assert raise_on_runner_failure(result, provider_name="proxmox", phase="apply") is None  # type: ignore[func-returns-value]
 
 
 def test_raise_on_runner_failure_raises_with_error_field() -> None:

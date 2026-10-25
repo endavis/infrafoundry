@@ -27,7 +27,7 @@ def provider(tmp_path: Path) -> ProxmoxProvider:
 
 def _make_ova_vm(name: str = "test-ova-vm", **config_overrides: Any) -> ResourceConfig:
     """Helper to create an OVA VM ResourceConfig with sensible defaults."""
-    config: dict = {
+    config: dict[str, Any] = {
         "name": name,
         "target_node": "pve01",
         "vmid": 900,
@@ -39,7 +39,7 @@ def _make_ova_vm(name: str = "test-ova-vm", **config_overrides: Any) -> Resource
 
 def _make_regular_vm(name: str = "regular-vm", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a regular VM ResourceConfig (no ova_source)."""
-    config: dict = {
+    config: dict[str, Any] = {
         "name": name,
         "target_node": "pve01",
         "clone": "100",

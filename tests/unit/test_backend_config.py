@@ -51,10 +51,10 @@ class TestS3BackendConfig:
     def test_missing_required_field(self) -> None:
         """Test S3 config fails without required fields."""
         with pytest.raises(ValidationError):
-            S3BackendConfig(bucket="test-bucket")  # missing region
+            S3BackendConfig(bucket="test-bucket")  # type: ignore[call-arg]  # missing region
 
         with pytest.raises(ValidationError):
-            S3BackendConfig(region="us-east-1")  # missing bucket
+            S3BackendConfig(region="us-east-1")  # type: ignore[call-arg]  # missing bucket
 
 
 @pytest.mark.unit
@@ -83,7 +83,7 @@ class TestGCSBackendConfig:
     def test_missing_required_field(self) -> None:
         """Test GCS config fails without bucket."""
         with pytest.raises(ValidationError):
-            GCSBackendConfig()  # missing bucket
+            GCSBackendConfig()  # type: ignore[call-arg]  # missing bucket
 
 
 @pytest.mark.unit
@@ -122,13 +122,13 @@ class TestAzureBackendConfig:
     def test_missing_required_fields(self) -> None:
         """Test Azure config fails without required fields."""
         with pytest.raises(ValidationError):
-            AzureBackendConfig(
+            AzureBackendConfig(  # type: ignore[call-arg]
                 storage_account_name="tfstatestorage",
                 container_name="tfstate",
             )  # missing resource_group_name
 
         with pytest.raises(ValidationError):
-            AzureBackendConfig(
+            AzureBackendConfig(  # type: ignore[call-arg]
                 resource_group_name="terraform-rg",
                 container_name="tfstate",
             )  # missing storage_account_name
@@ -158,7 +158,7 @@ class TestPostgresBackendConfig:
     def test_missing_required_field(self) -> None:
         """Test Postgres config fails without conn_str."""
         with pytest.raises(ValidationError):
-            PostgresBackendConfig()  # missing conn_str
+            PostgresBackendConfig()  # type: ignore[call-arg]  # missing conn_str
 
 
 @pytest.mark.unit
@@ -197,10 +197,10 @@ class TestTerraformCloudBackendConfig:
     def test_missing_required_fields(self) -> None:
         """Test Terraform Cloud config fails without required fields."""
         with pytest.raises(ValidationError):
-            TerraformCloudBackendConfig(workspaces={"name": "prod"})  # missing organization
+            TerraformCloudBackendConfig(workspaces={"name": "prod"})  # type: ignore[call-arg]  # missing organization
 
         with pytest.raises(ValidationError):
-            TerraformCloudBackendConfig(organization="my-org")  # missing workspaces
+            TerraformCloudBackendConfig(organization="my-org")  # type: ignore[call-arg]  # missing workspaces
 
 
 @pytest.mark.unit
@@ -282,10 +282,10 @@ class TestBackendConfig:
 
     def test_normalize_type_string(self) -> None:
         """Test backend type normalization from string."""
-        config = BackendConfig(type="s3", s3=S3BackendConfig(bucket="test", region="us-east-1"))
+        config = BackendConfig(type="s3", s3=S3BackendConfig(bucket="test", region="us-east-1"))  # type: ignore[arg-type]
         assert config.type == BackendType.S3
 
-        config = BackendConfig(type="GCS", gcs=GCSBackendConfig(bucket="test"))
+        config = BackendConfig(type="GCS", gcs=GCSBackendConfig(bucket="test"))  # type: ignore[arg-type]
         assert config.type == BackendType.GCS
 
     def test_get_backend_config_s3(self) -> None:
@@ -344,7 +344,7 @@ class TestBackendConfig:
         config = BackendConfig(type=BackendType.S3, s3=None)
         is_valid, error = config.validate_backend()
         assert is_valid is False
-        assert "no configuration provided" in error
+        assert "no configuration provided" in error  # type: ignore[operator]
 
     def test_validate_backend_gcs_success(self) -> None:
         """Test validate_backend for valid GCS config."""

@@ -103,7 +103,7 @@ def executor() -> DeploymentExecutor:
     runner_registry.list_runners.return_value = ["terraform", "ansible", "pyinfra"]
 
     # Mock create_runner to return instances of our mock classes
-    def create_runner(name: Any, **kwargs: Any) -> None:
+    def create_runner(name: Any, **kwargs: Any) -> Any:
         if name == "terraform":
             return MockTerraformRunner()
         if name == "ansible":

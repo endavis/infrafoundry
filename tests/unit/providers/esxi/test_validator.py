@@ -18,9 +18,9 @@ def report() -> MagicMock:
     return MagicMock(spec=ValidationReport)
 
 
-def _make_env_config(hosts: dict | None = None) -> Any:
+def _make_env_config(hosts: dict[str, Any] | None = None) -> Any:
     """Create an ``EnvironmentConfig`` populated with ESXi provider settings."""
-    esxi_settings: dict = {}
+    esxi_settings: dict[str, Any] = {}
     if hosts is not None:
         esxi_settings["hosts"] = hosts
     return make_env_config(provider_settings={"esxi": esxi_settings})

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -38,7 +39,7 @@ def validator(
     return NamespaceValidator(api_validator, validation_report)
 
 
-def _namespace_api_response(names: list[str]) -> dict:
+def _namespace_api_response(names: list[str]) -> dict[str, Any]:
     """Build a mock Kubernetes namespace list response."""
     return {
         "items": [{"metadata": {"name": n}} for n in names],
@@ -56,7 +57,7 @@ class TestNamespaceValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test that existing namespaces produce INFO."""
-        api_validator.fetch_json = MagicMock(
+        api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
             return_value=_namespace_api_response(["default", "kube-system", "my-ns"])
         )
         validator.validate(
@@ -78,7 +79,7 @@ class TestNamespaceValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test that namespaces in config produce 'will be created' INFO."""
-        api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))
+        api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},
@@ -95,7 +96,7 @@ class TestNamespaceValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test that missing namespaces produce WARNING."""
-        api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))
+        api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},
@@ -115,7 +116,7 @@ class TestNamespaceValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test graceful handling of API failure."""
-        api_validator.fetch_json = MagicMock(return_value=None)
+        api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},
@@ -136,7 +137,7 @@ class TestNamespaceValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test that empty namespaces set makes no API calls."""
-        api_validator.fetch_json = MagicMock()
+        api_validator.fetch_json = MagicMock()  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},

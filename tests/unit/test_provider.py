@@ -1,6 +1,7 @@
 """Unit tests for ProviderBase."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -14,7 +15,7 @@ class StubProviderImplementation(ProviderBase):
         """Initialize test provider."""
         super().__init__(name, config_dir, output_dir)
 
-    def validate_config(self, config: dict) -> bool:
+    def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate configuration."""
         return True
 

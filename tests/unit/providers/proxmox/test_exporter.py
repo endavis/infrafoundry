@@ -7,6 +7,7 @@ import pytest
 import requests
 import yaml
 
+from infrafoundry.core.types import EnvironmentData
 from infrafoundry.providers.proxmox.exporter import ProxmoxConfigExporter
 
 
@@ -15,7 +16,7 @@ class TestProxmoxConfigExporter:
     """Tests for ProxmoxConfigExporter."""
 
     @pytest.fixture
-    def env_config(self) -> dict[str, Any]:
+    def env_config(self) -> EnvironmentData:
         """Create a sample environment config."""
         return {
             "provider_settings": {
@@ -30,7 +31,7 @@ class TestProxmoxConfigExporter:
         }
 
     @pytest.fixture
-    def env_config_no_ssl(self) -> dict[str, Any]:
+    def env_config_no_ssl(self) -> EnvironmentData:
         """Create a sample environment config with SSL verification disabled."""
         return {
             "provider_settings": {
@@ -44,7 +45,7 @@ class TestProxmoxConfigExporter:
         }
 
     @pytest.fixture
-    def exporter(self, env_config: dict[str, Any]) -> ProxmoxConfigExporter:
+    def exporter(self, env_config: EnvironmentData) -> ProxmoxConfigExporter:
         """Create ProxmoxConfigExporter instance."""
         return ProxmoxConfigExporter(env_config)
 
@@ -58,7 +59,7 @@ class TestProxmoxConfigExporter:
 
     def test_init_defaults_verify_ssl_to_true(self) -> None:
         """Test that verify_ssl defaults to True for security."""
-        config = {
+        config: EnvironmentData = {
             "provider_settings": {
                 "proxmox": {
                     "api_url": "https://proxmox.example.com:8006/api2/json",
@@ -70,7 +71,7 @@ class TestProxmoxConfigExporter:
         exporter = ProxmoxConfigExporter(config)
         assert exporter.verify_ssl is True
 
-    def test_init_respects_verify_ssl_false(self, env_config_no_ssl: dict[str, Any]) -> None:
+    def test_init_respects_verify_ssl_false(self, env_config_no_ssl: EnvironmentData) -> None:
         """Test that verify_ssl can be explicitly set to False."""
         exporter = ProxmoxConfigExporter(env_config_no_ssl)
         assert exporter.verify_ssl is False
@@ -82,7 +83,7 @@ class TestProxmoxConfigExporter:
 
     def test_build_token_from_api_token(self) -> None:
         """Test token building from api_token directly."""
-        config = {
+        config: EnvironmentData = {
             "provider_settings": {
                 "proxmox": {
                     "api_url": "https://proxmox.example.com:8006/api2/json",
@@ -96,7 +97,7 @@ class TestProxmoxConfigExporter:
 
     def test_build_token_raises_when_no_credentials(self) -> None:
         """Test that _build_token raises ValueError when no credentials provided."""
-        config = {
+        config: EnvironmentData = {
             "provider_settings": {
                 "proxmox": {
                     "api_url": "https://proxmox.example.com:8006/api2/json",
@@ -484,13 +485,13 @@ class TestProxmoxConfigExporter:
 
     def test_export_raises_when_no_api_url(self) -> None:
         """Test export raises ValueError when api_url not configured."""
-        config = {"provider_settings": {"proxmox": {}}}
+        config: EnvironmentData = {"provider_settings": {"proxmox": {}}}
         exporter = ProxmoxConfigExporter(config)
 
         with pytest.raises(ValueError, match="Proxmox api_url not configured"):
             exporter.export()
 
-    def test_session_respects_verify_ssl_setting(self, env_config_no_ssl: dict[str, Any]) -> None:
+    def test_session_respects_verify_ssl_setting(self, env_config_no_ssl: EnvironmentData) -> None:
         """Test that session respects the verify_ssl setting."""
         exporter = ProxmoxConfigExporter(env_config_no_ssl)
         session = exporter.session

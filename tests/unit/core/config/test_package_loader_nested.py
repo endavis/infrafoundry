@@ -10,6 +10,7 @@ this phase.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -264,7 +265,7 @@ class TestParseNestedList:
     def test_empty_list_emits_nothing(self, temp_dir: Path) -> None:
         """An empty list at a known list-shape path emits zero resources."""
         loader = PackageLoader(temp_dir)
-        data = {"opnsense": {"firewall": {"aliases": []}}}
+        data: dict[str, Any] = {"opnsense": {"firewall": {"aliases": []}}}
         resources = loader._parse_resources_from_data(data, "fw.yaml", "opnsense")
         assert resources == []
 
@@ -335,7 +336,7 @@ class TestParseNestedEmpty:
     def test_empty_namespace_emits_nothing(self, temp_dir: Path) -> None:
         """``opnsense: {}`` returns an empty list."""
         loader = PackageLoader(temp_dir)
-        data: dict = {"opnsense": {}}
+        data: dict[str, Any] = {"opnsense": {}}
         resources = loader._parse_resources_from_data(data, "empty.yaml", "opnsense")
         assert resources == []
 
@@ -353,7 +354,7 @@ class TestParseNestedEmpty:
         is emitted (consistent with passing through to the flat branch).
         """
         loader = PackageLoader(temp_dir)
-        data: dict = {"opnsense": None}
+        data: dict[str, Any] = {"opnsense": None}
         resources = loader._parse_resources_from_data(data, "opnsense.yaml", "opnsense")
         # Flat path treats opnsense: null as an empty resource list for the
         # filename-derived stem.
@@ -596,7 +597,7 @@ class TestFlatFormatNoLongerTranslated:
         loader = PackageLoader(temp_dir)
         # ``opnsense.foo.bar`` has no list/dict leaf at a known path —
         # walking finds nothing and returns empty.
-        data: dict = {"opnsense": {"foo": {"bar": {"baz": {}}}}}
+        data: dict[str, Any] = {"opnsense": {"foo": {"bar": {"baz": {}}}}}
         resources = loader._parse_resources_from_data(data, "x.yaml", "opnsense")
         assert resources == []
 
@@ -778,7 +779,7 @@ class TestParseNestedDirect:
         loader = PackageLoader(temp_dir)
         # Build a dict with an int key — Python allows it; YAML normally
         # wouldn't, but the loader must defend against it.
-        data: dict = {123: {}}
+        data: dict[str, Any] = {123: {}}  # type: ignore[dict-item]
         with pytest.raises(InvalidConfigurationError) as excinfo:
             loader._parse_nested_provider_format(data, "opnsense", "x.yaml")
         assert "must be a string" in str(excinfo.value)

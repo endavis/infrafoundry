@@ -460,7 +460,7 @@ class TestResourceValidatorSchema:
         rv = ResourceValidator("test", report)
 
         result = rv.validate_schema(
-            resource=["not a dict"],
+            resource=["not a dict"],  # type: ignore[arg-type]
             schema={"type": dict, "required": ["name"]},
             check_name="schema_vm",
         )

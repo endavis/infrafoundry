@@ -1,6 +1,7 @@
 """Unit tests for NotificationManager."""
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -516,14 +517,14 @@ class TestNotificationManager:
 
     def test_webhook_missing_url_config(self) -> None:
         """Test webhook notifier with missing URL configuration."""
-        config = {}  # No URL provided
+        config: dict[str, Any] = {}  # No URL provided
         notifier = WebhookNotifier(config)
         result = notifier.send("APPLY_COMPLETED", "dev", {"resource": "vm-01"})
         assert result is False
 
     def test_slack_missing_webhook_url_config(self) -> None:
         """Test Slack notifier with missing webhook URL configuration."""
-        config = {}  # No webhook_url provided
+        config: dict[str, Any] = {}  # No webhook_url provided
         notifier = SlackNotifier(config)
         result = notifier.send("APPLY_COMPLETED", "dev", {"resource": "vm-01"})
         assert result is False

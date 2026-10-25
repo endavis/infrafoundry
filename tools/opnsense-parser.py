@@ -25,7 +25,7 @@ class OPNsenseParser:
 
     def parse_interfaces(self) -> dict[str, Any]:
         """Parse interface configurations."""
-        interfaces = {}
+        interfaces: dict[str, Any] = {}
         interfaces_elem = self.root.find("interfaces")
 
         if interfaces_elem is None:
@@ -36,7 +36,7 @@ class OPNsenseParser:
                 continue
 
             name = iface.tag
-            config = {
+            config: dict[str, Any] = {
                 "name": name,
                 "physical_interface": self._get_text(iface, "if"),
                 "description": self._get_text(iface, "descr") or name.upper(),
@@ -75,7 +75,7 @@ class OPNsenseParser:
 
     def parse_aliases(self) -> dict[str, Any]:
         """Parse firewall aliases."""
-        aliases = {}
+        aliases: dict[str, Any] = {}
 
         # Find aliases in the Firewall section
         firewall = self.root.find(".//Firewall")
@@ -103,7 +103,7 @@ class OPNsenseParser:
             # Parse content based on type
             items = [line.strip() for line in content.split("\n") if line.strip()]
 
-            alias_config = {
+            alias_config: dict[str, Any] = {
                 "name": name,
                 "type": alias_type,
                 "description": description,
@@ -124,7 +124,7 @@ class OPNsenseParser:
 
     def parse_dhcp(self) -> dict[str, Any]:
         """Parse DHCP server configurations."""
-        dhcp_configs = {}
+        dhcp_configs: dict[str, Any] = {}
         dhcpd = self.root.find("dhcpd")
 
         if dhcpd is None:
@@ -137,7 +137,7 @@ class OPNsenseParser:
             if not enabled:
                 continue
 
-            config = {
+            config: dict[str, Any] = {
                 "interface": iface_name,
                 "enabled": True,
             }
@@ -154,7 +154,7 @@ class OPNsenseParser:
                     }
 
             # Static mappings
-            static_maps = []
+            static_maps: list[dict[str, Any]] = []
             for static in interface.findall("staticmap"):
                 mac = self._get_text(static, "mac")
                 ipaddr = self._get_text(static, "ipaddr")
@@ -162,7 +162,7 @@ class OPNsenseParser:
                 descr = self._get_text(static, "descr", "")
 
                 if mac and ipaddr:
-                    mapping = {
+                    mapping: dict[str, Any] = {
                         "mac_address": mac,
                         "ip_address": ipaddr,
                     }
@@ -187,7 +187,7 @@ class OPNsenseParser:
 
     def parse_firewall_rules(self) -> list[dict[str, Any]]:
         """Parse firewall rules."""
-        rules = []
+        rules: list[dict[str, Any]] = []
         filter_elem = self.root.find("filter")
 
         if filter_elem is None:
@@ -197,7 +197,7 @@ class OPNsenseParser:
             uuid = rule.get("uuid", "")
 
             # Basic rule properties
-            rule_config = {
+            rule_config: dict[str, Any] = {
                 "uuid": uuid,
                 "type": self._get_text(rule, "type", "pass"),
                 "interface": self._get_text(rule, "interface", ""),
@@ -226,7 +226,7 @@ class OPNsenseParser:
             # Source
             source = rule.find("source")
             if source is not None:
-                src_config = {}
+                src_config: dict[str, Any] = {}
                 src_net = self._get_text(source, "network")
                 src_addr = self._get_text(source, "address")
                 src_port = self._get_text(source, "port")
@@ -248,7 +248,7 @@ class OPNsenseParser:
             # Destination
             destination = rule.find("destination")
             if destination is not None:
-                dst_config = {}
+                dst_config: dict[str, Any] = {}
                 dst_net = self._get_text(destination, "network")
                 dst_addr = self._get_text(destination, "address")
                 dst_port = self._get_text(destination, "port")
@@ -284,7 +284,7 @@ class OPNsenseParser:
 
     def parse_vlans(self) -> list[dict[str, Any]]:
         """Parse VLAN configurations."""
-        vlans = []
+        vlans: list[dict[str, Any]] = []
         vlans_elem = self.root.find("vlans")
 
         if vlans_elem is None:
@@ -319,7 +319,7 @@ class OPNsenseParser:
         if system is None:
             return {}
 
-        config = {
+        config: dict[str, Any] = {
             "hostname": self._get_text(system, "hostname"),
             "domain": self._get_text(system, "domain"),
             "timezone": self._get_text(system, "timezone"),
@@ -327,7 +327,7 @@ class OPNsenseParser:
         }
 
         # DNS servers
-        dns_servers = []
+        dns_servers: list[str] = []
         for dns in system.findall("dnsserver"):
             if dns.text:
                 dns_servers.append(dns.text.strip())
@@ -337,7 +337,7 @@ class OPNsenseParser:
         # SSH configuration
         ssh = system.find("ssh")
         if ssh is not None:
-            ssh_config = {
+            ssh_config: dict[str, Any] = {
                 "enabled": self._get_text(ssh, "enabled") == "enabled",
                 "interfaces": self._get_text(ssh, "interfaces", ""),
             }
@@ -355,14 +355,14 @@ class OPNsenseParser:
 
     def parse_gateways(self) -> list[dict[str, Any]]:
         """Parse gateway configurations."""
-        gateways = []
+        gateways: list[dict[str, Any]] = []
         gateways_section = self.root.find(".//Gateways")
 
         if gateways_section is None:
             return gateways
 
         for gateway in gateways_section.findall("gateway_item"):
-            gw_config = {
+            gw_config: dict[str, Any] = {
                 "uuid": gateway.get("uuid", ""),
                 "name": self._get_text(gateway, "name"),
                 "description": self._get_text(gateway, "descr", ""),
@@ -379,17 +379,17 @@ class OPNsenseParser:
 
         return gateways
 
-    def parse_nat_outbound(self) -> list[dict[str, Any]]:
+    def parse_nat_outbound(self) -> dict[str, Any]:
         """Parse NAT outbound rules."""
-        nat_rules = []
+        nat_rules: list[dict[str, Any]] = []
         nat = self.root.find("nat")
 
         if nat is None:
-            return nat_rules
+            return {"mode": "automatic", "rules": nat_rules}
 
         outbound = nat.find("outbound")
         if outbound is None:
-            return nat_rules
+            return {"mode": "automatic", "rules": nat_rules}
 
         mode = self._get_text(outbound, "mode", "automatic")
 
@@ -397,7 +397,7 @@ class OPNsenseParser:
             source = rule.find("source")
             destination = rule.find("destination")
 
-            rule_config = {
+            rule_config: dict[str, Any] = {
                 "description": self._get_text(rule, "descr", ""),
                 "interface": self._get_text(rule, "interface"),
                 "protocol": self._get_text(rule, "ipprotocol", "inet"),
@@ -418,14 +418,14 @@ class OPNsenseParser:
 
     def parse_openvpn(self) -> list[dict[str, Any]]:
         """Parse OpenVPN client configurations."""
-        vpn_clients = []
+        vpn_clients: list[dict[str, Any]] = []
         openvpn = self.root.find("openvpn")
 
         if openvpn is None:
             return vpn_clients
 
         for client in openvpn.findall("openvpn-client"):
-            client_config = {
+            client_config: dict[str, Any] = {
                 "description": self._get_text(client, "description"),
                 "server_address": self._get_text(client, "server_addr"),
                 "server_port": self._get_text(client, "server_port"),
@@ -530,8 +530,8 @@ class OPNsenseParser:
         # Write firewall rules
         if rules:
             # Separate by interface/floating
-            rules_by_interface = {}
-            floating_rules = []
+            rules_by_interface: dict[str, list[dict[str, Any]]] = {}
+            floating_rules: list[dict[str, Any]] = []
 
             for rule in rules:
                 if rule.get("floating"):
@@ -706,8 +706,8 @@ def main() -> int:
     print(f"Parsing OPNsense configuration from: {args.config_xml}")
     print(f"Output directory: {args.output}\n")
 
-    parser = OPNsenseParser(args.config_xml)
-    parser.generate_infrafoundry_configs(args.output)
+    opnsense_parser = OPNsenseParser(args.config_xml)
+    opnsense_parser.generate_infrafoundry_configs(args.output)
 
     return 0
 

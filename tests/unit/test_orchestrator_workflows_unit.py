@@ -44,7 +44,7 @@ def test_plan_orchestrator_dry_run_skips_generation(console: Console) -> None:
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
@@ -77,7 +77,7 @@ def test_plan_orchestrator_dry_run_skips_generation(console: Console) -> None:
     )
 
     assert result["proxmox"]["dry_run"] is True
-    providers["proxmox"].ensure_directories.assert_not_called()
+    cast(MagicMock, providers["proxmox"]).ensure_directories.assert_not_called()
     state_manager.update_deployment_status.assert_called_with(1, DeploymentStatus.COMPLETED)
     event_manager.emit_event.assert_any_call(
         EventType.BEFORE_PLAN,
@@ -119,7 +119,7 @@ def test_plan_orchestrator_runs_runners_in_priority_order(console: Console) -> N
     provider = MagicMock()
     provider.generate_terraform = MagicMock()
     provider.generate_ansible = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
     def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
@@ -199,7 +199,7 @@ def test_destroy_orchestrator_requires_confirmation(console: Console) -> None:
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     orchestrator = DestroyOrchestrator(
         console,
@@ -292,7 +292,7 @@ def test_plan_emits_runner_starting_and_completed(console: Console) -> None:
 
     provider = MagicMock()
     provider.generate_terraform = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
     def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
@@ -386,7 +386,7 @@ def _build_plan_orchestrator_with_runner(
 
     provider = MagicMock()
     provider.generate_terraform = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 1234
@@ -549,10 +549,10 @@ def test_destroy_emits_runner_starting_and_completed(console: Console) -> None:
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
 
-    runners = {"terraform": tf_runner}
+    runners: dict[str, BaseRunner] = {"terraform": tf_runner}
 
     provider = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
     def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
@@ -1046,7 +1046,7 @@ def test_drift_orchestrator_sets_providers() -> None:
     """DriftOrchestrator injects providers before detection."""
     drift_detector = MagicMock()
     drift_detector.detect.return_value = {"drift": False}
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     orchestrator = DriftOrchestrator(drift_detector, get_providers=lambda: providers)
     result = orchestrator.detect("dev")
@@ -1055,7 +1055,7 @@ def test_drift_orchestrator_sets_providers() -> None:
     assert drift_detector.providers == providers
 
 
-def _make_env_config_with_events(events: dict | None = None) -> EnvironmentConfig:
+def _make_env_config_with_events(events: dict[str, Any] | None = None) -> EnvironmentConfig:
     """Create an EnvironmentConfig with optional events dict."""
     return EnvironmentConfig(
         name="dev",
@@ -1070,7 +1070,7 @@ def test_plan_loads_event_config(console: Console) -> None:
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     events_cfg = {"RUNNER_COMPLETED": [{"type": "script", "name": "post", "script": "s.sh"}]}
     env_config = _make_env_config_with_events(events_cfg)
@@ -1108,7 +1108,7 @@ def test_plan_skips_event_config_when_empty(console: Console) -> None:
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     env_config = _make_env_config_with_events({})
 
@@ -1180,7 +1180,7 @@ def test_destroy_loads_event_config(console: Console) -> None:
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     events_cfg = {"RUNNER_COMPLETED": [{"type": "script", "name": "post", "script": "s.sh"}]}
     env_config = _make_env_config_with_events(events_cfg)
@@ -1693,7 +1693,7 @@ def test_plan_provider_filter_unknown_name_raises(console: Console) -> None:
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     def load_resources(env: str) -> Any:
         res = [_resource("vm1")]

@@ -78,7 +78,7 @@ class TestValidateReferences:
         ]
 
         # Mock _validate_api_references to isolate local checks
-        validator._validate_api_references = MagicMock()
+        validator._validate_api_references = MagicMock()  # type: ignore[method-assign]
         validator.validate_references(resources)
 
         # Should have passed checks
@@ -98,7 +98,7 @@ class TestValidateReferences:
             ),
         ]
 
-        validator._validate_api_references = MagicMock()
+        validator._validate_api_references = MagicMock()  # type: ignore[method-assign]
         validator.validate_references(resources)
 
         calls = report.add_check.call_args_list
@@ -126,7 +126,7 @@ class TestValidateReferences:
             ),
         ]
 
-        validator._validate_api_references = MagicMock()
+        validator._validate_api_references = MagicMock()  # type: ignore[method-assign]
         validator.validate_references(resources)
 
         calls = report.add_check.call_args_list
@@ -151,7 +151,7 @@ class TestValidateReferences:
             ),
         ]
 
-        validator._validate_api_references = MagicMock()
+        validator._validate_api_references = MagicMock()  # type: ignore[method-assign]
         validator.validate_references(resources)
 
         calls = report.add_check.call_args_list
@@ -171,7 +171,7 @@ class TestValidateReferences:
             ),
         ]
 
-        validator._validate_api_references = MagicMock()
+        validator._validate_api_references = MagicMock()  # type: ignore[method-assign]
         validator.validate_references(resources)
 
         # No checks for VCN-only resources
@@ -190,7 +190,7 @@ class TestValidateReferences:
             ),
         ]
 
-        validator._validate_api_references = MagicMock()
+        validator._validate_api_references = MagicMock()  # type: ignore[method-assign]
         validator.validate_references(resources)
 
         # No subnet reference, should pass silently
@@ -237,7 +237,7 @@ class TestValidateReferences:
             ),
         ]
 
-        validator._validate_api_references = MagicMock()
+        validator._validate_api_references = MagicMock()  # type: ignore[method-assign]
         validator.validate_references(resources)
 
         calls = report.add_check.call_args_list
@@ -292,7 +292,7 @@ class TestValidateAPIReferences:
 
     def test_skipped_when_client_creation_fails(self, validator: OCIValidator) -> None:
         """API validation skips gracefully when client creation fails."""
-        validator._create_client = MagicMock(return_value=None)
+        validator._create_client = MagicMock(return_value=None)  # type: ignore[method-assign]
 
         resources = [
             ResourceConfig(
@@ -329,10 +329,10 @@ class TestValidateAPIReferences:
             return []
 
         mock_client.list_resources.side_effect = mock_list
-        validator._create_client = MagicMock(return_value=mock_client)
-        validator.compartment_validator.validate = MagicMock()
-        validator.network_validator.validate = MagicMock()
-        validator.image_validator.validate = MagicMock()
+        validator._create_client = MagicMock(return_value=mock_client)  # type: ignore[method-assign]
+        validator.compartment_validator.validate = MagicMock()  # type: ignore[method-assign]
+        validator.network_validator.validate = MagicMock()  # type: ignore[method-assign]
+        validator.image_validator.validate = MagicMock()  # type: ignore[method-assign]
 
         resources = [
             ResourceConfig(
@@ -394,7 +394,7 @@ class TestValidateConnectivity:
         self, validator: OCIValidator, report: MagicMock
     ) -> None:
         """Test that connectivity creates a client and calls list_resources."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "tenancy_ocid": "ocid1.tenancy.oc1..example",
                 "user_ocid": "ocid1.user.oc1..example",
@@ -406,8 +406,8 @@ class TestValidateConnectivity:
         mock_client = MagicMock()
         mock_client.identity_url.return_value = "https://identity.us-ashburn-1.oraclecloud.com"
         mock_client.list_resources.return_value = [{"name": "AD-1"}]
-        validator._create_client = MagicMock(return_value=mock_client)
-        validator.api_validator.add_success = MagicMock()
+        validator._create_client = MagicMock(return_value=mock_client)  # type: ignore[method-assign]
+        validator.api_validator.add_success = MagicMock()  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -418,7 +418,7 @@ class TestValidateConnectivity:
         self, validator: OCIValidator, report: MagicMock
     ) -> None:
         """Test connectivity when client creation fails."""
-        validator.api_validator.get_credentials = MagicMock(
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
             return_value={
                 "tenancy_ocid": "t",
                 "user_ocid": "u",
@@ -427,7 +427,7 @@ class TestValidateConnectivity:
                 "region": "us-ashburn-1",
             }
         )
-        validator._create_client = MagicMock(return_value=None)
+        validator._create_client = MagicMock(return_value=None)  # type: ignore[method-assign]
 
         validator.validate_connectivity()
 
@@ -439,7 +439,7 @@ class TestCreateClient:
 
     def test_returns_none_on_configuration_error(self, validator: OCIValidator) -> None:
         """Returns None and reports warning when client creation fails."""
-        validator.api_validator.add_error = MagicMock()
+        validator.api_validator.add_error = MagicMock()  # type: ignore[method-assign]
         with patch(
             "infrafoundry.providers.oci.validator.OCIClient.from_provider_settings",
             side_effect=ConfigurationError("key not found"),

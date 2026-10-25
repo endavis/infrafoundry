@@ -203,6 +203,7 @@ class TestSecurityScanner:
         scanner = SecurityScanner()
         result = scanner.scan(Path("/nonexistent/path"))
         assert result.passed is False
+        assert result.error is not None
         assert "not found" in result.error
 
     def test_scan_success(self, tmp_path: Path) -> None:
@@ -274,6 +275,7 @@ class TestSecurityScanner:
         ):
             result = scanner.scan(tmp_path, timeout=10)
             assert result.passed is False
+            assert result.error is not None
             assert "timed out" in result.error
 
     def test_cleanup(self) -> None:

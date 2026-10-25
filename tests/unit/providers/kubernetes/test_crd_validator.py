@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -35,7 +36,7 @@ def validator(api_validator: BaseAPIValidator, validation_report: ValidationRepo
     return CRDValidator(api_validator, validation_report)
 
 
-def _crd_api_response(groups: list[str]) -> dict:
+def _crd_api_response(groups: list[str]) -> dict[str, Any]:
     """Build a mock CRD list response."""
     return {
         "items": [{"spec": {"group": g}} for g in groups],
@@ -53,7 +54,7 @@ class TestCRDValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test that existing CRDs produce success."""
-        api_validator.fetch_json = MagicMock(
+        api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
             return_value=_crd_api_response(["cert-manager.io", "traefik.io"])
         )
         manifests = [
@@ -79,7 +80,7 @@ class TestCRDValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test that missing CRDs produce ERROR."""
-        api_validator.fetch_json = MagicMock(return_value=_crd_api_response(["some-other.io"]))
+        api_validator.fetch_json = MagicMock(return_value=_crd_api_response(["some-other.io"]))  # type: ignore[method-assign]
         manifests = [
             ResourceConfig(
                 provider="kubernetes",
@@ -106,7 +107,7 @@ class TestCRDValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test that standard K8s API groups are not checked."""
-        api_validator.fetch_json = MagicMock(return_value=_crd_api_response([]))
+        api_validator.fetch_json = MagicMock(return_value=_crd_api_response([]))  # type: ignore[method-assign]
         manifests = [
             ResourceConfig(
                 provider="kubernetes",
@@ -131,7 +132,7 @@ class TestCRDValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test that empty manifests list makes no API calls."""
-        api_validator.fetch_json = MagicMock()
+        api_validator.fetch_json = MagicMock()  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},
@@ -147,7 +148,7 @@ class TestCRDValidator:
         api_validator: BaseAPIValidator,
     ) -> None:
         """Test graceful handling when CRD API call fails."""
-        api_validator.fetch_json = MagicMock(return_value=None)
+        api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
         manifests = [
             ResourceConfig(
                 provider="kubernetes",

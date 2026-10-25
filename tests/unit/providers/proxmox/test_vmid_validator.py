@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.providers.proxmox.validator import ClusterVM
 from infrafoundry.providers.proxmox.validators.vmid_validator import VMIDValidator
 
 
@@ -22,7 +23,7 @@ def validator(report: MagicMock) -> VMIDValidator:
 
 def test_validate_vmid_available(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation of available VMID."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -37,7 +38,7 @@ def test_validate_vmid_available(validator: VMIDValidator, report: MagicMock) ->
 
 def test_validate_vmid_conflict_different_name(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation of VMID conflict with different VM name."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -53,7 +54,7 @@ def test_validate_vmid_conflict_different_name(validator: VMIDValidator, report:
 
 def test_validate_vmid_exists_same_name(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation of VMID that already exists with same name (update scenario)."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "my-vm"},
     ]
 
@@ -69,7 +70,7 @@ def test_validate_vmid_exists_same_name(validator: VMIDValidator, report: MagicM
 
 def test_validate_empty_vmids(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation with no VMIDs."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -87,7 +88,7 @@ def test_validate_cluster_vms_none(validator: VMIDValidator, report: MagicMock) 
 
 def test_validate_multiple_vmids(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation of multiple VMIDs."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -105,7 +106,7 @@ def test_validate_multiple_vmids(validator: VMIDValidator, report: MagicMock) ->
 
 def test_validate_vm_without_name(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation with VM that has no name field."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100},  # No name field
     ]
 
@@ -119,7 +120,7 @@ def test_validate_vm_without_name(validator: VMIDValidator, report: MagicMock) -
 
 def test_validate_all_vmids_available(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation when all VMIDs are available."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -140,7 +141,7 @@ def test_validate_all_vmids_available(validator: VMIDValidator, report: MagicMoc
 
 def test_validate_all_vmids_conflicts(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation when all VMIDs have conflicts."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "vm1"},
         {"vmid": 200, "name": "vm2"},
     ]

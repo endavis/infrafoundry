@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,7 +18,9 @@ def cli_runner() -> CliRunner:
     return CliRunner()
 
 
-def _mock_orchestrator(validate_results: dict | None = None, has_errors: bool = False) -> MagicMock:
+def _mock_orchestrator(
+    validate_results: dict[str, Any] | None = None, has_errors: bool = False
+) -> MagicMock:
     """Build a mock orchestrator with configurable validate results.
 
     Args:

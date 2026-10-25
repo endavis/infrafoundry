@@ -1,6 +1,7 @@
 """Unit tests for InventoryGenerator."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -200,7 +201,7 @@ class TestInventoryGeneratorGenerate:
             "      {{ w.name }}: {}\n"
             "      {% endfor %}\n"
         )
-        variables = {"workers": []}
+        variables: dict[str, Any] = {"workers": []}
 
         output_path = generator.generate(raw, variables, temp_dir)
 

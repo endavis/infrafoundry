@@ -1,6 +1,7 @@
 """Unit tests for OCI template rendering."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -479,7 +480,7 @@ class TestPlaybookTemplate:
 
     def test_renders_playbook_without_roles(self, provider: OCIProvider) -> None:
         """Test playbook renders empty when no roles defined."""
-        role_groups: dict[str, list] = {}
+        role_groups: dict[str, list[Any]] = {}
         content = provider.render_template("oci/playbook.yml.j2", {"role_groups": role_groups})
         assert "---" in content
         assert "hosts:" not in content

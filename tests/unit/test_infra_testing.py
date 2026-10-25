@@ -275,6 +275,7 @@ class TestAssertNoDuplicateNames:
         ]
         result = test.run(resources, {})
         assert result.passed is False
+        assert result.details is not None
         assert "duplicates" in result.details
 
 

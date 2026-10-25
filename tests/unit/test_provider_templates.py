@@ -520,7 +520,7 @@ class TestOPNsenseTemplates:
                 kwargs.update(test_vars)
                 return original_render(**kwargs)
 
-            template.render = render_with_test_vars
+            template.render = render_with_test_vars  # type: ignore[method-assign]
             return template
 
         with patch.object(provider.jinja_env, "get_template", side_effect=get_template_with_vars):
@@ -754,7 +754,7 @@ class TestKubernetesTemplates:
                 kwargs["item"] = mock_item
                 return original_render(**kwargs)
 
-            template.render = render_with_mock
+            template.render = render_with_mock  # type: ignore[method-assign]
             return template
 
         with patch.object(

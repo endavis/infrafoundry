@@ -36,7 +36,7 @@ class TestAuditStatus:
     def test_status_is_string_enum(self) -> None:
         """Test that AuditStatus is a string enum."""
         assert isinstance(AuditStatus.SUCCESS, str)
-        assert AuditStatus.SUCCESS == "success"
+        assert AuditStatus.SUCCESS == "success"  # type: ignore[comparison-overlap]
 
 
 class TestAuditEntry:
@@ -85,7 +85,9 @@ class TestAuditEntry:
 
         assert entry.provider == "proxmox"
         assert entry.resource_name == "web-server-1"
+        assert entry.changes_summary is not None
         assert entry.changes_summary["added"] == 3
+        assert entry.request_metadata is not None
         assert entry.request_metadata["cli_args"] == ["apply", "--env", "prod"]
 
     def test_to_dict(self, db_session: Any) -> None:

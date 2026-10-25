@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -23,7 +25,7 @@ def validator(report: ValidationReport) -> NetworkValidator:
 
 def _vcn(name: str, display_name: str | None = None) -> ResourceConfig:
     """Helper to create a VCN resource config."""
-    config: dict = {"cidr_block": "10.0.0.0/16"}
+    config: dict[str, Any] = {"cidr_block": "10.0.0.0/16"}
     if display_name:
         config["display_name"] = display_name
     return ResourceConfig(name=name, type="vcn", provider="oci", config=config)
@@ -31,7 +33,7 @@ def _vcn(name: str, display_name: str | None = None) -> ResourceConfig:
 
 def _subnet(name: str, vcn: str, display_name: str | None = None) -> ResourceConfig:
     """Helper to create a subnet resource config."""
-    config: dict = {"vcn": vcn, "cidr_block": "10.0.1.0/24"}
+    config: dict[str, Any] = {"vcn": vcn, "cidr_block": "10.0.1.0/24"}
     if display_name:
         config["display_name"] = display_name
     return ResourceConfig(name=name, type="subnet", provider="oci", config=config)

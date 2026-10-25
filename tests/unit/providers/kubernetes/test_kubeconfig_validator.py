@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,15 +51,15 @@ def _make_kubeconfig(
     exec_auth: bool = False,
     ca_data: str | None = None,
     insecure: bool = False,
-) -> dict:
+) -> dict[str, Any]:
     """Build a minimal kubeconfig dict for testing."""
-    cluster_info: dict = {"server": server}
+    cluster_info: dict[str, Any] = {"server": server}
     if ca_data:
         cluster_info["certificate-authority-data"] = ca_data
     if insecure:
         cluster_info["insecure-skip-tls-verify"] = True
 
-    user_info: dict = {}
+    user_info: dict[str, Any] = {}
     if token:
         user_info["token"] = token
     if token_file:
@@ -167,7 +168,7 @@ class TestKubeconfigValidatorParsing:
 
         kubeconfig.write_text(yaml.dump(data))
         # Mock connectivity to avoid real API calls
-        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)
+        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
         validator.validate(str(kubeconfig), context_override="override-ctx")
         # Should not fail on context lookup
         context_errors = [
@@ -189,7 +190,7 @@ class TestKubeconfigValidatorAuth:
         import yaml
 
         kubeconfig.write_text(yaml.dump(data))
-        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)
+        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
         validator.validate(str(kubeconfig))
         assert validator.connection_info.headers.get("Authorization") == "Bearer my-secret-token"
 
@@ -205,7 +206,7 @@ class TestKubeconfigValidatorAuth:
         import yaml
 
         kubeconfig.write_text(yaml.dump(data))
-        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)
+        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
         validator.validate(str(kubeconfig))
         assert validator.connection_info.headers.get("Authorization") == "Bearer file-based-token"
 
@@ -218,7 +219,7 @@ class TestKubeconfigValidatorAuth:
         import yaml
 
         kubeconfig.write_text(yaml.dump(data))
-        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)
+        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
         validator.validate(str(kubeconfig))
         assert any(
             "exec-based auth" in r.message and r.level == ValidationLevel.WARNING
@@ -240,8 +241,8 @@ class TestKubeconfigValidatorConnectivity:
 
         kubeconfig.write_text(yaml.dump(data))
 
-        validator.api_validator.check_api_connectivity = MagicMock(return_value=True)
-        validator.api_validator.fetch_json = MagicMock(return_value={"gitVersion": "v1.28.0"})
+        validator.api_validator.check_api_connectivity = MagicMock(return_value=True)  # type: ignore[method-assign]
+        validator.api_validator.fetch_json = MagicMock(return_value={"gitVersion": "v1.28.0"})  # type: ignore[method-assign]
         validator.validate(str(kubeconfig))
         assert validator.is_connected
 
@@ -255,7 +256,7 @@ class TestKubeconfigValidatorConnectivity:
 
         kubeconfig.write_text(yaml.dump(data))
 
-        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)
+        validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
         validator.validate(str(kubeconfig))
         assert not validator.is_connected
         assert any(

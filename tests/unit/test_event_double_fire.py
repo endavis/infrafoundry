@@ -5,6 +5,7 @@ package event handlers should be registered exactly once during each phase.
 """
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -24,7 +25,7 @@ class TestEventDoubleFireBug:
             console=MagicMock(),
         )
 
-    def _sample_handler_config(self) -> dict:
+    def _sample_handler_config(self) -> dict[str, Any]:
         """Return a sample script handler config."""
         return {
             "type": "script",
@@ -32,7 +33,7 @@ class TestEventDoubleFireBug:
             "script": "scripts/test.sh",
         }
 
-    def _sample_package_events(self) -> dict:
+    def _sample_package_events(self) -> dict[str, Any]:
         """Return sample package events config."""
         return {
             "RUNNER_COMPLETED": [self._sample_handler_config()],

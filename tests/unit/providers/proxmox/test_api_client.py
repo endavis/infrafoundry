@@ -6,6 +6,7 @@ import pytest
 import requests
 
 from infrafoundry.core.exceptions import APIError, AuthenticationError
+from infrafoundry.core.types import ProxmoxProviderSettings
 from infrafoundry.providers.proxmox.api_client import ProxmoxClient
 
 
@@ -144,7 +145,7 @@ class TestFromProviderSettings:
 
     def test_with_api_token(self) -> None:
         """Creates client from api_token setting."""
-        settings = {
+        settings: ProxmoxProviderSettings = {
             "api_url": "https://pve.example.com:8006/api2/json",
             "api_token": "user@pam!token=secret",
             "node": "pve1",
@@ -158,7 +159,7 @@ class TestFromProviderSettings:
 
     def test_with_token_id_and_secret(self) -> None:
         """Creates client from api_token_id + api_token_secret."""
-        settings = {
+        settings: ProxmoxProviderSettings = {
             "api_url": "https://pve.example.com:8006/api2/json",
             "api_token_id": "user@pam!mytoken",
             "api_token_secret": "12345-abcde",
@@ -172,7 +173,7 @@ class TestFromProviderSettings:
 
     def test_no_token_returns_none(self) -> None:
         """Returns None when no token is available."""
-        settings = {
+        settings: ProxmoxProviderSettings = {
             "api_url": "https://pve.example.com:8006/api2/json",
             "node": "pve1",
         }
@@ -183,7 +184,7 @@ class TestFromProviderSettings:
 
     def test_no_api_url_returns_none(self) -> None:
         """Returns None when api_url is missing."""
-        settings = {
+        settings: ProxmoxProviderSettings = {
             "api_token": "user@pam!token=secret",
             "node": "pve1",
         }

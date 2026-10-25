@@ -5,6 +5,7 @@ merge hardcoded tags with the extra_freeform_tags variable.
 """
 
 from pathlib import Path
+from typing import cast
 
 import jinja2
 import pytest
@@ -44,7 +45,7 @@ def _render_freeform_tags(
         extra_freeform_tags=extra_freeform_tags,
     )
     data = yaml.safe_load(rendered)
-    return data["freeform_tags"]
+    return cast("dict[str, str]", data["freeform_tags"])
 
 
 @pytest.mark.unit
