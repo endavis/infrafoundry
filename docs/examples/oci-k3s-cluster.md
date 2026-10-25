@@ -82,7 +82,7 @@ example-config/
 
 ## Key Design Decisions
 
-For detailed explanations of all design decisions, see [DECISIONS.md](../../example-config/envs/oci-k3s/DECISIONS.md).
+For detailed explanations of all design decisions, see [DECISIONS.md](https://github.com/endavis/infrafoundry/blob/b68596f278ebedc46499e21761e894bce622a1e0/example-config/envs/oci-k3s/DECISIONS.md).
 
 ### OCI Firewall Fix (Critical)
 
@@ -140,7 +140,7 @@ secrets:
     auth_key: "tskey-auth-XXXX-XXXXXXXXXXXX"
 ```
 
-Edit `envs/oci-k3s/oci/instances.yaml`:
+Edit `envs/oci-k3s/k3s-cluster/infrafoundry.yml`:
 - Replace image OCIDs
 - Add your SSH public key
 
@@ -321,7 +321,7 @@ TAILSCALE_API_KEY=tskey-api-xxx ./scripts/cleanup-tailscale.sh
 
 ## See Also
 
-- [Design Decisions Document](../../example-config/envs/oci-k3s/DECISIONS.md)
+- [Design Decisions Document](https://github.com/endavis/infrafoundry/blob/b68596f278ebedc46499e21761e894bce622a1e0/example-config/envs/oci-k3s/DECISIONS.md)
 - [OCI Provider Documentation](../providers/oci.md)
 - [Ansible Runner Documentation](../runners/ansible.md)
 - [Separate Config Repository Guide](../configuration/separate-config-repo.md)

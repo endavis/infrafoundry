@@ -664,4 +664,4 @@ ignore-words-list = "crate,kubernetes,terraform"
 
 - [Coding Standards](coding-standards.md) - Code style guidelines
 - [CI/CD Testing](ci-cd-testing.md) - Continuous integration setup
-- [AGENTS.md](../AGENTS.md) - Issue-driven development workflow
+- [AGENTS.md](../../AGENTS.md) - Issue-driven development workflow

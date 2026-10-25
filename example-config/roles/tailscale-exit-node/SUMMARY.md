@@ -174,7 +174,7 @@ This checks:
 
 ## Example Configurations
 
-Two complete examples are provided in `example-config/envs/dev/resources/vms.yaml`:
+Two example exit nodes (their dev environment VM file was removed in #518):
 
 1. **exit-node-01**: Regular Ubuntu 22.04 exit node
 2. **exit-node-core-01**: Ubuntu Core 22 exit node (immutable)

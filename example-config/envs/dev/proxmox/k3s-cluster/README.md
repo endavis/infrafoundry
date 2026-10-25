@@ -8,5 +8,5 @@ VM IDs, jumphost, and the DHCP subnet for your environment before applying.**
 foundry -c example-config infra apply --env dev --package k3s-cluster
 ```
 
-See `blueprints/proxmox-k3s-cluster/README.md` for the full variable reference,
+See `blueprints/k3s-cluster/README.md` for the full variable reference,
 prerequisites, and the description of the post-deploy event handler.

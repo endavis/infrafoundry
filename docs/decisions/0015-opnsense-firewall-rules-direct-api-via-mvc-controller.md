@@ -12,7 +12,7 @@ Accepted — implemented in [#742](https://github.com/endavis/infrafoundry/issue
 
 `firewall_rules` is the remaining production-critical component still on the older terraform + `browningluke/opnsense` provider path. Issue [#742](https://github.com/endavis/infrafoundry/issues/742) documents that the current pipeline cannot express features prod actually uses — policy-based routing (`<gateway>`), floating rules, direction (in/out), `quick`, `statetype`, source/destination negation, `<any>`, and address-vs-network dest semantics — because those fields never round-trip through `firewall_rules.tf.j2`. A live audit of prod's `<filter>` block (82 rules) confirmed every gap is reached by real rules.
 
-A live REST-surface survey of `opnsense-a` running `26.1.6_2` (2026-05-05) is captured at [`tmp/agents/claude/issue-742-firewall-survey.md`](../../tmp/agents/claude/issue-742-firewall-survey.md) as evidence; the relevant findings are folded into this ADR. The survey will not be committed — it is a working artifact.
+A live REST-surface survey of `opnsense-a` running `26.1.6_2` (2026-05-05) is captured at `tmp/agents/claude/issue-742-firewall-survey.md` as evidence; the relevant findings are folded into this ADR. The survey will not be committed — it is a working artifact.
 
 ## Decision
 
@@ -129,4 +129,3 @@ Following the `nat_rules` template:
 - [ADR-0013](0013-opnsense-full-iac-migration.md), [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md)
 - [`docs/development/opnsense-resource-coverage.md`](../development/opnsense-resource-coverage.md)
 - Survey artifact (transient): `tmp/agents/claude/issue-742-firewall-survey.md`
-

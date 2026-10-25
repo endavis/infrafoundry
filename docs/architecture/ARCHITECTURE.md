@@ -31,8 +31,8 @@ InfraFoundry’s architecture combines pluggable providers, template-driven code
 
 ## Architecture Details
 
-- **State management:** `StateManager` (`src/infrafoundry/core/state.py`) persists deployments/resources/dependencies/events via SQLAlchemy. Default SQLite at `~/.infrafoundry/state.db`; PostgreSQL supported via `INFRAFOUNDRY_STATE_CONNECTION`.
-- **Event system:** Pub/sub in `src/infrafoundry/core/events.py` with lifecycle events (`PLAN`, `APPLY`, `DESTROY`, resource lifecycle, validation, drift). Consumers subscribe for notifications, auditing, or custom automation.
+- **State management:** `StateManager` (`src/infrafoundry/core/state/`) persists deployments/resources/dependencies/events via SQLAlchemy. Default SQLite at `~/.infrafoundry/state.db`; PostgreSQL supported via `INFRAFOUNDRY_STATE_CONNECTION`.
+- **Event system:** Pub/sub in `src/infrafoundry/core/events/` with lifecycle events (`PLAN`, `APPLY`, `DESTROY`, resource lifecycle, validation, drift). Consumers subscribe for notifications, auditing, or custom automation.
 - **Dependency graph:** Resources and provider rules produce a graph used for ordering creation/destruction and impact analysis.
 - **Code generation:** Providers render Jinja2 templates into Terraform/Ansible under `generated/{env}/{terraform|ansible}/{provider}`.
 - **Orchestration:** Orchestrator coordinates generation, runner invocation, and event emission; CLI drives user entry points.
