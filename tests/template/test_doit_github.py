@@ -25,13 +25,20 @@ from tools.doit.github import (
     _gh_repo_slug,
     _is_transient_gh_error,
     _load_labels_file,
+    _parse_markdown_sections,
+    _read_body_file,
     _reconcile_labels,
     _run_gh_with_retry,
+    _validate_issue_content,
     task_env_create,
     task_env_list,
+    task_issue,
     task_labels_sync,
+    task_pr,
+    task_pr_merge,
     task_publish_setup,
 )
+from tools.doit.templates import get_required_sections
 
 
 class TestExtractLinkedIssues:
@@ -1313,3 +1320,467 @@ class TestRunGhWithRetry:
         printed = " ".join(str(call.args[0]) for call in mock_console.print.call_args_list)
         assert "Retry" in printed
         assert "1/1" in printed
+
+
+# ---------------------------------------------------------------------------
+# Coverage paydown for the mandated workflow paths (#708)
+#
+# AGENTS.md requires `doit issue`, `doit pr` and `doit pr_merge` for every
+# change, so a defect in any of them blocks all work and is expensive to undo.
+# #689 made the gap visible; these cover it.
+# ---------------------------------------------------------------------------
+
+
+class TestParseMarkdownSections:
+    """`_parse_markdown_sections` splits an issue body into its `##` sections."""
+
+    def test_splits_on_level_two_headers(self) -> None:
+        content = "## Problem\nIt breaks.\n\n## Proposed Solution\nFix it.\n"
+
+        assert _parse_markdown_sections(content) == {
+            "Problem": "It breaks.",
+            "Proposed Solution": "Fix it.",
+        }
+
+    def test_content_before_the_first_header_is_dropped(self) -> None:
+        """Preamble belongs to no section, so it cannot satisfy a required one."""
+        assert _parse_markdown_sections("stray preamble\n\n## Problem\nreal\n") == {
+            "Problem": "real"
+        }
+
+    def test_deeper_headers_stay_inside_their_section(self) -> None:
+        """`###` is body text, not a section boundary."""
+        sections = _parse_markdown_sections("## Problem\n### Detail\nnested\n")
+
+        assert list(sections) == ["Problem"]
+        assert "### Detail" in sections["Problem"]
+
+    def test_empty_content_yields_no_sections(self) -> None:
+        assert _parse_markdown_sections("") == {}
+
+
+class TestValidateIssueContent:
+    """`_validate_issue_content` gates issue creation on required sections."""
+
+    def test_missing_required_section_is_rejected(self) -> None:
+        console = Console(file=io.StringIO())
+
+        assert _validate_issue_content({}, "feature", console) is False
+        assert "Missing required sections" in console.file.getvalue()  # type: ignore[attr-defined]
+
+    def test_section_present_but_empty_is_rejected(self) -> None:
+        """Whitespace is not content — an empty heading must not pass."""
+        console = Console(file=io.StringIO())
+        sections = dict.fromkeys(get_required_sections("feature"), "   \n  ")
+
+        assert _validate_issue_content(sections, "feature", console) is False
+
+    def test_complete_sections_pass(self) -> None:
+        console = Console(file=io.StringIO())
+        sections = dict.fromkeys(get_required_sections("feature"), "real content here")
+
+        assert _validate_issue_content(sections, "feature", console) is True
+
+    def test_placeholder_text_warns_but_still_passes(self) -> None:
+        """A warning, not a rejection: the text may be legitimately similar."""
+        console = Console(file=io.StringIO())
+        sections = dict.fromkeys(get_required_sections("feature"), "Describe the problem")
+
+        assert _validate_issue_content(sections, "feature", console) is True
+        assert "placeholder" in console.file.getvalue().lower()  # type: ignore[attr-defined]
+
+
+class TestReadBodyFile:
+    """`_read_body_file` backs `--body-file`, which AGENTS.md recommends."""
+
+    def test_reads_existing_file(self, tmp_path: Path) -> None:
+        body = tmp_path / "body.md"
+        body.write_text("## Problem\ncontent\n", encoding="utf-8")
+
+        assert _read_body_file(str(body), Console(file=io.StringIO())) == "## Problem\ncontent\n"
+
+    def test_missing_file_reports_and_returns_none(self, tmp_path: Path) -> None:
+        console = Console(file=io.StringIO())
+
+        assert _read_body_file(str(tmp_path / "absent.md"), console) is None
+        assert "File not found" in console.file.getvalue()  # type: ignore[attr-defined]
+
+    def test_unreadable_file_reports_and_returns_none(self, tmp_path: Path) -> None:
+        """A directory passed as a file must not raise past the caller."""
+        console = Console(file=io.StringIO())
+
+        assert _read_body_file(str(tmp_path), console) is None
+        assert "Error reading file" in console.file.getvalue()  # type: ignore[attr-defined]
+
+
+def _issue_action() -> Callable[..., None]:
+    """Return the `create_issue` action that `doit issue` runs."""
+    action: Callable[..., None] = task_issue()["actions"][0]
+    return action
+
+
+class TestCreateIssue:
+    """`doit issue` — AGENTS.md mandates it for every issue (#708)."""
+
+    @staticmethod
+    def _valid_body(issue_type: str = "feature") -> str:
+        return "\n".join(
+            f"## {section}\nreal content for {section}\n"
+            for section in get_required_sections(issue_type)
+        )
+
+    def test_creates_issue_from_body_file(
+        self, tmp_path: Path, mock_subprocess: MagicMock, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        body = tmp_path / "body.md"
+        body.write_text(self._valid_body(), encoding="utf-8")
+        mock_subprocess.register(
+            {("gh", "issue", "create"): {"stdout": "https://github.com/o/r/issues/42\n"}}
+        )
+
+        _issue_action()(type="feature", title="feat: a thing", body_file=str(body))
+
+        cmd = mock_subprocess.call_args.args[0]
+        assert cmd[:3] == ["gh", "issue", "create"]
+        assert "feat: a thing" in cmd
+        assert "https://github.com/o/r/issues/42" in capsys.readouterr().out
+
+    def test_creates_issue_from_inline_body(self, mock_subprocess: MagicMock) -> None:
+        mock_subprocess.register({("gh", "issue", "create"): {"stdout": "url\n"}})
+
+        _issue_action()(type="feature", title="feat: x", body=self._valid_body())
+
+        assert mock_subprocess.call_count == 1
+
+    def test_labels_come_from_the_template(self, mock_subprocess: MagicMock) -> None:
+        """The label set is the template's, not the caller's — AGENTS.md relies on this."""
+        mock_subprocess.register({("gh", "issue", "create"): {"stdout": "url\n"}})
+
+        _issue_action()(type="bug", title="bug: x", body=self._valid_body("bug"))
+
+        cmd = mock_subprocess.call_args.args[0]
+        assert "--label" in cmd
+        assert cmd[cmd.index("--label") + 1]
+
+    def test_unknown_issue_type_exits(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc:
+            _issue_action()(type="not-a-type", title="x", body="## Problem\ncontent")
+
+        assert exc.value.code == 1
+
+    def test_missing_body_file_exits(self, tmp_path: Path) -> None:
+        with pytest.raises(SystemExit) as exc:
+            _issue_action()(type="feature", title="x", body_file=str(tmp_path / "nope.md"))
+
+        assert exc.value.code == 1
+
+    def test_incomplete_body_is_rejected_before_calling_gh(
+        self, mock_subprocess: MagicMock, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Validation must gate the API call, not follow it."""
+        with pytest.raises(SystemExit) as exc:
+            _issue_action()(type="feature", title="x", body="## Problem\n")
+
+        assert exc.value.code == 1
+        assert mock_subprocess.call_count == 0
+        assert "validation failed" in capsys.readouterr().out.lower()
+
+    def test_gh_failure_exits_nonzero(self, mock_subprocess: MagicMock) -> None:
+        mock_subprocess.register(
+            {("gh", "issue", "create"): subprocess.CalledProcessError(1, ["gh"], stderr="denied")}
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            _issue_action()(type="feature", title="x", body=self._valid_body())
+
+        assert exc.value.code == 1
+
+    def test_title_is_prompted_when_absent(self, mock_subprocess: MagicMock) -> None:
+        mock_subprocess.register({("gh", "issue", "create"): {"stdout": "url\n"}})
+
+        with patch("builtins.input", return_value="feat: prompted title"):
+            _issue_action()(type="feature", body=self._valid_body())
+
+        assert "feat: prompted title" in mock_subprocess.call_args.args[0]
+
+    def test_empty_prompted_title_exits(self, mock_subprocess: MagicMock) -> None:
+        with patch("builtins.input", return_value="   "), pytest.raises(SystemExit) as exc:
+            _issue_action()(type="feature", body=self._valid_body())
+
+        assert exc.value.code == 1
+        assert mock_subprocess.call_count == 0
+
+
+def _pr_action() -> Callable[..., None]:
+    """Return the `create_pr` action that `doit pr` runs."""
+    action: Callable[..., None] = task_pr()["actions"][0]
+    return action
+
+
+class TestCreatePr:
+    """`doit pr` — AGENTS.md mandates it for every PR (#708)."""
+
+    @staticmethod
+    def _on_branch(name: str) -> MagicMock:
+        return MagicMock(stdout=f"{name}\n", returncode=0)
+
+    def test_refuses_to_open_a_pr_from_main(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """The NEVER-commit-to-main rule has a PR-shaped counterpart."""
+        with (
+            patch("tools.doit.github.subprocess.run", return_value=self._on_branch("main")),
+            pytest.raises(SystemExit) as exc,
+        ):
+            _pr_action()(title="feat: x", body="## Description\nx")
+
+        assert exc.value.code == 1
+        assert "Cannot create PR from main" in capsys.readouterr().out
+
+    def test_creates_pr_and_reports_the_url(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with (
+            patch(
+                "tools.doit.github.subprocess.run",
+                return_value=self._on_branch("feat/42-thing"),
+            ),
+            patch("tools.doit.github._check_branch_up_to_date"),
+            patch("tools.doit.github._ensure_branch_pushed"),
+            patch(
+                "tools.doit.github._run_gh_with_retry",
+                return_value=MagicMock(stdout="https://github.com/o/r/pull/7\n"),
+            ) as mock_gh,
+        ):
+            _pr_action()(title="feat: x", body="## Description\nx\n\nAddresses #42")
+
+        cmd = mock_gh.call_args.args[0]
+        assert cmd[:3] == ["gh", "pr", "create"]
+        assert "https://github.com/o/r/pull/7" in capsys.readouterr().out
+
+    def test_draft_flag_is_forwarded(self) -> None:
+        with (
+            patch(
+                "tools.doit.github.subprocess.run",
+                return_value=self._on_branch("feat/42-thing"),
+            ),
+            patch("tools.doit.github._check_branch_up_to_date"),
+            patch("tools.doit.github._ensure_branch_pushed"),
+            patch(
+                "tools.doit.github._run_gh_with_retry", return_value=MagicMock(stdout="url\n")
+            ) as mock_gh,
+        ):
+            _pr_action()(title="feat: x", body="## Description\nx", draft=True)
+
+        assert "--draft" in mock_gh.call_args.args[0]
+
+    def test_no_update_check_skips_the_up_to_date_guard(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """`--no-update-check` is the documented override; it must actually skip."""
+        with (
+            patch(
+                "tools.doit.github.subprocess.run",
+                return_value=self._on_branch("feat/42-thing"),
+            ),
+            patch("tools.doit.github._check_branch_up_to_date") as mock_check,
+            patch("tools.doit.github._ensure_branch_pushed"),
+            patch("tools.doit.github._run_gh_with_retry", return_value=MagicMock(stdout="u\n")),
+        ):
+            _pr_action()(title="feat: x", body="## Description\nx", no_update_check=True)
+
+        mock_check.assert_not_called()
+        assert "Skipping up-to-date check" in capsys.readouterr().out
+
+    def test_up_to_date_guard_runs_by_default(self) -> None:
+        with (
+            patch(
+                "tools.doit.github.subprocess.run",
+                return_value=self._on_branch("feat/42-thing"),
+            ),
+            patch("tools.doit.github._check_branch_up_to_date") as mock_check,
+            patch("tools.doit.github._ensure_branch_pushed"),
+            patch("tools.doit.github._run_gh_with_retry", return_value=MagicMock(stdout="u\n")),
+        ):
+            _pr_action()(title="feat: x", body="## Description\nx")
+
+        mock_check.assert_called_once()
+
+    def test_no_push_is_forwarded_to_the_push_guard(self) -> None:
+        with (
+            patch(
+                "tools.doit.github.subprocess.run",
+                return_value=self._on_branch("feat/42-thing"),
+            ),
+            patch("tools.doit.github._check_branch_up_to_date"),
+            patch("tools.doit.github._ensure_branch_pushed") as mock_push,
+            patch("tools.doit.github._run_gh_with_retry", return_value=MagicMock(stdout="u\n")),
+        ):
+            _pr_action()(title="feat: x", body="## Description\nx", no_push=True)
+
+        assert mock_push.call_args.args[2] is True
+
+    def test_gh_failure_exits_nonzero(self) -> None:
+        with (
+            patch(
+                "tools.doit.github.subprocess.run",
+                return_value=self._on_branch("feat/42-thing"),
+            ),
+            patch("tools.doit.github._check_branch_up_to_date"),
+            patch("tools.doit.github._ensure_branch_pushed"),
+            patch(
+                "tools.doit.github._run_gh_with_retry",
+                side_effect=subprocess.CalledProcessError(1, ["gh"], stderr="denied"),
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            _pr_action()(title="feat: x", body="## Description\nx")
+
+        assert exc.value.code == 1
+
+    def test_missing_body_file_exits(self, tmp_path: Path) -> None:
+        with (
+            patch(
+                "tools.doit.github.subprocess.run",
+                return_value=self._on_branch("feat/42-thing"),
+            ),
+            patch("tools.doit.github._check_branch_up_to_date"),
+            patch("tools.doit.github._ensure_branch_pushed"),
+            pytest.raises(SystemExit) as exc,
+        ):
+            _pr_action()(title="feat: x", body_file=str(tmp_path / "absent.md"))
+
+        assert exc.value.code == 1
+
+
+def _merge_action() -> Callable[..., None]:
+    """Return the `merge_pr` action that `doit pr_merge` runs."""
+    action: Callable[..., None] = task_pr_merge()["actions"][0]
+    return action
+
+
+class TestMergePr:
+    """`doit pr_merge` — the mandated path that mutates remote state (#708).
+
+    A defect here is the most expensive of the three: it lands, or fails to
+    land, a squash commit on `main`.
+    """
+
+    @staticmethod
+    def _pr(**overrides: object) -> dict[str, object]:
+        info: dict[str, object] = {
+            "number": 42,
+            "title": "feat: add a thing",
+            "body": "## Description\nx\n\nAddresses #7",
+            "state": "OPEN",
+        }
+        info.update(overrides)
+        return info
+
+    def test_merges_with_a_conventional_squash_subject(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+        ):
+            _merge_action()(pr="42")
+
+        cmd = mock_gh.call_args.args[0]
+        assert cmd[:5] == ["gh", "pr", "merge", "42", "--squash"]
+        subject = cmd[cmd.index("--subject") + 1]
+        assert "merges PR #42" in subject and "addresses #7" in subject
+        assert "merged successfully" in capsys.readouterr().out
+
+    def test_missing_pr_info_exits(self) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=None),
+            pytest.raises(SystemExit) as exc,
+        ):
+            _merge_action()(pr="42")
+
+        assert exc.value.code == 1
+
+    @pytest.mark.parametrize("state", ["MERGED", "CLOSED", "DRAFT"])
+    def test_refuses_a_pr_that_is_not_open(self, state: str) -> None:
+        """Re-merging a merged PR, or merging a closed one, must not proceed."""
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr(state=state)),
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+            pytest.raises(SystemExit) as exc,
+        ):
+            _merge_action()(pr="42")
+
+        assert exc.value.code == 1
+        mock_gh.assert_not_called()
+
+    def test_refuses_a_non_conventional_title(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """The squash subject becomes a commit on main, so the format is enforced."""
+        with (
+            patch(
+                "tools.doit.github._get_pr_info",
+                return_value=self._pr(title="added some stuff"),
+            ),
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+            pytest.raises(SystemExit) as exc,
+        ):
+            _merge_action()(pr="42")
+
+        assert exc.value.code == 1
+        mock_gh.assert_not_called()
+        assert "conventional commit format" in capsys.readouterr().out
+
+    def test_warns_when_no_issue_is_linked(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A warning, not a refusal — some PRs legitimately link nothing."""
+        with (
+            patch(
+                "tools.doit.github._get_pr_info",
+                return_value=self._pr(body="## Description\nno link here"),
+            ),
+            patch("tools.doit.github._run_gh_with_retry"),
+        ):
+            _merge_action()(pr="42")
+
+        assert "No linked issues" in capsys.readouterr().out
+
+    def test_delete_branch_is_opt_out(self) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+        ):
+            _merge_action()(pr="42", delete_branch=False)
+
+        assert "--delete-branch" not in mock_gh.call_args.args[0]
+
+    def test_auto_close_closes_linked_issues(self) -> None:
+        """`--auto-close` is what AGENTS.md offers instead of a manual close."""
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch("tools.doit.github._run_gh_with_retry"),
+            patch("tools.doit.github._close_linked_issues") as mock_close,
+        ):
+            _merge_action()(pr="42", auto_close=True)
+
+        assert mock_close.call_args.args[0] == ["7"]
+
+    def test_without_auto_close_it_reminds_instead(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch("tools.doit.github._run_gh_with_retry"),
+            patch("tools.doit.github._close_linked_issues") as mock_close,
+        ):
+            _merge_action()(pr="42")
+
+        mock_close.assert_not_called()
+        assert "Reminder: Update linked issues" in capsys.readouterr().out
+
+    def test_merge_failure_exits_nonzero(self) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch(
+                "tools.doit.github._run_gh_with_retry",
+                side_effect=subprocess.CalledProcessError(1, ["gh"], stderr="not mergeable"),
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            _merge_action()(pr="42")
+
+        assert exc.value.code == 1

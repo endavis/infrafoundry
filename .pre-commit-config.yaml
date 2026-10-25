@@ -1,3 +1,16 @@
+# Hook types installed by `pre-commit install`.
+#
+# `commit-msg` was missing, so every hook declared with `stages: [commit-msg]`
+# was configured but never ran — including `conventional-pre-commit`, which has
+# been enforcing nothing since it was added. Declaring the types here means a
+# plain `pre-commit install` wires all of them, rather than depending on each
+# caller remembering the right `--hook-type` flags (#741).
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+  - post-merge
+  - post-checkout
+
 repos:
   # Generic file checks (not Python-specific, keep external)
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -56,7 +69,10 @@ repos:
         stages: [pre-commit]
 
       # Type checking (uses project's mypy version)
-      # Only checks src/ to match doit type_check behavior
+      # Scope matches `doit type_check`. It was src/ only, which stopped
+      # matching when #700 widened the doit task to tools/ and tests/ --
+      # leaving the hook able to pass on code CI would then reject. Warm-cache
+      # cost of the wider scope is ~60ms.
       - id: mypy
         name: mypy
         entry: uv run mypy src/
@@ -121,6 +137,13 @@ repos:
         stages: [pre-commit]
 
       # Prevent direct commits to main branch
+      - id: check-commit-issue-ref
+        name: Check commit issue matches branch
+        entry: python3 tools/hooks/check_commit_issue_ref.py
+        language: system
+        # commit-msg stage: the message is what this compares against the branch.
+        stages: [commit-msg]
+
       - id: no-commit-to-main
         name: Prevent commits to main branch
         entry: |

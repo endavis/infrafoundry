@@ -4,6 +4,8 @@ Run a single-agent PR review using Claude. Optional focus area: $ARGUMENTS.
 
 ## Instructions
 
+**Read-only.** Review and report — do not edit files, commit, or push. Findings go to the user and the PR; any fix is a separate change the user asks for.
+
 This command runs in the main conversation context. Claude reviews the current branch's PR directly — no external CLI invocation needed.
 
 ### Step 1: Verify a PR exists

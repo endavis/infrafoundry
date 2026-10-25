@@ -20,5 +20,5 @@ MkDocs uses Markdown (familiar to most developers), Material theme provides mode
 
 ## Related Documentation
 
-- [Documentation Index](../../index.md)
-- [Extensions Guide](../../development/extensions.md)
+- [Documentation Index](../index.md)
+- [Extensions Guide](../development/extensions.md)

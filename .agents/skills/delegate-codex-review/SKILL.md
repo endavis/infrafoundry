@@ -1,6 +1,6 @@
 ---
 name: delegate-codex-review
-description: Delegate a read-only code review of current changes to Codex CLI. Hands the review to Codex via `codex -a never exec` and returns findings to the calling agent.
+description: Delegate a read-only code review of current changes to Codex CLI. Hands the review to Codex via `codex -a never --dangerously-bypass-hook-trust exec` and returns findings to the calling agent.
 ---
 
 # Delegate Review to Codex
@@ -24,7 +24,7 @@ The user may include optional focus text after the trigger.
 2. Run Codex non-interactively. Hybrid C: prefer the existing `$codex-review` skill if available, otherwise the prompt is fully inlined. Single-quote the prompt so the literal `$codex-review` reaches Codex (not the shell).
 
    ```bash
-   codex -a never exec 'Review the current uncommitted changes and the current branch vs main, read-only. If the $codex-review skill is available, activate it. Otherwise: 1) Run `git status` and `git diff` to see what changed. 2) Run `git log main..HEAD --oneline` for branch context. 3) Read AGENTS.md and any relevant ADRs in docs/decisions/. 4) Identify correctness issues, risks, missing tests, style/convention violations, and concrete suggestions. 5) Print findings to stdout in a structured format (Summary / Issues / Suggestions). Do NOT modify any files. Focus area (optional): <focus>'
+   codex -a never --dangerously-bypass-hook-trust exec 'Review the current uncommitted changes and the current branch vs main, read-only. If the $codex-review skill is available, activate it. Otherwise: 1) Run `git status` and `git diff` to see what changed. 2) Run `git log main..HEAD --oneline` for branch context. 3) Read AGENTS.md and any relevant ADRs in docs/decisions/. 4) Identify correctness issues, risks, missing tests, style/convention violations, and concrete suggestions. 5) Print findings to stdout in a structured format (Summary / Issues / Suggestions). Do NOT modify any files. Focus area (optional): <focus>'
    ```
 
 3. Capture stdout and summarize the review findings.

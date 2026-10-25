@@ -24,4 +24,4 @@ PRs could be merged while CI was still running or without explicit human approva
 
 ## Related Documentation
 
-- [CI/CD Testing Guide](../../development/ci-cd-testing.md)
+- [CI/CD Testing Guide](../development/ci-cd-testing.md)

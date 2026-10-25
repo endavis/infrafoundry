@@ -12,9 +12,8 @@ The pattern works because a short, skill-gated checklist is more likely to be ho
 session than a paragraph buried in a large reference file.
 
 > **Copilot-native format:** Files in this directory are consumed by GitHub Copilot via its native
-> auto-discovery mechanism. Claude Code and Gemini CLI **cannot** read `.github/instructions/`
-> files. For the Claude equivalent use `.claude/rules/`; for the Gemini equivalent use
-> `.gemini/rules/`.
+> auto-discovery mechanism. Claude Code **cannot** read `.github/instructions/` files. For the
+> Claude equivalent use `.claude/rules/`; for Codex and Antigravity use `.agents/skills/`.
 
 ## When to author an instruction file
 
@@ -112,16 +111,15 @@ Observed failures: endavis/pynetappfoundry#104, endavis/pynetappfoundry#117
 ## Shared discipline across CLIs
 
 The **discipline** (≤30 lines, numbered self-checks, observed-failures footer) is shared across
-Claude Code, Gemini CLI, and GitHub Copilot even though the file format differs:
+Claude Code, GitHub Copilot, Codex and Antigravity even though the file format differs:
 
 | CLI | Directory | Load mechanism |
 | :--- | :--- | :--- |
 | Claude Code | `.claude/rules/` | `@./rules/*.md` in `.claude/CLAUDE.md` |
-| Gemini CLI | `.gemini/rules/` | One `@./.gemini/rules/<name>.md` line per rule file in `GEMINI.md` (literal paths only) |
 | GitHub Copilot | `.github/instructions/` | Native auto-discovery (no directive needed) |
 
 See [`.claude/rules/README.md`](../../.claude/rules/README.md) and
-[`.gemini/rules/README.md`](../../.gemini/rules/README.md) for the Claude and Gemini variants.
+[`.agents/skills/README.md`](../../.agents/skills/README.md) for the other CLI variants.
 
 ## What NOT to put in an instruction file
 
@@ -133,3 +131,20 @@ See [`.claude/rules/README.md`](../../.claude/rules/README.md) and
   behavior.
 - **Anything not tied to an observed failure** — if you cannot cite a PR or issue where the rule
   was violated, the instruction file is not ready to be written.
+
+## Shipped rule: `typing-branch-narrowing`
+
+This template ships one rule file, mirrored across all three agent rule surfaces because every
+agent in the delegation matrix edits this codebase. The checklist body is identical everywhere;
+only the frontmatter and the loading mechanism differ.
+
+| Surface | Path |
+| :--- | :--- |
+| Claude | `.claude/rules/typing-branch-narrowing.md` |
+| Copilot | `.github/instructions/typing-branch-narrowing.instructions.md` |
+| Codex / Antigravity | `.agents/skills/typing-branch-narrowing/SKILL.md` |
+
+**When you change one, change all three.** A rule that disagrees with itself across agents is worse
+than no rule, because whichever agent is driving decides which version applies.
+`tests/template/test_rule_files.py` enforces that each rule's three bodies stay identical. See
+[`.claude/rules/README.md`](../../.claude/rules/README.md) for the authoring discipline.

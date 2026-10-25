@@ -18,4 +18,4 @@ ruff is an extremely fast Python linter and formatter written in Rust that conso
 
 ## Related Documentation
 
-- [Coding Standards](../../development/coding-standards.md)
+- [Coding Standards](../development/coding-standards.md)

@@ -6,7 +6,7 @@ Accepted
 
 ## Decision
 
-Implement tool-level enforcement that blocks dangerous commands (like `--force`, `--admin`, `--no-verify`) before execution via Claude Code PreToolUse hooks, Gemini CLI BeforeTool hooks, and Codex CLI approval policies.
+Implement tool-level enforcement that blocks dangerous commands (like `--force`, `--admin`, `--no-verify`) before execution via Claude Code PreToolUse hooks, Copilot/Antigravity PreToolUse hooks, and Codex CLI approval policies.
 
 ## Rationale
 
@@ -21,9 +21,11 @@ Documentation alone is insufficient - AI agents may violate rules after context 
 - Issue #166: Block uv add in AI agent hooks
 - Issue #362: Add Copilot CLI command-blocking hook integration
 - Issue #409: Complete Copilot CLI coverage in AI_SETUP, enforcement-principles, first-5-minutes
+- Issue #678: Fix dangerous-command hook for git global options, refspecs, and shell wrappers
 
 ## Related Documentation
 
-- [AI Command Blocking](../../development/ai/command-blocking.md)
-- [AI Enforcement Principles](../../development/ai/enforcement-principles.md)
-- [AI Setup Guide](../../development/AI_SETUP.md)
+- [ADR-9019](9019-the-dangerous-command-hook-is-a-guardrail-not-a-security-boundary.md) — what the hook should block, and how far to go to do it
+- [AI Command Blocking](../development/ai/command-blocking.md)
+- [AI Enforcement Principles](../development/ai/enforcement-principles.md)
+- [AI Setup Guide](../development/AI_SETUP.md)

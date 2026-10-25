@@ -28,7 +28,7 @@ and discoverable. It is not part of the published package's public API.
   convenience; #348 moved it to dev to align with the boundary above.)
 
 For the broader layering rationale, see
-[Tooling Roles and Architectural Boundaries](../../development/tooling-roles.md).
+[Tooling Roles and Architectural Boundaries](../development/tooling-roles.md).
 
 ## Related Issues
 
@@ -46,5 +46,5 @@ For the broader layering rationale, see
 
 ## Related Documentation
 
-- [Tools Reference](../tools-reference.md)
-- [CLI Guide](../../usage/cli.md)
+- [Tools Reference](../template/tools-reference.md)
+- [CLI Guide](../usage/cli.md)

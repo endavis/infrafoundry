@@ -4,7 +4,7 @@
     "preToolUse": [
       {
         "type": "command",
-        "bash": "python3 ../../tools/hooks/ai/block-dangerous-commands.py",
+        "bash": "sh ../../tools/hooks/ai/block-dangerous-commands.sh",
         "cwd": ".github/hooks",
         "timeoutSec": 10
       }

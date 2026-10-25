@@ -164,8 +164,8 @@ class TestAnalyzeJob:
         job = workflow["jobs"]["analyze"]
         assert job["strategy"]["fail-fast"] is False
 
-    def test_analyze_pins_checkout_major_version(self) -> None:
-        """``actions/checkout`` must be pinned to a major-version tag (``@vN``).
+    def test_analyze_pins_checkout_to_a_sha(self) -> None:
+        """``actions/checkout`` must be pinned to a commit SHA.
 
         The exact major version is intentionally not asserted. Dependabot bumps
         ``actions/checkout`` routinely; pinning this test to a specific number
@@ -177,18 +177,19 @@ class TestAnalyzeJob:
         checkout_steps = [s for s in steps if s.get("uses", "").startswith("actions/checkout@")]
         assert checkout_steps, "expected an actions/checkout step"
         uses = checkout_steps[0]["uses"]
-        assert re.fullmatch(r"actions/checkout@v\d+", uses), (
-            f"expected actions/checkout pinned to a major-version tag, got {uses!r}"
+        assert re.fullmatch(r"actions/checkout@[0-9a-f]{40}", uses), (
+            f"expected actions/checkout pinned to a commit SHA, got {uses!r}"
         )
 
-    def test_analyze_pins_codeql_init_major_version(self) -> None:
-        """``github/codeql-action/init`` must be pinned to a major-version tag (``@vN``).
+    def test_analyze_pins_codeql_init_to_a_sha(self) -> None:
+        """``github/codeql-action/init`` must be pinned to a commit SHA.
 
         The exact major version is intentionally not asserted. Dependabot bumps
         ``github/codeql-action`` routinely; pinning this test to a specific
         number turns every such bump into a false CI failure (see #626). The
-        repo convention this guards is that the action is pinned to a version
-        tag, not a floating ref/branch.
+        SHA-pinning superseded major-tag pinning in #695. The general rule is
+        enforced by tests/test_workflow_action_pinning.py; this asserts only
+        that the right action is the one pinned.
         """
         steps = _analyze_steps()
         init_steps = [
@@ -196,14 +197,14 @@ class TestAnalyzeJob:
         ]
         assert init_steps, "expected a github/codeql-action/init step"
         uses = init_steps[0]["uses"]
-        assert re.fullmatch(r"github/codeql-action/init@v\d+", uses), (
-            f"expected github/codeql-action/init pinned to a major-version tag, got {uses!r}"
+        assert re.fullmatch(r"github/codeql-action/init@[0-9a-f]{40}", uses), (
+            f"expected github/codeql-action/init pinned to a commit SHA, got {uses!r}"
         )
 
-    def test_analyze_pins_codeql_analyze_major_version(self) -> None:
-        """``github/codeql-action/analyze`` must be pinned to a major-version tag (``@vN``).
+    def test_analyze_pins_codeql_analyze_to_a_sha(self) -> None:
+        """``github/codeql-action/analyze`` must be pinned to a commit SHA.
 
-        See ``test_analyze_pins_codeql_init_major_version`` for the rationale
+        See ``test_analyze_pins_codeql_init_to_a_sha`` for the rationale
         (#626): the exact major version is intentionally not asserted so routine
         dependabot bumps don't turn into false CI failures.
         """
@@ -213,8 +214,8 @@ class TestAnalyzeJob:
         ]
         assert analyze_steps, "expected a github/codeql-action/analyze step"
         uses = analyze_steps[0]["uses"]
-        assert re.fullmatch(r"github/codeql-action/analyze@v\d+", uses), (
-            f"expected github/codeql-action/analyze pinned to a major-version tag, got {uses!r}"
+        assert re.fullmatch(r"github/codeql-action/analyze@[0-9a-f]{40}", uses), (
+            f"expected github/codeql-action/analyze pinned to a commit SHA, got {uses!r}"
         )
 
     def test_analyze_init_passes_matrix_language(self) -> None:

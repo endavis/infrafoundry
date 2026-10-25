@@ -22,6 +22,7 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 import tempfile
 import urllib.request
@@ -32,18 +33,82 @@ from urllib.parse import urlparse
 REPO_OWNER = "endavis"
 REPO_NAME = "pyproject-template"
 BRANCH = "main"
-BASE_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/{BRANCH}"
 
-# Files needed for new project setup (downloaded to temp dir, runs wizard)
-SETUP_FILES = [
-    "tools/pyproject_template/__init__.py",
-    "tools/pyproject_template/utils.py",
-    "tools/pyproject_template/setup_repo.py",
-    "tools/pyproject_template/configure.py",
-]
+# `main` moves. Fetching a dozen files from a moving ref means a push that lands
+# mid-run produces a mixed file set, and the same command run twice can install
+# different code. `resolve_ref()` pins the branch to one commit up front so a run
+# is internally consistent and its result is recordable (#694).
+#
+# This is not protection against the template repository itself being malicious —
+# running `curl | python3` against it already extends that trust. It closes the
+# window where main changes underneath a run, and makes "which code did I get?"
+# an answerable question.
+REF = os.environ.get("PYPROJECT_TEMPLATE_REF", BRANCH)
+BASE_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/{REF}"
 
-# Files needed for template sync management (installed permanently)
-SYNC_FILES = [
+
+def resolve_ref(ref: str = REF) -> str:
+    """Resolve *ref* to a commit SHA so every download comes from one commit.
+
+    Returns the SHA on success. On failure — offline, rate-limited, or an
+    unknown ref — returns *ref* unchanged and warns: pinning is a consistency
+    improvement, and refusing to bootstrap because api.github.com is
+    unreachable would trade a small gain for a hard outage.
+
+    A ref that already looks like a full SHA is returned as-is.
+    """
+    if len(ref) == 40 and all(c in "0123456789abcdef" for c in ref.lower()):
+        return ref
+
+    api = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/commits/{ref}"
+    request = urllib.request.Request(api, headers={"Accept": "application/vnd.github.sha"})
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        request.add_header("Authorization", f"token {token}")
+
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:  # nosec B310
+            sha: str = response.read().decode("utf-8").strip()
+    except Exception as e:
+        print(f"  Warning: could not resolve {ref} to a commit ({e}).")
+        print(f"  Continuing against the moving ref '{ref}'.")
+        return ref
+
+    if len(sha) != 40 or not all(c in "0123456789abcdef" for c in sha.lower()):
+        print(f"  Warning: unexpected response resolving {ref}; using the ref as-is.")
+        return ref
+    return sha
+
+
+def pin_base_url() -> str:
+    """Pin :data:`BASE_URL` to a resolved commit and return the SHA used."""
+    global BASE_URL
+    sha = resolve_ref()
+    BASE_URL = f"https://raw.githubusercontent.com/{REPO_OWNER}/{REPO_NAME}/{sha}"
+    if sha != REF:
+        print(f"  Pinned to commit {sha[:12]} (from '{REF}')")
+    return sha
+
+
+# Every module in ``tools/pyproject_template/``. Both bootstrap paths download
+# this same list.
+#
+# There used to be two lists — a four-file ``SETUP_FILES`` for the new-project
+# wizard and a seven-file ``SYNC_FILES`` for ``--sync`` — on the reasoning that
+# each path needs only what it runs. Neither list ever closed over what its
+# entry point actually imports, so both were broken: ``SETUP_FILES`` could not
+# import ``setup_repo`` at all (#790) and ``SYNC_FILES`` could not run
+# ``manage.py repo`` or ``manage.py create`` (#788).
+#
+# The split earned nothing to pay for that. ``__init__.py`` eagerly imports four
+# submodules, so any path that touches the package pulls most of it in; closing
+# both lists over their imports left them differing by a single file. One list
+# that is verifiably every module in the package cannot drift from the code —
+# ``tests/template/test_bootstrap.py`` asserts both the package-completeness and
+# the import-graph closure that the old filename assertions only gestured at.
+# This follows ADR-9017's finding that a single source of truth is what stops
+# two derived lists diverging silently.
+TEMPLATE_MODULES = [
     "tools/pyproject_template/__init__.py",
     "tools/pyproject_template/utils.py",
     "tools/pyproject_template/settings.py",
@@ -51,6 +116,8 @@ SYNC_FILES = [
     "tools/pyproject_template/manage.py",
     "tools/pyproject_template/configure.py",
     "tools/pyproject_template/cleanup.py",
+    "tools/pyproject_template/repo_settings.py",
+    "tools/pyproject_template/setup_repo.py",
 ]
 
 
@@ -96,13 +163,18 @@ def detect_project_settings(project_root: Path) -> dict[str, str]:
         if description:
             settings["description"] = description
 
-        authors = project.get("authors", [])
-        if authors:
-            first = authors[0]
-            if "name" in first:
-                settings["author_name"] = first["name"]
-            if "email" in first:
-                settings["author_email"] = first["email"]
+        # Author and maintainer are read separately. Collapsing them means an
+        # adopted or forked project, where PEP 621 says they differ, gets the
+        # original author's name written into settings the maintainer then
+        # uses (#787).
+        for key, prefix in (("authors", "author"), ("maintainers", "maintainer")):
+            people = project.get(key, [])
+            if people:
+                first = people[0]
+                if "name" in first:
+                    settings[f"{prefix}_name"] = first["name"]
+                if "email" in first:
+                    settings[f"{prefix}_email"] = first["email"]
 
         repo_url = project.get("urls", {}).get("Repository", "")
         if repo_url:
@@ -136,6 +208,8 @@ def create_settings_file(project_root: Path, settings: dict[str, str]) -> Path:
         "description",
         "author_name",
         "author_email",
+        "maintainer_name",
+        "maintainer_email",
         "github_user",
         "github_repo",
     ):
@@ -172,8 +246,10 @@ def run_sync(project_root: Path) -> None:
     # Create directory structure
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
-    # Download sync files
-    for file_path in SYNC_FILES:
+    pin_base_url()
+
+    # Download the management suite
+    for file_path in TEMPLATE_MODULES:
         filename = Path(file_path).name
         url = f"{BASE_URL}/{file_path}"
         dest = pkg_dir / filename
@@ -238,8 +314,10 @@ def run_setup() -> None:
         pkg_dir = root_path / "tools" / "pyproject_template"
         pkg_dir.mkdir(parents=True, exist_ok=True)
 
-        # Download files
-        for file_path in SETUP_FILES:
+        pin_base_url()
+
+        # Download the management suite
+        for file_path in TEMPLATE_MODULES:
             url = f"{BASE_URL}/{file_path}"
             dest = pkg_dir / Path(file_path).name
             print(f"  Downloading {Path(file_path).name}...")

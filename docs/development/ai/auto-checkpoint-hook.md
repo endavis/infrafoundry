@@ -24,7 +24,7 @@ Before Claude Code compacts the conversation context, the hook:
 
 1. Reads the `transcript_path` from the hook payload.
 2. Takes up to 200 KB from the tail of the JSONL transcript.
-3. Spawns `claude -p --bare --model claude-sonnet-4-6` with a strict-JSON prompt asking for:
+3. Spawns `claude -p --bare --model claude-sonnet-5` with a strict-JSON prompt asking for:
    `{title, status, in_flight_work, constraints, files_touched, next_steps, resume_prompt}`.
 4. Parses the JSON response and renders it into a markdown checkpoint file matching the
    `/checkpoint` section structure (Title, Status, In-flight work, Constraints, Files touched,

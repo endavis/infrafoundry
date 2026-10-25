@@ -47,7 +47,6 @@ exclude = [
     "docs/development/install-tools-framework.md",
     "docs/development/tooling-roles.md",
     "docs/development/github-repository-settings.md",
-    "docs/development/dependabot-automerge.md",
     "docs/TABLE_OF_CONTENTS.md",
 
     # InfraFoundry ships its own license; never overwrite.

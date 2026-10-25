@@ -20,8 +20,8 @@ This page is a narrative walkthrough of the AI agent workflow this template ship
 
 - Claude Code installed and authenticated. See [AI Agent Setup](../AI_SETUP.md) for installation and per-agent configuration.
 - The [GitHub CLI](https://cli.github.com/) (`gh`) installed and logged in. The slash commands shell out to `gh` for issue and PR operations.
-- Optionally, the [Gemini CLI](https://github.com/google-gemini/gemini-cli) if you want to run the dual-agent review commands. The single-agent flow described below does not require it.
-- Alternatively, the [GitHub Copilot CLI](https://github.com/github/copilot-cli) can be used in place of Claude Code for the single-agent flow — it auto-discovers the same slash commands from `.claude/commands/`. See [AI Agent Setup § 4. GitHub Copilot CLI](../AI_SETUP.md#4-github-copilot-cli) for the wiring.
+- Optionally, a second agent CLI (Copilot, Codex or Antigravity) if you want to run the multi-agent review commands. The single-agent flow described below does not require it.
+- Alternatively, the [GitHub Copilot CLI](https://github.com/github/copilot-cli) can be used in place of Claude Code for the single-agent flow — it runs the same workflow through its own hyphen-named skills (`/copilot-plan`, `/copilot-implement`, …), discovered from `.github/skills/`. See [AI Agent Setup § 3. GitHub Copilot CLI](../AI_SETUP.md#3-github-copilot-cli) for the wiring.
 
 The rest of this page assumes you have these working.
 
@@ -74,9 +74,9 @@ Once the plan comment exists, run `/claude:implement 42`. Claude checks out `mai
 
 The artifact at the end of this step is an uncommitted working tree on the feature branch. Nothing has been committed yet — that is deliberate.
 
-### 5. (Optional) `/multi-review claude gemini`
+### 5. (Optional) `/multi-review claude codex`
 
-If you have the Gemini CLI installed and want a second opinion on the changes, you can run `/multi-review claude gemini` at this point (after a PR exists). This runs both agents in isolated contexts, posts each review as a separate PR comment, and then synthesizes the findings for you to approve before posting. If you want an adversarial challenge instead of a code review, use `/multi-adversarial-review claude gemini`. Skip this step if you are running single-agent.
+If you have a second agent CLI installed and want another opinion on the changes, you can run `/multi-review claude codex` at this point (after a PR exists). This runs both agents in isolated contexts, posts each review as a separate PR comment, and then synthesizes the findings for you to approve before posting. If you want an adversarial challenge instead of a code review, use `/multi-adversarial-review claude codex`. Skip this step if you are running single-agent.
 
 ### 6. `/ghi-finalize`
 
@@ -151,7 +151,6 @@ Run `/ghi-status`. It is read-only, has no side effects, and will tell you the c
 - [Architectural Conventions](architectural-conventions.md) — imperative rules for AI-generated code.
 - [AGENTS.md](../../../AGENTS.md) — universal context file and workflow reference.
 - [`.claude/rules/` scaffold](../../../.claude/rules/README.md) — per-stack rule-file pattern for Claude Code.
-- [`.gemini/rules/` scaffold](../../../.gemini/rules/README.md) — per-stack rule-file pattern for Gemini CLI.
 - [`.github/instructions/` scaffold](../../../.github/instructions/README.md) — per-stack instruction-file pattern for GitHub Copilot.
 - [`.agents/skills/` scaffold](../../../.agents/skills/README.md) — per-stack rule-shaped skill pattern for Codex CLI.
 - <!-- TODO: wire this link up properly when #342 lands -->

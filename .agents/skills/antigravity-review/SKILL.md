@@ -22,6 +22,8 @@ The user may include optional focus text.
 
 ## Instructions
 
+**Read-only.** Review and report — do not edit files, commit, or push. Findings go to the user and the PR; any fix is a separate change the user asks for.
+
 1. Verify a PR exists for the current branch:
    ```bash
    gh pr view --json number,title,body,headRefName

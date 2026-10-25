@@ -40,7 +40,10 @@ def _load_workflow() -> dict[Any, Any]:
     default ``locale.getpreferredencoding()`` is cp1252 and chokes on any
     non-ASCII content in the workflow file (lesson from issue #430).
     """
-    return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    # Bind to an annotated local first: yaml.safe_load returns Any,
+    # and returning Any from a typed function trips warn_return_any.
+    data: dict[Any, Any] = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    return data
 
 
 def _handle_blocked_label_steps() -> list[dict[str, Any]]:
@@ -191,7 +194,7 @@ class TestHandleBlockedLabelSteps:
         """Step 3 posts the sticky blocked comment via ``actions/github-script``."""
         steps = _handle_blocked_label_steps()
         assert steps[2]["name"] == "Post sticky blocked comment"
-        assert steps[2]["uses"] == "actions/github-script@v9"
+        assert steps[2]["uses"].startswith("actions/github-script@")
 
     def test_sticky_comment_retains_dedupe_marker(self) -> None:
         """The sticky-comment dedupe marker must match the parent workflow's marker

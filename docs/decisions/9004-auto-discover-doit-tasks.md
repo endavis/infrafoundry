@@ -18,4 +18,4 @@ Manual imports were error-prone - developers would forget to add imports for new
 
 ## Related Documentation
 
-- [Tools Reference](../tools-reference.md)
+- [Tools Reference](../template/tools-reference.md)

@@ -22,7 +22,7 @@ INV_EPOCH=$(printf '%010d' $((9999999999 - $(date +%s))))
 
 Run `mkdir -p tmp/checkpoints` before writing. Don't overwrite existing files; if a same-named file exists, append a 1-letter discriminator (`-a`, `-b`, …) to the slug.
 
-> Note: this directory deviates from the `tmp/agents/<agent-type>/` convention in `AGENTS.md`. `tmp/checkpoints/` is intentionally shared (not per-agent) so checkpoints are portable across agents — Claude can write a checkpoint and Gemini or Codex can restore from it.
+> Note: this directory deviates from the `tmp/agents/<agent-type>/` convention in `AGENTS.md`. `tmp/checkpoints/` is intentionally shared (not per-agent) so checkpoints are portable across agents — Claude can write a checkpoint and Codex or Copilot can restore from it.
 
 ### Step 2: Draft the prompt
 

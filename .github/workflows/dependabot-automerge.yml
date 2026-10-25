@@ -28,17 +28,17 @@ jobs:
       reason: ${{ steps.decide.outputs.reason }}
       pr_number: ${{ github.event.pull_request.number }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Fetch dependabot metadata
         id: meta
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Decide eligibility
         id: decide
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
           DEPENDENCY_NAMES: ${{ steps.meta.outputs.dependency-names }}
@@ -120,7 +120,7 @@ jobs:
       - name: Generate App token
         id: app-token
         if: ${{ vars.RELEASE_APP_ID != '' }}
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -138,7 +138,7 @@ jobs:
 
       - name: Post sticky status comment
         if: always()
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           AUTOMERGE_OUTCOME: ${{ steps.automerge.outcome }}
           APP_TOKEN_CONFIGURED: ${{ steps.app-token.outputs.token != '' }}
@@ -190,7 +190,7 @@ jobs:
     if: needs.evaluate.outputs.qualifies == 'false'
     steps:
       - name: Post sticky skip comment
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR_NUMBER: ${{ needs.evaluate.outputs.pr_number }}
           REASON: ${{ needs.evaluate.outputs.reason }}

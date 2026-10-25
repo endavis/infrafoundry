@@ -16,8 +16,8 @@ tags:
 ## Purpose
 
 This page is an **opt-in menu** for operators of larger downstream projects who hit token-cost or
-session-length pain points. The baseline defaults (env-var settings, autocompact threshold) are
-already on for everyone — see [AI Agent Setup: Environment Variables](../AI_SETUP.md#environment-variables).
+session-length pain points. The baseline defaults (env-var settings for Claude) are
+already on for everyone — see [AI Agent Setup Guide](../AI_SETUP.md).
 Add-ons here are additional investments: each has setup cost, operational burden, and in some cases
 a trust trade-off. Read the tipping-point guidance before adopting any of them.
 
@@ -54,7 +54,6 @@ frequently in a session, RTK compresses that cost significantly.
 | CLI | Works? |
 | :--- | :--- |
 | Claude Code | Yes |
-| Gemini CLI | Yes (shell interception is CLI-agnostic) |
 | GitHub Copilot CLI | Yes |
 | Codex CLI | Yes |
 
@@ -100,7 +99,6 @@ option and gives you the broadest reduction.
 | CLI | Works? |
 | :--- | :--- |
 | Claude Code | Yes |
-| Gemini CLI | No (Gemini API endpoint differs; not tested) |
 | GitHub Copilot CLI | No (uses GitHub's Copilot endpoint, not Anthropic) |
 | Codex CLI | No (uses OpenAI endpoint) |
 
@@ -166,7 +164,6 @@ after confirming your workload does not produce artefacts that need to meet a le
 | CLI | Works? |
 | :--- | :--- |
 | Claude Code | Yes (native plugin system) |
-| Gemini CLI | No |
 | GitHub Copilot CLI | No |
 | Codex CLI | No |
 
@@ -190,6 +187,329 @@ in your local Claude Code settings:
 This is a **local-only** file (not committed). Do not commit Caveman plugin config — intensity
 preference varies by operator and can conflict with other contributors' expectations.
 
+## Bash raw-tool ban (opt-in)
+
+This hook enforces what `AGENTS.md` already asks for: prefer native file tools (`Read`, `Grep`,
+`Glob`, `Edit`, `Write`) over their raw shell equivalents. When an agent defects to `Bash`, the
+raw output bypasses every other token-efficiency control and lands in context uncompressed.
+
+**What it blocks:**
+
+- Leading banned commands: `cat`, `head`, `tail`, `find`, `grep`, `rg`, `wc`
+
+Each block message names the offending command, suggests the native replacement, and reminds the
+agent about the escape hatch.
+
+**Native tool replacements:**
+
+| Blocked command | Use instead |
+| :--- | :--- |
+| `cat` / `head` / `tail` | `Read` |
+| `find` | `Glob` |
+| `grep` / `rg` | `Grep` |
+| `wc` | `Read` (then count in the result) |
+
+**Opt-in via `.claude/settings.local.json`:**
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/bash-ban-raw-tools.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This goes in `.claude/settings.local.json` (not committed) — each operator opts in individually.
+Do **not** add it to the committed `.claude/settings.json`.
+
+**Escape hatch:**
+
+```bash
+mkdir -p tmp/agents/claude && touch tmp/agents/claude/bash-raw-unlock
+```
+
+Run this from the project root. Allows all banned commands for 10 minutes. The file auto-expires —
+no cleanup needed. Useful when you need a one-off raw shell command without disabling the hook
+permanently.
+
+The unlock file is scoped to the project directory, so enabling the escape hatch in one project
+does not affect any other project running concurrently on the same machine. If you work across
+multiple projects, you must re-touch the file in each project root where you want raw commands
+allowed.
+
+**Why disabled by default:** humans share the repo. Raw shell commands are legitimate in human
+workflows. The hook is only beneficial when an AI agent is the primary operator of the terminal.
+Enable it locally for AI-heavy sessions; disable it when you are working interactively.
+
+**Related:** the always-on dangerous-command hook (committed in `.claude/settings.json`) is
+documented in [AI Command Blocking](command-blocking.md). The two hooks are complementary: the
+dangerous-command hook blocks security-relevant patterns for everyone; this hook enforces
+token-efficiency discipline only for operators who opt in.
+
+## Codebase Memory MCP gate (opt-in)
+
+The [Codebase Memory MCP server](https://github.com/DeusData/codebase-memory-mcp) (CBM) builds a
+tree-sitter knowledge graph of your repository and exposes it as MCP tools
+(`search_graph`, `trace_path`, `get_architecture`, `get_code_snippet`, `index_repository`,
+`detect_changes`). Structural queries — "where is function X defined?", "what calls module Y?" —
+cost orders of magnitude fewer tokens answered by the graph than by reading files directly.
+
+Without enforcement, models default to trained behaviour: `Read`/`Grep`/`Glob` on source files.
+The three hooks below close that loop.
+
+### Three-hook design
+
+| Hook | Event | What it does |
+| :--- | :--- | :--- |
+| `cbm-code-discovery-gate.py` | `PreToolUse` on `Read\|Grep\|Glob` | Blocks code-discovery on source files unless a CBM tool ran recently or the target is in the allow-list |
+| `cbm-mcp-marker.py` | `PostToolUse` on CBM tool prefix | Touches a sidecar marker file, opening a 120s window during which the gate passes through |
+| `cbm-session-reminder.py` | `SessionStart` on `compact\|resume\|clear` | Re-injects the CBM protocol into context so the model does not forget the discipline after autocompact |
+
+### Allow-list
+
+The gate passes through automatically for paths that CBM cannot help with:
+
+| Allow-list rule | What it covers |
+| :--- | :--- |
+| Extensions `.json .yaml .yml .md .toml .lock .txt .env .sh` | Config, docs, lockfiles |
+| Path contains `.claude/`, `CLAUDE.md`, `settings`, `hooks/` | Project metadata and hooks |
+| Path contains `tests/` or `_test.` | Test files |
+
+Source-code files (`.py`, `.ts`, `.js`, `.go`, etc.) are **not** in the allow-list. A
+`Grep`/`Glob` with no `path` argument (whole-repo search) is also always gated — that is exactly
+the case CBM's `search_graph` is optimised for.
+
+### Read-after-CBM workflow
+
+1. Agent calls a CBM tool (e.g. `mcp__codebase-memory__search_graph`).
+2. `cbm-mcp-marker.py` touches `/tmp/cbm-mcp-used-{ppid}` (scoped to the Claude Code session by
+   parent PID).
+3. Within 120 seconds, `Read`/`Grep`/`Glob` on source files passes through the gate.
+4. After 120 seconds the window closes — the next code-discovery call requires another CBM call
+   first.
+
+The 120-second window is deliberately short: long enough for a focused follow-up read, short
+enough to prevent the gate from becoming permanently open after a single CBM call at session start.
+
+### Setup
+
+**Prerequisites:** install and configure the CBM MCP server. Follow the upstream instructions at
+[github.com/DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp). The
+hooks in this template assume the server is named `codebase-memory` in your MCP config.
+
+**Step 1** — Index the repository once:
+
+```bash
+# Inside a Claude Code session with CBM MCP wired:
+mcp__codebase-memory__index_repository
+```
+
+**Step 2** — Wire the three hooks in `.claude/settings.local.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/cbm-code-discovery-gate.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__codebase-memory__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/cbm-mcp-marker.py"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/cbm-session-reminder.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This goes in `.claude/settings.local.json` (not committed) — each operator opts in individually.
+Do **not** add it to the committed `.claude/settings.json`.
+
+**Step 3** — Refresh the graph when the codebase changes materially:
+
+```bash
+mcp__codebase-memory__detect_changes   # check if refresh is needed
+mcp__codebase-memory__index_repository # re-index if needed
+```
+
+### Trust caveats
+
+CBM indexes the repository by parsing source files with tree-sitter. The resulting graph lives
+locally in whatever storage backend the CBM server is configured with. Key considerations:
+
+- **Graph staleness:** the graph reflects the codebase at the time of the last `index_repository`
+  call. After significant changes (new modules, major refactors), call `detect_changes` and
+  re-index before relying on graph results. The gate passes through regardless of graph freshness —
+  it enforces that a CBM tool *runs*, not that the graph is accurate.
+- **Server trust:** CBM reads your source files to build the graph. Apply the same due-diligence
+  you would to any tool that reads your codebase. Read the source and confirm no network egress
+  before using on sensitive or employer-owned codebases.
+- **MCP server name:** if your CBM server is configured under a different name than
+  `codebase-memory`, update the `PostToolUse` matcher (e.g. `mcp__my-cbm__.*`) to match. The
+  hook itself is tool-name-agnostic; only the matcher needs updating.
+
+**Why disabled by default:** CBM requires an external MCP server that each operator installs and
+configures separately. Wiring these hooks in committed settings would break every contributor who
+has not installed CBM.
+
+## context-mode MCP wrappers (opt-in)
+
+The [context-mode MCP](https://github.com/mksglu/context-mode) intercepts tool outputs, runs
+commands in a sandboxed environment, indexes the full output into a local BM25 knowledge base, and
+returns only a compact summary to the model. Claude can call `ctx_search` later to retrieve detail.
+This prevents large tool outputs — `pytest -v` over thousands of tests, `terraform plan`, verbose
+`kubectl describe` — from flooding the conversation context and consuming tokens until the next
+autocompact event.
+
+context-mode wires up via four lifecycle hooks (`PreToolUse`, `PostToolUse`, `PreCompact`,
+`SessionStart`), each invoking `context-mode hook claude-code <event>`. Without thin wrappers,
+operators must hand-wire all four — error-prone, and easy to omit the `PreCompact`/`SessionStart`
+events that handle index persistence across compaction cycles.
+
+### Five-hook design
+
+| Hook | Event | What it does |
+| :--- | :--- | :--- |
+| `context-mode-pretooluse.py` | `PreToolUse` (no matcher) | Forwards every PreToolUse event to the context-mode CLI for interception |
+| `context-mode-posttooluse.py` | `PostToolUse` (no matcher) | Forwards every PostToolUse event so outputs are indexed and summarised |
+| `context-mode-precompact.py` | `PreCompact` | Persists the BM25 index before autocompact so it survives context resets |
+| `context-mode-sessionstart.py` | `SessionStart` | Restores the index when a session resumes after compaction |
+| `context-mode-test-runner-reminder.py` | `PreToolUse` on `Bash` | Advisory only — reminds Claude to prefer `ctx_batch_execute` for test runs |
+
+Each forwarder uses `shutil.which("context-mode")` to detect non-installation and exits 0 silently.
+Non-installation is a no-op, not an error.
+
+### Setup
+
+**Prerequisites:** install the context-mode CLI and configure the MCP server. Follow the upstream
+instructions at [github.com/mksglu/context-mode](https://github.com/mksglu/context-mode).
+
+**Step 1** — Wire all five hooks in `.claude/settings.local.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/context-mode-pretooluse.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/context-mode-test-runner-reminder.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/context-mode-posttooluse.py"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/context-mode-precompact.py"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/tools/hooks/ai/context-mode-sessionstart.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This goes in `.claude/settings.local.json` (not committed) — each operator opts in individually.
+Do **not** add it to the committed `.claude/settings.json`.
+
+**Step 2** — Verify the wiring with a manual smoke test: install a fake `context-mode` shim that
+logs its argv to stderr, wire `context-mode-pretooluse.py` as above, trigger any tool call, and
+confirm stderr shows `context-mode hook claude-code PreToolUse` with the original stdin forwarded.
+
+### ctx_batch_execute workflow
+
+When `context-mode` MCP is active, prefer `ctx_batch_execute` for multi-command sequences (test +
+lint + typecheck) rather than running each command in a separate `Bash` call. `ctx_batch_execute`
+submits all commands together, indexes the combined output into the BM25 store, and returns a
+compact summary. Use `ctx_search` to retrieve specific detail from that summary on demand.
+
+This is most valuable for test runs on large projects where `pytest -v` output can easily exceed
+tens of thousands of lines.
+
+### Trust caveats
+
+context-mode claims to run commands in a sandboxed environment and maintain a local BM25 index with
+no network egress. Key considerations before adopting:
+
+- **Verify upstream:** read the source at [github.com/mksglu/context-mode](https://github.com/mksglu/context-mode)
+  to confirm no network egress before using on sensitive or employer-owned codebases.
+- **Local index:** the BM25 index lives on disk in whatever path context-mode configures. Treat it
+  with the same care as any file containing code excerpts.
+- **Index freshness:** the index reflects commands run since the last `SessionStart` restore. After
+  a session that skips the hooks, `ctx_search` may return stale or empty results.
+
+**Why disabled by default:** context-mode intercepts every tool call via `PreToolUse` and
+`PostToolUse` with no matcher restriction. Wiring these hooks in committed settings would add
+latency and context-mode dependency for every contributor regardless of whether they have installed
+the CLI.
+
 ## Session-survival of project rules
 
 This section documents the **pattern** that Caveman uses, so you can apply it to any narrow rule
@@ -212,7 +532,9 @@ even though `AGENTS.md` is still nominally in context.
 
 **Per-turn injection** fires on every `UserPromptSubmit` event. It adds a small amount of text to
 every message, but that text is always present, always current, and always wins against drift.
-Caveman uses this mechanism for terse style.
+Caveman uses this mechanism for terse style. `cbm-session-reminder` (from the CBM tooling) uses
+it for protocol reminders — ensuring that CBM conventions are active throughout a session
+regardless of how many autocompact events have occurred.
 
 ### When to use this pattern yourself
 
@@ -228,6 +550,42 @@ The hook lives in `.claude/settings.json` (committed) or `.claude/settings.local
 (local-only). Keep injected text short — per-turn injection costs tokens on every message, so
 verbosity here works against the goal.
 
+### Per-stack rule files (third mechanism)
+
+A third application of the same pattern is **small per-stack rule files** imported into
+`.claude/CLAUDE.md` via the `@import` directive. Where per-turn injection is best for style rules that must survive every
+autocompact event, per-stack rule files are best for **narrow, domain-specific self-checks** that
+only apply when the agent is doing a specific class of work (code generation, database migrations,
+API contract changes, etc.).
+
+Each rule file is skill-gated, capped at 30 lines, and built from documented observed failures —
+not from generic advice. The template ships one such rule file
+(`typing-branch-narrowing`) and loads it: `.claude/CLAUDE.md` carries a live
+`@./rules/*.md` glob import.
+
+See [`.claude/rules/README.md`](../../../.claude/rules/README.md) for the pattern, file structure,
+and a worked example.
+
+GitHub Copilot has a native equivalent: **`.github/instructions/NAME.instructions.md`** files with
+`applyTo:` YAML frontmatter for path-based gating. No import directive is needed — Copilot
+auto-discovers all `*.instructions.md` files in `.github/instructions/`. The body format (skill
+gate, numbered self-checks, observed-failures footer, ≤30 lines) is identical to the Claude
+variant. The key contrast is the load mechanism:
+
+| CLI | Directory | Load mechanism |
+| :--- | :--- | :--- |
+| Claude Code | `.claude/rules/` | `@./rules/*.md` in `.claude/CLAUDE.md` |
+| GitHub Copilot | `.github/instructions/` | Native auto-discovery (no directive needed) |
+| Codex CLI | `.agents/skills/<name>/` | `description:` frontmatter is the skill-gate trigger |
+
+Claude Code cannot read `.github/instructions/` files; this format is Copilot-native only. See [`.github/instructions/README.md`](../../../.github/instructions/README.md)
+for the full pattern and a worked example.
+
+Codex CLI uses a different mechanism: the `description:` field in a skill's YAML frontmatter acts
+as the skill-gate trigger — Codex auto-loads the skill when the task description matches. There is
+no `@import` directive. See [`.agents/skills/README.md`](../../../.agents/skills/README.md) for the
+full pattern and a worked example.
+
 ## Related primitives in this template
 
 These are not add-ons (they ship with the template) but they interact with the tools above:
@@ -240,15 +598,13 @@ These are not add-ons (they ship with the template) but they interact with the t
   `CLAUDE_CODE_SUBAGENT_MODEL` are already set via `.claude/settings.json`. Headroom and Caveman
   layer on top of these defaults, not instead of them. See
   [AI Agent Setup: Environment Variables](../AI_SETUP.md#environment-variables).
-- **PreCompact handoff hook** — `tools/hooks/ai/precompact-checkpoint.py` (shipped in PR #828).
-  Autocompact events serialize session state via the hook, so the post-compact continuation
-  rehydrates more context automatically — reducing the frequency of sessions that need
-  `/checkpoint` or Headroom.
-
+- **PreCompact handoff hook** — ships with this template. Autocompact events now synthesize a
+  checkpoint automatically to `tmp/checkpoints/{inv_epoch}-auto-precompact.md` and the
+  `SessionStart` hook restores it into the next session, reducing context loss without any manual
+  `/checkpoint` invocation. See [Auto-Checkpoint and Session-Restore Hooks](auto-checkpoint-hook.md).
 ## Out of scope
 
 - No code is shipped here. All three tools are external; install them from their respective repos.
-- Equivalent add-ons for Gemini CLI, Codex CLI, and GitHub Copilot CLI. Most of these tools are
-  Claude Code-specific. If equivalents exist for other CLIs, that is a separate doc.
+- Equivalent add-ons for Codex CLI and GitHub Copilot CLI. Most of these tools are Claude Code-specific. RTK is the notable exception with universal support.
 - Shipping tool configuration in this template's committed files. All snippets above go into
   `.claude/settings.local.json` (not committed) to keep individual operator preferences local.

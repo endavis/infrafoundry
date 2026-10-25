@@ -42,4 +42,4 @@ Testing every Python version on every PR creates excessive CI load without propo
 
 ## Related Documentation
 
-- [CI/CD Testing Guide - Python Version Support Policy](../../development/ci-cd-testing.md#python-version-support-policy)
+- [CI/CD Testing Guide - Python Version Support Policy](../development/ci-cd-testing.md#python-version-support-policy)

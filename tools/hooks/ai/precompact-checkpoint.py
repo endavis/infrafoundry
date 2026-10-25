@@ -131,7 +131,7 @@ def synthesize_checkpoint(transcript_tail: str) -> dict[str, object] | None:
                 "-p",
                 "--bare",
                 "--model",
-                "claude-sonnet-4-6",
+                "claude-sonnet-5",
                 prompt,
             ],
             capture_output=True,

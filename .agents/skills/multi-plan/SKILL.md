@@ -13,8 +13,8 @@ Use this skill when the user wants multiple agents to independently plan an issu
 
 Expected prompt shape:
 
-- `$multi-plan claude gemini 42`
-- `$multi-plan run multi-agent plan for issue 42 with claude and gemini`
+- `$multi-plan claude codex 42`
+- `$multi-plan run multi-agent plan for issue 42 with claude and codex`
 
 If the agent list or issue number is missing, ask for it before continuing.
 
@@ -23,7 +23,7 @@ If the agent list or issue number is missing, ask for it before continuing.
 ### Step 0: Parse arguments
 
 Extract the agent list and issue number from the user's request.
-Allowed agent names: `claude`, `gemini`, `copilot`, `codex`, `antigravity`.
+Allowed agent names: `claude`, `copilot`, `codex`, `antigravity`.
 
 - If the issue number is missing, ask for it.
 - If any agent name is not in the allowed list, report the unknown name, list allowed names, and stop.
@@ -47,7 +47,7 @@ gh api repos/{owner}/{repo}/issues/<issue>/comments --jq '.[].body' | grep -E "^
 
 ### Step 3: Generate plans in parallel
 
-Each plan MUST be in an isolated context. Use `codex -a never exec` as the shell tool for all non-self agents.
+Each plan MUST be in an isolated context. Use `codex -a never --dangerously-bypass-hook-trust exec` as the shell tool for all non-self agents.
 
 #### If `codex` is in the agent list (self):
 
@@ -75,14 +75,6 @@ claude -p 'Read AGENTS.md and .claude/CLAUDE.md for project standards. Fetch iss
 ```
 
 Capture stdout as Claude's plan.
-
-#### If `gemini` is in the agent list:
-
-```bash
-gemini -y -p 'Plan the implementation for GitHub issue #<issue> in the current repository. If the /gemini:plan command is available, run it for this issue. Otherwise: 1) Run `gh issue view <issue> --json title,body,labels`. 2) Read AGENTS.md. 3) Explore relevant files. 4) Draft a plan: ## Implementation Plan for #<number>: <title> / ### Overview / ### Files to Create/Modify / ### Test Plan / ### Documentation / ### Validation / ### Risks and Considerations. End with --- and *Plan by: Gemini* | *Date: <today>*. 5) Print ONLY the plan to stdout. Do NOT post to GitHub.' 2>/dev/null
-```
-
-Capture stdout as Gemini's plan.
 
 #### If `copilot` is in the agent list:
 

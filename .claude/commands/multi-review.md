@@ -9,12 +9,12 @@ Run multiple AI agents in parallel to independently review the current branch's 
 Arguments: `<ais...>`
 
 All arguments are agent names. No issue number is needed — the PR is inferred from the current branch.
-Allowed agent names: `claude`, `gemini`, `copilot`, `codex`.
+Allowed agent names: `claude`, `copilot`, `codex`, `antigravity`.
 
 - If no agents are given, tell the user the required syntax and stop.
 - If any agent name is not in the allowed list, report the unknown name, list allowed names, and stop.
 
-Example: `/multi-review claude gemini` → agents: [claude, gemini]
+Example: `/multi-review claude codex` → agents: [claude, codex]
 
 ### Step 1: Verify the PR exists
 
@@ -65,14 +65,6 @@ Use the Task tool to spawn a subagent with this prompt:
 
 Save the subagent's output as Claude's review.
 
-#### If `gemini` is in the agent list:
-
-```bash
-gemini -y -p 'Review the pull request for the current branch. 1) Run `gh pr view --json number,title,body,headRefName` to identify the PR. 2) Run `gh pr diff` to get the diff. 3) Read AGENTS.md and .github/CONTRIBUTING.md. 4) Review for correctness, style, testing, security, documentation, architecture, and breaking changes. 5) Output ONLY the review in this format: ## PR Review: #<number> — <title> / ### Summary / ### Findings / #### Critical / #### Suggestions / #### Positive / ### Verdict. End with --- and *Review by: Gemini* | *Date: <today>*. Do NOT post to GitHub.' 2>/dev/null
-```
-
-Capture stdout as Gemini's review.
-
 #### If `copilot` is in the agent list:
 
 ```bash
@@ -84,10 +76,18 @@ Capture stdout as Copilot's review.
 #### If `codex` is in the agent list:
 
 ```bash
-codex -a never exec 'Review the pull request for the current branch. 1) Run `gh pr view --json number,title,body,headRefName` to identify the PR. 2) Run `gh pr diff` to get the diff. 3) Read AGENTS.md and .github/CONTRIBUTING.md. 4) Review for correctness, style, testing, security, documentation, architecture, and breaking changes. 5) Output ONLY the review in this format: ## PR Review: #<number> — <title> / ### Summary / ### Findings / #### Critical / #### Suggestions / #### Positive / ### Verdict. End with --- and *Review by: Codex* | *Date: <today>*. Do NOT post to GitHub.'
+codex -a never --dangerously-bypass-hook-trust exec 'Review the pull request for the current branch. 1) Run `gh pr view --json number,title,body,headRefName` to identify the PR. 2) Run `gh pr diff` to get the diff. 3) Read AGENTS.md and .github/CONTRIBUTING.md. 4) Review for correctness, style, testing, security, documentation, architecture, and breaking changes. 5) Output ONLY the review in this format: ## PR Review: #<number> — <title> / ### Summary / ### Findings / #### Critical / #### Suggestions / #### Positive / ### Verdict. End with --- and *Review by: Codex* | *Date: <today>*. Do NOT post to GitHub.'
 ```
 
 Capture stdout as Codex's review.
+
+#### If `antigravity` is in the agent list:
+
+```bash
+agy -p 'Review the pull request for the current branch. If an Antigravity review skill (antigravity-review) is available, use it. Otherwise: 1) Run `gh pr view --json number,title,body,headRefName`. 2) Run `gh pr diff`. 3) Read AGENTS.md and .github/CONTRIBUTING.md. 4) Review for correctness, style, testing, security, documentation, architecture, breaking changes. 5) Output ONLY the review: ## PR Review: #<number> — <title> / ### Summary / ### Findings / #### Critical / #### Suggestions / #### Positive / ### Verdict. End with --- and *Review by: Antigravity* | *Date: <today>*. Do NOT post to GitHub.' --dangerously-skip-permissions --add-dir "$(git rev-parse --show-toplevel)" 2>/dev/null
+```
+
+Capture stdout as Antigravity's review.
 
 If any agent fails or produces empty output, report the error and ask the user whether to continue with remaining reviews or retry.
 

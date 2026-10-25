@@ -67,6 +67,40 @@ markdown_extensions:
       permalink: true
       toc_depth: 3
 
+# `docs/` deliberately links to real repository files that live outside
+# `docs_dir` — AGENTS.md, README.md, .github/CONTRIBUTING.md, hook scripts
+# under tools/, and their tests. Those links are kept relative so they resolve
+# when the repository is browsed on GitHub, which is how a template is mostly
+# read, and so downstream forks resolve to their own files rather than to this
+# upstream repo.
+#
+# mkdocs 1.6 reports those identically to genuinely broken links
+# (`links.not_found`), so silencing one silences the other. `not_found` is
+# therefore ignored here and link validation lives in
+# `tests/test_docs_links.py`, which resolves every relative link against the
+# whole repository — including the out-of-docs links mkdocs can never check.
+# Anchors are still validated here, where mkdocs has the rendered headings.
+#
+# Trade-off: the out-of-docs links do not resolve on the published site.
+# `decisions/adr-template.md` is a scaffold, not a decision record: it carries
+# placeholder text and intentionally unresolvable links (`../path/to/doc.md`).
+# Listing it in the nav would present a fill-in-the-blanks form to readers as
+# though it were content, and `doit adr` is how an ADR is actually created. It
+# is excluded deliberately rather than left to drift out of the nav unnoticed.
+not_in_nav: |
+  decisions/adr-template.md
+
+validation:
+  nav:
+    # Any other page missing from the nav is an oversight; surface it. With
+    # `mkdocs build --strict` this fails the docs job rather than scrolling
+    # past as INFO, which is how seven pages became unreachable (#688).
+    omitted_files: warn
+  links:
+    not_found: ignore
+    unrecognized_links: ignore
+    anchors: warn
+
 nav:
   - Home: index.md
 
@@ -135,6 +169,10 @@ nav:
     - ADR-9014 click CLI: decisions/9014-use-click-for-application-cli.md
     - ADR-9015 install_tools: decisions/9015-install-tools-framework-archive-extraction-and-custom-urls.md
     - ADR-9016 Unify ADRs: decisions/9016-unify-adr-directories.md
+    - ADR-9017 Template ownership: decisions/9017-template-tooling-and-its-tests-are-template-owned.md
+    - ADR-9018 Instruction allocation: decisions/9018-agentsmd-carries-only-shared-always-on-instructions.md
+    - ADR-9019 Hook scope: decisions/9019-the-dangerous-command-hook-is-a-guardrail-not-a-security-boundary.md
+    - ADR-9020 Template version: decisions/9020-a-template-version-is-a-commit-sha.md
 
   - Providers:
     - ESXi: providers/esxi.md
@@ -159,6 +197,7 @@ nav:
     - Credential Loader: development/credential-loader-system.md
     - Coding Standards: development/coding-standards.md
     - CI/CD Testing: development/ci-cd-testing.md
+    - Dependabot Auto-Merge: development/dependabot-automerge.md
     - Release & Automation: development/release-and-automation.md
     - AI:
         - First 5 Minutes: development/ai/first-5-minutes.md
@@ -169,6 +208,8 @@ nav:
         - Command Blocking: development/ai/command-blocking.md
         - LSP Tool and Diagnostics: development/ai/lsp-tool.md
         - Token-Efficiency Add-Ons: development/ai/token-efficiency-add-ons.md
+        - Cross-Agent Delegation: development/ai/cross-agent-delegation.md
+        - Auto-Checkpoint Hook: development/ai/auto-checkpoint-hook.md
         - Ruff-fix Hook: development/ai/ruff-fix-hook.md
         - Statusline: development/ai/statusline.md
     - pyproject-template Divergences: development/pyproject-template-divergences.md
