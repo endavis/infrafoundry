@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782901349188,
+  "lastUpdate": 1792945400652,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9827,6 +9827,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003216442676751132",
             "extra": "mean: 127.62332338320758 usec\nrounds: 201"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "310275c1278dca4cae9b7925210296c7e285e0f2",
+          "message": "chore: upgrade vulnerable transitive dependencies in uv.lock (merges PR #1053, addresses #1050, #1051)\n\n* chore: upgrade vulnerable transitive dependencies in uv.lock\n\npip-audit reported 56 known vulnerabilities in 9 transitive deps that\ndependabot's direct-dependency bumps do not move:\n\n- anyio 4.12.1 -> 4.15.1\n- certifi 2026.2.25 -> 2026.10.23\n- cryptography 48.0.1 -> 50.0.2\n- filelock 3.25.2 -> 4.2.4\n- pyjwt 2.13.0 -> 2.15.1\n- pymdown-extensions 10.21.3 -> 12.3\n- setuptools 82.0.1 -> 84.2.1\n- urllib3 2.7.0 -> 2.8.0\n- virtualenv 21.2.0 -> 21.14.13\n\nPulled along: distlib 0.4.4, packaging 26.3, python-discovery 1.6.4.\n\nAddresses #1050\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* fix: add tests/unit/core/__init__.py to avoid stdlib secrets collision\n\nWithout a package marker in tests/unit/core/, pytest imported\ntests/unit/core/secrets/ as a top-level package named \"secrets\", which\ncollides with the stdlib module and broke collection of\ntest_secret_manager_flatten.py (17 tests never ran).\n\nAddresses #1051\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T16:22:57Z",
+          "tree_id": "3221fe729501e61e5b30d8ee0dd54be7eaeb5bbb",
+          "url": "https://github.com/endavis/infrafoundry/commit/310275c1278dca4cae9b7925210296c7e285e0f2"
+        },
+        "date": 1792945399685,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14194.626383153322,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006524149858020156",
+            "extra": "mean: 70.4491948577692 usec\nrounds: 4706"
           }
         ]
       }
