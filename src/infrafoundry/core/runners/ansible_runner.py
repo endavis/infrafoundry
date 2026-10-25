@@ -2,9 +2,10 @@
 
 import subprocess  # nosec B404 - required for running ansible-playbook
 from pathlib import Path
-from typing import Any, override
+from typing import Any, cast, override
 
 from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.result_types import ApplyResult, BaseResult, PlanResult
 from infrafoundry.core.runners.base_runner import BaseRunner
 
 
@@ -41,7 +42,7 @@ class AnsibleRunner(BaseRunner):
             return {"success": False, "error": "ansible-playbook command not found"}
         return {"success": True, "message": "Ansible is available"}
 
-    def plan(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def plan(self, provider: ProviderBase, **kwargs: Any) -> PlanResult:
         """Run Ansible playbook in check mode (dry run).
 
         Args:
@@ -49,21 +50,25 @@ class AnsibleRunner(BaseRunner):
             **kwargs: Additional ansible options
 
         Returns:
-            Dict with plan results
+            Plan result
         """
-        return self._run_ansible(provider, check_mode=True)
+        # Every field PlanResult adds to BaseResult is NotRequired.
+        return cast(PlanResult, self._run_ansible(provider, check_mode=True))
 
-    def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def apply(
+        self, provider: ProviderBase, auto_approve: bool = True, **kwargs: Any
+    ) -> ApplyResult:
         """Run Ansible playbook.
 
         Args:
             provider: Provider instance
+            auto_approve: Accepted for the Applyable protocol; ansible does not prompt
             **kwargs: Additional ansible options
 
         Returns:
-            Dict with apply results
+            Apply result
         """
-        return self._run_ansible(provider, check_mode=False)
+        return cast(ApplyResult, self._run_ansible(provider, check_mode=False))
 
     @override
     def get_version(self) -> str | None:
@@ -119,7 +124,7 @@ class AnsibleRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"valid": False, "error": str(e)}
 
-    def _run_ansible(self, provider: ProviderBase, check_mode: bool = True) -> dict[str, Any]:
+    def _run_ansible(self, provider: ProviderBase, check_mode: bool = True) -> BaseResult:
         """Run Ansible playbook for a provider.
 
         Args:

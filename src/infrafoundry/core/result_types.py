@@ -6,7 +6,7 @@ mypy type checking while maintaining backward compatibility with existing
 dict-based code.
 """
 
-from typing import NotRequired, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 
 class BaseResult(TypedDict):
@@ -30,6 +30,15 @@ class BaseResult(TypedDict):
 
     stderr: NotRequired[str]
     """Captured standard-error stream from the underlying tool."""
+
+    skipped: NotRequired[bool]
+    """True when the runner had nothing to run (e.g. no playbook or deploy file)."""
+
+    resource_outcomes: NotRequired[list[Any]]
+    """Per-resource outcomes of the operation, when the runner tracks them."""
+
+    resource_outcomes_summary: NotRequired[list[dict[str, Any]]]
+    """``resource_outcomes`` serialized to plain dicts."""
 
 
 class PlanResult(BaseResult):

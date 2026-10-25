@@ -479,10 +479,8 @@ class OPNsenseDirectRunner(BaseRunner):
             "resources_updated": total_updated,
             "resources_deleted": total_deleted,
         }
-        applied["resource_outcomes"] = all_outcomes  # type: ignore[typeddict-unknown-key]
-        applied["resource_outcomes_summary"] = [  # type: ignore[typeddict-unknown-key]
-            o.to_dict() for o in all_outcomes
-        ]
+        applied["resource_outcomes"] = all_outcomes
+        applied["resource_outcomes_summary"] = [o.to_dict() for o in all_outcomes]
         return applied
 
     def _fire_finalization_hooks(
@@ -552,7 +550,7 @@ class OPNsenseDirectRunner(BaseRunner):
             "resources_updated": 0,
             "resources_deleted": 0,
         }
-        empty["resource_outcomes"] = []  # type: ignore[typeddict-unknown-key]
+        empty["resource_outcomes"] = []
         return empty
 
     def _log_apply_progress(

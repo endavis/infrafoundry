@@ -12,6 +12,7 @@ from typing import IO, Any, cast, override
 from rich.console import Console
 
 from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.result_types import ApplyResult, BaseResult, DestroyResult, PlanResult
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.types import ResourceOutcome
 
@@ -145,7 +146,7 @@ class TerraformRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": str(e), "output": e.stderr}
 
-    def plan(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def plan(self, provider: ProviderBase, **kwargs: Any) -> PlanResult:
         """Generate Terraform execution plan.
 
         Args:
@@ -154,51 +155,64 @@ class TerraformRunner(BaseRunner):
                 - target_resources: List of resource names to target with -target
 
         Returns:
-            Dict with plan results
+            Plan result
         """
         target_resources = kwargs.get("target_resources")
-        return self._run_terraform(provider, "plan", target_resources=target_resources)
+        # Every field PlanResult adds to BaseResult is NotRequired.
+        return cast(
+            PlanResult, self._run_terraform(provider, "plan", target_resources=target_resources)
+        )
 
-    def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def apply(
+        self, provider: ProviderBase, auto_approve: bool = False, **kwargs: Any
+    ) -> ApplyResult:
         """Apply Terraform configuration.
 
         Args:
             provider: Provider instance
-            **kwargs: Options including auto_approve, target_resources, parallelism
+            auto_approve: Pass ``-auto-approve`` to terraform (default: False)
+            **kwargs: Options including target_resources, parallelism
 
         Returns:
-            Dict with apply results
+            Apply result, with ``resource_outcomes``
         """
-        auto_approve = kwargs.get("auto_approve", False)
         target_resources = kwargs.get("target_resources")
         parallelism = kwargs.get("parallelism")
-        return self._run_terraform(
-            provider,
-            "apply",
-            auto_approve=auto_approve,
-            target_resources=target_resources,
-            parallelism=parallelism,
+        return cast(
+            ApplyResult,
+            self._run_terraform(
+                provider,
+                "apply",
+                auto_approve=auto_approve,
+                target_resources=target_resources,
+                parallelism=parallelism,
+            ),
         )
 
-    def destroy(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def destroy(
+        self, provider: ProviderBase, auto_approve: bool = False, **kwargs: Any
+    ) -> DestroyResult:
         """Destroy Terraform-managed infrastructure.
 
         Args:
             provider: Provider instance
-            **kwargs: Options including auto_approve, target_resources, parallelism
+            auto_approve: Pass ``-auto-approve`` to terraform (default: False)
+            **kwargs: Options including target_resources, parallelism
 
         Returns:
-            Dict with destroy results
+            Destroy result, with ``resource_outcomes``
         """
-        auto_approve = kwargs.get("auto_approve", False)
         target_resources = kwargs.get("target_resources")
         parallelism = kwargs.get("parallelism")
-        return self._run_terraform(
-            provider,
-            "destroy",
-            auto_approve=auto_approve,
-            target_resources=target_resources,
-            parallelism=parallelism,
+        return cast(
+            DestroyResult,
+            self._run_terraform(
+                provider,
+                "destroy",
+                auto_approve=auto_approve,
+                target_resources=target_resources,
+                parallelism=parallelism,
+            ),
         )
 
     @override
@@ -251,7 +265,7 @@ class TerraformRunner(BaseRunner):
         auto_approve: bool = False,
         target_resources: list[str] | None = None,
         parallelism: int | None = None,
-    ) -> dict[str, Any]:
+    ) -> BaseResult:
         """Run Terraform command for a provider.
 
         For apply and destroy commands, the ``-json`` flag is added so that
@@ -284,7 +298,7 @@ class TerraformRunner(BaseRunner):
         # Initialize if needed
         init_result = self.initialize(tf_dir)
         if not init_result.get("success"):
-            return init_result
+            return cast(BaseResult, init_result)
 
         # Build command using full path to terraform binary
         cmd = [self.tool_path, command]
@@ -367,7 +381,7 @@ class TerraformRunner(BaseRunner):
         stderr_thread.join(timeout=10)
 
         stderr_text = "\n".join(stderr_lines)
-        response: dict[str, Any] = {
+        response: BaseResult = {
             "exit_code": process.returncode,
             "success": process.returncode == 0,
             "stderr": stderr_text,

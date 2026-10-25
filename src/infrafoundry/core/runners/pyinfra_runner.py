@@ -3,9 +3,10 @@
 import subprocess  # nosec B404 - required for running pyinfra
 import sys
 from pathlib import Path
-from typing import Any, override
+from typing import Any, cast, override
 
 from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.result_types import ApplyResult, BaseResult, PlanResult
 from infrafoundry.core.runners.base_runner import BaseRunner
 
 
@@ -42,7 +43,7 @@ class PyInfraRunner(BaseRunner):
             return {"success": False, "error": "pyinfra command not found"}
         return {"success": True, "message": "pyinfra is available"}
 
-    def plan(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def plan(self, provider: ProviderBase, **kwargs: Any) -> PlanResult:
         """Run pyinfra in dry-run mode.
 
         Args:
@@ -50,21 +51,25 @@ class PyInfraRunner(BaseRunner):
             **kwargs: Additional options
 
         Returns:
-            Dict with plan results
+            Plan result
         """
-        return self._run_pyinfra(provider, dry_run=True)
+        # Every field PlanResult adds to BaseResult is NotRequired.
+        return cast(PlanResult, self._run_pyinfra(provider, dry_run=True))
 
-    def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def apply(
+        self, provider: ProviderBase, auto_approve: bool = True, **kwargs: Any
+    ) -> ApplyResult:
         """Run pyinfra.
 
         Args:
             provider: Provider instance
+            auto_approve: Accepted for the Applyable protocol; pyinfra does not prompt
             **kwargs: Additional options
 
         Returns:
-            Dict with apply results
+            Apply result
         """
-        return self._run_pyinfra(provider, dry_run=False)
+        return cast(ApplyResult, self._run_pyinfra(provider, dry_run=False))
 
     @override
     def get_version(self) -> str | None:
@@ -123,7 +128,7 @@ class PyInfraRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"valid": False, "error": f"Syntax error: {e}"}
 
-    def _run_pyinfra(self, provider: ProviderBase, dry_run: bool = True) -> dict[str, Any]:
+    def _run_pyinfra(self, provider: ProviderBase, dry_run: bool = True) -> BaseResult:
         """Run pyinfra for a provider.
 
         Args:
