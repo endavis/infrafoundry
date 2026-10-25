@@ -339,7 +339,7 @@ class TestApplyDelegation:
         assert result["resources_created"] == 0
         assert result["resources_updated"] == 0
         assert result["resources_deleted"] == 0
-        assert result["resource_outcomes"] == []  # type: ignore[typeddict-item]
+        assert result["resource_outcomes"] == []
         manager_cls.assert_not_called()
 
     def test_outcomes_returned(self, provider_with_env: MagicMock) -> None:
@@ -366,7 +366,7 @@ class TestApplyDelegation:
             "test-env", resources, auto_approve=True, add_only=False
         )
         assert result["resources_created"] == 1
-        assert result["resource_outcomes"] == [outcome]  # type: ignore[typeddict-item]
+        assert result["resource_outcomes"] == [outcome]
 
     def test_apply_threads_add_only(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
@@ -561,7 +561,7 @@ class TestMultiComponentDispatch:
             result = runner.apply(provider_with_env)
 
         assert result["resources_created"] == 1
-        assert result["resource_outcomes"] == [outcome]  # type: ignore[typeddict-item]
+        assert result["resource_outcomes"] == [outcome]
         # Each manager dispatched exactly once.
         vlan_manager.apply.assert_called_once()
         ifa_manager.apply.assert_called_once()

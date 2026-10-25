@@ -478,6 +478,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_runner_interfaces.py",
     "tests/unit/test_runner_opentofu.py",
     "tests/unit/test_runner_priorities.py",
+    "tests/unit/test_runner_protocol_conformance.py",
     "tests/unit/test_runner_results.py",
     "tests/unit/test_runner_terraform.py",
     "tests/unit/test_secrets.py",
