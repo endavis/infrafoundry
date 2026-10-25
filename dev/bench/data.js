@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792966431085,
+  "lastUpdate": 1792967533960,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10044,6 +10044,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014459411347606319",
             "extra": "mean: 127.78300502578108 usec\nrounds: 8556"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ede9445f68e2a25817a4421e40406cd80e4999bb",
+          "message": "fix: make runners conform to the runner protocols (merges PR #1076, addresses #1073)\n\n* fix: make runners conform to the runner protocols\n\nThe runners returned dict[str, Any] and took auto_approve through **kwargs,\nso none was assignable to Plannable, Applyable or Destroyable under mypy.\n\n- plan/apply/destroy return PlanResult/ApplyResult/DestroyResult; internal\n  helpers return BaseResult\n- apply/destroy take an explicit auto_approve, keeping each runner's\n  existing default (Terraform/OpenTofu/Pulumi False, Ansible/PyInfra True)\n- BaseResult gains NotRequired skipped, resource_outcomes and\n  resource_outcomes_summary, removing the OPNsense direct runner's\n  typeddict-unknown-key ignores\n- Pulumi plan sets error only when the preview fails\n\nTerraformRunner.parse_plan_for_drift still does not match DriftDetectable\n(its keys differ from DriftInfo), so that one test keeps its cast.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* test: point the DriftDetectable cast comment at its follow-up issue\n\nPart of #1073.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T22:31:27Z",
+          "tree_id": "e2003b8f86612e7703060cb2374e0573bf9ca9d1",
+          "url": "https://github.com/endavis/infrafoundry/commit/ede9445f68e2a25817a4421e40406cd80e4999bb"
+        },
+        "date": 1792967532815,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11812.958993716828,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008850033209966595",
+            "extra": "mean: 84.65279533535062 usec\nrounds: 12777"
           }
         ]
       }
