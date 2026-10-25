@@ -2,7 +2,12 @@
 
 from unittest.mock import MagicMock, patch
 
-from tools.doit.install import task_install, task_install_dev, task_install_gh
+from tools.doit.install import (
+    task_install,
+    task_install_dev,
+    task_install_gh,
+    task_install_jq,
+)
 
 
 class TestTaskInstall:
@@ -108,3 +113,59 @@ class TestTaskInstallGh:
         result["actions"][0]()
 
         assert mock_install.call_args.kwargs["extract_binaries"] == ["gh"]
+
+
+class TestTaskInstallJq:
+    """Tests for task_install_jq function."""
+
+    def test_returns_valid_doit_task(self) -> None:
+        """Test that task_install_jq returns a valid doit task dict."""
+        result = task_install_jq()
+        assert isinstance(result, dict)
+        assert "actions" in result
+        assert "title" in result
+        assert len(result["actions"]) == 1
+        assert callable(result["actions"][0])
+
+    @patch("tools.doit.install_tools.install_tool")
+    def test_action_calls_install_tool_with_correct_args(self, mock_install: MagicMock) -> None:
+        """Test that the task action calls install_tool with jq-specific args."""
+        result = task_install_jq()
+        result["actions"][0]()
+
+        mock_install.assert_called_once_with(
+            name="jq",
+            repo="jqlang/jq",
+            asset_patterns={},
+            version_cmd=["jq", "--version"],
+            post_install_message=None,
+            extract_binaries=None,
+            url_template={
+                "linux": "https://github.com/jqlang/jq/releases/download/{version}/jq-linux-{arch}",
+                "darwin": "https://github.com/jqlang/jq/releases/download/{version}/jq-macos-{arch}",
+            },
+            prefer_brew=False,
+            sha256=None,
+        )
+
+    @patch("tools.doit.install_tools.install_tool")
+    def test_url_template_is_dict_with_linux_and_darwin_only(self, mock_install: MagicMock) -> None:
+        """Test that url_template has only linux and darwin keys with placeholders."""
+        result = task_install_jq()
+        result["actions"][0]()
+
+        url_template = mock_install.call_args.kwargs["url_template"]
+        assert isinstance(url_template, dict)
+        assert set(url_template) == {"linux", "darwin"}
+        for url in url_template.values():
+            assert "{version}" in url
+            assert "{arch}" in url
+            assert "/v{version}/" not in url
+
+    @patch("tools.doit.install_tools.install_tool")
+    def test_prefer_brew_is_false(self, mock_install: MagicMock) -> None:
+        """Test that prefer_brew is False for consistent cross-platform behavior."""
+        result = task_install_jq()
+        result["actions"][0]()
+
+        assert mock_install.call_args.kwargs["prefer_brew"] is False

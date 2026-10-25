@@ -195,7 +195,7 @@ scoped token is not valid for project`.
 and `pypi` environments in one step (idempotent). Trusted publishers must
 still be configured manually on PyPI and TestPyPI — see the instructions
 printed by `doit publish_setup` and the
-[release automation guide](release-and-automation.md#github-environments-trusted-publishing).
+[release automation guide](release-and-automation.md#environment-configuration).
 
 ## Secrets and Variables
 

@@ -26,9 +26,9 @@ doit <task_name>
 | [Security](#security-tasks) | `security`, `audit`, `licenses`, `sbom` | Security scanning and SBOM |
 | [Documentation](#documentation-tasks) | `docs_serve`, `docs_build`, `docs_deploy`, `docs_toc` | Documentation management |
 | [Dependencies](#dependency-tasks) | `install`, `install_dev`, `update_deps` | Package management |
-| [GitHub Workflow](#github-workflow-tasks) | `issue`, `pr`, `pr_merge`, `adr`, `labels_sync`, `env_create`, `env_list`, `publish_setup` | Issue, PR, and environment management |
+| [GitHub Workflow](#github-workflow-tasks) | `issue`, `pr`, `pr_merge`, `adr`, `labels_sync`, `delegation_context`, `env_create`, `env_list`, `publish_setup` | Issue, PR, and environment management |
 | [Release](#release-tasks) | `release`, `release_tag`, `publish` | Version and release management |
-| [Setup](#setup-tasks) | `pre_commit_install`, `completions`, `install_direnv`, `worktree` | Development environment |
+| [Setup](#setup-tasks) | `pre_commit_install`, `completions`, `install_direnv`, `install_jq`, `worktree` | Development environment |
 | [Maintenance](#maintenance-tasks) | `cleanup` | Project cleanup |
 
 ---
@@ -147,7 +147,18 @@ Run all quality checks in sequence.
 doit check
 ```
 
-Runs format check, lint, type check, security, spelling, and tests. Stops on first failure.
+Runs format check, lint, blueprint lint, type check, security, audit, spelling, a wheel smoke test (`wheel_check`), a strict docs build (`docs_build`), and tests. Stops on first failure.
+
+### `wheel_check`
+
+Install the built wheel into a throwaway venv and smoke-test it, so a packaging regression (missing module, broken entry point, missing `py.typed`) fails before it ships. Part of `doit check`.
+
+```bash
+doit wheel_check              # Build a fresh wheel and check it
+doit wheel_check --dist=dist  # Check the single *.whl already in dist/
+```
+
+Builds the wheel from a temporary clone of the working tree (uncommitted changes included, so `src/` `_version.py` is not rewritten), confirms `py.typed` is in it, installs it into an isolated venv, imports the package from there, and runs every `[project.scripts]` entry with `--help`. `--dist` fails if the directory has zero or more than one `*.whl`. The release and TestPyPI workflows run it with `--dist=dist` on the wheel they upload.
 
 ### `spell_check`
 
@@ -406,6 +417,17 @@ doit labels_sync                # Create missing / update drift
 doit labels_sync --prune        # Also delete labels absent from the file
 ```
 
+### `delegation_context`
+
+Fetch the GitHub data a delegated agent needs and write it to files, so the delegated agent reads them instead of calling `gh` itself. The host CLI runs it before delegating (`/multi-*`, `implement-issue`, the Codex bridge skills).
+
+```bash
+doit delegation_context --kind=issue --n=985 --out=tmp/agents/claude/multi-plan-985  # issue.json + comments.json
+doit delegation_context --kind=pr --n=42 --out=tmp/agents/claude/multi-review-42      # pr.json + diff.txt
+```
+
+All three options are required. A missing or inaccessible issue or PR aborts with exit code 1, never an empty file. The calling skill deletes the directory when done. See [Cross-Agent Delegation Matrix](ai/cross-agent-delegation.md).
+
 ### `env_create`
 
 Create a GitHub environment by name (idempotent).
@@ -464,6 +486,16 @@ Install direnv for automatic environment loading.
 ```bash
 doit install_direnv
 ```
+
+### `install_jq`
+
+Install jq, which the Claude and agy statusline scripts depend on.
+
+```bash
+doit install_jq
+```
+
+Installs `jq` into `~/.local/bin` from the `jqlang/jq` GitHub releases if it is not already on `PATH`. Without it, the statusline scripts print `statusline: jq not installed (run: doit install_jq)` instead of rendering.
 
 ### `commit`
 

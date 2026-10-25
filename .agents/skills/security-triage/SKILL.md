@@ -87,8 +87,8 @@ Step 3 upgraded a direct or a transitive package, and what Step 2 or Step 3 rule
 should not have to re-run the scanner to find out why the project still trips a bandit test or
 still depends on a package with an open advisory.
 
-When the task is done, hand off to the `ghi-finalize` skill, and make sure the PR body it drafts
-carries this record.
+When the task is done, return to the `implement-issue` run, or commit and open a PR per
+`.github/CONTRIBUTING.md` — either way, make sure the PR body carries this record.
 
 ## Notes
 

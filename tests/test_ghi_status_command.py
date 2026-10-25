@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-GHI_STATUS = REPO_ROOT / ".claude" / "commands" / "ghi-status.md"
+GHI_STATUS = REPO_ROOT / ".agents" / "skills" / "ghi-status" / "SKILL.md"
 MERGED = "On feature branch, PR exists (merged)"
 
 

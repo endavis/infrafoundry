@@ -17,11 +17,11 @@ the questions, and the review gate.
 
 Use this skill when the user wants to pull upstream template improvements into this project.
 
-Expected prompt shape:
+Expected request shape:
 
-- `$template-sync upgrade this project to the latest template`
-- `$template-sync sync with pyproject-template`
-- `$template-sync sync to v2.2.0`
+- "upgrade this project to the latest template"
+- "sync with pyproject-template"
+- "sync to v2.2.0"
 
 The user may supply an optional template ref (tag, branch, or commit SHA) to sync *to*. Default is
 `main`. An older ref takes a large backlog one step at a time.
@@ -32,24 +32,35 @@ The full reference is `docs/template/ai-sync-checklist.md`; read it if any step 
 
 ### Step 1: Preflight
 
-1. **Refuse to run in the template itself.**
+1. **Check this skill against the upstream copy.** Fetch the template's latest `SKILL.md`:
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/endavis/pyproject-template/main/.agents/skills/template-sync/SKILL.md \
+     -o tmp/agents/<agent>/template-sync-upstream-SKILL.md
+   diff tmp/agents/<agent>/template-sync-upstream-SKILL.md .agents/skills/template-sync/SKILL.md
+   ```
+   If they differ, you are running a stale copy of these very instructions — follow the fetched
+   version for the rest of this sync instead. The local copy is then adopted through the normal
+   Step 5 triage, not by overwriting it here: it is downstream-owned, and `manage.py check` (Step 4)
+   only warns about it and never writes it.
+
+2. **Refuse to run in the template itself.**
    ```bash
    git remote get-url origin
    ```
    If it points at `endavis/pyproject-template`, stop and say so. This project *is* the upstream;
    there is nothing to sync from.
 
-2. **Confirm a clean starting point.**
+3. **Confirm a clean starting point.**
    ```bash
    git status --short && git branch --show-current
    ```
    Working tree must be clean. If it is not, stop and ask — a sync produces a large diff and
    unrelated pending edits will be impossible to separate afterwards.
 
-3. **Confirm the current state passes** with `doit check`. A failure that predates the sync must be
+4. **Confirm the current state passes** with `doit check`. A failure that predates the sync must be
    understood before you add a hundred changed files on top of it. Stop and report if it fails.
 
-4. **Read `docs/template/consumer-notes.md`** — the breaking changes and one-off actions that
+5. **Read `docs/template/consumer-notes.md`** — the breaking changes and one-off actions that
    arrive through this path. Note which apply before adopting anything. If the project has no copy
    of that file yet, read it from the template you download in Step 3.
 
@@ -247,7 +258,7 @@ before moving on.
 Report against the plan, not from memory: what was adopted, what was skipped, where you deviated
 and why, the `doit check` result, and the old and new template SHAs.
 
-Then hand off to the `ghi-finalize` skill, which drafts the commit and PR and waits for approval.
+Then return to the `implement-issue` run, or commit and open a PR per `.github/CONTRIBUTING.md`.
 The commit message should list the upstream changes taken:
 
 ```

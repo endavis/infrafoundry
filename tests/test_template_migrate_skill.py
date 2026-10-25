@@ -9,11 +9,13 @@ as a failure. `test_no_body_reads_template_docs_from_disk` is the guard for
 that, and it is the reason this module exists separately from
 `test_template_sync_skill.py`.
 
-The rest follows the same reasoning as that module: two surfaces, whichever
-agent the user drives decides which body applies, so a step present in one and
-missing from the other is a control that fires for some users and not others.
-The bodies are deliberately not byte-identical -- invocation syntax differs per
-host -- so what is asserted is the contract and its ordering.
+The rest follows the same reasoning as that module: two surfaces --
+`.agents/skills/` for Codex, Antigravity and Copilot, `.claude/skills/` for
+Claude (generated from the former by `doit skills_sync`, byte for byte) --
+and whichever agent the user drives decides which body applies, so a step
+present in one and missing from the other is a control that fires for some
+users and not others. The bodies are identical since #972; what is asserted
+here is the contract and its ordering.
 
 Scoped to the agents a project actually wires, per `tests/agent_roster.py`
 (#690).
@@ -29,7 +31,7 @@ from agent_roster import agent_is_present
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-CLAUDE_COMMAND = REPO_ROOT / ".claude" / "commands" / "template-migrate.md"
+CLAUDE_COMMAND = REPO_ROOT / ".claude" / "skills" / "template-migrate" / "SKILL.md"
 SHARED_SKILL = REPO_ROOT / ".agents" / "skills" / "template-migrate" / "SKILL.md"
 
 # (label, substring) pairs both bodies must carry. Literal substrings rather

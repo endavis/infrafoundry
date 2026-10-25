@@ -1,9 +1,12 @@
 """`AI_SETUP.md` must not credit `.agents/skills/` with a command it lacks (#869).
 
-It said, twice, that `/ghi-status` came from `.agents/skills/`, which has no
-`ghi-status` skill. Copilot reads `/ghi-status` from
-`.claude/commands/ghi-status.md` instead, as `.copilot/README.md` says. These
-tests hold every command the doc credits to `.agents/skills/` to a skill there.
+It once said, twice, that `/ghi-status` came from `.agents/skills/`, which had
+no `ghi-status` skill at the time: Copilot read `/ghi-status` from
+`.claude/commands/ghi-status.md` instead. #972 moved `ghi-status` into
+`.agents/skills/` along with the template's other shared workflow skills, so
+the credit is now true, but the check that catches the next false one stays.
+These tests hold every command the doc credits to `.agents/skills/` to a skill
+there.
 """
 
 from __future__ import annotations
@@ -47,7 +50,7 @@ def test_every_credited_command_has_a_skill() -> None:
 
 def test_the_scan_finds_the_credits() -> None:
     """A rewording that the patterns no longer match must fail here, not pass unchecked."""
-    assert "ghi-finalize" in _credited_commands(AI_SETUP.read_text(encoding="utf-8"))
+    assert "implement-issue" in _credited_commands(AI_SETUP.read_text(encoding="utf-8"))
 
 
 def test_the_scan_detects_the_line_this_fixed() -> None:

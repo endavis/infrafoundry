@@ -100,7 +100,7 @@ Stop and report the failure instead.
 
 Carry the comparison table, what Step 3 found, and what Step 4 changed into the PR description; a
 reviewer should not have to re-run the benchmark to see whether the change helped. When the task is
-done, hand off to the `ghi-finalize` skill.
+done, return to the `implement-issue` run, or commit and open a PR per `.github/CONTRIBUTING.md`.
 
 ## Notes
 

@@ -24,6 +24,73 @@ uv run pytest
 doit coverage
 ```
 
+## Python Version Support Policy
+
+### Active Support
+
+Only the **last 3 major Python versions** are actively supported. This means:
+- Bug fixes and new features are tested against these versions
+- CI runs these versions on every PR (using bookend strategy - oldest + newest)
+- Documentation and examples target these versions
+
+**Current active versions:** Python 3.12, 3.13, 3.14
+
+### Passive Compatibility
+
+Older Python versions may continue to work but are not actively maintained:
+- We continue testing previous versions in CI via the `full-matrix` label
+- Once a version fails CI tests, it is removed from the matrix and marked incompatible
+- Users on older Python versions can use version-tagged releases (e.g., `v1.2.3-py310-final`)
+
+### Version Lifecycle
+
+| Stage | Description | CI Testing |
+|-------|-------------|------------|
+| **Active** | Last 3 major versions | Every PR (bookend strategy) |
+| **Passive** | Older versions still passing | On-demand (`full-matrix` label) |
+| **Deprecated** | Fails CI tests | Removed from matrix |
+
+### CI Matrix Strategy
+
+To balance test coverage with CI efficiency:
+
+| PR State | Python Versions Tested | Jobs |
+|----------|----------------------|------|
+| Default | Bookends only (oldest + newest) × 3 OSes | 6 |
+| `full-matrix` label | Middle versions only × 3 OSes | 3 per middle version |
+
+The **bookend strategy** tests the oldest and newest supported versions. If both pass, intermediate versions are assumed compatible. Use the `full-matrix` label when:
+- Making changes that might affect version compatibility
+- Preparing a release
+- Investigating compatibility issues
+
+### Configuration
+
+Python versions are configured in `.github/python-versions.json`:
+
+```json
+{
+  "oldest": "3.12",
+  "newest": "3.14"
+}
+```
+
+The CI workflow automatically derives:
+- **Bookends**: oldest + newest (tested on every PR)
+- **Middle versions**: everything between (tested when `full-matrix` label is added)
+
+When updating supported versions, edit this config file - no workflow changes needed.
+
+### Deprecation Process
+
+When a Python version starts failing CI:
+
+1. **Assess**: Determine if the failure is fixable without significant effort
+2. **Decide**: Fix compatibility or deprecate the version
+3. **Tag**: If deprecating, tag the last compatible release (e.g., `v1.2.3-py310-final`)
+4. **Update**: Remove version from CI matrix and update `pyproject.toml` classifiers
+5. **Document**: Update this documentation and release notes
+
 ## Pipeline Details (GitHub Actions)
 
 - **Workflow:** `.github/workflows/tests.yml`
@@ -75,7 +142,7 @@ uv run pre-commit autoupdate
 | `mypy` | Type checking (strict mode, `src/` only) |
 | `bandit` | Security scanning (skipped if not installed) |
 | `codespell` | Spell checking |
-| `actionlint` | Lint GitHub Actions workflow files |
+| `actionlint` | Lint GitHub Actions workflow files (extra runner labels in `.github/actionlint.yaml`) |
 | `check-branch-name` | Enforce branch naming convention |
 | `generate-doc-toc` | Update documentation TOC when docs change |
 | `no-commit-to-main` | Prevent direct commits to main branch |
@@ -183,6 +250,12 @@ doit mutate_html
 # Open the report in a browser
 xdg-open tmp/mutmut/index.html
 ```
+
+### Which Tests Run
+
+mutmut does not run all of `tests/`. It copies `src/`, `tests/`, `pyproject.toml` and `uv.lock` into `mutants/` (git-ignored) and runs the tests there. A test that imports `tools` or reads any other file in the repository fails in that copy. mutmut passes `-x` to pytest, so the first such failure stops the run before any mutant is checked (pyproject-template#873).
+
+`pytest_add_cli_args_test_selection` in `[tool.mutmut]` therefore lists only the tests that exercise `src/`. When you add a test file that imports the package, add it to that list. `tests/test_mutmut_config.py` fails until you do. It also fails if a listed file imports a module that mutmut does not copy, or no longer exists. The benchmarks in `tests/benchmarks/` are left out on purpose: they time the package and assert nothing, so they cannot kill a mutant.
 
 ### Interpreting Results
 

@@ -118,4 +118,5 @@ guarantee a mutant there dies, so re-running is still how you know a new test re
 - Triage the survivors and uncovered lines that belong to the code the current task already touches.
   One you notice elsewhere is a separate task, not scope creep to fold in here.
 - Once every survivor and uncovered line in scope is classified, and every test you added is proven
-  against what it targeted and passes `doit check`, hand off to the `ghi-finalize` skill.
+  against what it targeted and passes `doit check`, hand off to the `implement-issue` run in
+  progress, or commit and open a PR per `.github/CONTRIBUTING.md`.

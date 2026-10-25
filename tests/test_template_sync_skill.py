@@ -1,17 +1,17 @@
 """The two `template-sync` bodies must agree on the steps that carry the risk.
 
-`template-sync` ships on two surfaces — `.claude/commands/template-sync.md` for
-Claude, `.agents/skills/template-sync/SKILL.md` for Codex, Antigravity and
-Copilot. Whichever agent the user happens to be driving decides which body
-applies, so a step present in one and missing from the other is not a
-documentation inconsistency; it is a control that fires for some users and not
-others. `.claude/rules/README.md` makes the same argument for rule files.
+`template-sync` ships on two surfaces — `.agents/skills/template-sync/SKILL.md`
+for Codex, Antigravity and Copilot, `.claude/skills/template-sync/SKILL.md` for
+Claude (generated from the former by `doit skills_sync`, byte for byte).
+Whichever agent the user happens to be driving decides which body applies, so
+a step present in one and missing from the other is not a documentation
+inconsistency; it is a control that fires for some users and not others.
+`docs/development/ai/rule-files.md` makes the same argument for rule files.
 
-Unlike rule files, these two bodies are not byte-identical and should not be:
-the invocation syntax differs per host (`/ghi-finalize` against the
-`ghi-finalize` skill), and each host names itself. What must agree is the
-contract — the ordering constraint and the guards whose absence produces a
-wrong sync.
+Since #972 the two bodies are byte-identical, like the rule files. What is
+asserted here is the contract — the ordering constraint and the guards whose
+absence produces a wrong sync — which stays worth checking on its own even
+though a diff would now also catch drift.
 
 Scoped to the agents a project actually wires, per `tests/agent_roster.py`
 (#690).
@@ -26,7 +26,7 @@ from agent_roster import agent_is_present
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-CLAUDE_COMMAND = REPO_ROOT / ".claude" / "commands" / "template-sync.md"
+CLAUDE_COMMAND = REPO_ROOT / ".claude" / "skills" / "template-sync" / "SKILL.md"
 SHARED_SKILL = REPO_ROOT / ".agents" / "skills" / "template-sync" / "SKILL.md"
 
 # The path `manage.py` used to hardcode, which `check` never creates: the archive
@@ -56,7 +56,7 @@ CONTRACT: tuple[tuple[str, str], ...] = (
     ("pre-commit reinstall", "doit pre_commit_install"),
     ("validation command", "doit check"),
     ("never edit a failing test", "Never edit a test to make it pass"),
-    ("finalize handoff", "ghi-finalize"),
+    ("finalize handoff", "implement-issue"),
 )
 
 # The identical sentence both bodies must carry, so the gate cannot be reworded

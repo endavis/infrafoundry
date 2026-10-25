@@ -172,6 +172,82 @@ def test_emits_fallback_when_resets_at_missing(tmp_path: Path) -> None:
     assert result.stdout.strip() == "?"
 
 
+def test_null_resets_at_shows_placeholder_time(tmp_path: Path) -> None:
+    """resets_at: null (no active window) shows -- for that bucket, not '?'."""
+    env = _make_env(tmp_path)
+    cache_file = Path(env["XDG_CACHE_HOME"]) / "claude-usage.json"
+    payload = {
+        "five_hour": {"utilization": 0.0, "resets_at": None},
+        "seven_day": {"utilization": 18.0, "resets_at": _WK_RESETS_AT},
+    }
+    cache_file.write_text(json.dumps(payload), encoding="utf-8")
+    now = time.time()
+    os.utime(cache_file, (now, now))
+
+    result = subprocess.run(
+        ["bash", str(SCRIPT)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert result.returncode == 0
+    output = result.stdout.strip()
+    assert re.fullmatch(r"5h:0%@-- wk:18%@[A-Za-z]{3}-\d{4}", output), (
+        f"Unexpected output: {output!r}"
+    )
+
+
+def test_both_resets_at_null_shows_placeholders(tmp_path: Path) -> None:
+    """Both buckets without an active window still emit the segment."""
+    env = _make_env(tmp_path)
+    cache_file = Path(env["XDG_CACHE_HOME"]) / "claude-usage.json"
+    payload = {
+        "five_hour": {"utilization": 0.0, "resets_at": None},
+        "seven_day": {"utilization": 0.0, "resets_at": None},
+    }
+    cache_file.write_text(json.dumps(payload), encoding="utf-8")
+    now = time.time()
+    os.utime(cache_file, (now, now))
+
+    result = subprocess.run(
+        ["bash", str(SCRIPT)],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == "5h:0%@-- wk:0%@--"
+
+
+def test_statusline_shows_usage_when_five_hour_window_inactive(tmp_path: Path) -> None:
+    """A null 5h resets_at must not hide the weekly gauge in the statusline."""
+    env = _make_env(tmp_path)
+    env["CLAUDE_USAGE_STATUSLINE"] = "1"
+    env["CLAUDE_PROJECT_DIR"] = str(REPO_ROOT)
+    cache_file = Path(env["XDG_CACHE_HOME"]) / "claude-usage.json"
+    payload = {
+        "five_hour": {"utilization": 0.0, "resets_at": None},
+        "seven_day": {"utilization": 18.0, "resets_at": _WK_RESETS_AT},
+    }
+    cache_file.write_text(json.dumps(payload), encoding="utf-8")
+    now = time.time()
+    os.utime(cache_file, (now, now))
+
+    result = subprocess.run(
+        ["bash", str(STATUSLINE)],
+        input=_STATUSLINE_INPUT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+    assert re.search(r"5h:0%@-- · wk:18%@[A-Za-z]{3}-\d{4}", plain), f"Unexpected output: {plain!r}"
+
+
 def test_emits_fallback_when_resets_at_malformed(tmp_path: Path) -> None:
     """Fresh cache with unparsable resets_at string emits '?'."""
     env = _make_env(tmp_path)

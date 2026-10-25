@@ -256,7 +256,7 @@ Hooks include:
 
 ## AI Agent Support
 
-InfraFoundry is designed primarily for **Claude Code**, which ships the full slash-command workflow (plan → implement → finalize → close-issue). **Gemini CLI** is supported as a second-opinion planner/reviewer inside Claude-orchestrated dual-agent commands, and **Codex CLI** is supported as a standalone alternative without slash commands.
+InfraFoundry supports **Claude Code**, **Codex CLI**, **GitHub Copilot CLI** and **Antigravity CLI**. Saying "implement issue N" runs one shared skill that plans when needed, codes, tests, commits, pushes, opens the PR, and fixes CI for up to 3 rounds. Cross-agent review (`/claude:review`, `$codex-adversarial-review`, `/copilot-review`) and the `/multi-*` orchestrators fan a task out to several agents and synthesize the results. See [AI Agent Setup](docs/development/AI_SETUP.md).
 
 ### Requirements
 

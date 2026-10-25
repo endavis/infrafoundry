@@ -7,12 +7,12 @@ surviving mutant does not fail `doit mutate`, locally or in the weekly workflow,
 a test that pins the mutated literal instead of real behavior -- both look like progress and
 prove nothing (#830).
 
-Two surfaces carry the workflow -- `.claude/commands/` for Claude, `.agents/skills/` for Codex,
-Antigravity and Copilot -- and whichever agent the user drives decides which body applies. A
-step, or a gate sentence, present in one and missing from the other is a control that fires for
-some users and not others. The bodies are deliberately not byte-identical, since invocation
-syntax differs per host, so what is asserted is the contract and its ordering -- the same
-approach `test_add_dependency_skill.py` takes for `add-dependency` (#829).
+Two surfaces carry the workflow -- `.agents/skills/` for Codex, Antigravity and Copilot,
+`.claude/skills/` for Claude (generated from the former by `doit skills_sync`, byte for byte) --
+and whichever agent the user drives decides which body applies. A step, or a gate sentence,
+present in one and missing from the other is a control that fires for some users and not others.
+The bodies are identical since #972; what is asserted here is the contract and its ordering --
+the same approach `test_add_dependency_skill.py` takes for `add-dependency` (#829).
 
 Scoped to the agents a project actually wires, per `tests/agent_roster.py` (#690).
 """
@@ -27,7 +27,7 @@ from agent_roster import agent_is_present
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-CLAUDE_COMMAND = REPO_ROOT / ".claude" / "commands" / "mutation-triage.md"
+CLAUDE_COMMAND = REPO_ROOT / ".claude" / "skills" / "mutation-triage" / "SKILL.md"
 SHARED_SKILL = REPO_ROOT / ".agents" / "skills" / "mutation-triage" / "SKILL.md"
 
 # The steps both bodies take, in this order.

@@ -6,7 +6,7 @@ identical everywhere: a rule that disagrees with itself across agents is worse
 than no rule, because whichever agent is driving decides which version applies.
 
 These tests also enforce the authoring discipline from
-``.claude/rules/README.md`` — the 30-line cap and the mandatory
+``docs/development/ai/rule-files.md`` — the 30-line cap and the mandatory
 ``Observed failures:`` footer, which is what separates a rule derived from real
 defects from a generic best-practices checklist.
 """
@@ -30,7 +30,7 @@ RULE_DIR = REPO_ROOT / ".claude" / "rules"
 
 def _rule_names() -> list[str]:
     """Every rule authored on the Claude surface, which is the canonical list."""
-    return sorted(path.stem for path in RULE_DIR.glob("*.md") if path.name not in {"README.md"})
+    return sorted(path.stem for path in RULE_DIR.glob("*.md"))
 
 
 def _all_rule_paths(rule: str) -> dict[str, Path]:
@@ -169,3 +169,17 @@ def test_claude_loads_rule_files() -> None:
     assert re.search(r"^@\./rules/\*\.md\s*$", text, re.MULTILINE), (
         "CLAUDE.md must import ./rules/*.md (uncommented)"
     )
+
+
+def test_rule_dir_holds_only_rule_files() -> None:
+    """The glob loads every ``.md`` in ``.claude/rules/`` into every session.
+
+    Authoring docs placed there load too: ``README.md`` did until #957, costing
+    about 6 KB of context per session. They belong in ``docs/development/ai/``.
+    """
+    not_rules = [
+        path.name
+        for path in RULE_DIR.glob("*.md")
+        if not path.read_text(encoding="utf-8").startswith("Skill: ")
+    ]
+    assert not not_rules, f"not rule files, but loaded every session: {not_rules}"

@@ -55,6 +55,27 @@ class TestTaskLint:
         # Sanity check: the ruff invocation is still present.
         assert "ruff check" in action
 
+    def test_includes_examples_when_present(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "examples").mkdir()
+
+        task = task_lint()
+        action = task["actions"][0]
+        assert isinstance(action, str)
+        assert " examples/" in action
+
+    def test_excludes_examples_when_absent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        task = task_lint()
+        action = task["actions"][0]
+        assert isinstance(action, str)
+        assert "examples" not in action
+
 
 class TestTaskFormat:
     """``task_format`` has two actions (format + check --fix); both must behave the same."""
@@ -79,6 +100,27 @@ class TestTaskFormat:
         for action in task["actions"]:
             assert isinstance(action, str)
             assert "bootstrap.py" not in action
+
+    def test_both_actions_include_examples_when_present(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "examples").mkdir()
+
+        task = task_format()
+        for action in task["actions"]:
+            assert isinstance(action, str)
+            assert " examples/" in action
+
+    def test_both_actions_exclude_examples_when_absent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        task = task_format()
+        for action in task["actions"]:
+            assert isinstance(action, str)
+            assert "examples" not in action
 
 
 class TestTaskFormatCheck:
@@ -106,6 +148,27 @@ class TestTaskFormatCheck:
         assert "bootstrap.py" not in action
         assert "ruff format --check" in action
 
+    def test_includes_examples_when_present(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "examples").mkdir()
+
+        task = task_format_check()
+        action = task["actions"][0]
+        assert isinstance(action, str)
+        assert " examples/" in action
+
+    def test_excludes_examples_when_absent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        task = task_format_check()
+        action = task["actions"][0]
+        assert isinstance(action, str)
+        assert "examples" not in action
+
 
 class TestTaskCheck:
     """``task_check`` aggregates the pre-PR check tasks via ``task_dep``."""
@@ -116,7 +179,12 @@ class TestTaskCheck:
         assert "audit" in task["task_dep"]
 
     def test_task_dep_covers_full_check_set(self) -> None:
-        """``task_check`` must depend on every pre-PR quality/security task."""
+        """``task_check`` must depend on every pre-PR quality/security task.
+
+        ``wheel_check`` joined in #837 so a packaging regression fails locally, not on PyPI.
+        ``docs_build`` joined in #974 so a strict-mode docs build failure (e.g. a
+        page missing from mkdocs ``nav``) fails locally, not only in CI.
+        """
         task = task_check()
         assert set(task["task_dep"]) == {
             "format_check",
@@ -126,8 +194,18 @@ class TestTaskCheck:
             "security",
             "audit",
             "spell_check",
+            "wheel_check",
+            "docs_build",
             "test",
         }
+
+    def test_check_gates_on_docs_build(self) -> None:
+        """``docs_build`` must run as part of ``doit check``, not just on demand.
+
+        Before #974, ``doit check`` could pass locally while the strict mkdocs
+        build failed in CI (e.g. a new ADR missing from the ``nav`` config).
+        """
+        assert "docs_build" in task_check()["task_dep"]
 
 
 class TestTaskTypeCheck:

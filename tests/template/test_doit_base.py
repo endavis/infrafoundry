@@ -13,7 +13,12 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from tools.doit.base import install_check_or_skip, optional_root_files, verbatim
+from tools.doit.base import (
+    install_check_or_skip,
+    optional_root_dirs,
+    optional_root_files,
+    verbatim,
+)
 
 
 def _touch(tmp_path: Path, rel: str) -> Path:
@@ -98,6 +103,68 @@ class TestOptionalRootFiles:
         (tmp_path / "bootstrap.py").mkdir()
 
         assert optional_root_files("bootstrap.py") == ""
+
+
+class TestOptionalRootDirs:
+    """Tests for the ``optional_root_dirs`` helper (sibling of ``optional_root_files``)."""
+
+    def test_empty_input_returns_empty_string(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No names -> empty string (safe to concatenate)."""
+        monkeypatch.chdir(tmp_path)
+        assert optional_root_dirs() == ""
+
+    def test_missing_dir_returns_empty_string(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Absent candidate -> empty string."""
+        monkeypatch.chdir(tmp_path)
+        assert optional_root_dirs("examples") == ""
+
+    def test_present_dir_returns_space_prefixed_name_with_trailing_slash(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Existing directory -> ``' examples/'`` (leading space, trailing slash)."""
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "examples").mkdir()
+
+        result = optional_root_dirs("examples")
+        assert result == " examples/"
+        # Exactly one leading space.
+        assert result.startswith(" ")
+        assert not result.startswith("  ")
+
+    def test_two_present_dirs_preserve_argument_order(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Multiple present names -> argument order preserved, single space separators."""
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "a").mkdir()
+        (tmp_path / "b").mkdir()
+
+        assert optional_root_dirs("a", "b") == " a/ b/"
+        # Swapping the argument order swaps the output order too.
+        assert optional_root_dirs("b", "a") == " b/ a/"
+
+    def test_mix_of_present_and_absent_filters_out_missing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Only the present names survive; missing ones are silently skipped."""
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "a").mkdir()
+
+        assert optional_root_dirs("a", "missing") == " a/"
+        assert optional_root_dirs("missing", "a") == " a/"
+
+    def test_file_with_matching_name_is_not_treated_as_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A file named ``examples`` must not satisfy the is_dir() guard."""
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "examples").write_text("", encoding="utf-8")
+
+        assert optional_root_dirs("examples") == ""
 
 
 # ---------------------------------------------------------------------------

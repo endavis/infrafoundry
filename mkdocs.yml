@@ -89,6 +89,10 @@ markdown_extensions:
 # is excluded deliberately rather than left to drift out of the nav unnoticed.
 not_in_nav: |
   decisions/adr-template.md
+  architecture/plans/
+  architecture/runner-protocol-proposal-archive.md
+  development/opnsense-spike-*.md
+  validation/
 
 validation:
   nav:
@@ -111,6 +115,7 @@ nav:
   - Usage:
     - CLI Reference: usage/cli-reference.md
     - Validation: usage/validation.md
+    - Error Reference: reference/errors.md
 
   - Configuration:
     - Overview: configuration/overview.md
@@ -125,6 +130,8 @@ nav:
     - Separate Config Repo: configuration/separate-config-repo.md
     - Notifications: configuration/notifications.md
     - Blueprints: configuration/blueprints.md
+    - Infrastructure Packages: configuration/infrastructure-packages.md
+    - Lifecycle Hooks: configuration/lifecycle-hooks.md
 
   - Architecture:
     - Overview: architecture/overview.md
@@ -153,6 +160,10 @@ nav:
     - ADR-0010 Protocol Runners: decisions/0010-protocol-based-runner-interfaces.md
     - ADR-0011 Lifecycle Hooks: decisions/0011-environment-lifecycle-hooks.md
     - ADR-0012 Packages as Resource Model: decisions/0012-packages-as-primary-resource-model.md
+    - ADR-0013 OPNsense Full-IaC Migration: decisions/0013-opnsense-full-iac-migration.md
+    - ADR-0014 OPNsense Direct-API Apply: decisions/0014-opnsense-direct-api-apply-mechanism.md
+    - ADR-0015 OPNsense Firewall Rules: decisions/0015-opnsense-firewall-rules-direct-api-via-mvc-controller.md
+    - ADR-0016 OPNsense Nested YAML Schema: decisions/0016-direct-opnsense-nested-yaml-schema.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md
@@ -175,10 +186,16 @@ nav:
     - ADR-9020 Template version: decisions/9020-a-template-version-is-a-commit-sha.md
     - ADR-9021 Dependent PRs: decisions/9021-a-pr-may-target-the-unmerged-branch-it-builds-on.md
     - ADR-9022 Worktrees: decisions/9022-worktrees-live-in-worktrees-each-with-its-own-environment.md
+    - ADR-9023 Shared skills: decisions/9023-shared-workflow-skills-live-in-agents-skills-generated-for-claude.md
+    - ADR-9024 Implement-issue skill: decisions/9024-one-implement-issue-skill-takes-an-issue-to-a-green-pr.md
+    - ADR-9025 Delegation context: decisions/9025-delegated-agents-receive-github-data-from-the-host-and-run-without-network.md
 
   - Providers:
     - ESXi: providers/esxi.md
     - OCI: providers/oci.md
+    - Kubernetes: providers/kubernetes.md
+    - Proxmox: providers/proxmox.md
+    - OPNsense Resource Coverage: development/opnsense-resource-coverage.md
 
   - Guides:
     - ISC to Kea Migration: guides/isc-to-kea-migration.md
@@ -187,6 +204,7 @@ nav:
     - SSH Authentication: guides/ssh-authentication.md
     - Drift Detection: guides/drift-detection.md
     - Drift Remediation: guides/drift-remediation.md
+    - CI/CD with Separate Config Repo: guides/ci-cd-with-separate-config-repo.md
 
   - Development:
     - Overview: development/README.md
@@ -199,6 +217,8 @@ nav:
     - Credential Loader: development/credential-loader-system.md
     - Coding Standards: development/coding-standards.md
     - CI/CD Testing: development/ci-cd-testing.md
+    - CI/CD Deployment: development/ci-cd-deployment.md
+    - Doit Tasks Reference: development/doit-tasks-reference.md
     - Dependabot Auto-Merge: development/dependabot-automerge.md
     - GitHub Repository Settings: development/github-repository-settings.md
     - Release & Automation: development/release-and-automation.md
@@ -206,6 +226,7 @@ nav:
         - First 5 Minutes: development/ai/first-5-minutes.md
         - Setup: development/AI_SETUP.md
         - Slash Commands: development/ai/slash-commands.md
+        - Review Focus Areas: development/ai/review-focus-areas.md
         - Architectural Conventions: development/ai/architectural-conventions.md
         - Enforcement Principles: development/ai/enforcement-principles.md
         - Command Blocking: development/ai/command-blocking.md
@@ -215,9 +236,17 @@ nav:
         - Auto-Checkpoint Hook: development/ai/auto-checkpoint-hook.md
         - Ruff-fix Hook: development/ai/ruff-fix-hook.md
         - Statusline: development/ai/statusline.md
+        - Per-Stack Rule Files: development/ai/rule-files.md
     - pyproject-template Divergences: development/pyproject-template-divergences.md
     - Implementing Secret Providers: development/implementing-secret-providers.md
     - Secrets Handling: development/security/secrets-handling.md
+    - Plugin System:
+        - Overview: plugin_system/README.md
+        - Plugin System Design: plugin_system/PLUGIN_SYSTEM_DESIGN.md
+        - CLI Design: plugin_system/CLI_DESIGN.md
+        - Project Structure: plugin_system/PROJECT_STRUCTURE.md
+        - Proxmox Provider Design: plugin_system/PROXMOX_PROVIDER_DESIGN.md
+        - Secret Backend Design: plugin_system/SECRET_BACKEND_DESIGN.md
 
   - Runners:
     - Overview: runners/overview.md
@@ -225,6 +254,7 @@ nav:
     - Terraform: runners/terraform.md
     - PyInfra: runners/pyinfra.md
     - Pulumi: runners/pulumi.md
+    - OpenTofu: runners/opentofu.md
 
   - Examples:
     - Overview: examples/overview.md
@@ -236,14 +266,18 @@ nav:
     - Custom Runner: examples/custom-runner-example.md
 
   - Tools:
+    - Overview: tools/README.md
     - OPNsense Parser: tools/opnsense-parser.md
+    - Config Diff: tools/config-diff.md
+    - Dependency Analysis: tools/dependency-analysis.md
+    - Proxmox Exporter: tools/proxmox-exporter.md
 
   - Testing:
     - Maintenance Report: testing/TESTING_MAINTENANCE_REPORT.md
 
   - Meta:
     - Roadmap: TODO.md
-    - Agent Instructions: AGENTS.md
+    - Agent Instructions: https://github.com/endavis/infrafoundry/blob/main/AGENTS.md
     - Documentation Template: meta/documentation-template.md
     - Code Quality Analysis: meta/code-quality-analysis.md
 

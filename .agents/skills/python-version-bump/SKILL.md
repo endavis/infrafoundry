@@ -139,4 +139,5 @@ Five things follow from raising the floor, and none of them are optional:
   this skill twice, ordinarily newest-version first since it is the simpler, non-breaking half.
 - Write scratch files to `tmp/agents/<agent>/` with the issue number in the name, and delete them
   when the task is done.
-- When the task is done, hand off to the `ghi-finalize` skill.
+- When the task is done, return to the `implement-issue` run, or commit and open a PR per
+  `.github/CONTRIBUTING.md`.
