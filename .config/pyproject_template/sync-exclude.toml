@@ -28,6 +28,7 @@ exclude = [
     # Skeleton tests (placeholder-package tests, not template-tool tests)
     "tests/test_cli.py",
     "tests/test_core.py",
+    "tests/template/test_properties.py",
     "tests/test_logging.py",
     "tests/test_example.py",
     "tests/benchmarks/test_bench_core.py",

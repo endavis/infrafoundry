@@ -39,7 +39,7 @@ The PackageLoader selects the correct resource set based on the package's `provi
 
 Blueprints without a `providers:` section continue to work unchanged.
 
-See [Package Loader](../architecture/package-loader.md) for implementation details (to be created in Phase 2).
+Package Loader implementation details were to be documented in Phase 2; that page was never created.
 
 ## Consequences
 

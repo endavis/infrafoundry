@@ -58,6 +58,8 @@ include them in actionable drift.
 - `tests/benchmarks/test_bench_core.py`,
   `tests/benchmarks/test_bench_logging.py` — benchmarks for the skeleton
   package.
+- `tests/template/test_properties.py` — property tests for the skeleton
+  package's `greet`.
 
 > **Note on `tests/template/`:** this directory is **not** blanket-skipped.
 > Upstream uses it for tests that exercise the `tools/pyproject_template/*`
@@ -116,6 +118,8 @@ not to ask "should we sync this?" — there is nothing to sync from.
   `0001–0012`). Upstream ships its own ADRs in the `9000-` series under the
   same directory; those are adopted verbatim. See ADR-9016 for the two-series
   convention.
+- `tests/sync_excluded.py` — lets the link and documented-path tests skip
+  targets that `sync-exclude.toml` keeps out of this repository (#1057).
 
 Note: `tools/doit/quality.py` is an upstream file but contains an
 infrafoundry-specific task (`task_lint_blueprints()`). See category 3.
@@ -144,6 +148,9 @@ customization a reviewer must verify survived the merge.
 | `tests/conftest.py` | Preserves InfraFoundry-specific fixtures (`mock_config_manager`, `mock_config_dir`, sample resource fixtures, etc.) alongside upstream's `mock_subprocess` fixture. |
 | `tests/template/test_doit_quality.py` | Preserves the local-only `lint_blueprints` entry in the `task_check` dependency set and `TestTaskLintBlueprints`. The mypy scope assertions match upstream since #1056. |
 | `tests/template/test_doit_release.py` | Local-flow test file with no upstream equivalent (upstream's version targets a different `task_release` shape; local covers `task_release_pr`, `task_release_tag`, `task_release_dev`, `validate_*` helpers). Tracked in #853. |
+| `tests/test_markdown_links.py` | Preserves the `is_sync_excluded` skip, so links in template-owned files to excluded upstream files are not reported (#1057). |
+| `tests/test_documented_paths.py` | Preserves the `is_sync_excluded` skip, the committed-files-only scan, the `HISTORICAL` exemptions for dated records, the package/provider/example-config shorthand bases, and the InfraFoundry `ALLOWED` entries for config-repo walkthrough paths (#1057). |
+| `tests/test_instruction_pointers.py` | Preserves `_committed_markdown()`, so anchor checks skip git-ignored trees such as `generated/` (#1057). |
 | `tools/doit/quality.py` | Preserves `task_lint_blueprints()` and any sibling blueprint-specific tasks. |
 | `tools/doit/install_tools.py` | Preserves age/sops/terraform/opentofu installer tasks. |
 | `tools/doit/release.py` | Preserves infrafoundry-specific release automation (release-PR flow). |
@@ -157,6 +164,11 @@ proposed change, the merge lost it — push back and ask for a rework.
 ## 4. Temporarily deferred files
 
 Unlike the categories above, these files **will** be adopted — just not in the
-current sync phase. Sync-tracker #673 completed in Phase E (issue #678); no
-files are currently deferred. Future deferrals should be logged here with a
-pointer to the follow-up issue.
+current sync phase. Sync-tracker #673 completed in Phase E (issue #678). Future
+deferrals should be logged here with a pointer to the follow-up issue.
+
+| File | Why deferred | Follow-up |
+| :--- | :--- | :--- |
+| `tests/test_docs_frontmatter.py` | Most docs under `docs/` have no frontmatter yet; it must be backfilled first. | #1057 |
+| `docs/development/ci-cd-testing.md` | Upstream's rewrite drops InfraFoundry's pre-commit hook tables; needs a hand merge. | #1057 |
+| `tests/test_release_steps_doc.py` and the release-steps docs | Waits on the `release.py` reconciliation. | #1059 |

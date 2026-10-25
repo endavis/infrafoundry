@@ -601,7 +601,7 @@ test: add tests for edge cases in state manager
 chore: update dependencies to latest versions
 ```
 
-### Breaking Changes Policy
+## Breaking Changes Policy
 
 **What Constitutes a Breaking Change:**
 - Changes to public function/method signatures
@@ -744,13 +744,13 @@ Before creating a PR, verify:
 
 ## Help & Resources
 
-- **Documentation Index:** [Table of Contents](index.md)
+- **Documentation Index:** [Table of Contents](docs/index.md)
 - **Getting Started:** `getting-started/`
 - **Configuration:** `configuration/`
 - **Architecture:** `architecture/`
 - **Development:** `development/`
 - **Example Configs:** `../example-config/`
-- **Roadmap & TODOs:** [TODO.md](TODO.md)
+- **Roadmap & TODOs:** [TODO.md](docs/TODO.md)
 
 ---
 This file unifies essential agent instructions for InfraFoundry. For coding/development specifics, see dedicated documentation files.

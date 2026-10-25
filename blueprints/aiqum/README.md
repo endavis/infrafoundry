@@ -8,7 +8,7 @@ datasource.
 
 This blueprint clones from the `rocky9-template` blueprint. See
 `blueprints/rocky9-template/README.md` for the upstream template, and
-`blueprints/ontap-cluster/README.md` for the canonical multi-file blueprint
+`blueprints/ontap-cluster/blueprint.yaml` for the canonical multi-file blueprint
 structure.
 
 ## Usage
