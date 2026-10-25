@@ -330,8 +330,9 @@ The tool hierarchy (prefer higher over lower):
 | Create ADRs | `doit adr` | Manual file creation |
 | Sync GitHub labels | `doit labels_sync` | `gh label create` / `gh label edit` manually |
 | Commit (interactive) | `doit commit` | `git commit` without format |
+| Create a worktree | `doit worktree --branch=<branch>` | `git worktree add` by hand |
 | Install/add packages | `uv add <pkg>` | `pip install` |
-| Sync dependencies | `uv sync` | `pip install -r` |
+| Sync dependencies | `doit install_dev` | plain `uv sync`, `pip install -r` |
 | Run Python scripts | `uv run <script>` | `python` directly |
 | Run a specific test file | `uv run pytest tests/test_foo.py` | `pytest` directly |
 | Read issues/PRs/comments | `gh issue view`, `gh pr view`, `gh api` | `WebFetch` on GitHub URLs |
@@ -442,6 +443,8 @@ Where `<agent-type>` is one of: `claude`, `copilot`, `codex`, `antigravity`, or 
 **Cleanup rule:** Agents must delete their temporary files when the task is complete. Do not leave stale files in `tmp/agents/`.
 
 **Exception:** `tmp/checkpoints/` is the one location outside `tmp/agents/<agent-type>/`. Checkpoints written by `/checkpoint` are portable project-state captures meant to be readable by any agent — Claude can write a checkpoint and Codex or Copilot can restore from it.
+
+**Worktrees are not temporary files.** A worktree lives until its PR merges, so it goes in `worktrees/` (gitignored), never under `tmp/`, which `doit cleanup` empties. Create one with `doit worktree`. Inside it, run commands through `uv run` and never pass `--active`, which installs the worktree into the main checkout's `.venv`. Merge its PR from the main checkout with `uv run doit pr_merge --pr=<number>`, which removes the worktree.
 
 ## Token Efficiency
 - **Be Concise:** Minimal text output.
@@ -615,8 +618,8 @@ chore: update dependencies to latest versions
    ```
 
 2. **Document in PR Description** with migration guide
-3. **Update CHANGELOG.md** with migration instructions
-4. **Version Bump:** Breaking changes require a major version bump
+3. **Don't edit CHANGELOG.md:** `doit release` writes it from the commit messages (`cz bump --changelog`), `BREAKING CHANGE:` footer included
+4. **Version Bump:** Breaking changes bump MINOR before 1.0 and MAJOR from 1.0 on; set `major_version_zero = false` in `[tool.commitizen]` before releasing 1.0
 
 ## Pull Request Guidelines
 

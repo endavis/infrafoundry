@@ -490,6 +490,8 @@ Force push, delete, and merge operations are only blocked when targeting protect
 | `git branch -D feat/old` | ALLOWED |
 | `git merge branch` (on main) | BLOCKED (creates merge commit) |
 | `git merge --ff-only branch` (on main) | ALLOWED (fast-forward only) |
+| `git merge branch; echo --ff-only` (on main) | BLOCKED (`--ff-only` counts only on the merge itself) |
+| `git log --grep merge` (on main) | ALLOWED (a `git log`, not a merge) |
 | `git merge branch` (on feature) | ALLOWED |
 
 #### Blocked Workflow Commands

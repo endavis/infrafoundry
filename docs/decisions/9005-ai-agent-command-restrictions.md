@@ -1,3 +1,15 @@
+---
+title: "ADR-9005: AI agent command restrictions via hooks"
+description: Block dangerous commands such as --force, --admin and --no-verify at the tool level, through each AI agent's hooks
+date: 2026-01-21
+audience:
+  - contributors
+tags:
+  - adr
+  - ai
+  - hooks
+---
+
 # ADR-9005: AI agent command restrictions via hooks
 
 ## Status
@@ -22,6 +34,7 @@ Documentation alone is insufficient - AI agents may violate rules after context 
 - Issue #362: Add Copilot CLI command-blocking hook integration
 - Issue #409: Complete Copilot CLI coverage in AI_SETUP, enforcement-principles, first-5-minutes
 - Issue #678: Fix dangerous-command hook for git global options, refspecs, and shell wrappers
+- Issue #829: Add an add-dependency skill that prepares the blocked `uv add` for the user to run
 
 ## Related Documentation
 
@@ -29,3 +42,4 @@ Documentation alone is insufficient - AI agents may violate rules after context 
 - [AI Command Blocking](../development/ai/command-blocking.md)
 - [AI Enforcement Principles](../development/ai/enforcement-principles.md)
 - [AI Setup Guide](../development/AI_SETUP.md)
+- [Slash Commands and Workflows](../development/ai/slash-commands.md) — `/add-dependency`, the workflow for a dependency the hook will not let an agent add

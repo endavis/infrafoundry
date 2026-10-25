@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 from doit.tools import title_with_actions
 from rich.console import Console
 
-from .base import UV_CACHE_DIR
+from .base import UV_CACHE_DIR, verbatim
 
 if TYPE_CHECKING:
     from rich.console import Console as ConsoleType
@@ -47,7 +47,7 @@ def validate_merge_commits(console: "ConsoleType") -> bool:
         merge_commits = result.stdout.strip().split("\n") if result.stdout.strip() else []
 
     except Exception as e:
-        console.print(f"[yellow]⚠ Could not check merge commits: {e}[/yellow]")
+        console.print(verbatim(f"⚠ Could not check merge commits: {e}", "yellow"))
         return True  # Don't block on this check
 
     if not merge_commits or merge_commits == [""]:
@@ -70,7 +70,7 @@ def validate_merge_commits(console: "ConsoleType") -> bool:
     if invalid_commits:
         console.print("[bold red]❌ Invalid merge commit format found:[/bold red]")
         for commit in invalid_commits:
-            console.print(f"  [red]{commit}[/red]")
+            console.print(verbatim(f"  {commit}", "red"))
         console.print("\n[yellow]Expected format:[/yellow]")
         console.print("  <type>: <subject> (merges PR #XX, addresses #YY)")
         console.print("  <type>: <subject> (merges PR #XX)")
@@ -107,7 +107,7 @@ def validate_issue_links(console: "ConsoleType") -> bool:
         commits = result.stdout.strip().split("\n") if result.stdout.strip() else []
 
     except Exception as e:
-        console.print(f"[yellow]⚠ Could not check issue links: {e}[/yellow]")
+        console.print(verbatim(f"⚠ Could not check issue links: {e}", "yellow"))
         return True  # Don't block on this check
 
     if not commits or commits == [""]:
@@ -133,7 +133,7 @@ def validate_issue_links(console: "ConsoleType") -> bool:
     if commits_without_issues:
         console.print("[bold yellow]⚠ Warning: Some commits don't reference issues:[/bold yellow]")
         for commit in commits_without_issues[:5]:  # Show first 5
-            console.print(f"  [yellow]{commit}[/yellow]")
+            console.print(verbatim(f"  {commit}", "yellow"))
         if len(commits_without_issues) > 5:
             console.print(f"  [dim]...and {len(commits_without_issues) - 5} more[/dim]")
         console.print("\n[dim]This is a warning only - release can continue.[/dim]")
@@ -154,7 +154,7 @@ def task_release_dev(type: str = "alpha") -> dict[str, Any]:
     def create_dev_release() -> None:
         console = Console()
         console.print("=" * 70)
-        console.print(f"[bold green]Starting {type} release tagging...[/bold green]")
+        console.print(verbatim(f"Starting {type} release tagging...", "bold green"))
         console.print("=" * 70)
         console.print()
 
@@ -184,7 +184,7 @@ def task_release_dev(type: str = "alpha") -> dict[str, Any]:
         ).stdout.strip()
         if status:
             console.print("[bold red]❌ Error: Uncommitted changes detected.[/bold red]")
-            console.print(status)
+            console.print(verbatim(status))
             sys.exit(1)
 
         # Pull latest changes
@@ -194,8 +194,8 @@ def task_release_dev(type: str = "alpha") -> dict[str, Any]:
             console.print("[green]✓ Git pull successful.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Error pulling latest changes:[/bold red]")
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Run checks
@@ -208,8 +208,8 @@ def task_release_dev(type: str = "alpha") -> dict[str, Any]:
                 "[bold red]❌ Pre-release checks failed! "
                 "Please fix issues before tagging.[/bold red]"
             )
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Automated version bump and tagging
@@ -223,16 +223,16 @@ def task_release_dev(type: str = "alpha") -> dict[str, Any]:
                 capture_output=True,
                 text=True,
             )
-            console.print(f"[green]✓ Version bumped to {type}.[/green]")
-            console.print(f"[dim]{result.stdout}[/dim]")
+            console.print(verbatim(f"✓ Version bumped to {type}.", "green"))
+            console.print(verbatim(f"{result.stdout}", "dim"))
             # Extract new version
             version_match = re.search(r"Bumping to version (\d+\.\d+\.\d+[^\s]*)", result.stdout)
             new_version = version_match.group(1) if version_match else "unknown"
 
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ commitizen bump failed![/bold red]")
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         console.print(f"\n[cyan]Pushing tag v{new_version} to origin...[/cyan]")
@@ -246,12 +246,12 @@ def task_release_dev(type: str = "alpha") -> dict[str, Any]:
             console.print("[green]✓ Tags pushed to origin.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Error pushing tag to origin:[/bold red]")
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         console.print("\n" + "=" * 70)
-        console.print(f"[bold green]✓ Development release {new_version} complete![/bold green]")
+        console.print(verbatim(f"✓ Development release {new_version} complete!", "bold green"))
         console.print("=" * 70)
         console.print("\nNext steps:")
         console.print("1. Monitor GitHub Actions (testpypi.yml) for the TestPyPI publish.")
@@ -345,7 +345,7 @@ def task_release(increment: str = "") -> dict[str, Any]:
         ).stdout.strip()
         if status:
             console.print("[bold red]❌ Error: Uncommitted changes detected.[/bold red]")
-            console.print(status)
+            console.print(verbatim(status))
             sys.exit(1)
 
         # Pull latest changes
@@ -355,8 +355,8 @@ def task_release(increment: str = "") -> dict[str, Any]:
             console.print("[green]✓ Git pull successful.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Error pulling latest changes:[/bold red]")
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Governance validation
@@ -384,8 +384,8 @@ def task_release(increment: str = "") -> dict[str, Any]:
                 "[bold red]❌ Pre-release checks failed! "
                 "Please fix issues before releasing.[/bold red]"
             )
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Automated version bump and CHANGELOG generation using commitizen
@@ -397,7 +397,7 @@ def task_release(increment: str = "") -> dict[str, Any]:
             bump_cmd = ["uv", "run", "cz", "bump", "--changelog", "--merge-prerelease"]
             if increment:
                 bump_cmd.extend(["--increment", increment.upper()])
-                console.print(f"[dim]Forcing {increment.upper()} version bump[/dim]")
+                console.print(verbatim(f"Forcing {increment.upper()} version bump", "dim"))
             result = subprocess.run(
                 bump_cmd,
                 env={**os.environ, "UV_CACHE_DIR": UV_CACHE_DIR},
@@ -408,7 +408,7 @@ def task_release(increment: str = "") -> dict[str, Any]:
             console.print(
                 "[green]✓ Version bumped and CHANGELOG updated (merged pre-releases).[/green]"
             )
-            console.print(f"[dim]{result.stdout}[/dim]")
+            console.print(verbatim(f"{result.stdout}", "dim"))
             # Extract new version from cz output (example: "Bumping to version 1.0.0")
             version_match = re.search(r"Bumping to version (\d+\.\d+\.\d+)", result.stdout)
             # Fallback to "unknown" if regex fails
@@ -419,12 +419,12 @@ def task_release(increment: str = "") -> dict[str, Any]:
                 "[bold red]❌ commitizen bump failed! "
                 "Ensure your commit history is conventional.[/bold red]"
             )
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
         except Exception as e:
             console.print(
-                f"[bold red]❌ An unexpected error occurred during commitizen bump: {e}[/bold red]"
+                verbatim(f"❌ An unexpected error occurred during commitizen bump: {e}", "bold red")
             )
             sys.exit(1)
 
@@ -440,12 +440,12 @@ def task_release(increment: str = "") -> dict[str, Any]:
             console.print("[green]✓ Pushed new commits and tags to GitHub.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Error pushing to GitHub:[/bold red]")
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         console.print("\n" + "=" * 70)
-        console.print(f"[bold green]✓ Automated release {new_version} complete![/bold green]")
+        console.print(verbatim(f"✓ Automated release {new_version} complete!", "bold green"))
         console.print("=" * 70)
         console.print("\nNext steps:")
         console.print("1. Monitor GitHub Actions for build and publish.")
@@ -517,7 +517,7 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
         ).stdout.strip()
         if status:
             console.print("[bold red]❌ Error: Uncommitted changes detected.[/bold red]")
-            console.print(status)
+            console.print(verbatim(status))
             sys.exit(1)
 
         # Pull latest changes
@@ -527,8 +527,8 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
             console.print("[green]✓ Git pull successful.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Error pulling latest changes:[/bold red]")
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Governance validation
@@ -556,8 +556,8 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
                 "[bold red]❌ Pre-release checks failed! "
                 "Please fix issues before releasing.[/bold red]"
             )
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Get next version using commitizen
@@ -566,7 +566,7 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
             get_next_cmd = ["uv", "run", "cz", "bump", "--get-next"]
             if increment:
                 get_next_cmd.extend(["--increment", increment.upper()])
-                console.print(f"[dim]Forcing {increment.upper()} version bump[/dim]")
+                console.print(verbatim(f"Forcing {increment.upper()} version bump", "dim"))
             result = subprocess.run(
                 get_next_cmd,
                 env={**os.environ, "UV_CACHE_DIR": UV_CACHE_DIR},
@@ -575,11 +575,11 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
                 text=True,
             )
             next_version = result.stdout.strip()
-            console.print(f"[green]✓ Next version: {next_version}[/green]")
+            console.print(verbatim(f"✓ Next version: {next_version}", "green"))
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Failed to determine next version.[/bold red]")
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Create release branch
@@ -592,10 +592,10 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
                 capture_output=True,
                 text=True,
             )
-            console.print(f"[green]✓ Created branch {branch_name}[/green]")
+            console.print(verbatim(f"✓ Created branch {branch_name}", "green"))
         except subprocess.CalledProcessError as e:
-            console.print(f"[bold red]❌ Failed to create branch {branch_name}.[/bold red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"❌ Failed to create branch {branch_name}.", "bold red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Update changelog
@@ -612,8 +612,8 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
             console.print("[green]✓ CHANGELOG.md updated.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Failed to update changelog.[/bold red]")
-            console.print(f"[red]Stdout: {e.stdout}[/red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stdout: {e.stdout}", "red"))
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             # Cleanup: go back to main
             subprocess.run(["git", "checkout", "main"], capture_output=True)
             subprocess.run(["git", "branch", "-D", branch_name], capture_output=True)
@@ -637,7 +637,7 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
             console.print("[green]✓ Changelog committed.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Failed to commit changelog.[/bold red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             # Cleanup
             subprocess.run(["git", "checkout", "main"], capture_output=True)
             subprocess.run(["git", "branch", "-D", branch_name], capture_output=True)
@@ -655,7 +655,7 @@ def task_release_pr(increment: str = "") -> dict[str, Any]:
             console.print("[green]✓ Branch pushed.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Failed to push branch.[/bold red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Create PR using doit pr
@@ -703,11 +703,11 @@ and trigger the release workflow.
             console.print("[green]✓ Pull request created.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Failed to create PR.[/bold red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         console.print("\n" + "=" * 70)
-        console.print(f"[bold green]✓ Release PR for v{next_version} created![/bold green]")
+        console.print(verbatim(f"✓ Release PR for v{next_version} created!", "bold green"))
         console.print("=" * 70)
         console.print("\nNext steps:")
         console.print("1. Review and merge the PR.")
@@ -763,7 +763,7 @@ def task_release_tag() -> dict[str, Any]:
             console.print("[green]✓ Git pull successful.[/green]")
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Error pulling latest changes:[/bold red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Find the most recently merged release PR
@@ -813,18 +813,18 @@ def task_release_tag() -> dict[str, Any]:
 
             if not version_match:
                 console.print("[bold red]❌ Could not extract version from PR.[/bold red]")
-                console.print(f"[yellow]PR title: {pr_title}[/yellow]")
-                console.print(f"[yellow]Branch: {branch_name}[/yellow]")
+                console.print(verbatim(f"PR title: {pr_title}", "yellow"))
+                console.print(verbatim(f"Branch: {branch_name}", "yellow"))
                 sys.exit(1)
 
             version = version_match.group(1)
             tag_name = f"v{version}"
-            console.print(f"[green]✓ Found release PR: {pr_title}[/green]")
-            console.print(f"[green]✓ Version to tag: {tag_name}[/green]")
+            console.print(verbatim(f"✓ Found release PR: {pr_title}", "green"))
+            console.print(verbatim(f"✓ Version to tag: {tag_name}", "green"))
 
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Failed to find release PR.[/bold red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Check if tag already exists
@@ -834,7 +834,7 @@ def task_release_tag() -> dict[str, Any]:
             text=True,
         ).stdout.strip()
         if existing_tags:
-            console.print(f"[bold red]❌ Tag {tag_name} already exists.[/bold red]")
+            console.print(verbatim(f"❌ Tag {tag_name} already exists.", "bold red"))
             sys.exit(1)
 
         # Create tag
@@ -846,10 +846,10 @@ def task_release_tag() -> dict[str, Any]:
                 capture_output=True,
                 text=True,
             )
-            console.print(f"[green]✓ Tag {tag_name} created.[/green]")
+            console.print(verbatim(f"✓ Tag {tag_name} created.", "green"))
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Failed to create tag.[/bold red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         # Push tag
@@ -861,14 +861,14 @@ def task_release_tag() -> dict[str, Any]:
                 capture_output=True,
                 text=True,
             )
-            console.print(f"[green]✓ Tag {tag_name} pushed.[/green]")
+            console.print(verbatim(f"✓ Tag {tag_name} pushed.", "green"))
         except subprocess.CalledProcessError as e:
             console.print("[bold red]❌ Failed to push tag.[/bold red]")
-            console.print(f"[red]Stderr: {e.stderr}[/red]")
+            console.print(verbatim(f"Stderr: {e.stderr}", "red"))
             sys.exit(1)
 
         console.print("\n" + "=" * 70)
-        console.print(f"[bold green]✓ Release {tag_name} tagged![/bold green]")
+        console.print(verbatim(f"✓ Release {tag_name} tagged!", "bold green"))
         console.print("=" * 70)
         console.print("\nNext steps:")
         console.print("1. Monitor GitHub Actions for build and publish.")

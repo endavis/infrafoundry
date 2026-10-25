@@ -114,6 +114,100 @@ Pause-and-resume helpers for long-running workstreams. `/checkpoint` writes a pa
 
 **Auto-checkpoint (PreCompact / SessionStart hooks):** Claude Code also ships two lifecycle hooks that automate the pause/resume pattern for the most common context-loss event — autocompact firing mid-task. The `PreCompact` hook synthesizes a checkpoint to `tmp/checkpoints/{inv_epoch}-auto-precompact.md` before compaction; the `SessionStart` hook (matcher `compact|resume`) injects the newest auto-precompact file into the new session's context automatically. Auto-precompact files share the same filename convention and directory as manual `/checkpoint` files, so `/restore auto-precompact` also works. Set `CLAUDE_NO_AUTO_RESTORE=1` to opt out of the automatic restore; set `CLAUDE_RESTORE_ANY=1` to widen the restore glob to any `*.md` checkpoint. See [Auto-Checkpoint and Session-Restore Hooks](auto-checkpoint-hook.md) for full details.
 
+### `/template-sync [ref]`
+
+**Args:** optional template ref (tag, branch, or commit SHA) to sync *to*; defaults to `main`. **Sources:** `.claude/commands/template-sync.md` (Claude), `.agents/skills/template-sync/SKILL.md` (Codex, Antigravity, and Copilot — all three read `.agents/skills/`; Copilot additionally picks up the Claude file as a single-file command).
+
+Upgrades a downstream project to the latest `pyproject-template`. Refuses to run in the template repo itself. Opens a tracking issue and branch, refreshes the management suite with `bootstrap.py --sync` **before** running `manage.py check` (a stale drift checker misreports drift), triages the diff into adopt / skip / merge-by-hand, batches every open judgment call into one round of questions to the user, then posts the result as a plan comment on the issue under the header `## Sync Plan for #<n>: <ref>` and **stops for the repo admin to approve**. Only after approval does it apply, validate with `doit check`, mark the sync point, and hand off to `/ghi-finalize`. **Workflow position:** any time, independent of the issue lifecycle. **Design note:** the plan gate is the point of the command — a sync applied first and explained afterwards is a record, not a decision the admin got to make. `tests/test_template_sync_skill.py` enforces that both bodies carry the same gate sentence and that the gate precedes the apply step.
+
+This command drives the tooling documented in [Template Management](../../template/manage.md) and the procedure in [AI Sync Checklist](../../template/ai-sync-checklist.md); it replaces neither. Read the checklist when a step is ambiguous.
+
+### `/template-migrate [ref]`
+
+**Args:** optional template ref (tag, branch, or commit SHA) to plan against; defaults to `main`. **Sources:** `.claude/commands/template-migrate.md` (Claude), `.agents/skills/template-migrate/SKILL.md` (Codex, Antigravity, Copilot).
+
+Plans an **existing** project's migration onto the template — the step before `/template-sync` has anything to sync. Unlike every other file here it is **standalone**: it is meant to be copied into a project that does not use the template, so it assumes no `doit`, no `tools/pyproject_template/`, no `AGENTS.md`, and no local copy of any template document. It resolves the template ref to a commit, fetches `migration.md`, `consumer-notes.md`, `AGENTS.md`, `python-versions.json` and `pyproject.toml` over raw HTTP (there is no documentation site, so raw URLs are the only online source), inventories the project read-only, batches its open questions to the owner, and writes `TEMPLATE_MIGRATION_PLAN.md` to the repository root. **It changes nothing until the owner approves the plan.**
+
+**Workflow position:** before adopting the template at all; `/template-sync` takes over afterwards. **Design note:** it plans rather than migrates on purpose. #783 deleted an automated migrator because it did the one mechanical step destructively while leaving every judgement step — which package is *the* package, how imports break moving to `src/`, which dependencies survive the merge — untouched. This is the complement to that decision. `tests/test_template_migrate_skill.py` enforces that both bodies fetch rather than read from disk, and that the plan gate precedes the execute step.
+
+**Installing it into another project:**
+
+```bash
+# Claude Code
+mkdir -p .claude/commands && curl -sSL \
+  https://raw.githubusercontent.com/endavis/pyproject-template/main/.claude/commands/template-migrate.md \
+  -o .claude/commands/template-migrate.md
+
+# Codex, Antigravity, or Copilot
+mkdir -p .agents/skills/template-migrate && curl -sSL \
+  https://raw.githubusercontent.com/endavis/pyproject-template/main/.agents/skills/template-migrate/SKILL.md \
+  -o .agents/skills/template-migrate/SKILL.md
+```
+
+### `/add-dependency <package> [what it is for]`
+
+**Args:** the package the task needs, optionally followed by what it is for. **Sources:** `.claude/commands/add-dependency.md` (Claude), `.agents/skills/add-dependency/SKILL.md` (Codex, Antigravity, Copilot).
+
+Walks an agent through adding a dependency, which it cannot do alone: the dangerous-command hook blocks every `uv add`. It rules out the standard library and existing dependencies, places the package in `[project] dependencies` or the `dev` or `security` extra, vets its license, supported Python versions, maintenance and typing against PyPI, and hands the user the exact `uv add` command with a `>=` lower bound. **It stops there until the user has run the command.** Afterwards it confirms what landed and adds the `[[tool.mypy.overrides]]` entry an untyped package needs. It then runs `doit licenses`, `doit audit` and `doit check`, and carries the justification into the PR description.
+
+**Workflow position:** mid-task, whenever the work needs a package the project does not have. **Design note:** it applies the policy in [CONTRIBUTING.md — Dependencies](../../../.github/CONTRIBUTING.md#dependencies) rather than restating it. `tests/test_add_dependency_skill.py` enforces that both bodies take the same steps in the same order and carry the same stop and hand-off sentences, and that neither puts `uv add` in a command for the agent to run.
+
+### `/mutation-triage [scope]`
+
+**Args:** an optional scope — a dotted module path or a file under `src/` to triage, optionally followed by specific mutant names already known to survive; empty means every current survivor. **Sources:** `.claude/commands/mutation-triage.md` (Claude), `.agents/skills/mutation-triage/SKILL.md` (Codex, Antigravity, Copilot).
+
+Turns a `doit mutate` survivor, or a `doit coverage` line marked `Missing`, into a behavior test or a documented reason it needs none. For each survivor in scope it inspects the diff with `mutmut show`, classifies it as equivalent, a missing assertion, an untested branch, or a real bug — stopping to report a bug rather than writing a test that pins it — then writes a test for the genuine gaps and re-runs what it targeted, by exact name or by an `fnmatch` pattern, to prove each one is now killed.
+
+**Workflow position:** after `doit mutate` or `doit coverage` finds something worth a second look, before the change that produced it is finalized. **Design note:** both underlying tasks are informational — neither fails on a survivor or an uncovered line — so nothing but this command's own gates stops a survivor being declared equivalent with no reason, or "killed" by a test keyed to the mutated literal instead of real behavior. `tests/test_mutation_triage_skill.py` enforces that both bodies take the same six steps in the same order and carry the same four gate sentences in place.
+
+### `/property-tests <target> [property]`
+
+**Args:** the function or module to test, optionally followed by what property to check. **Sources:** `.claude/commands/property-tests.md` (Claude), `.agents/skills/property-tests/SKILL.md` (Codex, Antigravity, Copilot).
+
+Walks an agent through writing a Hypothesis property test: name the property first (round-trip, idempotence, invariant or oracle, or stop for an example-based test instead), build the strategy from types before reaching for `assume()` or `.filter()`, mark it `@pytest.mark.property`, and leave `deadline` and `max_examples` to the profiles in `tests/conftest.py` rather than a per-test `@settings(...)`. It also breaks the code under test on purpose to confirm the property actually fails, undoes just that break without touching the task's other changes, and -- whenever a property turns up a genuine failing input against the real code -- fixes the bug first and pins that input as `@example(...)`.
+
+**Workflow position:** mid-task, whenever new or changed code needs a property test rather than (or alongside) an example-based one. **Design note:** it defers to the `ci` and `default` profiles already configured in `tests/conftest.py` (#736) instead of restating their values, and its restore step undoes only the deliberate break so it never discards the task's own uncommitted work. A new test file that imports the package also needs adding to mutmut's test selection; see [Which Tests Run](../ci-cd-testing.md#which-tests-run). `tests/test_property_tests_skill.py` enforces that both bodies take the same steps in the same order and carry the same stop and prove-it-can-fail sentences.
+
+### `/deprecate-api deprecate <old-name> <new-name>` / `/deprecate-api remove <old-name>`
+
+**Args:** the phase (`deprecate` or `remove`) and the name or names it applies to. **Sources:** `.claude/commands/deprecate-api.md` (Claude), `.agents/skills/deprecate-api/SKILL.md` (Codex, Antigravity, Copilot).
+
+Retires a public name over two releases instead of breaking callers with no notice. In the `deprecate` phase it keeps the old name exported and routes it to the replacement, warns with `warnings.warn(..., DeprecationWarning, stacklevel=2)` — not `@warnings.deprecated`, since this template's floor (Python 3.12) predates it — requires a `pytest.warns` test in the same change, and documents the replacement in the docstring. In the `remove` phase, a later release, it refuses to delete the name until that deprecating release has already shipped, then deletes it and follows [AGENTS.md — Breaking Changes Policy](../../../AGENTS.md#breaking-changes-policy): a `BREAKING CHANGE:` footer and a migration guide in the PR description, never a hand-edited `CHANGELOG.md` or `pyproject.toml` version — both come from `doit release`.
+
+**Workflow position:** whenever a public name needs to change, in two separate PRs a release apart. **Design note:** pytest's own configuration (`--strict-config --strict-markers`, no `filterwarnings`) does not fail a test merely because code under test raises `DeprecationWarning`, so the `pytest.warns` test is the only thing that catches a shim that silently stops warning — measured against this project's own `tests/test_core.py`. `tests/test_deprecate_api_skill.py` enforces that both bodies take the same phases and steps in the same order and carry the same gate sentences, and that neither body's code examples use `@warnings.deprecated` or `@typing_extensions.deprecated`.
+
+### `/python-version-bump [direction] [version]`
+
+**Args:** the direction and the version, e.g. `newest 3.15` or `floor 3.13`. **Sources:** `.claude/commands/python-version-bump.md` (Claude), `.agents/skills/python-version-bump/SKILL.md` (Codex, Antigravity, Copilot).
+
+The supported Python range is declared in seven places (`requires-python`, ruff `target-version`, mypy `python_version`, pyright `pythonVersion`, `.python-version`, `.github/python-versions.json`'s `oldest`/`newest`, and the PyPI classifiers), and `tests/test_python_versions_agree.py` is the only check that they agree. This command moves the range in either direction. Adding a newest version touches `.github/python-versions.json`, a classifier, and any prose that states the range — no gate, and no `uv lock` since the floor does not move. Raising the floor drops support for the oldest version, so **it asks the user first**, in the same message asking whether the release should carry a `BREAKING CHANGE:` footer and whether the last release still supporting the old floor should be tagged, then changes all seven settings in one commit, regenerates `uv.lock`, rebuilds the environment with `uv sync --all-extras --dev` (the new interpreter's `.venv` comes back without the dev tools), applies the `UP` rewrites `doit lint` reports, removes dead `sys.version_info` branches for the dropped version, updates any other prose that stated the old floor, and runs `doit check`.
+
+**Workflow position:** mid-task, whenever the work is to change which Python versions the project supports. **Design note:** it applies the policy in [CI/CD Testing Guide — Python Version Support Policy](../ci-cd-testing.md#python-version-support-policy) rather than restating it. `tests/test_python_version_bump_skill.py` enforces that both bodies take the same steps in the same order and carry the same ask-first and one-commit sentences.
+
+### `/security-triage [bandit|pip-audit]`
+
+**Args:** optional, which scanner to focus on; empty triages both. **Sources:** `.claude/commands/security-triage.md` (Claude), `.agents/skills/security-triage/SKILL.md` (Codex, Antigravity, Copilot).
+
+Triages a `doit security` (bandit) or `doit audit` (pip-audit) finding instead of letting an agent reach for the fastest suppression. For a bandit finding it fixes the pattern when it can (list-form `subprocess` without `shell=True`, `yaml.safe_load`, a validated path) or justifies it with `# nosec <ID> - <reason>` naming only the IDs reported on that line — **never a bare `# nosec`, and never a new `[tool.bandit] skips` entry without asking.** For a pip-audit finding it upgrades to a fixed version, or assesses reachability when none exists, and **stops to ask before a `--ignore-vuln` advisory is accepted.** It also guards against a false clean result: both scanners need the `security` extra and silently pass without it, and a bandit run scoped to a sample under `tmp/` finds nothing because `[tool.bandit] exclude_dirs` excludes that directory.
+
+**Workflow position:** whenever `doit check`, `doit security` or `doit audit` reports a finding. **Design note:** bandit's `# nosec` convention and pip-audit's advisory handling were unwritten before this skill (#834); it is the policy, not an application of one. `tests/test_security_triage_skill.py` enforces that both bodies take the same steps in the same order and carry the bare-nosec, skips and ignore-vuln gates word for word.
+
+### `/dead-code-triage [finding]`
+
+**Args:** the finding to triage — a `doit deadcode` output line, or a file and line number; empty triages every finding `doit deadcode` reports. **Sources:** `.claude/commands/dead-code-triage.md` (Claude), `.agents/skills/dead-code-triage/SKILL.md` (Codex, Antigravity, Copilot).
+
+Walks an agent through a vulture finding before it deletes code, hides it, or leaves a bug in place. `doit check` runs `doit deadcode` as one of its `task_dep`, so a finding blocks the check, and vulture cannot tell a genuine dead import from one an interface, a framework, or the type checker still needs. It reads `[tool.vulture]` in `pyproject.toml` for the configured threshold and the existing `ignore_names`/`ignore_decorators` exceptions, then branches on the finding's kind: checking string annotations, re-exports and side-effect imports before deleting an unused import; whether a caller or framework imposes an argument's signature before removing or `_`-prefixing it; and whether the statement before unreachable code exits too early before deleting the code after it.
+
+**Workflow position:** whenever `doit check` or `doit deadcode` reports a finding, or the user pastes one. **Design note:** every new `ignore_names` entry must carry a comment naming the reference vulture cannot see, the same shape as the entries already there. `tests/test_dead_code_triage_skill.py` enforces that both bodies take the same steps in the same order and carry the same early-exit and reason-comment gates word for word.
+
+### `/perf-change [target and why]`
+
+**Args:** the function or path to make faster, and why. **Sources:** `.claude/commands/perf-change.md` (Claude), `.agents/skills/perf-change/SKILL.md` (Codex, Antigravity, Copilot).
+
+Turns a performance change into a measured one instead of a claimed one. It confirms `tests/benchmarks/` covers the path being changed (writing a benchmark first if it does not), takes a baseline with `doit benchmark_save`, profiles with the standard library's `cProfile` read through `pstats`, makes the change, then compares with `doit benchmark_compare` and pastes the table into the PR. `doit check` must still pass — a faster wrong answer is a regression.
+
+**Workflow position:** mid-task, whenever the work is a performance change or a speedup claim needs backing. **Design note:** the local `doit benchmark_save` / change / `doit benchmark_compare` loop used to compare against a pinned first save regardless of how many baselines existed (`tools/doit/benchmark.py`); #840 made `--benchmark-compare` use the latest one instead, which is what makes running this loop as-is trustworthy. CI tracks its own benchmark history too (see [CI/CD and Testing — Benchmark Tracking](../ci-cd-testing.md#benchmark-tracking)), but only from pushes to `main` — the workflow's `store` job, the only one that writes history or can comment, is gated on `github.event_name == 'push'`. A PR gets no benchmark comparison from CI, so this loop's pasted table is the only before/after number the PR carries. `tests/test_perf_change_skill.py` enforces that both bodies take the same steps in the same order, carry the same benchmark, comparison and correctness gates word for word, and never tell the agent to pin the comparison to a specific saved run.
+
 ## Codex
 
 Codex does not use repo-defined slash commands in this template. Instead, the Codex workflow is provided through **repo-scoped skills** under `.agents/skills/`, which Codex can invoke through its built-in `/skills` browser or explicit mentions such as `$codex-plan`, `$codex-implement`, and `$ghi-finalize`.
@@ -125,6 +219,17 @@ Codex does not use repo-defined slash commands in this template. Instead, the Co
 - `$codex-review` reviews the current branch's PR and posts findings after user approval
 - `$codex-adversarial-review` runs an adversarial challenge review
 - `$ghi-finalize` drafts the commit and PR artifacts and uses `doit pr` after explicit approval
+- `$template-sync` upgrades the project to the latest template, posting a plan on the tracking issue for the admin to approve before applying anything
+- `$template-migrate` is the standalone precursor: copied into a project that does not use the template yet, it plans the migration and writes it to `TEMPLATE_MIGRATION_PLAN.md`
+- `$add-dependency` prepares a new dependency for the user to approve and install, since the agent cannot run `uv add`, then settles its typing and runs the license and audit checks
+- `$mutation-triage` classifies each `doit mutate` survivor or `doit coverage` gap in scope, writes behavior tests for the genuine ones, and re-runs them by name or pattern to prove each is killed
+- `$property-tests` names the property a Hypothesis test asserts, builds the strategy from types, proves the test can fail against deliberately broken code, and pins the counterexample
+- `$deprecate-api` warns callers off a public name in one release and only removes it in a later one, following the Breaking Changes Policy
+- `$python-version-bump` adds a newest supported Python version, or asks first and then raises the
+  floor across all seven settings in one commit
+- `$security-triage` fixes or justifies each bandit and pip-audit finding, and stops to ask before a `skips` entry or an ignored advisory
+- `$dead-code-triage` triages a `doit deadcode` finding against `[tool.vulture]` in `pyproject.toml` — unused import, unused variable, or unreachable code — before fixing it, adding a documented exception, or asking
+- `$perf-change` takes a measured baseline before a performance change, profiles with `cProfile`, and compares after, so a speedup claim is backed by a pasted table
 
 **Config and safety:** `.codex/config.toml` still configures approvals and hook wiring for Codex. The shared dangerous-command hook at `tools/hooks/ai/block-dangerous-commands.py` applies to Codex, and the approval-policy deny rules remain a secondary defense layer.
 
@@ -141,6 +246,17 @@ Antigravity (`agy`) does not use repo-defined slash commands in this template. I
 - `antigravity-review` reviews the current branch's PR and posts findings after user approval
 - `antigravity-adversarial-review` runs an adversarial challenge review
 - The shared `ghi-finalize` skill (from `.agents/skills/`) drafts the commit and PR artifacts
+- The shared `template-sync` skill (from `.agents/skills/`) upgrades the project to the latest template behind an admin review gate
+- The shared `template-migrate` skill plans an existing project's move onto the template, changing nothing until the owner approves
+- The shared `add-dependency` skill prepares a new dependency for the user to approve and install, then settles its typing and runs the license and audit checks
+- The shared `mutation-triage` skill classifies each `doit mutate` survivor or `doit coverage` gap in scope, writes behavior tests for the genuine ones, and re-runs them by name or pattern to prove each is killed
+- The shared `property-tests` skill names the property a Hypothesis test asserts, builds the strategy from types, proves the test can fail against deliberately broken code, and pins the counterexample
+- The shared `deprecate-api` skill warns callers off a public name in one release and only removes it in a later one, following the Breaking Changes Policy
+- The shared `python-version-bump` skill adds a newest supported Python version, or asks first and
+  then raises the floor across all seven settings in one commit
+- The shared `security-triage` skill fixes or justifies each bandit and pip-audit finding, and stops to ask before a `skips` entry or an ignored advisory
+- The shared `dead-code-triage` skill triages a `doit deadcode` finding against `[tool.vulture]` in `pyproject.toml` — unused import, unused variable, or unreachable code — before fixing it, adding a documented exception, or asking
+- The shared `perf-change` skill takes a measured baseline before a performance change, profiles with `cProfile`, and compares after, so a speedup claim is backed by a pasted table
 
 **Config and safety:** `.agents/hooks.json` wires the shared dangerous-command hook at `tools/hooks/ai/block-dangerous-commands.py` for Antigravity (a `PreToolUse` matcher on `run_command`/`write_to_file`). Unlike the exit-code-2 CLIs, `agy` blocks by printing `{"decision":"deny"}` on stdout, which holds even under `--dangerously-skip-permissions`. Because `agy` only loads workspace customizations for an active/trusted workspace, headless `agy -p` invocations must pass `--add-dir <repo-root>`.
 
@@ -200,17 +316,19 @@ question is closed (#757). Run `copilot skill list` from the repo root to reprod
 
 | | |
 | :--- | ---: |
-| project entries Copilot lists | 40 |
+| project entries Copilot lists | 51 |
 | from `.github/skills/` | 16 |
-| from `.agents/skills/` | 23 |
+| from `.agents/skills/` | 34 |
 | **from `.claude/commands/`** | **1** |
 
 Two reasons the number is one:
 
 - **Discovery is not recursive.** Only top-level `*.md` files in `.claude/commands/` are read, so
   none of the 16 nested `<target>/<action>.md` bridge files surface in Copilot.
-- **Names collide and dedupe.** `checkpoint`, `ghi-finalize`, `multi-*` and `restore` exist in
-  `.agents/skills/` as well, and Copilot keeps one entry per name.
+- **Names collide and dedupe.** `add-dependency`, `checkpoint`, `dead-code-triage`, `deprecate-api`,
+  `ghi-finalize`, `multi-*`, `mutation-triage`, `perf-change`, `property-tests`,
+  `python-version-bump`, `restore`, `security-triage`, `template-migrate` and `template-sync` exist
+  in `.agents/skills/` as well, and Copilot keeps one entry per name.
 
 The one entry is **`ghi-status`**, which has no `.agents/skills/` counterpart — so
 `.claude/commands/` discovery is not a leak here, it is the only thing that makes `/ghi-status`

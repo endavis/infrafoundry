@@ -1,3 +1,15 @@
+---
+title: "ADR-9017: Template tooling and its tests are template-owned"
+description: A test under tests/template/ is template-owned when its target does not survive configuration
+date: 2026-07-16
+audience:
+  - contributors
+tags:
+  - adr
+  - template
+  - testing
+---
+
 # ADR-9017: Template tooling and its tests are template-owned
 
 ## Status

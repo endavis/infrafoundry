@@ -77,7 +77,7 @@ markdown_extensions:
 # mkdocs 1.6 reports those identically to genuinely broken links
 # (`links.not_found`), so silencing one silences the other. `not_found` is
 # therefore ignored here and link validation lives in
-# `tests/test_docs_links.py`, which resolves every relative link against the
+# `tests/test_markdown_links.py`, which resolves every relative link against the
 # whole repository — including the out-of-docs links mkdocs can never check.
 # Anchors are still validated here, where mkdocs has the rendered headings.
 #
@@ -173,6 +173,8 @@ nav:
     - ADR-9018 Instruction allocation: decisions/9018-agentsmd-carries-only-shared-always-on-instructions.md
     - ADR-9019 Hook scope: decisions/9019-the-dangerous-command-hook-is-a-guardrail-not-a-security-boundary.md
     - ADR-9020 Template version: decisions/9020-a-template-version-is-a-commit-sha.md
+    - ADR-9021 Dependent PRs: decisions/9021-a-pr-may-target-the-unmerged-branch-it-builds-on.md
+    - ADR-9022 Worktrees: decisions/9022-worktrees-live-in-worktrees-each-with-its-own-environment.md
 
   - Providers:
     - ESXi: providers/esxi.md
@@ -198,6 +200,7 @@ nav:
     - Coding Standards: development/coding-standards.md
     - CI/CD Testing: development/ci-cd-testing.md
     - Dependabot Auto-Merge: development/dependabot-automerge.md
+    - GitHub Repository Settings: development/github-repository-settings.md
     - Release & Automation: development/release-and-automation.md
     - AI:
         - First 5 Minutes: development/ai/first-5-minutes.md

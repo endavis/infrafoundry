@@ -517,7 +517,7 @@ cd infrafoundry
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install workspace in editable mode
-uv sync
+uv sync --all-extras --dev
 
 # This installs all packages in development mode
 # Changes to any package are immediately available
@@ -584,7 +584,7 @@ members = [
 ]
 
 # Install in editable mode
-uv sync
+uv sync --all-extras --dev
 
 # Package is now available in development
 ```
@@ -676,7 +676,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install workspace
-        run: uv sync
+        run: uv sync --all-extras --dev
 
       - name: Lint
         run: |
@@ -703,7 +703,7 @@ jobs:
 
       - name: Test ${{ matrix.package }}
         run: |
-          uv sync
+          uv sync --all-extras --dev
           uv run pytest packages/${{ matrix.package }}/tests
 ```
 

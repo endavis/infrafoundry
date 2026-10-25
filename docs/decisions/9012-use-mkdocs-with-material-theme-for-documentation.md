@@ -1,3 +1,14 @@
+---
+title: "ADR-9012: Use mkdocs with Material theme for documentation"
+description: Build the documentation with MkDocs and the Material theme, and host it on GitHub Pages
+date: 2026-01-21
+audience:
+  - contributors
+tags:
+  - adr
+  - tooling
+---
+
 # ADR-9012: Use mkdocs with Material theme for documentation
 
 ## Status

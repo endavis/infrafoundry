@@ -1,3 +1,14 @@
+---
+title: "ADR-9008: PR-based development workflow"
+description: Every change goes Issue → Branch → Commit → PR → Merge, and nothing is committed to main directly
+date: 2026-01-21
+audience:
+  - contributors
+tags:
+  - adr
+  - workflow
+---
+
 # ADR-9008: PR-based development workflow
 
 ## Status
@@ -17,6 +28,8 @@ Provides clear audit trail linking issues to PRs to commits, enables code review
 - Issue #80: Add doit issue and doit pr commands for GitHub workflow
 - Issue #48: Enforce workflow by blocking direct commits to main
 - Issue #176: Add doit pr_merge task with enforced commit format
+- Issue #853: Make doit pr_merge refuse a PR whose base isn't the default branch
+- Issue #855: Add --base to doit pr for work that builds on an unmerged branch (see ADR-9021)
 
 ## Related Documentation
 
