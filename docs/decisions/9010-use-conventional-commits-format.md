@@ -1,3 +1,14 @@
+---
+title: "ADR-9010: Use conventional commits format"
+description: Write every commit message, merge commits included, in the Conventional Commits format
+date: 2026-01-21
+audience:
+  - contributors
+tags:
+  - adr
+  - workflow
+---
+
 # ADR-9010: Use conventional commits format
 
 ## Status

@@ -1,3 +1,14 @@
+---
+title: "ADR-9014: Use click for application CLI"
+description: Build the package's user-facing command-line interface with click, registered as a console script
+date: 2026-04-09
+audience:
+  - contributors
+tags:
+  - adr
+  - cli
+---
+
 # ADR-9014: Use click for application CLI
 
 ## Status

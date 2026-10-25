@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import shlex
 import subprocess  # nosec B404 - test invokes bash deliberately to verify shell-snippet behaviour
 import sys
+from io import StringIO
 from pathlib import Path
 
 import pytest
+from rich.console import Console
 
-from tools.doit.base import install_check_or_skip, optional_root_files
+from tools.doit.base import install_check_or_skip, optional_root_files, verbatim
 
 
 def _touch(tmp_path: Path, rel: str) -> Path:
@@ -187,6 +190,56 @@ class TestInstallCheckOrSkip:
         assert shlex.quote(hint) in snippet
 
 
+DOIT_DIR = Path(__file__).resolve().parents[2] / "tools" / "doit"
+
+
+def _install_hints() -> list[tuple[str, str | None]]:
+    """Return (file:line, hint) for every ``install_check_or_skip`` call in ``tools/doit``.
+
+    The hint is None when it is not a string literal, so the test can say so instead of
+    skipping a hint it cannot read.
+    """
+    found: list[tuple[str, str | None]] = []
+    for module in sorted(DOIT_DIR.glob("*.py")):
+        for node in ast.walk(ast.parse(module.read_text(encoding="utf-8"))):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "install_check_or_skip"
+            ):
+                continue
+            hints = node.args[1:2] + [kw.value for kw in node.keywords if kw.arg == "hint"]
+            hint = hints[0] if hints else None
+            value = hint.value if isinstance(hint, ast.Constant) else None
+            text = value if isinstance(value, str) else None
+            found.append((f"{module.name}:{node.lineno}", text))
+    return found
+
+
+class TestInstallHints:
+    """Every install hint in ``tools/doit`` names ``doit install_dev`` (#889).
+
+    The tools the hints ask for are in the ``dev`` and ``security`` extras, and ``uv sync``
+    uninstalls every extra it is not asked for. The hints said ``uv sync`` and
+    ``uv sync --extra security``, and following either one uninstalled ``doit``, the tool
+    that printed the hint.
+    """
+
+    def test_the_scan_finds_hints(self) -> None:
+        assert _install_hints(), f"no install_check_or_skip calls found in {DOIT_DIR}"
+
+    def test_every_hint_names_install_dev(self) -> None:
+        wrong = [
+            f"{where}: {hint!r}"
+            for where, hint in _install_hints()
+            if hint is None or not hint.endswith("Run: doit install_dev")
+        ]
+        assert not wrong, (
+            "these install hints do not end in 'Run: doit install_dev' "
+            "(None means the hint is not a string literal):\n  " + "\n  ".join(wrong)
+        )
+
+
 @pytest.mark.skipif(
     sys.platform == "win32",
     reason=(
@@ -263,3 +316,30 @@ class TestInstallCheckOrSkipShellBehavior:
         assert result.returncode != 0
         # The "not installed" hint must NOT appear when the failure is real.
         assert "not installed" not in result.stdout
+
+
+class TestVerbatim:
+    """Tests for the ``verbatim`` helper (#914)."""
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            r"C:\notes\[1].md",  # a backslash before a [ that opens no tag
+            r"C:\notes\[Draft].md",
+            "[/x] and [red]",  # tags
+            ":memo: :sparkles:",  # emoji shortcodes
+        ],
+    )
+    def test_prints_the_text_as_given(self, text: str) -> None:
+        # color_system=None: no ANSI codes, even when FORCE_COLOR is set.
+        console = Console(file=StringIO(), soft_wrap=True, color_system=None)
+
+        console.print(verbatim(text, "red"))
+
+        assert console.file.getvalue() == f"{text}\n"  # type: ignore[attr-defined]
+
+    def test_applies_the_style_to_the_whole_text(self) -> None:
+        text = verbatim("Stderr: [x]", "bold red")
+
+        assert text.plain == "Stderr: [x]"
+        assert text.style == "bold red"

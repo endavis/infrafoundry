@@ -83,11 +83,10 @@ include them in actionable drift.
   `docs/getting-started/setup-guide.md` is the real entry point.
 - `docs/development/extensions.md`,
   `docs/development/install-tools-framework.md`,
-  `docs/development/tooling-roles.md`,
-  `docs/development/github-repository-settings.md` — skeleton/meta docs about the
+  `docs/development/tooling-roles.md` — skeleton/meta docs about the
   template's own tooling choices.
-  (`docs/development/dependabot-automerge.md` was excluded here until #1054: upstream
-  moved the Dependabot rebase procedure out of `AGENTS.md` into it, so it is now adopted.)
+  (`docs/development/dependabot-automerge.md` and `docs/development/github-repository-settings.md`
+  were excluded here until #1054: adopted tests and docs now read or link them.)
 - `docs/TABLE_OF_CONTENTS.md` — skeleton table of contents. Superseded by the
   mkdocs-generated nav.
 

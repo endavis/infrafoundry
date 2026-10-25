@@ -1,3 +1,14 @@
+---
+title: "ADR-9009: Use pre-commit hooks for quality gates"
+description: Run quality and safety checks through the pre-commit framework before every commit
+date: 2026-01-21
+audience:
+  - contributors
+tags:
+  - adr
+  - hooks
+---
+
 # ADR-9009: Use pre-commit hooks for quality gates
 
 ## Status

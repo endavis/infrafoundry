@@ -74,6 +74,8 @@ Once the plan comment exists, run `/claude:implement 42`. Claude checks out `mai
 
 The artifact at the end of this step is an uncommitted working tree on the feature branch. Nothing has been committed yet — that is deliberate.
 
+If your checkout holds work you want left alone, do not run this step there: see [When your checkout holds other work](#when-your-checkout-holds-other-work) first.
+
 ### 5. (Optional) `/multi-review claude codex`
 
 If you have a second agent CLI installed and want another opinion on the changes, you can run `/multi-review claude codex` at this point (after a PR exists). This runs both agents in isolated contexts, posts each review as a separate PR comment, and then synthesizes the findings for you to approve before posting. If you want an adversarial challenge instead of a code review, use `/multi-adversarial-review claude codex`. Skip this step if you are running single-agent.
@@ -116,7 +118,7 @@ Approve, and Claude stages the files, commits, and opens the PR via `doit pr`. T
 
 ### 7. Merge
 
-Merging is never automated. Review the PR yourself, wait for CI to go green, add the `ready-to-merge` label, and merge via `doit pr_merge` (or the GitHub web UI). The `ready-to-merge` label and the Merge Gate action are designed to be a human checkpoint — do not let an agent add that label for you.
+Merging is never automated. Review the PR yourself, wait for CI to go green, add the `ready-to-merge` label, and merge via `doit pr_merge` (or the GitHub web UI). The `ready-to-merge` label and the Merge Gate action are designed to be a human checkpoint — do not let an agent add that label for you. A PR from a worktree is merged from the main checkout instead: see [When your checkout holds other work](#when-your-checkout-holds-other-work).
 
 ### 8. Close the issue
 
@@ -127,6 +129,27 @@ gh issue close 42 --comment "Addressed in PR #<pr-number>"
 ```
 
 That is the full loop.
+
+## When your checkout holds other work
+
+Step 4 checks out `main` in the checkout Claude runs in. If yours holds work you want left alone, give the issue its own [worktree](../doit-tasks-reference.md#worktree) before step 4, and start Claude Code there:
+
+```bash
+doit worktree --branch=feat/42-add-caching-layer
+cd worktrees/feat/42-add-caching-layer
+direnv allow  # direnv users: switches the shell to the worktree's .venv
+claude
+```
+
+The worktree is a separate checkout with its own `.venv`, on a new branch from `origin/main`. Name the branch the way `/claude:implement` would, `<type>/42-<description>`. `/claude:implement 42` then finds it is already on a branch for issue 42, skips creating one, and does the work in the worktree. Steps 5 and 6 run there unchanged.
+
+Step 7 changes: merge from the main checkout, and pass the PR number. Without `--pr`, `doit pr_merge` looks up the PR for the main checkout's own branch instead. From the main checkout:
+
+```bash
+uv run doit pr_merge --pr=<pr-number> --auto-close
+```
+
+That merges the PR, closes issue 42, removes the worktree and its branch, and fast-forwards the main checkout's `main`. See [`pr_merge`](../doit-tasks-reference.md#pr_merge) for when it keeps them instead.
 
 ## What each command produces
 

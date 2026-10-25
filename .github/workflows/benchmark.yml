@@ -51,7 +51,7 @@ jobs:
         with:
           python-version: ${{ steps.pv.outputs.newest }}
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         if: steps.check-benchmarks.outputs.exists == 'true'
         with:
           version: "latest"
@@ -126,7 +126,7 @@ jobs:
           git checkout ${{ github.sha }}
 
       - name: Store benchmark results
-        uses: benchmark-action/github-action-benchmark@52576c92bccf6ac60c8223ec7eb2565637cae9ba # v1.22.1
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
         with:
           tool: 'pytest'
           output-file-path: tmp/benchmark-results.json

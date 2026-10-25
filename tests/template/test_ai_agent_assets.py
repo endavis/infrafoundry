@@ -70,6 +70,173 @@ def test_self_action_grid_exists() -> None:
             assert path.exists(), f"Missing self-action file: {path}"
 
 
+def test_template_sync_exists_on_every_wired_surface() -> None:
+    """`template-sync` is the entry point to the template upgrade, on every host.
+
+    Claude reads `.claude/commands/`; Codex, Antigravity and Copilot all read
+    `.agents/skills/` (Copilot additionally picks the Claude file up as a
+    single-file command, #757). There is no `.copilot/commands/` copy because
+    that path is never loaded — see `.copilot/README.md`.
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "template-sync.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "template-sync" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing template-sync file: {path}"
+
+
+def test_template_migrate_exists_on_every_wired_surface() -> None:
+    """`template-migrate` plans an existing project's move onto the template.
+
+    Same two-surface layout as `template-sync`, but this one is meant to be
+    copied into a project that does not use the template yet — so the template
+    is only its distribution point.
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "template-migrate.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "template-migrate" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing template-migrate file: {path}"
+
+
+def test_add_dependency_exists_on_every_wired_surface() -> None:
+    """`add-dependency` walks an agent through a new dependency it cannot add itself.
+
+    Same two-surface layout as `template-sync`. It ships to downstream projects,
+    which is who adds dependencies, so it is not in `cleanup.SETUP_FILES` (#829).
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "add-dependency.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "add-dependency" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing add-dependency file: {path}"
+
+
+def test_mutation_triage_exists_on_every_wired_surface() -> None:
+    """`mutation-triage` turns a mutmut survivor or an uncovered line into a behavior test.
+
+    Same two-surface layout as `add-dependency` (#830): `doit mutate` and `doit
+    coverage` are both informational, so nothing stops a survivor being declared
+    equivalent with no reason, or a line staying uncovered forever. It ships to
+    downstream projects, which is who runs `doit mutate`, so it is not in
+    `cleanup.SETUP_FILES`.
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "mutation-triage.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "mutation-triage" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing mutation-triage file: {path}"
+
+
+def test_property_tests_exists_on_every_wired_surface() -> None:
+    """`property-tests` walks an agent through picking and pinning a Hypothesis property.
+
+    Same two-surface layout as `add-dependency`. It ships to downstream projects,
+    which is who writes property tests, so it is not in `cleanup.SETUP_FILES` (#831).
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "property-tests.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "property-tests" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing property-tests file: {path}"
+
+
+def test_deprecate_api_exists_on_every_wired_surface() -> None:
+    """`deprecate-api` warns callers off a public name before a later release removes it.
+
+    Same two-surface layout as `template-sync`. It ships to downstream projects, which is who
+    retires their own public API, so it is not in `cleanup.SETUP_FILES` (#832).
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "deprecate-api.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "deprecate-api" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing deprecate-api file: {path}"
+
+
+def test_python_version_bump_exists_on_every_wired_surface() -> None:
+    """`python-version-bump` keeps the seven Python-version settings from drifting apart.
+
+    Same two-surface layout as `add-dependency`. It ships to downstream projects, which are who
+    bump Python versions, so it is not in `cleanup.SETUP_FILES` (#833).
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "python-version-bump.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "python-version-bump" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing python-version-bump file: {path}"
+
+
+def test_security_triage_exists_on_every_wired_surface() -> None:
+    """`security-triage` triages bandit and pip-audit findings instead of silencing them.
+
+    Same two-surface layout as `template-sync`. It ships to downstream projects, which is who
+    triages their own scanner findings, so it is not in `cleanup.SETUP_FILES` (#834).
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "security-triage.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "security-triage" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing security-triage file: {path}"
+
+
+def test_dead_code_triage_exists_on_every_wired_surface() -> None:
+    """`dead-code-triage` walks an agent through a vulture finding before it deletes anything.
+
+    Same two-surface layout as `add-dependency`. It ships to downstream projects,
+    which is who runs `doit check` against their own vulture findings, so it is
+    not in `cleanup.SETUP_FILES` (#835).
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "dead-code-triage.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "dead-code-triage" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing dead-code-triage file: {path}"
+
+
+def test_perf_change_exists_on_every_wired_surface() -> None:
+    """`perf-change` walks an agent through a measured baseline, profile and comparison.
+
+    Same two-surface layout as `add-dependency`. It ships to downstream projects, which is who
+    makes performance changes, so it is not in `cleanup.SETUP_FILES` (#836).
+    """
+    paths: list[Path] = []
+    if agent_is_present("claude"):
+        paths.append(REPO_ROOT / ".claude" / "commands" / "perf-change.md")
+    if any(agent_is_present(a) for a in ("codex", "antigravity", "copilot")):
+        paths.append(REPO_ROOT / ".agents" / "skills" / "perf-change" / "SKILL.md")
+
+    for path in paths:
+        assert path.exists(), f"Missing perf-change file: {path}"
+
+
 def test_retired_self_action_aliases_are_removed() -> None:
     """The old ghissue-plan/implement/close self-action aliases should be gone."""
     removed = [
