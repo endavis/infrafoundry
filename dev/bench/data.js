@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792958860583,
+  "lastUpdate": 1792960284564,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9920,6 +9920,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011080850102974823",
             "extra": "mean: 124.98383077721019 usec\nrounds: 3847"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c65cf66d195095833a59b4c2849b7888f38b11a0",
+          "message": "chore: synchronize with pyproject-template through 7b7bbf9 (merges PR #1060, addresses #1054)\n\nStep 3 of 4 of the template sync (9ab53a0..7b7bbf9, through 2026-09-29).\n\nSyncs the following template improvements:\n- endavis/pyproject-template#809, #812, #867, #876, #882-#888 (shared\n  workflow skills, ghi-status, Claude command copies at this ref)\n- endavis/pyproject-template#856, #857, #858, #862, #864, #868, #896\n  (doit pr --base, pr_merge base check and worktree removal, doit\n  worktree, ADR-9021/9022)\n- endavis/pyproject-template#895, #901, #905, #908, #915, #924 (doit\n  output printed through verbatim(), release.py included)\n- endavis/pyproject-template#861, #872 (ADR frontmatter tooling)\n- endavis/pyproject-template#897, #902 (hook merge rule per command)\n- endavis/pyproject-template#840, #874, #877, #879, #898, #927 (mutmut 3\n  keys with an explicit test selection, benchmark settings in addopts)\n- endavis/pyproject-template#800 (dependabot/CodeQL grouping)\n- endavis/pyproject-template#846, #850, #851, #870, #871, #903, #904,\n  #916, #926 (docs, dependency floors, action pins)\n\nLocal adaptations:\n- mutmut selection lists tests/unit files individually, leaving out\n  test_blueprint_portability_lint.py, which imports tools/\n- pytest cache_dir removed (conflicts with -p no:cacheprovider under\n  --strict-config); Python classifiers added\n- github-repository-settings.md adopted (removed from sync-exclude)\n- benchmark settings test points at the local placeholder benchmark\n\nDeferred: release.py behavior and release tests (#1059),\ntest_docs_frontmatter.py and doc-debt tests (#1057).\n\nAddresses #1054\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T20:30:36Z",
+          "tree_id": "65ffff8e5bbd55cea48baa2dd5b17f1679f4b8d8",
+          "url": "https://github.com/endavis/infrafoundry/commit/c65cf66d195095833a59b4c2849b7888f38b11a0"
+        },
+        "date": 1792960283670,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8115.1975262383685,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001021791776764552",
+            "extra": "mean: 123.22558961340886 usec\nrounds: 8665"
           }
         ]
       }
