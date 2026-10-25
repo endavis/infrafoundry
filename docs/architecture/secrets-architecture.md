@@ -1,3 +1,12 @@
+---
+title: "Secrets Management Architecture"
+description: "The pluggable secrets system, with SecretManager as a facade over SOPS/age and other providers"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # Secrets Management Architecture
 
 ## Overview

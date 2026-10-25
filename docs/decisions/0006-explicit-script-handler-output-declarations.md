@@ -1,3 +1,12 @@
+---
+title: "ADR-0006: Explicit script handler output declarations"
+description: "Script event handlers declare their outputs in an optional outputs field"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-0006: Explicit script handler output declarations
 
 ## Status
@@ -156,4 +165,3 @@ and need runtime context to resolve.
 - Documentation:
   - [Event System → Declaring script outputs](../development/event-system.md#declaring-script-outputs)
   - [Blueprint script portability → Outputs](../development/blueprint-script-portability.md#outputs-pulling-artifacts-back-to-the-operator)
-

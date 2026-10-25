@@ -1,3 +1,12 @@
+---
+title: "ADR-0013: OPNsense Full-IaC Migration Coverage"
+description: "Close the OPNsense IaC gap so box-to-box migration works through foundry infra apply"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-0013: OPNsense Full-IaC Migration Coverage
 
 **Date:** 2026-04-30

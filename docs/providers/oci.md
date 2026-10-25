@@ -1,3 +1,12 @@
+---
+title: "OCI Provider"
+description: "Manage Oracle Cloud Infrastructure networking and compute"
+audience:
+  - users
+tags:
+  - providers
+---
+
 # OCI Provider
 
 The OCI (Oracle Cloud Infrastructure) provider manages networking and compute resources in Oracle Cloud.

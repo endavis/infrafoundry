@@ -1,3 +1,12 @@
+---
+title: "Plugin System Design"
+description: "Proposed design of the generic plugin infrastructure and plugin types"
+audience:
+  - contributors
+tags:
+  - plugins
+---
+
 # InfraFoundry Plugin System Design
 
 **Version:** 2.0

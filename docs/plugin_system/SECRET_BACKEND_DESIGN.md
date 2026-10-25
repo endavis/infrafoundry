@@ -1,3 +1,12 @@
+---
+title: "Secret Backend Plugin Type Design"
+description: "Proposed design of secret backends as a plugin type"
+audience:
+  - contributors
+tags:
+  - plugins
+---
+
 # Secret Backend Plugin Type Design
 
 **Version:** 1.0

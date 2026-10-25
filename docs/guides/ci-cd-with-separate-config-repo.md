@@ -1,3 +1,12 @@
+---
+title: "CI/CD with a Separate Configuration Repository"
+description: "Set up CI/CD when configuration lives in its own repository"
+audience:
+  - users
+tags:
+  - guides
+---
+
 # Using InfraFoundry in CI/CD with Separate Configuration Repository
 
 This guide shows how to set up CI/CD when using a separate configuration repository.

@@ -1,3 +1,12 @@
+---
+title: "OpenTofu Runner Guide"
+description: "Use OpenTofu as a drop-in alternative to the Terraform runner"
+audience:
+  - users
+tags:
+  - runners
+---
+
 # OpenTofu Runner Guide
 
 ## Overview

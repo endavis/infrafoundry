@@ -1,3 +1,12 @@
+---
+title: "ADR-0009: Use Granular Lifecycle Event Types"
+description: "Define granular EventType values for every major lifecycle state transition"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # 3. Use Granular Lifecycle Event Types
 
 **Date:** 2025-12-01

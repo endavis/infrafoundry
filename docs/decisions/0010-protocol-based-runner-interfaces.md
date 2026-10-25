@@ -1,3 +1,12 @@
+---
+title: "ADR-0010: Protocol-Based Runner Interfaces"
+description: "Runners implement only the typing.Protocol interfaces for the operations they support"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # 4. Protocol-Based Runner Interfaces
 
 **Date:** 2025-12-04

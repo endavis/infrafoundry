@@ -1,3 +1,12 @@
+---
+title: "Proxmox Provider"
+description: "Manage Proxmox VMs, containers, templates, networks and storage with bpg/proxmox"
+audience:
+  - users
+tags:
+  - providers
+---
+
 # Proxmox Provider
 
 The Proxmox provider manages virtual machines, containers, templates,

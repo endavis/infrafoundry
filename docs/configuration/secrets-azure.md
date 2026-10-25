@@ -1,3 +1,12 @@
+---
+title: "Azure Key Vault Provider"
+description: "Manage secrets in Azure Key Vault"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Azure Key Vault Provider
 
 InfraFoundry can integrate with Azure Key Vault to manage secrets.

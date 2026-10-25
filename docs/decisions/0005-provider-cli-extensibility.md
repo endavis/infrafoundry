@@ -1,3 +1,12 @@
+---
+title: "ADR-0005: Provider-owned CLI commands discovered via entry points"
+description: "Provider CLI commands live under foundry provider <name>, owned by each provider and found via entry points"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-0005: Provider-owned CLI commands discovered via entry points
 
 ## Status

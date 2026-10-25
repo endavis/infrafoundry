@@ -1,3 +1,12 @@
+---
+title: "Blueprint Script Portability"
+description: "The contract that keeps blueprint event-handler scripts runnable on any host"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Blueprint Script Portability
 
 Blueprint event-handler scripts (`on_create`, `after_apply`, `before_destroy`, etc.) do not always run on the InfraFoundry orchestration host. Depending on the consuming package's configuration, the framework may rsync a script to a remote jumphost and execute it there, or a script may upload sibling helpers onto a target VM and run them via ssh. Each of those contexts has its own set of tools you can safely assume exist.

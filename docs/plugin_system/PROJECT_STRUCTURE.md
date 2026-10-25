@@ -1,3 +1,12 @@
+---
+title: "Plugin Project Structure and UV Workspace"
+description: "Proposed monorepo layout and uv workspace for plugin packages"
+audience:
+  - contributors
+tags:
+  - plugins
+---
+
 # Project Structure and UV Workspace
 
 **Version:** 1.0

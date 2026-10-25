@@ -1,3 +1,12 @@
+---
+title: "Orchestrator Architecture"
+description: "The orchestrator as a thin coordinator and the workflow classes that do the work"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # Orchestrator Architecture
 
 ## Overview

@@ -1,3 +1,12 @@
+---
+title: "Coding Standards"
+description: "Conventions for exceptions, typing, structure, tests and docs"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # InfraFoundry Coding Standards
 
 ## Overview

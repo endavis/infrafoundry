@@ -1,3 +1,12 @@
+---
+title: "direnv Setup"
+description: "Load InfraFoundry environment variables automatically with direnv"
+audience:
+  - users
+tags:
+  - getting-started
+---
+
 # direnv Setup for InfraFoundry
 
 ## Overview

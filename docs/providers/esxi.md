@@ -1,3 +1,12 @@
+---
+title: "ESXi Provider"
+description: "Manage resources on VMware ESXi hosts with the josenk/esxi Terraform provider"
+audience:
+  - users
+tags:
+  - providers
+---
+
 # ESXi Provider
 
 The ESXi provider manages resources inside one or more VMware ESXi hosts using the [josenk/esxi](https://registry.terraform.io/providers/josenk/esxi/latest) Terraform provider.

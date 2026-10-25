@@ -1,3 +1,12 @@
+---
+title: "Age Key Management Best Practices"
+description: "Generate, distribute and safeguard the age keys that protect SOPS secrets"
+audience:
+  - users
+tags:
+  - guides
+---
+
 # Age Key Management Best Practices
 
 ## Overview

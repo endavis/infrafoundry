@@ -1,3 +1,12 @@
+---
+title: "OPNsense Interface-Assignment Spike Findings"
+description: "Findings from the spike that assigned interfaces through a gist-based controller"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # OPNsense Gist-based Interface-Assignment Spike — Findings
 
 > **Graduation note (2026-05-03, #720):** The mechanism documented below

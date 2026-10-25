@@ -1,3 +1,12 @@
+---
+title: "Example: .envrc.local"
+description: "A personal direnv .envrc.local that loads config paths and credentials"
+audience:
+  - users
+tags:
+  - examples
+---
+
 # Example: .envrc.local
 
 ## Overview

@@ -1,3 +1,12 @@
+---
+title: "Config Diff Tool"
+description: "Compare configuration between environments or git revisions"
+audience:
+  - users
+tags:
+  - tools
+---
+
 # Config Diff Tool
 
 ## Overview
