@@ -7,12 +7,12 @@ what strategy, proven able to fail, with its counterexample pinned (#831). A pro
 that only checks a call does not raise, or that restates the implementation under a
 different name, passes forever and finds nothing.
 
-Two surfaces carry it -- `.claude/commands/` for Claude, `.agents/skills/` for
-Codex, Antigravity and Copilot -- and whichever agent the user drives decides
-which body applies. A step present in one and missing from the other is a
-control that fires for some users and not others. The bodies are deliberately
-not byte-identical, since invocation syntax differs per host, so what is
-asserted is the contract and its ordering.
+Two surfaces carry it -- `.agents/skills/` for Codex, Antigravity and Copilot,
+`.claude/skills/` for Claude (generated from the former by `doit skills_sync`,
+byte for byte) -- and whichever agent the user drives decides which body
+applies. A step present in one and missing from the other is a control that
+fires for some users and not others. The bodies are identical since #972;
+what is asserted here is the contract and its ordering.
 
 Scoped to the agents a project actually wires, per `tests/agent_roster.py`
 (#690).
@@ -28,7 +28,7 @@ from agent_roster import agent_is_present
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-CLAUDE_COMMAND = REPO_ROOT / ".claude" / "commands" / "property-tests.md"
+CLAUDE_COMMAND = REPO_ROOT / ".claude" / "skills" / "property-tests" / "SKILL.md"
 SHARED_SKILL = REPO_ROOT / ".agents" / "skills" / "property-tests" / "SKILL.md"
 
 # The steps both bodies take, in this order.

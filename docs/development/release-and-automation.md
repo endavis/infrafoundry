@@ -6,7 +6,7 @@ This guide covers the automated versioning, release management, governance valid
 - [Automated Versioning](#automated-versioning)
 - [Release Management](#release-management)
 - [Release Notes](#release-notes)
-- [Security & Quality Tasks](#security--quality-tasks)
+- [Security & Quality Tasks](#security-quality-tasks)
 - [SBOM Generation](#sbom-generation)
 - [Governance Validation](#governance-validation)
 - [Environment Configuration](#environment-configuration)
@@ -157,6 +157,8 @@ uv run doit release_dev --type=beta
 uv run doit release
 # --> Creates v0.2.0, updates CHANGELOG, publishes to PyPI
 ```
+
+Both publish workflows' `build` job runs `doit wheel_check --dist=dist` against the exact wheel that gets uploaded, so a packaging regression (missing module, broken entry point, missing `py.typed`) fails the build step rather than reaching PyPI. See [`wheel_check`](doit-tasks-reference.md#wheel_check).
 
 ## Release Notes
 

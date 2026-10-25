@@ -344,7 +344,7 @@ def install_tool(
     version_cmd: list[str] | None = None,
     post_install_message: str | None = None,
     extract_binaries: list[str] | dict[str, list[str]] | None = None,
-    url_template: str | None = None,
+    url_template: str | dict[str, str] | None = None,
     prefer_brew: bool = True,
     sha256: str | dict[str, str] | None = None,
 ) -> None:
@@ -385,6 +385,16 @@ def install_tool(
         url_template: Optional download URL template with ``{version}``,
             ``{os}``, and ``{arch}`` placeholders. When set, this is used
             instead of building a GitHub release URL from ``asset_patterns``.
+
+            Also accepts a per-platform mapping using the same key
+            convention as ``asset_patterns`` (``platform.system().lower()``
+            values such as ``"linux"``, ``"darwin"``) for releases whose
+            asset naming can't be expressed with a single template — for
+            example, a release tag that doesn't start with ``v`` combined
+            with an OS name that differs from ``{os}`` (``jq``'s
+            ``jq-macos-<arch>`` asset vs. the ``darwin`` platform key). On a
+            platform missing from the dict, the install aborts with the same
+            ``Unsupported OS`` error used for ``asset_patterns``.
         prefer_brew: When True (the default), use ``brew install`` on macOS
             instead of downloading. Set False to force download even on
             macOS (useful for cross-platform consistency).
@@ -426,7 +436,14 @@ def install_tool(
         subprocess.run(["brew", "install", name], check=True)
     else:
         if url_template is not None:
-            url = url_template.format(version=version, os=system, arch=_get_arch())
+            if isinstance(url_template, dict):
+                if system not in url_template:
+                    print(f"Unsupported OS for {name}: {system}")
+                    sys.exit(1)
+                resolved_template = url_template[system]
+            else:
+                resolved_template = url_template
+            url = resolved_template.format(version=version, os=system, arch=_get_arch())
         elif system in asset_patterns:
             url = _build_github_release_url(repo, version, asset_patterns[system])
         else:
@@ -471,7 +488,7 @@ def create_install_task(
     version_cmd: list[str] | None = None,
     post_install_message: str | None = None,
     extract_binaries: list[str] | dict[str, list[str]] | None = None,
-    url_template: str | None = None,
+    url_template: str | dict[str, str] | None = None,
     prefer_brew: bool = True,
     sha256: str | dict[str, str] | None = None,
 ) -> dict[str, Any]:
@@ -493,7 +510,8 @@ def create_install_task(
             "windows": ["age.exe"]}``) when archive members differ per OS.
             See :func:`install_tool`.
         url_template: Optional download URL template with ``{version}``,
-            ``{os}``, ``{arch}`` placeholders. See :func:`install_tool`.
+            ``{os}``, ``{arch}`` placeholders, or a per-platform mapping
+            keyed by ``platform.system().lower()``. See :func:`install_tool`.
         prefer_brew: Use brew on macOS when True (default). See
             :func:`install_tool`.
         sha256: Expected hex SHA-256 of the asset, or a per-platform mapping.

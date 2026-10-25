@@ -23,6 +23,8 @@ from tools.doit.github import (
     _extract_linked_issues,
     _fast_forward_base,
     _fetch_github_labels,
+    _fetch_issue_context,
+    _fetch_pr_context,
     _finish_branch_in_worktree,
     _format_merge_subject,
     _get_default_branch,
@@ -42,6 +44,7 @@ from tools.doit.github import (
     _run_label_cmd,
     _validate_issue_content,
     _worktree_holding,
+    task_delegation_context,
     task_env_create,
     task_env_list,
     task_issue,
@@ -2071,6 +2074,237 @@ class TestGetPrInfo:
         cmd = mock_subprocess.call_args.args[0]
         fields = cmd[cmd.index("--json") + 1].split(",")
         assert {"headRefName", "isCrossRepository"} <= set(fields)
+
+
+class TestDelegationContext:
+    """Tests for the ``delegation_context`` doit task and its helpers (#985).
+
+    The host CLI runs this task before delegating a task to another agent, so the
+    delegated prompt can read a file instead of shelling out to ``gh`` itself.
+    """
+
+    @staticmethod
+    def _action() -> "Callable[..., None]":
+        action = task_delegation_context()["actions"][0]
+        return action  # type: ignore[no-any-return]
+
+    @staticmethod
+    def _console() -> Console:
+        return Console(file=io.StringIO(), width=200)
+
+    def test_missing_kind_exits(self, mock_subprocess: MagicMock) -> None:
+        """No ``--kind`` → SystemExit(1), no gh calls."""
+        with pytest.raises(SystemExit) as excinfo:
+            self._action()(kind="", n="1", out="ctx")
+
+        assert excinfo.value.code == 1
+        mock_subprocess.assert_not_called()
+
+    def test_invalid_kind_exits(self, mock_subprocess: MagicMock) -> None:
+        """An unknown ``--kind`` value → SystemExit(1), no gh calls."""
+        with pytest.raises(SystemExit) as excinfo:
+            self._action()(kind="bogus", n="1", out="ctx")
+
+        assert excinfo.value.code == 1
+        mock_subprocess.assert_not_called()
+
+    def test_missing_number_exits(self, mock_subprocess: MagicMock) -> None:
+        """No ``--n`` → SystemExit(1), no gh calls."""
+        with pytest.raises(SystemExit) as excinfo:
+            self._action()(kind="issue", n="", out="ctx")
+
+        assert excinfo.value.code == 1
+        mock_subprocess.assert_not_called()
+
+    def test_missing_out_exits(self, mock_subprocess: MagicMock) -> None:
+        """No ``--out`` → SystemExit(1), no gh calls."""
+        with pytest.raises(SystemExit) as excinfo:
+            self._action()(kind="issue", n="1", out="")
+
+        assert excinfo.value.code == 1
+        mock_subprocess.assert_not_called()
+
+    def test_issue_kind_writes_issue_and_comments_json(
+        self, tmp_path: Path, mock_subprocess: MagicMock
+    ) -> None:
+        """``--kind=issue`` writes ``issue.json`` (sans comments) and ``comments.json``."""
+        payload = {
+            "number": 985,
+            "title": "refactor: host fetches GitHub data",
+            "body": "issue body",
+            "labels": [{"name": "refactor"}],
+            "assignees": [],
+            "comments": [
+                {
+                    "author": {"login": "endavis"},
+                    "body": "## Implementation Plan for #985",
+                }
+            ],
+        }
+        mock_subprocess.register({("gh", "issue", "view"): {"stdout": json.dumps(payload)}})
+        out_dir = tmp_path / "ctx"
+
+        self._action()(kind="issue", n="985", out=str(out_dir))
+
+        issue_data = json.loads((out_dir / "issue.json").read_text(encoding="utf-8"))
+        assert issue_data["number"] == 985
+        assert issue_data["title"] == payload["title"]
+        assert "comments" not in issue_data
+
+        comments_data = json.loads((out_dir / "comments.json").read_text(encoding="utf-8"))
+        assert comments_data["comments"][0]["body"] == "## Implementation Plan for #985"
+
+        cmd = mock_subprocess.call_args.args[0]
+        assert cmd[:4] == ["gh", "issue", "view", "985"]
+        assert "comments" in cmd[cmd.index("--json") + 1].split(",")
+
+    def test_issue_kind_missing_issue_errors_and_writes_nothing(
+        self, tmp_path: Path, mock_subprocess: MagicMock
+    ) -> None:
+        """A nonexistent issue surfaces a clear error, not a silent empty file."""
+        mock_subprocess.register(
+            {
+                ("gh", "issue", "view"): subprocess.CalledProcessError(
+                    returncode=1,
+                    cmd=["gh", "issue", "view"],
+                    stderr="GraphQL: Could not resolve to an Issue",
+                )
+            }
+        )
+        out_dir = tmp_path / "ctx"
+
+        with pytest.raises(SystemExit) as excinfo:
+            self._action()(kind="issue", n="99999", out=str(out_dir))
+
+        assert excinfo.value.code == 1
+        assert not out_dir.exists()
+
+    def test_pr_kind_writes_pr_json_and_diff(
+        self, tmp_path: Path, mock_subprocess: MagicMock
+    ) -> None:
+        """``--kind=pr`` writes ``pr.json`` and the raw diff to ``diff.txt``."""
+        payload = {
+            "number": 42,
+            "title": "feat: add export",
+            "body": "pr body",
+            "baseRefName": "main",
+            "headRefName": "feat/42-export",
+        }
+        mock_subprocess.register(
+            {
+                ("gh", "pr", "view"): {"stdout": json.dumps(payload)},
+                ("gh", "pr", "diff"): {"stdout": "diff --git a/x b/x\n+added\n"},
+            }
+        )
+        out_dir = tmp_path / "ctx"
+
+        self._action()(kind="pr", n="42", out=str(out_dir))
+
+        pr_data = json.loads((out_dir / "pr.json").read_text(encoding="utf-8"))
+        assert pr_data == payload
+        assert (out_dir / "diff.txt").read_text(encoding="utf-8") == "diff --git a/x b/x\n+added\n"
+
+        view_cmd = mock_subprocess.call_args_list[0].args[0]
+        assert view_cmd == [
+            "gh",
+            "pr",
+            "view",
+            "42",
+            "--json",
+            "number,title,body,baseRefName,headRefName",
+        ]
+        assert mock_subprocess.call_args_list[1].args[0] == ["gh", "pr", "diff", "42"]
+
+    def test_pr_kind_missing_pr_errors_and_writes_nothing(
+        self, tmp_path: Path, mock_subprocess: MagicMock
+    ) -> None:
+        """A nonexistent PR surfaces a clear error, not a silent empty file."""
+        mock_subprocess.register(
+            {
+                ("gh", "pr", "view"): subprocess.CalledProcessError(
+                    returncode=1, cmd=["gh", "pr", "view"], stderr="no pull requests found"
+                )
+            }
+        )
+        out_dir = tmp_path / "ctx"
+
+        with pytest.raises(SystemExit) as excinfo:
+            self._action()(kind="pr", n="999", out=str(out_dir))
+
+        assert excinfo.value.code == 1
+        assert not out_dir.exists()
+
+    def test_pr_kind_diff_failure_errors_and_writes_nothing(
+        self, tmp_path: Path, mock_subprocess: MagicMock
+    ) -> None:
+        """A ``gh pr diff`` failure after a successful ``gh pr view`` still writes nothing."""
+        payload = {
+            "number": 42,
+            "title": "feat: add export",
+            "body": "pr body",
+            "baseRefName": "main",
+            "headRefName": "feat/42-export",
+        }
+        mock_subprocess.register(
+            {
+                ("gh", "pr", "view"): {"stdout": json.dumps(payload)},
+                ("gh", "pr", "diff"): subprocess.CalledProcessError(
+                    returncode=1, cmd=["gh", "pr", "diff"], stderr="boom"
+                ),
+            }
+        )
+        out_dir = tmp_path / "ctx"
+
+        with pytest.raises(SystemExit) as excinfo:
+            self._action()(kind="pr", n="42", out=str(out_dir))
+
+        assert excinfo.value.code == 1
+        assert not out_dir.exists()
+
+    def test_creates_nested_output_directory(
+        self, tmp_path: Path, mock_subprocess: MagicMock
+    ) -> None:
+        """A multi-level ``--out`` is created, matching ``tmp/agents/<host>/<task>-<n>/``."""
+        mock_subprocess.register(
+            {("gh", "issue", "view"): {"stdout": json.dumps({"number": 1, "comments": []})}}
+        )
+        out_dir = tmp_path / "agents" / "claude" / "multi-plan-1"
+
+        self._action()(kind="issue", n="1", out=str(out_dir))
+
+        assert out_dir.is_dir()
+        assert (out_dir / "issue.json").exists()
+        assert (out_dir / "comments.json").exists()
+
+    def test_fetch_issue_context_helper_used_directly(
+        self, tmp_path: Path, mock_subprocess: MagicMock
+    ) -> None:
+        """``_fetch_issue_context`` can be called directly (used by the task action)."""
+        mock_subprocess.register(
+            {("gh", "issue", "view"): {"stdout": json.dumps({"number": 7, "comments": []})}}
+        )
+        out_dir = tmp_path / "ctx"
+
+        _fetch_issue_context("7", out_dir, self._console())
+
+        assert json.loads((out_dir / "issue.json").read_text(encoding="utf-8"))["number"] == 7
+
+    def test_fetch_pr_context_helper_used_directly(
+        self, tmp_path: Path, mock_subprocess: MagicMock
+    ) -> None:
+        """``_fetch_pr_context`` can be called directly (used by the task action)."""
+        mock_subprocess.register(
+            {
+                ("gh", "pr", "view"): {"stdout": json.dumps({"number": 7})},
+                ("gh", "pr", "diff"): {"stdout": "diff\n"},
+            }
+        )
+        out_dir = tmp_path / "ctx"
+
+        _fetch_pr_context("7", out_dir, self._console())
+
+        assert json.loads((out_dir / "pr.json").read_text(encoding="utf-8"))["number"] == 7
+        assert (out_dir / "diff.txt").read_text(encoding="utf-8") == "diff\n"
 
 
 class TestGetDefaultBranch:

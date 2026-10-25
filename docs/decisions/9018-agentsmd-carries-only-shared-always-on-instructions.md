@@ -54,7 +54,7 @@ The cost of misallocation is not context size. Against a large context window, `
   agents' config layouts to all four agents. Claude parsed Codex's approval flags and
   Antigravity's stdout-deny hook contract every session and could act on neither.
 - **Position.** A rule buried in a large file is less likely to be honored late in a session;
-  `.claude/rules/README.md` makes the same argument for why short skill-gated checklists work.
+  `docs/development/ai/rule-files.md` makes the same argument for why short skill-gated checklists work.
   #738 is the evidence that always-on is not always-honored: `.claude/CLAUDE.md` instructed every
   Claude session, in blocks marked MANDATORY, to find two `AGENTS.md` sections that did not exist
   and run a command that was never installed — for months, unnoticed.
@@ -115,4 +115,4 @@ per-agent config detail in the shared file, and pointer-table rows that stay one
   workflow contract, non-interactive flags
 - [AI Command Blocking](../development/ai/command-blocking.md) — hook wiring and per-host block
   contracts
-- [Per-Stack Rule Files](../../.claude/rules/README.md) — the mirrored-with-a-sync-test exception
+- [Per-Stack Rule Files](../development/ai/rule-files.md) — the mirrored-with-a-sync-test exception

@@ -53,6 +53,7 @@ envs/
 !blueprints/**/*.yaml
 !.sops.yaml
 !.pre-commit-config.yaml
+!.github/actionlint.yaml
 !tools/spikes/**/*.yaml
 .env
 *.tfvars

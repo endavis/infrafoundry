@@ -148,8 +148,8 @@ default, that footer bumps MINOR, which is right while the project is on 0.x, an
 refuses to release 1.0 or later until the setting is `false` (#881); with `false`, it bumps MAJOR.
 The agent tells the user which applies. Do not edit `pyproject.toml` to change it.
 
-When the task is done, hand off to the `ghi-finalize` skill, and make sure the PR body it drafts
-carries the migration guide.
+When the task is done, return to the `implement-issue` run, or commit and open a PR per
+`.github/CONTRIBUTING.md` — either way, make sure the PR body carries the migration guide.
 
 ## Notes
 

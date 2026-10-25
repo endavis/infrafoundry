@@ -27,6 +27,8 @@ Supporting refactors: a private `_get_arch()` helper that maps `platform.machine
 
 `extract_binaries` also accepts an optional per-platform `dict[str, list[str]]` keyed by `platform.system().lower()` (same convention as `asset_patterns`), for tools whose archive members differ per OS (e.g., `.exe` suffix on Windows).
 
+`url_template` likewise accepts a per-platform `dict[str, str]` keyed by `platform.system().lower()`, in addition to the plain string form (#930). This was needed because `{os}`/`{version}` substitution into one template cannot express every release's asset naming: `jq`'s release tag is `jq-1.8.2` rather than `v{version}`, and its macOS asset is named `jq-macos-<arch>` while `{os}` expands to `darwin`. A dict `url_template` is resolved by the current OS exactly like a plain string one — it still bypasses brew on macOS — except that an OS missing from the dict aborts with the same `Unsupported OS for {name}` error `asset_patterns` uses. The plain string form is unchanged.
+
 4. **Integrity verification (#694)** — an optional `sha256` parameter (a single digest, or a per-platform mapping) verified before the archive is opened and before the executable bit is set; a mismatch deletes the file and aborts. A digest is **mandatory** for hosts outside `IMPLICITLY_TRUSTED_HOSTS`, i.e. for the `url_template` escape hatch this ADR introduced.
 
    The asymmetry is deliberate. `url_template` exists to fetch from arbitrary third parties such as `releases.hashicorp.com`, which bypasses even the implicit trust already extended to GitHub by cloning this template. A caller reaching outside that boundary must state what it expects to receive; a GitHub-release install rests on trust the user has already granted.
@@ -66,6 +68,7 @@ The three capabilities are intentionally orthogonal so simple cases stay simple 
 - Issue #326: install_tools framework: archive extraction and custom URLs
 - Issue #477: support per-platform `extract_binaries` in install_tool framework
 - Issue #694: verify checksums for binaries and scripts downloaded by install_tools and bootstrap
+- Issue #930: add doit install_jq and make the statusline report a missing jq
 
 ## Related Documentation
 

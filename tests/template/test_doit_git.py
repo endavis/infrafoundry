@@ -431,9 +431,12 @@ def main_checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     repo.mkdir()
     _git(repo, "init", "-q", "-b", "main")
     (repo / ".gitignore").write_text(
-        ".venv/\n__pycache__/\n.envrc.local\n/worktrees/\n", encoding="utf-8"
+        ".venv/\n__pycache__/\n.envrc.local\n/mutants/\n/worktrees/\ntmp/*\n!tmp/.gitkeep\n",
+        encoding="utf-8",
     )
-    _git(repo, "add", ".gitignore")
+    (repo / "tmp").mkdir()
+    (repo / "tmp" / ".gitkeep").touch()
+    _git(repo, "add", ".gitignore", "tmp/.gitkeep")
     _git(repo, "commit", "-q", "-m", "init")
     monkeypatch.chdir(repo)
     return repo
@@ -518,6 +521,26 @@ class TestRemoveMergedWorktree:
         (path / ".venv" / "bin" / "python").write_text("", encoding="utf-8")
         (path / "__pycache__").mkdir()
         (path / "__pycache__" / "export.cpython-312.pyc").write_bytes(b"")
+
+        self._remove(path, self.BRANCH, head)
+
+        assert not path.exists()
+
+    def test_pre_commit_store_does_not_keep_it(self, main_checkout: Path) -> None:
+        """PRE_COMMIT_HOME under tmp/ (#998); pre-commit rebuilds its store on next run."""
+        path, head = _add_worktree(main_checkout, self.BRANCH)
+        (path / "tmp" / ".pre-commit").mkdir(parents=True)
+        (path / "tmp" / ".pre-commit" / "db.db").write_text("", encoding="utf-8")
+
+        self._remove(path, self.BRANCH, head)
+
+        assert not path.exists()
+
+    def test_mutmut_cache_does_not_keep_it(self, main_checkout: Path) -> None:
+        """mutants/ is mutmut's copy of the project (#1000); the next run makes it again."""
+        path, head = _add_worktree(main_checkout, self.BRANCH)
+        (path / "mutants").mkdir()
+        (path / "mutants" / "mutmut-stats.json").write_text("{}\n", encoding="utf-8")
 
         self._remove(path, self.BRANCH, head)
 

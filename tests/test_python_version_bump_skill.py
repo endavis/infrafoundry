@@ -6,11 +6,11 @@ drops users on the old version, which only the user may decide. A skill that cha
 settings without asking, or that a user drives on one host but not another, makes that call for
 them silently on whichever surface skipped the gate.
 
-Two surfaces carry it -- `.claude/commands/` for Claude, `.agents/skills/` for Codex, Antigravity
-and Copilot -- and whichever agent the user drives decides which body applies. A step present in
-one and missing from the other is a control that fires for some users and not others. The bodies
-are deliberately not byte-identical, since invocation syntax differs per host, so what is asserted
-is the contract and its ordering.
+Two surfaces carry it -- `.agents/skills/` for Codex, Antigravity and Copilot, `.claude/skills/`
+for Claude (generated from the former by `doit skills_sync`, byte for byte) -- and whichever agent
+the user drives decides which body applies. A step present in one and missing from the other is a
+control that fires for some users and not others. The bodies are identical since #972; what is
+asserted here is the contract and its ordering.
 
 Scoped to the agents a project actually wires, per `tests/agent_roster.py` (#690).
 """
@@ -25,7 +25,7 @@ from agent_roster import agent_is_present
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-CLAUDE_COMMAND = REPO_ROOT / ".claude" / "commands" / "python-version-bump.md"
+CLAUDE_COMMAND = REPO_ROOT / ".claude" / "skills" / "python-version-bump" / "SKILL.md"
 SHARED_SKILL = REPO_ROOT / ".agents" / "skills" / "python-version-bump" / "SKILL.md"
 
 # The steps both bodies take, in this order. Steps 2 and 3-6 are alternatives (add a newest

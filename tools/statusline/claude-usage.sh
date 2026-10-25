@@ -2,6 +2,7 @@
 
 # Opt-in Claude Max usage helper for statusline display.
 # Outputs: 5h:N%@HHMM wk:N%@aaa-HHMM on success, or literal ? on any failure.
+# A bucket with no active window (resets_at: null) shows -- for its time.
 # Wire into .claude/statusline-command.sh manually — not called by default.
 #
 # Requirements: curl, jq, python3, active Claude Code OAuth login
@@ -38,15 +39,19 @@ except Exception:
 parse_usage() {
     local file="$1"
     # Extract the four fields as tab-separated; 'empty' if any field is missing.
+    # The API sends resets_at: null when a bucket has no active window (e.g. the
+    # 5h window expired and no prompt has opened a new one). That is emitted as
+    # the literal "null" — not an empty field, which read would collapse — and
+    # shown as --. A missing resets_at key is still a schema change and fails.
     local record
     record=$(jq -r '
-        if (.five_hour.utilization != null) and (.five_hour.resets_at != null) and
-           (.seven_day.utilization != null) and (.seven_day.resets_at != null)
+        def bucket_ok: type == "object" and (.utilization != null) and has("resets_at");
+        if (.five_hour | bucket_ok) and (.seven_day | bucket_ok)
         then [
             (.five_hour.utilization | floor | tostring),
-            .five_hour.resets_at,
+            (.five_hour.resets_at // "null"),
             (.seven_day.utilization | floor | tostring),
-            .seven_day.resets_at
+            (.seven_day.resets_at // "null")
         ] | join("\t")
         else empty
         end
@@ -60,13 +65,21 @@ parse_usage() {
     IFS=$'\t' read -r fh_pct fh_ts wk_pct wk_ts <<< "$record"
 
     local fh_time wk_time
-    fh_time=$(_fmt_ts "$fh_ts" "%H%M")
+    if [[ "$fh_ts" == "null" ]]; then
+        fh_time="--"
+    else
+        fh_time=$(_fmt_ts "$fh_ts" "%H%M")
+    fi
     if [[ -z "$fh_time" ]]; then
         echo "?"
         return 1
     fi
 
-    wk_time=$(_fmt_ts "$wk_ts" "%a-%H%M")
+    if [[ "$wk_ts" == "null" ]]; then
+        wk_time="--"
+    else
+        wk_time=$(_fmt_ts "$wk_ts" "%a-%H%M")
+    fi
     if [[ -z "$wk_time" ]]; then
         echo "?"
         return 1

@@ -1,10 +1,10 @@
-"""The walkthrough's worktree section relies on what `/claude:implement` does (#866).
+"""The walkthrough's worktree section relies on what `implement-issue` does (#866, #976).
 
-It tells the reader to create the issue's branch in a worktree before step 4,
-because `/claude:implement` skips branch creation, and with it
-`git checkout main`, when the current branch already belongs to the issue. If
-the command stops doing that, the walkthrough sends readers into a failing
-checkout, so these tests hold the two files together.
+It tells the reader to create the issue's branch in a worktree before running
+"implement issue 42", because `implement-issue` resumes on it — skipping branch
+creation, and with it `git checkout main` — when the current branch already
+belongs to the issue. If the skill stops doing that, the walkthrough sends
+readers into a failing checkout, so these tests hold the two files together.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WALKTHROUGH = REPO_ROOT / "docs" / "development" / "ai" / "first-5-minutes.md"
-IMPLEMENT = REPO_ROOT / ".claude" / "commands" / "claude" / "implement.md"
+IMPLEMENT_ISSUE = REPO_ROOT / ".agents" / "skills" / "implement-issue" / "SKILL.md"
 HEADING = "## When your checkout holds other work"
 
 
@@ -27,13 +27,13 @@ def _section() -> str:
 
 
 def test_implement_skips_branch_creation_on_the_issue_branch() -> None:
-    text = IMPLEMENT.read_text(encoding="utf-8")
-    assert "If already on a branch matching `*/$ARGUMENTS-*`" in text
-    assert "Skip branch creation (Step 2)" in text
+    text = IMPLEMENT_ISSUE.read_text(encoding="utf-8")
+    assert "If already on `<type>/<n>-*`, resume on it" in text
+    assert "skip branch creation" in text
 
 
 def test_the_walkthrough_names_the_branch_for_the_issue() -> None:
-    """Otherwise `/claude:implement 42` does not recognize the worktree's branch."""
+    """Otherwise "implement issue 42" does not recognize the worktree's branch."""
     assert re.search(r"doit worktree --branch=[a-z]+/42-", _section())
 
 

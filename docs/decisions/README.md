@@ -133,6 +133,9 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [9020](9020-a-template-version-is-a-commit-sha.md) | A template version is a commit SHA | Accepted |
 | [9021](9021-a-pr-may-target-the-unmerged-branch-it-builds-on.md) | A PR may target the unmerged branch it builds on | Accepted |
 | [9022](9022-worktrees-live-in-worktrees-each-with-its-own-environment.md) | Worktrees live in worktrees/, each with its own environment | Accepted |
+| [9023](9023-shared-workflow-skills-live-in-agents-skills-generated-for-claude.md) | Shared workflow skills live once in .agents/skills/ and are generated for Claude | Accepted |
+| [9024](9024-one-implement-issue-skill-takes-an-issue-to-a-green-pr.md) | One implement-issue skill takes an issue to a green PR | Accepted |
+| [9025](9025-delegated-agents-receive-github-data-from-the-host-and-run-without-network.md) | Delegated agents receive GitHub data from the host and run without network | Accepted |
 
 ### Project-level ADRs (0001+)
 

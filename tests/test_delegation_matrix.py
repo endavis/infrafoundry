@@ -7,10 +7,13 @@ Static test only — no CLI or model invocations. Verifies that:
   `.agents/skills/delegate-*` files, so distinct files number fewer than cells).
 - The matrix documentation page exists.
 
-The matrix is sized from the agents this project wires, not from the template's
-own four. In the template that is 48 cells over 40 distinct files; a project that
-keeps one agent has no cross-agent matrix and checks nothing here, rather than
-failing 37 cells for agents it deliberately dropped (#690).
+The matrix covers `review` and `adversarial-review` only — `plan` and `implement`
+were removed from the per-agent matrix in favor of the single shared
+`implement-issue` skill (#976). The matrix is sized from the agents this
+project wires, not from the template's own four. In the template that is 24
+cells over 20 distinct files; a project that keeps one agent has no
+cross-agent matrix and checks nothing here, rather than failing cells for
+agents it deliberately dropped (#690).
 
 See `docs/development/ai/cross-agent-delegation.md` and issues #550, #640.
 """
@@ -25,7 +28,7 @@ from agent_roster import present_agents
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-ACTIONS = ("plan", "implement", "review", "adversarial-review")
+ACTIONS = ("review", "adversarial-review")
 
 # The agents this project actually wires. The template wires all four; a project
 # spawned from it keeps only the ones it uses, and must not be told its suite is
@@ -78,8 +81,8 @@ def test_delegation_file_exists(source: str, target: str, action: str) -> None:
 def test_total_file_count() -> None:
     """Every cross-agent cell resolves, and Codex/Antigravity share their files.
 
-    The template wires four agents: 4 sources x 3 targets x 4 actions = 48 cells,
-    of which 8 share a file, leaving 40 distinct. Both counts are *derived* from
+    The template wires four agents: 4 sources x 3 targets x 2 actions = 24 cells,
+    of which 4 share a file, leaving 20 distinct. Both counts are *derived* from
     the agents this project wires rather than pinned, so dropping an agent
     narrows the matrix instead of failing it (#690).
     """
@@ -216,7 +219,7 @@ def test_only_the_matrix_doc_states_counts(relative: str) -> None:
 
 def test_the_count_checks_detect_a_planted_error() -> None:
     """Guard against both scans passing because they match nothing."""
-    doctored = MATRIX_DOC.read_text(encoding="utf-8").replace("= 64 cells", "= 65 cells", 1)
+    doctored = MATRIX_DOC.read_text(encoding="utf-8").replace("= 32 cells", "= 33 cells", 1)
     assert _stated_counts(doctored) != _derived_counts(), (
         "the matrix sentence parser did not notice a wrong total"
     )
