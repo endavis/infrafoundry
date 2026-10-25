@@ -4,6 +4,9 @@ Tests template rendering, resource type registration, and dependency resolution
 for NFS, CIFS, and directory storage backends.
 """
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -11,7 +14,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> ProxmoxProvider:
     """Create a ProxmoxProvider for template testing."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -22,9 +25,9 @@ def provider(tmp_path):
     return p
 
 
-def _make_storage(name: str = "test-storage", **config_overrides) -> ResourceConfig:
+def _make_storage(name: str = "test-storage", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a storage ResourceConfig with sensible defaults."""
-    config: dict = {
+    config: dict[str, Any] = {
         "name": name,
         **config_overrides,
     }
@@ -39,28 +42,28 @@ def _render_storage(provider: ProxmoxProvider, storages: list[ResourceConfig]) -
 class TestResourceRegistration:
     """Tests for storage resource type registration."""
 
-    def test_resource_types_include_storage(self, provider):
+    def test_resource_types_include_storage(self, provider: ProxmoxProvider) -> None:
         """Storage should be in the list of supported resource types."""
         types = provider.get_resource_types()
         assert "storage" in types
 
-    def test_dependencies_include_storage(self, provider):
+    def test_dependencies_include_storage(self, provider: ProxmoxProvider) -> None:
         """Storage should have no dependencies."""
         deps = provider.get_dependencies()
         assert "storage" in deps
         assert deps["storage"] == []
 
-    def test_vm_depends_on_storage(self, provider):
+    def test_vm_depends_on_storage(self, provider: ProxmoxProvider) -> None:
         """VM dependencies should include storage."""
         deps = provider.get_dependencies()
         assert "storage" in deps["vm"]
 
-    def test_container_depends_on_storage(self, provider):
+    def test_container_depends_on_storage(self, provider: ProxmoxProvider) -> None:
         """Container dependencies should include storage."""
         deps = provider.get_dependencies()
         assert "storage" in deps["container"]
 
-    def test_existing_types_still_present(self, provider):
+    def test_existing_types_still_present(self, provider: ProxmoxProvider) -> None:
         """Existing resource types should still be registered."""
         types = provider.get_resource_types()
         assert "vm" in types
@@ -72,7 +75,7 @@ class TestResourceRegistration:
 class TestNFSRendering:
     """Tests for NFS storage template rendering."""
 
-    def test_basic_nfs(self, provider):
+    def test_basic_nfs(self, provider: ProxmoxProvider) -> None:
         """Basic NFS storage should render the correct Terraform resource."""
         storages = [
             _make_storage(
@@ -89,7 +92,7 @@ class TestNFSRendering:
         assert 'server = "192.168.10.50"' in content
         assert 'export = "/export/infra"' in content
 
-    def test_nfs_with_content_types(self, provider):
+    def test_nfs_with_content_types(self, provider: ProxmoxProvider) -> None:
         """NFS with content_types should render the content attribute."""
         storages = [
             _make_storage(
@@ -105,7 +108,7 @@ class TestNFSRendering:
         assert '"vztmpl"' in content
         assert '"iso"' in content
 
-    def test_nfs_with_nodes(self, provider):
+    def test_nfs_with_nodes(self, provider: ProxmoxProvider) -> None:
         """NFS with nodes should render the nodes attribute."""
         storages = [
             _make_storage(
@@ -120,7 +123,7 @@ class TestNFSRendering:
         assert '"pve1"' in content
         assert '"pve2"' in content
 
-    def test_nfs_with_all_options(self, provider):
+    def test_nfs_with_all_options(self, provider: ProxmoxProvider) -> None:
         """NFS with all optional fields should render them."""
         storages = [
             _make_storage(
@@ -141,7 +144,7 @@ class TestNFSRendering:
 class TestCIFSRendering:
     """Tests for CIFS storage template rendering."""
 
-    def test_basic_cifs(self, provider):
+    def test_basic_cifs(self, provider: ProxmoxProvider) -> None:
         """Basic CIFS storage should render the correct Terraform resource."""
         storages = [
             _make_storage(
@@ -158,7 +161,7 @@ class TestCIFSRendering:
         assert 'server = "192.168.10.50"' in content
         assert 'share  = "backups"' in content
 
-    def test_cifs_with_credentials(self, provider):
+    def test_cifs_with_credentials(self, provider: ProxmoxProvider) -> None:
         """CIFS with username/password should render credential attributes."""
         storages = [
             _make_storage(
@@ -173,7 +176,7 @@ class TestCIFSRendering:
         assert 'username = "proxmox"' in content
         assert 'password = "secret"' in content
 
-    def test_cifs_with_domain_and_subdirectory(self, provider):
+    def test_cifs_with_domain_and_subdirectory(self, provider: ProxmoxProvider) -> None:
         """CIFS with domain and subdirectory should render them."""
         storages = [
             _make_storage(
@@ -192,7 +195,7 @@ class TestCIFSRendering:
 class TestDirRendering:
     """Tests for directory storage template rendering."""
 
-    def test_basic_dir(self, provider):
+    def test_basic_dir(self, provider: ProxmoxProvider) -> None:
         """Basic dir storage should render the correct Terraform resource."""
         storages = [
             _make_storage(
@@ -207,7 +210,7 @@ class TestDirRendering:
         assert 'id     = "local-snippets"' in content
         assert 'path   = "/mnt/snippets"' in content
 
-    def test_dir_with_shared(self, provider):
+    def test_dir_with_shared(self, provider: ProxmoxProvider) -> None:
         """Dir with shared flag should render the shared attribute."""
         storages = [
             _make_storage(
@@ -223,7 +226,7 @@ class TestDirRendering:
 class TestCommonOptions:
     """Tests for common storage options across backends."""
 
-    def test_disable_option(self, provider):
+    def test_disable_option(self, provider: ProxmoxProvider) -> None:
         """Disable option should work for all backends."""
         for backend, extra in [
             ("nfs", {"server": "1.2.3.4", "export": "/e"}),
@@ -234,7 +237,7 @@ class TestCommonOptions:
             content = _render_storage(provider, storages)
             assert "disable = true" in content
 
-    def test_content_types_across_backends(self, provider):
+    def test_content_types_across_backends(self, provider: ProxmoxProvider) -> None:
         """content_types should render for all backends."""
         for backend, extra in [
             ("nfs", {"server": "1.2.3.4", "export": "/e"}),
@@ -245,7 +248,7 @@ class TestCommonOptions:
             content = _render_storage(provider, storages)
             assert '"backup"' in content
 
-    def test_nodes_across_backends(self, provider):
+    def test_nodes_across_backends(self, provider: ProxmoxProvider) -> None:
         """nodes should render for all backends."""
         for backend, extra in [
             ("nfs", {"server": "1.2.3.4", "export": "/e"}),
@@ -260,7 +263,7 @@ class TestCommonOptions:
 class TestNameNormalization:
     """Tests for name normalization (dashes to underscores)."""
 
-    def test_dashes_replaced_in_resource_name(self, provider):
+    def test_dashes_replaced_in_resource_name(self, provider: ProxmoxProvider) -> None:
         """Dashes in storage name should be replaced with underscores in resource ID."""
         storages = [
             _make_storage(
@@ -279,7 +282,7 @@ class TestNameNormalization:
 class TestIntegration:
     """Integration test with multiple storage backends."""
 
-    def test_multiple_backends(self, provider):
+    def test_multiple_backends(self, provider: ProxmoxProvider) -> None:
         """Multiple storage backends should all render in the same file."""
         storages = [
             _make_storage(

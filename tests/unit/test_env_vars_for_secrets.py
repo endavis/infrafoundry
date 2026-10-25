@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, Mock
 
+import pytest
+
 from infrafoundry.core.events.context import EventContext
 from infrafoundry.core.events.handlers.script import ScriptHandler
 from infrafoundry.core.events.types import EventType
@@ -25,12 +27,12 @@ from infrafoundry.core.runners.terraform_runner import TerraformRunner
 class TestResourceConfigPackageVariables:
     """ResourceConfig carries package_variables."""
 
-    def test_default_none(self):
+    def test_default_none(self) -> None:
         """package_variables defaults to None."""
         rc = ResourceConfig(name="vm-1", type="vm", provider="proxmox", config={})
         assert rc.package_variables is None
 
-    def test_set_package_variables(self):
+    def test_set_package_variables(self) -> None:
         """package_variables can be set."""
         vars_ = {"cluster_name": "lab", "admin_password": "secret"}
         rc = ResourceConfig(
@@ -42,12 +44,12 @@ class TestResourceConfigPackageVariables:
 class TestEventContextPackageVariables:
     """EventContext carries package_variables."""
 
-    def test_default_empty(self):
+    def test_default_empty(self) -> None:
         """package_variables defaults to empty dict."""
         ctx = EventContext(event_type=EventType.RESOURCE_CREATED, environment="dev")
         assert ctx.package_variables == {}
 
-    def test_set_package_variables(self):
+    def test_set_package_variables(self) -> None:
         """package_variables can be set via constructor."""
         vars_ = {"ontap_password": "secret123"}
         ctx = EventContext(
@@ -61,7 +63,7 @@ class TestEventContextPackageVariables:
 class TestTerraformRunnerEnvVars:
     """TerraformRunner._prepare_environment merges TF_VAR_* from provider."""
 
-    def test_sets_tf_var_from_provider(self, monkeypatch):
+    def test_sets_tf_var_from_provider(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Provider TF_VAR_* env vars are merged into the environment."""
         runner = TerraformRunner(console=Mock())
         provider = MagicMock(spec=ProviderBase)
@@ -78,7 +80,7 @@ class TestTerraformRunnerEnvVars:
         assert env["TF_VAR_proxmox_api_token"] == "user@pam!token=secret"
         provider.get_terraform_env_vars.assert_called_once()
 
-    def test_empty_provider_vars(self, monkeypatch):
+    def test_empty_provider_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Empty provider vars don't break environment preparation."""
         runner = TerraformRunner(console=Mock())
         provider = MagicMock(spec=ProviderBase)
@@ -89,7 +91,7 @@ class TestTerraformRunnerEnvVars:
 
         assert "TF_VAR_proxmox_api_url" not in env
 
-    def test_preserves_existing_env_vars(self, monkeypatch):
+    def test_preserves_existing_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Existing environment variables are preserved."""
         runner = TerraformRunner(console=Mock())
         provider = MagicMock(spec=ProviderBase)
@@ -111,7 +113,7 @@ class TestScriptHandlerPackageVars:
             config_base_dir=Path("/tmp/config"),
         )
 
-    def test_sets_package_vars_json(self, monkeypatch):
+    def test_sets_package_vars_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """INFRAFOUNDRY_PACKAGE_VARS is set as JSON string."""
         handler = self._make_handler()
         vars_ = {"cluster_name": "lab", "admin_password": "secret123"}
@@ -128,7 +130,7 @@ class TestScriptHandlerPackageVars:
         parsed = json.loads(env["INFRAFOUNDRY_PACKAGE_VARS"])
         assert parsed == vars_
 
-    def test_sets_individual_var_env_vars(self, monkeypatch):
+    def test_sets_individual_var_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """INFRAFOUNDRY_VAR_<key> is set for each variable."""
         handler = self._make_handler()
         vars_ = {"cluster_name": "lab", "node_count": 3}
@@ -145,7 +147,7 @@ class TestScriptHandlerPackageVars:
         assert env["INFRAFOUNDRY_VAR_cluster_name"] == "lab"
         assert env["INFRAFOUNDRY_VAR_node_count"] == "3"
 
-    def test_empty_package_variables_no_env_vars(self, monkeypatch):
+    def test_empty_package_variables_no_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Empty package_variables doesn't set INFRAFOUNDRY_PACKAGE_VARS."""
         handler = self._make_handler()
         ctx = EventContext(
@@ -159,7 +161,7 @@ class TestScriptHandlerPackageVars:
 
         assert "INFRAFOUNDRY_PACKAGE_VARS" not in env
 
-    def test_none_package_variables_no_env_vars(self, monkeypatch):
+    def test_none_package_variables_no_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Default empty package_variables doesn't set env vars."""
         handler = self._make_handler()
         ctx = EventContext(
@@ -176,7 +178,7 @@ class TestScriptHandlerPackageVars:
 class TestPackageLoaderReturnsVariables:
     """PackageLoader.load_package returns variables as third element."""
 
-    def test_load_package_returns_variables(self, tmp_path):
+    def test_load_package_returns_variables(self, tmp_path: Path) -> None:
         """load_package returns (resources, events, variables) triple."""
         from infrafoundry.core.config.package_loader import PackageLoader
 
@@ -202,7 +204,7 @@ class TestPackageLoaderReturnsVariables:
         assert len(resources) == 1
         assert variables == {"cluster_name": "lab", "node_count": 2}
 
-    def test_load_package_empty_variables(self, tmp_path):
+    def test_load_package_empty_variables(self, tmp_path: Path) -> None:
         """Empty variables returns empty dict."""
         from infrafoundry.core.config.package_loader import PackageLoader
 
@@ -222,7 +224,7 @@ class TestPackageLoaderReturnsVariables:
 class TestProviderBaseGetTerraformEnvVars:
     """ProviderBase.get_terraform_env_vars default returns empty dict."""
 
-    def test_default_returns_empty(self):
+    def test_default_returns_empty(self) -> None:
         """Base implementation returns empty dict."""
 
         class ConcreteProvider(ProviderBase):

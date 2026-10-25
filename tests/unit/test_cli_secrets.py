@@ -1,5 +1,6 @@
 """Unit tests for the 'secrets' CLI command group."""
 
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -9,12 +10,12 @@ from infrafoundry.cli.main import main
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
-def test_secrets_init_basic(cli_runner, tmp_path):
+def test_secrets_init_basic(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test secrets init command."""
     key_file = tmp_path / "age.key"
 
@@ -34,7 +35,7 @@ def test_secrets_init_basic(cli_runner, tmp_path):
         assert "Created .sops.yaml" in result.output
 
 
-def test_secrets_init_key_exists(cli_runner, tmp_path):
+def test_secrets_init_key_exists(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test secrets init when key file already exists."""
     key_file = tmp_path / "age.key"
     key_file.touch()
@@ -45,7 +46,7 @@ def test_secrets_init_key_exists(cli_runner, tmp_path):
     assert "Key file already exists" in result.output
 
 
-def test_secrets_init_age_keygen_failure(cli_runner, tmp_path):
+def test_secrets_init_age_keygen_failure(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test secrets init when age-keygen fails."""
     key_file = tmp_path / "age.key"
 
@@ -60,7 +61,7 @@ def test_secrets_init_age_keygen_failure(cli_runner, tmp_path):
         assert "Failed to generate key" in result.output
 
 
-def test_secrets_encrypt_basic(cli_runner, tmp_path):
+def test_secrets_encrypt_basic(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test secrets encrypt command."""
     test_file = tmp_path / "test.yaml"
     test_file.write_text("secret: value")
@@ -77,7 +78,7 @@ def test_secrets_encrypt_basic(cli_runner, tmp_path):
         assert "Encrypted:" in result.output
 
 
-def test_secrets_encrypt_file_not_found(cli_runner, tmp_path):
+def test_secrets_encrypt_file_not_found(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test secrets encrypt when file doesn't exist."""
     nonexistent_file = tmp_path / "nonexistent.yaml"
 
@@ -87,7 +88,7 @@ def test_secrets_encrypt_file_not_found(cli_runner, tmp_path):
     assert "File not found" in result.output
 
 
-def test_secrets_encrypt_sops_failure(cli_runner, tmp_path):
+def test_secrets_encrypt_sops_failure(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test secrets encrypt when sops fails."""
     test_file = tmp_path / "test.yaml"
     test_file.write_text("secret: value")
@@ -103,7 +104,7 @@ def test_secrets_encrypt_sops_failure(cli_runner, tmp_path):
         assert "Encryption failed" in result.output
 
 
-def test_secrets_decrypt_basic(cli_runner, tmp_path):
+def test_secrets_decrypt_basic(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test secrets decrypt command."""
     test_file = tmp_path / "test.yaml"
     test_file.write_text("encrypted content")
@@ -121,7 +122,7 @@ def test_secrets_decrypt_basic(cli_runner, tmp_path):
         assert "secret: value" in result.output
 
 
-def test_secrets_decrypt_file_not_found(cli_runner, tmp_path):
+def test_secrets_decrypt_file_not_found(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test secrets decrypt when file doesn't exist."""
     nonexistent_file = tmp_path / "nonexistent.yaml"
 
@@ -131,7 +132,7 @@ def test_secrets_decrypt_file_not_found(cli_runner, tmp_path):
     assert "File not found" in result.output
 
 
-def test_secrets_decrypt_sops_failure(cli_runner, tmp_path):
+def test_secrets_decrypt_sops_failure(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test secrets decrypt when sops fails."""
     test_file = tmp_path / "test.yaml"
     test_file.write_text("encrypted content")

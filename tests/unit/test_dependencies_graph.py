@@ -10,7 +10,7 @@ from infrafoundry.core.dependencies.graph_algorithms import (
 from infrafoundry.core.dependencies.impact_analyzer import ImpactAnalyzer, ResourceNode
 
 
-def test_dependency_graph_basic_topology():
+def test_dependency_graph_basic_topology() -> None:
     graph = DependencyGraph()
     graph.add_resource("proxmox", "network", "net-1")
     graph.add_resource("proxmox", "vm", "vm-1", dependencies=["net-1"])
@@ -25,7 +25,7 @@ def test_dependency_graph_basic_topology():
     assert "proxmox:net-1" in graph
 
 
-def test_dependency_graph_cycle_detection():
+def test_dependency_graph_cycle_detection() -> None:
     graph = DependencyGraph()
     graph.add_resource("k8s", "svc", "a", dependencies=["c"])
     graph.add_resource("k8s", "svc", "b", dependencies=["a"])
@@ -37,7 +37,7 @@ def test_dependency_graph_cycle_detection():
         graph.topological_sort()
 
 
-def test_graph_algorithms_transitive_closure_and_batches():
+def test_graph_algorithms_transitive_closure_and_batches() -> None:
     nodes = {"A", "B", "C", "D"}
     adjacency = {"C": {"A", "B"}, "D": {"B"}}
     closure = GraphAlgorithms.get_transitive_closure("C", adjacency)
@@ -47,7 +47,7 @@ def test_graph_algorithms_transitive_closure_and_batches():
     assert [set(batch) for batch in batches] == [{"A", "B"}, {"C", "D"}]
 
 
-def test_impact_analyzer_paths_and_risk_levels():
+def test_impact_analyzer_paths_and_risk_levels() -> None:
     nodes = {
         "p:net": ResourceNode("p", "network", "net", []),
         "p:vm1": ResourceNode("p", "vm", "vm1", ["net"]),

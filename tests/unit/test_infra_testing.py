@@ -21,7 +21,7 @@ from infrafoundry.core.testing.framework import FunctionalTest
 class TestTestStatus:
     """Tests for TestStatus enum."""
 
-    def test_status_values(self):
+    def test_status_values(self) -> None:
         """Test status enum values."""
         assert TestStatus.PASSED.value == "passed"
         assert TestStatus.FAILED.value == "failed"
@@ -32,7 +32,7 @@ class TestTestStatus:
 class TestInfraTestResult:
     """Tests for InfraTestResult dataclass."""
 
-    def test_create_result(self):
+    def test_create_result(self) -> None:
         """Test creating a test result."""
         result = InfraTestResult(
             test_name="my_test",
@@ -44,7 +44,7 @@ class TestInfraTestResult:
         assert result.passed is True
         assert result.duration_seconds == 1.5
 
-    def test_result_to_dict(self):
+    def test_result_to_dict(self) -> None:
         """Test converting result to dictionary."""
         result = InfraTestResult(
             test_name="test1",
@@ -61,19 +61,19 @@ class TestInfraTestResult:
 class TestInfraTestSuite:
     """Tests for InfraTestSuite class."""
 
-    def test_create_suite(self):
+    def test_create_suite(self) -> None:
         """Test creating a test suite."""
         suite = InfraTestSuite(name="my_suite", description="Test suite")
         assert suite.name == "my_suite"
         assert len(suite.tests) == 0
 
-    def test_add_test(self):
+    def test_add_test(self) -> None:
         """Test adding tests to suite."""
         suite = InfraTestSuite(name="suite")
         suite.add_test(assert_no_duplicate_names())
         assert len(suite.tests) == 1
 
-    def test_add_functional_test(self):
+    def test_add_functional_test(self) -> None:
         """Test adding functional test to suite."""
         suite = InfraTestSuite(name="suite")
 
@@ -88,7 +88,7 @@ class TestInfraTestSuite:
 class TestFunctionalTest:
     """Tests for FunctionalTest class."""
 
-    def test_passing_functional_test(self):
+    def test_passing_functional_test(self) -> None:
         """Test functional test that passes."""
 
         def test_func(resources: list[ResourceConfig], env: dict[str, Any]) -> tuple[bool, str]:
@@ -99,7 +99,7 @@ class TestFunctionalTest:
         assert result.passed is True
         assert result.message == "All good"
 
-    def test_failing_functional_test(self):
+    def test_failing_functional_test(self) -> None:
         """Test functional test that fails."""
 
         def test_func(resources: list[ResourceConfig], env: dict[str, Any]) -> tuple[bool, str]:
@@ -110,7 +110,7 @@ class TestFunctionalTest:
         assert result.passed is False
         assert result.message == "Something wrong"
 
-    def test_error_in_functional_test(self):
+    def test_error_in_functional_test(self) -> None:
         """Test functional test that raises exception."""
 
         def test_func(resources: list[ResourceConfig], env: dict[str, Any]) -> tuple[bool, str]:
@@ -125,27 +125,27 @@ class TestFunctionalTest:
 class TestInfraTestRunner:
     """Tests for InfraTestRunner class."""
 
-    def test_runner_init(self):
+    def test_runner_init(self) -> None:
         """Test runner initialization."""
         runner = InfraTestRunner()
         assert len(runner.suites) == 0
         assert len(runner._builtin_tests) == 0
 
-    def test_runner_add_suite(self):
+    def test_runner_add_suite(self) -> None:
         """Test adding suite to runner."""
         runner = InfraTestRunner()
         suite = InfraTestSuite(name="test_suite")
         runner.add_suite(suite)
         assert len(runner.suites) == 1
 
-    def test_runner_run_empty(self):
+    def test_runner_run_empty(self) -> None:
         """Test running with no tests."""
         runner = InfraTestRunner()
         results = runner.run([], {})
         assert results["passed"] is True
         assert results["summary"]["total"] == 0
 
-    def test_runner_run_with_tests(self):
+    def test_runner_run_with_tests(self) -> None:
         """Test running tests."""
         runner = InfraTestRunner()
         runner.add_test(assert_no_duplicate_names())
@@ -159,7 +159,7 @@ class TestInfraTestRunner:
         assert results["passed"] is True
         assert results["summary"]["passed"] == 1
 
-    def test_runner_filter_tests(self):
+    def test_runner_filter_tests(self) -> None:
         """Test filtering tests by name."""
         runner = InfraTestRunner()
         runner.add_test(assert_no_duplicate_names())
@@ -173,7 +173,7 @@ class TestInfraTestRunner:
         results = runner.run(resources, {}, test_filter=["no_duplicate_names"])
         assert results["summary"]["total"] == 1
 
-    def test_runner_cleanup(self):
+    def test_runner_cleanup(self) -> None:
         """Test cleanup method."""
         runner = InfraTestRunner()
         runner.cleanup()  # Should not raise
@@ -182,7 +182,7 @@ class TestInfraTestRunner:
 class TestAssertResourceExists:
     """Tests for assert_resource_exists."""
 
-    def test_resource_found(self):
+    def test_resource_found(self) -> None:
         """Test when resource exists."""
         test = assert_resource_exists("my_vm")
         resources = [
@@ -191,7 +191,7 @@ class TestAssertResourceExists:
         result = test.run(resources, {})
         assert result.passed is True
 
-    def test_resource_not_found(self):
+    def test_resource_not_found(self) -> None:
         """Test when resource doesn't exist."""
         test = assert_resource_exists("missing_vm")
         resources = [
@@ -200,7 +200,7 @@ class TestAssertResourceExists:
         result = test.run(resources, {})
         assert result.passed is False
 
-    def test_resource_with_type_filter(self):
+    def test_resource_with_type_filter(self) -> None:
         """Test filtering by resource type."""
         test = assert_resource_exists("my_vm", resource_type="vm")
         resources = [
@@ -213,7 +213,7 @@ class TestAssertResourceExists:
 class TestAssertResourceCount:
     """Tests for assert_resource_count."""
 
-    def test_exact_count_match(self):
+    def test_exact_count_match(self) -> None:
         """Test exact count matching."""
         test = assert_resource_count(exact_count=2)
         resources = [
@@ -223,7 +223,7 @@ class TestAssertResourceCount:
         result = test.run(resources, {})
         assert result.passed is True
 
-    def test_exact_count_mismatch(self):
+    def test_exact_count_mismatch(self) -> None:
         """Test exact count not matching."""
         test = assert_resource_count(exact_count=3)
         resources = [
@@ -233,7 +233,7 @@ class TestAssertResourceCount:
         result = test.run(resources, {})
         assert result.passed is False
 
-    def test_min_count(self):
+    def test_min_count(self) -> None:
         """Test minimum count."""
         test = assert_resource_count(min_count=1)
         resources = [
@@ -242,7 +242,7 @@ class TestAssertResourceCount:
         result = test.run(resources, {})
         assert result.passed is True
 
-    def test_max_count_exceeded(self):
+    def test_max_count_exceeded(self) -> None:
         """Test maximum count exceeded."""
         test = assert_resource_count(max_count=1)
         resources = [
@@ -256,7 +256,7 @@ class TestAssertResourceCount:
 class TestAssertNoDuplicateNames:
     """Tests for assert_no_duplicate_names."""
 
-    def test_no_duplicates(self):
+    def test_no_duplicates(self) -> None:
         """Test with no duplicates."""
         test = assert_no_duplicate_names()
         resources = [
@@ -266,7 +266,7 @@ class TestAssertNoDuplicateNames:
         result = test.run(resources, {})
         assert result.passed is True
 
-    def test_with_duplicates(self):
+    def test_with_duplicates(self) -> None:
         """Test with duplicate names."""
         test = assert_no_duplicate_names()
         resources = [
@@ -275,13 +275,14 @@ class TestAssertNoDuplicateNames:
         ]
         result = test.run(resources, {})
         assert result.passed is False
+        assert result.details is not None
         assert "duplicates" in result.details
 
 
 class TestAssertReferencesExist:
     """Tests for assert_references_exist."""
 
-    def test_valid_references(self):
+    def test_valid_references(self) -> None:
         """Test when all references exist."""
         test = assert_references_exist("network", "networks")
         resources = [
@@ -291,7 +292,7 @@ class TestAssertReferencesExist:
         result = test.run(resources, {})
         assert result.passed is True
 
-    def test_missing_reference(self):
+    def test_missing_reference(self) -> None:
         """Test when reference doesn't exist."""
         test = assert_references_exist("network", "networks")
         resources = [
@@ -306,7 +307,7 @@ class TestAssertReferencesExist:
 class TestAssertConfigHasKey:
     """Tests for assert_config_has_key."""
 
-    def test_key_exists(self):
+    def test_key_exists(self) -> None:
         """Test when config key exists."""
         test = assert_config_has_key("memory")
         resources = [
@@ -315,7 +316,7 @@ class TestAssertConfigHasKey:
         result = test.run(resources, {})
         assert result.passed is True
 
-    def test_key_missing(self):
+    def test_key_missing(self) -> None:
         """Test when config key is missing."""
         test = assert_config_has_key("memory")
         resources = [
@@ -328,7 +329,7 @@ class TestAssertConfigHasKey:
 class TestAssertConfigMatches:
     """Tests for assert_config_matches."""
 
-    def test_exact_value_match(self):
+    def test_exact_value_match(self) -> None:
         """Test matching exact value."""
         test = assert_config_matches("memory", expected_value=1024)
         resources = [
@@ -337,7 +338,7 @@ class TestAssertConfigMatches:
         result = test.run(resources, {})
         assert result.passed is True
 
-    def test_pattern_match(self):
+    def test_pattern_match(self) -> None:
         """Test matching regex pattern."""
         test = assert_config_matches("name", pattern=r"^prod-.*")
         resources = [
@@ -346,7 +347,7 @@ class TestAssertConfigMatches:
         result = test.run(resources, {})
         assert result.passed is True
 
-    def test_pattern_mismatch(self):
+    def test_pattern_mismatch(self) -> None:
         """Test pattern not matching."""
         test = assert_config_matches("name", pattern=r"^prod-.*")
         resources = [

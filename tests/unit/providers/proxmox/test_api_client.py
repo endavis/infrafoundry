@@ -6,11 +6,12 @@ import pytest
 import requests
 
 from infrafoundry.core.exceptions import APIError, AuthenticationError
+from infrafoundry.core.types import ProxmoxProviderSettings
 from infrafoundry.providers.proxmox.api_client import ProxmoxClient
 
 
 @pytest.fixture
-def client():
+def client() -> ProxmoxClient:
     """Create a ProxmoxClient instance."""
     return ProxmoxClient(
         api_url="https://proxmox.example.com:8006/api2/json",
@@ -22,7 +23,7 @@ class TestGetJson:
     """Tests for ProxmoxClient.get_json."""
 
     @patch("infrafoundry.providers.proxmox.api_client.requests.get")
-    def test_success(self, mock_get, client):
+    def test_success(self, mock_get: MagicMock, client: ProxmoxClient) -> None:
         """Successful GET returns parsed JSON dict."""
         mock_response = MagicMock()
         mock_response.ok = True
@@ -41,7 +42,9 @@ class TestGetJson:
         )
 
     @patch("infrafoundry.providers.proxmox.api_client.requests.get")
-    def test_http_401_raises_authentication_error(self, mock_get, client):
+    def test_http_401_raises_authentication_error(
+        self, mock_get: MagicMock, client: ProxmoxClient
+    ) -> None:
         """HTTP 401 raises AuthenticationError."""
         mock_response = MagicMock()
         mock_response.status_code = 401
@@ -56,7 +59,9 @@ class TestGetJson:
         assert exc_info.value.provider == "proxmox"
 
     @patch("infrafoundry.providers.proxmox.api_client.requests.get")
-    def test_http_403_raises_authentication_error(self, mock_get, client):
+    def test_http_403_raises_authentication_error(
+        self, mock_get: MagicMock, client: ProxmoxClient
+    ) -> None:
         """HTTP 403 raises AuthenticationError."""
         mock_response = MagicMock()
         mock_response.status_code = 403
@@ -68,7 +73,7 @@ class TestGetJson:
             client.get_json("version")
 
     @patch("infrafoundry.providers.proxmox.api_client.requests.get")
-    def test_http_500_raises_api_error(self, mock_get, client):
+    def test_http_500_raises_api_error(self, mock_get: MagicMock, client: ProxmoxClient) -> None:
         """HTTP 500 raises APIError with status code."""
         mock_response = MagicMock()
         mock_response.status_code = 500
@@ -83,7 +88,9 @@ class TestGetJson:
         assert exc_info.value.provider == "proxmox"
 
     @patch("infrafoundry.providers.proxmox.api_client.requests.get")
-    def test_connection_error_raises_api_error(self, mock_get, client):
+    def test_connection_error_raises_api_error(
+        self, mock_get: MagicMock, client: ProxmoxClient
+    ) -> None:
         """Connection error raises APIError."""
         mock_get.side_effect = requests.exceptions.ConnectionError("Connection refused")
 
@@ -93,7 +100,7 @@ class TestGetJson:
         assert "connection failed" in exc_info.value.message.lower()
 
     @patch("infrafoundry.providers.proxmox.api_client.requests.get")
-    def test_timeout_raises_api_error(self, mock_get, client):
+    def test_timeout_raises_api_error(self, mock_get: MagicMock, client: ProxmoxClient) -> None:
         """Timeout raises APIError."""
         mock_get.side_effect = requests.exceptions.Timeout("Request timed out")
 
@@ -103,7 +110,9 @@ class TestGetJson:
         assert "timed out" in exc_info.value.message.lower()
 
     @patch("infrafoundry.providers.proxmox.api_client.requests.get")
-    def test_invalid_json_raises_api_error(self, mock_get, client):
+    def test_invalid_json_raises_api_error(
+        self, mock_get: MagicMock, client: ProxmoxClient
+    ) -> None:
         """Invalid JSON response raises APIError."""
         mock_response = MagicMock()
         mock_response.ok = True
@@ -117,7 +126,7 @@ class TestGetJson:
         assert "Invalid JSON" in exc_info.value.message
 
     @patch("infrafoundry.providers.proxmox.api_client.requests.get")
-    def test_passes_extra_kwargs(self, mock_get, client):
+    def test_passes_extra_kwargs(self, mock_get: MagicMock, client: ProxmoxClient) -> None:
         """Extra kwargs are passed through to requests.get."""
         mock_response = MagicMock()
         mock_response.ok = True
@@ -134,9 +143,9 @@ class TestGetJson:
 class TestFromProviderSettings:
     """Tests for ProxmoxClient.from_provider_settings."""
 
-    def test_with_api_token(self):
+    def test_with_api_token(self) -> None:
         """Creates client from api_token setting."""
-        settings = {
+        settings: ProxmoxProviderSettings = {
             "api_url": "https://pve.example.com:8006/api2/json",
             "api_token": "user@pam!token=secret",
             "node": "pve1",
@@ -148,9 +157,9 @@ class TestFromProviderSettings:
         assert client.base_url == "https://pve.example.com:8006/api2/json"
         assert client.headers["Authorization"] == "PVEAPIToken=user@pam!token=secret"
 
-    def test_with_token_id_and_secret(self):
+    def test_with_token_id_and_secret(self) -> None:
         """Creates client from api_token_id + api_token_secret."""
-        settings = {
+        settings: ProxmoxProviderSettings = {
             "api_url": "https://pve.example.com:8006/api2/json",
             "api_token_id": "user@pam!mytoken",
             "api_token_secret": "12345-abcde",
@@ -162,9 +171,9 @@ class TestFromProviderSettings:
         assert client is not None
         assert client.headers["Authorization"] == "PVEAPIToken=user@pam!mytoken=12345-abcde"
 
-    def test_no_token_returns_none(self):
+    def test_no_token_returns_none(self) -> None:
         """Returns None when no token is available."""
-        settings = {
+        settings: ProxmoxProviderSettings = {
             "api_url": "https://pve.example.com:8006/api2/json",
             "node": "pve1",
         }
@@ -173,9 +182,9 @@ class TestFromProviderSettings:
 
         assert client is None
 
-    def test_no_api_url_returns_none(self):
+    def test_no_api_url_returns_none(self) -> None:
         """Returns None when api_url is missing."""
-        settings = {
+        settings: ProxmoxProviderSettings = {
             "api_token": "user@pam!token=secret",
             "node": "pve1",
         }
@@ -188,6 +197,6 @@ class TestFromProviderSettings:
 class TestBaseUrl:
     """Tests for the base_url property."""
 
-    def test_returns_api_url(self, client):
+    def test_returns_api_url(self, client: ProxmoxClient) -> None:
         """base_url property returns the API URL."""
         assert client.base_url == "https://proxmox.example.com:8006/api2/json"

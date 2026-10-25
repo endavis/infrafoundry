@@ -4,6 +4,9 @@ Tests that all cloud-init directives are passed through to the generated
 user-data, not just a hardcoded subset.
 """
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -11,7 +14,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> ProxmoxProvider:
     """Create a ProxmoxProvider with snippet directories."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -28,14 +31,14 @@ def provider(tmp_path):
 
 
 @pytest.fixture
-def snippet_dir(tmp_path):
+def snippet_dir(tmp_path: Path) -> Path:
     """Return the snippet directory path."""
     return tmp_path / "config" / "test" / "files" / "cloud-init-snippets"
 
 
-def _make_vm(name: str = "test-vm", **config_overrides) -> ResourceConfig:
+def _make_vm(name: str = "test-vm", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a VM ResourceConfig."""
-    config: dict = {
+    config: dict[str, Any] = {
         "name": name,
         "target_node": "pve01",
         **config_overrides,
@@ -43,7 +46,7 @@ def _make_vm(name: str = "test-vm", **config_overrides) -> ResourceConfig:
     return ResourceConfig(name=name, type="vm", provider="proxmox", config=config)
 
 
-def _write_snippet(snippet_dir, path, content):
+def _write_snippet(snippet_dir: Path, path: Any, content: Any) -> None:
     """Write a cloud-init snippet YAML file."""
     full_path = snippet_dir / f"{path}.yaml"
     full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -53,7 +56,7 @@ def _write_snippet(snippet_dir, path, content):
 class TestSnippetPassthrough:
     """Tests that all cloud-init directives are preserved."""
 
-    def test_mounts_preserved(self, provider, snippet_dir):
+    def test_mounts_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """Mounts directive should be included in user-data."""
         _write_snippet(
             snippet_dir,
@@ -66,7 +69,7 @@ class TestSnippetPassthrough:
         assert "mounts:" in result.config["cloud_init_user_data"]
         assert "10.0.0.1:/export" in result.config["cloud_init_user_data"]
 
-    def test_write_files_preserved(self, provider, snippet_dir):
+    def test_write_files_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """write_files directive should be included in user-data."""
         _write_snippet(
             snippet_dir,
@@ -78,7 +81,7 @@ class TestSnippetPassthrough:
         assert "write_files:" in result.config["cloud_init_user_data"]
         assert "/etc/myapp.conf" in result.config["cloud_init_user_data"]
 
-    def test_bootcmd_preserved(self, provider, snippet_dir):
+    def test_bootcmd_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """bootcmd directive should be included in user-data."""
         _write_snippet(
             snippet_dir,
@@ -89,7 +92,7 @@ class TestSnippetPassthrough:
         result = provider._process_cloud_init_snippets(vm)
         assert "bootcmd:" in result.config["cloud_init_user_data"]
 
-    def test_swap_preserved(self, provider, snippet_dir):
+    def test_swap_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """swap directive should be included in user-data."""
         _write_snippet(
             snippet_dir,
@@ -100,7 +103,7 @@ class TestSnippetPassthrough:
         result = provider._process_cloud_init_snippets(vm)
         assert "swap:" in result.config["cloud_init_user_data"]
 
-    def test_hostname_preserved(self, provider, snippet_dir):
+    def test_hostname_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """hostname directive should be included in user-data."""
         _write_snippet(
             snippet_dir,
@@ -113,7 +116,7 @@ class TestSnippetPassthrough:
         assert "hostname: web-01" in user_data
         assert "fqdn: web-01" in user_data
 
-    def test_users_preserved(self, provider, snippet_dir):
+    def test_users_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """users directive should be included in user-data."""
         _write_snippet(
             snippet_dir,
@@ -125,7 +128,7 @@ class TestSnippetPassthrough:
         assert "users:" in result.config["cloud_init_user_data"]
         assert "admin" in result.config["cloud_init_user_data"]
 
-    def test_packages_preserved(self, provider, snippet_dir):
+    def test_packages_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """packages directive should be included in user-data."""
         _write_snippet(
             snippet_dir,
@@ -137,7 +140,7 @@ class TestSnippetPassthrough:
         assert "packages:" in result.config["cloud_init_user_data"]
         assert "nginx" in result.config["cloud_init_user_data"]
 
-    def test_runcmd_preserved(self, provider, snippet_dir):
+    def test_runcmd_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """runcmd directive should be included in user-data."""
         _write_snippet(
             snippet_dir,
@@ -148,7 +151,7 @@ class TestSnippetPassthrough:
         result = provider._process_cloud_init_snippets(vm)
         assert "runcmd:" in result.config["cloud_init_user_data"]
 
-    def test_network_preserved(self, provider, snippet_dir):
+    def test_network_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """network directive should be included in user-data."""
         _write_snippet(
             snippet_dir,
@@ -164,7 +167,7 @@ class TestSnippetPassthrough:
 class TestSnippetMerging:
     """Tests for merging multiple snippets."""
 
-    def test_multiple_snippets_merged(self, provider, snippet_dir):
+    def test_multiple_snippets_merged(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """Multiple snippets should be deep-merged."""
         _write_snippet(snippet_dir, "users/admin", "users:\n  - name: admin\n")
         _write_snippet(snippet_dir, "packages/base", "packages:\n  - nginx\n")
@@ -180,7 +183,7 @@ class TestSnippetMerging:
         assert "packages:" in user_data
         assert "mounts:" in user_data
 
-    def test_list_fields_merged(self, provider, snippet_dir):
+    def test_list_fields_merged(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """List fields from multiple snippets should be concatenated."""
         _write_snippet(snippet_dir, "packages/a", "packages:\n  - nginx\n")
         _write_snippet(snippet_dir, "packages/b", "packages:\n  - curl\n")
@@ -190,7 +193,7 @@ class TestSnippetMerging:
         assert "nginx" in user_data
         assert "curl" in user_data
 
-    def test_variable_substitution(self, provider, snippet_dir):
+    def test_variable_substitution(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """Variables in snippets should be substituted."""
         _write_snippet(
             snippet_dir,
@@ -208,13 +211,15 @@ class TestSnippetMerging:
 class TestSnippetEdgeCases:
     """Edge cases for snippet processing."""
 
-    def test_no_snippets_no_user_data(self, provider):
+    def test_no_snippets_no_user_data(self, provider: ProxmoxProvider) -> None:
         """VM without snippets should not have cloud_init_user_data."""
         vm = _make_vm()
         result = provider._process_cloud_init_snippets(vm)
         assert "cloud_init_user_data" not in result.config
 
-    def test_missing_snippet_warns(self, provider, caplog):
+    def test_missing_snippet_warns(
+        self, provider: ProxmoxProvider, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Missing snippet should log a warning (not raise)."""
         import logging
 
@@ -225,14 +230,14 @@ class TestSnippetEdgeCases:
         assert "Cloud-init snippet not found" in caplog.text
         assert "cloud_init_user_data" not in result.config
 
-    def test_missing_snippet_strict_raises(self, provider):
+    def test_missing_snippet_strict_raises(self, provider: ProxmoxProvider) -> None:
         """Missing snippet in strict mode should raise FileNotFoundError."""
         vm = _make_vm(cloud_init_snippets=["nonexistent/snippet"])
         provider.fail_on_missing_snippets = True
         with pytest.raises(FileNotFoundError):
             provider._process_cloud_init_snippets(vm)
 
-    def test_does_not_mutate_original(self, provider, snippet_dir):
+    def test_does_not_mutate_original(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """Original VM config should not be modified."""
         _write_snippet(snippet_dir, "packages/base", "packages:\n  - nginx\n")
         vm = _make_vm(cloud_init_snippets=["packages/base"])
@@ -243,7 +248,9 @@ class TestSnippetEdgeCases:
 class TestTemplateRendering:
     """Tests that the template renders cloud-init user-data correctly."""
 
-    def test_user_data_creates_file_resource(self, provider, snippet_dir):
+    def test_user_data_creates_file_resource(
+        self, provider: ProxmoxProvider, snippet_dir: Path
+    ) -> None:
         """VM with snippets should create a proxmox_virtual_environment_file resource."""
         _write_snippet(snippet_dir, "packages/base", "packages:\n  - nginx\n")
         vm = _make_vm(
@@ -259,14 +266,14 @@ class TestTemplateRendering:
         assert "nginx" in content
         assert "user_data_file_id" in content
 
-    def test_no_snippets_no_file_resource(self, provider):
+    def test_no_snippets_no_file_resource(self, provider: ProxmoxProvider) -> None:
         """VM without snippets should not create a file resource."""
         vm = _make_vm(ipconfig="ip=dhcp")
         processed = provider._normalize_vm_config(vm)
         content = provider.render_template("proxmox/vms.tf.j2", {"vms": [processed]})
         assert "proxmox_virtual_environment_file" not in content
 
-    def test_mounts_in_rendered_output(self, provider, snippet_dir):
+    def test_mounts_in_rendered_output(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """Mounts should appear in the rendered Terraform output."""
         _write_snippet(
             snippet_dir,
@@ -283,7 +290,9 @@ class TestTemplateRendering:
         assert "mounts:" in content
         assert "10.0.0.1:/export" in content
 
-    def test_ip_config_alongside_user_data(self, provider, snippet_dir):
+    def test_ip_config_alongside_user_data(
+        self, provider: ProxmoxProvider, snippet_dir: Path
+    ) -> None:
         """ipconfig should render ip_config block alongside custom user-data."""
         _write_snippet(snippet_dir, "users/admin", "users:\n  - name: admin\n")
         vm = _make_vm(

@@ -26,7 +26,7 @@ import subprocess
 import sys
 import types
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -585,7 +585,7 @@ BYPASS_CASES = [
 ]
 
 # --- File-edit cases (Claude/Codex format) ---
-EDIT_CASES: list[tuple[str, dict, str, str]] = [
+EDIT_CASES: list[tuple[str, dict[str, Any], str, str]] = [
     (
         "Edit",
         {
@@ -668,7 +668,7 @@ EDIT_CASES: list[tuple[str, dict, str, str]] = [
 ]
 
 # --- File-edit cases (Copilot format) ---
-COPILOT_EDIT_CASES: list[tuple[str, dict, str, str]] = [
+COPILOT_EDIT_CASES: list[tuple[str, dict[str, Any], str, str]] = [
     (
         "Edit",
         {
@@ -841,7 +841,7 @@ def _outcome_stdout(
         return "ALLOW"
 
 
-def _ids(cases: list, desc_index: int) -> list[str]:
+def _ids(cases: list[Any], desc_index: int) -> list[str]:
     """Build unique, readable test ids from each case's description."""
     return [f"{i:03d}-{case[desc_index]}" for i, case in enumerate(cases)]
 
@@ -884,7 +884,7 @@ def test_file_edit_claude_format(
     hook: types.ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tool_name: str,
-    tool_input: dict,
+    tool_input: dict[str, Any],
     expected: str,
     description: str,
 ) -> None:
@@ -903,7 +903,7 @@ def test_file_edit_copilot_format(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tool_name: str,
-    tool_input: dict,
+    tool_input: dict[str, Any],
     expected: str,
     description: str,
 ) -> None:

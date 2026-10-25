@@ -74,7 +74,7 @@ def mock_subprocess() -> Iterator[MagicMock]:
                         result = spec(cmd)
                         if isinstance(result, BaseException):
                             raise result
-                        return result  # type: ignore[return-value]
+                        return result
                     return MagicMock(
                         returncode=spec.get("returncode", 0),
                         stdout=spec.get("stdout", ""),
@@ -88,14 +88,14 @@ def mock_subprocess() -> Iterator[MagicMock]:
 
 
 @pytest.fixture
-def temp_dir():
+def temp_dir() -> Iterator[Path]:
     """Create a temporary directory for test files."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
 
 
 @pytest.fixture
-def mock_config_manager(temp_dir):
+def mock_config_manager(temp_dir: Path) -> Mock:
     """Create a mock ConfigManager with required attributes for Orchestrator tests."""
     config_manager = Mock(spec=ConfigManager)
     config_manager.base_dir = temp_dir
@@ -104,7 +104,7 @@ def mock_config_manager(temp_dir):
 
 
 @pytest.fixture
-def mock_config_dir(temp_dir):
+def mock_config_dir(temp_dir: Path) -> Any:
     """Create a mock configuration directory structure."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
@@ -171,7 +171,7 @@ def mock_config_dir(temp_dir):
 
 
 @pytest.fixture
-def mock_secrets_dir(temp_dir):
+def mock_secrets_dir(temp_dir: Path) -> Any:
     """Create a mock secrets directory."""
     secrets_dir = temp_dir / "secrets"
     secrets_dir.mkdir()
@@ -187,7 +187,7 @@ def mock_secrets_dir(temp_dir):
 
 
 @pytest.fixture
-def mock_policy_dir(temp_dir):
+def mock_policy_dir(temp_dir: Path) -> Any:
     """Create a mock policy directory."""
     policy_dir = temp_dir / "policies"
     policy_dir.mkdir()
@@ -231,7 +231,7 @@ def mock_policy_dir(temp_dir):
 
 
 @pytest.fixture
-def mock_config():
+def mock_config() -> dict[str, Any]:
     """Create mock configuration data for orchestrator tests."""
     from unittest.mock import Mock
 
@@ -257,7 +257,7 @@ def mock_config():
 
 
 @pytest.fixture
-def mock_terraform_state():
+def mock_terraform_state() -> dict[str, Any]:
     """Create a mock Terraform state."""
     return {
         "version": 4,
@@ -289,7 +289,7 @@ def mock_terraform_state():
 
 
 @pytest.fixture
-def mock_provider_config():
+def mock_provider_config() -> dict[str, Any]:
     """Create a mock provider configuration."""
     return {
         "proxmox": {
@@ -306,14 +306,14 @@ def mock_provider_config():
 
 
 @pytest.fixture
-def mock_environment_vars(monkeypatch):
+def mock_environment_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Set up mock environment variables."""
     monkeypatch.setenv("INFRAFOUNDRY_LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("ANSIBLE_HOST_KEY_CHECKING", "False")
 
 
 @pytest.fixture
-def sample_vm_resource():
+def sample_vm_resource() -> dict[str, Any]:
     """Sample VM resource configuration."""
     return {
         "name": "test-vm-01",
@@ -327,7 +327,7 @@ def sample_vm_resource():
 
 
 @pytest.fixture
-def sample_firewall_rule():
+def sample_firewall_rule() -> dict[str, Any]:
     """Sample firewall rule configuration."""
     return {
         "name": "allow-http",
@@ -341,7 +341,7 @@ def sample_firewall_rule():
 
 
 @pytest.fixture
-def sample_k8s_deployment():
+def sample_k8s_deployment() -> dict[str, Any]:
     """Sample Kubernetes deployment configuration."""
     return {
         "name": "web-app",

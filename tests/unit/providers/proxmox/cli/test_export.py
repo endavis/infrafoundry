@@ -10,13 +10,13 @@ from infrafoundry.providers.proxmox.cli.export import export_proxmox
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_config_manager():
+def mock_config_manager() -> Mock:
     """Mock ConfigManager for testing."""
     mock = Mock()
     mock_env = Mock()
@@ -34,7 +34,7 @@ def mock_config_manager():
 
 
 @pytest.fixture
-def mock_exporter():
+def mock_exporter() -> Mock:
     """Mock ProxmoxConfigExporter for testing."""
     mock = Mock()
     mock.export.return_value = {
@@ -45,7 +45,9 @@ def mock_exporter():
     return mock
 
 
-def test_export_proxmox_success(cli_runner, tmp_path, mock_config_manager, mock_exporter):
+def test_export_proxmox_success(
+    cli_runner: CliRunner, tmp_path: Path, mock_config_manager: Mock, mock_exporter: Mock
+) -> None:
     """Test successful Proxmox configuration export."""
     output_dir = tmp_path / "output"
 
@@ -76,7 +78,9 @@ def test_export_proxmox_success(cli_runner, tmp_path, mock_config_manager, mock_
         assert (output_dir / "storage.yaml").read_text() == "storage: content"
 
 
-def test_export_proxmox_with_node_filter(cli_runner, tmp_path, mock_config_manager, mock_exporter):
+def test_export_proxmox_with_node_filter(
+    cli_runner: CliRunner, tmp_path: Path, mock_config_manager: Mock, mock_exporter: Mock
+) -> None:
     """Test export with node filter."""
     output_dir = tmp_path / "output"
 
@@ -101,8 +105,8 @@ def test_export_proxmox_with_node_filter(cli_runner, tmp_path, mock_config_manag
 
 
 def test_export_proxmox_with_resource_type_filter(
-    cli_runner, tmp_path, mock_config_manager, mock_exporter
-):
+    cli_runner: CliRunner, tmp_path: Path, mock_config_manager: Mock, mock_exporter: Mock
+) -> None:
     """Test export with resource type filter."""
     output_dir = tmp_path / "output"
 
@@ -126,7 +130,9 @@ def test_export_proxmox_with_resource_type_filter(
         mock_exporter.export.assert_called_once_with(node_filter=None, resource_filter="vm")
 
 
-def test_export_proxmox_with_both_filters(cli_runner, tmp_path, mock_config_manager, mock_exporter):
+def test_export_proxmox_with_both_filters(
+    cli_runner: CliRunner, tmp_path: Path, mock_config_manager: Mock, mock_exporter: Mock
+) -> None:
     """Test export with both node and resource type filters."""
     output_dir = tmp_path / "output"
 
@@ -159,7 +165,7 @@ def test_export_proxmox_with_both_filters(cli_runner, tmp_path, mock_config_mana
         mock_exporter.export.assert_called_once_with(node_filter="pve2", resource_filter="network")
 
 
-def test_export_proxmox_missing_env(cli_runner, tmp_path):
+def test_export_proxmox_missing_env(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test export fails when --env is not provided."""
     output_dir = tmp_path / "output"
 
@@ -173,7 +179,7 @@ def test_export_proxmox_missing_env(cli_runner, tmp_path):
     assert "Missing option '--env'" in result.output or "Error" in result.output
 
 
-def test_export_proxmox_missing_output(cli_runner):
+def test_export_proxmox_missing_output(cli_runner: CliRunner) -> None:
     """Test export fails when --output is not provided."""
     result = cli_runner.invoke(
         export_proxmox,
@@ -186,8 +192,8 @@ def test_export_proxmox_missing_output(cli_runner):
 
 
 def test_export_proxmox_creates_output_directory(
-    cli_runner, tmp_path, mock_config_manager, mock_exporter
-):
+    cli_runner: CliRunner, tmp_path: Path, mock_config_manager: Mock, mock_exporter: Mock
+) -> None:
     """Test export creates output directory if it doesn't exist."""
     output_dir = tmp_path / "nested" / "output" / "dir"
     assert not output_dir.exists()
@@ -212,7 +218,9 @@ def test_export_proxmox_creates_output_directory(
         assert output_dir.exists()
 
 
-def test_export_proxmox_handles_exporter_error(cli_runner, tmp_path, mock_config_manager):
+def test_export_proxmox_handles_exporter_error(
+    cli_runner: CliRunner, tmp_path: Path, mock_config_manager: Mock
+) -> None:
     """Test export handles exporter errors gracefully."""
     output_dir = tmp_path / "output"
 
@@ -239,7 +247,7 @@ def test_export_proxmox_handles_exporter_error(cli_runner, tmp_path, mock_config
         assert "Failed to export Proxmox configuration" in result.output
 
 
-def test_export_proxmox_handles_config_load_error(cli_runner, tmp_path):
+def test_export_proxmox_handles_config_load_error(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test export handles configuration load errors."""
     output_dir = tmp_path / "output"
 
@@ -260,7 +268,9 @@ def test_export_proxmox_handles_config_load_error(cli_runner, tmp_path):
         assert "Failed to export Proxmox configuration" in result.output
 
 
-def test_export_proxmox_without_config_dir(cli_runner, tmp_path, mock_exporter):
+def test_export_proxmox_without_config_dir(
+    cli_runner: CliRunner, tmp_path: Path, mock_exporter: Mock
+) -> None:
     """Test export works without config_dir in context."""
     output_dir = tmp_path / "output"
 
@@ -295,7 +305,7 @@ def test_export_proxmox_without_config_dir(cli_runner, tmp_path, mock_exporter):
         assert result.exit_code == 0
 
 
-def test_export_proxmox_invalid_resource_type(cli_runner, tmp_path):
+def test_export_proxmox_invalid_resource_type(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test export rejects invalid resource type."""
     output_dir = tmp_path / "output"
 

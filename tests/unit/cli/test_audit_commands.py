@@ -1,5 +1,8 @@
 """Tests for audit CLI commands."""
 
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,13 +18,13 @@ from infrafoundry.core.state.models import Base
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Create a CLI runner for testing."""
     return CliRunner()
 
 
 @pytest.fixture
-def db_session_factory(tmp_path):
+def db_session_factory(tmp_path: Path) -> Iterator[Any]:
     """Create a SQLite database for testing."""
     db_path = tmp_path / "test.db"
     engine = create_engine(f"sqlite:///{db_path}")
@@ -32,7 +35,7 @@ def db_session_factory(tmp_path):
 
 
 @pytest.fixture
-def audit_logger(db_session_factory):
+def audit_logger(db_session_factory: Any) -> AuditLogger:
     """Create an AuditLogger with test database."""
     return AuditLogger(
         session_factory=db_session_factory,
@@ -41,7 +44,7 @@ def audit_logger(db_session_factory):
 
 
 @pytest.fixture
-def populated_logger(audit_logger):
+def populated_logger(audit_logger: AuditLogger) -> Any:
     """Create an AuditLogger with some test entries."""
     # Create various audit entries
     audit_logger.log(
@@ -72,25 +75,25 @@ def populated_logger(audit_logger):
 class TestAuditCommandGroup:
     """Tests for the audit command group."""
 
-    def test_audit_group_exists(self, cli_runner):
+    def test_audit_group_exists(self, cli_runner: CliRunner) -> None:
         """Test that audit command group is registered."""
         result = cli_runner.invoke(audit, ["--help"])
         assert result.exit_code == 0
         assert "audit" in result.output.lower() or "View and export" in result.output
 
-    def test_audit_list_subcommand_exists(self, cli_runner):
+    def test_audit_list_subcommand_exists(self, cli_runner: CliRunner) -> None:
         """Test that list subcommand exists."""
         result = cli_runner.invoke(audit, ["list", "--help"])
         assert result.exit_code == 0
         assert "entries" in result.output.lower() or "--env" in result.output
 
-    def test_audit_export_subcommand_exists(self, cli_runner):
+    def test_audit_export_subcommand_exists(self, cli_runner: CliRunner) -> None:
         """Test that export subcommand exists."""
         result = cli_runner.invoke(audit, ["export", "--help"])
         assert result.exit_code == 0
         assert "--format" in result.output or "--output" in result.output
 
-    def test_audit_verify_subcommand_exists(self, cli_runner):
+    def test_audit_verify_subcommand_exists(self, cli_runner: CliRunner) -> None:
         """Test that verify subcommand exists."""
         result = cli_runner.invoke(audit, ["verify", "--help"])
         assert result.exit_code == 0
@@ -100,7 +103,7 @@ class TestAuditCommandGroup:
 class TestAuditListCommand:
     """Tests for infra audit list command."""
 
-    def test_list_no_entries(self, cli_runner, db_session_factory):
+    def test_list_no_entries(self, cli_runner: CliRunner, db_session_factory: Any) -> None:
         """Test list with no audit entries."""
         with patch("infrafoundry.cli.commands.audit.list.StateManager") as mock_sm:
             mock_instance = MagicMock()
@@ -112,7 +115,9 @@ class TestAuditListCommand:
         assert result.exit_code == 0
         assert "No audit entries found" in result.output
 
-    def test_list_shows_entries(self, cli_runner, db_session_factory, populated_logger):
+    def test_list_shows_entries(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any
+    ) -> None:
         """Test list displays audit entries."""
         with patch("infrafoundry.cli.commands.audit.list.StateManager") as mock_sm:
             mock_instance = MagicMock()
@@ -125,7 +130,9 @@ class TestAuditListCommand:
         # Should show some entries in table format
         assert "entries" in result.output.lower() or "plan_completed" in result.output
 
-    def test_list_filter_by_env(self, cli_runner, db_session_factory, populated_logger):
+    def test_list_filter_by_env(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any
+    ) -> None:
         """Test list with environment filter."""
         with patch("infrafoundry.cli.commands.audit.list.StateManager") as mock_sm:
             mock_instance = MagicMock()
@@ -136,7 +143,9 @@ class TestAuditListCommand:
 
         assert result.exit_code == 0
 
-    def test_list_filter_by_user(self, cli_runner, db_session_factory, populated_logger):
+    def test_list_filter_by_user(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any
+    ) -> None:
         """Test list with user filter."""
         with patch("infrafoundry.cli.commands.audit.list.StateManager") as mock_sm:
             mock_instance = MagicMock()
@@ -147,7 +156,9 @@ class TestAuditListCommand:
 
         assert result.exit_code == 0
 
-    def test_list_filter_by_action(self, cli_runner, db_session_factory, populated_logger):
+    def test_list_filter_by_action(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any
+    ) -> None:
         """Test list with action filter."""
         with patch("infrafoundry.cli.commands.audit.list.StateManager") as mock_sm:
             mock_instance = MagicMock()
@@ -158,7 +169,9 @@ class TestAuditListCommand:
 
         assert result.exit_code == 0
 
-    def test_list_with_limit(self, cli_runner, db_session_factory, populated_logger):
+    def test_list_with_limit(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any
+    ) -> None:
         """Test list with limit option."""
         with patch("infrafoundry.cli.commands.audit.list.StateManager") as mock_sm:
             mock_instance = MagicMock()
@@ -169,7 +182,9 @@ class TestAuditListCommand:
 
         assert result.exit_code == 0
 
-    def test_list_with_date_filter(self, cli_runner, db_session_factory, populated_logger):
+    def test_list_with_date_filter(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any
+    ) -> None:
         """Test list with date range filter."""
         with patch("infrafoundry.cli.commands.audit.list.StateManager") as mock_sm:
             mock_instance = MagicMock()
@@ -180,7 +195,7 @@ class TestAuditListCommand:
 
         assert result.exit_code == 0
 
-    def test_list_invalid_date_format(self, cli_runner, db_session_factory):
+    def test_list_invalid_date_format(self, cli_runner: CliRunner, db_session_factory: Any) -> None:
         """Test list with invalid date format."""
         with patch("infrafoundry.cli.commands.audit.list.StateManager") as mock_sm:
             mock_instance = MagicMock()
@@ -195,13 +210,15 @@ class TestAuditListCommand:
 class TestAuditExportCommand:
     """Tests for infra audit export command."""
 
-    def test_export_requires_output(self, cli_runner):
+    def test_export_requires_output(self, cli_runner: CliRunner) -> None:
         """Test export requires --output option."""
         result = cli_runner.invoke(audit, ["export"])
         assert result.exit_code != 0
         assert "output" in result.output.lower() or "required" in result.output.lower()
 
-    def test_export_json(self, cli_runner, db_session_factory, populated_logger, tmp_path):
+    def test_export_json(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any, tmp_path: Path
+    ) -> None:
         """Test export to JSON format."""
         output_file = tmp_path / "audit.json"
 
@@ -217,7 +234,9 @@ class TestAuditExportCommand:
         assert result.exit_code == 0
         assert output_file.exists()
 
-    def test_export_csv(self, cli_runner, db_session_factory, populated_logger, tmp_path):
+    def test_export_csv(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any, tmp_path: Path
+    ) -> None:
         """Test export to CSV format."""
         output_file = tmp_path / "audit.csv"
 
@@ -233,7 +252,9 @@ class TestAuditExportCommand:
         assert result.exit_code == 0
         assert output_file.exists()
 
-    def test_export_with_filters(self, cli_runner, db_session_factory, populated_logger, tmp_path):
+    def test_export_with_filters(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any, tmp_path: Path
+    ) -> None:
         """Test export with filters applied."""
         output_file = tmp_path / "audit.json"
 
@@ -257,7 +278,9 @@ class TestAuditExportCommand:
 
         assert result.exit_code == 0
 
-    def test_export_no_entries_warning(self, cli_runner, db_session_factory, tmp_path):
+    def test_export_no_entries_warning(
+        self, cli_runner: CliRunner, db_session_factory: Any, tmp_path: Path
+    ) -> None:
         """Test export with no matching entries shows warning."""
         output_file = tmp_path / "audit.json"
 
@@ -277,12 +300,14 @@ class TestAuditExportCommand:
 class TestAuditVerifyCommand:
     """Tests for infra audit verify command."""
 
-    def test_verify_requires_entry_id(self, cli_runner):
+    def test_verify_requires_entry_id(self, cli_runner: CliRunner) -> None:
         """Test verify requires entry ID argument."""
         result = cli_runner.invoke(audit, ["verify"])
         assert result.exit_code != 0
 
-    def test_verify_valid_entry(self, cli_runner, db_session_factory, populated_logger):
+    def test_verify_valid_entry(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any
+    ) -> None:
         """Test verify with valid entry."""
         # Get an entry ID
         entries = populated_logger.query(limit=1)
@@ -298,7 +323,7 @@ class TestAuditVerifyCommand:
         assert result.exit_code == 0
         assert "PASSED" in result.output or "not been tampered" in result.output
 
-    def test_verify_nonexistent_entry(self, cli_runner, db_session_factory):
+    def test_verify_nonexistent_entry(self, cli_runner: CliRunner, db_session_factory: Any) -> None:
         """Test verify with nonexistent entry ID."""
         with patch("infrafoundry.cli.commands.audit.verify.StateManager") as mock_sm:
             mock_instance = MagicMock()
@@ -310,7 +335,9 @@ class TestAuditVerifyCommand:
         assert result.exit_code != 0
         assert "not found" in result.output
 
-    def test_verify_tampered_entry(self, cli_runner, db_session_factory, populated_logger):
+    def test_verify_tampered_entry(
+        self, cli_runner: CliRunner, db_session_factory: Any, populated_logger: Any
+    ) -> None:
         """Test verify detects tampered entry."""
         # Get an entry and tamper with it
         entries = populated_logger.query(limit=1)

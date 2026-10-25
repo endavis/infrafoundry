@@ -5,6 +5,7 @@ merge hardcoded tags with the extra_freeform_tags variable.
 """
 
 from pathlib import Path
+from typing import cast
 
 import jinja2
 import pytest
@@ -44,14 +45,14 @@ def _render_freeform_tags(
         extra_freeform_tags=extra_freeform_tags,
     )
     data = yaml.safe_load(rendered)
-    return data["freeform_tags"]
+    return cast("dict[str, str]", data["freeform_tags"])
 
 
 @pytest.mark.unit
 class TestExtraFreeformTagsExpression:
     """Test that Jinja2 dict iteration produces correct freeform_tags."""
 
-    def test_empty_extra_freeform_tags_preserves_base(self):
+    def test_empty_extra_freeform_tags_preserves_base(self) -> None:
         """Default extra_freeform_tags={} produces only the hardcoded tags."""
         result = _render_freeform_tags({})
         assert result == {
@@ -60,7 +61,7 @@ class TestExtraFreeformTagsExpression:
             "managed_by": "infrafoundry",
         }
 
-    def test_single_extra_freeform_tag_added(self):
+    def test_single_extra_freeform_tag_added(self) -> None:
         """A single extra freeform tag is included in the output."""
         result = _render_freeform_tags({"environment": "test"})
         assert result["environment"] == "test"
@@ -68,7 +69,7 @@ class TestExtraFreeformTagsExpression:
         assert result["cluster"] == "test-cluster"
         assert result["managed_by"] == "infrafoundry"
 
-    def test_multiple_extra_freeform_tags_added(self):
+    def test_multiple_extra_freeform_tags_added(self) -> None:
         """Multiple extra freeform tags are all included."""
         result = _render_freeform_tags({"environment": "test", "team": "platform"})
         assert result["environment"] == "test"
@@ -83,7 +84,7 @@ class TestExtraFreeformTagsExpression:
 class TestBlueprintDefaultsIncludeExtraFreeformTags:
     """Verify that oci-k3s-cluster blueprint.yaml declares extra_freeform_tags."""
 
-    def test_extra_freeform_tags_in_defaults(self):
+    def test_extra_freeform_tags_in_defaults(self) -> None:
         """Blueprint inputs must declare extra_freeform_tags with an empty dict default."""
         blueprint_path = BLUEPRINTS_DIR / "k3s-cluster" / "blueprint.yaml"
         data = yaml.safe_load(blueprint_path.read_text())
@@ -100,7 +101,7 @@ class TestBlueprintDefaultsIncludeExtraFreeformTags:
 class TestResourceTemplatesUseExtraFreeformTags:
     """Verify that instance.yaml references extra_freeform_tags."""
 
-    def test_template_contains_extra_freeform_tags(self):
+    def test_template_contains_extra_freeform_tags(self) -> None:
         """Resource template must contain 'extra_freeform_tags' in a loop."""
         resource_path = BLUEPRINTS_DIR / "k3s-cluster" / "providers" / "oci" / "instance.yaml"
         content = resource_path.read_text()

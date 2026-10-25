@@ -11,18 +11,18 @@ from infrafoundry.providers.esxi.validators.host_connectivity_validator import (
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> HostConnectivityValidator:
     """Create a HostConnectivityValidator instance."""
     return HostConnectivityValidator(report, timeout=1.0)
 
 
-def test_validate_host_reachable(validator, report):
+def test_validate_host_reachable(validator: HostConnectivityValidator, report: MagicMock) -> None:
     """Test validation of reachable host."""
     mock_conn = MagicMock()
     with patch("socket.create_connection", return_value=mock_conn):
@@ -36,7 +36,7 @@ def test_validate_host_reachable(validator, report):
     mock_conn.close.assert_called_once()
 
 
-def test_validate_host_unreachable(validator, report):
+def test_validate_host_unreachable(validator: HostConnectivityValidator, report: MagicMock) -> None:
     """Test validation of unreachable host."""
     with patch("socket.create_connection", side_effect=OSError("Connection refused")):
         validator.validate("esxi-host-01")
@@ -48,7 +48,7 @@ def test_validate_host_unreachable(validator, report):
     assert "esxi-host-01" in call_args["message"]
 
 
-def test_validate_custom_port(validator, report):
+def test_validate_custom_port(validator: HostConnectivityValidator, report: MagicMock) -> None:
     """Test validation with custom port."""
     mock_conn = MagicMock()
     with patch("socket.create_connection", return_value=mock_conn) as mock_create:
@@ -59,7 +59,7 @@ def test_validate_custom_port(validator, report):
     assert "port 443" in call_args["message"]
 
 
-def test_validate_timeout_error(validator, report):
+def test_validate_timeout_error(validator: HostConnectivityValidator, report: MagicMock) -> None:
     """Test validation when connection times out."""
     with patch("socket.create_connection", side_effect=OSError("Connection timed out")):
         validator.validate("esxi-host-01")
@@ -69,7 +69,9 @@ def test_validate_timeout_error(validator, report):
     assert "timed out" in call_args["message"]
 
 
-def test_validate_check_name_includes_hostname(validator, report):
+def test_validate_check_name_includes_hostname(
+    validator: HostConnectivityValidator, report: MagicMock
+) -> None:
     """Test that check name includes the hostname."""
     mock_conn = MagicMock()
     with patch("socket.create_connection", return_value=mock_conn):

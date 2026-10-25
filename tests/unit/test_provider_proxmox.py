@@ -1,5 +1,7 @@
 """Unit tests for ProxmoxProvider."""
 
+from pathlib import Path
+
 import pytest
 
 from infrafoundry.providers.proxmox import ProxmoxProvider
@@ -9,7 +11,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 class TestProxmoxProvider:
     """Tests for ProxmoxProvider."""
 
-    def test_init(self, temp_dir):
+    def test_init(self, temp_dir: Path) -> None:
         """Test ProxmoxProvider initialization."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -21,7 +23,7 @@ class TestProxmoxProvider:
         )
         assert provider.name == "proxmox"
 
-    def test_get_resource_types(self, temp_dir):
+    def test_get_resource_types(self, temp_dir: Path) -> None:
         """Test getting supported resource types."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -34,14 +36,14 @@ class TestProxmoxProvider:
         assert "vm" in types
         assert "template" in types
 
-    def test_terraform_parallelism_defaults_to_one(self, temp_dir):
+    def test_terraform_parallelism_defaults_to_one(self, temp_dir: Path) -> None:
         """Proxmox serializes terraform operations to avoid CFS lock timeouts."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
         provider = ProxmoxProvider(config_dir=config_dir, output_dir=temp_dir / "output")
         assert provider.terraform_parallelism == 1
 
-    def test_get_dependencies(self, temp_dir):
+    def test_get_dependencies(self, temp_dir: Path) -> None:
         """Test dependency resolution."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()

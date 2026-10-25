@@ -4,6 +4,9 @@ Tests template rendering for terraform_data trigger resources used
 to fire lifecycle events in packages without real infrastructure.
 """
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -11,7 +14,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> ProxmoxProvider:
     """Create a ProxmoxProvider for template testing."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -22,9 +25,9 @@ def provider(tmp_path):
     return p
 
 
-def _make_trigger(name: str = "test-trigger", **config_overrides) -> ResourceConfig:
+def _make_trigger(name: str = "test-trigger", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a trigger ResourceConfig."""
-    config: dict = {**config_overrides}
+    config: dict[str, Any] = {**config_overrides}
     return ResourceConfig(name=name, type="trigger", provider="proxmox", config=config)
 
 
@@ -36,13 +39,13 @@ def _render_triggers(provider: ProxmoxProvider, triggers: list[ResourceConfig]) 
 class TestTriggerRendering:
     """Tests for trigger resource template rendering."""
 
-    def test_trigger_basic(self, provider):
+    def test_trigger_basic(self, provider: ProxmoxProvider) -> None:
         """Basic trigger should render a terraform_data resource."""
         triggers = [_make_trigger()]
         content = _render_triggers(provider, triggers)
         assert 'resource "terraform_data" "test_trigger"' in content
 
-    def test_trigger_with_inputs(self, provider):
+    def test_trigger_with_inputs(self, provider: ProxmoxProvider) -> None:
         """Trigger with inputs should render input block."""
         triggers = [_make_trigger(inputs={"deployment": "minio", "version": "1.0"})]
         content = _render_triggers(provider, triggers)
@@ -51,19 +54,19 @@ class TestTriggerRendering:
         assert 'deployment = "minio"' in content
         assert 'version = "1.0"' in content
 
-    def test_trigger_without_inputs(self, provider):
+    def test_trigger_without_inputs(self, provider: ProxmoxProvider) -> None:
         """Trigger without inputs should not render input block."""
         triggers = [_make_trigger()]
         content = _render_triggers(provider, triggers)
         assert "input" not in content
 
-    def test_trigger_name_with_hyphens(self, provider):
+    def test_trigger_name_with_hyphens(self, provider: ProxmoxProvider) -> None:
         """Hyphens in trigger name should be converted to underscores."""
         triggers = [_make_trigger(name="minio-deploy-trigger")]
         content = _render_triggers(provider, triggers)
         assert 'resource "terraform_data" "minio_deploy_trigger"' in content
 
-    def test_multiple_triggers(self, provider):
+    def test_multiple_triggers(self, provider: ProxmoxProvider) -> None:
         """Multiple triggers should render multiple terraform_data resources."""
         triggers = [
             _make_trigger(name="trigger-1", inputs={"app": "minio"}),
@@ -79,17 +82,17 @@ class TestTriggerRendering:
 class TestTriggerProviderIntegration:
     """Tests for trigger type registration in the Proxmox provider."""
 
-    def test_trigger_in_resource_types(self, provider):
+    def test_trigger_in_resource_types(self, provider: ProxmoxProvider) -> None:
         """Trigger should be a supported resource type."""
         assert "trigger" in provider.get_resource_types()
 
-    def test_trigger_terraform_type(self, provider):
+    def test_trigger_terraform_type(self, provider: ProxmoxProvider) -> None:
         """Trigger should map to terraform_data."""
         tf_types = provider.get_terraform_resource_types()
         assert "trigger" in tf_types
         assert "terraform_data" in tf_types["trigger"]
 
-    def test_trigger_has_no_dependencies(self, provider):
+    def test_trigger_has_no_dependencies(self, provider: ProxmoxProvider) -> None:
         """Trigger should have no dependencies."""
         deps = provider.get_dependencies()
         assert "trigger" in deps

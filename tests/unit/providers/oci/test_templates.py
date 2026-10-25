@@ -1,5 +1,8 @@
 """Unit tests for OCI template rendering."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -7,7 +10,7 @@ from infrafoundry.providers.oci import OCIProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> OCIProvider:
     """Create an OCIProvider for template testing."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -21,14 +24,14 @@ def provider(tmp_path):
 class TestProviderTemplate:
     """Tests for provider.tf.j2 template."""
 
-    def test_renders_oci_provider_block(self, provider):
+    def test_renders_oci_provider_block(self, provider: OCIProvider) -> None:
         """Test provider template renders OCI provider configuration."""
         content = provider.render_template("oci/provider.tf.j2", {})
         assert 'provider "oci"' in content
         assert "oracle/oci" in content
         assert "~> 6.0" in content
 
-    def test_includes_all_auth_variables(self, provider):
+    def test_includes_all_auth_variables(self, provider: OCIProvider) -> None:
         """Test provider template references all auth variables."""
         content = provider.render_template("oci/provider.tf.j2", {})
         assert "var.oci_tenancy_ocid" in content
@@ -41,7 +44,7 @@ class TestProviderTemplate:
 class TestVariablesTemplate:
     """Tests for variables.tf.j2 template."""
 
-    def test_declares_all_variables(self, provider):
+    def test_declares_all_variables(self, provider: OCIProvider) -> None:
         """Test variables template declares all required variables."""
         content = provider.render_template("oci/variables.tf.j2", {})
         assert 'variable "oci_tenancy_ocid"' in content
@@ -51,7 +54,7 @@ class TestVariablesTemplate:
         assert 'variable "oci_region"' in content
         assert 'variable "oci_compartment_ocid"' in content
 
-    def test_variables_have_descriptions(self, provider):
+    def test_variables_have_descriptions(self, provider: OCIProvider) -> None:
         """Test all variables have descriptions."""
         content = provider.render_template("oci/variables.tf.j2", {})
         # Each variable block should have a description
@@ -61,7 +64,7 @@ class TestVariablesTemplate:
 class TestVCNTemplate:
     """Tests for vcn.tf.j2 template."""
 
-    def test_renders_vcn_resource(self, provider):
+    def test_renders_vcn_resource(self, provider: OCIProvider) -> None:
         """Test VCN template renders oci_core_vcn resource."""
         vcns = [
             ResourceConfig(
@@ -76,7 +79,7 @@ class TestVCNTemplate:
         assert "10.0.0.0/16" in content
         assert "testvcn" in content
 
-    def test_renders_internet_gateway(self, provider):
+    def test_renders_internet_gateway(self, provider: OCIProvider) -> None:
         """Test VCN with internet_gateway creates IGW and route table."""
         vcns = [
             ResourceConfig(
@@ -94,7 +97,7 @@ class TestVCNTemplate:
         assert "oci_core_route_table" in content
         assert "0.0.0.0/0" in content
 
-    def test_renders_subnet(self, provider):
+    def test_renders_subnet(self, provider: OCIProvider) -> None:
         """Test subnet rendering."""
         subnets = [
             ResourceConfig(
@@ -115,7 +118,7 @@ class TestVCNTemplate:
         assert "mysub" in content
         assert "prohibit_public_ip_on_vnic = false" in content
 
-    def test_private_subnet(self, provider):
+    def test_private_subnet(self, provider: OCIProvider) -> None:
         """Test private subnet prohibits public IP."""
         subnets = [
             ResourceConfig(
@@ -132,7 +135,7 @@ class TestVCNTemplate:
         content = provider.render_template("oci/vcn.tf.j2", {"vcns": [], "subnets": subnets})
         assert "prohibit_public_ip_on_vnic = true" in content
 
-    def test_renders_nat_gateway(self, provider):
+    def test_renders_nat_gateway(self, provider: OCIProvider) -> None:
         """Test VCN with nat_gateway creates NAT gateway and private route table."""
         vcns = [
             ResourceConfig(
@@ -151,7 +154,7 @@ class TestVCNTemplate:
         assert "nat_vcn_private_rt" in content
         assert "oci_core_nat_gateway.nat_vcn_nat.id" in content
 
-    def test_private_subnet_with_nat_gets_private_rt(self, provider):
+    def test_private_subnet_with_nat_gets_private_rt(self, provider: OCIProvider) -> None:
         """Test private subnet gets private_rt when VCN has NAT gateway."""
         vcns = [
             ResourceConfig(
@@ -180,7 +183,7 @@ class TestVCNTemplate:
         content = provider.render_template("oci/vcn.tf.j2", {"vcns": vcns, "subnets": subnets})
         assert "oci_core_route_table.my_vcn_private_rt.id" in content
 
-    def test_private_subnet_without_nat_no_route_table(self, provider):
+    def test_private_subnet_without_nat_no_route_table(self, provider: OCIProvider) -> None:
         """Test private subnet without NAT gateway gets no route table."""
         vcns = [
             ResourceConfig(
@@ -208,7 +211,7 @@ class TestVCNTemplate:
         content = provider.render_template("oci/vcn.tf.j2", {"vcns": vcns, "subnets": subnets})
         assert "private_rt" not in content
 
-    def test_vcn_with_security_list(self, provider):
+    def test_vcn_with_security_list(self, provider: OCIProvider) -> None:
         """Test VCN with security list configuration."""
         vcns = [
             ResourceConfig(
@@ -238,7 +241,7 @@ class TestVCNTemplate:
 class TestInstancesTemplate:
     """Tests for instances.tf.j2 template."""
 
-    def test_renders_instance(self, provider):
+    def test_renders_instance(self, provider: OCIProvider) -> None:
         """Test basic instance rendering."""
         instances = [
             ResourceConfig(
@@ -257,7 +260,7 @@ class TestInstancesTemplate:
         assert "VM.Standard.A1.Flex" in content
         assert "ocid1.image.oc1.iad.example" in content
 
-    def test_renders_shape_config(self, provider):
+    def test_renders_shape_config(self, provider: OCIProvider) -> None:
         """Test flex shape configuration."""
         instances = [
             ResourceConfig(
@@ -277,7 +280,7 @@ class TestInstancesTemplate:
         assert "ocpus         = 4" in content
         assert "memory_in_gbs = 24" in content
 
-    def test_renders_ssh_keys(self, provider):
+    def test_renders_ssh_keys(self, provider: OCIProvider) -> None:
         """Test SSH authorized keys in metadata."""
         instances = [
             ResourceConfig(
@@ -295,7 +298,7 @@ class TestInstancesTemplate:
         content = provider.render_template("oci/instances.tf.j2", {"instances": instances})
         assert "ssh_authorized_keys" in content
 
-    def test_renders_boot_volume_size(self, provider):
+    def test_renders_boot_volume_size(self, provider: OCIProvider) -> None:
         """Test custom boot volume size."""
         instances = [
             ResourceConfig(
@@ -313,7 +316,7 @@ class TestInstancesTemplate:
         content = provider.render_template("oci/instances.tf.j2", {"instances": instances})
         assert "boot_volume_size_in_gbs = 100" in content
 
-    def test_renders_freeform_tags(self, provider):
+    def test_renders_freeform_tags(self, provider: OCIProvider) -> None:
         """Test freeform tags rendering."""
         instances = [
             ResourceConfig(
@@ -333,7 +336,7 @@ class TestInstancesTemplate:
         assert '"env"' in content
         assert '"dev"' in content
 
-    def test_renders_availability_domains_data(self, provider):
+    def test_renders_availability_domains_data(self, provider: OCIProvider) -> None:
         """Test availability domains data source is included."""
         instances = [
             ResourceConfig(
@@ -350,7 +353,7 @@ class TestInstancesTemplate:
         content = provider.render_template("oci/instances.tf.j2", {"instances": instances})
         assert "oci_identity_availability_domains" in content
 
-    def test_renders_cloud_init_merged(self, provider):
+    def test_renders_cloud_init_merged(self, provider: OCIProvider) -> None:
         """Test cloud-init merged data in metadata."""
         instances = [
             ResourceConfig(
@@ -373,7 +376,7 @@ class TestInstancesTemplate:
 class TestOutputsTemplate:
     """Tests for outputs.tf.j2 template."""
 
-    def test_renders_vcn_outputs(self, provider):
+    def test_renders_vcn_outputs(self, provider: OCIProvider) -> None:
         """Test VCN outputs."""
         resources_by_type = {
             "vcn": [
@@ -391,7 +394,7 @@ class TestOutputsTemplate:
         assert "vcn_ids" in content
         assert "oci_core_vcn.my_vcn.id" in content
 
-    def test_renders_subnet_outputs(self, provider):
+    def test_renders_subnet_outputs(self, provider: OCIProvider) -> None:
         """Test subnet outputs."""
         resources_by_type = {
             "subnet": [
@@ -409,7 +412,7 @@ class TestOutputsTemplate:
         assert "subnet_ids" in content
         assert "oci_core_subnet.pub_subnet.id" in content
 
-    def test_renders_instance_outputs(self, provider):
+    def test_renders_instance_outputs(self, provider: OCIProvider) -> None:
         """Test instance outputs include public and private IPs."""
         resources_by_type = {
             "instance": [
@@ -429,7 +432,7 @@ class TestOutputsTemplate:
         assert "oci_core_instance.web_server.public_ip" in content
         assert "oci_core_instance.web_server.private_ip" in content
 
-    def test_empty_resources_no_outputs(self, provider):
+    def test_empty_resources_no_outputs(self, provider: OCIProvider) -> None:
         """Test empty resources produce no output blocks."""
         content = provider.render_template("oci/outputs.tf.j2", {"resources_by_type": {}})
         assert "output" not in content
@@ -438,7 +441,7 @@ class TestOutputsTemplate:
 class TestAnsibleCfgTemplate:
     """Tests for ansible.cfg.j2 template."""
 
-    def test_renders_ansible_cfg_with_roles_path(self, provider):
+    def test_renders_ansible_cfg_with_roles_path(self, provider: OCIProvider) -> None:
         """Test ansible.cfg includes roles_path and ssh settings."""
         content = provider.render_template(
             "oci/ansible.cfg.j2", {"roles_path": "/home/user/infra/roles"}
@@ -451,7 +454,7 @@ class TestAnsibleCfgTemplate:
 class TestPlaybookTemplate:
     """Tests for playbook.yml.j2 template."""
 
-    def test_renders_playbook_with_roles(self, provider):
+    def test_renders_playbook_with_roles(self, provider: OCIProvider) -> None:
         """Test playbook creates per-role plays."""
         instances = [
             ResourceConfig(
@@ -475,9 +478,9 @@ class TestPlaybookTemplate:
         assert "app_hosts" in content
         assert "- app" in content
 
-    def test_renders_playbook_without_roles(self, provider):
+    def test_renders_playbook_without_roles(self, provider: OCIProvider) -> None:
         """Test playbook renders empty when no roles defined."""
-        role_groups: dict[str, list] = {}
+        role_groups: dict[str, list[Any]] = {}
         content = provider.render_template("oci/playbook.yml.j2", {"role_groups": role_groups})
         assert "---" in content
         assert "hosts:" not in content
@@ -486,7 +489,7 @@ class TestPlaybookTemplate:
 class TestInventoryTemplate:
     """Tests for inventory.yml.j2 template."""
 
-    def test_renders_inventory_with_instances(self, provider):
+    def test_renders_inventory_with_instances(self, provider: OCIProvider) -> None:
         """Test inventory lists instances in per-role groups."""
         instances = [
             ResourceConfig(
@@ -508,7 +511,7 @@ class TestInventoryTemplate:
         assert "opc" in content
         assert "nginx_hosts" in content
 
-    def test_ansible_host_override(self, provider):
+    def test_ansible_host_override(self, provider: OCIProvider) -> None:
         """Test ansible_host config override is included in inventory."""
         custom_host = "custom-ansible-host-override"
         instances = [
@@ -530,7 +533,7 @@ class TestInventoryTemplate:
         assert custom_host in content
         assert "oci_core_instance" not in content
 
-    def test_ansible_host_omitted_when_not_set(self, provider):
+    def test_ansible_host_omitted_when_not_set(self, provider: OCIProvider) -> None:
         """Test ansible_host line is omitted when not set in config."""
         instances = [
             ResourceConfig(
@@ -549,7 +552,7 @@ class TestInventoryTemplate:
         content = provider.render_template("oci/inventory.yml.j2", {"role_groups": role_groups})
         assert "ansible_host" not in content
 
-    def test_default_ssh_user(self, provider):
+    def test_default_ssh_user(self, provider: OCIProvider) -> None:
         """Test inventory uses ubuntu as default ssh user."""
         instances = [
             ResourceConfig(

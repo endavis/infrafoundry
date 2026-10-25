@@ -1,5 +1,7 @@
 """Unit tests for Proxmox inventory template rendering."""
 
+from pathlib import Path
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -7,7 +9,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> ProxmoxProvider:
     """Create a ProxmoxProvider for template testing."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -21,7 +23,7 @@ def provider(tmp_path):
 class TestInventoryTemplate:
     """Tests for proxmox/inventory.yml.j2 template."""
 
-    def test_ansible_host_override(self, provider):
+    def test_ansible_host_override(self, provider: ProxmoxProvider) -> None:
         """Test ansible_host config override takes priority over ipconfig parsing."""
         custom_host = "custom-ansible-host-override"
         resources = [
@@ -40,7 +42,7 @@ class TestInventoryTemplate:
         assert custom_host in content
         assert "192.168.1.100" not in content
 
-    def test_ansible_host_falls_back_to_ipconfig(self, provider):
+    def test_ansible_host_falls_back_to_ipconfig(self, provider: ProxmoxProvider) -> None:
         """Test ansible_host falls back to ipconfig when not overridden."""
         resources = [
             ResourceConfig(
@@ -56,7 +58,7 @@ class TestInventoryTemplate:
         content = provider.render_template("proxmox/inventory.yml.j2", {"resources": resources})
         assert "10.0.0.50" in content
 
-    def test_ansible_host_no_ipconfig_no_override(self, provider):
+    def test_ansible_host_no_ipconfig_no_override(self, provider: ProxmoxProvider) -> None:
         """Test CHANGEME fallback when no ansible_host and no ipconfig."""
         resources = [
             ResourceConfig(

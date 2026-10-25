@@ -1,5 +1,8 @@
 """Unit tests for InventoryGenerator."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 import yaml
 
@@ -14,7 +17,7 @@ from infrafoundry.core.exceptions import InvalidConfigurationError
 class TestInventoryGeneratorGenerate:
     """Tests for InventoryGenerator.generate."""
 
-    def test_generate_simple_inventory(self, temp_dir):
+    def test_generate_simple_inventory(self, temp_dir: Path) -> None:
         """Generates a valid inventory file from a simple raw block."""
         generator = InventoryGenerator()
         raw = (
@@ -38,7 +41,7 @@ class TestInventoryGeneratorGenerate:
         assert data["groups"]["webservers"]["hosts"]["web-01"]["ansible_host"] == "192.168.1.10"
         assert data["groups"]["webservers"]["vars"]["ansible_user"] == "root"
 
-    def test_generate_with_jinja2_variables(self, temp_dir):
+    def test_generate_with_jinja2_variables(self, temp_dir: Path) -> None:
         """Jinja2 string interpolation is rendered with variables."""
         generator = InventoryGenerator()
         raw = (
@@ -57,7 +60,7 @@ class TestInventoryGeneratorGenerate:
 
         assert data["groups"]["cluster"]["hosts"]["node-01"]["ansible_host"] == "10.0.0.1"
 
-    def test_generate_undefined_variable_raises(self, temp_dir):
+    def test_generate_undefined_variable_raises(self, temp_dir: Path) -> None:
         """Undefined variables raise InvalidConfigurationError."""
         generator = InventoryGenerator()
         raw = (
@@ -71,7 +74,7 @@ class TestInventoryGeneratorGenerate:
         with pytest.raises(InvalidConfigurationError, match="Undefined variable"):
             generator.generate(raw, {}, temp_dir)
 
-    def test_generate_overwrites_existing(self, temp_dir):
+    def test_generate_overwrites_existing(self, temp_dir: Path) -> None:
         """Generating inventory overwrites an existing file."""
         generator = InventoryGenerator()
         existing = temp_dir / GENERATED_INVENTORY_FILENAME
@@ -86,7 +89,7 @@ class TestInventoryGeneratorGenerate:
         assert "new" in data["groups"]
         assert "old" not in data
 
-    def test_generate_creates_parent_dirs(self, temp_dir):
+    def test_generate_creates_parent_dirs(self, temp_dir: Path) -> None:
         """Parent directories are created if they don't exist."""
         generator = InventoryGenerator()
         output_dir = temp_dir / "deep" / "nested" / "dir"
@@ -96,7 +99,7 @@ class TestInventoryGeneratorGenerate:
 
         assert output_path.exists()
 
-    def test_generate_multiple_groups(self, temp_dir):
+    def test_generate_multiple_groups(self, temp_dir: Path) -> None:
         """Multiple groups are rendered correctly."""
         generator = InventoryGenerator()
         raw = (
@@ -129,7 +132,7 @@ class TestInventoryGeneratorGenerate:
             "local"
         )
 
-    def test_generate_with_for_loop(self, temp_dir):
+    def test_generate_with_for_loop(self, temp_dir: Path) -> None:
         """A `{% for %}` loop expands into multiple host entries."""
         generator = InventoryGenerator()
         raw = (
@@ -160,7 +163,7 @@ class TestInventoryGeneratorGenerate:
         assert hosts["worker-02"]["ansible_host"] == "10.0.0.12"
         assert hosts["worker-03"]["ansible_host"] == "10.0.0.13"
 
-    def test_generate_with_if_conditional(self, temp_dir):
+    def test_generate_with_if_conditional(self, temp_dir: Path) -> None:
         """`{% if %}` selects between branches."""
         generator = InventoryGenerator()
         raw = (
@@ -187,7 +190,7 @@ class TestInventoryGeneratorGenerate:
 
         assert data["groups"]["server"]["hosts"]["host-01"]["ansible_host"] == "203.0.113.5"
 
-    def test_generate_with_for_loop_zero_iterations(self, temp_dir):
+    def test_generate_with_for_loop_zero_iterations(self, temp_dir: Path) -> None:
         """A loop over an empty list yields no host entries."""
         generator = InventoryGenerator()
         raw = (
@@ -198,7 +201,7 @@ class TestInventoryGeneratorGenerate:
             "      {{ w.name }}: {}\n"
             "      {% endfor %}\n"
         )
-        variables = {"workers": []}
+        variables: dict[str, Any] = {"workers": []}
 
         output_path = generator.generate(raw, variables, temp_dir)
 
@@ -208,7 +211,7 @@ class TestInventoryGeneratorGenerate:
         hosts = data["groups"]["k3s_workers"]["hosts"]
         assert hosts is None or hosts == {}
 
-    def test_generate_with_for_loop_undefined_variable_raises(self, temp_dir):
+    def test_generate_with_for_loop_undefined_variable_raises(self, temp_dir: Path) -> None:
         """Looping over an undefined variable raises InvalidConfigurationError."""
         generator = InventoryGenerator()
         raw = (
@@ -228,7 +231,7 @@ class TestInventoryGeneratorGenerate:
 class TestInventoryGeneratorRenderInventory:
     """Tests for InventoryGenerator._render_inventory."""
 
-    def test_render_template_syntax_error(self, temp_dir):
+    def test_render_template_syntax_error(self, temp_dir: Path) -> None:
         """Template syntax error raises InvalidConfigurationError."""
         generator = InventoryGenerator()
         raw = 'groups:\n  test:\n    hosts:\n      h1:\n        ip: "{{ broken }"\n'
@@ -236,7 +239,7 @@ class TestInventoryGeneratorRenderInventory:
         with pytest.raises(InvalidConfigurationError, match="Template syntax error"):
             generator._render_inventory(raw, {})
 
-    def test_render_non_dict_result(self, temp_dir):
+    def test_render_non_dict_result(self, temp_dir: Path) -> None:
         """A rendered result that is not a mapping raises InvalidConfigurationError."""
         generator = InventoryGenerator()
         raw = "- item1\n- item2\n"

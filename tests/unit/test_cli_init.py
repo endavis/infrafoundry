@@ -2,12 +2,13 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
 from click.testing import CliRunner
 
 from infrafoundry.cli.main import main
 
 
-def test_init_basic(monkeypatch):
+def test_init_basic(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test basic state init command."""
     runner = CliRunner()
     mock_state_manager = Mock()
@@ -27,7 +28,7 @@ def test_init_basic(monkeypatch):
             mock_state_manager.initialize.assert_called_once()
 
 
-def test_init_with_sqlite(monkeypatch):
+def test_init_with_sqlite(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test state init command with SQLite backend."""
     runner = CliRunner()
     mock_state_manager = Mock()
@@ -48,7 +49,7 @@ def test_init_with_sqlite(monkeypatch):
             assert "Database location:" in result.output
 
 
-def test_init_with_custom_connection_string(monkeypatch):
+def test_init_with_custom_connection_string(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test state init command with custom connection string."""
     runner = CliRunner()
     mock_state_manager = Mock()
@@ -67,7 +68,7 @@ def test_init_with_custom_connection_string(monkeypatch):
             assert "State database initialized successfully!" in result.output
 
 
-def test_init_state_manager_failure(monkeypatch):
+def test_init_state_manager_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test state init command when StateManager.initialize raises an error."""
     from infrafoundry.core.exceptions import StateError
 

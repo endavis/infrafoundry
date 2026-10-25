@@ -1,6 +1,8 @@
 """Unit tests for NotificationManager."""
 
-from unittest.mock import patch
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -17,14 +19,14 @@ from infrafoundry.core.notifications import (
 class TestWebhookNotifier:
     """Tests for WebhookNotifier."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Test WebhookNotifier initialization."""
         config = {"url": "https://webhook.example.com", "headers": {"X-Custom": "value"}}
         notifier = WebhookNotifier(config)
         assert notifier.config["url"] == "https://webhook.example.com"
 
     @patch("requests.post")
-    def test_send_success(self, mock_post):
+    def test_send_success(self, mock_post: MagicMock) -> None:
         """Test successful webhook send."""
         mock_post.return_value.status_code = 200
         config = {"url": "https://webhook.example.com"}
@@ -34,7 +36,7 @@ class TestWebhookNotifier:
         assert result is True
         mock_post.assert_called_once()
 
-    def test_send_failure(self):
+    def test_send_failure(self) -> None:
         """Test webhook send failure."""
         with patch("infrafoundry.core.notifications.notifiers.webhook.requests.post") as mock_post:
             import requests
@@ -46,7 +48,7 @@ class TestWebhookNotifier:
             result = notifier.send("AFTER_APPLY", "dev", {})
             assert result is False
 
-    def test_format_message(self):
+    def test_format_message(self) -> None:
         """Test message formatting."""
         config = {"url": "https://webhook.example.com"}
         notifier = WebhookNotifier(config)
@@ -61,14 +63,14 @@ class TestWebhookNotifier:
 class TestSlackNotifier:
     """Tests for SlackNotifier."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Test SlackNotifier initialization."""
         config = {"webhook_url": "https://hooks.slack.com/services/TEST"}
         notifier = SlackNotifier(config)
         assert notifier.config["webhook_url"] == "https://hooks.slack.com/services/TEST"
 
     @patch("requests.post")
-    def test_send_success(self, mock_post):
+    def test_send_success(self, mock_post: MagicMock) -> None:
         """Test successful Slack notification."""
         mock_post.return_value.status_code = 200
         config = {"webhook_url": "https://hooks.slack.com/services/TEST"}
@@ -78,7 +80,7 @@ class TestSlackNotifier:
         assert result is True
 
     @patch("requests.post")
-    def test_send_with_blocks(self, mock_post):
+    def test_send_with_blocks(self, mock_post: MagicMock) -> None:
         """Test that Slack sends with block formatting."""
         mock_post.return_value.status_code = 200
         config = {"webhook_url": "https://hooks.slack.com/services/TEST"}
@@ -97,13 +99,13 @@ class TestSlackNotifier:
 class TestNotificationManager:
     """Tests for NotificationManager."""
 
-    def test_init_no_config(self, temp_dir):
+    def test_init_no_config(self, temp_dir: Path) -> None:
         """Test initialization with no config file."""
         nonexistent = temp_dir / "nonexistent.yaml"
         manager = NotificationManager(nonexistent)
         assert len(manager.channels) == 0
 
-    def test_load_config(self, temp_dir):
+    def test_load_config(self, temp_dir: Path) -> None:
         """Test loading configuration."""
         import yaml
 
@@ -128,7 +130,7 @@ class TestNotificationManager:
         assert manager.channels[0].name == "test-webhook"
         assert "test-webhook" in manager.notifiers
 
-    def test_disabled_channel_not_initialized(self, temp_dir):
+    def test_disabled_channel_not_initialized(self, temp_dir: Path) -> None:
         """Test that disabled channels don't create notifiers."""
         import yaml
 
@@ -151,7 +153,7 @@ class TestNotificationManager:
         assert len(manager.notifiers) == 0
 
     @patch("requests.post")
-    def test_notify_filters_events(self, mock_post, temp_dir):
+    def test_notify_filters_events(self, mock_post: MagicMock, temp_dir: Path) -> None:
         """Test that events are filtered per channel."""
         import yaml
 
@@ -183,7 +185,7 @@ class TestNotificationManager:
         assert mock_post.call_count == 1  # Still 1
 
     @patch("requests.post")
-    def test_notify_all_channels(self, mock_post, temp_dir):
+    def test_notify_all_channels(self, mock_post: MagicMock, temp_dir: Path) -> None:
         """Test notifying multiple channels."""
         import yaml
 
@@ -216,7 +218,7 @@ class TestNotificationManager:
         assert mock_post.call_count == 2
 
     @patch("requests.post")
-    def test_webhook_no_url_configured(self, mock_post, temp_dir):
+    def test_webhook_no_url_configured(self, mock_post: MagicMock, temp_dir: Path) -> None:
         """Test webhook notifier with missing URL."""
         import yaml
 
@@ -240,7 +242,7 @@ class TestNotificationManager:
         mock_post.assert_not_called()
 
     @patch("requests.post")
-    def test_webhook_request_exception(self, mock_post, temp_dir):
+    def test_webhook_request_exception(self, mock_post: MagicMock, temp_dir: Path) -> None:
         """Test webhook notifier with request exception."""
         import yaml
 
@@ -265,7 +267,7 @@ class TestNotificationManager:
         manager.notify("AFTER_APPLY", "dev", {"resource": "vm-01"})
 
     @patch("requests.post")
-    def test_slack_no_webhook_url_configured(self, mock_post, temp_dir):
+    def test_slack_no_webhook_url_configured(self, mock_post: MagicMock, temp_dir: Path) -> None:
         """Test Slack notifier with missing webhook URL."""
         import yaml
 
@@ -289,7 +291,7 @@ class TestNotificationManager:
         mock_post.assert_not_called()
 
     @patch("requests.post")
-    def test_slack_request_exception(self, mock_post, temp_dir):
+    def test_slack_request_exception(self, mock_post: MagicMock, temp_dir: Path) -> None:
         """Test Slack notifier with request exception."""
         import yaml
 
@@ -313,7 +315,7 @@ class TestNotificationManager:
         # Should not raise exception, just print error
         manager.notify("AFTER_APPLY", "dev", {"resource": "vm-01"})
 
-    def test_load_config_invalid_yaml(self, temp_dir):
+    def test_load_config_invalid_yaml(self, temp_dir: Path) -> None:
         """Test loading configuration with invalid YAML."""
         config_file = temp_dir / "notifications.yaml"
         with open(config_file, "w") as f:
@@ -323,7 +325,7 @@ class TestNotificationManager:
         manager = NotificationManager(config_file)
         assert len(manager.channels) == 0
 
-    def test_load_config_empty_file(self, temp_dir):
+    def test_load_config_empty_file(self, temp_dir: Path) -> None:
         """Test loading configuration from empty file."""
         config_file = temp_dir / "notifications.yaml"
         with open(config_file, "w") as f:
@@ -332,7 +334,7 @@ class TestNotificationManager:
         manager = NotificationManager(config_file)
         assert len(manager.channels) == 0
 
-    def test_load_config_no_channels_key(self, temp_dir):
+    def test_load_config_no_channels_key(self, temp_dir: Path) -> None:
         """Test loading configuration without channels key."""
         import yaml
 
@@ -345,7 +347,7 @@ class TestNotificationManager:
         assert len(manager.channels) == 0
 
     @patch("requests.post")
-    def test_add_channel_dynamically(self, mock_post, temp_dir):
+    def test_add_channel_dynamically(self, mock_post: MagicMock, temp_dir: Path) -> None:
         """Test adding a channel after initialization."""
         manager = NotificationManager()
 
@@ -363,7 +365,7 @@ class TestNotificationManager:
         assert mock_post.call_count == 1
 
     @patch("requests.post")
-    def test_slack_format_apply_failed_event(self, mock_post, temp_dir):
+    def test_slack_format_apply_failed_event(self, mock_post: MagicMock, temp_dir: Path) -> None:
         """Test Slack formatting for APPLY_FAILED event."""
         import yaml
 
@@ -396,7 +398,7 @@ class TestNotificationManager:
         assert "APPLY_FAILED" in str(blocks)
 
     @patch("requests.post")
-    def test_slack_format_drift_detected_event(self, mock_post, temp_dir):
+    def test_slack_format_drift_detected_event(self, mock_post: MagicMock, temp_dir: Path) -> None:
         """Test Slack formatting for DRIFT_DETECTED event."""
         import yaml
 
@@ -429,7 +431,9 @@ class TestNotificationManager:
         assert "DRIFT_DETECTED" in str(blocks)
 
     @patch("requests.post")
-    def test_slack_format_policy_violation_event(self, mock_post, temp_dir):
+    def test_slack_format_policy_violation_event(
+        self, mock_post: MagicMock, temp_dir: Path
+    ) -> None:
         """Test Slack formatting for POLICY_VIOLATION event."""
         import yaml
 
@@ -466,7 +470,9 @@ class TestNotificationManager:
         assert "POLICY_VIOLATION" in str(blocks)
 
     @patch("requests.post")
-    def test_slack_emoji_for_various_event_types(self, mock_post, temp_dir):
+    def test_slack_emoji_for_various_event_types(
+        self, mock_post: MagicMock, temp_dir: Path
+    ) -> None:
         """Test Slack emoji selection for different event types."""
         import yaml
 
@@ -509,22 +515,22 @@ class TestNotificationManager:
             header_text = str(blocks[0])
             assert expected_emoji in header_text or event_type in header_text
 
-    def test_webhook_missing_url_config(self):
+    def test_webhook_missing_url_config(self) -> None:
         """Test webhook notifier with missing URL configuration."""
-        config = {}  # No URL provided
+        config: dict[str, Any] = {}  # No URL provided
         notifier = WebhookNotifier(config)
         result = notifier.send("APPLY_COMPLETED", "dev", {"resource": "vm-01"})
         assert result is False
 
-    def test_slack_missing_webhook_url_config(self):
+    def test_slack_missing_webhook_url_config(self) -> None:
         """Test Slack notifier with missing webhook URL configuration."""
-        config = {}  # No webhook_url provided
+        config: dict[str, Any] = {}  # No webhook_url provided
         notifier = SlackNotifier(config)
         result = notifier.send("APPLY_COMPLETED", "dev", {"resource": "vm-01"})
         assert result is False
 
     @patch("requests.post")
-    def test_slack_network_error(self, mock_post):
+    def test_slack_network_error(self, mock_post: MagicMock) -> None:
         """Test Slack notifier handling network error."""
         import requests
 
@@ -534,14 +540,14 @@ class TestNotificationManager:
         result = notifier.send("APPLY_COMPLETED", "dev", {"resource": "vm-01"})
         assert result is False
 
-    def test_init_no_params(self):
+    def test_init_no_params(self) -> None:
         """Test initialization with no parameters."""
         manager = NotificationManager()
         assert len(manager.channels) == 0
         assert len(manager.notifiers) == 0
 
     @patch("requests.post")
-    def test_load_from_notifications_config(self, mock_post):
+    def test_load_from_notifications_config(self, mock_post: MagicMock) -> None:
         """Test loading from NotificationsConfig."""
         mock_post.return_value.status_code = 200
 
@@ -573,7 +579,7 @@ class TestNotificationManager:
         # Both channels should receive (slack has no event filter)
         assert mock_post.call_count == 2
 
-    def test_notifications_config_takes_precedence_over_file(self, temp_dir):
+    def test_notifications_config_takes_precedence_over_file(self, temp_dir: Path) -> None:
         """Test that notifications_config takes precedence over config_file."""
         import yaml
 
@@ -613,7 +619,7 @@ class TestNotificationManager:
         assert manager.channels[0].name == "config-webhook"
         assert "file-webhook" not in manager.notifiers
 
-    def test_disabled_channel_in_notifications_config(self):
+    def test_disabled_channel_in_notifications_config(self) -> None:
         """Test that disabled channels in NotificationsConfig don't create notifiers."""
         notifications_config = NotificationsConfig(
             channels=[

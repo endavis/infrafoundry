@@ -144,7 +144,7 @@ def fetch_sha256_from_sums(sums_url: str, filename: str) -> str:
         IntegrityError: If *filename* is not listed in the checksums file.
     """
     with urllib.request.urlopen(sums_url) as response:  # nosec B310 - hardcoded release host
-        sums = response.read().decode()
+        sums: str = response.read().decode()
     for line in sums.splitlines():
         parts = line.split()
         if len(parts) == 2 and parts[1].lstrip("*") == filename:

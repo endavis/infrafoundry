@@ -4,6 +4,9 @@ Tests template rendering for cpu_type, balloon/floating, multi-NIC,
 ISO boot, SATA disk, and backward compatibility.
 """
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -11,7 +14,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> ProxmoxProvider:
     """Create a ProxmoxProvider for template testing."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -22,9 +25,9 @@ def provider(tmp_path):
     return p
 
 
-def _make_vm(name: str = "test-vm", **config_overrides) -> ResourceConfig:
+def _make_vm(name: str = "test-vm", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a VM ResourceConfig with sensible defaults."""
-    config: dict = {
+    config: dict[str, Any] = {
         "name": name,
         "target_node": "pve01",
         **config_overrides,
@@ -41,13 +44,13 @@ def _render_vms(provider: ProxmoxProvider, vms: list[ResourceConfig]) -> str:
 class TestCPUType:
     """Tests for cpu_type rendering in the cpu block."""
 
-    def test_vm_with_cpu_type(self, provider):
+    def test_vm_with_cpu_type(self, provider: ProxmoxProvider) -> None:
         """CPU type should render in the cpu block."""
         vms = [_make_vm(cpu_type="host")]
         content = _render_vms(provider, vms)
         assert 'type    = "host"' in content
 
-    def test_vm_cpu_type_default(self, provider):
+    def test_vm_cpu_type_default(self, provider: ProxmoxProvider) -> None:
         """Default cpu_type should be host."""
         vms = [_make_vm()]
         content = _render_vms(provider, vms)
@@ -57,19 +60,19 @@ class TestCPUType:
 class TestBalloon:
     """Tests for memory balloon (floating) rendering."""
 
-    def test_vm_with_balloon_disabled(self, provider):
+    def test_vm_with_balloon_disabled(self, provider: ProxmoxProvider) -> None:
         """Balloon=0 should render as floating = 0."""
         vms = [_make_vm(balloon=0)]
         content = _render_vms(provider, vms)
         assert "floating  = 0" in content
 
-    def test_vm_with_balloon_value(self, provider):
+    def test_vm_with_balloon_value(self, provider: ProxmoxProvider) -> None:
         """Balloon with a positive value should render floating."""
         vms = [_make_vm(balloon=2048)]
         content = _render_vms(provider, vms)
         assert "floating  = 2048" in content
 
-    def test_vm_without_balloon(self, provider):
+    def test_vm_without_balloon(self, provider: ProxmoxProvider) -> None:
         """No balloon config should omit the floating attribute."""
         vms = [_make_vm()]
         content = _render_vms(provider, vms)
@@ -79,7 +82,7 @@ class TestBalloon:
 class TestMultiNIC:
     """Tests for multi-NIC support."""
 
-    def test_vm_with_multi_nic(self, provider):
+    def test_vm_with_multi_nic(self, provider: ProxmoxProvider) -> None:
         """Multiple NICs should produce multiple network_device blocks."""
         vms = [
             _make_vm(
@@ -98,7 +101,7 @@ class TestMultiNIC:
         assert "vlan_id     = 100" in content
         assert "vlan_id     = 200" in content
 
-    def test_vm_with_single_nic_backward_compat(self, provider):
+    def test_vm_with_single_nic_backward_compat(self, provider: ProxmoxProvider) -> None:
         """A single dict network config should still render correctly after normalization."""
         vms = [_make_vm(network={"bridge": "vmbr0", "tag": 50})]
         content = _render_vms(provider, vms)
@@ -106,13 +109,13 @@ class TestMultiNIC:
         assert '"vmbr0"' in content
         assert "vlan_id     = 50" in content
 
-    def test_vm_with_nic_mac_address(self, provider):
+    def test_vm_with_nic_mac_address(self, provider: ProxmoxProvider) -> None:
         """MAC address should render in network_device."""
         vms = [_make_vm(network=[{"bridge": "vmbr0", "macaddr": "AA:BB:CC:DD:EE:FF"}])]
         content = _render_vms(provider, vms)
         assert '"AA:BB:CC:DD:EE:FF"' in content
 
-    def test_vm_with_nic_model(self, provider):
+    def test_vm_with_nic_model(self, provider: ProxmoxProvider) -> None:
         """NIC model should render in network_device."""
         vms = [_make_vm(network=[{"bridge": "vmbr0", "model": "e1000"}])]
         content = _render_vms(provider, vms)
@@ -122,20 +125,20 @@ class TestMultiNIC:
 class TestISOBoot:
     """Tests for ISO boot / cdrom support."""
 
-    def test_vm_with_iso_boot(self, provider):
+    def test_vm_with_iso_boot(self, provider: ProxmoxProvider) -> None:
         """ISO config should render a cdrom block with file_id."""
         vms = [_make_vm(iso="local:iso/ubuntu-24.04.iso")]
         content = _render_vms(provider, vms)
         assert "cdrom {" in content
         assert 'file_id = "local:iso/ubuntu-24.04.iso"' in content
 
-    def test_vm_without_iso(self, provider):
+    def test_vm_without_iso(self, provider: ProxmoxProvider) -> None:
         """No ISO should omit the cdrom block."""
         vms = [_make_vm()]
         content = _render_vms(provider, vms)
         assert "cdrom" not in content
 
-    def test_vm_iso_skips_initialization(self, provider):
+    def test_vm_iso_skips_initialization(self, provider: ProxmoxProvider) -> None:
         """When ISO is set, cloud-init initialization block should be skipped."""
         vms = [
             _make_vm(
@@ -152,19 +155,19 @@ class TestISOBoot:
 class TestSATADisk:
     """Tests for SATA disk type support."""
 
-    def test_vm_with_sata_disk(self, provider):
+    def test_vm_with_sata_disk(self, provider: ProxmoxProvider) -> None:
         """SATA disk type should render as interface = 'sata0'."""
         vms = [_make_vm(disk={"storage": "local-lvm", "size": "50G", "type": "sata"})]
         content = _render_vms(provider, vms)
         assert '"sata0"' in content
 
-    def test_vm_with_scsi_disk(self, provider):
+    def test_vm_with_scsi_disk(self, provider: ProxmoxProvider) -> None:
         """SCSI disk type should still render as interface = 'scsi0'."""
         vms = [_make_vm(disk={"storage": "local-lvm", "size": "50G", "type": "scsi"})]
         content = _render_vms(provider, vms)
         assert '"scsi0"' in content
 
-    def test_vm_with_virtio_disk(self, provider):
+    def test_vm_with_virtio_disk(self, provider: ProxmoxProvider) -> None:
         """Virtio disk type should render as interface = 'virtio0'."""
         vms = [_make_vm(disk={"storage": "local-lvm", "size": "50G", "type": "virtio"})]
         content = _render_vms(provider, vms)
@@ -174,7 +177,7 @@ class TestSATADisk:
 class TestAllNewFields:
     """Integration test with all new features together."""
 
-    def test_vm_with_all_new_fields(self, provider):
+    def test_vm_with_all_new_fields(self, provider: ProxmoxProvider) -> None:
         """A VM with all new fields should render them all correctly."""
         vms = [
             _make_vm(
@@ -205,7 +208,7 @@ class TestAllNewFields:
 class TestBootOrder:
     """Tests for boot_order rendering."""
 
-    def test_vm_with_boot_order(self, provider):
+    def test_vm_with_boot_order(self, provider: ProxmoxProvider) -> None:
         """Boot order should render as a list."""
         vms = [_make_vm(boot_order=["sata0", "ide3"])]
         content = _render_vms(provider, vms)
@@ -213,13 +216,13 @@ class TestBootOrder:
         assert '"sata0"' in content
         assert '"ide3"' in content
 
-    def test_vm_without_boot_order(self, provider):
+    def test_vm_without_boot_order(self, provider: ProxmoxProvider) -> None:
         """No boot_order config should not render the attribute."""
         vms = [_make_vm(clone="100")]
         content = _render_vms(provider, vms)
         assert "boot_order" not in content
 
-    def test_vm_single_boot_device(self, provider):
+    def test_vm_single_boot_device(self, provider: ProxmoxProvider) -> None:
         """Single device boot order should render correctly."""
         vms = [_make_vm(boot_order=["scsi0"])]
         content = _render_vms(provider, vms)
@@ -230,7 +233,7 @@ class TestBootOrder:
 class TestClone:
     """Tests for VM clone block rendering, including cross-node cloning."""
 
-    def test_clone_scalar(self, provider):
+    def test_clone_scalar(self, provider: ProxmoxProvider) -> None:
         """Scalar clone value should be normalized to dict and render vm_id."""
         vms = [_make_vm(clone=100)]
         content = _render_vms(provider, vms)
@@ -240,7 +243,7 @@ class TestClone:
         assert "node_name" not in clone_block
         assert "datastore_id" not in clone_block
 
-    def test_clone_dict_vm_id_only(self, provider):
+    def test_clone_dict_vm_id_only(self, provider: ProxmoxProvider) -> None:
         """Dict clone with only vm_id should render vm_id without node_name."""
         vms = [_make_vm(clone={"vm_id": 901})]
         content = _render_vms(provider, vms)
@@ -248,14 +251,14 @@ class TestClone:
         clone_block = content.split("clone {")[1].split("}")[0]
         assert "node_name" not in clone_block
 
-    def test_clone_cross_node(self, provider):
+    def test_clone_cross_node(self, provider: ProxmoxProvider) -> None:
         """Dict clone with node_name should render both vm_id and node_name."""
         vms = [_make_vm(clone={"vm_id": 901, "node_name": "pve1"})]
         content = _render_vms(provider, vms)
         assert "vm_id = 901" in content
         assert 'node_name    = "pve1"' in content
 
-    def test_clone_cross_node_with_datastore(self, provider):
+    def test_clone_cross_node_with_datastore(self, provider: ProxmoxProvider) -> None:
         """Dict clone with node_name and datastore_id should render all fields."""
         vms = [_make_vm(clone={"vm_id": 901, "node_name": "pve1", "datastore_id": "local-lvm"})]
         content = _render_vms(provider, vms)
@@ -263,7 +266,7 @@ class TestClone:
         assert 'node_name    = "pve1"' in content
         assert 'datastore_id = "local-lvm"' in content
 
-    def test_clone_with_full_clone(self, provider):
+    def test_clone_with_full_clone(self, provider: ProxmoxProvider) -> None:
         """Clone with full_clone should render the full field."""
         vms = [_make_vm(clone={"vm_id": 901, "node_name": "pve1"}, full_clone=True)]
         content = _render_vms(provider, vms)
@@ -271,7 +274,7 @@ class TestClone:
         assert 'node_name    = "pve1"' in content
         assert "full = true" in content
 
-    def test_clone_string_vmid_normalized(self, provider):
+    def test_clone_string_vmid_normalized(self, provider: ProxmoxProvider) -> None:
         """String clone value should be normalized to dict."""
         vms = [_make_vm(clone="901")]
         content = _render_vms(provider, vms)
@@ -281,7 +284,7 @@ class TestClone:
 class TestDefaultsUnchanged:
     """Verify that minimal configs still produce the same output."""
 
-    def test_vm_defaults_unchanged(self, provider):
+    def test_vm_defaults_unchanged(self, provider: ProxmoxProvider) -> None:
         """A minimal VM config should produce default values with no new blocks."""
         vms = [_make_vm(clone="100")]
         content = _render_vms(provider, vms)
@@ -294,7 +297,7 @@ class TestDefaultsUnchanged:
 class TestNormalization:
     """Tests for _normalize_vm_config()."""
 
-    def test_normalize_dict_to_list(self, provider):
+    def test_normalize_dict_to_list(self, provider: ProxmoxProvider) -> None:
         """Single dict network should be wrapped in a list."""
         vm = _make_vm(network={"bridge": "vmbr0"})
         result = provider._normalize_vm_config(vm)
@@ -302,7 +305,7 @@ class TestNormalization:
         assert len(result.config["network"]) == 1
         assert result.config["network"][0]["bridge"] == "vmbr0"
 
-    def test_normalize_list_unchanged(self, provider):
+    def test_normalize_list_unchanged(self, provider: ProxmoxProvider) -> None:
         """List network should remain a list."""
         nics = [{"bridge": "vmbr0"}, {"bridge": "vmbr1"}]
         vm = _make_vm(network=nics)
@@ -310,34 +313,34 @@ class TestNormalization:
         assert isinstance(result.config["network"], list)
         assert len(result.config["network"]) == 2
 
-    def test_normalize_no_network(self, provider):
+    def test_normalize_no_network(self, provider: ProxmoxProvider) -> None:
         """No network key should remain absent."""
         vm = _make_vm()
         result = provider._normalize_vm_config(vm)
         assert "network" not in result.config
 
-    def test_normalize_does_not_mutate_original(self, provider):
+    def test_normalize_does_not_mutate_original(self, provider: ProxmoxProvider) -> None:
         """Original VM config should not be modified."""
         vm = _make_vm(network={"bridge": "vmbr0"})
         provider._normalize_vm_config(vm)
         # Original should still be a dict
         assert isinstance(vm.config["network"], dict)
 
-    def test_normalize_clone_scalar_to_dict(self, provider):
+    def test_normalize_clone_scalar_to_dict(self, provider: ProxmoxProvider) -> None:
         """Scalar clone should be normalized to dict with vm_id key."""
         vm = _make_vm(clone=901)
         result = provider._normalize_vm_config(vm)
         assert isinstance(result.config["clone"], dict)
         assert result.config["clone"]["vm_id"] == 901
 
-    def test_normalize_clone_string_to_dict(self, provider):
+    def test_normalize_clone_string_to_dict(self, provider: ProxmoxProvider) -> None:
         """String clone should be normalized to dict with vm_id key."""
         vm = _make_vm(clone="901")
         result = provider._normalize_vm_config(vm)
         assert isinstance(result.config["clone"], dict)
         assert result.config["clone"]["vm_id"] == "901"
 
-    def test_normalize_clone_dict_unchanged(self, provider):
+    def test_normalize_clone_dict_unchanged(self, provider: ProxmoxProvider) -> None:
         """Dict clone should remain unchanged."""
         vm = _make_vm(clone={"vm_id": 901, "node_name": "pve1"})
         result = provider._normalize_vm_config(vm)
@@ -345,7 +348,7 @@ class TestNormalization:
         assert result.config["clone"]["vm_id"] == 901
         assert result.config["clone"]["node_name"] == "pve1"
 
-    def test_normalize_clone_does_not_mutate_original(self, provider):
+    def test_normalize_clone_does_not_mutate_original(self, provider: ProxmoxProvider) -> None:
         """Original clone scalar should not be modified."""
         vm = _make_vm(clone=901)
         provider._normalize_vm_config(vm)

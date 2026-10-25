@@ -16,6 +16,7 @@ import os
 import subprocess  # nosec B404 - needed to run hook for testing
 import sys
 from pathlib import Path
+from typing import Any
 
 # ANSI color codes
 RED = "\033[91m"
@@ -251,7 +252,7 @@ BYPASS_TESTS = [
 # File-edit test cases: (tool_name, tool_input_dict, expected, description)
 # expected: 'ALLOW' or 'BLOCK'
 # ---------------------------------------------------------------------------
-EDIT_TESTS = [
+EDIT_TESTS: list[tuple[str, dict[str, Any], str, str]] = [
     # Edit ~/.bashrc adding the env var name → BLOCK
     (
         "Edit",
@@ -419,7 +420,7 @@ def run_test(
 
 def run_edit_test(
     tool_name: str,
-    tool_input: dict,
+    tool_input: dict[str, Any],
     expected: str,
     desc: str,
     copilot_format: bool = False,

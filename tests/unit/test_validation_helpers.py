@@ -1,5 +1,6 @@
 """Tests for base provider validation helpers."""
 
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -13,7 +14,7 @@ class TestBaseProviderValidator:
     """Tests for BaseProviderValidator class."""
 
     @pytest.fixture
-    def env_config(self):
+    def env_config(self) -> Any:
         """Sample environment configuration."""
         return make_env_config(
             provider_settings={
@@ -26,12 +27,12 @@ class TestBaseProviderValidator:
         )
 
     @pytest.fixture
-    def report(self):
+    def report(self) -> Mock:
         """Mock validation report."""
         return Mock(spec=ValidationReport)
 
     @pytest.fixture
-    def validator(self, env_config, report):
+    def validator(self, env_config: Any, report: Mock) -> BaseProviderValidator:
         """Create validator instance."""
         return BaseProviderValidator(
             provider_name="test_provider",
@@ -39,14 +40,16 @@ class TestBaseProviderValidator:
             report=report,
         )
 
-    def test_init(self, validator, env_config, report):
+    def test_init(self, validator: BaseProviderValidator, env_config: Any, report: Mock) -> None:
         """Test validator initialization."""
         assert validator.provider_name == "test_provider"
         assert validator.env_config == env_config
         assert validator.report == report
         assert validator.provider_settings == env_config.provider_settings["test_provider"]
 
-    def test_validate_credentials_success(self, validator, report):
+    def test_validate_credentials_success(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test successful credential validation."""
         credentials = validator.validate_credentials(
             required_fields=["api_url", "api_key", "api_secret"]
@@ -59,7 +62,9 @@ class TestBaseProviderValidator:
         }
         report.add_check.assert_not_called()
 
-    def test_validate_credentials_missing_fields(self, validator, report):
+    def test_validate_credentials_missing_fields(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test credential validation with missing fields."""
         credentials = validator.validate_credentials(
             required_fields=["api_url", "api_key", "api_secret", "missing_field"]
@@ -73,7 +78,9 @@ class TestBaseProviderValidator:
         assert call_args["level"] == ValidationLevel.ERROR
         assert "missing_field" in call_args["message"]
 
-    def test_validate_credentials_with_env_vars(self, validator, report):
+    def test_validate_credentials_with_env_vars(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test credential validation with environment variables."""
         # Remove provider settings
         validator.provider_settings = {}
@@ -101,7 +108,9 @@ class TestBaseProviderValidator:
             "api_secret": "env-secret",
         }
 
-    def test_check_api_connectivity_success(self, validator, report):
+    def test_check_api_connectivity_success(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test successful API connectivity check."""
         mock_response = Mock()
         mock_response.status_code = 200
@@ -116,7 +125,9 @@ class TestBaseProviderValidator:
         assert call_args["passed"] is True
         assert call_args["level"] == ValidationLevel.INFO
 
-    def test_check_api_connectivity_custom_success_message(self, validator, report):
+    def test_check_api_connectivity_custom_success_message(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test API connectivity with custom success message."""
         mock_response = Mock()
         mock_response.status_code = 200
@@ -131,7 +142,9 @@ class TestBaseProviderValidator:
         call_args = report.add_check.call_args[1]
         assert "Custom success message" in call_args["message"]
 
-    def test_check_api_connectivity_unauthorized(self, validator, report):
+    def test_check_api_connectivity_unauthorized(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test API connectivity with 401 Unauthorized."""
         mock_response = Mock()
         mock_response.status_code = 401
@@ -145,7 +158,9 @@ class TestBaseProviderValidator:
         assert "401 Unauthorized" in call_args["message"]
         assert call_args["level"] == ValidationLevel.ERROR
 
-    def test_check_api_connectivity_forbidden(self, validator, report):
+    def test_check_api_connectivity_forbidden(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test API connectivity with 403 Forbidden."""
         mock_response = Mock()
         mock_response.status_code = 403
@@ -158,7 +173,9 @@ class TestBaseProviderValidator:
         assert call_args["passed"] is False
         assert "403 Forbidden" in call_args["message"]
 
-    def test_check_api_connectivity_other_error(self, validator, report):
+    def test_check_api_connectivity_other_error(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test API connectivity with other HTTP error."""
         mock_response = Mock()
         mock_response.status_code = 500
@@ -171,7 +188,9 @@ class TestBaseProviderValidator:
         assert call_args["passed"] is False
         assert "HTTP 500" in call_args["message"]
 
-    def test_check_api_connectivity_timeout(self, validator, report):
+    def test_check_api_connectivity_timeout(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test API connectivity with timeout."""
         import requests
 
@@ -183,7 +202,9 @@ class TestBaseProviderValidator:
         assert call_args["passed"] is False
         assert "timeout" in call_args["message"].lower()
 
-    def test_check_api_connectivity_connection_error(self, validator, report):
+    def test_check_api_connectivity_connection_error(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test API connectivity with connection error."""
         import requests
 
@@ -198,11 +219,13 @@ class TestBaseProviderValidator:
         assert call_args["passed"] is False
         assert "Connection failed" in call_args["message"]
 
-    def test_check_api_connectivity_no_requests_library(self, validator, report):
+    def test_check_api_connectivity_no_requests_library(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test API connectivity when requests library is not installed."""
         real_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
 
-        def selective_import(name, *args, **kwargs):
+        def selective_import(name: Any, *args: Any, **kwargs: Any) -> Any:
             if name == "requests":
                 raise ImportError("No module named 'requests'")
             return real_import(name, *args, **kwargs)
@@ -218,7 +241,9 @@ class TestBaseProviderValidator:
         assert call_args["passed"] is False
         assert "requests library" in call_args["message"]
 
-    def test_handle_validation_exception_maps_levels(self, validator, report):
+    def test_handle_validation_exception_maps_levels(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Validate error mapping and report integration."""
         from infrafoundry.core.exceptions import APIError, InfraFoundryError
 
@@ -239,7 +264,9 @@ class TestBaseProviderValidator:
         assert call_args["level"] == ValidationLevel.WARNING
         assert call_args["check_name"] == "infra_check"
 
-    def test_check_api_connectivity_with_auth(self, validator, report):
+    def test_check_api_connectivity_with_auth(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test API connectivity with basic auth."""
         mock_response = Mock()
         mock_response.status_code = 200
@@ -256,7 +283,9 @@ class TestBaseProviderValidator:
         call_kwargs = mock_request.call_args[1]
         assert call_kwargs["auth"] == ("user", "pass")
 
-    def test_check_api_connectivity_with_headers(self, validator, report):
+    def test_check_api_connectivity_with_headers(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test API connectivity with custom headers."""
         mock_response = Mock()
         mock_response.status_code = 200
@@ -272,7 +301,7 @@ class TestBaseProviderValidator:
         call_kwargs = mock_request.call_args[1]
         assert call_kwargs["headers"] == {"Authorization": "Bearer token"}
 
-    def test_add_success_check(self, validator, report):
+    def test_add_success_check(self, validator: BaseProviderValidator, report: Mock) -> None:
         """Test adding a success check."""
         validator.add_success_check(
             check_name="test_check",
@@ -288,7 +317,7 @@ class TestBaseProviderValidator:
             details={"key": "value"},
         )
 
-    def test_add_error_check(self, validator, report):
+    def test_add_error_check(self, validator: BaseProviderValidator, report: Mock) -> None:
         """Test adding an error check."""
         validator.add_error_check(
             check_name="test_check",
@@ -305,7 +334,9 @@ class TestBaseProviderValidator:
             details={"error": "details"},
         )
 
-    def test_add_error_check_default_level(self, validator, report):
+    def test_add_error_check_default_level(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test adding an error check with default level."""
         validator.add_error_check(
             check_name="test_check",
@@ -315,7 +346,9 @@ class TestBaseProviderValidator:
         call_args = report.add_check.call_args[1]
         assert call_args["level"] == ValidationLevel.ERROR
 
-    def test_validate_resource_exists_success(self, validator, report):
+    def test_validate_resource_exists_success(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test resource validation when resource exists."""
         existing = {"template1", "template2", "template3"}
 
@@ -330,7 +363,9 @@ class TestBaseProviderValidator:
         assert call_args["passed"] is True
         assert "template1" in call_args["message"]
 
-    def test_validate_resource_exists_with_parent(self, validator, report):
+    def test_validate_resource_exists_with_parent(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test resource validation with parent context."""
         existing = {"vlan1", "vlan2"}
 
@@ -345,7 +380,9 @@ class TestBaseProviderValidator:
         call_args = report.add_check.call_args[1]
         assert "firewall_rule_1" in call_args["message"]
 
-    def test_validate_resource_not_found(self, validator, report):
+    def test_validate_resource_not_found(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test resource validation when resource doesn't exist."""
         existing = {"template1", "template2"}
 
@@ -361,7 +398,9 @@ class TestBaseProviderValidator:
         assert "not found" in call_args["message"]
         assert call_args["details"]["resource_name"] == "missing_template"
 
-    def test_validate_resource_not_found_with_parent(self, validator, report):
+    def test_validate_resource_not_found_with_parent(
+        self, validator: BaseProviderValidator, report: Mock
+    ) -> None:
         """Test resource validation failure with parent context."""
         existing = {"alias1", "alias2"}
 
@@ -381,7 +420,7 @@ class TestBaseProviderValidator:
 class TestResourceValidatorSchema:
     """Tests for ResourceValidator schema checks."""
 
-    def test_validate_schema_success(self):
+    def test_validate_schema_success(self) -> None:
         """Valid schema passes and records info-level success."""
         report = Mock(spec=ValidationReport)
         rv = ResourceValidator("test", report)
@@ -398,7 +437,7 @@ class TestResourceValidatorSchema:
         assert args["passed"] is True
         assert args["level"] == ValidationLevel.INFO
 
-    def test_validate_schema_missing_field(self):
+    def test_validate_schema_missing_field(self) -> None:
         """Missing fields are reported as errors."""
         report = Mock(spec=ValidationReport)
         rv = ResourceValidator("test", report)
@@ -415,13 +454,13 @@ class TestResourceValidatorSchema:
         assert "cpu" in args["message"]
         assert args["level"] == ValidationLevel.ERROR
 
-    def test_validate_schema_type_mismatch(self):
+    def test_validate_schema_type_mismatch(self) -> None:
         """Type mismatches are reported as errors."""
         report = Mock(spec=ValidationReport)
         rv = ResourceValidator("test", report)
 
         result = rv.validate_schema(
-            resource=["not a dict"],
+            resource=["not a dict"],  # type: ignore[arg-type]
             schema={"type": dict, "required": ["name"]},
             check_name="schema_vm",
         )

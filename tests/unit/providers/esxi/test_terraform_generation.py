@@ -1,5 +1,8 @@
 """Unit tests for ESXi Terraform template rendering."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -7,7 +10,7 @@ from infrafoundry.providers.esxi import EsxiProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> EsxiProvider:
     """Create an EsxiProvider for template testing."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -18,28 +21,28 @@ def provider(tmp_path):
     return p
 
 
-def _make_vswitch(name: str = "vSwitch1", **config_overrides) -> ResourceConfig:
+def _make_vswitch(name: str = "vSwitch1", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a vswitch ResourceConfig."""
-    config: dict = {"host": "esxi-01", **config_overrides}
+    config: dict[str, Any] = {"host": "esxi-01", **config_overrides}
     return ResourceConfig(name=name, type="vswitch", provider="esxi", config=config)
 
 
-def _make_portgroup(name: str = "pg-mgmt", **config_overrides) -> ResourceConfig:
+def _make_portgroup(name: str = "pg-mgmt", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a portgroup ResourceConfig."""
-    config: dict = {"host": "esxi-01", "vswitch": "vSwitch1", **config_overrides}
+    config: dict[str, Any] = {"host": "esxi-01", "vswitch": "vSwitch1", **config_overrides}
     return ResourceConfig(name=name, type="portgroup", provider="esxi", config=config)
 
 
-def _make_vm(name: str = "test-vm", **config_overrides) -> ResourceConfig:
+def _make_vm(name: str = "test-vm", **config_overrides: Any) -> ResourceConfig:
     """Helper to create a VM ResourceConfig."""
-    config: dict = {"host": "esxi-01", "name": name, **config_overrides}
+    config: dict[str, Any] = {"host": "esxi-01", "name": name, **config_overrides}
     return ResourceConfig(name=name, type="vm", provider="esxi", config=config)
 
 
 class TestProviderTemplate:
     """Tests for provider.tf.j2 template."""
 
-    def test_provider_renders_hosts(self, provider):
+    def test_provider_renders_hosts(self, provider: EsxiProvider) -> None:
         """Provider template should render aliased blocks for each host."""
         hosts = [
             {"name": "esxi-01", "alias": "esxi_01"},
@@ -52,7 +55,7 @@ class TestProviderTemplate:
         assert "var.esxi_hostname_esxi_01" in content
         assert "var.esxi_password_esxi_02" in content
 
-    def test_provider_single_host(self, provider):
+    def test_provider_single_host(self, provider: EsxiProvider) -> None:
         """Provider template should work with a single host."""
         hosts = [{"name": "esxi-01", "alias": "esxi_01"}]
         content = provider.render_template("esxi/provider.tf.j2", {"hosts": hosts})
@@ -62,7 +65,7 @@ class TestProviderTemplate:
 class TestVariablesTemplate:
     """Tests for variables.tf.j2 template."""
 
-    def test_variables_per_host(self, provider):
+    def test_variables_per_host(self, provider: EsxiProvider) -> None:
         """Variables should be generated for each host."""
         hosts = [
             {"name": "esxi-01", "alias": "esxi_01"},
@@ -79,7 +82,7 @@ class TestVariablesTemplate:
 class TestVswitchTemplate:
     """Tests for vswitch.tf.j2 template."""
 
-    def test_basic_vswitch(self, provider):
+    def test_basic_vswitch(self, provider: EsxiProvider) -> None:
         """Basic vswitch should render with provider alias."""
         vswitches = [_make_vswitch()]
         content = provider.render_template(
@@ -90,7 +93,7 @@ class TestVswitchTemplate:
         assert "provider = esxi.esxi_01" in content
         assert 'name     = "vSwitch1"' in content
 
-    def test_vswitch_with_uplinks(self, provider):
+    def test_vswitch_with_uplinks(self, provider: EsxiProvider) -> None:
         """Vswitch with uplinks should render uplink blocks."""
         vswitches = [_make_vswitch(uplink=["vmnic0", "vmnic1"])]
         content = provider.render_template(
@@ -101,7 +104,7 @@ class TestVswitchTemplate:
         assert '"vmnic0"' in content
         assert '"vmnic1"' in content
 
-    def test_vswitch_with_mtu(self, provider):
+    def test_vswitch_with_mtu(self, provider: EsxiProvider) -> None:
         """Vswitch with MTU should render mtu field."""
         vswitches = [_make_vswitch(mtu=9000)]
         content = provider.render_template(
@@ -110,7 +113,7 @@ class TestVswitchTemplate:
         )
         assert "mtu = 9000" in content
 
-    def test_vswitch_with_ports(self, provider):
+    def test_vswitch_with_ports(self, provider: EsxiProvider) -> None:
         """Vswitch with ports should render ports field."""
         vswitches = [_make_vswitch(ports=128)]
         content = provider.render_template(
@@ -123,7 +126,7 @@ class TestVswitchTemplate:
 class TestPortgroupTemplate:
     """Tests for portgroup.tf.j2 template."""
 
-    def test_basic_portgroup(self, provider):
+    def test_basic_portgroup(self, provider: EsxiProvider) -> None:
         """Basic portgroup should render with vswitch reference."""
         portgroups = [_make_portgroup()]
         content = provider.render_template(
@@ -134,7 +137,7 @@ class TestPortgroupTemplate:
         assert "provider = esxi.esxi_01" in content
         assert 'vswitch  = "vSwitch1"' in content
 
-    def test_portgroup_with_vlan(self, provider):
+    def test_portgroup_with_vlan(self, provider: EsxiProvider) -> None:
         """Portgroup with VLAN should render vlan field."""
         portgroups = [_make_portgroup(vlan=100)]
         content = provider.render_template(
@@ -143,7 +146,7 @@ class TestPortgroupTemplate:
         )
         assert "vlan     = 100" in content
 
-    def test_portgroup_with_security_policies(self, provider):
+    def test_portgroup_with_security_policies(self, provider: EsxiProvider) -> None:
         """Portgroup with security policies should render all flags."""
         portgroups = [
             _make_portgroup(
@@ -164,7 +167,7 @@ class TestPortgroupTemplate:
 class TestVMTemplate:
     """Tests for vm.tf.j2 template."""
 
-    def test_basic_vm(self, provider):
+    def test_basic_vm(self, provider: EsxiProvider) -> None:
         """Basic VM should render with guest name and provider."""
         vms = [provider._normalize_vm_config(_make_vm())]
         content = provider.render_template(
@@ -175,7 +178,7 @@ class TestVMTemplate:
         assert "provider     = esxi.esxi_01" in content
         assert 'guest_name   = "test-vm"' in content
 
-    def test_vm_with_resources(self, provider):
+    def test_vm_with_resources(self, provider: EsxiProvider) -> None:
         """VM with CPU/memory should render resource fields."""
         vms = [
             provider._normalize_vm_config(
@@ -190,7 +193,7 @@ class TestVMTemplate:
         assert "memsize      = 8192" in content
         assert 'disk_store   = "datastore1"' in content
 
-    def test_vm_with_ovf_source(self, provider):
+    def test_vm_with_ovf_source(self, provider: EsxiProvider) -> None:
         """VM with OVF source should render ovf_source."""
         vms = [
             provider._normalize_vm_config(_make_vm(ovf_source="https://example.com/template.ova"))
@@ -201,7 +204,7 @@ class TestVMTemplate:
         )
         assert 'ovf_source   = "https://example.com/template.ova"' in content
 
-    def test_vm_with_network_interfaces(self, provider):
+    def test_vm_with_network_interfaces(self, provider: EsxiProvider) -> None:
         """VM with network interfaces should render network blocks."""
         vms = [
             provider._normalize_vm_config(
@@ -223,7 +226,7 @@ class TestVMTemplate:
         assert '"mgmt-pg"' in content
         assert '"AA:BB:CC:DD:EE:FF"' in content
 
-    def test_vm_with_virtual_disks(self, provider):
+    def test_vm_with_virtual_disks(self, provider: EsxiProvider) -> None:
         """VM with virtual disks should render disk blocks."""
         vms = [
             provider._normalize_vm_config(
@@ -243,7 +246,7 @@ class TestVMTemplate:
         assert '"disk1.vmdk"' in content
         assert '"0:2"' in content
 
-    def test_vm_with_power_and_notes(self, provider):
+    def test_vm_with_power_and_notes(self, provider: EsxiProvider) -> None:
         """VM with power state and notes should render those fields."""
         vms = [provider._normalize_vm_config(_make_vm(power="on", notes="Test VM for CI"))]
         content = provider.render_template(
@@ -253,7 +256,7 @@ class TestVMTemplate:
         assert 'power        = "on"' in content
         assert 'notes        = "Test VM for CI"' in content
 
-    def test_vm_single_nic_dict_normalized(self, provider):
+    def test_vm_single_nic_dict_normalized(self, provider: EsxiProvider) -> None:
         """Single dict NIC should be normalized to list and render."""
         vms = [provider._normalize_vm_config(_make_vm(network={"portgroup": "VM Network"}))]
         content = provider.render_template(
@@ -267,7 +270,7 @@ class TestVMTemplate:
 class TestOutputsTemplate:
     """Tests for outputs.tf.j2 template."""
 
-    def test_outputs_with_vms(self, provider):
+    def test_outputs_with_vms(self, provider: EsxiProvider) -> None:
         """Outputs should include VM info."""
         resources_by_type = {
             "vm": [_make_vm("web-01"), _make_vm("web-02")],
@@ -281,7 +284,7 @@ class TestOutputsTemplate:
         assert "web-02" in content
         assert "ip_address" in content
 
-    def test_outputs_with_vswitches(self, provider):
+    def test_outputs_with_vswitches(self, provider: EsxiProvider) -> None:
         """Outputs should include vswitch names."""
         resources_by_type = {
             "vswitch": [_make_vswitch("vSwitch1"), _make_vswitch("vSwitch2")],
@@ -294,7 +297,7 @@ class TestOutputsTemplate:
         assert "vSwitch1" in content
         assert "vSwitch2" in content
 
-    def test_outputs_with_portgroups(self, provider):
+    def test_outputs_with_portgroups(self, provider: EsxiProvider) -> None:
         """Outputs should include portgroup names."""
         resources_by_type = {
             "portgroup": [_make_portgroup("pg-mgmt"), _make_portgroup("pg-storage")],
@@ -307,7 +310,7 @@ class TestOutputsTemplate:
         assert "pg-mgmt" in content
         assert "pg-storage" in content
 
-    def test_outputs_with_ovf_deployments(self, provider):
+    def test_outputs_with_ovf_deployments(self, provider: EsxiProvider) -> None:
         """Outputs should include OVF deployment VM names."""
         resources_by_type = {
             "ovf_deployment": [
@@ -333,7 +336,7 @@ class TestOutputsTemplate:
         assert "ontap-01" in content
         assert "ontap-02" in content
 
-    def test_outputs_ovf_deployment_defaults_to_name(self, provider):
+    def test_outputs_ovf_deployment_defaults_to_name(self, provider: EsxiProvider) -> None:
         """OVF deployment output should fall back to resource name when vm_name missing."""
         resources_by_type = {
             "ovf_deployment": [
@@ -351,7 +354,7 @@ class TestOutputsTemplate:
         )
         assert "my-ovf-vm" in content
 
-    def test_outputs_empty_resources(self, provider):
+    def test_outputs_empty_resources(self, provider: EsxiProvider) -> None:
         """Outputs with no resources should not render output blocks."""
         content = provider.render_template(
             "esxi/outputs.tf.j2",

@@ -20,7 +20,7 @@ class TestISCToKeaMigration:
         return ISCToKeaMigrationManager(tmp_path)
 
     @pytest.fixture
-    def mock_isc_service(self):
+    def mock_isc_service(self) -> MagicMock:
         """Create a mock ISC DHCP service."""
         mock = MagicMock()
         mock.get_dhcpv4_config.return_value = {
@@ -70,7 +70,9 @@ class TestISCToKeaMigration:
         }
         return mock
 
-    def test_migrate_dhcpv4_basic(self, manager: ISCToKeaMigrationManager, mock_isc_service):
+    def test_migrate_dhcpv4_basic(
+        self, manager: ISCToKeaMigrationManager, mock_isc_service: MagicMock
+    ) -> None:
         """Test basic DHCPv4 migration."""
         with patch(
             "infrafoundry.providers.opnsense.components.isc_to_kea_migration.ISCDHCPService.from_environment",
@@ -106,8 +108,8 @@ class TestISCToKeaMigration:
             assert reservation["config"]["description"] == "Main Server"
 
     def test_migrate_dhcpv4_interface_filter(
-        self, manager: ISCToKeaMigrationManager, mock_isc_service
-    ):
+        self, manager: ISCToKeaMigrationManager, mock_isc_service: MagicMock
+    ) -> None:
         """Test DHCPv4 migration with interface filter."""
         # Add another interface to the mock
         mock_isc_service.get_dhcpv4_config.return_value = {
@@ -127,8 +129,8 @@ class TestISCToKeaMigration:
             assert result["subnets"][0]["config"]["subnet"] == "192.168.1.0/24"
 
     def test_migrate_dhcpv4_disabled_interface(
-        self, manager: ISCToKeaMigrationManager, mock_isc_service
-    ):
+        self, manager: ISCToKeaMigrationManager, mock_isc_service: MagicMock
+    ) -> None:
         """Test DHCPv4 migration skips disabled interfaces."""
         mock_isc_service.get_dhcpv4_config.return_value = {
             "lan": {"enable": "0", "subnet": "192.168.1.0", "subnet_bits": "24"}
@@ -144,7 +146,9 @@ class TestISCToKeaMigration:
             # Should have no subnets (disabled)
             assert len(result["subnets"]) == 0
 
-    def test_migrate_dhcpv6_basic(self, manager: ISCToKeaMigrationManager, mock_isc_service):
+    def test_migrate_dhcpv6_basic(
+        self, manager: ISCToKeaMigrationManager, mock_isc_service: MagicMock
+    ) -> None:
         """Test basic DHCPv6 migration."""
         with patch(
             "infrafoundry.providers.opnsense.components.isc_to_kea_migration.ISCDHCPService.from_environment",
@@ -176,7 +180,9 @@ class TestISCToKeaMigration:
             assert reservation["config"]["hostname"] == "server01"
             assert reservation["config"]["description"] == "Main Server IPv6"
 
-    def test_migrate_all(self, manager: ISCToKeaMigrationManager, mock_isc_service):
+    def test_migrate_all(
+        self, manager: ISCToKeaMigrationManager, mock_isc_service: MagicMock
+    ) -> None:
         """Test migrating both DHCPv4 and DHCPv6."""
         with patch(
             "infrafoundry.providers.opnsense.components.isc_to_kea_migration.ISCDHCPService.from_environment",
@@ -196,7 +202,9 @@ class TestISCToKeaMigration:
             assert len(result["dhcpv6"]["subnets"]) == 1
             assert len(result["dhcpv6"]["reservations"]) == 1
 
-    def test_export_to_yaml(self, manager: ISCToKeaMigrationManager, mock_isc_service):
+    def test_export_to_yaml(
+        self, manager: ISCToKeaMigrationManager, mock_isc_service: MagicMock
+    ) -> None:
         """Test exporting migration to YAML format."""
         with patch(
             "infrafoundry.providers.opnsense.components.isc_to_kea_migration.ISCDHCPService.from_environment",
@@ -219,7 +227,7 @@ class TestISCToKeaMigration:
             assert "fd00::/64" in yaml_output
             assert "server01" in yaml_output
 
-    def test_convert_dhcpv4_subnet_minimal(self, manager: ISCToKeaMigrationManager):
+    def test_convert_dhcpv4_subnet_minimal(self, manager: ISCToKeaMigrationManager) -> None:
         """Test converting minimal ISC DHCPv4 subnet."""
         isc_config = {
             "enable": "1",
@@ -236,7 +244,7 @@ class TestISCToKeaMigration:
         assert result["config"]["interface"] == "opt1"
         assert result["config"]["pools"] == []
 
-    def test_convert_dhcpv4_reservation_minimal(self, manager: ISCToKeaMigrationManager):
+    def test_convert_dhcpv4_reservation_minimal(self, manager: ISCToKeaMigrationManager) -> None:
         """Test converting minimal ISC DHCPv4 static map."""
         static_map = {
             "mac": "aa:bb:cc:dd:ee:ff",
@@ -255,7 +263,9 @@ class TestISCToKeaMigration:
         assert result["config"]["ip_address"] == "10.0.0.100"
         assert result["config"]["subnet"] == "10.0.0.0/16"
 
-    def test_convert_dhcpv4_reservation_without_mac(self, manager: ISCToKeaMigrationManager):
+    def test_convert_dhcpv4_reservation_without_mac(
+        self, manager: ISCToKeaMigrationManager
+    ) -> None:
         """Test that reservation without MAC is skipped."""
         static_map = {
             "ipaddr": "10.0.0.100",
@@ -270,7 +280,7 @@ class TestISCToKeaMigration:
 
         assert result is None
 
-    def test_empty_configuration(self, manager: ISCToKeaMigrationManager):
+    def test_empty_configuration(self, manager: ISCToKeaMigrationManager) -> None:
         """Test migration with empty configuration."""
         mock_service = MagicMock()
         mock_service.get_dhcpv4_config.return_value = {}

@@ -1,7 +1,7 @@
 """Tests for PackageLoader resource parsing."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -129,8 +129,8 @@ class TestParseResourceCentric:
 
     def test_non_dict_items_are_skipped(self, loader: PackageLoader) -> None:
         """Non-dict items in the resources list are skipped."""
-        resources = ["not-a-dict", {"type": "vm", "name": "valid"}]  # type: ignore[list-item]
-        result = self._parse(loader, resources)
+        resources = ["not-a-dict", {"type": "vm", "name": "valid"}]
+        result = self._parse(loader, resources)  # type: ignore[arg-type]
         assert len(result) == 1
 
 
@@ -207,7 +207,7 @@ def _create_package(
         secrets_path = package_dir / "secrets.yaml"
         secrets_path.write_text(yaml.dump(secrets_data))
 
-    return package_dir
+    return cast("Path", package_dir)
 
 
 class TestPackageSecrets:

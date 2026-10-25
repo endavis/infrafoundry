@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,13 +16,13 @@ from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
-def validation_report():
+def validation_report() -> ValidationReport:
     """Create a ValidationReport instance."""
     return ValidationReport()
 
 
 @pytest.fixture
-def api_validator(validation_report):
+def api_validator(validation_report: ValidationReport) -> BaseAPIValidator:
     """Create a BaseAPIValidator instance."""
     env_config = make_env_config(
         name="test-env",
@@ -31,12 +32,14 @@ def api_validator(validation_report):
 
 
 @pytest.fixture
-def validator(api_validator, validation_report):
+def validator(
+    api_validator: BaseAPIValidator, validation_report: ValidationReport
+) -> NamespaceValidator:
     """Create a NamespaceValidator instance."""
     return NamespaceValidator(api_validator, validation_report)
 
 
-def _namespace_api_response(names: list[str]) -> dict:
+def _namespace_api_response(names: list[str]) -> dict[str, Any]:
     """Build a mock Kubernetes namespace list response."""
     return {
         "items": [{"metadata": {"name": n}} for n in names],
@@ -47,9 +50,14 @@ def _namespace_api_response(names: list[str]) -> dict:
 class TestNamespaceValidator:
     """Tests for NamespaceValidator."""
 
-    def test_existing_namespace(self, validator, validation_report, api_validator):
+    def test_existing_namespace(
+        self,
+        validator: NamespaceValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that existing namespaces produce INFO."""
-        api_validator.fetch_json = MagicMock(
+        api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
             return_value=_namespace_api_response(["default", "kube-system", "my-ns"])
         )
         validator.validate(
@@ -64,9 +72,14 @@ class TestNamespaceValidator:
             for r in validation_report.results
         )
 
-    def test_namespace_in_config(self, validator, validation_report, api_validator):
+    def test_namespace_in_config(
+        self,
+        validator: NamespaceValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that namespaces in config produce 'will be created' INFO."""
-        api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))
+        api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},
@@ -76,9 +89,14 @@ class TestNamespaceValidator:
         )
         assert any("will be created" in r.message for r in validation_report.results)
 
-    def test_namespace_missing_warning(self, validator, validation_report, api_validator):
+    def test_namespace_missing_warning(
+        self,
+        validator: NamespaceValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that missing namespaces produce WARNING."""
-        api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))
+        api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},
@@ -91,9 +109,14 @@ class TestNamespaceValidator:
             for r in validation_report.results
         )
 
-    def test_api_failure_graceful(self, validator, validation_report, api_validator):
+    def test_api_failure_graceful(
+        self,
+        validator: NamespaceValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test graceful handling of API failure."""
-        api_validator.fetch_json = MagicMock(return_value=None)
+        api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},
@@ -107,9 +130,14 @@ class TestNamespaceValidator:
         ]
         assert len(ns_checks) == 0
 
-    def test_empty_namespaces_skips(self, validator, validation_report, api_validator):
+    def test_empty_namespaces_skips(
+        self,
+        validator: NamespaceValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that empty namespaces set makes no API calls."""
-        api_validator.fetch_json = MagicMock()
+        api_validator.fetch_json = MagicMock()  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},

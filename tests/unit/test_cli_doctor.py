@@ -1,5 +1,9 @@
 """Unit tests for the foundry doctor command (system-level checks only)."""
 
+from pathlib import Path
+from typing import Any
+
+import pytest
 from click.testing import CliRunner
 
 from infrafoundry.cli import main as cli
@@ -10,7 +14,7 @@ from infrafoundry.cli.commands.doctor_utils import CheckResult, check_dependency
 class TestWelcomeMessage:
     """Tests for the welcome message when no subcommand is invoked."""
 
-    def test_welcome_shown_without_subcommand(self):
+    def test_welcome_shown_without_subcommand(self) -> None:
         """Test that welcome message is shown when no subcommand is provided."""
         runner = CliRunner()
         result = runner.invoke(cli, [])
@@ -20,7 +24,7 @@ class TestWelcomeMessage:
         assert "Quick Start" in result.output
         assert "Environment Variables" in result.output
 
-    def test_welcome_shows_config_status(self, tmp_path):
+    def test_welcome_shows_config_status(self, tmp_path: Path) -> None:
         """Test that welcome message shows configuration status."""
         runner = CliRunner()
         envs_dir = tmp_path / "envs"
@@ -33,7 +37,7 @@ class TestWelcomeMessage:
         assert result.exit_code == 0
         assert "Status" in result.output
 
-    def test_welcome_not_shown_with_subcommand(self):
+    def test_welcome_not_shown_with_subcommand(self) -> None:
         """Test that welcome message is not shown when a subcommand is provided."""
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
@@ -45,7 +49,7 @@ class TestWelcomeMessage:
 class TestDoctorCommand:
     """Tests for the foundry doctor command (system dependencies only)."""
 
-    def test_doctor_help(self):
+    def test_doctor_help(self) -> None:
         """Test doctor command help output."""
         runner = CliRunner()
         result = runner.invoke(cli, ["doctor", "--help"])
@@ -53,7 +57,7 @@ class TestDoctorCommand:
         assert result.exit_code == 0
         assert "system dependencies" in result.output.lower()
 
-    def test_doctor_runs_successfully(self):
+    def test_doctor_runs_successfully(self) -> None:
         """Test doctor command runs without errors."""
         runner = CliRunner()
         result = runner.invoke(cli, ["doctor"])
@@ -61,7 +65,7 @@ class TestDoctorCommand:
         assert result.exit_code == 0
         assert "Health Check Results" in result.output
 
-    def test_doctor_shows_only_dependency_checks(self):
+    def test_doctor_shows_only_dependency_checks(self) -> None:
         """Test doctor only shows binary dependency checks, not config checks."""
         runner = CliRunner()
         result = runner.invoke(cli, ["doctor"])
@@ -77,7 +81,7 @@ class TestDoctorCommand:
         assert "State Backend" not in result.output
         assert "SOPS/Age Keys" not in result.output
 
-    def test_doctor_json_format(self):
+    def test_doctor_json_format(self) -> None:
         """Test doctor JSON output contains only system checks."""
         runner = CliRunner()
         result = runner.invoke(cli, ["doctor", "--format", "json"])
@@ -95,7 +99,7 @@ class TestDoctorCommand:
         assert "Config Repository" not in check_names
         assert "Environments" not in check_names
 
-    def test_doctor_no_blueprint_reference(self):
+    def test_doctor_no_blueprint_reference(self) -> None:
         """Test that foundry --help no longer shows blueprint command."""
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
@@ -107,14 +111,14 @@ class TestDoctorCommand:
 class TestCheckDependency:
     """Tests for the shared dependency checking utility."""
 
-    def test_check_dependency_found(self):
+    def test_check_dependency_found(self) -> None:
         """Test dependency check when command is found."""
         result = check_dependency("Python", "python", "Install Python")
 
         assert result.status == "ok"
         assert "Found at" in result.message
 
-    def test_check_dependency_not_found(self):
+    def test_check_dependency_not_found(self) -> None:
         """Test dependency check when command is not found."""
         result = check_dependency(
             "NonExistent",
@@ -130,13 +134,13 @@ class TestCheckDependency:
 class TestIacToolAlternatives:
     """Tests that Terraform and OpenTofu are treated as alternatives."""
 
-    def _which_stub(self, installed: set[str]):
+    def _which_stub(self, installed: set[str]) -> Any:
         def _which(cmd: str) -> str | None:
             return f"/usr/bin/{cmd}" if cmd in installed else None
 
         return _which
 
-    def test_both_installed_ok(self, monkeypatch):
+    def test_both_installed_ok(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"terraform", "tofu"}))
         result = doctor_module._check_iac_tool()
         assert result.name == "IaC Tool"
@@ -144,19 +148,19 @@ class TestIacToolAlternatives:
         assert "Terraform" in result.message
         assert "OpenTofu" in result.message
 
-    def test_only_terraform_ok(self, monkeypatch):
+    def test_only_terraform_ok(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"terraform"}))
         result = doctor_module._check_iac_tool()
         assert result.status == "ok"
         assert "Terraform" in result.message
 
-    def test_only_opentofu_ok(self, monkeypatch):
+    def test_only_opentofu_ok(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"tofu"}))
         result = doctor_module._check_iac_tool()
         assert result.status == "ok"
         assert "OpenTofu" in result.message
 
-    def test_neither_installed_error(self, monkeypatch):
+    def test_neither_installed_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub(set()))
         result = doctor_module._check_iac_tool()
         assert result.status == "error"
@@ -164,7 +168,9 @@ class TestIacToolAlternatives:
         assert "Terraform" in result.suggestion
         assert "OpenTofu" in result.suggestion
 
-    def test_doctor_exits_zero_with_only_terraform_and_no_warnings(self, monkeypatch):
+    def test_doctor_exits_zero_with_only_terraform_and_no_warnings(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Doctor should exit 0 and show no warnings when only Terraform is installed."""
         installed = {"terraform", "ansible", "sops", "age"}
         monkeypatch.setattr(
@@ -192,7 +198,7 @@ class TestIacToolAlternatives:
 class TestCheckResultDataclass:
     """Tests for the CheckResult dataclass."""
 
-    def test_check_result_creation(self):
+    def test_check_result_creation(self) -> None:
         """Test CheckResult creation with all fields."""
         result = CheckResult(
             name="Test Check",
@@ -206,7 +212,7 @@ class TestCheckResultDataclass:
         assert result.message == "All good"
         assert result.suggestion == "No action needed"
 
-    def test_check_result_default_suggestion(self):
+    def test_check_result_default_suggestion(self) -> None:
         """Test CheckResult creation with default suggestion."""
         result = CheckResult(
             name="Test Check",

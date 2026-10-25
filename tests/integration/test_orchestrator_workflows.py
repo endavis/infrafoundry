@@ -1,5 +1,8 @@
 """Integration tests for Orchestrator workflow methods (plan, apply, destroy, rollback)."""
 
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -13,7 +16,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 @pytest.fixture
-def mock_providers(tmp_path):
+def mock_providers(tmp_path: Path) -> dict[str, Any]:
     """Create mock providers for testing."""
     # Create mock Proxmox provider
     proxmox = Mock(spec=ProxmoxProvider)
@@ -34,7 +37,9 @@ def mock_providers(tmp_path):
 
 
 @pytest.fixture
-def orchestrator(tmp_path, mock_config, mock_providers):
+def orchestrator(
+    tmp_path: Path, mock_config: dict[str, Any], mock_providers: dict[str, Any]
+) -> Orchestrator:
     """Create Orchestrator with mocked components for workflow testing."""
     config_dir = tmp_path / "config"
     output_dir = tmp_path / "generated"
@@ -98,7 +103,7 @@ def orchestrator(tmp_path, mock_config, mock_providers):
     return orchestrator
 
 
-def mock_apply_methods(orchestrator):
+def mock_apply_methods(orchestrator: Orchestrator) -> Iterator[None]:
     """Helper to mock methods needed for apply workflow."""
     with (
         patch(
@@ -120,7 +125,9 @@ def mock_apply_methods(orchestrator):
 class TestPlanOrchestrator:
     """Tests for plan workflow."""
 
-    def test_plan_basic_workflow(self, orchestrator, mock_providers):
+    def test_plan_basic_workflow(
+        self, orchestrator: Orchestrator, mock_providers: dict[str, Any]
+    ) -> None:
         """Test basic plan workflow execution."""
         with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
             mock_plan.return_value = {"success": True, "changes": 2}
@@ -141,7 +148,9 @@ class TestPlanOrchestrator:
             # Verify terraform was run
             mock_plan.assert_called_once()
 
-    def test_plan_dry_run_skips_terraform(self, orchestrator, mock_providers):
+    def test_plan_dry_run_skips_terraform(
+        self, orchestrator: Orchestrator, mock_providers: dict[str, Any]
+    ) -> None:
         """Test that dry_run mode doesn't generate files or run terraform."""
         result = orchestrator.plan(env_name="dev", dry_run=True)
 
@@ -152,7 +161,12 @@ class TestPlanOrchestrator:
         mock_providers["proxmox"].generate_terraform.assert_not_called()
         mock_providers["proxmox"].generate_ansible.assert_not_called()
 
-    def test_plan_with_resource_filter(self, orchestrator, mock_providers, mock_config):
+    def test_plan_with_resource_filter(
+        self,
+        orchestrator: Orchestrator,
+        mock_providers: dict[str, Any],
+        mock_config: dict[str, Any],
+    ) -> None:
         """Test plan with resource filter."""
         with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
             mock_plan.return_value = {"success": True, "changes": 1}
@@ -162,7 +176,7 @@ class TestPlanOrchestrator:
             # Verify only filtered resources were processed
             assert result["proxmox"]["resources"] == 1
 
-    def test_plan_creates_deployment_record(self, orchestrator):
+    def test_plan_creates_deployment_record(self, orchestrator: Orchestrator) -> None:
         """Test that plan creates a deployment record in state manager."""
         with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
             mock_plan.return_value = {"success": True}
@@ -174,11 +188,11 @@ class TestPlanOrchestrator:
             assert deployments[0].command == "plan"
             assert deployments[0].environment == "dev"
 
-    def test_plan_emits_events(self, orchestrator):
+    def test_plan_emits_events(self, orchestrator: Orchestrator) -> None:
         """Test that plan emits before/after events."""
         events_received = []
 
-        def capture_event(event):
+        def capture_event(event: Any) -> None:
             events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.BEFORE_PLAN, capture_event)
@@ -191,7 +205,7 @@ class TestPlanOrchestrator:
         assert EventType.BEFORE_PLAN in events_received
         assert EventType.AFTER_PLAN in events_received
 
-    def test_plan_tracks_resources_in_state(self, orchestrator):
+    def test_plan_tracks_resources_in_state(self, orchestrator: Orchestrator) -> None:
         """Test that plan tracks resources in state manager."""
         with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
             mock_plan.return_value = {"success": True}
@@ -212,7 +226,7 @@ class TestPlanOrchestrator:
     #     """Test that plan handles missing secrets gracefully."""
     #     ...
 
-    def test_plan_failure_updates_deployment_status(self, orchestrator):
+    def test_plan_failure_updates_deployment_status(self, orchestrator: Orchestrator) -> None:
         """Test that plan failure marks deployment as failed."""
         with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
             mock_plan.side_effect = RuntimeError("Terraform failed")
@@ -223,13 +237,14 @@ class TestPlanOrchestrator:
             # Check deployment was marked as failed
             deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].status == DeploymentStatus.FAILED
+            assert deployments[0].error_message is not None
             assert "Terraform failed" in deployments[0].error_message
 
-    def test_plan_emits_failure_event(self, orchestrator):
+    def test_plan_emits_failure_event(self, orchestrator: Orchestrator) -> None:
         """Test that plan failure emits failure event."""
         events_received = []
 
-        def capture_event(event):
+        def capture_event(event: Any) -> None:
             events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.PLAN_FAILED, capture_event)
@@ -242,7 +257,9 @@ class TestPlanOrchestrator:
 
         assert EventType.PLAN_FAILED in events_received
 
-    def test_plan_runner_returning_success_false_marks_deployment_failed(self, orchestrator):
+    def test_plan_runner_returning_success_false_marks_deployment_failed(
+        self, orchestrator: Orchestrator
+    ) -> None:
         """Plan must mark deployment FAILED when runner returns success=False.
 
         Mirrors ``test_plan_failure_updates_deployment_status`` but exercises
@@ -269,9 +286,12 @@ class TestPlanOrchestrator:
             # message propagated into the deployment record.
             deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].status == DeploymentStatus.FAILED
+            assert deployments[0].error_message is not None
             assert "boom" in deployments[0].error_message
 
-    def test_plan_runner_returning_success_false_emits_plan_failed_event(self, orchestrator):
+    def test_plan_runner_returning_success_false_emits_plan_failed_event(
+        self, orchestrator: Orchestrator
+    ) -> None:
         """Plan must emit PLAN_FAILED when runner returns success=False.
 
         Mirrors ``test_plan_emits_failure_event`` but exercises the
@@ -281,7 +301,7 @@ class TestPlanOrchestrator:
 
         events_received = []
 
-        def capture_event(event):
+        def capture_event(event: Any) -> None:
             events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.PLAN_FAILED, capture_event)
@@ -304,7 +324,7 @@ class TestPlanOrchestrator:
 class TestApplyOrchestrator:
     """Tests for apply workflow."""
 
-    def test_apply_runs_plan_first(self, orchestrator):
+    def test_apply_runs_plan_first(self, orchestrator: Orchestrator) -> None:
         """Test that apply runs plan before applying."""
         with (
             patch.object(orchestrator, "plan") as mock_plan,
@@ -326,7 +346,9 @@ class TestApplyOrchestrator:
             assert mock_plan.call_args[0][0] == "dev"  # First positional arg
             assert mock_plan.call_args[1]["dry_run"] is False
 
-    def test_apply_basic_workflow(self, orchestrator, mock_providers):
+    def test_apply_basic_workflow(
+        self, orchestrator: Orchestrator, mock_providers: dict[str, Any]
+    ) -> None:
         """Test basic apply workflow execution."""
         with (
             patch(
@@ -351,7 +373,7 @@ class TestApplyOrchestrator:
             # Verify apply completed
             assert "proxmox" in result
 
-    def test_apply_creates_deployment_record(self, orchestrator):
+    def test_apply_creates_deployment_record(self, orchestrator: Orchestrator) -> None:
         """Test that apply creates a deployment record."""
         with (
             patch(
@@ -380,7 +402,7 @@ class TestApplyOrchestrator:
             assert len(deployments) > 0
             assert deployments[0].command == "apply"
 
-    def test_apply_captures_rollback_snapshot(self, orchestrator):
+    def test_apply_captures_rollback_snapshot(self, orchestrator: Orchestrator) -> None:
         """Test that apply captures configuration snapshot for rollback."""
         with (
             patch(
@@ -407,7 +429,9 @@ class TestApplyOrchestrator:
             # At least one deployment should exist
             assert len(deployments) > 0
 
-    def test_apply_with_resource_filter(self, orchestrator, mock_providers):
+    def test_apply_with_resource_filter(
+        self, orchestrator: Orchestrator, mock_providers: dict[str, Any]
+    ) -> None:
         """Test apply with resource filter."""
         with (
             patch(
@@ -434,11 +458,11 @@ class TestApplyOrchestrator:
             # Should process filtered resources
             assert "proxmox" in result
 
-    def test_apply_emits_events(self, orchestrator):
+    def test_apply_emits_events(self, orchestrator: Orchestrator) -> None:
         """Test that apply emits before/after events."""
         events_received = []
 
-        def capture_event(event):
+        def capture_event(event: Any) -> None:
             events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.BEFORE_APPLY, capture_event)
@@ -467,7 +491,7 @@ class TestApplyOrchestrator:
         assert EventType.BEFORE_APPLY in events_received
         assert EventType.AFTER_APPLY in events_received
 
-    def test_apply_failure_updates_deployment_status(self, orchestrator):
+    def test_apply_failure_updates_deployment_status(self, orchestrator: Orchestrator) -> None:
         """Test that apply failure marks deployment as failed."""
         with (
             patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan,
@@ -484,11 +508,11 @@ class TestApplyOrchestrator:
             failed_deployments = [d for d in deployments if d.status == DeploymentStatus.FAILED]
             assert failed_deployments
 
-    def test_apply_emits_failure_event(self, orchestrator):
+    def test_apply_emits_failure_event(self, orchestrator: Orchestrator) -> None:
         """Test that apply failure emits failure event."""
         events_received = []
 
-        def capture_event(event):
+        def capture_event(event: Any) -> None:
             events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.APPLY_FAILED, capture_event)
@@ -518,7 +542,9 @@ class TestApplyOrchestrator:
 class TestDestroyOrchestrator:
     """Tests for destroy workflow."""
 
-    def test_destroy_basic_workflow(self, orchestrator, mock_providers):
+    def test_destroy_basic_workflow(
+        self, orchestrator: Orchestrator, mock_providers: dict[str, Any]
+    ) -> None:
         """Test basic destroy workflow execution."""
         with (
             patch(
@@ -536,7 +562,7 @@ class TestDestroyOrchestrator:
             # Verify destroy completed
             assert "proxmox" in result
 
-    def test_destroy_creates_deployment_record(self, orchestrator):
+    def test_destroy_creates_deployment_record(self, orchestrator: Orchestrator) -> None:
         """Test that destroy creates a deployment record."""
         with (
             patch(
@@ -556,7 +582,7 @@ class TestDestroyOrchestrator:
             )
             assert len(deployments) > 0
 
-    def test_destroy_prompts_without_callback_and_aborts(self, orchestrator):
+    def test_destroy_prompts_without_callback_and_aborts(self, orchestrator: Orchestrator) -> None:
         """Test that destroy returns an error when auto_approve=False and no callback provided."""
         # The orchestrator should now return an error if called improperly
         result = orchestrator.destroy(env_name="dev", auto_approve=False, confirm_callback=None)
@@ -568,7 +594,7 @@ class TestDestroyOrchestrator:
         assert deployments[0].status == DeploymentStatus.FAILED
         assert deployments[0].error_message == "Confirmation callback required but not provided"
 
-    def test_destroy_proceeds_with_confirmation(self, orchestrator):
+    def test_destroy_proceeds_with_confirmation(self, orchestrator: Orchestrator) -> None:
         """Test that destroy proceeds when user confirms."""
         with (
             patch(
@@ -588,7 +614,7 @@ class TestDestroyOrchestrator:
             # Should proceed with destroy
             assert "proxmox" in result
 
-    def test_destroy_with_resource_filter(self, orchestrator):
+    def test_destroy_with_resource_filter(self, orchestrator: Orchestrator) -> None:
         """Test destroy with resource filter."""
         with (
             patch(
@@ -607,11 +633,11 @@ class TestDestroyOrchestrator:
             # Should process filtered resources
             assert "proxmox" in result
 
-    def test_destroy_emits_events(self, orchestrator):
+    def test_destroy_emits_events(self, orchestrator: Orchestrator) -> None:
         """Test that destroy emits before/after events."""
         events_received = []
 
-        def capture_event(event):
+        def capture_event(event: Any) -> None:
             events_received.append(event.event_type)
 
         orchestrator.event_manager.subscribe(EventType.BEFORE_DESTROY, capture_event)
@@ -632,7 +658,7 @@ class TestDestroyOrchestrator:
         assert EventType.BEFORE_DESTROY in events_received
         assert EventType.AFTER_DESTROY in events_received
 
-    def test_destroy_tracks_resources_as_destroyed(self, orchestrator):
+    def test_destroy_tracks_resources_as_destroyed(self, orchestrator: Orchestrator) -> None:
         """Test that destroy marks resources as destroyed in state."""
         with (
             patch(
@@ -650,7 +676,7 @@ class TestDestroyOrchestrator:
             resources = orchestrator.state_manager.get_resources(environment="dev")
             assert len(resources) > 0
 
-    def test_destroy_failure_updates_deployment_status(self, orchestrator):
+    def test_destroy_failure_updates_deployment_status(self, orchestrator: Orchestrator) -> None:
         """Test that destroy failure marks deployment as failed."""
         with patch(
             "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
@@ -669,7 +695,13 @@ class TestDestroyOrchestrator:
 class TestMultiProviderWorkflow:
     """Tests for multi-provider orchestration."""
 
-    def test_plan_multiple_providers(self, orchestrator, mock_providers, mock_config, tmp_path):
+    def test_plan_multiple_providers(
+        self,
+        orchestrator: Orchestrator,
+        mock_providers: dict[str, Any],
+        mock_config: dict[str, Any],
+        tmp_path: Path,
+    ) -> None:
         """Test plan workflow with multiple providers."""
         # Add a second provider
         kubernetes = Mock()
@@ -704,8 +736,12 @@ class TestMultiProviderWorkflow:
             assert "kubernetes" in result
 
     def test_apply_multiple_providers_serial(
-        self, orchestrator, mock_providers, mock_config, tmp_path
-    ):
+        self,
+        orchestrator: Orchestrator,
+        mock_providers: dict[str, Any],
+        mock_config: dict[str, Any],
+        tmp_path: Path,
+    ) -> None:
         """Test apply workflow with multiple providers in serial mode."""
         # Add second provider
         kubernetes = Mock()
@@ -755,7 +791,13 @@ class TestMultiProviderWorkflow:
             assert "proxmox" in result
             assert "kubernetes" in result
 
-    def test_destroy_multiple_providers(self, orchestrator, mock_providers, mock_config, tmp_path):
+    def test_destroy_multiple_providers(
+        self,
+        orchestrator: Orchestrator,
+        mock_providers: dict[str, Any],
+        mock_config: dict[str, Any],
+        tmp_path: Path,
+    ) -> None:
         """Test destroy workflow with multiple providers."""
         # Add second provider
         opnsense = Mock()
@@ -800,7 +842,7 @@ class TestMultiProviderWorkflow:
 class TestWorkflowStateManagement:
     """Tests for state management during workflows."""
 
-    def test_deployment_lifecycle_plan_to_apply(self, orchestrator):
+    def test_deployment_lifecycle_plan_to_apply(self, orchestrator: Orchestrator) -> None:
         """Test complete deployment lifecycle from plan to apply."""
         with (
             patch(
@@ -835,7 +877,7 @@ class TestWorkflowStateManagement:
             )
             assert len(apply_deployments) > 0
 
-    def test_resource_state_transitions(self, orchestrator):
+    def test_resource_state_transitions(self, orchestrator: Orchestrator) -> None:
         """Test resource state transitions through workflow."""
         with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
             mock_plan.return_value = {"success": True}
@@ -844,7 +886,7 @@ class TestWorkflowStateManagement:
             resources = orchestrator.state_manager.get_resources(environment="dev")
             assert all(r.state == ResourceState.PLANNED for r in resources)
 
-    def test_deployment_metadata_captured(self, orchestrator):
+    def test_deployment_metadata_captured(self, orchestrator: Orchestrator) -> None:
         """Test that deployment metadata is properly captured."""
         with patch("infrafoundry.core.runners.terraform_runner.TerraformRunner.plan") as mock_plan:
             mock_plan.return_value = {"success": True}
@@ -852,4 +894,5 @@ class TestWorkflowStateManagement:
 
             deployments = orchestrator.state_manager.get_deployment_history(environment="dev")
             assert deployments[0].dry_run is True
+            assert deployments[0].extra_data is not None
             assert "resource_filter" in deployments[0].extra_data

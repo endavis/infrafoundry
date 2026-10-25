@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -13,13 +14,13 @@ from infrafoundry.cli.main import main
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def temp_config_dir(tmp_path):
+def temp_config_dir(tmp_path: Path) -> Path:
     """Create a temporary config directory with two environments."""
     config_dir = tmp_path / "config"
     envs_dir = config_dir / "envs"
@@ -50,7 +51,7 @@ def temp_config_dir(tmp_path):
 class TestConfigEnvsSyncStatus:
     """Tests for config envs sync status display."""
 
-    def test_fs_only_env_shows_status(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_fs_only_env_shows_status(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """FS-only environment shows FS-ONLY status."""
         with patch(
             "infrafoundry.cli.commands.config.envs._get_state_db_environments",
@@ -60,7 +61,7 @@ class TestConfigEnvsSyncStatus:
             assert result.exit_code == 0
             assert "FS-ONLY" in result.output
 
-    def test_db_only_env_shows_status(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_db_only_env_shows_status(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """DB-only environment shows DB-ONLY status."""
         with patch(
             "infrafoundry.cli.commands.config.envs._get_state_db_environments",
@@ -70,7 +71,7 @@ class TestConfigEnvsSyncStatus:
             assert result.exit_code == 0
             assert "DB-ONLY" in result.output
 
-    def test_consistent_env_shows_ok(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_consistent_env_shows_ok(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Environment in both sources shows OK status."""
         with patch(
             "infrafoundry.cli.commands.config.envs._get_state_db_environments",
@@ -81,7 +82,7 @@ class TestConfigEnvsSyncStatus:
             assert "OK" in result.output
 
     def test_state_db_unavailable_degrades_gracefully(
-        self, cli_runner: CliRunner, temp_config_dir
+        self, cli_runner: CliRunner, temp_config_dir: Path
     ) -> None:
         """State DB unavailable shows warning and FS environments."""
         with patch(
@@ -94,7 +95,9 @@ class TestConfigEnvsSyncStatus:
             assert "dev" in result.output
             assert "prod" in result.output
 
-    def test_json_output_includes_sync_status(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_json_output_includes_sync_status(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """JSON output includes sync_status field per environment."""
         with patch(
             "infrafoundry.cli.commands.config.envs._get_state_db_environments",
@@ -114,7 +117,7 @@ class TestConfigEnvsSyncStatus:
             assert envs_by_name["prod"]["sync_status"] == "fs_only"
             assert envs_by_name["hl"]["sync_status"] == "db_only"
 
-    def test_json_output_db_unavailable(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_json_output_db_unavailable(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """JSON output includes state_db_available flag."""
         with patch(
             "infrafoundry.cli.commands.config.envs._get_state_db_environments",
@@ -128,7 +131,7 @@ class TestConfigEnvsSyncStatus:
             data = json.loads(result.output)
             assert data["state_db_available"] is False
 
-    def test_no_environments_found(self, cli_runner: CliRunner, tmp_path) -> None:
+    def test_no_environments_found(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """No environments anywhere shows appropriate message."""
         config_dir = tmp_path / "empty"
         envs_dir = config_dir / "envs"
@@ -142,7 +145,9 @@ class TestConfigEnvsSyncStatus:
             assert result.exit_code == 0
             assert "No environments found" in result.output
 
-    def test_resource_count_shown_for_db_envs(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_resource_count_shown_for_db_envs(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """Tracked resource count shown for environments with DB records."""
         with patch(
             "infrafoundry.cli.commands.config.envs._get_state_db_environments",

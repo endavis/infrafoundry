@@ -12,13 +12,13 @@ from infrafoundry.providers.esxi.validators.vswitch_reference_validator import (
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> VswitchReferenceValidator:
     """Create a VswitchReferenceValidator instance."""
     return VswitchReferenceValidator(report)
 
@@ -38,7 +38,7 @@ def _make_portgroup(name: str, vswitch: str, host: str = "esxi-01") -> ResourceC
     )
 
 
-def test_valid_reference(validator, report):
+def test_valid_reference(validator: VswitchReferenceValidator, report: MagicMock) -> None:
     """Test portgroup referencing existing vswitch on same host."""
     resources = [
         _make_vswitch("vSwitch1", "esxi-01"),
@@ -52,7 +52,9 @@ def test_valid_reference(validator, report):
     assert "vSwitch1" in call_args["message"]
 
 
-def test_invalid_reference_wrong_host(validator, report):
+def test_invalid_reference_wrong_host(
+    validator: VswitchReferenceValidator, report: MagicMock
+) -> None:
     """Test portgroup referencing vswitch on different host."""
     resources = [
         _make_vswitch("vSwitch1", "esxi-01"),
@@ -66,7 +68,9 @@ def test_invalid_reference_wrong_host(validator, report):
     assert "does not exist" in call_args["message"]
 
 
-def test_invalid_reference_missing_vswitch(validator, report):
+def test_invalid_reference_missing_vswitch(
+    validator: VswitchReferenceValidator, report: MagicMock
+) -> None:
     """Test portgroup referencing non-existent vswitch."""
     resources = [
         _make_portgroup("pg-mgmt", "vSwitch99", "esxi-01"),
@@ -78,7 +82,7 @@ def test_invalid_reference_missing_vswitch(validator, report):
     assert "vSwitch99" in call_args["message"]
 
 
-def test_no_vswitch_reference(validator, report):
+def test_no_vswitch_reference(validator: VswitchReferenceValidator, report: MagicMock) -> None:
     """Test portgroup with empty vswitch reference."""
     resources = [
         ResourceConfig(
@@ -95,7 +99,7 @@ def test_no_vswitch_reference(validator, report):
     assert "no vswitch reference" in call_args["message"]
 
 
-def test_multiple_portgroups(validator, report):
+def test_multiple_portgroups(validator: VswitchReferenceValidator, report: MagicMock) -> None:
     """Test multiple portgroups with mixed valid/invalid refs."""
     resources = [
         _make_vswitch("vSwitch1", "esxi-01"),
@@ -111,7 +115,7 @@ def test_multiple_portgroups(validator, report):
     assert False in passed_values
 
 
-def test_no_portgroups(validator, report):
+def test_no_portgroups(validator: VswitchReferenceValidator, report: MagicMock) -> None:
     """Test with no portgroup resources."""
     resources = [
         _make_vswitch("vSwitch1", "esxi-01"),
@@ -120,7 +124,7 @@ def test_no_portgroups(validator, report):
     report.add_check.assert_not_called()
 
 
-def test_no_resources(validator, report):
+def test_no_resources(validator: VswitchReferenceValidator, report: MagicMock) -> None:
     """Test with empty resource list."""
     validator.validate([])
     report.add_check.assert_not_called()

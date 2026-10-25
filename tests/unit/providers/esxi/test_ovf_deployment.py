@@ -1,5 +1,8 @@
 """Unit tests for ESXi OVF deployment template rendering."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -7,7 +10,7 @@ from infrafoundry.providers.esxi import EsxiProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> EsxiProvider:
     """Create an EsxiProvider for template testing."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -18,9 +21,9 @@ def provider(tmp_path):
     return p
 
 
-def _make_ovf_deployment(name: str = "ontap-node-01", **config_overrides) -> ResourceConfig:
+def _make_ovf_deployment(name: str = "ontap-node-01", **config_overrides: Any) -> ResourceConfig:
     """Helper to create an ovf_deployment ResourceConfig."""
-    config: dict = {
+    config: dict[str, Any] = {
         "host": "esxi-01",
         "ovf_source": "/path/to/vsim.ovf",
         "disk_store": "datastore1",
@@ -37,7 +40,7 @@ def _make_ovf_deployment(name: str = "ontap-node-01", **config_overrides) -> Res
 class TestOvfDeploymentTemplate:
     """Tests for ovf_deployment.tf.j2 template."""
 
-    def test_basic_ovf_deployment(self, provider):
+    def test_basic_ovf_deployment(self, provider: EsxiProvider) -> None:
         """Basic OVF deployment should render terraform_data resource."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
@@ -48,7 +51,7 @@ class TestOvfDeploymentTemplate:
         assert "ovftool" in content
         assert "triggers_replace" in content
 
-    def test_network_map_renders_net_flags(self, provider):
+    def test_network_map_renders_net_flags(self, provider: EsxiProvider) -> None:
         """Network map should render --net: flags for each OVF network."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
@@ -58,7 +61,7 @@ class TestOvfDeploymentTemplate:
         assert '--net:"hostonly"="PG-Cluster-esx-01"' in content
         assert '--net:"nat"="PG-Management-esx-01"' in content
 
-    def test_host_alias_in_triggers(self, provider):
+    def test_host_alias_in_triggers(self, provider: EsxiProvider) -> None:
         """Host alias should be used in triggers_replace variable references."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
@@ -73,7 +76,7 @@ class TestOvfDeploymentTemplate:
         assert "self.triggers_replace.esxi_username" in content
         assert "self.triggers_replace.esxi_hostname" in content
 
-    def test_multiple_deployments(self, provider):
+    def test_multiple_deployments(self, provider: EsxiProvider) -> None:
         """Multiple deployments should render multiple resources."""
         deployments = [
             _make_ovf_deployment("node-01", vm_name="ontap-01"),
@@ -87,7 +90,7 @@ class TestOvfDeploymentTemplate:
         assert 'resource "terraform_data" "ovf_node_02"' in content
         assert "var.esxi_hostname_esxi_02" in content
 
-    def test_name_normalization(self, provider):
+    def test_name_normalization(self, provider: EsxiProvider) -> None:
         """Dashes in resource names should be converted to underscores."""
         deployments = [_make_ovf_deployment("my-ovf-vm")]
         content = provider.render_template(
@@ -96,7 +99,7 @@ class TestOvfDeploymentTemplate:
         )
         assert '"ovf_my_ovf_vm"' in content
 
-    def test_default_disk_mode_thin(self, provider):
+    def test_default_disk_mode_thin(self, provider: EsxiProvider) -> None:
         """Default disk mode should be thin."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
@@ -105,7 +108,7 @@ class TestOvfDeploymentTemplate:
         )
         assert "-dm=thin" in content
 
-    def test_custom_disk_mode(self, provider):
+    def test_custom_disk_mode(self, provider: EsxiProvider) -> None:
         """Custom disk mode should be rendered."""
         deployments = [_make_ovf_deployment(disk_mode="thick")]
         content = provider.render_template(
@@ -114,7 +117,7 @@ class TestOvfDeploymentTemplate:
         )
         assert "-dm=thick" in content
 
-    def test_power_on_default(self, provider):
+    def test_power_on_default(self, provider: EsxiProvider) -> None:
         """Default power=on should render --powerOn flag."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
@@ -123,7 +126,7 @@ class TestOvfDeploymentTemplate:
         )
         assert "--powerOn" in content
 
-    def test_power_off(self, provider):
+    def test_power_off(self, provider: EsxiProvider) -> None:
         """Power=off should not render --powerOn flag."""
         deployments = [_make_ovf_deployment(power="off")]
         content = provider.render_template(
@@ -132,7 +135,7 @@ class TestOvfDeploymentTemplate:
         )
         assert "--powerOn" not in content
 
-    def test_notes_rendered(self, provider):
+    def test_notes_rendered(self, provider: EsxiProvider) -> None:
         """Notes should be rendered as --annotation flag."""
         deployments = [_make_ovf_deployment(notes="ONTAP 9.17.1")]
         content = provider.render_template(
@@ -141,7 +144,7 @@ class TestOvfDeploymentTemplate:
         )
         assert '--annotation="ONTAP 9.17.1"' in content
 
-    def test_no_notes(self, provider):
+    def test_no_notes(self, provider: EsxiProvider) -> None:
         """Without notes, --annotation should not appear."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
@@ -150,7 +153,7 @@ class TestOvfDeploymentTemplate:
         )
         assert "--annotation" not in content
 
-    def test_destroy_provisioner(self, provider):
+    def test_destroy_provisioner(self, provider: EsxiProvider) -> None:
         """Destroy provisioner should use self references for SSH commands."""
         deployments = [_make_ovf_deployment(vm_name="ontap-node-01")]
         content = provider.render_template(
@@ -165,7 +168,7 @@ class TestOvfDeploymentTemplate:
         assert "self.triggers_replace.esxi_password" in content
         assert "sshpass" in content
 
-    def test_vm_name_defaults_to_resource_name(self, provider):
+    def test_vm_name_defaults_to_resource_name(self, provider: EsxiProvider) -> None:
         """When vm_name is not set, resource name should be used in triggers."""
         deployment = _make_ovf_deployment("my-vm")
         del deployment.config["vm_name"]
@@ -176,7 +179,7 @@ class TestOvfDeploymentTemplate:
         assert "vm_name" in content
         assert '"my-vm"' in content
 
-    def test_triggers_replace_block(self, provider):
+    def test_triggers_replace_block(self, provider: EsxiProvider) -> None:
         """Triggers replace block should contain config and connection details."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
@@ -192,7 +195,7 @@ class TestOvfDeploymentTemplate:
         assert "esxi_username = var.esxi_username_esxi_01" in content
         assert "esxi_password = var.esxi_password_esxi_01" in content
 
-    def test_overwrite_flag(self, provider):
+    def test_overwrite_flag(self, provider: EsxiProvider) -> None:
         """Overwrite=true should render --overwrite flag."""
         deployments = [_make_ovf_deployment(overwrite=True)]
         content = provider.render_template(
@@ -201,7 +204,7 @@ class TestOvfDeploymentTemplate:
         )
         assert "--overwrite" in content
 
-    def test_no_overwrite_by_default(self, provider):
+    def test_no_overwrite_by_default(self, provider: EsxiProvider) -> None:
         """By default --overwrite should not appear."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
@@ -210,7 +213,7 @@ class TestOvfDeploymentTemplate:
         )
         assert "--overwrite" not in content
 
-    def test_password_url_encoded_in_vi_url(self, provider):
+    def test_password_url_encoded_in_vi_url(self, provider: EsxiProvider) -> None:
         """Password should be URL-encoded in the vi:// URL to handle special chars."""
         deployments = [_make_ovf_deployment()]
         content = provider.render_template(
@@ -224,7 +227,7 @@ class TestOvfDeploymentTemplate:
 class TestOvfDeploymentMacMap:
     """Tests for mac_map support in ovf_deployment template."""
 
-    def _render_with_mac_map(self, provider, **config_overrides):
+    def _render_with_mac_map(self, provider: EsxiProvider, **config_overrides: Any) -> Any:
         """Helper to render template with mac_map config."""
         deployments = [_make_ovf_deployment(**config_overrides)]
         return provider.render_template(
@@ -232,7 +235,7 @@ class TestOvfDeploymentMacMap:
             {"ovf_deployments": deployments, "host_alias": EsxiProvider._host_alias},
         )
 
-    def test_mac_map_suppresses_power_on(self, provider):
+    def test_mac_map_suppresses_power_on(self, provider: EsxiProvider) -> None:
         """When mac_map is set, --powerOn should not appear in ovftool command."""
         content = self._render_with_mac_map(
             provider,
@@ -240,7 +243,7 @@ class TestOvfDeploymentMacMap:
         )
         assert "--powerOn" not in content
 
-    def test_mac_map_set_mac_provisioner(self, provider):
+    def test_mac_map_set_mac_provisioner(self, provider: EsxiProvider) -> None:
         """mac_map should generate a provisioner that modifies VMX via SSH."""
         content = self._render_with_mac_map(
             provider,
@@ -253,7 +256,7 @@ class TestOvfDeploymentMacMap:
         assert "ethernet2.generatedAddress" in content
         assert "FULL_PATH" in content
 
-    def test_mac_map_power_on_provisioner(self, provider):
+    def test_mac_map_power_on_provisioner(self, provider: EsxiProvider) -> None:
         """When mac_map is set and power=on, a power-on provisioner should exist."""
         content = self._render_with_mac_map(
             provider,
@@ -262,7 +265,7 @@ class TestOvfDeploymentMacMap:
         )
         assert "vim-cmd vmsvc/power.on" in content
 
-    def test_mac_map_power_off_no_power_on(self, provider):
+    def test_mac_map_power_off_no_power_on(self, provider: EsxiProvider) -> None:
         """When mac_map is set and power=off, no power-on provisioner should exist."""
         content = self._render_with_mac_map(
             provider,
@@ -272,7 +275,7 @@ class TestOvfDeploymentMacMap:
         assert "vim-cmd vmsvc/power.on" not in content
         assert "addressType" in content
 
-    def test_mac_map_in_triggers_replace(self, provider):
+    def test_mac_map_in_triggers_replace(self, provider: EsxiProvider) -> None:
         """MAC values should appear in triggers_replace for change detection."""
         content = self._render_with_mac_map(
             provider,
@@ -281,7 +284,7 @@ class TestOvfDeploymentMacMap:
         assert "mac_ethernet0" in content
         assert '"BC:24:11:0A:01:01"' in content
 
-    def test_no_mac_map_unchanged(self, provider):
+    def test_no_mac_map_unchanged(self, provider: EsxiProvider) -> None:
         """Without mac_map, template output should be unchanged (no MAC provisioners)."""
         content = self._render_with_mac_map(provider)
         assert "--powerOn" in content
@@ -290,7 +293,7 @@ class TestOvfDeploymentMacMap:
         assert "vim-cmd vmsvc/power.on" not in content
         assert "mac_" not in content
 
-    def test_mac_map_multiple_entries(self, provider):
+    def test_mac_map_multiple_entries(self, provider: EsxiProvider) -> None:
         """Multiple mac_map entries should generate commands for each."""
         content = self._render_with_mac_map(
             provider,
@@ -312,7 +315,7 @@ class TestOvfDeploymentMacMap:
         assert "ethernet0.addressType" in content
         assert "ethernet3.addressType" in content
 
-    def test_mac_map_ssh_auth_pattern(self, provider):
+    def test_mac_map_ssh_auth_pattern(self, provider: EsxiProvider) -> None:
         """MAC provisioner should use the same SSH auth pattern (key then password)."""
         content = self._render_with_mac_map(
             provider,

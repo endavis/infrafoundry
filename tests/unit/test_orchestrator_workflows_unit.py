@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -28,7 +28,7 @@ from infrafoundry.core.state import DeploymentStatus
 
 
 @pytest.fixture
-def console():
+def console() -> Console:
     """Stub console to avoid actual output."""
     return Console(file=open(Path("/dev/null"), "w"))
 
@@ -37,16 +37,16 @@ def _resource(name: str, provider: str = "proxmox", type_: str = "vm") -> Resour
     return ResourceConfig(name=name, provider=provider, type=type_, config={"id": name})
 
 
-def test_plan_orchestrator_dry_run_skips_generation(console):
+def test_plan_orchestrator_dry_run_skips_generation(console: Console) -> None:
     """Dry run should skip generate/run and mark dry_run in results."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 1
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
         return res, {"proxmox": res}
 
@@ -77,7 +77,7 @@ def test_plan_orchestrator_dry_run_skips_generation(console):
     )
 
     assert result["proxmox"]["dry_run"] is True
-    providers["proxmox"].ensure_directories.assert_not_called()
+    cast(MagicMock, providers["proxmox"]).ensure_directories.assert_not_called()
     state_manager.update_deployment_status.assert_called_with(1, DeploymentStatus.COMPLETED)
     event_manager.emit_event.assert_any_call(
         EventType.BEFORE_PLAN,
@@ -95,7 +95,7 @@ def test_plan_orchestrator_dry_run_skips_generation(console):
     )
 
 
-def test_plan_orchestrator_runs_runners_in_priority_order(console):
+def test_plan_orchestrator_runs_runners_in_priority_order(console: Console) -> None:
     """Runners are sorted by provided priorities when generating plans."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 2
@@ -119,9 +119,9 @@ def test_plan_orchestrator_runs_runners_in_priority_order(console):
     provider = MagicMock()
     provider.generate_terraform = MagicMock()
     provider.generate_ansible = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
         return res, {"proxmox": res}
 
@@ -154,13 +154,13 @@ def test_plan_orchestrator_runs_runners_in_priority_order(console):
     assert tf_runner.plan.call_args_list[0][0][0] == provider
 
 
-def test_apply_orchestrator_uses_parallel_when_multiple_providers(console):
+def test_apply_orchestrator_uses_parallel_when_multiple_providers(console: Console) -> None:
     """Apply chooses parallel path when requested and multiple providers exist."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 3
     event_manager = MagicMock()
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         res_a = [_resource("vm1", provider="proxmox")]
         res_b = [_resource("fw1", provider="opnsense", type_="firewall_rule")]
         return res_a + res_b, {"proxmox": res_a, "opnsense": res_b}
@@ -192,14 +192,14 @@ def test_apply_orchestrator_uses_parallel_when_multiple_providers(console):
     assert result == {"parallel": True}
 
 
-def test_destroy_orchestrator_requires_confirmation(console):
+def test_destroy_orchestrator_requires_confirmation(console: Console) -> None:
     """Destroy requires confirmation when auto_approve is False."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 4
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     orchestrator = DestroyOrchestrator(
         console,
@@ -227,7 +227,7 @@ def test_destroy_orchestrator_requires_confirmation(console):
     )
 
 
-def test_validation_orchestrator_warns_on_missing_provider(console):
+def test_validation_orchestrator_warns_on_missing_provider(console: Console) -> None:
     """Validation skips missing providers without crashing."""
     config_manager = MagicMock()
     config_manager.load_environment.return_value = SimpleNamespace(
@@ -248,18 +248,18 @@ def test_validation_orchestrator_warns_on_missing_provider(console):
     assert results == {}
 
 
-def test_status_orchestrator_marks_unregistered_provider(console):
+def test_status_orchestrator_marks_unregistered_provider(console: Console) -> None:
     """Status shows not registered when provider missing."""
     rows: list[tuple[str, str, str]] = []
 
     class FakeTable:
-        def __init__(self, *args, **kwargs) -> None:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
 
-        def add_column(self, *args, **kwargs):
+        def add_column(self, *args: Any, **kwargs: Any) -> None:
             pass
 
-        def add_row(self, provider: str, resources: str, status: str):
+        def add_row(self, provider: str, resources: str, status: str) -> None:
             rows.append((provider, resources, status))
 
     console_stub = MagicMock()
@@ -276,7 +276,7 @@ def test_status_orchestrator_marks_unregistered_provider(console):
     assert "Not registered" in rows[0][2]
 
 
-def test_plan_emits_runner_starting_and_completed(console):
+def test_plan_emits_runner_starting_and_completed(console: Console) -> None:
     """Runner events are emitted around each runner.plan() call."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 10
@@ -292,9 +292,9 @@ def test_plan_emits_runner_starting_and_completed(console):
 
     provider = MagicMock()
     provider.generate_terraform = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
         return res, {"proxmox": res}
 
@@ -362,7 +362,7 @@ def _build_plan_orchestrator_with_runner(
     runner_output: str,
     expose_extractor: bool = True,
     extractor_return: str = "21 to add, 0 to change, 0 to destroy",
-):
+) -> Any:
     """Build a PlanOrchestrator wired to *runner* and a captured-output dict.
 
     The runner is registered under the name ``terraform`` and the provider
@@ -386,14 +386,14 @@ def _build_plan_orchestrator_with_runner(
 
     provider = MagicMock()
     provider.generate_terraform = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 1234
     event_manager = MagicMock()
     console_mock = MagicMock(spec=Console)
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
         return res, {"proxmox": res}
 
@@ -427,7 +427,7 @@ def _print_strings(console_mock: MagicMock) -> list[str]:
     return out
 
 
-def test_plan_prints_per_provider_summary_line_by_default(console):
+def test_plan_prints_per_provider_summary_line_by_default(console: Console) -> None:
     """Default-on summary: one ``terraform: <summary>`` line per provider."""
     runner = MagicMock()
     output = (
@@ -446,7 +446,7 @@ def test_plan_prints_per_provider_summary_line_by_default(console):
     assert "[dim]" in summary_lines[0]
 
 
-def test_plan_does_not_print_full_output_by_default(console):
+def test_plan_does_not_print_full_output_by_default(console: Console) -> None:
     """Default-off verbose: the full captured output is NOT printed when verbose=False."""
     runner = MagicMock()
     diff_body = (
@@ -465,7 +465,7 @@ def test_plan_does_not_print_full_output_by_default(console):
     assert not any("# proxmox_virtual_environment_vm.web will be created" in p for p in prints)
 
 
-def test_plan_prints_full_output_when_verbose(console):
+def test_plan_prints_full_output_when_verbose(console: Console) -> None:
     """When ``verbose=True``, the full captured runner output is printed verbatim."""
     runner = MagicMock()
     diff_body = (
@@ -499,7 +499,7 @@ def test_plan_prints_full_output_when_verbose(console):
     assert kwargs.get("highlight") is False
 
 
-def test_plan_summary_handles_no_changes_output(console):
+def test_plan_summary_handles_no_changes_output(console: Console) -> None:
     """Output containing ``No changes`` produces a ``terraform: No changes`` line."""
     runner = MagicMock()
     orchestrator, console_mock, _ = _build_plan_orchestrator_with_runner(
@@ -514,7 +514,7 @@ def test_plan_summary_handles_no_changes_output(console):
     assert any("terraform: No changes" in p for p in prints)
 
 
-def test_plan_skips_summary_for_runner_without_extract_plan_summary(console):
+def test_plan_skips_summary_for_runner_without_extract_plan_summary(console: Console) -> None:
     """A runner without ``extract_plan_summary`` (e.g. ansible) prints no summary line."""
     # spec the mock so ``getattr(runner, "extract_plan_summary", None)`` is None
     runner = MagicMock(spec=["priority", "is_iac_runner", "plan"])
@@ -534,7 +534,7 @@ def test_plan_skips_summary_for_runner_without_extract_plan_summary(console):
     assert not any("terraform: " in p and "Running" not in p for p in prints)
 
 
-def test_destroy_emits_runner_starting_and_completed(console):
+def test_destroy_emits_runner_starting_and_completed(console: Console) -> None:
     """Runner events are emitted around each runner.destroy() call."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 20
@@ -549,12 +549,12 @@ def test_destroy_emits_runner_starting_and_completed(console):
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
 
-    runners = {"terraform": tf_runner}
+    runners: dict[str, BaseRunner] = {"terraform": tf_runner}
 
     provider = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
         return res, {"proxmox": res}
 
@@ -612,7 +612,7 @@ def test_destroy_emits_runner_starting_and_completed(console):
     }
 
 
-def test_destroy_orchestrator_regenerates_configs_before_destroy(console):
+def test_destroy_orchestrator_regenerates_configs_before_destroy(console: Console) -> None:
     """Destroy regenerates provider IaC configs before invoking runner.destroy."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 30
@@ -637,7 +637,7 @@ def test_destroy_orchestrator_regenerates_configs_before_destroy(console):
 
     resources = [_resource("vm1"), _resource("vm2"), _resource("vm3")]
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         return resources, {"proxmox": resources}
 
     orchestrator = DestroyOrchestrator(
@@ -671,7 +671,9 @@ def test_destroy_orchestrator_regenerates_configs_before_destroy(console):
     assert gen_idx < destroy_idx
 
 
-def test_destroy_orchestrator_regenerates_with_all_resources_when_filtered(console):
+def test_destroy_orchestrator_regenerates_with_all_resources_when_filtered(
+    console: Console,
+) -> None:
     """Filtered destroy still regenerates all provider resources (not just the filtered subset)."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 31
@@ -694,7 +696,7 @@ def test_destroy_orchestrator_regenerates_with_all_resources_when_filtered(conso
     all_resources = [_resource("vm1"), _resource("vm2"), _resource("vm3")]
     filtered_resources = [_resource("vm1")]
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         return all_resources, {"proxmox": all_resources}
 
     orchestrator = DestroyOrchestrator(
@@ -723,7 +725,7 @@ def test_destroy_orchestrator_regenerates_with_all_resources_when_filtered(conso
     provider.generate_terraform.assert_called_once_with(all_resources)
 
 
-def test_destroy_orchestrator_skips_generate_when_provider_lacks_method(console):
+def test_destroy_orchestrator_skips_generate_when_provider_lacks_method(console: Console) -> None:
     """Destroy proceeds without error when provider has no generate_terraform method."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 32
@@ -746,7 +748,7 @@ def test_destroy_orchestrator_skips_generate_when_provider_lacks_method(console)
 
     resources = [_resource("vm1")]
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         return resources, {"proxmox": resources}
 
     orchestrator = DestroyOrchestrator(
@@ -775,7 +777,7 @@ def test_destroy_orchestrator_skips_generate_when_provider_lacks_method(console)
     assert not hasattr(provider, "generate_terraform")
 
 
-def test_destroy_orchestrator_raises_on_runner_failure(console):
+def test_destroy_orchestrator_raises_on_runner_failure(console: Console) -> None:
     """When runner returns success=False, destroy raises TerraformError and fires RUNNER_FAILED."""
     from infrafoundry.core.exceptions import TerraformError
 
@@ -805,7 +807,7 @@ def test_destroy_orchestrator_raises_on_runner_failure(console):
 
     resources = [_resource("vm1")]
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         return resources, {"proxmox": resources}
 
     orchestrator = DestroyOrchestrator(
@@ -851,7 +853,7 @@ def test_destroy_orchestrator_raises_on_runner_failure(console):
     assert any(call[0][1] == DeploymentStatus.FAILED for call in status_calls)
 
 
-def test_destroy_orchestrator_raises_when_resource_remains_in_state(console):
+def test_destroy_orchestrator_raises_when_resource_remains_in_state(console: Console) -> None:
     """Defense-in-depth: success=True but state still has the resource -> TerraformError."""
     from infrafoundry.core.exceptions import TerraformError
 
@@ -874,7 +876,7 @@ def test_destroy_orchestrator_raises_when_resource_remains_in_state(console):
 
     resources = [_resource("vm1")]
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         return resources, {"proxmox": resources}
 
     orchestrator = DestroyOrchestrator(
@@ -903,7 +905,7 @@ def test_destroy_orchestrator_raises_when_resource_remains_in_state(console):
     tf_runner.verify_destroyed.assert_called_once_with(provider, ["vm1"])
 
 
-def test_destroy_orchestrator_skips_verify_when_runner_lacks_method(console):
+def test_destroy_orchestrator_skips_verify_when_runner_lacks_method(console: Console) -> None:
     """A runner without verify_destroyed (e.g. Ansible) proceeds without AttributeError."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 42
@@ -930,7 +932,7 @@ def test_destroy_orchestrator_skips_verify_when_runner_lacks_method(console):
 
     resources = [_resource("vm1")]
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         return resources, {"proxmox": resources}
 
     orchestrator = DestroyOrchestrator(
@@ -959,7 +961,7 @@ def test_destroy_orchestrator_skips_verify_when_runner_lacks_method(console):
     assert not hasattr(tf_runner, "verify_destroyed")
 
 
-def test_destroy_orchestrator_aggregates_failures_across_providers(console):
+def test_destroy_orchestrator_aggregates_failures_across_providers(console: Console) -> None:
     """With two providers, the second's failure surfaces while the first completes."""
     from infrafoundry.core.exceptions import TerraformError
 
@@ -995,7 +997,7 @@ def test_destroy_orchestrator_aggregates_failures_across_providers(console):
     res_a = [_resource("vm_a", provider="prov_a")]
     res_b = [_resource("vm_b", provider="prov_b")]
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         return res_a + res_b, {"prov_a": res_a, "prov_b": res_b}
 
     orchestrator = DestroyOrchestrator(
@@ -1040,11 +1042,11 @@ def test_destroy_orchestrator_aggregates_failures_across_providers(console):
     assert any(call[0][1] == DeploymentStatus.FAILED for call in status_calls)
 
 
-def test_drift_orchestrator_sets_providers():
+def test_drift_orchestrator_sets_providers() -> None:
     """DriftOrchestrator injects providers before detection."""
     drift_detector = MagicMock()
     drift_detector.detect.return_value = {"drift": False}
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     orchestrator = DriftOrchestrator(drift_detector, get_providers=lambda: providers)
     result = orchestrator.detect("dev")
@@ -1053,7 +1055,7 @@ def test_drift_orchestrator_sets_providers():
     assert drift_detector.providers == providers
 
 
-def _make_env_config_with_events(events: dict | None = None) -> EnvironmentConfig:
+def _make_env_config_with_events(events: dict[str, Any] | None = None) -> EnvironmentConfig:
     """Create an EnvironmentConfig with optional events dict."""
     return EnvironmentConfig(
         name="dev",
@@ -1061,14 +1063,14 @@ def _make_env_config_with_events(events: dict | None = None) -> EnvironmentConfi
     )
 
 
-def test_plan_loads_event_config(console):
+def test_plan_loads_event_config(console: Console) -> None:
     """PlanOrchestrator calls load_config when events are present."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 100
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     events_cfg = {"RUNNER_COMPLETED": [{"type": "script", "name": "post", "script": "s.sh"}]}
     env_config = _make_env_config_with_events(events_cfg)
@@ -1099,14 +1101,14 @@ def test_plan_loads_event_config(console):
     event_manager.load_config.assert_called_once_with(events_cfg)
 
 
-def test_plan_skips_event_config_when_empty(console):
+def test_plan_skips_event_config_when_empty(console: Console) -> None:
     """PlanOrchestrator clears handlers but does not call load_config when events is empty."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 101
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     env_config = _make_env_config_with_events({})
 
@@ -1136,7 +1138,7 @@ def test_plan_skips_event_config_when_empty(console):
     event_manager.load_config.assert_not_called()
 
 
-def test_apply_loads_event_config(console):
+def test_apply_loads_event_config(console: Console) -> None:
     """ApplyOrchestrator calls load_config when events are present."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 102
@@ -1170,7 +1172,7 @@ def test_apply_loads_event_config(console):
     event_manager.load_config.assert_called_once_with(events_cfg)
 
 
-def test_destroy_loads_event_config(console):
+def test_destroy_loads_event_config(console: Console) -> None:
     """DestroyOrchestrator calls load_config when events are present."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 103
@@ -1178,7 +1180,7 @@ def test_destroy_loads_event_config(console):
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
     events_cfg = {"RUNNER_COMPLETED": [{"type": "script", "name": "post", "script": "s.sh"}]}
     env_config = _make_env_config_with_events(events_cfg)
@@ -1206,7 +1208,7 @@ def test_destroy_loads_event_config(console):
     event_manager.load_config.assert_called_once_with(events_cfg)
 
 
-def test_environment_config_parses_events():
+def test_environment_config_parses_events() -> None:
     """EnvironmentConfig accepts events dict from settings data."""
     config = EnvironmentConfig(
         name="test",
@@ -1220,7 +1222,7 @@ def test_environment_config_parses_events():
     assert config.events["RUNNER_COMPLETED"][0]["type"] == "script"
 
 
-def test_environment_config_default_empty_events():
+def test_environment_config_default_empty_events() -> None:
     """EnvironmentConfig defaults to empty dict for events."""
     config = EnvironmentConfig(name="test")
     assert config.events == {}
@@ -1232,9 +1234,9 @@ def test_environment_config_default_empty_events():
 
 
 def _apply_orchestrator_with_hooks(
-    load_resources_hook,
-    apply_serial_hook=None,
-):
+    load_resources_hook: Any,
+    apply_serial_hook: Any = None,
+) -> Any:
     """Build an ApplyOrchestrator whose load_resources callback runs a hook.
 
     This lets individual tests inject assertions / side-effects at the
@@ -1248,7 +1250,7 @@ def _apply_orchestrator_with_hooks(
 
     default_resources = ([_resource("vm1")], {"proxmox": [_resource("vm1")]})
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         load_resources_hook(env)
         return default_resources
 
@@ -1266,7 +1268,7 @@ def _apply_orchestrator_with_hooks(
     return orchestrator, console, state_manager
 
 
-def test_apply_renders_warnings_panel_when_warnings_present():
+def test_apply_renders_warnings_panel_when_warnings_present() -> None:
     """A warning written mid-apply causes a Panel to be printed at the end."""
     from rich.panel import Panel
 
@@ -1302,7 +1304,7 @@ def test_apply_renders_warnings_panel_when_warnings_present():
     assert "event:test" in panel.renderable.plain
 
 
-def test_apply_no_panel_when_no_warnings():
+def test_apply_no_panel_when_no_warnings() -> None:
     """No warnings → no Panel is printed."""
     from rich.panel import Panel
 
@@ -1322,7 +1324,7 @@ def test_apply_no_panel_when_no_warnings():
     assert panel_calls == []
 
 
-def test_apply_renders_warnings_panel_on_failure_path():
+def test_apply_renders_warnings_panel_on_failure_path() -> None:
     """Warnings emitted before a failure still get summarized."""
     from rich.panel import Panel
 
@@ -1360,7 +1362,7 @@ def test_apply_renders_warnings_panel_on_failure_path():
     )
 
 
-def test_apply_sets_and_restores_warnings_env_var(monkeypatch):
+def test_apply_sets_and_restores_warnings_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
     """INFRAFOUNDRY_WARNINGS_FILE is set during apply and restored after."""
     from infrafoundry.core.warnings import ENV_VAR
 
@@ -1388,7 +1390,9 @@ def test_apply_sets_and_restores_warnings_env_var(monkeypatch):
     assert ENV_VAR not in os.environ
 
 
-def test_apply_restores_prior_warnings_env_var(monkeypatch, tmp_path):
+def test_apply_restores_prior_warnings_env_var(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """A prior value of INFRAFOUNDRY_WARNINGS_FILE is restored after apply."""
     from infrafoundry.core.warnings import ENV_VAR
 
@@ -1419,7 +1423,7 @@ def test_apply_restores_prior_warnings_env_var(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_apply_provider_filter_isolates_to_requested_provider(console):
+def test_apply_provider_filter_isolates_to_requested_provider(console: Console) -> None:
     """``provider_filter=["opnsense"]`` keeps Proxmox resources out of the apply path."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 200
@@ -1431,15 +1435,15 @@ def test_apply_provider_filter_isolates_to_requested_provider(console):
     captured: dict[str, dict[str, list[ResourceConfig]]] = {}
 
     def apply_serial(
-        env_name,
-        deployment_id,
-        resources_by_provider,
-        resource_filter,
-        auto_approve,
-        package_filter=None,
+        env_name: Any,
+        deployment_id: Any,
+        resources_by_provider: Any,
+        resource_filter: Any,
+        auto_approve: Any,
+        package_filter: Any = None,
         *,
-        add_only=False,
-    ):
+        add_only: Any = False,
+    ) -> dict[str, Any]:
         captured["resources_by_provider"] = resources_by_provider
         return {"opnsense": {"success": True}}
 
@@ -1473,7 +1477,7 @@ def test_apply_provider_filter_isolates_to_requested_provider(console):
     assert captured["resources_by_provider"]["opnsense"] == res_opnsense
 
 
-def test_apply_provider_filter_none_preserves_full_iteration(console):
+def test_apply_provider_filter_none_preserves_full_iteration(console: Console) -> None:
     """Passing ``provider_filter=None`` is equivalent to no filter (regression check)."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 201
@@ -1485,15 +1489,15 @@ def test_apply_provider_filter_none_preserves_full_iteration(console):
     captured: dict[str, dict[str, list[ResourceConfig]]] = {}
 
     def apply_serial(
-        env_name,
-        deployment_id,
-        resources_by_provider,
-        resource_filter,
-        auto_approve,
-        package_filter=None,
+        env_name: Any,
+        deployment_id: Any,
+        resources_by_provider: Any,
+        resource_filter: Any,
+        auto_approve: Any,
+        package_filter: Any = None,
         *,
-        add_only=False,
-    ):
+        add_only: Any = False,
+    ) -> dict[str, Any]:
         captured["resources_by_provider"] = resources_by_provider
         return {}
 
@@ -1522,7 +1526,7 @@ def test_apply_provider_filter_none_preserves_full_iteration(console):
     assert set(captured["resources_by_provider"].keys()) == {"proxmox", "opnsense"}
 
 
-def test_apply_provider_filter_unknown_name_raises(console):
+def test_apply_provider_filter_unknown_name_raises(console: Console) -> None:
     """An unknown name in ``provider_filter`` raises ``ProviderFilterError``."""
     from infrafoundry.core.exceptions import ProviderFilterError
 
@@ -1566,7 +1570,7 @@ def test_apply_provider_filter_unknown_name_raises(console):
     )
 
 
-def test_apply_provider_filter_multi_provider_scoping(console):
+def test_apply_provider_filter_multi_provider_scoping(console: Console) -> None:
     """``provider_filter=["opnsense", "proxmox"]`` keeps both, drops the third."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 203
@@ -1579,15 +1583,15 @@ def test_apply_provider_filter_multi_provider_scoping(console):
     captured: dict[str, dict[str, list[ResourceConfig]]] = {}
 
     def apply_serial(
-        env_name,
-        deployment_id,
-        resources_by_provider,
-        resource_filter,
-        auto_approve,
-        package_filter=None,
+        env_name: Any,
+        deployment_id: Any,
+        resources_by_provider: Any,
+        resource_filter: Any,
+        auto_approve: Any,
+        package_filter: Any = None,
         *,
-        add_only=False,
-    ):
+        add_only: Any = False,
+    ) -> dict[str, Any]:
         captured["resources_by_provider"] = resources_by_provider
         return {}
 
@@ -1617,7 +1621,7 @@ def test_apply_provider_filter_multi_provider_scoping(console):
     assert "oci" not in captured["resources_by_provider"]
 
 
-def test_apply_provider_filter_drops_cross_provider_dependency_silently(console):
+def test_apply_provider_filter_drops_cross_provider_dependency_silently(console: Console) -> None:
     """When a filtered-in provider has a dep on a filtered-out provider, the run still completes.
 
     The orchestrator-level provider filter narrows ``resources_by_provider`` to the
@@ -1637,15 +1641,15 @@ def test_apply_provider_filter_drops_cross_provider_dependency_silently(console)
     serial_called = MagicMock()
 
     def apply_serial(
-        env_name,
-        deployment_id,
-        resources_by_provider,
-        resource_filter,
-        auto_approve,
-        package_filter=None,
+        env_name: Any,
+        deployment_id: Any,
+        resources_by_provider: Any,
+        resource_filter: Any,
+        auto_approve: Any,
+        package_filter: Any = None,
         *,
-        add_only=False,
-    ):
+        add_only: Any = False,
+    ) -> dict[str, Any]:
         captured["resources_by_provider"] = resources_by_provider
         serial_called(env_name)
         return {"proxmox": {"success": True}}
@@ -1680,7 +1684,7 @@ def test_apply_provider_filter_drops_cross_provider_dependency_silently(console)
     state_manager.update_deployment_status.assert_called_with(204, DeploymentStatus.COMPLETED)
 
 
-def test_plan_provider_filter_unknown_name_raises(console):
+def test_plan_provider_filter_unknown_name_raises(console: Console) -> None:
     """Plan also raises ``ProviderFilterError`` for unknown names."""
     from infrafoundry.core.exceptions import ProviderFilterError
 
@@ -1689,9 +1693,9 @@ def test_plan_provider_filter_unknown_name_raises(console):
     event_manager = MagicMock()
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
 
-    def load_resources(env: str):
+    def load_resources(env: str) -> Any:
         res = [_resource("vm1")]
         return res, {"proxmox": res}
 

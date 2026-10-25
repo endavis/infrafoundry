@@ -1,6 +1,7 @@
 """Unit tests for the 'rollback-points' CLI command."""
 
 from datetime import datetime
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -11,13 +12,13 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     mock.state_manager = Mock()
@@ -25,7 +26,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def sample_rollback_points():
+def sample_rollback_points() -> list[Any]:
     """Sample rollback point data."""
     deployment1 = Mock()
     deployment1.id = 1
@@ -44,7 +45,9 @@ def sample_rollback_points():
     return [deployment1, deployment2]
 
 
-def test_rollback_points_list(cli_runner, mock_orchestrator, sample_rollback_points):
+def test_rollback_points_list(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_rollback_points: list[Any]
+) -> None:
     """Test rollback-points command lists available rollback points."""
     mock_orchestrator.state_manager.get_rollback_points.return_value = sample_rollback_points
 
@@ -62,7 +65,9 @@ def test_rollback_points_list(cli_runner, mock_orchestrator, sample_rollback_poi
         )
 
 
-def test_rollback_points_with_limit(cli_runner, mock_orchestrator, sample_rollback_points):
+def test_rollback_points_with_limit(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_rollback_points: list[Any]
+) -> None:
     """Test rollback-points command with custom limit."""
     mock_orchestrator.state_manager.get_rollback_points.return_value = sample_rollback_points
 
@@ -75,7 +80,7 @@ def test_rollback_points_with_limit(cli_runner, mock_orchestrator, sample_rollba
         mock_orchestrator.state_manager.get_rollback_points.assert_called_once_with("test", limit=5)
 
 
-def test_rollback_points_no_points_found(cli_runner, mock_orchestrator):
+def test_rollback_points_no_points_found(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test rollback-points command when no rollback points are found."""
     mock_orchestrator.state_manager.get_rollback_points.return_value = []
 
@@ -87,7 +92,9 @@ def test_rollback_points_no_points_found(cli_runner, mock_orchestrator):
         assert "Rollback points are created from successful apply operations" in result.output
 
 
-def test_rollback_points_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_rollback_points_orchestrator_failure(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """Test rollback-points command when state_manager.get_rollback_points raises an error."""
     mock_orchestrator.state_manager.get_rollback_points.side_effect = Exception("Database error")
 

@@ -1,5 +1,8 @@
 """Unit tests for OCI provider."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -7,7 +10,7 @@ from infrafoundry.providers.oci import OCIProvider
 
 
 @pytest.fixture
-def tmp_dirs(tmp_path):
+def tmp_dirs(tmp_path: Path) -> Any:
     """Create temporary config and output directories."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -17,18 +20,18 @@ def tmp_dirs(tmp_path):
 
 
 @pytest.fixture
-def provider(tmp_dirs):
+def provider(tmp_dirs: Any) -> OCIProvider:
     """Create an OCIProvider instance."""
     config_dir, output_dir = tmp_dirs
     return OCIProvider(config_dir, output_dir)
 
 
-def test_provider_init(provider):
+def test_provider_init(provider: OCIProvider) -> None:
     """Test provider initializes with correct name."""
     assert provider.name == "oci"
 
 
-def test_get_resource_types(provider):
+def test_get_resource_types(provider: OCIProvider) -> None:
     """Test supported resource types."""
     types = provider.get_resource_types()
     assert "vcn" in types
@@ -36,7 +39,7 @@ def test_get_resource_types(provider):
     assert "instance" in types
 
 
-def test_get_dependencies(provider):
+def test_get_dependencies(provider: OCIProvider) -> None:
     """Test resource dependency graph."""
     deps = provider.get_dependencies()
     assert deps["vcn"] == []
@@ -45,17 +48,17 @@ def test_get_dependencies(provider):
     assert "subnet" in deps["instance"]
 
 
-def test_validate_config_valid(provider):
+def test_validate_config_valid(provider: OCIProvider) -> None:
     """Test config validation with required fields."""
     assert provider.validate_config({"name": "test"}) is True
 
 
-def test_validate_config_invalid(provider):
+def test_validate_config_invalid(provider: OCIProvider) -> None:
     """Test config validation with missing fields."""
     assert provider.validate_config({}) is False
 
 
-def test_generate_terraform_creates_files(provider, tmp_dirs):
+def test_generate_terraform_creates_files(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test that generate_terraform creates expected files."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -106,7 +109,7 @@ def test_generate_terraform_creates_files(provider, tmp_dirs):
     assert (terraform_dir / "outputs.tf").exists()
 
 
-def test_generate_terraform_vcn_content(provider, tmp_dirs):
+def test_generate_terraform_vcn_content(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test VCN terraform content."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -132,7 +135,9 @@ def test_generate_terraform_vcn_content(provider, tmp_dirs):
     assert "myvcn" in vcn_content
 
 
-def test_generate_terraform_instance_with_shape_config(provider, tmp_dirs):
+def test_generate_terraform_instance_with_shape_config(
+    provider: OCIProvider, tmp_dirs: Any
+) -> None:
     """Test instance terraform with flex shape config."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -170,7 +175,7 @@ def test_generate_terraform_instance_with_shape_config(provider, tmp_dirs):
     assert "memory_in_gbs" in content
 
 
-def test_generate_ansible_creates_files(provider, tmp_dirs):
+def test_generate_ansible_creates_files(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test that generate_ansible creates playbook, inventory, and ansible.cfg."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -197,7 +202,7 @@ def test_generate_ansible_creates_files(provider, tmp_dirs):
     assert (ansible_dir / "inventory.yml").exists()
 
 
-def test_generate_ansible_playbook_content(provider, tmp_dirs):
+def test_generate_ansible_playbook_content(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test playbook creates per-role plays with correct host groups."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -225,7 +230,7 @@ def test_generate_ansible_playbook_content(provider, tmp_dirs):
     assert "- nginx" in content
 
 
-def test_generate_ansible_inventory_content(provider, tmp_dirs):
+def test_generate_ansible_inventory_content(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test inventory contains per-role groups with instance entries."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -254,7 +259,7 @@ def test_generate_ansible_inventory_content(provider, tmp_dirs):
     assert "opc" in content
 
 
-def test_cloud_init_snippets_missing_file(provider, tmp_dirs):
+def test_cloud_init_snippets_missing_file(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test cloud-init snippets with missing file does not raise."""
     _config_dir, _output_dir = tmp_dirs
     provider.set_environment("test")
@@ -277,7 +282,7 @@ def test_cloud_init_snippets_missing_file(provider, tmp_dirs):
     provider.generate_terraform(resources)
 
 
-def test_cloud_init_snippets_fail_on_missing(provider, tmp_dirs):
+def test_cloud_init_snippets_fail_on_missing(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test cloud-init snippets raises when configured to fail."""
     _config_dir, _output_dir = tmp_dirs
     provider.set_environment("test")
@@ -301,7 +306,7 @@ def test_cloud_init_snippets_fail_on_missing(provider, tmp_dirs):
         provider.generate_terraform(resources)
 
 
-def test_cloud_init_snippets_merge(provider, tmp_dirs):
+def test_cloud_init_snippets_merge(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test cloud-init snippets are merged into config."""
     config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -334,7 +339,7 @@ def test_cloud_init_snippets_merge(provider, tmp_dirs):
     assert "user_data" in content
 
 
-def test_provider_terraform_provider_content(provider, tmp_dirs):
+def test_provider_terraform_provider_content(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test provider.tf content."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -357,7 +362,7 @@ def test_provider_terraform_provider_content(provider, tmp_dirs):
     assert "var.oci_region" in content
 
 
-def test_generate_terraform_only_instances(provider, tmp_dirs):
+def test_generate_terraform_only_instances(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test generating terraform with only instances."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -382,7 +387,7 @@ def test_generate_terraform_only_instances(provider, tmp_dirs):
     assert not (terraform_dir / "vcn.tf").exists()
 
 
-def test_generate_terraform_with_nat_gateway(provider, tmp_dirs):
+def test_generate_terraform_with_nat_gateway(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test full terraform generation with NAT gateway produces correct vcn.tf."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -437,7 +442,7 @@ def test_generate_terraform_with_nat_gateway(provider, tmp_dirs):
     assert "oci_core_route_table.k3s_vcn_private_rt.id" in vcn_content
 
 
-def test_generate_ansible_with_ansible_host_override(provider, tmp_dirs):
+def test_generate_ansible_with_ansible_host_override(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test ansible inventory uses ansible_host override when set."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -466,7 +471,7 @@ def test_generate_ansible_with_ansible_host_override(provider, tmp_dirs):
     assert "oci_core_instance" not in content
 
 
-def test_generate_ansible_filters_non_instances(provider, tmp_dirs):
+def test_generate_ansible_filters_non_instances(provider: OCIProvider, tmp_dirs: Any) -> None:
     """Test that generate_ansible only includes instance resources."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")

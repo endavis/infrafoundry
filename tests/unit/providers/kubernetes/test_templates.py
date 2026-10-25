@@ -1,5 +1,7 @@
 """Unit tests for Kubernetes template rendering."""
 
+from pathlib import Path
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -7,7 +9,7 @@ from infrafoundry.providers.kubernetes import KubernetesProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> KubernetesProvider:
     """Create a KubernetesProvider for template testing."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -21,7 +23,7 @@ def provider(tmp_path):
 class TestProviderTemplate:
     """Tests for provider.tf.j2 template."""
 
-    def test_renders_kubernetes_provider_block(self, provider):
+    def test_renders_kubernetes_provider_block(self, provider: KubernetesProvider) -> None:
         """Test provider template renders Kubernetes provider configuration."""
         content = provider.render_template(
             "kubernetes/provider.tf.j2", {"has_helm_releases": False}
@@ -32,14 +34,14 @@ class TestProviderTemplate:
         # Verify pathexpand is used for kubeconfig
         assert "pathexpand(var.kubeconfig_path)" in content
 
-    def test_includes_helm_provider_when_releases_exist(self, provider):
+    def test_includes_helm_provider_when_releases_exist(self, provider: KubernetesProvider) -> None:
         """Test provider template includes Helm when releases exist."""
         content = provider.render_template("kubernetes/provider.tf.j2", {"has_helm_releases": True})
         assert "hashicorp/helm" in content
         assert 'provider "helm"' in content
         assert "~> 2.12" in content
 
-    def test_excludes_helm_provider_without_releases(self, provider):
+    def test_excludes_helm_provider_without_releases(self, provider: KubernetesProvider) -> None:
         """Test provider template excludes Helm when no releases."""
         content = provider.render_template(
             "kubernetes/provider.tf.j2", {"has_helm_releases": False}
@@ -51,7 +53,7 @@ class TestProviderTemplate:
 class TestSecretsTemplate:
     """Tests for secrets.tf.j2 template."""
 
-    def test_renders_opaque_secret(self, provider):
+    def test_renders_opaque_secret(self, provider: KubernetesProvider) -> None:
         """Test rendering an Opaque secret."""
         secrets = [
             ResourceConfig(
@@ -72,7 +74,7 @@ class TestSecretsTemplate:
         assert 'type = "Opaque"' in content
         assert '"key" = "dmFsdWU="' in content
 
-    def test_renders_tls_secret(self, provider):
+    def test_renders_tls_secret(self, provider: KubernetesProvider) -> None:
         """Test rendering a TLS secret."""
         secrets = [
             ResourceConfig(
@@ -91,7 +93,7 @@ class TestSecretsTemplate:
         )
         assert 'type = "kubernetes.io/tls"' in content
 
-    def test_renders_secret_with_labels(self, provider):
+    def test_renders_secret_with_labels(self, provider: KubernetesProvider) -> None:
         """Test secret with labels and annotations."""
         secrets = [
             ResourceConfig(
@@ -115,7 +117,7 @@ class TestSecretsTemplate:
 class TestIngressTemplate:
     """Tests for ingress.tf.j2 template."""
 
-    def test_renders_basic_ingress(self, provider):
+    def test_renders_basic_ingress(self, provider: KubernetesProvider) -> None:
         """Test basic ingress rendering."""
         ingresses = [
             ResourceConfig(
@@ -153,7 +155,7 @@ class TestIngressTemplate:
         assert 'path      = "/"' in content
         assert "number = 80" in content
 
-    def test_renders_ingress_with_tls(self, provider):
+    def test_renders_ingress_with_tls(self, provider: KubernetesProvider) -> None:
         """Test ingress with TLS configuration."""
         ingresses = [
             ResourceConfig(
@@ -186,7 +188,7 @@ class TestIngressTemplate:
 class TestPVCTemplate:
     """Tests for pvc.tf.j2 template."""
 
-    def test_renders_basic_pvc(self, provider):
+    def test_renders_basic_pvc(self, provider: KubernetesProvider) -> None:
         """Test basic PVC rendering."""
         pvcs = [
             ResourceConfig(
@@ -206,7 +208,7 @@ class TestPVCTemplate:
         assert 'storage = "5Gi"' in content
         assert '"ReadWriteOnce"' in content
 
-    def test_renders_pvc_with_storage_class(self, provider):
+    def test_renders_pvc_with_storage_class(self, provider: KubernetesProvider) -> None:
         """Test PVC with storage class."""
         pvcs = [
             ResourceConfig(
@@ -228,7 +230,7 @@ class TestPVCTemplate:
 class TestJobTemplate:
     """Tests for jobs.tf.j2 template."""
 
-    def test_renders_basic_job(self, provider):
+    def test_renders_basic_job(self, provider: KubernetesProvider) -> None:
         """Test basic job rendering."""
         jobs = [
             ResourceConfig(
@@ -249,7 +251,7 @@ class TestJobTemplate:
         assert 'restart_policy = "Never"' in content
         assert 'image = "busybox"' in content
 
-    def test_renders_job_with_backoff_limit(self, provider):
+    def test_renders_job_with_backoff_limit(self, provider: KubernetesProvider) -> None:
         """Test job with backoff limit."""
         jobs = [
             ResourceConfig(
@@ -271,7 +273,7 @@ class TestJobTemplate:
 class TestCronJobTemplate:
     """Tests for cronjobs.tf.j2 template."""
 
-    def test_renders_basic_cronjob(self, provider):
+    def test_renders_basic_cronjob(self, provider: KubernetesProvider) -> None:
         """Test basic cron job rendering."""
         cronjobs = [
             ResourceConfig(
@@ -290,7 +292,7 @@ class TestCronJobTemplate:
         assert 'resource "kubernetes_cron_job_v1" "hourly_task"' in content
         assert 'schedule = "0 * * * *"' in content
 
-    def test_renders_cronjob_with_concurrency_policy(self, provider):
+    def test_renders_cronjob_with_concurrency_policy(self, provider: KubernetesProvider) -> None:
         """Test cron job with concurrency policy."""
         cronjobs = [
             ResourceConfig(
@@ -313,7 +315,7 @@ class TestCronJobTemplate:
 class TestRBACTemplate:
     """Tests for rbac.tf.j2 template."""
 
-    def test_renders_service_account(self, provider):
+    def test_renders_service_account(self, provider: KubernetesProvider) -> None:
         """Test service account rendering."""
         content = provider.render_template(
             "kubernetes/rbac.tf.j2",
@@ -339,7 +341,7 @@ class TestRBACTemplate:
         )
         assert 'resource "kubernetes_service_account" "app_sa"' in content
 
-    def test_renders_role_with_rules(self, provider):
+    def test_renders_role_with_rules(self, provider: KubernetesProvider) -> None:
         """Test role rendering with rules."""
         content = provider.render_template(
             "kubernetes/rbac.tf.j2",
@@ -377,7 +379,7 @@ class TestRBACTemplate:
         assert 'resources  = ["pods"]' in content
         assert 'verbs      = ["get", "list", "watch"]' in content
 
-    def test_renders_role_binding(self, provider):
+    def test_renders_role_binding(self, provider: KubernetesProvider) -> None:
         """Test role binding rendering."""
         content = provider.render_template(
             "kubernetes/rbac.tf.j2",
@@ -411,7 +413,7 @@ class TestRBACTemplate:
         assert 'name      = "pod-reader"' in content
         assert 'kind      = "ServiceAccount"' in content
 
-    def test_renders_cluster_role(self, provider):
+    def test_renders_cluster_role(self, provider: KubernetesProvider) -> None:
         """Test cluster role rendering."""
         content = provider.render_template(
             "kubernetes/rbac.tf.j2",
@@ -449,7 +451,7 @@ class TestRBACTemplate:
 class TestHelmReleaseTemplate:
     """Tests for helm_releases.tf.j2 template."""
 
-    def test_renders_basic_helm_release(self, provider):
+    def test_renders_basic_helm_release(self, provider: KubernetesProvider) -> None:
         """Test basic helm release rendering."""
         releases = [
             ResourceConfig(
@@ -472,7 +474,7 @@ class TestHelmReleaseTemplate:
         assert 'repository = "https://kubernetes.github.io/ingress-nginx"' in content
         assert 'version    = "4.8.3"' in content
 
-    def test_renders_helm_release_with_values(self, provider):
+    def test_renders_helm_release_with_values(self, provider: KubernetesProvider) -> None:
         """Test helm release with values."""
         releases = [
             ResourceConfig(
@@ -495,7 +497,7 @@ class TestHelmReleaseTemplate:
         assert "values = [<<-EOT" in content
         assert "installCRDs:" in content
 
-    def test_renders_helm_release_with_set(self, provider):
+    def test_renders_helm_release_with_set(self, provider: KubernetesProvider) -> None:
         """Test helm release with set values."""
         releases = [
             ResourceConfig(
@@ -523,7 +525,7 @@ class TestHelmReleaseTemplate:
 class TestManifestsTemplate:
     """Tests for manifests.tf.j2 template."""
 
-    def test_renders_basic_manifest(self, provider):
+    def test_renders_basic_manifest(self, provider: KubernetesProvider) -> None:
         """Test basic custom manifest rendering."""
         manifests = [
             ResourceConfig(
@@ -554,7 +556,7 @@ class TestManifestsTemplate:
         assert '"name"      = "my-resource"' in content
         assert '"namespace" = "default"' in content
 
-    def test_renders_tailscale_connector(self, provider):
+    def test_renders_tailscale_connector(self, provider: KubernetesProvider) -> None:
         """Test Tailscale Connector CRD rendering."""
         manifests = [
             ResourceConfig(
@@ -590,7 +592,7 @@ class TestManifestsTemplate:
         assert "oci-k3s-subnet-router" in content
         assert "10.0.0.0/16" in content
 
-    def test_renders_manifest_with_labels(self, provider):
+    def test_renders_manifest_with_labels(self, provider: KubernetesProvider) -> None:
         """Test manifest with labels and annotations."""
         manifests = [
             ResourceConfig(
@@ -618,7 +620,7 @@ class TestManifestsTemplate:
         assert '"env" = "prod"' in content
         assert '"managed-by" = "infrafoundry"' in content
 
-    def test_renders_manifest_without_namespace(self, provider):
+    def test_renders_manifest_without_namespace(self, provider: KubernetesProvider) -> None:
         """Test cluster-scoped manifest without namespace."""
         manifests = [
             ResourceConfig(
@@ -644,7 +646,7 @@ class TestManifestsTemplate:
         # Should not have namespace line
         assert '"namespace"' not in content
 
-    def test_renders_manifest_with_helm_depends_on(self, provider):
+    def test_renders_manifest_with_helm_depends_on(self, provider: KubernetesProvider) -> None:
         """Test manifest with automatic depends_on for Helm releases via dependency_refs."""
         manifests = [
             ResourceConfig(
@@ -677,7 +679,7 @@ class TestManifestsTemplate:
 class TestDependencyRefs:
     """Tests for dependency_refs (depends_on) rendering across all templates."""
 
-    def test_secrets_renders_depends_on_with_refs(self, provider):
+    def test_secrets_renders_depends_on_with_refs(self, provider: KubernetesProvider) -> None:
         """Test secrets template renders depends_on when dependency_refs present."""
         secrets = [
             ResourceConfig(
@@ -694,7 +696,7 @@ class TestDependencyRefs:
         assert "depends_on" in content
         assert "kubernetes_namespace.my_ns" in content
 
-    def test_secrets_no_depends_on_when_empty(self, provider):
+    def test_secrets_no_depends_on_when_empty(self, provider: KubernetesProvider) -> None:
         """Test secrets template omits depends_on when no refs and no config.depends_on."""
         secrets = [
             ResourceConfig(
@@ -710,7 +712,7 @@ class TestDependencyRefs:
         )
         assert "depends_on" not in content
 
-    def test_configmaps_renders_depends_on(self, provider):
+    def test_configmaps_renders_depends_on(self, provider: KubernetesProvider) -> None:
         """Test configmaps template renders depends_on when dependency_refs present."""
         configmaps = [
             ResourceConfig(
@@ -730,7 +732,7 @@ class TestDependencyRefs:
         assert "depends_on" in content
         assert "kubernetes_namespace.my_ns" in content
 
-    def test_pvc_renders_depends_on(self, provider):
+    def test_pvc_renders_depends_on(self, provider: KubernetesProvider) -> None:
         """Test PVC template renders depends_on when dependency_refs present."""
         pvcs = [
             ResourceConfig(
@@ -747,7 +749,7 @@ class TestDependencyRefs:
         assert "depends_on" in content
         assert "kubernetes_namespace.my_ns" in content
 
-    def test_deployments_renders_depends_on(self, provider):
+    def test_deployments_renders_depends_on(self, provider: KubernetesProvider) -> None:
         """Test deployments template renders depends_on when dependency_refs present."""
         deployments = [
             ResourceConfig(
@@ -774,7 +776,7 @@ class TestDependencyRefs:
         assert "kubernetes_namespace.my_ns" in content
         assert "kubernetes_secret.my_secret" in content
 
-    def test_services_renders_depends_on(self, provider):
+    def test_services_renders_depends_on(self, provider: KubernetesProvider) -> None:
         """Test services template renders depends_on when dependency_refs present."""
         services = [
             ResourceConfig(
@@ -797,7 +799,7 @@ class TestDependencyRefs:
         assert "depends_on" in content
         assert "kubernetes_deployment.my_app" in content
 
-    def test_ingress_renders_depends_on(self, provider):
+    def test_ingress_renders_depends_on(self, provider: KubernetesProvider) -> None:
         """Test ingress template renders depends_on when dependency_refs present."""
         ingresses = [
             ResourceConfig(
@@ -834,7 +836,7 @@ class TestDependencyRefs:
         assert "depends_on" in content
         assert "kubernetes_service.my_svc" in content
 
-    def test_jobs_renders_depends_on(self, provider):
+    def test_jobs_renders_depends_on(self, provider: KubernetesProvider) -> None:
         """Test jobs template renders depends_on when dependency_refs present."""
         jobs = [
             ResourceConfig(
@@ -853,7 +855,7 @@ class TestDependencyRefs:
         assert "depends_on" in content
         assert "kubernetes_namespace.my_ns" in content
 
-    def test_cronjobs_renders_depends_on(self, provider):
+    def test_cronjobs_renders_depends_on(self, provider: KubernetesProvider) -> None:
         """Test cronjobs template renders depends_on when dependency_refs present."""
         cronjobs = [
             ResourceConfig(
@@ -873,7 +875,9 @@ class TestDependencyRefs:
         assert "depends_on" in content
         assert "kubernetes_namespace.my_ns" in content
 
-    def test_helm_releases_renders_automatic_and_manual_depends_on(self, provider):
+    def test_helm_releases_renders_automatic_and_manual_depends_on(
+        self, provider: KubernetesProvider
+    ) -> None:
         """Test helm_releases merges automatic dependency_refs with config.depends_on."""
         releases = [
             ResourceConfig(
@@ -897,7 +901,7 @@ class TestDependencyRefs:
         assert "kubernetes_namespace.my_ns" in content
         assert "kubernetes_secret.extra" in content
 
-    def test_rbac_sa_renders_depends_on(self, provider):
+    def test_rbac_sa_renders_depends_on(self, provider: KubernetesProvider) -> None:
         """Test RBAC service account renders depends_on with refs."""
         content = provider.render_template(
             "kubernetes/rbac.tf.j2",
@@ -924,7 +928,7 @@ class TestDependencyRefs:
         assert "depends_on" in content
         assert "kubernetes_namespace.my_ns" in content
 
-    def test_rbac_rolebinding_renders_depends_on(self, provider):
+    def test_rbac_rolebinding_renders_depends_on(self, provider: KubernetesProvider) -> None:
         """Test RBAC role binding renders depends_on with refs."""
         content = provider.render_template(
             "kubernetes/rbac.tf.j2",
@@ -961,7 +965,9 @@ class TestDependencyRefs:
         assert "kubernetes_role.my_role" in content
         assert "kubernetes_service_account.my_sa" in content
 
-    def test_manifest_merges_automatic_and_manual_depends_on(self, provider):
+    def test_manifest_merges_automatic_and_manual_depends_on(
+        self, provider: KubernetesProvider
+    ) -> None:
         """Test manifests template merges dependency_refs with config.depends_on."""
         manifests = [
             ResourceConfig(
@@ -990,7 +996,7 @@ class TestDependencyRefs:
         assert "helm_release.my_operator" in content
         assert "kubernetes_secret.extra" in content
 
-    def test_no_depends_on_when_all_empty(self, provider):
+    def test_no_depends_on_when_all_empty(self, provider: KubernetesProvider) -> None:
         """Test that no depends_on block is rendered when refs and config are empty."""
         deployments = [
             ResourceConfig(

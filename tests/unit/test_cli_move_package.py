@@ -1,5 +1,6 @@
 """Unit tests for the 'infra move-package' CLI command."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -32,7 +33,7 @@ def test_requires_config_dir(cli_runner: CliRunner) -> None:
     assert "config" in result.output.lower() or "Error" in result.output
 
 
-def test_dry_run_shows_actions(cli_runner: CliRunner, tmp_path) -> None:
+def test_dry_run_shows_actions(cli_runner: CliRunner, tmp_path: Path) -> None:
     """--dry-run shows planned actions via mocked PackageMover."""
     mock_result = {
         "dry_run": True,
@@ -72,7 +73,7 @@ def test_dry_run_shows_actions(cli_runner: CliRunner, tmp_path) -> None:
     assert "dry run" in result.output.lower()
 
 
-def test_success_with_mocked_mover(cli_runner: CliRunner, tmp_path) -> None:
+def test_success_with_mocked_mover(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Successful move with mocked PackageMover."""
     mock_result = {
         "dry_run": False,
@@ -110,7 +111,7 @@ def test_success_with_mocked_mover(cli_runner: CliRunner, tmp_path) -> None:
     assert "proxmox" in result.output.lower()
 
 
-def test_package_not_found_error(cli_runner: CliRunner, tmp_path) -> None:
+def test_package_not_found_error(cli_runner: CliRunner, tmp_path: Path) -> None:
     """PackageNotFoundError is reported as CLI error."""
     with patch("infrafoundry.cli.commands.infra.move_package.PackageMover") as mock_mover_cls:
         mock_instance = MagicMock()

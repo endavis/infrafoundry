@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -30,14 +31,14 @@ from infrafoundry.core.secrets.secret_manager import (
 
 
 @pytest.fixture
-def temp_secrets_dir():
+def temp_secrets_dir() -> Iterator[Path]:
     """Yield an empty temporary directory used as the env secrets root."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
 
 
 @pytest.fixture
-def mock_provider():
+def mock_provider() -> MagicMock:
     """Return a MagicMock SecretProvider with no default behavior."""
     return MagicMock(spec=SecretProvider)
 
@@ -55,25 +56,25 @@ def make_manager(secrets_dir: Path, provider: SecretProvider) -> SecretManager:
 class TestFlattenDict:
     """Static ``SecretManager.flatten_dict`` covers all leaf-shape edge cases."""
 
-    def test_none_returns_empty(self):
+    def test_none_returns_empty(self) -> None:
         assert SecretManager.flatten_dict(None) == {}
 
-    def test_empty_dict_returns_empty(self):
+    def test_empty_dict_returns_empty(self) -> None:
         assert SecretManager.flatten_dict({}) == {}
 
-    def test_flat_string_values(self):
+    def test_flat_string_values(self) -> None:
         data = {"a": "1", "b": "2"}
         assert SecretManager.flatten_dict(data) == {"a": "1", "b": "2"}
 
-    def test_nested_dict_uses_dot_separator(self):
+    def test_nested_dict_uses_dot_separator(self) -> None:
         data = {"tailscale": {"oauth_client_secret": "abc"}}
         assert SecretManager.flatten_dict(data) == {"tailscale.oauth_client_secret": "abc"}
 
-    def test_deeply_nested(self):
+    def test_deeply_nested(self) -> None:
         data = {"a": {"b": {"c": {"d": "x"}}}}
         assert SecretManager.flatten_dict(data) == {"a.b.c.d": "x"}
 
-    def test_multiple_nested_keys(self):
+    def test_multiple_nested_keys(self) -> None:
         data = {
             "tailscale": {
                 "oauth_client_id": "id",
@@ -90,27 +91,27 @@ class TestFlattenDict:
             "proxmox.api_token": "ptok",
         }
 
-    def test_skips_none_leaves(self):
+    def test_skips_none_leaves(self) -> None:
         data = {"a": None, "b": "x"}
         assert SecretManager.flatten_dict(data) == {"b": "x"}
 
-    def test_skips_empty_nested_dicts(self):
+    def test_skips_empty_nested_dicts(self) -> None:
         data = {"a": {}, "b": "x"}
         assert SecretManager.flatten_dict(data) == {"b": "x"}
 
-    def test_int_leaf_stringified(self):
+    def test_int_leaf_stringified(self) -> None:
         data = {"port": 22}
         assert SecretManager.flatten_dict(data) == {"port": "22"}
 
-    def test_bool_leaf_stringified(self):
+    def test_bool_leaf_stringified(self) -> None:
         data = {"enabled": True}
         assert SecretManager.flatten_dict(data) == {"enabled": "True"}
 
-    def test_list_leaf_jsonified(self):
+    def test_list_leaf_jsonified(self) -> None:
         data = {"tags": ["a", "b"]}
         assert SecretManager.flatten_dict(data) == {"tags": json.dumps(["a", "b"])}
 
-    def test_does_not_mutate_input(self):
+    def test_does_not_mutate_input(self) -> None:
         data = {"a": {"b": "x"}}
         snapshot = {"a": {"b": "x"}}
         SecretManager.flatten_dict(data)
@@ -125,13 +126,17 @@ class TestFlattenDict:
 class TestFlattenInstanceMethod:
     """``SecretManager.flatten`` reads the default secrets file and flattens it."""
 
-    def test_returns_empty_when_no_file(self, temp_secrets_dir, mock_provider):
+    def test_returns_empty_when_no_file(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         manager = make_manager(temp_secrets_dir, mock_provider)
         assert manager.flatten() == {}
         # Provider was never called because the file doesn't exist.
         mock_provider.load_secret.assert_not_called()
 
-    def test_returns_flat_dict_when_file_exists(self, temp_secrets_dir, mock_provider):
+    def test_returns_flat_dict_when_file_exists(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         # Touch the file so .exists() is True; provider mock supplies the data.
         secrets_file = temp_secrets_dir / DEFAULT_SECRETS_FILENAME
         secrets_file.write_text("# placeholder")
@@ -152,7 +157,9 @@ class TestFlattenInstanceMethod:
 class TestPopulateEnvironmentConfig:
     """``populate_environment_config`` mutates the env config in place."""
 
-    def test_no_file_leaves_secrets_none(self, temp_secrets_dir, mock_provider):
+    def test_no_file_leaves_secrets_none(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         manager = make_manager(temp_secrets_dir, mock_provider)
         env_config = EnvironmentConfig(name="test")
 
@@ -161,7 +168,9 @@ class TestPopulateEnvironmentConfig:
         assert env_config.secrets is None
         mock_provider.load_secret.assert_not_called()
 
-    def test_decrypted_secrets_assigned(self, temp_secrets_dir, mock_provider):
+    def test_decrypted_secrets_assigned(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         secrets_file = temp_secrets_dir / DEFAULT_SECRETS_FILENAME
         secrets_file.write_text("# placeholder")
         mock_provider.load_secret.return_value = {
@@ -182,7 +191,9 @@ class TestPopulateEnvironmentConfig:
             }
         }
 
-    def test_decryption_failure_propagates(self, temp_secrets_dir, mock_provider):
+    def test_decryption_failure_propagates(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         secrets_file = temp_secrets_dir / DEFAULT_SECRETS_FILENAME
         secrets_file.write_text("# placeholder")
         mock_provider.load_secret.side_effect = RuntimeError("sops boom")

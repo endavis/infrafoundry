@@ -98,8 +98,8 @@ class TestSecretResolver:
         assert resolver.is_secret_uri("secret://env/key") is True
         assert resolver.is_secret_uri("secret://file/db/password") is True
         assert resolver.is_secret_uri("plain-value") is False
-        assert resolver.is_secret_uri(123) is False  # type: ignore[arg-type]
-        assert resolver.is_secret_uri(None) is False  # type: ignore[arg-type]
+        assert resolver.is_secret_uri(123) is False
+        assert resolver.is_secret_uri(None) is False
 
     def test_parse_secret_uri_valid(self) -> None:
         """Test parsing valid secret URIs."""

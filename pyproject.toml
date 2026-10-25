@@ -184,17 +184,46 @@ no_implicit_optional = true
 strict_equality = true
 warn_redundant_casts = true
 warn_unreachable = true
-exclude = ["tools/pyproject_template/", ".claude/", ".codex/"]
+exclude = [".claude/", ".codex/"]
 
 [[tool.mypy.overrides]]
 module = "doit.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# Standalone scripts using sys.path manipulation; excluded from discovery
-# but still followed via imports from bootstrap.py
-module = "tools.pyproject_template.*"
-follow_imports = "skip"
+# tools/pyproject_template/ scripts run standalone and do `sys.path.insert`
+# before importing their siblings by bare name (`from utils import ...`).
+# mypy cannot resolve those, so suppress the import errors by naming the
+# sibling modules (pyproject-template #700, #705).
+module = [
+    "check_template_updates",
+    "cleanup",
+    "configure",
+    "repo_settings",
+    "settings",
+    "setup_repo",
+    "utils",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# pytest imports tests/agent_roster.py as `agent_roster` via `pythonpath = ["tests"]`.
+# tests/ is a package here, so pointing mypy_path at it makes mypy see the file
+# twice (as `tests.agent_roster` and `agent_roster`); suppress the bare import instead.
+module = "agent_roster"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Template-owned tooling is written against the template's mypy config, which
+# leaves disallow_any_generics off. Apply that here too so those files stay
+# identical to the template; InfraFoundry's own code keeps the stricter setting.
+module = [
+    "tools.doit.*",
+    "tools.generate_doc_toc",
+    "tools.pyproject_template.*",
+    "tools.hooks.*",
+]
+disallow_any_generics = false
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -296,12 +325,30 @@ output = "tmp/coverage.xml"
 
 [tool.vulture]
 min_confidence = 80
-paths = ["src", "tests"]
+paths = ["src", "tests", "tools"]
 exclude = [
     "*/tests/*",      # Test fixtures often appear unused
     "*/__pycache__/*",
 ]
 ignore_names = [
+    # Imported under `if TYPE_CHECKING:` and referenced only from string
+    # annotations (e.g. `console: "ConsoleType"`), which vulture does not
+    # parse. Deleting these imports would break type checking.
+    "ConsoleType",
+    # `__exit__` parameters the context-manager protocol requires; renaming them
+    # (e.g. `_exc_type`) would change BaseManager's public signature.
+    "exc_type",
+    "exc_val",
+    "exc_tb",
+    # Click passes options by keyword; `state backend migrate` accepts --from/--to
+    # but is not implemented yet (src/infrafoundry/cli/commands/state/backend.py).
+    "from_backend",
+    "to_backend",
+    # Parameters of abstract methods in the provider plugin contract
+    # (src/infrafoundry/providers/protocol.py); implementers and callers rely on
+    # the names, so they cannot be `_`-prefixed.
+    "resource_config",
+    "desired_config",
     "test_*",         # Pytest test functions
     "fixture_*",      # Pytest fixtures
     "*_fixture",      # Pytest fixtures

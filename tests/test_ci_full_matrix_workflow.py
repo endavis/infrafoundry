@@ -14,7 +14,7 @@ guard checks the label name, then delegates to ``ci.yml`` via
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -31,7 +31,7 @@ def _load_workflow() -> dict[Any, Any]:
     default ``locale.getpreferredencoding()`` is cp1252 and chokes on any
     non-ASCII content in the workflow file (lesson from pyproject-template#430).
     """
-    return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    return cast("dict[Any, Any]", yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8")))
 
 
 class TestWorkflowFile:

@@ -5,6 +5,7 @@ import shutil
 import stat
 import subprocess
 from pathlib import Path
+from typing import Any, Never
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,28 +20,28 @@ from infrafoundry.core.events.handlers.script import ScriptHandler, _build_remot
 class TestEventManager:
     """Tests for EventManager."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Test EventManager initialization."""
         manager = EventManager()
         assert manager.handler_count() == 0
 
-    def test_subscribe(self):
+    def test_subscribe(self) -> None:
         """Test subscribing to events."""
         manager = EventManager()
         called = []
 
-        def handler(event: Event):
+        def handler(event: Event) -> None:
             called.append(event.event_type)
 
         manager.subscribe(EventType.BEFORE_PLAN, handler)
         assert manager.handler_count(EventType.BEFORE_PLAN) == 1
 
-    def test_emit_event(self):
+    def test_emit_event(self) -> None:
         """Test emitting events."""
         manager = EventManager()
         events_received = []
 
-        def handler(event: Event):
+        def handler(event: Event) -> None:
             events_received.append((event.event_type, event.environment, event.data))
 
         manager.subscribe(EventType.BEFORE_PLAN, handler)
@@ -51,12 +52,12 @@ class TestEventManager:
         assert events_received[0][1] == "dev"
         assert events_received[0][2]["resource"] == "test-vm"
 
-    def test_global_handler(self):
+    def test_global_handler(self) -> None:
         """Test global event handlers."""
         manager = EventManager()
         events = []
 
-        def global_handler(event: Event):
+        def global_handler(event: Event) -> None:
             events.append(event.event_type)
 
         manager.subscribe_all(global_handler)
@@ -68,15 +69,15 @@ class TestEventManager:
         assert EventType.BEFORE_PLAN in events
         assert EventType.AFTER_APPLY in events
 
-    def test_multiple_handlers(self):
+    def test_multiple_handlers(self) -> None:
         """Test multiple handlers for same event."""
         manager = EventManager()
         calls = []
 
-        def handler1(event: Event):
+        def handler1(event: Event) -> None:
             calls.append("handler1")
 
-        def handler2(event: Event):
+        def handler2(event: Event) -> None:
             calls.append("handler2")
 
         manager.subscribe(EventType.BEFORE_PLAN, handler1)
@@ -88,15 +89,15 @@ class TestEventManager:
         assert "handler1" in calls
         assert "handler2" in calls
 
-    def test_handler_error_handling(self):
+    def test_handler_error_handling(self) -> None:
         """Test that handler errors don't stop other handlers."""
         manager = EventManager()
         calls = []
 
-        def failing_handler(event: Event):
+        def failing_handler(event: Event) -> Never:
             raise ValueError("Handler error")
 
-        def working_handler(event: Event):
+        def working_handler(event: Event) -> None:
             calls.append("success")
 
         manager.subscribe(EventType.BEFORE_PLAN, failing_handler)
@@ -108,11 +109,11 @@ class TestEventManager:
         # Working handler should still be called
         assert "success" in calls
 
-    def test_clear_handlers(self):
+    def test_clear_handlers(self) -> None:
         """Test clearing all handlers."""
         manager = EventManager()
 
-        def handler(event: Event):
+        def handler(event: Event) -> None:
             pass
 
         manager.subscribe(EventType.BEFORE_PLAN, handler)
@@ -121,29 +122,29 @@ class TestEventManager:
         manager.clear()
         assert manager.handler_count(EventType.BEFORE_PLAN) == 0
 
-    def test_event_object(self):
+    def test_event_object(self) -> None:
         """Test Event object creation."""
         event = Event(EventType.BEFORE_PLAN, "dev", {"key": "value"})
         assert event.event_type == EventType.BEFORE_PLAN
         assert event.environment == "dev"
         assert event.data["key"] == "value"
 
-    def test_event_repr(self):
+    def test_event_repr(self) -> None:
         """Test Event string representation."""
         event = Event(EventType.BEFORE_PLAN, "dev", {"resource": "vm-01"})
         repr_str = repr(event)
         assert "before_plan" in repr_str
         assert "dev" in repr_str
 
-    def test_global_handler_error_handling(self):
+    def test_global_handler_error_handling(self) -> None:
         """Test that global handler errors don't stop other handlers."""
         manager = EventManager()
         calls = []
 
-        def failing_global_handler(event: Event):
+        def failing_global_handler(event: Event) -> Never:
             raise RuntimeError("Global handler error")
 
-        def working_global_handler(event: Event):
+        def working_global_handler(event: Event) -> None:
             calls.append("global_success")
 
         manager.subscribe_all(failing_global_handler)
@@ -155,15 +156,15 @@ class TestEventManager:
         # Working global handler should still be called
         assert "global_success" in calls
 
-    def test_unsubscribe(self):
+    def test_unsubscribe(self) -> None:
         """Test unsubscribing a handler from an event."""
         manager = EventManager()
         calls = []
 
-        def handler1(event: Event):
+        def handler1(event: Event) -> None:
             calls.append("handler1")
 
-        def handler2(event: Event):
+        def handler2(event: Event) -> None:
             calls.append("handler2")
 
         # Subscribe both handlers
@@ -184,7 +185,7 @@ class TestEventManager:
         assert "handler2" in calls
         assert "handler1" not in calls
 
-    def test_handler_error_metadata(self):
+    def test_handler_error_metadata(self) -> None:
         """Ensure EventHandlerError exposes handler name and message."""
 
         def failing_handler(event: Event) -> None:
@@ -195,11 +196,11 @@ class TestEventManager:
         assert "failing_handler" in str(error)
         assert error.handler_name.endswith("failing_handler")
 
-    def test_unsubscribe_nonexistent_handler(self):
+    def test_unsubscribe_nonexistent_handler(self) -> None:
         """Test unsubscribing a handler that was never subscribed."""
         manager = EventManager()
 
-        def handler(event: Event):
+        def handler(event: Event) -> None:
             pass
 
         # Should not raise exception when unsubscribing non-existent handler
@@ -210,7 +211,7 @@ class TestEventManager:
 class TestScriptHandlerEnvironment:
     """Tests for ScriptHandler._prepare_environment."""
 
-    def test_runner_env_var_injected_when_present(self, tmp_path: Path):
+    def test_runner_env_var_injected_when_present(self, tmp_path: Path) -> None:
         """INFRAFOUNDRY_RUNNER is set when context.runner is provided."""
         handler = ScriptHandler({"script": "test.sh"}, config_base_dir=tmp_path)
         context = EventContext(
@@ -222,7 +223,7 @@ class TestScriptHandlerEnvironment:
         env = handler._prepare_environment(context, tmp_path)
         assert env["INFRAFOUNDRY_RUNNER"] == "terraform"
 
-    def test_runner_env_var_omitted_when_none(self, tmp_path: Path):
+    def test_runner_env_var_omitted_when_none(self, tmp_path: Path) -> None:
         """INFRAFOUNDRY_RUNNER is not set when context.runner is None."""
         handler = ScriptHandler({"script": "test.sh"}, config_base_dir=tmp_path)
         context = EventContext(
@@ -264,7 +265,9 @@ def _parse_env_dump(path: Path) -> dict[str, str]:
 class TestScriptHandlerInventoryInjection:
     """Tests for INFRAFOUNDRY_INVENTORY / INFRAFOUNDRY_PACKAGE_DIR injection from _package_dir."""
 
-    def test_injects_inventory_env_when_package_dir_has_generated_inventory(self, tmp_path: Path):
+    def test_injects_inventory_env_when_package_dir_has_generated_inventory(
+        self, tmp_path: Path
+    ) -> None:
         """INFRAFOUNDRY_INVENTORY is set when _package_dir contains .generated-inventory.yml."""
         script_rel, out_file = _make_dump_env_script(tmp_path, "dump.sh")
 
@@ -288,7 +291,7 @@ class TestScriptHandlerInventoryInjection:
         env = _parse_env_dump(out_file)
         assert env.get("INFRAFOUNDRY_INVENTORY") == str(inventory_path)
 
-    def test_does_not_inject_inventory_when_file_missing(self, tmp_path: Path):
+    def test_does_not_inject_inventory_when_file_missing(self, tmp_path: Path) -> None:
         """INFRAFOUNDRY_INVENTORY is not set when _package_dir has no inventory file."""
         script_rel, out_file = _make_dump_env_script(tmp_path, "dump-no-inv.sh")
 
@@ -310,7 +313,7 @@ class TestScriptHandlerInventoryInjection:
         env = _parse_env_dump(out_file)
         assert "INFRAFOUNDRY_INVENTORY" not in env
 
-    def test_does_not_inject_inventory_when_package_dir_absent(self, tmp_path: Path):
+    def test_does_not_inject_inventory_when_package_dir_absent(self, tmp_path: Path) -> None:
         """INFRAFOUNDRY_INVENTORY is unset when config has no _package_dir (env-level handler)."""
         script_rel, out_file = _make_dump_env_script(tmp_path, "dump-no-pkg.sh")
 
@@ -328,7 +331,7 @@ class TestScriptHandlerInventoryInjection:
         env = _parse_env_dump(out_file)
         assert "INFRAFOUNDRY_INVENTORY" not in env
 
-    def test_injects_package_dir_env_when_package_dir_configured(self, tmp_path: Path):
+    def test_injects_package_dir_env_when_package_dir_configured(self, tmp_path: Path) -> None:
         """INFRAFOUNDRY_PACKAGE_DIR is set to the configured _package_dir."""
         script_rel, out_file = _make_dump_env_script(tmp_path, "dump-pkg-dir.sh")
 
@@ -349,7 +352,7 @@ class TestScriptHandlerInventoryInjection:
         env = _parse_env_dump(out_file)
         assert env.get("INFRAFOUNDRY_PACKAGE_DIR") == str(pkg_dir)
 
-    def test_does_not_inject_package_dir_when_not_configured(self, tmp_path: Path):
+    def test_does_not_inject_package_dir_when_not_configured(self, tmp_path: Path) -> None:
         """INFRAFOUNDRY_PACKAGE_DIR is unset when config has no _package_dir."""
         script_rel, out_file = _make_dump_env_script(tmp_path, "dump-no-pkg-dir.sh")
 
@@ -391,7 +394,7 @@ def _make_script(tmp_path: Path, name: str, content: str) -> Path:
 class TestScriptHandlerStreaming:
     """Tests for ScriptHandler real-time output streaming."""
 
-    def test_streaming_prints_stdout_to_console(self, tmp_path: Path):
+    def test_streaming_prints_stdout_to_console(self, tmp_path: Path) -> None:
         """Stdout lines are printed to console in real-time."""
         script_rel = _make_script(
             tmp_path,
@@ -418,7 +421,7 @@ class TestScriptHandlerStreaming:
         assert any("line1" in c for c in print_calls)
         assert any("line2" in c for c in print_calls)
 
-    def test_streaming_prints_stderr_with_red_style(self, tmp_path: Path):
+    def test_streaming_prints_stderr_with_red_style(self, tmp_path: Path) -> None:
         """Stderr lines are printed to console with red styling."""
         script_rel = _make_script(
             tmp_path,
@@ -441,7 +444,7 @@ class TestScriptHandlerStreaming:
         print_calls = [str(c) for c in console.print.call_args_list]
         assert any("[red]" in c and "err_msg" in c for c in print_calls)
 
-    def test_stdout_and_stderr_captured_in_result(self, tmp_path: Path):
+    def test_stdout_and_stderr_captured_in_result(self, tmp_path: Path) -> None:
         """EventResult still contains full stdout and stderr."""
         script_rel = _make_script(
             tmp_path,
@@ -464,7 +467,7 @@ class TestScriptHandlerStreaming:
         assert "out_line" in result.stdout
         assert "err_line" in result.stderr
 
-    def test_no_console_backward_compat(self, tmp_path: Path):
+    def test_no_console_backward_compat(self, tmp_path: Path) -> None:
         """ScriptHandler works without console (backward compatibility)."""
         script_rel = _make_script(
             tmp_path,
@@ -486,7 +489,7 @@ class TestScriptHandlerStreaming:
         assert result.success
         assert "hello" in result.stdout
 
-    def test_timeout_kills_process_returns_partial(self, tmp_path: Path):
+    def test_timeout_kills_process_returns_partial(self, tmp_path: Path) -> None:
         """Timeout kills the process and returns partial output."""
         script_rel = _make_script(
             tmp_path,
@@ -509,7 +512,7 @@ class TestScriptHandlerStreaming:
         assert "Timeout" in (result.reason or "")
         assert "partial_out" in result.stdout
 
-    def test_empty_output(self, tmp_path: Path):
+    def test_empty_output(self, tmp_path: Path) -> None:
         """Empty output produces empty strings in result."""
         script_rel = _make_script(
             tmp_path,
@@ -535,7 +538,7 @@ class TestScriptHandlerStreaming:
 class TestPrintHandlerResultStreaming:
     """Tests for _print_handler_result with streaming behavior."""
 
-    def test_skips_reprinting_for_streamed_script_handler(self):
+    def test_skips_reprinting_for_streamed_script_handler(self) -> None:
         """Output is not re-printed for ScriptHandler with console."""
         console = MagicMock()
         bus = UnifiedEventBus(console=console)
@@ -558,7 +561,7 @@ class TestPrintHandlerResultStreaming:
         assert any("completed" in c for c in calls)
         assert not any("already streamed line" in c for c in calls)
 
-    def test_skips_reprinting_stderr_for_streamed_script_handler(self):
+    def test_skips_reprinting_stderr_for_streamed_script_handler(self) -> None:
         """Stderr is not re-printed for failed ScriptHandler with console."""
         console = MagicMock()
         bus = UnifiedEventBus(console=console)
@@ -583,7 +586,7 @@ class TestPrintHandlerResultStreaming:
         assert not any("some output" in c for c in calls)
         assert not any("some error" in c for c in calls)
 
-    def test_prints_output_for_non_script_handler(self):
+    def test_prints_output_for_non_script_handler(self) -> None:
         """Output is still printed for non-script handlers."""
         from infrafoundry.core.events.handlers.python import PythonHandler
 
@@ -603,7 +606,7 @@ class TestPrintHandlerResultStreaming:
         calls = [str(c) for c in console.print.call_args_list]
         assert any("python handler output" in c for c in calls)
 
-    def test_prints_output_for_script_handler_without_console(self):
+    def test_prints_output_for_script_handler_without_console(self) -> None:
         """Output is printed for ScriptHandler without console (no streaming)."""
         console = MagicMock()
         bus = UnifiedEventBus(console=console)
@@ -629,7 +632,7 @@ class TestPrintHandlerResultStreaming:
 class TestPackageEventsIntegration:
     """Tests for package events wiring through orchestrator."""
 
-    def test_package_events_registered_after_resource_load(self, tmp_path: Path):
+    def test_package_events_registered_after_resource_load(self, tmp_path: Path) -> None:
         """Verify orchestrator registers package events after resource loading."""
         from unittest.mock import Mock, patch
 
@@ -661,9 +664,9 @@ class TestPackageEventsIntegration:
 
         # Spy on load_config
         original_load_config = event_manager.load_config
-        load_config_calls: list[dict] = []
+        load_config_calls: list[dict[str, Any]] = []
 
-        def spy_load_config(config: dict) -> None:
+        def spy_load_config(config: dict[str, Any]) -> None:
             load_config_calls.append(config)
             original_load_config(config)
 
@@ -755,7 +758,7 @@ class TestScriptHandlerJumphostReexec:
             package_variables=dict(vars),
         )
 
-    def test_no_jumphost_runs_locally(self, tmp_path: Path):
+    def test_no_jumphost_runs_locally(self, tmp_path: Path) -> None:
         """Empty/missing jumphost takes the local subprocess path."""
         handler, script = self._handler(tmp_path)
         context = self._context()  # no jumphost
@@ -770,7 +773,7 @@ class TestScriptHandlerJumphostReexec:
         assert args[0] == [str(script)]
         assert result.success
 
-    def test_jumphost_set_triggers_reexec(self, tmp_path: Path):
+    def test_jumphost_set_triggers_reexec(self, tmp_path: Path) -> None:
         """jumphost variable causes ssh-based remote execution."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="ansible@jump", other="val")
@@ -796,7 +799,7 @@ class TestScriptHandlerJumphostReexec:
         assert "INFRAFOUNDRY_ON_JUMPHOST=1" in cmd[-1]
         assert "bash /tmp/infrafoundry-" in cmd[-1]
 
-    def test_jumphost_stripped_from_forwarded_json(self, tmp_path: Path):
+    def test_jumphost_stripped_from_forwarded_json(self, tmp_path: Path) -> None:
         """Package vars JSON piped to stdin excludes 'jumphost'."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="jh", foo="bar", num=7)
@@ -823,7 +826,7 @@ class TestScriptHandlerJumphostReexec:
         assert parsed["num"] == 7
         fake_proc.stdin.close.assert_called_once()
 
-    def test_infrafoundry_on_jumphost_env_set_in_remote_command(self, tmp_path: Path):
+    def test_infrafoundry_on_jumphost_env_set_in_remote_command(self, tmp_path: Path) -> None:
         """Remote bash command sets INFRAFOUNDRY_ON_JUMPHOST=1 for recursion guard."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="jh")
@@ -845,7 +848,7 @@ class TestScriptHandlerJumphostReexec:
         assert "INFRAFOUNDRY_ON_JUMPHOST=1" in remote_bash
         assert 'INFRAFOUNDRY_PACKAGE_VARS="$(cat)"' in remote_bash
 
-    def test_remote_exit_code_propagated(self, tmp_path: Path):
+    def test_remote_exit_code_propagated(self, tmp_path: Path) -> None:
         """Non-zero remote returncode surfaces as failure with abort."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="jh")
@@ -868,7 +871,7 @@ class TestScriptHandlerJumphostReexec:
         assert result.data.get("returncode") == 17
         assert "17" in (result.reason or "")
 
-    def test_rsync_failure(self, tmp_path: Path):
+    def test_rsync_failure(self, tmp_path: Path) -> None:
         """Rsync failure returns a clear reason and never launches the remote script."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="jh")
@@ -877,7 +880,7 @@ class TestScriptHandlerJumphostReexec:
         rsync_fail = MagicMock(returncode=23, stdout="", stderr="permission denied")
         cleanup_ok = MagicMock(returncode=0, stdout=b"", stderr=b"")
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> Any:
             if cmd[0] == "rsync":
                 return rsync_fail
             if cmd[0] == "ssh" and cmd[-1].startswith("mkdir"):
@@ -897,14 +900,14 @@ class TestScriptHandlerJumphostReexec:
         assert "rsync" in (result.reason or "")
         assert mock_popen.call_count == 0
 
-    def test_ssh_mkdir_failure(self, tmp_path: Path):
+    def test_ssh_mkdir_failure(self, tmp_path: Path) -> None:
         """mkdir failure returns a clear reason and never runs rsync or remote."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="jh")
 
         mkdir_fail = MagicMock(returncode=255, stdout="", stderr="host unreachable")
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> Any:
             if cmd[0] == "ssh" and cmd[-1].startswith("mkdir"):
                 return mkdir_fail
             # rsync/cleanup should not be reached
@@ -923,14 +926,14 @@ class TestScriptHandlerJumphostReexec:
         assert "mkdir" in (result.reason or "")
         assert mock_popen.call_count == 0
 
-    def test_cleanup_runs_on_success(self, tmp_path: Path):
+    def test_cleanup_runs_on_success(self, tmp_path: Path) -> None:
         """Cleanup ssh rm -rf fires after a successful remote run."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="jh")
 
         calls: list[list[str]] = []
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> MagicMock:
             calls.append(list(cmd))
             return MagicMock(returncode=0, stdout=b"", stderr=b"")
 
@@ -950,14 +953,14 @@ class TestScriptHandlerJumphostReexec:
         cleanup_calls = [c for c in calls if c[0] == "ssh" and "rm -rf" in c[-1]]
         assert len(cleanup_calls) == 1
 
-    def test_cleanup_runs_on_failure(self, tmp_path: Path):
+    def test_cleanup_runs_on_failure(self, tmp_path: Path) -> None:
         """Cleanup ssh rm -rf fires even when remote script returns non-zero."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="jh")
 
         calls: list[list[str]] = []
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> MagicMock:
             calls.append(list(cmd))
             return MagicMock(returncode=0, stdout=b"", stderr=b"")
 
@@ -977,12 +980,12 @@ class TestScriptHandlerJumphostReexec:
         cleanup_calls = [c for c in calls if c[0] == "ssh" and "rm -rf" in c[-1]]
         assert len(cleanup_calls) == 1
 
-    def test_cleanup_error_ignored(self, tmp_path: Path):
+    def test_cleanup_error_ignored(self, tmp_path: Path) -> None:
         """Non-zero cleanup return code does not affect the main EventResult."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="jh")
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> MagicMock:
             if cmd[0] == "ssh" and "rm -rf" in cmd[-1]:
                 return MagicMock(returncode=1, stdout=b"", stderr=b"cleanup failed")
             return MagicMock(returncode=0, stdout=b"", stderr=b"")
@@ -1003,7 +1006,7 @@ class TestScriptHandlerJumphostReexec:
         assert result.data.get("returncode") == 3
         assert result.success is False
 
-    def test_stream_output_from_remote(self, tmp_path: Path):
+    def test_stream_output_from_remote(self, tmp_path: Path) -> None:
         """stdout/stderr from the remote Popen are captured in EventResult."""
         handler, _ = self._handler(tmp_path)
         context = self._context(jumphost="jh")
@@ -1029,7 +1032,7 @@ class TestScriptHandlerJumphostReexec:
         assert "out-line-2" in result.stdout
         assert "err-line-1" in result.stderr
 
-    def test_timeout_kills_ssh_subprocess(self, tmp_path: Path):
+    def test_timeout_kills_ssh_subprocess(self, tmp_path: Path) -> None:
         """Timeout on remote wait kills ssh process and still runs cleanup."""
         handler, _ = self._handler(tmp_path)
         handler.config["timeout"] = 1
@@ -1037,7 +1040,7 @@ class TestScriptHandlerJumphostReexec:
 
         cleanup_seen: list[list[str]] = []
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> MagicMock:
             if cmd[0] == "ssh" and "rm -rf" in cmd[-1]:
                 cleanup_seen.append(list(cmd))
             return MagicMock(returncode=0, stdout=b"", stderr=b"")
@@ -1065,7 +1068,7 @@ class TestScriptHandlerJumphostReexec:
 
     def test_infrafoundry_on_jumphost_already_set_skips_reexec(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    ) -> None:
         """If INFRAFOUNDRY_ON_JUMPHOST is already set, local path is taken."""
         handler, script = self._handler(tmp_path)
         context = self._context(jumphost="jh")
@@ -1080,7 +1083,7 @@ class TestScriptHandlerJumphostReexec:
         assert mock_popen.call_args[0][0] == [str(script)]
         assert result.success
 
-    def test_remote_bash_contains_var_reexport(self, tmp_path: Path):
+    def test_remote_bash_contains_var_reexport(self, tmp_path: Path) -> None:
         """Remote wrapper re-exports each package var as INFRAFOUNDRY_VAR_<key>.
 
         Regression for #639: the jumphost path previously only forwarded
@@ -1111,7 +1114,7 @@ class TestScriptHandlerJumphostReexec:
         # Regression for #641: must not silently depend on jq.
         assert "jq " not in remote_bash
 
-    def test_remote_wrapper_sets_var_env_via_real_shell(self, tmp_path: Path):
+    def test_remote_wrapper_sets_var_env_via_real_shell(self, tmp_path: Path) -> None:
         """End-to-end: the wrapper under bash+python3 populates INFRAFOUNDRY_VAR_<key>.
 
         Executes the generated remote bash string against a local bash+python3
@@ -1153,7 +1156,7 @@ class TestScriptHandlerJumphostReexec:
         # Full JSON remains available (incl. the array value that scalars skip).
         assert '"agents"' in proc.stdout
 
-    def test_remote_wrapper_fails_fast_without_python3(self, tmp_path: Path):
+    def test_remote_wrapper_fails_fast_without_python3(self, tmp_path: Path) -> None:
         """Regression for #641: wrapper fails fast with a clear error when python3 is absent.
 
         Previously (PR #640) the wrapper silently depended on ``jq`` — when
@@ -1185,7 +1188,7 @@ class TestScriptHandlerJumphostReexec:
         assert "python3 is required" in proc.stderr
         assert "unreachable" not in proc.stdout
 
-    def test_remote_bash_exports_warnings_file(self, tmp_path: Path):
+    def test_remote_bash_exports_warnings_file(self, tmp_path: Path) -> None:
         """When a warnings_file is provided, the wrapper seeds and exports it.
 
         Regression for #661: the jumphost path must propagate
@@ -1203,7 +1206,7 @@ class TestScriptHandlerJumphostReexec:
         plain = _build_remote_bash(str(tmp_path), "dump.sh")
         assert "INFRAFOUNDRY_WARNINGS_FILE" not in plain
 
-    def test_remote_wrapper_appends_to_warnings_file_on_disk(self, tmp_path: Path):
+    def test_remote_wrapper_appends_to_warnings_file_on_disk(self, tmp_path: Path) -> None:
         """End-to-end: inner script appends to $INFRAFOUNDRY_WARNINGS_FILE on disk.
 
         Runs the real bash+python3 wrapper and asserts that a warning
@@ -1263,7 +1266,7 @@ class TestScriptHandlerOutputs:
         script = env_dir / "run.sh"
         script.write_text(script_content)
         script.chmod(script.stat().st_mode | stat.S_IEXEC)
-        config: dict = {"script": "run.sh"}
+        config: dict[str, Any] = {"script": "run.sh"}
         if outputs is not None:
             config["outputs"] = outputs
         handler = ScriptHandler(config, config_base_dir=tmp_path)
@@ -1278,17 +1281,17 @@ class TestScriptHandlerOutputs:
 
     # -- Validation -----------------------------------------------------
 
-    def test_validate_config_accepts_absent_outputs(self, tmp_path: Path):
+    def test_validate_config_accepts_absent_outputs(self, tmp_path: Path) -> None:
         """Missing ``outputs`` field is valid (back-compat default)."""
         handler, _ = self._handler(tmp_path)
         assert handler.validate_config() == []
 
-    def test_validate_config_accepts_empty_outputs_list(self, tmp_path: Path):
+    def test_validate_config_accepts_empty_outputs_list(self, tmp_path: Path) -> None:
         """Empty ``outputs: []`` is valid."""
         handler, _ = self._handler(tmp_path, outputs=[])
         assert handler.validate_config() == []
 
-    def test_validate_config_rejects_non_list_outputs(self, tmp_path: Path):
+    def test_validate_config_rejects_non_list_outputs(self, tmp_path: Path) -> None:
         """``outputs`` as a non-list produces a validation error."""
         env_dir = tmp_path / "envs" / "dev"
         env_dir.mkdir(parents=True, exist_ok=True)
@@ -1302,19 +1305,19 @@ class TestScriptHandlerOutputs:
         errors = handler.validate_config()
         assert any("outputs must be a list" in e for e in errors)
 
-    def test_validate_config_rejects_entry_missing_source(self, tmp_path: Path):
+    def test_validate_config_rejects_entry_missing_source(self, tmp_path: Path) -> None:
         """An entry without ``source`` is invalid."""
         handler, _ = self._handler(tmp_path, outputs=[{"dest": "/tmp/x"}])
         errors = handler.validate_config()
         assert any("source" in e for e in errors)
 
-    def test_validate_config_rejects_entry_missing_dest(self, tmp_path: Path):
+    def test_validate_config_rejects_entry_missing_dest(self, tmp_path: Path) -> None:
         """An entry without ``dest`` is invalid."""
         handler, _ = self._handler(tmp_path, outputs=[{"source": "/tmp/x"}])
         errors = handler.validate_config()
         assert any("dest" in e for e in errors)
 
-    def test_validate_config_rejects_non_mapping_entry(self, tmp_path: Path):
+    def test_validate_config_rejects_non_mapping_entry(self, tmp_path: Path) -> None:
         """A list entry that isn't a mapping is invalid."""
         handler, _ = self._handler(
             tmp_path,
@@ -1325,7 +1328,7 @@ class TestScriptHandlerOutputs:
 
     # -- Absent / empty are no-ops --------------------------------------
 
-    def test_outputs_absent_is_noop(self, tmp_path: Path):
+    def test_outputs_absent_is_noop(self, tmp_path: Path) -> None:
         """With no ``outputs`` config, no copy/scp happens."""
         handler, _ = self._handler(tmp_path)
         context = self._context()
@@ -1334,7 +1337,7 @@ class TestScriptHandlerOutputs:
         assert result.success
         assert mock_copy.call_count == 0
 
-    def test_outputs_empty_list_is_noop(self, tmp_path: Path):
+    def test_outputs_empty_list_is_noop(self, tmp_path: Path) -> None:
         """``outputs: []`` behaves identically to absent."""
         handler, _ = self._handler(tmp_path, outputs=[])
         context = self._context()
@@ -1345,7 +1348,7 @@ class TestScriptHandlerOutputs:
 
     # -- Local execution paths ------------------------------------------
 
-    def test_local_copies_source_to_dest(self, tmp_path: Path):
+    def test_local_copies_source_to_dest(self, tmp_path: Path) -> None:
         """On success, source is copied to dest with different paths."""
         src = tmp_path / "src.txt"
         src.write_text("hello world")
@@ -1360,7 +1363,7 @@ class TestScriptHandlerOutputs:
         assert dst.exists()
         assert dst.read_text() == "hello world"
 
-    def test_local_same_path_is_noop(self, tmp_path: Path):
+    def test_local_same_path_is_noop(self, tmp_path: Path) -> None:
         """When source == dest, no copy is attempted."""
         both = tmp_path / "file.txt"
         both.write_text("unchanged")
@@ -1375,7 +1378,9 @@ class TestScriptHandlerOutputs:
         # File is unmodified.
         assert both.read_text() == "unchanged"
 
-    def test_local_missing_source_warns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def test_local_missing_source_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Missing source after success: warning emitted, handler still succeeds."""
         warnings_file = tmp_path / "warnings.jsonl"
         monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
@@ -1395,7 +1400,7 @@ class TestScriptHandlerOutputs:
 
     def test_local_relative_path_warns_and_skips(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    ) -> None:
         """Non-absolute rendered paths warn and skip the entry."""
         warnings_file = tmp_path / "warnings.jsonl"
         monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
@@ -1413,7 +1418,7 @@ class TestScriptHandlerOutputs:
         assert warnings_file.exists()
         assert "dest must be an absolute path" in warnings_file.read_text()
 
-    def test_local_template_vars_rendered(self, tmp_path: Path):
+    def test_local_template_vars_rendered(self, tmp_path: Path) -> None:
         """Jinja2 templates in source/dest resolve against package vars."""
         src = tmp_path / "k3s-prod.yaml"
         src.write_text("# kubeconfig")
@@ -1432,7 +1437,7 @@ class TestScriptHandlerOutputs:
         assert dst.exists()
         assert dst.read_text() == "# kubeconfig"
 
-    def test_local_creates_dest_parent_dir(self, tmp_path: Path):
+    def test_local_creates_dest_parent_dir(self, tmp_path: Path) -> None:
         """Nonexistent dest parent dir is created automatically."""
         src = tmp_path / "src.txt"
         src.write_text("payload")
@@ -1447,7 +1452,7 @@ class TestScriptHandlerOutputs:
         assert dst.exists()
         assert dst.read_text() == "payload"
 
-    def test_local_outputs_skipped_on_script_failure(self, tmp_path: Path):
+    def test_local_outputs_skipped_on_script_failure(self, tmp_path: Path) -> None:
         """Non-zero script exit skips outputs processing entirely."""
         src = tmp_path / "src.txt"
         src.write_text("payload")
@@ -1463,17 +1468,17 @@ class TestScriptHandlerOutputs:
 
     # -- Jumphost (scp) paths -------------------------------------------
 
-    def _jumphost_run_ok(self, scp_calls: list[list[str]] | None = None):
+    def _jumphost_run_ok(self, scp_calls: list[list[str]] | None = None) -> Any:
         """Build a subprocess.run side effect that records scp invocations."""
 
-        def side_effect(cmd, *_args, **_kwargs):
+        def side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> MagicMock:
             if cmd[0] == "scp" and scp_calls is not None:
                 scp_calls.append(list(cmd))
             return MagicMock(returncode=0, stdout=b"", stderr=b"")
 
         return side_effect
 
-    def test_remote_scp_invoked_on_success(self, tmp_path: Path):
+    def test_remote_scp_invoked_on_success(self, tmp_path: Path) -> None:
         """A successful remote run triggers one scp per output."""
         handler, _ = self._handler(
             tmp_path,
@@ -1499,7 +1504,7 @@ class TestScriptHandlerOutputs:
         assert "jump@host:/tmp/remote/out.txt" in scp_cmd
         assert str(tmp_path / "out.txt") in scp_cmd
 
-    def test_remote_scp_skipped_on_script_failure(self, tmp_path: Path):
+    def test_remote_scp_skipped_on_script_failure(self, tmp_path: Path) -> None:
         """A failed remote run skips scp entirely."""
         handler, _ = self._handler(
             tmp_path,
@@ -1523,7 +1528,7 @@ class TestScriptHandlerOutputs:
 
     def test_remote_scp_failure_warns_but_handler_succeeds(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    ) -> None:
         """A non-zero scp returncode surfaces as a warning, not a handler failure."""
         warnings_file = tmp_path / "warnings.jsonl"
         monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
@@ -1533,7 +1538,7 @@ class TestScriptHandlerOutputs:
         )
         context = self._context(jumphost="jump@host")
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> MagicMock:
             if cmd[0] == "scp":
                 return MagicMock(returncode=1, stdout=b"", stderr=b"no such file")
             return MagicMock(returncode=0, stdout=b"", stderr=b"")
@@ -1556,7 +1561,7 @@ class TestScriptHandlerOutputs:
         assert "scp of output" in content
         assert "no such file" in content
 
-    def test_remote_multiple_outputs_all_attempted(self, tmp_path: Path):
+    def test_remote_multiple_outputs_all_attempted(self, tmp_path: Path) -> None:
         """Multiple outputs: one failure does not skip subsequent entries."""
         handler, _ = self._handler(
             tmp_path,
@@ -1568,7 +1573,7 @@ class TestScriptHandlerOutputs:
         context = self._context(jumphost="jump@host")
         scp_calls: list[list[str]] = []
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> MagicMock:
             if cmd[0] == "scp":
                 scp_calls.append(list(cmd))
                 # First scp fails, second succeeds.
@@ -1598,7 +1603,7 @@ class TestScriptHandlerOutputs:
         assert any("first.txt" in c[-2] for c in output_scps)
         assert any("second.txt" in c[-2] for c in output_scps)
 
-    def test_remote_cleanup_runs_after_outputs_processing(self, tmp_path: Path):
+    def test_remote_cleanup_runs_after_outputs_processing(self, tmp_path: Path) -> None:
         """Remote cleanup (rm -rf) always fires after scp attempts."""
         handler, _ = self._handler(
             tmp_path,
@@ -1607,7 +1612,7 @@ class TestScriptHandlerOutputs:
         context = self._context(jumphost="jump@host")
         order: list[str] = []
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> MagicMock:
             if cmd[0] == "scp":
                 order.append("scp")
                 # Make scp fail so we also verify cleanup still runs after a
@@ -1634,7 +1639,7 @@ class TestScriptHandlerOutputs:
         # still contains the artifact when scp executes.
         assert order == ["scp", "cleanup"]
 
-    def test_remote_ssh_opts_forwarded_to_scp(self, tmp_path: Path):
+    def test_remote_ssh_opts_forwarded_to_scp(self, tmp_path: Path) -> None:
         """scp inherits the same StrictHostKeyChecking=no used by the handler."""
         handler, _ = self._handler(
             tmp_path,
@@ -1661,7 +1666,7 @@ class TestScriptHandlerOutputs:
 
     def test_local_template_error_warns_and_skips(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    ) -> None:
         """A malformed Jinja2 template surfaces a warning and skips the entry."""
         warnings_file = tmp_path / "warnings.jsonl"
         monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
@@ -1679,7 +1684,7 @@ class TestScriptHandlerOutputs:
 
     def test_local_source_relative_warns_and_skips(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ):
+    ) -> None:
         """A non-absolute rendered source also triggers a warning."""
         warnings_file = tmp_path / "warnings.jsonl"
         monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
@@ -1693,7 +1698,9 @@ class TestScriptHandlerOutputs:
         assert mock_copy.call_count == 0
         assert "source must be an absolute path" in warnings_file.read_text()
 
-    def test_local_copy_oserror_warns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def test_local_copy_oserror_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A raising ``shutil.copy2`` surfaces as a warning (not a failure)."""
         warnings_file = tmp_path / "warnings.jsonl"
         monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
@@ -1713,7 +1720,9 @@ class TestScriptHandlerOutputs:
         content = warnings_file.read_text()
         assert "failed to copy" in content
 
-    def test_remote_scp_oserror_warns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def test_remote_scp_oserror_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """An ``OSError`` from ``subprocess.run`` during scp is also a warning."""
         warnings_file = tmp_path / "warnings.jsonl"
         monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
@@ -1723,7 +1732,7 @@ class TestScriptHandlerOutputs:
         )
         context = self._context(jumphost="jump@host")
 
-        def run_side_effect(cmd, *_args, **_kwargs):
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> MagicMock:
             if cmd[0] == "scp":
                 raise OSError("scp binary missing")
             return MagicMock(returncode=0, stdout=b"", stderr=b"")

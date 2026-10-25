@@ -1,5 +1,8 @@
 """Unit tests for PolicyEngine."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 import yaml
 
@@ -12,19 +15,19 @@ from infrafoundry.core.provider import ResourceConfig
 class TestPolicyEngine:
     """Tests for PolicyEngine."""
 
-    def test_init(self, mock_policy_dir):
+    def test_init(self, mock_policy_dir: Any) -> None:
         """Test PolicyEngine initialization."""
         engine = PolicyEngine(mock_policy_dir)
         assert len(engine.policies) > 0
 
-    def test_load_policies(self, mock_policy_dir):
+    def test_load_policies(self, mock_policy_dir: Any) -> None:
         """Test loading policies from directory."""
         engine = PolicyEngine(mock_policy_dir)
         policy_names = {p.name for p in engine.policies}
         assert "resource_limits" in policy_names
         assert "require_tags" in policy_names
 
-    def test_validate_resource_limits(self, mock_policy_dir):
+    def test_validate_resource_limits(self, mock_policy_dir: Any) -> None:
         """Test resource limits policy."""
         engine = PolicyEngine(mock_policy_dir)
 
@@ -44,7 +47,7 @@ class TestPolicyEngine:
         violations = engine.evaluate_resources([resource2], "dev")
         assert len(violations) > 0
 
-    def test_validate_required_tags(self, mock_policy_dir):
+    def test_validate_required_tags(self, mock_policy_dir: Any) -> None:
         """Test required tags policy."""
         engine = PolicyEngine(mock_policy_dir)
 
@@ -70,7 +73,7 @@ class TestPolicyEngine:
         tag_violations = [v for v in violations if "tag" in v.message.lower()]
         assert len(tag_violations) > 0
 
-    def test_policy_level_enforcement(self, temp_dir):
+    def test_policy_level_enforcement(self, temp_dir: Path) -> None:
         """Test different policy enforcement levels."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -93,7 +96,7 @@ class TestPolicyEngine:
         if violations:
             assert violations[0].level == PolicyLevel.WARNING
 
-    def test_empty_policy_directory(self, temp_dir):
+    def test_empty_policy_directory(self, temp_dir: Path) -> None:
         """Test with empty policy directory."""
         empty_dir = temp_dir / "empty_policies"
         empty_dir.mkdir()
@@ -106,7 +109,7 @@ class TestPolicyEngine:
         violations = engine.evaluate_resources([resource], "dev")
         assert len(violations) == 0
 
-    def test_evaluate_resources_multiple(self, mock_policy_dir):
+    def test_evaluate_resources_multiple(self, mock_policy_dir: Any) -> None:
         """Test evaluating multiple resources."""
         engine = PolicyEngine(mock_policy_dir)
 
@@ -127,7 +130,7 @@ class TestPolicyEngine:
         # Should have violations for vm-02
         assert any("vm-02" in v.resource_name for v in all_violations)
 
-    def test_policy_violation_object(self):
+    def test_policy_violation_object(self) -> None:
         """Test PolicyViolation object."""
         violation = PolicyViolation(
             policy_name="test_policy",
@@ -141,7 +144,7 @@ class TestPolicyEngine:
         assert violation.level == PolicyLevel.ERROR
         assert violation.resource_name == "vm-01"
 
-    def test_load_policies_invalid_yaml(self, temp_dir):
+    def test_load_policies_invalid_yaml(self, temp_dir: Path) -> None:
         """Test loading policies with invalid YAML."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -155,7 +158,7 @@ class TestPolicyEngine:
         # No policies loaded from invalid file
         assert len(engine.policies) == 0
 
-    def test_load_policies_empty_file(self, temp_dir):
+    def test_load_policies_empty_file(self, temp_dir: Path) -> None:
         """Test loading policies from empty file."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -166,7 +169,7 @@ class TestPolicyEngine:
         engine = PolicyEngine(policy_dir)
         assert len(engine.policies) == 0
 
-    def test_load_policies_no_policies_key(self, temp_dir):
+    def test_load_policies_no_policies_key(self, temp_dir: Path) -> None:
         """Test loading policies without policies key."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -177,7 +180,7 @@ class TestPolicyEngine:
         engine = PolicyEngine(policy_dir)
         assert len(engine.policies) == 0
 
-    def test_disabled_policy_not_evaluated(self, temp_dir):
+    def test_disabled_policy_not_evaluated(self, temp_dir: Path) -> None:
         """Test that disabled policies are not evaluated."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -202,7 +205,7 @@ class TestPolicyEngine:
         # No violations because policy is disabled
         assert len(violations) == 0
 
-    def test_policy_environment_filtering(self, temp_dir):
+    def test_policy_environment_filtering(self, temp_dir: Path) -> None:
         """Test that policies only apply to specified environments."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -232,7 +235,7 @@ class TestPolicyEngine:
         violations_dev = engine.evaluate_resources([resource], "dev")
         assert len(violations_dev) == 0
 
-    def test_naming_convention_policy(self, temp_dir):
+    def test_naming_convention_policy(self, temp_dir: Path) -> None:
         """Test naming convention policy."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -262,7 +265,7 @@ class TestPolicyEngine:
         violations2 = engine.evaluate_resources([resource2], "dev")
         assert len(violations2) > 0
 
-    def test_naming_convention_wildcard_pattern(self, temp_dir):
+    def test_naming_convention_wildcard_pattern(self, temp_dir: Path) -> None:
         """Test naming convention with wildcard pattern."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -292,7 +295,7 @@ class TestPolicyEngine:
         violations2 = engine.evaluate_resources([resource2], "dev")
         assert len(violations2) > 0
 
-    def test_naming_convention_invalid_regex(self, temp_dir):
+    def test_naming_convention_invalid_regex(self, temp_dir: Path) -> None:
         """Test naming convention with invalid regex pattern."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -317,7 +320,7 @@ class TestPolicyEngine:
         # No violations because regex is invalid
         assert len(violations) == 0
 
-    def test_required_tags_list_format(self, temp_dir):
+    def test_required_tags_list_format(self, temp_dir: Path) -> None:
         """Test required tags policy with list format tags."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -356,7 +359,7 @@ class TestPolicyEngine:
         tag_violations2 = [v for v in violations2 if "tag" in v.message.lower()]
         assert len(tag_violations2) > 0
 
-    def test_required_tags_no_tags(self, temp_dir):
+    def test_required_tags_no_tags(self, temp_dir: Path) -> None:
         """Test required tags policy with resource having no tags."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -380,7 +383,7 @@ class TestPolicyEngine:
         tag_violations = [v for v in violations if "tag" in v.message.lower()]
         assert len(tag_violations) > 0
 
-    def test_required_tags_invalid_format(self, temp_dir):
+    def test_required_tags_invalid_format(self, temp_dir: Path) -> None:
         """Test required tags policy with invalid tags format."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -407,7 +410,7 @@ class TestPolicyEngine:
         tag_violations = [v for v in violations if "tag" in v.message.lower()]
         assert len(tag_violations) > 0
 
-    def test_allowed_providers_policy(self, temp_dir):
+    def test_allowed_providers_policy(self, temp_dir: Path) -> None:
         """Test allowed providers policy."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -439,7 +442,7 @@ class TestPolicyEngine:
         violations2 = engine.evaluate_resources([resource2], "dev")
         assert len(violations2) > 0
 
-    def test_allowed_providers_empty_list(self, temp_dir):
+    def test_allowed_providers_empty_list(self, temp_dir: Path) -> None:
         """Test allowed providers policy with empty allowed list."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -463,7 +466,7 @@ class TestPolicyEngine:
         # Empty allowed list means policy doesn't apply
         assert len(violations) == 0
 
-    def test_get_policy(self, mock_policy_dir):
+    def test_get_policy(self, mock_policy_dir: Any) -> None:
         """Test getting a specific policy by name."""
         engine = PolicyEngine(mock_policy_dir)
         policy = engine.get_policy("resource_limits")
@@ -474,7 +477,7 @@ class TestPolicyEngine:
         missing = engine.get_policy("nonexistent")
         assert missing is None
 
-    def test_get_policies_for_environment(self, temp_dir):
+    def test_get_policies_for_environment(self, temp_dir: Path) -> None:
         """Test getting policies for a specific environment."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -522,7 +525,7 @@ class TestPolicyEngine:
         assert "all_envs" in dev_names
         assert "disabled" not in dev_names
 
-    def test_resource_limit_memory_only(self, temp_dir):
+    def test_resource_limit_memory_only(self, temp_dir: Path) -> None:
         """Test resource limits policy with only memory limit."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -556,7 +559,7 @@ class TestPolicyEngine:
         violations2 = engine.evaluate_resources([resource2], "dev")
         assert len(violations2) > 0
 
-    def test_resource_with_cpu_field(self, temp_dir):
+    def test_resource_with_cpu_field(self, temp_dir: Path) -> None:
         """Test resource limits with 'cpu' field instead of 'cores'."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -583,7 +586,7 @@ class TestPolicyEngine:
         violations = engine.evaluate_resources([resource], "dev")
         assert len(violations) > 0
 
-    def test_inherits_from_base_manager(self, temp_dir):
+    def test_inherits_from_base_manager(self, temp_dir: Path) -> None:
         """Test that PolicyEngine inherits from BaseManager."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -597,7 +600,7 @@ class TestPolicyEngine:
         assert hasattr(engine, "_log_debug")
         assert hasattr(engine, "cleanup")
 
-    def test_cleanup_method(self, temp_dir):
+    def test_cleanup_method(self, temp_dir: Path) -> None:
         """Test that cleanup method works."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
@@ -606,7 +609,7 @@ class TestPolicyEngine:
         # cleanup() should not raise any exceptions
         engine.cleanup()
 
-    def test_context_manager(self, temp_dir):
+    def test_context_manager(self, temp_dir: Path) -> None:
         """Test that PolicyEngine can be used as context manager."""
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()

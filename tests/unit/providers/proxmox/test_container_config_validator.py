@@ -1,5 +1,6 @@
 """Unit tests for Proxmox ContainerConfigValidator."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,18 +13,18 @@ from infrafoundry.providers.proxmox.validators.container_config_validator import
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> ContainerConfigValidator:
     """Create a ContainerConfigValidator instance."""
     return ContainerConfigValidator(report)
 
 
-def _ct(name: str = "test-ct", **config) -> ResourceConfig:
+def _ct(name: str = "test-ct", **config: Any) -> ResourceConfig:
     """Helper to create a container ResourceConfig."""
     return ResourceConfig(
         name=name,
@@ -36,21 +37,25 @@ def _ct(name: str = "test-ct", **config) -> ResourceConfig:
 class TestOSTemplateValidation:
     """Tests for ostemplate validation."""
 
-    def test_valid_ostemplate(self, validator, report):
+    def test_valid_ostemplate(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Valid ostemplate should not trigger an error."""
         validator.validate(
             [_ct(ostemplate="nas01:vztmpl/alpine-3.21-default_20250108_amd64.tar.xz")]
         )
         report.add_check.assert_not_called()
 
-    def test_valid_ostemplate_zst(self, validator, report):
+    def test_valid_ostemplate_zst(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Zstandard-compressed ostemplate should be valid."""
         validator.validate(
             [_ct(ostemplate="local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst")]
         )
         report.add_check.assert_not_called()
 
-    def test_invalid_ostemplate_format(self, validator, report):
+    def test_invalid_ostemplate_format(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Invalid ostemplate format should trigger an error."""
         validator.validate([_ct(ostemplate="/path/to/template.tar.xz")])
         report.add_check.assert_called_once()
@@ -59,7 +64,9 @@ class TestOSTemplateValidation:
         assert call_args["level"] == ValidationLevel.ERROR
         assert "ostemplate" in call_args["message"]
 
-    def test_missing_ostemplate_no_clone(self, validator, report):
+    def test_missing_ostemplate_no_clone(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Missing ostemplate without clone should trigger an error."""
         validator.validate([_ct()])
         calls = [
@@ -71,7 +78,9 @@ class TestOSTemplateValidation:
         assert calls[0]["passed"] is False
         assert calls[0]["level"] == ValidationLevel.ERROR
 
-    def test_missing_ostemplate_with_clone(self, validator, report):
+    def test_missing_ostemplate_with_clone(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Missing ostemplate with clone should not trigger ostemplate error."""
         validator.validate([_ct(clone={"vm_id": 100})])
         ostemplate_calls = [
@@ -85,7 +94,9 @@ class TestOSTemplateValidation:
 class TestOSTypeValidation:
     """Tests for ostype validation."""
 
-    def test_known_ostype_no_warning(self, validator, report):
+    def test_known_ostype_no_warning(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Known ostype should not trigger a warning."""
         for ostype in ("alpine", "debian", "ubuntu", "centos"):
             report.reset_mock()
@@ -97,7 +108,9 @@ class TestOSTypeValidation:
             ]
             assert len(ostype_calls) == 0
 
-    def test_unknown_ostype_warning(self, validator, report):
+    def test_unknown_ostype_warning(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Unknown ostype should trigger a warning."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", ostype="freebsd")])
         calls = [
@@ -107,7 +120,9 @@ class TestOSTypeValidation:
         assert calls[0]["passed"] is True
         assert calls[0]["level"] == ValidationLevel.WARNING
 
-    def test_no_ostype_no_check(self, validator, report):
+    def test_no_ostype_no_check(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """No ostype should not trigger any check."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz")])
         ostype_calls = [
@@ -119,7 +134,9 @@ class TestOSTypeValidation:
 class TestRootfsValidation:
     """Tests for rootfs.size validation."""
 
-    def test_valid_rootfs_size(self, validator, report):
+    def test_valid_rootfs_size(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Valid rootfs size should not trigger an error."""
         validator.validate(
             [_ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": 8})]
@@ -129,7 +146,9 @@ class TestRootfsValidation:
         ]
         assert len(rootfs_calls) == 0
 
-    def test_invalid_rootfs_size_zero(self, validator, report):
+    def test_invalid_rootfs_size_zero(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Rootfs size of 0 should trigger an error."""
         validator.validate(
             [_ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": 0})]
@@ -141,7 +160,9 @@ class TestRootfsValidation:
         assert len(calls) == 1
         assert calls[0]["passed"] is False
 
-    def test_invalid_rootfs_size_negative(self, validator, report):
+    def test_invalid_rootfs_size_negative(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Negative rootfs size should trigger an error."""
         validator.validate(
             [_ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": -1})]
@@ -153,7 +174,9 @@ class TestRootfsValidation:
         assert calls[0]["passed"] is False
         assert calls[0]["level"] == ValidationLevel.ERROR
 
-    def test_invalid_rootfs_size_string(self, validator, report):
+    def test_invalid_rootfs_size_string(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """String rootfs size should trigger an error."""
         validator.validate(
             [_ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": "8G"})]
@@ -168,7 +191,9 @@ class TestRootfsValidation:
 class TestNetworkNameValidation:
     """Tests for network name validation."""
 
-    def test_network_with_name(self, validator, report):
+    def test_network_with_name(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Network with name should not trigger an error."""
         validator.validate(
             [_ct(ostemplate="s:vztmpl/t.tar.xz", network=[{"name": "eth0", "bridge": "vmbr0"}])]
@@ -178,7 +203,9 @@ class TestNetworkNameValidation:
         ]
         assert len(nic_calls) == 0
 
-    def test_network_missing_name(self, validator, report):
+    def test_network_missing_name(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Network without name should trigger an error."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", network=[{"bridge": "vmbr0"}])])
         calls = [
@@ -189,7 +216,9 @@ class TestNetworkNameValidation:
         assert calls[0]["level"] == ValidationLevel.ERROR
         assert "name" in calls[0]["message"]
 
-    def test_single_dict_network_missing_name(self, validator, report):
+    def test_single_dict_network_missing_name(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Single dict network without name should trigger an error."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", network={"bridge": "vmbr0"})])
         calls = [
@@ -202,7 +231,9 @@ class TestNetworkNameValidation:
 class TestMountPointValidation:
     """Tests for mount_point validation."""
 
-    def test_valid_mount_point(self, validator, report):
+    def test_valid_mount_point(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Valid mount_point should not trigger an error."""
         validator.validate(
             [
@@ -217,7 +248,9 @@ class TestMountPointValidation:
         ]
         assert len(mp_calls) == 0
 
-    def test_mount_point_missing_volume(self, validator, report):
+    def test_mount_point_missing_volume(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Mount point without volume should trigger an error."""
         validator.validate(
             [_ct(ostemplate="s:vztmpl/t.tar.xz", mount_point=[{"path": "/mnt/data"}])]
@@ -228,7 +261,9 @@ class TestMountPointValidation:
         assert len(calls) == 1
         assert calls[0]["passed"] is False
 
-    def test_mount_point_missing_path(self, validator, report):
+    def test_mount_point_missing_path(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Mount point without path should trigger an error."""
         validator.validate(
             [_ct(ostemplate="s:vztmpl/t.tar.xz", mount_point=[{"volume": "nas:data"}])]
@@ -239,7 +274,9 @@ class TestMountPointValidation:
         assert len(calls) == 1
         assert calls[0]["passed"] is False
 
-    def test_mount_point_missing_both(self, validator, report):
+    def test_mount_point_missing_both(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Mount point without volume and path should trigger two errors."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", mount_point=[{}])])
         mp_calls = [
@@ -247,7 +284,9 @@ class TestMountPointValidation:
         ]
         assert len(mp_calls) == 2
 
-    def test_single_dict_mount_point(self, validator, report):
+    def test_single_dict_mount_point(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Single dict mount_point should be handled."""
         validator.validate(
             [
@@ -266,7 +305,9 @@ class TestMountPointValidation:
 class TestFeaturesMountValidation:
     """Tests for features.mount validation."""
 
-    def test_known_mount_types(self, validator, report):
+    def test_known_mount_types(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Known mount types should not trigger a warning."""
         validator.validate(
             [
@@ -283,7 +324,9 @@ class TestFeaturesMountValidation:
         ]
         assert len(mount_calls) == 0
 
-    def test_unknown_mount_type_warning(self, validator, report):
+    def test_unknown_mount_type_warning(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Unknown mount type should trigger a warning."""
         validator.validate(
             [_ct(ostemplate="s:vztmpl/t.tar.xz", features={"mount": ["nfs", "gluster"]})]
@@ -302,7 +345,7 @@ class TestFeaturesMountValidation:
 class TestNumericFieldValidation:
     """Tests for cores, memory, and swap validation."""
 
-    def test_valid_cores(self, validator, report):
+    def test_valid_cores(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Valid cores should not trigger an error."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", cores=2)])
         cores_calls = [
@@ -310,7 +353,9 @@ class TestNumericFieldValidation:
         ]
         assert len(cores_calls) == 0
 
-    def test_invalid_cores_zero(self, validator, report):
+    def test_invalid_cores_zero(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Zero cores should trigger an error."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", cores=0)])
         calls = [
@@ -319,7 +364,9 @@ class TestNumericFieldValidation:
         assert len(calls) == 1
         assert calls[0]["passed"] is False
 
-    def test_invalid_cores_negative(self, validator, report):
+    def test_invalid_cores_negative(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Negative cores should trigger an error."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", cores=-1)])
         calls = [
@@ -329,7 +376,7 @@ class TestNumericFieldValidation:
         assert calls[0]["passed"] is False
         assert calls[0]["level"] == ValidationLevel.ERROR
 
-    def test_valid_memory(self, validator, report):
+    def test_valid_memory(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Valid memory should not trigger an error."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", memory=512)])
         memory_calls = [
@@ -337,7 +384,9 @@ class TestNumericFieldValidation:
         ]
         assert len(memory_calls) == 0
 
-    def test_invalid_memory_zero(self, validator, report):
+    def test_invalid_memory_zero(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Zero memory should trigger an error."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", memory=0)])
         calls = [
@@ -346,7 +395,7 @@ class TestNumericFieldValidation:
         assert len(calls) == 1
         assert calls[0]["passed"] is False
 
-    def test_valid_swap_zero(self, validator, report):
+    def test_valid_swap_zero(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Zero swap (disabled) should be valid."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", swap=0)])
         swap_calls = [
@@ -354,7 +403,9 @@ class TestNumericFieldValidation:
         ]
         assert len(swap_calls) == 0
 
-    def test_invalid_swap_negative(self, validator, report):
+    def test_invalid_swap_negative(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Negative swap should trigger an error."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", swap=-1)])
         calls = [
@@ -368,7 +419,7 @@ class TestNumericFieldValidation:
 class TestCPUArchitectureValidation:
     """Tests for CPU architecture validation."""
 
-    def test_known_arch(self, validator, report):
+    def test_known_arch(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Known architecture should not trigger a warning."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", arch="amd64")])
         arch_calls = [
@@ -376,7 +427,9 @@ class TestCPUArchitectureValidation:
         ]
         assert len(arch_calls) == 0
 
-    def test_unknown_arch_warning(self, validator, report):
+    def test_unknown_arch_warning(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Unknown architecture should trigger a warning."""
         validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", arch="mips")])
         calls = [
@@ -390,7 +443,9 @@ class TestCPUArchitectureValidation:
 class TestNonContainerResourcesSkipped:
     """Verify that non-container resources are skipped."""
 
-    def test_vm_resource_skipped(self, validator, report):
+    def test_vm_resource_skipped(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """VM resources should be ignored."""
         resource = ResourceConfig(
             name="test-vm",
@@ -401,7 +456,9 @@ class TestNonContainerResourcesSkipped:
         validator.validate([resource])
         report.add_check.assert_not_called()
 
-    def test_template_resource_skipped(self, validator, report):
+    def test_template_resource_skipped(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """Template resources should be ignored."""
         resource = ResourceConfig(
             name="test-template",
@@ -416,7 +473,9 @@ class TestNonContainerResourcesSkipped:
 class TestValidContainerPasses:
     """Verify that a fully valid container produces no errors."""
 
-    def test_valid_full_config(self, validator, report):
+    def test_valid_full_config(
+        self, validator: ContainerConfigValidator, report: MagicMock
+    ) -> None:
         """A fully configured valid container should produce no errors."""
         validator.validate(
             [

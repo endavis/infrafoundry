@@ -10,13 +10,13 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     mock.providers = {}
@@ -24,7 +24,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def mock_opnsense_provider():
+def mock_opnsense_provider() -> Mock:
     """Mock OPNsense provider."""
     from infrafoundry.providers.opnsense import OPNsenseProvider
 
@@ -32,7 +32,9 @@ def mock_opnsense_provider():
     return mock
 
 
-def test_reset_dhcpv4_with_auto_approve(cli_runner, mock_orchestrator, mock_opnsense_provider):
+def test_reset_dhcpv4_with_auto_approve(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock
+) -> None:
     """Test reset command for DHCPv4 with auto-approve."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
 
@@ -58,7 +60,9 @@ def test_reset_dhcpv4_with_auto_approve(cli_runner, mock_orchestrator, mock_opns
         mock_opnsense_provider.reset_kea_dhcpv6.assert_not_called()
 
 
-def test_reset_dhcpv6_with_auto_approve(cli_runner, mock_orchestrator, mock_opnsense_provider):
+def test_reset_dhcpv6_with_auto_approve(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock
+) -> None:
     """Test reset command for DHCPv6 with auto-approve."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
 
@@ -84,7 +88,9 @@ def test_reset_dhcpv6_with_auto_approve(cli_runner, mock_orchestrator, mock_opns
         mock_opnsense_provider.reset_kea_dhcpv6.assert_called_once_with("test")
 
 
-def test_reset_both_dhcp_versions(cli_runner, mock_orchestrator, mock_opnsense_provider):
+def test_reset_both_dhcp_versions(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock
+) -> None:
     """Test reset command for both DHCPv4 and DHCPv6."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
 
@@ -110,7 +116,9 @@ def test_reset_both_dhcp_versions(cli_runner, mock_orchestrator, mock_opnsense_p
         mock_opnsense_provider.reset_kea_dhcpv6.assert_called_once_with("test")
 
 
-def test_reset_with_confirmation(cli_runner, mock_orchestrator, mock_opnsense_provider):
+def test_reset_with_confirmation(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock
+) -> None:
     """Test reset command with user confirmation."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
 
@@ -136,7 +144,9 @@ def test_reset_with_confirmation(cli_runner, mock_orchestrator, mock_opnsense_pr
         mock_opnsense_provider.reset_kea_dhcpv4.assert_called_once()
 
 
-def test_reset_user_cancels(cli_runner, mock_orchestrator, mock_opnsense_provider):
+def test_reset_user_cancels(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock
+) -> None:
     """Test reset command when user cancels."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
 
@@ -162,7 +172,7 @@ def test_reset_user_cancels(cli_runner, mock_orchestrator, mock_opnsense_provide
         mock_opnsense_provider.reset_kea_dhcpv4.assert_not_called()
 
 
-def test_reset_provider_not_found(cli_runner, mock_orchestrator):
+def test_reset_provider_not_found(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test reset command when provider is not found."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(

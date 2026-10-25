@@ -1,5 +1,7 @@
 """Integration tests for CLI commands."""
 
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,13 +11,13 @@ from infrafoundry.cli import main as cli
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Create a Click CLI test runner."""
     return CliRunner()
 
 
 @pytest.fixture
-def cli_environment(temp_dir, mock_config_dir, mock_secrets_dir):
+def cli_environment(temp_dir: Path, mock_config_dir: Any, mock_secrets_dir: Any) -> dict[str, Any]:
     """Set up CLI test environment with configs and secrets."""
     # Set environment variables
     env_vars = {
@@ -30,18 +32,18 @@ def cli_environment(temp_dir, mock_config_dir, mock_secrets_dir):
 class TestCLICommands:
     """Integration tests for CLI commands."""
 
-    def test_cli_help(self, cli_runner):
+    def test_cli_help(self, cli_runner: CliRunner) -> None:
         """Test CLI help command."""
         result = cli_runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
         assert "InfraFoundry" in result.output or "infra" in result.output.lower()
 
-    def test_cli_version(self, cli_runner):
+    def test_cli_version(self, cli_runner: CliRunner) -> None:
         """Test CLI version command."""
         result = cli_runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
 
-    def test_envs_command(self, cli_runner, cli_environment):
+    def test_envs_command(self, cli_runner: CliRunner, cli_environment: dict[str, Any]) -> None:
         """Test listing environments."""
         with (
             patch(
@@ -55,49 +57,49 @@ class TestCLICommands:
             # Command should run (may need config setup)
             assert result.exit_code in [0, 1, 2]  # Success or expected error
 
-    def test_list_command_requires_env(self, cli_runner):
+    def test_list_command_requires_env(self, cli_runner: CliRunner) -> None:
         """Test that list command requires --env flag."""
         result = cli_runner.invoke(cli, ["list"])
         # Should fail or show help about missing --env
         assert result.exit_code != 0 or "env" in result.output.lower()
 
-    def test_plan_command_requires_env(self, cli_runner):
+    def test_plan_command_requires_env(self, cli_runner: CliRunner) -> None:
         """Test that plan command requires --env flag."""
         result = cli_runner.invoke(cli, ["plan"])
         # Should fail or show help about missing --env
         assert result.exit_code != 0 or "env" in result.output.lower()
 
-    def test_apply_command_requires_env(self, cli_runner):
+    def test_apply_command_requires_env(self, cli_runner: CliRunner) -> None:
         """Test that apply command requires --env flag."""
         result = cli_runner.invoke(cli, ["apply"])
         # Should fail or show help about missing --env
         assert result.exit_code != 0 or "env" in result.output.lower()
 
-    def test_destroy_command_requires_env(self, cli_runner):
+    def test_destroy_command_requires_env(self, cli_runner: CliRunner) -> None:
         """Test that destroy command requires --env flag."""
         result = cli_runner.invoke(cli, ["destroy"])
         # Should fail or show help about missing --env
         assert result.exit_code != 0 or "env" in result.output.lower()
 
-    def test_status_command_requires_env(self, cli_runner):
+    def test_status_command_requires_env(self, cli_runner: CliRunner) -> None:
         """Test that status command requires --env flag."""
         result = cli_runner.invoke(cli, ["status"])
         # Should fail or show help about missing --env
         assert result.exit_code != 0 or "env" in result.output.lower()
 
-    def test_validate_command_requires_env(self, cli_runner):
+    def test_validate_command_requires_env(self, cli_runner: CliRunner) -> None:
         """Test that validate command requires --env flag."""
         result = cli_runner.invoke(cli, ["validate"])
         # Should fail or show help about missing --env
         assert result.exit_code != 0 or "env" in result.output.lower()
 
-    def test_rollback_command_requires_env(self, cli_runner):
+    def test_rollback_command_requires_env(self, cli_runner: CliRunner) -> None:
         """Test that rollback command requires --env flag."""
         result = cli_runner.invoke(cli, ["rollback"])
         # Should fail or show help about missing --env
         assert result.exit_code != 0 or "env" in result.output.lower()
 
-    def test_secrets_init_command(self, cli_runner, temp_dir):
+    def test_secrets_init_command(self, cli_runner: CliRunner, temp_dir: Path) -> None:
         """Test secrets init command."""
         secrets_dir = temp_dir / "secrets"
         env = {"INFRAFOUNDRY_SECRETS_DIR": str(secrets_dir)}
@@ -110,13 +112,15 @@ class TestCLICommands:
             # Command should attempt to run
             assert result.exit_code in [0, 1, 2]
 
-    def test_secrets_init_defaults_to_config_dir(self, cli_runner, temp_dir):
+    def test_secrets_init_defaults_to_config_dir(
+        self, cli_runner: CliRunner, temp_dir: Path
+    ) -> None:
         """Test secrets init writes key to --config-dir when no key path provided."""
         config_dir = temp_dir / "config"
         (config_dir / "envs").mkdir(parents=True)
         key_path = config_dir / "envs" / "age.key"
 
-        def fake_run(*args, **kwargs):
+        def fake_run(*args: Any, **kwargs: Any) -> MagicMock:
             key_path.parent.mkdir(parents=True, exist_ok=True)
             key_path.write_text("AGE-SECRET-KEY-TEST")
             stderr = "# public key: age1test\n" if args and "age-keygen" in args[0][0] else ""
@@ -133,25 +137,25 @@ class TestCLICommands:
         assert key_path.exists()
         assert (config_dir / "envs" / ".sops.yaml").exists()
 
-    def test_secrets_encrypt_requires_file(self, cli_runner):
+    def test_secrets_encrypt_requires_file(self, cli_runner: CliRunner) -> None:
         """Test that secrets encrypt requires a file argument."""
         result = cli_runner.invoke(cli, ["secrets", "encrypt"])
         # Should fail or show help about missing file
         assert result.exit_code != 0
 
-    def test_secrets_decrypt_requires_file(self, cli_runner):
+    def test_secrets_decrypt_requires_file(self, cli_runner: CliRunner) -> None:
         """Test that secrets decrypt requires a file argument."""
         result = cli_runner.invoke(cli, ["secrets", "decrypt"])
         # Should fail or show help about missing file
         assert result.exit_code != 0
 
-    def test_debug_flag(self, cli_runner):
+    def test_debug_flag(self, cli_runner: CliRunner) -> None:
         """Test --debug flag."""
         result = cli_runner.invoke(cli, ["--help"])
         # Debug flag should be accepted, but we test with --help to avoid needing full setup
         assert result.exit_code == 0
 
-    def test_config_dir_flag(self, cli_runner, temp_dir):
+    def test_config_dir_flag(self, cli_runner: CliRunner, temp_dir: Path) -> None:
         """Test --config-dir flag."""
         config_dir = temp_dir / "custom-config"
         config_dir.mkdir()

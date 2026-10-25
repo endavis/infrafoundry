@@ -42,7 +42,9 @@ def task_format_check() -> dict[str, Any]:
 def task_type_check() -> dict[str, Any]:
     """Run mypy type checking (uses pyproject.toml configuration)."""
     return {
-        "actions": ["uv run mypy src/" + optional_root_files("bootstrap.py")],
+        # Covers tools/ and tests/, not just tools/doit/: narrower scopes let real
+        # errors in tools/hooks/ and tests/ pass a green `doit check`. See #700.
+        "actions": ["uv run mypy src/ tools/ tests/" + optional_root_files("bootstrap.py")],
         "title": title_with_actions,
         "verbosity": 0,
     }
@@ -88,7 +90,7 @@ def task_lint_blueprints() -> dict[str, Any]:
 
 
 def task_check() -> dict[str, Any]:
-    """Run all checks (format, lint, type, security, audit, spell, wheel, docs, test)."""
+    """Run all checks (format, lint, type, dead code, security, audit, spell, wheel, docs, test)."""
     return {
         "actions": [success_message],
         "task_dep": [
@@ -96,6 +98,7 @@ def task_check() -> dict[str, Any]:
             "lint",
             "lint_blueprints",
             "type_check",
+            "deadcode",
             "security",
             "audit",
             "spell_check",

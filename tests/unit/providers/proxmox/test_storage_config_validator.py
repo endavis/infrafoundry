@@ -1,5 +1,6 @@
 """Unit tests for Proxmox StorageConfigValidator."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,18 +13,18 @@ from infrafoundry.providers.proxmox.validators.storage_config_validator import (
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> StorageConfigValidator:
     """Create a StorageConfigValidator instance."""
     return StorageConfigValidator(report)
 
 
-def _storage(name: str = "test-storage", **config) -> ResourceConfig:
+def _storage(name: str = "test-storage", **config: Any) -> ResourceConfig:
     """Helper to create a storage ResourceConfig."""
     return ResourceConfig(
         name=name,
@@ -36,14 +37,14 @@ def _storage(name: str = "test-storage", **config) -> ResourceConfig:
 class TestBackendValidation:
     """Tests for backend field validation."""
 
-    def test_valid_nfs_backend(self, validator, report):
+    def test_valid_nfs_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid NFS backend should not trigger an error."""
         validator.validate([_storage(backend="nfs", server="192.168.1.1", export="/export/data")])
         # Only the CIFS username warning should NOT be present; no errors
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
 
-    def test_valid_cifs_backend(self, validator, report):
+    def test_valid_cifs_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid CIFS backend with username should not trigger errors."""
         validator.validate(
             [
@@ -58,13 +59,13 @@ class TestBackendValidation:
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
 
-    def test_valid_dir_backend(self, validator, report):
+    def test_valid_dir_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid dir backend should not trigger an error."""
         validator.validate([_storage(backend="dir", path="/mnt/data")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
 
-    def test_missing_backend(self, validator, report):
+    def test_missing_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Missing backend should trigger an error."""
         validator.validate([_storage()])
         report.add_check.assert_called()
@@ -73,7 +74,7 @@ class TestBackendValidation:
         assert call_args["level"] == ValidationLevel.ERROR
         assert "backend" in call_args["message"]
 
-    def test_invalid_backend(self, validator, report):
+    def test_invalid_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Invalid backend value should trigger an error."""
         validator.validate([_storage(backend="iscsi")])
         calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
@@ -85,19 +86,19 @@ class TestBackendValidation:
 class TestNFSValidation:
     """Tests for NFS backend field validation."""
 
-    def test_missing_server(self, validator, report):
+    def test_missing_server(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """NFS without server should trigger an error."""
         validator.validate([_storage(backend="nfs", export="/export/data")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("server" in c["message"] for c in error_calls)
 
-    def test_missing_export(self, validator, report):
+    def test_missing_export(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """NFS without export should trigger an error."""
         validator.validate([_storage(backend="nfs", server="192.168.1.1")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("export" in c["message"] for c in error_calls)
 
-    def test_valid_nfs(self, validator, report):
+    def test_valid_nfs(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid NFS config should not trigger errors."""
         validator.validate([_storage(backend="nfs", server="192.168.1.1", export="/export/data")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
@@ -107,19 +108,21 @@ class TestNFSValidation:
 class TestCIFSValidation:
     """Tests for CIFS backend field validation."""
 
-    def test_missing_server(self, validator, report):
+    def test_missing_server(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """CIFS without server should trigger an error."""
         validator.validate([_storage(backend="cifs", share="backups")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("server" in c["message"] for c in error_calls)
 
-    def test_missing_share(self, validator, report):
+    def test_missing_share(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """CIFS without share should trigger an error."""
         validator.validate([_storage(backend="cifs", server="192.168.1.1")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("share" in c["message"] for c in error_calls)
 
-    def test_cifs_without_username_warning(self, validator, report):
+    def test_cifs_without_username_warning(
+        self, validator: StorageConfigValidator, report: MagicMock
+    ) -> None:
         """CIFS without username should trigger a warning."""
         validator.validate([_storage(backend="cifs", server="192.168.1.1", share="backups")])
         warning_calls = [
@@ -130,7 +133,9 @@ class TestCIFSValidation:
         assert len(warning_calls) == 1
         assert "username" in warning_calls[0]["message"]
 
-    def test_cifs_with_username_no_warning(self, validator, report):
+    def test_cifs_with_username_no_warning(
+        self, validator: StorageConfigValidator, report: MagicMock
+    ) -> None:
         """CIFS with username should not trigger the username warning."""
         validator.validate(
             [
@@ -149,7 +154,7 @@ class TestCIFSValidation:
         ]
         assert len(warning_calls) == 0
 
-    def test_valid_cifs(self, validator, report):
+    def test_valid_cifs(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid CIFS config should not trigger errors."""
         validator.validate(
             [
@@ -168,13 +173,13 @@ class TestCIFSValidation:
 class TestDirValidation:
     """Tests for dir backend field validation."""
 
-    def test_missing_path(self, validator, report):
+    def test_missing_path(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Dir without path should trigger an error."""
         validator.validate([_storage(backend="dir")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("path" in c["message"] for c in error_calls)
 
-    def test_valid_dir(self, validator, report):
+    def test_valid_dir(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid dir config should not trigger errors."""
         validator.validate([_storage(backend="dir", path="/mnt/data")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
@@ -184,7 +189,9 @@ class TestDirValidation:
 class TestContentTypesValidation:
     """Tests for content_types validation."""
 
-    def test_valid_content_types(self, validator, report):
+    def test_valid_content_types(
+        self, validator: StorageConfigValidator, report: MagicMock
+    ) -> None:
         """Valid content types should not trigger errors."""
         validator.validate(
             [
@@ -198,7 +205,9 @@ class TestContentTypesValidation:
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
 
-    def test_invalid_content_type(self, validator, report):
+    def test_invalid_content_type(
+        self, validator: StorageConfigValidator, report: MagicMock
+    ) -> None:
         """Invalid content type should trigger an error."""
         validator.validate(
             [_storage(backend="dir", path="/mnt/data", content_types=["invalid_type"])]
@@ -206,14 +215,16 @@ class TestContentTypesValidation:
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("invalid_type" in c["message"] for c in error_calls)
 
-    def test_content_types_not_list(self, validator, report):
+    def test_content_types_not_list(
+        self, validator: StorageConfigValidator, report: MagicMock
+    ) -> None:
         """Non-list content_types should trigger an error."""
         validator.validate([_storage(backend="dir", path="/mnt/data", content_types="snippets")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 1
         assert "list" in error_calls[0]["message"]
 
-    def test_no_content_types(self, validator, report):
+    def test_no_content_types(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Missing content_types should not trigger an error."""
         validator.validate([_storage(backend="dir", path="/mnt/data")])
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
@@ -223,7 +234,9 @@ class TestContentTypesValidation:
 class TestNonStorageResources:
     """Tests that non-storage resources are skipped."""
 
-    def test_skips_non_storage_resources(self, validator, report):
+    def test_skips_non_storage_resources(
+        self, validator: StorageConfigValidator, report: MagicMock
+    ) -> None:
         """Non-storage resources should be skipped entirely."""
         resource = ResourceConfig(
             name="test-vm",
