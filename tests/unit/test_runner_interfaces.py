@@ -22,10 +22,12 @@ class TestTerraformRunnerInterfaces:
     def test_implements_all_protocols(self) -> None:
         """TerraformRunner should implement all runner protocols."""
         runner = TerraformRunner()
-        assert isinstance(cast(object, runner), Plannable)
-        assert isinstance(cast(object, runner), Applyable)
-        assert isinstance(cast(object, runner), Destroyable)
-        assert isinstance(cast(object, runner), StateAware)
+        assert isinstance(runner, Plannable)
+        assert isinstance(runner, Applyable)
+        assert isinstance(runner, Destroyable)
+        assert isinstance(runner, StateAware)
+        # parse_plan_for_drift returns to_add/to_change/to_destroy, not DriftInfo's
+        # added/changed/destroyed, so mypy rejects the protocol statically (#1073 report).
         assert isinstance(cast(object, runner), DriftDetectable)
 
 
@@ -35,15 +37,15 @@ class TestAnsibleRunnerInterfaces:
     def test_implements_core_protocols(self) -> None:
         """AnsibleRunner should implement core operations."""
         runner = AnsibleRunner()
-        assert isinstance(cast(object, runner), Plannable)  # via check mode
-        assert isinstance(cast(object, runner), Applyable)
+        assert isinstance(runner, Plannable)  # via check mode
+        assert isinstance(runner, Applyable)
 
     def test_does_not_implement_unsupported_protocols(self) -> None:
         """AnsibleRunner should NOT implement unsupported operations."""
         runner = AnsibleRunner()
-        assert not isinstance(cast(object, runner), Destroyable)
-        assert not isinstance(cast(object, runner), StateAware)
-        assert not isinstance(cast(object, runner), DriftDetectable)
+        assert not isinstance(runner, Destroyable)
+        assert not isinstance(runner, StateAware)
+        assert not isinstance(runner, DriftDetectable)
 
 
 class TestPyInfraRunnerInterfaces:
@@ -52,15 +54,15 @@ class TestPyInfraRunnerInterfaces:
     def test_implements_core_protocols(self) -> None:
         """PyInfraRunner should implement core operations."""
         runner = PyInfraRunner()
-        assert isinstance(cast(object, runner), Plannable)  # via dry-run
-        assert isinstance(cast(object, runner), Applyable)
+        assert isinstance(runner, Plannable)  # via dry-run
+        assert isinstance(runner, Applyable)
 
     def test_does_not_implement_unsupported_protocols(self) -> None:
         """PyInfraRunner should NOT implement unsupported operations."""
         runner = PyInfraRunner()
-        assert not isinstance(cast(object, runner), Destroyable)
-        assert not isinstance(cast(object, runner), StateAware)
-        assert not isinstance(cast(object, runner), DriftDetectable)
+        assert not isinstance(runner, Destroyable)
+        assert not isinstance(runner, StateAware)
+        assert not isinstance(runner, DriftDetectable)
 
 
 class TestBaseRunnerInterfaces:
@@ -85,8 +87,8 @@ class TestBaseRunnerInterfaces:
 
         runner = ConcreteRunner()
 
-        assert not isinstance(cast(object, runner), Plannable)
-        assert not isinstance(cast(object, runner), Applyable)
-        assert not isinstance(cast(object, runner), Destroyable)
-        assert not isinstance(cast(object, runner), StateAware)
-        assert not isinstance(cast(object, runner), DriftDetectable)
+        assert not isinstance(runner, Plannable)
+        assert not isinstance(runner, Applyable)
+        assert not isinstance(runner, Destroyable)
+        assert not isinstance(runner, StateAware)
+        assert not isinstance(runner, DriftDetectable)

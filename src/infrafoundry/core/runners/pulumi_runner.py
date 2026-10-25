@@ -8,6 +8,7 @@ from typing import Any, override
 from rich.console import Console
 
 from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.result_types import ApplyResult, DestroyResult, PlanResult
 from infrafoundry.core.runners.base_runner import BaseRunner
 
 
@@ -95,7 +96,7 @@ class PulumiRunner(BaseRunner):
 
         return {"success": False, "error": "Unknown error"}
 
-    def plan(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def plan(self, provider: ProviderBase, **kwargs: Any) -> PlanResult:
         """Generate Pulumi preview (plan).
 
         Args:
@@ -103,7 +104,7 @@ class PulumiRunner(BaseRunner):
             **kwargs: Additional pulumi preview options
 
         Returns:
-            Dict with preview results
+            Preview result; ``error`` is set only when the preview failed
         """
         pulumi_dir = provider.output_dir / "pulumi" / provider.name
 
@@ -117,27 +118,31 @@ class PulumiRunner(BaseRunner):
                 capture_output=True,
                 text=True,
             )
-            return {
+            preview: PlanResult = {
                 "success": result.returncode == 0,
                 "exit_code": result.returncode,
                 "output": result.stdout,
-                "error": result.stderr if result.returncode != 0 else None,
             }
+            if result.returncode != 0:
+                preview["error"] = result.stderr
+            return preview
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": str(e)}
 
-    def apply(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def apply(
+        self, provider: ProviderBase, auto_approve: bool = False, **kwargs: Any
+    ) -> ApplyResult:
         """Apply Pulumi program.
 
         Args:
             provider: Provider instance
-            **kwargs: Options including auto_approve
+            auto_approve: Pass ``--yes`` to pulumi (default: False)
+            **kwargs: Additional options (unused)
 
         Returns:
-            Dict with apply results
+            Apply result
         """
         pulumi_dir = provider.output_dir / "pulumi" / provider.name
-        auto_approve = kwargs.get("auto_approve", False)
 
         if not pulumi_dir.exists():
             return {"success": False, "error": "Pulumi directory does not exist"}
@@ -156,18 +161,20 @@ class PulumiRunner(BaseRunner):
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": str(e)}
 
-    def destroy(self, provider: ProviderBase, **kwargs: Any) -> dict[str, Any]:
+    def destroy(
+        self, provider: ProviderBase, auto_approve: bool = False, **kwargs: Any
+    ) -> DestroyResult:
         """Destroy Pulumi-managed infrastructure.
 
         Args:
             provider: Provider instance
-            **kwargs: Options including auto_approve
+            auto_approve: Pass ``--yes`` to pulumi (default: False)
+            **kwargs: Additional options (unused)
 
         Returns:
-            Dict with destroy results
+            Destroy result
         """
         pulumi_dir = provider.output_dir / "pulumi" / provider.name
-        auto_approve = kwargs.get("auto_approve", False)
 
         if not pulumi_dir.exists():
             return {"success": False, "error": "Pulumi directory does not exist"}
