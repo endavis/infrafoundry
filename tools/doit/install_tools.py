@@ -4,6 +4,7 @@ Extends the reusable GitHub release install framework with
 project-specific tools: age, sops, terraform, opentofu, ansible.
 """
 
+import hashlib
 import json
 import os
 import platform
@@ -16,8 +17,88 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from doit.tools import title_with_actions
+
+# Hosts whose release assets we fetch without a caller-supplied digest.
+#
+# This is not a claim that GitHub is trustworthy in some absolute sense — it is
+# the same trust already extended by cloning this template. What it excludes is
+# the `url_template` escape hatch (ADR-9015), which exists precisely to fetch
+# from arbitrary third parties such as `releases.hashicorp.com`. Those bypass
+# even that implicit trust, so they must name what they expect to receive.
+IMPLICITLY_TRUSTED_HOSTS = frozenset(
+    {
+        "github.com",
+        "objects.githubusercontent.com",
+        "raw.githubusercontent.com",
+        "api.github.com",
+    }
+)
+
+_DIGEST_CHUNK = 1024 * 1024
+
+
+class IntegrityError(RuntimeError):
+    """A download did not match the digest the caller expected."""
+
+
+def sha256_of(path: Path) -> str:
+    """Return the lowercase hex SHA-256 of the file at *path*."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(_DIGEST_CHUNK), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def requires_digest(url: str) -> bool:
+    """Return whether *url* must be accompanied by an expected digest.
+
+    True for any host outside :data:`IMPLICITLY_TRUSTED_HOSTS` — the
+    ``url_template`` escape hatch added in ADR-9015.
+    """
+    return (urlparse(url).hostname or "").lower() not in IMPLICITLY_TRUSTED_HOSTS
+
+
+def verify_download(path: Path, url: str, expected_sha256: str | None) -> None:
+    """Verify *path* against *expected_sha256*, deleting it if it does not match.
+
+    Fails closed in both directions:
+
+    - A digest that does not match aborts and leaves nothing on disk, so a
+      failed verification can never be mistaken for a completed install.
+    - A download from an untrusted host with no expected digest aborts before
+      the file is ever made executable.
+
+    Args:
+        path: The downloaded file.
+        url: Where it came from, used to decide whether a digest is mandatory.
+        expected_sha256: The hex digest the caller expects, if any.
+
+    Raises:
+        IntegrityError: On mismatch, or when a digest is required and absent.
+    """
+    if expected_sha256 is None:
+        if requires_digest(url):
+            path.unlink(missing_ok=True)
+            raise IntegrityError(
+                f"{url} is outside {sorted(IMPLICITLY_TRUSTED_HOSTS)} and no sha256 was "
+                "given. Pass sha256= to install_tool()/create_install_task() naming the "
+                "digest you expect (see docs/development/install-tools-framework.md)."
+            )
+        return
+
+    actual = sha256_of(path)
+    if actual.lower() != expected_sha256.strip().lower():
+        path.unlink(missing_ok=True)
+        raise IntegrityError(
+            f"Integrity check failed for {url}\n"
+            f"  expected sha256: {expected_sha256.strip().lower()}\n"
+            f"  actual sha256:   {actual}\n"
+            "The downloaded file has been deleted. Nothing was installed."
+        )
 
 
 def get_latest_github_release(repo: str) -> str:
@@ -43,6 +124,32 @@ def get_latest_github_release(repo: str) -> str:
         data = json.loads(response.read().decode())
         tag_name: str = data["tag_name"]
         return tag_name.lstrip("v")
+
+
+def fetch_sha256_from_sums(sums_url: str, filename: str) -> str:
+    """Look up *filename*'s digest in a ``SHA256SUMS``-style checksums file.
+
+    Publishers outside GitHub (e.g. ``releases.hashicorp.com``) ship one per
+    release, with lines of the form ``<hex digest>  <filename>``. The digest is
+    then passed as ``sha256=`` so the archive is verified before extraction.
+
+    Args:
+        sums_url: URL of the checksums file.
+        filename: Archive basename to look up.
+
+    Returns:
+        The lowercase hex SHA-256 digest for *filename*.
+
+    Raises:
+        IntegrityError: If *filename* is not listed in the checksums file.
+    """
+    with urllib.request.urlopen(sums_url) as response:  # nosec B310 - hardcoded release host
+        sums = response.read().decode()
+    for line in sums.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[1].lstrip("*") == filename:
+            return parts[0].lower()
+    raise IntegrityError(f"{filename} is not listed in {sums_url}")
 
 
 def get_install_dir() -> Path:
@@ -87,7 +194,7 @@ def _build_github_release_url(repo: str, version: str, asset_pattern: str) -> st
 
 
 def download_github_release_binary(
-    repo: str, version: str, asset_pattern: str, dest_name: str
+    repo: str, version: str, asset_pattern: str, dest_name: str, sha256: str | None = None
 ) -> Path:
     """Download a binary asset from a GitHub release.
 
@@ -101,23 +208,31 @@ def download_github_release_binary(
         asset_pattern: Filename pattern with {version} placeholder
             (e.g. "tool.linux-amd64" or "tool-v{version}-linux-amd64").
         dest_name: Name of the installed binary (e.g. "tool").
+        sha256: Expected hex SHA-256 of the asset. Optional for GitHub hosts;
+            verified when given.
 
     Returns:
         Path to the downloaded and installed binary.
+
+    Raises:
+        IntegrityError: If the download does not match *sha256*.
     """
     url = _build_github_release_url(repo, version, asset_pattern)
     install_dir = get_install_dir()
     dest_path = install_dir / dest_name
 
     print(f"Downloading {url}...")
-    urllib.request.urlretrieve(url, dest_path)  # nosec B310 - downloading from constructed GitHub release URL
+    urllib.request.urlretrieve(url, dest_path)  # nosec B310 - GitHub release URL; integrity via verify_download below
+    # Verify before the executable bit goes on: a file that never becomes
+    # executable cannot be run by a caller that ignores the exception.
+    verify_download(dest_path, url, sha256)
     dest_path.chmod(0o755)  # nosec B103 - rwxr-xr-x is required for executable binary
 
     return dest_path
 
 
 def download_and_extract_archive(
-    url: str, extract_binaries: list[str], dest_dir: Path
+    url: str, extract_binaries: list[str], dest_dir: Path, sha256: str | None = None
 ) -> list[Path]:
     """Download an archive and extract specific binaries from it.
 
@@ -138,6 +253,8 @@ def download_and_extract_archive(
             archive (e.g. ``["age", "age-keygen"]``).
         dest_dir: Directory to write extracted binaries into. Created if
             it does not exist.
+        sha256: Expected hex SHA-256 of the archive. Mandatory when *url* is
+            outside :data:`IMPLICITLY_TRUSTED_HOSTS`; optional otherwise.
 
     Returns:
         List of Paths to the extracted binaries.
@@ -145,6 +262,9 @@ def download_and_extract_archive(
     Raises:
         ValueError: If the URL has an unsupported archive extension.
         RuntimeError: If a requested binary is not found in the archive.
+        IntegrityError: If the archive does not match *sha256*, or a digest is
+            required for this host and none was given. Verified before the
+            archive is opened, so an unverified archive is never parsed.
     """
     url_lower = url.lower()
     if url_lower.endswith((".tar.gz", ".tgz")):
@@ -164,7 +284,11 @@ def download_and_extract_archive(
         temp_path = Path(tmp.name)
     try:
         print(f"Downloading {url}...")
-        urllib.request.urlretrieve(url, temp_path)  # nosec B310 - URL provided by trusted caller
+        urllib.request.urlretrieve(url, temp_path)  # nosec B310 - integrity via verify_download below, before the archive is opened
+        # Before opening the archive: extraction hardening (data_filter, zip-slip
+        # checks) limits what a malicious archive can write, but parsing one at
+        # all is avoidable when we already know it is the wrong bytes.
+        verify_download(temp_path, url, sha256)
 
         if archive_kind == "tar":
             with tarfile.open(temp_path, "r:gz") as tar:  # nosec B202 - data_filter set below when available
@@ -222,6 +346,7 @@ def install_tool(
     extract_binaries: list[str] | dict[str, list[str]] | None = None,
     url_template: str | None = None,
     prefer_brew: bool = True,
+    sha256: str | dict[str, str] | None = None,
 ) -> None:
     """Install a tool from GitHub releases if not already present.
 
@@ -263,6 +388,18 @@ def install_tool(
         prefer_brew: When True (the default), use ``brew install`` on macOS
             instead of downloading. Set False to force download even on
             macOS (useful for cross-platform consistency).
+        sha256: Expected hex SHA-256 of the downloaded asset. Either a single
+            digest, or a per-platform mapping keyed like ``asset_patterns``
+            (``platform.system().lower()``) for tools whose asset differs per
+            OS. Mandatory when the resolved URL is outside
+            :data:`IMPLICITLY_TRUSTED_HOSTS` — the ``url_template`` escape
+            hatch from ADR-9015 reaches arbitrary third parties, so those must
+            name what they expect to receive.
+
+    Raises:
+        IntegrityError: If the download does not match *sha256*, or a digest is
+            required for the resolved host and none was given. Nothing is left
+            on disk and nothing is made executable.
     """
     if version_cmd is None:
         version_cmd = [name, "--version"]
@@ -283,6 +420,7 @@ def install_tool(
     print(f"Latest version: {version}")
 
     system = platform.system().lower()
+    expected_sha = sha256.get(system) if isinstance(sha256, dict) else sha256
 
     if system == "darwin" and prefer_brew and url_template is None:
         subprocess.run(["brew", "install", name], check=True)
@@ -303,13 +441,14 @@ def install_tool(
                 resolved_binaries = extract_binaries[system]
             else:
                 resolved_binaries = extract_binaries
-            download_and_extract_archive(url, resolved_binaries, get_install_dir())
+            download_and_extract_archive(url, resolved_binaries, get_install_dir(), expected_sha)
         else:
             if url_template is not None:
                 install_dir = get_install_dir()
                 dest_path = install_dir / name
                 print(f"Downloading {url}...")
-                urllib.request.urlretrieve(url, dest_path)  # nosec B310 - URL from trusted caller template
+                urllib.request.urlretrieve(url, dest_path)  # nosec B310 - integrity via verify_download below, before chmod
+                verify_download(dest_path, url, expected_sha)
                 dest_path.chmod(0o755)  # nosec B103 - executable bit required
             else:
                 download_github_release_binary(
@@ -317,6 +456,7 @@ def install_tool(
                     version=version,
                     asset_pattern=asset_patterns[system],
                     dest_name=name,
+                    sha256=expected_sha,
                 )
 
     print(f"[OK] {name} installed.")
@@ -333,6 +473,7 @@ def create_install_task(
     extract_binaries: list[str] | dict[str, list[str]] | None = None,
     url_template: str | None = None,
     prefer_brew: bool = True,
+    sha256: str | dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Create a doit task dict for installing a tool from GitHub releases.
 
@@ -355,6 +496,9 @@ def create_install_task(
             ``{os}``, ``{arch}`` placeholders. See :func:`install_tool`.
         prefer_brew: Use brew on macOS when True (default). See
             :func:`install_tool`.
+        sha256: Expected hex SHA-256 of the asset, or a per-platform mapping.
+            Mandatory for URLs outside :data:`IMPLICITLY_TRUSTED_HOSTS`. See
+            :func:`install_tool`.
 
     Returns:
         A doit task dictionary with actions and title.
@@ -370,6 +514,7 @@ def create_install_task(
             extract_binaries=extract_binaries,
             url_template=url_template,
             prefer_brew=prefer_brew,
+            sha256=sha256,
         )
 
     return {
@@ -412,7 +557,11 @@ def _install_age() -> None:
 
 
 def _install_hashicorp_zip(
-    name: str, repo: str, url_template: str, binary_name: str | None = None
+    name: str,
+    repo: str,
+    url_template: str,
+    binary_name: str | None = None,
+    sums_url_template: str | None = None,
 ) -> None:
     """Install a HashiCorp-style tool distributed as a zip archive.
 
@@ -421,6 +570,9 @@ def _install_hashicorp_zip(
         repo: GitHub repo for version lookup.
         url_template: Download URL with {version}, {os}, {arch} placeholders.
         binary_name: Binary name inside zip (defaults to lowercase name).
+        sums_url_template: Checksums-file URL with a {version} placeholder. Required
+            when *url_template* is outside the implicitly trusted GitHub hosts, since
+            the download must then be verified against a digest.
     """
     if binary_name is None:
         binary_name = name.lower()
@@ -449,7 +601,12 @@ def _install_hashicorp_zip(
         sys.exit(1)
 
     url = url_template.format(version=version, os=os_name, arch=arch)
-    download_and_extract_archive(url, [binary_name], get_install_dir())
+    sha256 = None
+    if sums_url_template is not None:
+        sha256 = fetch_sha256_from_sums(
+            sums_url_template.format(version=version), url.rsplit("/", 1)[-1]
+        )
+    download_and_extract_archive(url, [binary_name], get_install_dir(), sha256=sha256)
 
     print(f"✓ {name} {version} installed.")
 
@@ -463,6 +620,9 @@ def _install_terraform() -> None:
             "https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{os}_{arch}.zip"
         ),
         binary_name="terraform",
+        sums_url_template=(
+            "https://releases.hashicorp.com/terraform/{version}/terraform_{version}_SHA256SUMS"
+        ),
     )
 
 

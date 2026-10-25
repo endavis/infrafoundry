@@ -20,21 +20,21 @@ jobs:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - id: pv
         uses: ./.github/actions/python-versions
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ steps.pv.outputs.newest }}
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "latest"
 
       - name: Cache uv dependencies
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.UV_CACHE_DIR }}
           key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}

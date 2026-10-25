@@ -270,6 +270,32 @@ docs: update installation instructions
 test: add tests for edge cases in parser
 ```
 
+### Passing the Message
+
+Short one-liners are fine inline:
+
+```bash
+git commit -m "fix: handle None values in data processor"
+```
+
+**Anything longer goes in a file.** Write the message, then pass it with `-F`:
+
+```bash
+# AI agents: use tmp/agents/<agent-type>/ and delete the file afterwards
+git commit -F tmp/agents/claude/commit-752.md
+```
+
+This matches how every other long-form body in this project is passed —
+`doit issue --body-file=`, `doit pr --body-file=`, `doit adr --body-file=`.
+
+It is also the only reliable way to write a message *about* the enforcement system. A heredoc
+(`git commit -F - <<EOF`) is scanned by the dangerous-command hook as command arguments, so a
+message that merely names `--admin`, `gh issue create` or any other blocked pattern is refused as
+if it invoked it. The hook is not taught to tell prose from commands — doing that means skipping
+heredoc bodies for a list of trusted commands, and a mistake in such a list is a bypass rather than
+an inconvenience (see [ADR-9019](../docs/decisions/9019-the-dangerous-command-hook-is-a-guardrail-not-a-security-boundary.md)).
+Passing the message by file costs nothing and avoids the question entirely.
+
 ### Breaking Changes
 
 For breaking changes, include `BREAKING CHANGE:` in the footer:
@@ -951,7 +977,7 @@ git push origin main
 
 If you have questions:
 
-1. Check the [README.md](README.md) and [AGENTS.md](AGENTS.md)
+1. Check the [README.md](../README.md) and [AGENTS.md](../AGENTS.md)
 2. Search existing [Issues](https://github.com/endavis/infrafoundry/issues)
 3. Open a new issue with the "question" label
 4. Join our discussions (if available)

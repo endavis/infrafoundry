@@ -28,7 +28,7 @@ jobs:
       oldest: ${{ steps.pv.outputs.oldest }}
       newest: ${{ steps.pv.outputs.newest }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
             .github/python-versions.json
@@ -86,18 +86,18 @@ jobs:
       HYPOTHESIS_PROFILE: ci
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "latest"
 
       - name: Cache uv dependencies
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.UV_CACHE_DIR }}
           key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
@@ -108,12 +108,12 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Install Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_wrapper: false
 
       - name: Install OpenTofu
-        uses: opentofu/setup-opentofu@v2
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           tofu_wrapper: false
 
@@ -131,7 +131,7 @@ jobs:
 
       - name: Run tests with coverage
         if: matrix.python-version == needs.setup.outputs.newest
-        run: uv run pytest -n auto --cov=infrafoundry --cov-report=xml:tmp/coverage.xml --cov-report=term -v --ignore=tests/benchmarks/
+        run: uv run pytest -n auto --cov --cov-report=xml:tmp/coverage.xml --cov-report=term -v --ignore=tests/benchmarks/
 
       - name: Run tests
         if: matrix.python-version != needs.setup.outputs.newest
@@ -139,7 +139,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == needs.setup.outputs.newest
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: ./tmp/coverage.xml
           flags: unittests
@@ -156,18 +156,18 @@ jobs:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ needs.setup.outputs.newest }}
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "latest"
 
       - name: Cache uv dependencies
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.UV_CACHE_DIR }}
           key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
@@ -203,18 +203,18 @@ jobs:
       UV_CACHE_DIR: ${{ github.workspace }}/.uv-cache
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ needs.setup.outputs.newest }}
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "latest"
 
       - name: Cache uv dependencies
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.UV_CACHE_DIR }}
           key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}

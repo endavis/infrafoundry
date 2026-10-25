@@ -1,6 +1,5 @@
 @../AGENTS.md
-<!-- Uncomment when you add rule files. See .claude/rules/README.md for the pattern. -->
-<!-- @./rules/*.md -->
+@./rules/*.md
 
 # BASIC CLAUDE INSTRUCTIONS
 
@@ -48,7 +47,7 @@ When creating new code (functions, modules, commands, features), Claude MUST use
 # DEVELOPMENT WORKFLOW (MANDATORY)
 
 Before making ANY changes, Claude MUST:
-1. Read AGENTS.md and locate the "## Development Workflow" section
+1. Read .github/CONTRIBUTING.md and locate the "## Development Workflow" section
 2. Verify the workflow: Issue → Branch → Commit → PR → Merge
 3. **NEVER commit directly to main**
 4. Ensure a GitHub Issue exists for the task
@@ -58,9 +57,12 @@ Before making ANY changes, Claude MUST:
 # COMMIT WORKFLOW (MANDATORY)
 
 When asked to create a commit or PR, Claude MUST:
-1. Read AGENTS.md and locate the "## Commit Guidelines" section
+1. Read .github/CONTRIBUTING.md and locate the "## Commit Guidelines" section
 2. Review the commit message format rules under that section
 3. Draft commit message following the exact format specified
-4. Use /commit-commands:commit (not Bash directly)
+4. Commit with `doit commit` when the session is interactive. It wraps commitizen
+   and enforces the format. When it is not — a headless or delegated run cannot
+   answer its prompts — use `git commit` with a message in the conventional
+   format from step 1. Never `git commit` without that format.
 
-NO EXCEPTIONS. If AGENTS.md has fallen out of context, READ IT FIRST.
+NO EXCEPTIONS. If .github/CONTRIBUTING.md has fallen out of context, READ IT FIRST.

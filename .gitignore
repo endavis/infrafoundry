@@ -109,9 +109,13 @@ coverage.xml
 .doit.db.db
 
 # AI agent settings originals
-.gemini/settings.json.orig
 
 # AI agent local state
 .claude/scheduled_tasks.lock
 
 endavis-infra
+
+# Per-user local state. `.local/` is where `gh` writes its state dir when
+# HOME is unset (see tests/test_statusline_agy.py).
+.claude/settings.local.json
+.local/

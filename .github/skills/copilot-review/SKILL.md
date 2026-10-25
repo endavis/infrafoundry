@@ -9,11 +9,13 @@ Run a single-agent PR review using GitHub Copilot.
 
 ## When to use
 
-Use this skill when the user wants Copilot to review the PR for the current branch. This is Copilot's self-action equivalent of `/claude:review` / `/gemini:review` / `$codex-review`.
+Use this skill when the user wants Copilot to review the PR for the current branch. This is Copilot's self-action equivalent of `/claude:review` / `$codex-review`.
 
 Optional focus area can be given as a freeform argument.
 
 ## Instructions
+
+**Read-only.** Review and report — do not edit files, commit, or push. Findings go to the user and the PR; any fix is a separate change the user asks for.
 
 This skill runs inline in the active Copilot session. Copilot reviews the current branch's PR directly.
 
