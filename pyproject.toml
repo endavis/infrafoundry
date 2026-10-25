@@ -335,6 +335,11 @@ ignore_names = [
     # annotations (e.g. `console: "ConsoleType"`), which vulture does not
     # parse. Deleting these imports would break type checking.
     "ConsoleType",
+    # `__exit__` parameters the context-manager protocol requires; renaming them
+    # (e.g. `_exc_type`) would change BaseManager's public signature.
+    "exc_type",
+    "exc_val",
+    "exc_tb",
     # Click passes options by keyword; `state backend migrate` accepts --from/--to
     # but is not implemented yet (src/infrafoundry/cli/commands/state/backend.py).
     "from_backend",
