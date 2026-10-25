@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792965872030,
+  "lastUpdate": 1792966431085,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10013,6 +10013,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002750694418843572",
             "extra": "mean: 134.84837074031975 usec\nrounds: 8510"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dcec874a9e447e66d371478975d4ca9f56880bd2",
+          "message": "fix: type ProviderValidator.env_config as EnvironmentConfig (merges PR #1075, addresses #1074)\n\nThe protocol declared `env_config: EnvironmentData` (the TypedDict form of\n`EnvironmentConfig.model_dump()`), but all five provider validators (ESXi,\nKubernetes, OCI, OPNsense, Proxmox) take and store the `EnvironmentConfig`\nmodel, so none was assignable to the protocol under mypy. The runtime\n`isinstance` check only compares attribute names and passed regardless.\n\nChange the protocol (and its docstring example) to `EnvironmentConfig`.\ntests/unit/test_provider_validator_protocol.py returns each validator typed\nas `ProviderValidator`, so `doit type_check` fails if one drifts again, and\nchecks `isinstance` at runtime. The Kubernetes validator test no longer\nneeds its `cast(object, ...)` workaround from #1056.\n\nAddresses #1074\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T22:13:07Z",
+          "tree_id": "dff0e32ec66c7f14b3710d5a5802cb5b25f7c428",
+          "url": "https://github.com/endavis/infrafoundry/commit/dcec874a9e447e66d371478975d4ca9f56880bd2"
+        },
+        "date": 1792966429696,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7825.766813029974,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014459411347606319",
+            "extra": "mean: 127.78300502578108 usec\nrounds: 8556"
           }
         ]
       }
