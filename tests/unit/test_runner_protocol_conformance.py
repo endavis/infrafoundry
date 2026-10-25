@@ -17,7 +17,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrafoundry.core.protocols import Applyable, Destroyable, Plannable, StateAware
+from infrafoundry.core.protocols import (
+    Applyable,
+    Destroyable,
+    DriftDetectable,
+    Plannable,
+    StateAware,
+)
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners.ansible_runner import AnsibleRunner
 from infrafoundry.core.runners.opentofu_runner import OpenTofuRunner
@@ -57,6 +63,11 @@ def _as_state_aware(runner: TerraformRunner | OpenTofuRunner) -> StateAware:
     return runner
 
 
+def _as_drift_detectable(runner: TerraformRunner | OpenTofuRunner) -> DriftDetectable:
+    """Return the runner typed as ``DriftDetectable``; mypy rejects this if one drifts."""
+    return runner
+
+
 ALL_RUNNERS = [
     TerraformRunner,
     OpenTofuRunner,
@@ -84,6 +95,11 @@ def test_runner_is_destroyable(cls: type[DestroyCapable]) -> None:
 @pytest.mark.parametrize("cls", [TerraformRunner, OpenTofuRunner])
 def test_terraform_runner_is_state_aware(cls: type[TerraformRunner]) -> None:
     assert isinstance(_as_state_aware(cls()), StateAware)
+
+
+@pytest.mark.parametrize("cls", [TerraformRunner, OpenTofuRunner])
+def test_terraform_runner_is_drift_detectable(cls: type[TerraformRunner]) -> None:
+    assert isinstance(_as_drift_detectable(cls()), DriftDetectable)
 
 
 @pytest.mark.parametrize("method", ["apply", "destroy"])

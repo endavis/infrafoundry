@@ -143,7 +143,7 @@ class TestOpenTofuRunnerOperations:
     def test_parse_plan_for_drift(self, runner: OpenTofuRunner) -> None:
         """Plan parser works identically to TerraformRunner."""
         output = "Plan: 2 to add, 1 to change, 0 to destroy"
-        result = runner.parse_plan_for_drift({"output": output})
+        result = runner.parse_plan_for_drift({"success": True, "output": output})
         assert result["has_changes"] is True
         assert result["to_add"] == 2
         assert result["to_change"] == 1

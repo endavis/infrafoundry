@@ -481,27 +481,29 @@ from infrafoundry.core.result_types import DestroyResult, DriftInfo
             DriftInfo with has_changes flag and summary
         """
         if not plan_result.get("success"):
+            # parsed=False tells callers drift is unknown, not absent
             return {
                 "has_changes": False,
+                "parsed": False,
                 "summary": "Plan failed - cannot detect drift",
             }
 
         output = plan_result.get("output", "")
 
         # Parse tool-specific output for drift indicators
-        added = self._count_resources(output, "created")
-        changed = self._count_resources(output, "updated")
-        destroyed = self._count_resources(output, "deleted")
+        to_add = self._count_resources(output, "created")
+        to_change = self._count_resources(output, "updated")
+        to_destroy = self._count_resources(output, "deleted")
 
-        has_drift = added > 0 or changed > 0 or destroyed > 0
+        has_drift = to_add > 0 or to_change > 0 or to_destroy > 0
 
         summary_parts = []
-        if added > 0:
-            summary_parts.append(f"{added} resources added")
-        if changed > 0:
-            summary_parts.append(f"{changed} resources changed")
-        if destroyed > 0:
-            summary_parts.append(f"{destroyed} resources removed")
+        if to_add > 0:
+            summary_parts.append(f"{to_add} resources added")
+        if to_change > 0:
+            summary_parts.append(f"{to_change} resources changed")
+        if to_destroy > 0:
+            summary_parts.append(f"{to_destroy} resources removed")
 
         summary = (
             ", ".join(summary_parts) if summary_parts
@@ -511,9 +513,9 @@ from infrafoundry.core.result_types import DestroyResult, DriftInfo
         return {
             "has_changes": has_drift,
             "summary": summary,
-            "added": added,
-            "changed": changed,
-            "destroyed": destroyed,
+            "to_add": to_add,
+            "to_change": to_change,
+            "to_destroy": to_destroy,
         }
 ```
 

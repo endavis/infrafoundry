@@ -97,14 +97,24 @@ class DriftInfo(TypedDict):
     summary: str
     """Human-readable drift summary."""
 
-    added: NotRequired[int]
-    """Number of resources that exist but shouldn't."""
+    to_add: NotRequired[int]
+    """Number of resources the plan would create."""
 
-    changed: NotRequired[int]
-    """Number of resources that differ from config."""
+    to_change: NotRequired[int]
+    """Number of resources the plan would update in place."""
 
-    destroyed: NotRequired[int]
-    """Number of resources that should exist but don't."""
+    to_destroy: NotRequired[int]
+    """Number of resources the plan would destroy."""
+
+    parsed: NotRequired[bool]
+    """``False`` when the plan output could not be interpreted.
+
+    ``has_changes`` is then ``False`` only because drift is unknown. Absent
+    means the output was parsed.
+    """
+
+    raw_output: NotRequired[str]
+    """The plan output the drift information was parsed from."""
 
 
 class ResourceIds(TypedDict):
