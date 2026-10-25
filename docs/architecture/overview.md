@@ -1,3 +1,12 @@
+---
+title: "InfraFoundry Architecture Overview"
+description: "How YAML configuration becomes generated Terraform and Ansible, and how execution is orchestrated"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # InfraFoundry Architecture Overview
 
 ## Overview

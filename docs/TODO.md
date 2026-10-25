@@ -1,3 +1,11 @@
+---
+title: "Project To-Do & Roadmap"
+description: "Planned features, enhancements and tools"
+audience:
+  - users
+  - contributors
+---
+
 # Project To-Do & Roadmap
 
 This document consolidates planned features, enhancements, and tools for InfraFoundry.

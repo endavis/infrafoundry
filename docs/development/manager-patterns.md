@@ -1,3 +1,12 @@
+---
+title: "Manager Patterns"
+description: "How managers use BaseManager and PathBasedManager, and how component managers and services fit"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Manager Pattern Documentation
 
 ## Overview

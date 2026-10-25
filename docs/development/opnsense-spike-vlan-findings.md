@@ -1,3 +1,12 @@
+---
+title: "OPNsense Direct-API VLAN Spike Findings"
+description: "Findings from the live VLAN spike behind the direct-API decision"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # OPNsense Direct-API VLAN Spike — Findings
 
 > **Status:** historical. The spike file `tools/spikes/vlan_direct_api.py` was removed once all ADR-0013 components shipped under direct-API. This document is preserved as evidence cited by ADR-0014; the example commands and path references no longer execute.

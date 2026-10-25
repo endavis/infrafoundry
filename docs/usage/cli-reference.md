@@ -1,3 +1,12 @@
+---
+title: "CLI Reference"
+description: "The foundry command groups and their commands"
+audience:
+  - users
+tags:
+  - usage
+---
+
 # InfraFoundry CLI Reference
 
 ## Overview

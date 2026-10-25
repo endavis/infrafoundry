@@ -1,3 +1,12 @@
+---
+title: "Testing & Maintenance Analysis"
+description: "A dated analysis of testing, testability, error handling and refactoring opportunities"
+audience:
+  - contributors
+tags:
+  - testing
+---
+
 # InfraFoundry Testing & Maintenance Analysis
 
 **Report Date:** 2025-12-01

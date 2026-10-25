@@ -1,3 +1,12 @@
+---
+title: "Proxmox Config Exporter"
+description: "Export an existing Proxmox cluster's configuration as InfraFoundry YAML"
+audience:
+  - users
+tags:
+  - tools
+---
+
 # Proxmox Config Exporter
 
 ## Overview

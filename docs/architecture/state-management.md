@@ -1,3 +1,12 @@
+---
+title: "State Management"
+description: "How Terraform state, the InfraFoundry state database and generated configs are kept and isolated"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # State Management in InfraFoundry
 
 ## Overview

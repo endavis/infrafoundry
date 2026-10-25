@@ -1,3 +1,12 @@
+---
+title: "OPNsense Provider Resource Coverage"
+description: "Which OPNsense resource types the provider manages, the known gaps, and box-to-box migration planning"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # OPNsense Provider Resource Coverage
 
 This document tracks which OPNsense resource types are managed by the InfraFoundry provider today, which are known gaps, and how to plan a box-to-box migration when the provider doesn't yet cover every section of `config.xml`.

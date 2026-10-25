@@ -1,3 +1,12 @@
+---
+title: "Custom Runner Implementation Example"
+description: "A complete working custom runner with all its files"
+audience:
+  - users
+tags:
+  - examples
+---
+
 # Custom Runner Implementation Example
 
 This document provides a complete, working example of implementing a custom runner for InfraFoundry, including all the necessary files and configurations.

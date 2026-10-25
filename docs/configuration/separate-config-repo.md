@@ -1,3 +1,12 @@
+---
+title: "Separate Configuration Repository"
+description: "Keep framework code and infrastructure configuration in separate repositories"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Separate Configuration Repository Pattern
 
 ## Overview

@@ -1,3 +1,12 @@
+---
+title: "YAML-Only Configuration"
+description: "Why all environment, resource and credential configuration is plain YAML"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # YAML-Only Configuration
 
 ## Overview

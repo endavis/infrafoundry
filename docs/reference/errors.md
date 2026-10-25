@@ -1,3 +1,12 @@
+---
+title: "Error Reference"
+description: "The structured IF-CATEGORY-NNN error codes and how to resolve them"
+audience:
+  - users
+tags:
+  - reference
+---
+
 # Error Reference
 
 InfraFoundry uses structured error codes to help you quickly identify and resolve issues. Each error code follows the format `IF-CATEGORY-NNN` where:

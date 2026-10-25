@@ -1,3 +1,12 @@
+---
+title: "ADR-0015: OPNsense firewall_rules direct-API via MVC controller"
+description: "Manage firewall_rules through OPNsense's stock MVC filter controller"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-0015: OPNsense firewall_rules direct-API via MVC controller
 
 **Status:** Accepted

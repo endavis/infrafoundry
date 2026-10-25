@@ -1,3 +1,12 @@
+---
+title: "Policy Configuration Guide"
+description: "Configure policies that block or warn on resource limits, naming, tags and allowed values"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Policy Configuration Guide
 
 ## Overview

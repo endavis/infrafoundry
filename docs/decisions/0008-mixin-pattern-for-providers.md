@@ -1,3 +1,12 @@
+---
+title: "ADR-0008: Use Mixin Pattern for Provider Functionality"
+description: "Share provider behavior through mixins rather than a deep inheritance hierarchy"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # 2. Use Mixin Pattern for Provider Functionality
 
 **Date:** 2025-12-01

@@ -1,3 +1,12 @@
+---
+title: "Infrastructure Packages"
+description: "Bundle resource templates, variables and event handlers into one deployable package"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Infrastructure Packages
 
 ## Overview

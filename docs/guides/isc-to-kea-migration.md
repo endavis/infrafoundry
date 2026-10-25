@@ -1,3 +1,12 @@
+---
+title: "ISC DHCP to Kea DHCP Migration"
+description: "Migrate OPNsense ISC DHCP configuration to Kea automatically"
+audience:
+  - users
+tags:
+  - guides
+---
+
 # ISC DHCP to Kea DHCP Migration
 
 ## Overview

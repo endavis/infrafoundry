@@ -1,3 +1,11 @@
+---
+title: "InfraFoundry Documentation"
+description: "Structured overview of the InfraFoundry documentation"
+audience:
+  - users
+  - contributors
+---
+
 # InfraFoundry Documentation
 
 This index provides a structured overview of the available documentation.

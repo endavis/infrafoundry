@@ -1,3 +1,12 @@
+---
+title: "Development Guides"
+description: "Index of the guides for developing and extending InfraFoundry"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Development Guides
 
 This section provides comprehensive guides for developing and extending InfraFoundry.

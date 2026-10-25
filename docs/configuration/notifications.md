@@ -1,3 +1,12 @@
+---
+title: "Notifications Guide"
+description: "Send deployment, drift and policy events to Slack, Discord or webhooks"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Notifications Guide
 
 ## Overview

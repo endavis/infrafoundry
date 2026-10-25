@@ -1,3 +1,12 @@
+---
+title: "Implementing Providers"
+description: "Write a provider plugin with ProviderBase, Jinja2 templates and the 3-layer pattern"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Plugin Development Guide
 
 ## Overview

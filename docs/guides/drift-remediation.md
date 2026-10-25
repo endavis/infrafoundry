@@ -1,3 +1,12 @@
+---
+title: "Automated Drift Remediation Guide"
+description: "Fix drift automatically when it stays within configured safety thresholds"
+audience:
+  - users
+tags:
+  - guides
+---
+
 # Automated Drift Remediation Guide
 
 ## Overview

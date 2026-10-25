@@ -1,3 +1,12 @@
+---
+title: "Code Quality Analysis Report"
+description: "A report on the codebase against code quality principles"
+audience:
+  - contributors
+tags:
+  - meta
+---
+
 # Code Quality Analysis Report
 
 **Date:** 2025-12-01

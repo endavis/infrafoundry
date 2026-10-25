@@ -1,3 +1,12 @@
+---
+title: "Dependency Analysis"
+description: "Analyze and visualize dependencies between resources"
+audience:
+  - users
+tags:
+  - tools
+---
+
 # Dependency Analysis
 
 ## Overview

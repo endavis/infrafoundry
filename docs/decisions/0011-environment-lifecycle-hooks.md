@@ -1,3 +1,12 @@
+---
+title: "ADR-0011: Environment Lifecycle Hooks"
+description: "Run custom scripts through environment-level and resource-level lifecycle hooks"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # 5. Environment Lifecycle Hooks
 
 **Date:** 2025-01-26

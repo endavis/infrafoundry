@@ -1,3 +1,12 @@
+---
+title: "SSH Authentication for Proxmox Operations"
+description: "Configure SSH for the Proxmox tasks the API cannot do"
+audience:
+  - users
+tags:
+  - guides
+---
+
 # SSH Authentication for Proxmox Operations
 
 ## Overview
@@ -88,7 +97,7 @@ InfraFoundry uses SSH for Proxmox tasks that lack API support (image extraction,
 ## Troubleshooting
 
 - **Symptom:** Connection refused or host key errors. **Fix:** Ensure SSH service is running on Proxmox, add host keys via `ssh-keyscan`, and avoid disabling host key checking in production.
-- **Symptom:** `Permission denied (publickey)`. **Fix:** Load key into ssh-agent or set `proxmox_ssh_key_path`; verify key permissions (`chmod 600`) and format (`BEGIN OPENSSH PRIVATE KEY`).
+- **Symptom:** `Permission denied (publickey)`. **Fix:** Load key into ssh-agent or set `proxmox_ssh_key_path`; verify key permissions (`chmod 600`) and that the key is in OpenSSH format (its first line names an OpenSSH private key).
 - **Symptom:** CI key not found. **Fix:** Store key in pipeline secrets, write to disk with correct permissions, set `TF_VAR_proxmox_ssh_key_path`, and add known hosts.
 
 ---
