@@ -151,13 +151,13 @@ class BaseManager(ABC):
         """
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
         """Context manager exit with cleanup.
 
         Args:
-            exc_type: Exception type if an exception occurred
-            exc_val: Exception value if an exception occurred
-            exc_tb: Exception traceback if an exception occurred
+            _exc_type: Exception type if an exception occurred (unused)
+            _exc_val: Exception value if an exception occurred (unused)
+            _exc_tb: Exception traceback if an exception occurred (unused)
         """
         try:
             self.cleanup()

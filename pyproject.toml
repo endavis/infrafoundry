@@ -325,12 +325,25 @@ output = "tmp/coverage.xml"
 
 [tool.vulture]
 min_confidence = 80
-paths = ["src", "tests"]
+paths = ["src", "tests", "tools"]
 exclude = [
     "*/tests/*",      # Test fixtures often appear unused
     "*/__pycache__/*",
 ]
 ignore_names = [
+    # Imported under `if TYPE_CHECKING:` and referenced only from string
+    # annotations (e.g. `console: "ConsoleType"`), which vulture does not
+    # parse. Deleting these imports would break type checking.
+    "ConsoleType",
+    # Click passes options by keyword; `state backend migrate` accepts --from/--to
+    # but is not implemented yet (src/infrafoundry/cli/commands/state/backend.py).
+    "from_backend",
+    "to_backend",
+    # Parameters of abstract methods in the provider plugin contract
+    # (src/infrafoundry/providers/protocol.py); implementers and callers rely on
+    # the names, so they cannot be `_`-prefixed.
+    "resource_config",
+    "desired_config",
     "test_*",         # Pytest test functions
     "fixture_*",      # Pytest fixtures
     "*_fixture",      # Pytest fixtures

@@ -196,6 +196,10 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: uv run doit type_check
 
+      - name: Find dead code
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run doit deadcode
+
       - name: Run security scan
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: uv run doit security
