@@ -23,11 +23,13 @@ from utils import (  # noqa: E402
     FILES_TO_UPDATE,
     Logger,
     get_first_author,
+    get_first_maintainer,
     get_git_config,
     load_toml_file,
     parse_github_url,
     prompt,
     prompt_confirm,
+    remove_template_owned_tests,
     update_file,
     update_test_files,
     validate_email,
@@ -103,6 +105,7 @@ def load_defaults(pyproject_path: Path) -> dict[str, str]:
     pypi_name = validate_pypi_name(project_name) if project_name else ""
     description = project.get("description") or read_readme_title(Path("README.md"))
     author_name, author_email = get_first_author(data)
+    maintainer_name, maintainer_email = get_first_maintainer(data)
     github_user = guess_github_user(data)
 
     # If current pyproject still has template placeholders, try backup for real values
@@ -136,6 +139,10 @@ def load_defaults(pyproject_path: Path) -> dict[str, str]:
         else:
             author_email = b_author_email or author_email
 
+        b_maintainer_name, b_maintainer_email = get_first_maintainer(backup_data)
+        maintainer_name = maintainer_name or b_maintainer_name
+        maintainer_email = maintainer_email or b_maintainer_email
+
         if not_placeholder(github_user, {"username", ""}):
             pass
         else:
@@ -148,6 +155,11 @@ def load_defaults(pyproject_path: Path) -> dict[str, str]:
         "description": description,
         "author_name": author_name,
         "author_email": author_email,
+        # A project with no [project].maintainers is one where the author still
+        # maintains it. Falling back here keeps every greenfield path identical
+        # to its behaviour before the split (#787).
+        "maintainer_name": maintainer_name or author_name,
+        "maintainer_email": maintainer_email or author_email,
         "github_user": github_user,
     }
 
@@ -272,11 +284,19 @@ def run_configure(
         author_email = require(defaults["author_email"], "author email")
         if not validate_email(author_email):
             raise SystemExit("❌ Invalid email format in pyproject.toml")
+        # `defaults` is caller-supplied, so the maintainer keys are read with a
+        # fallback rather than required: a mapping without them describes a
+        # project that names no maintainer, which is the greenfield case where
+        # the author is the maintainer. `load_defaults` resolves this already;
+        # this keeps every other caller working unchanged.
+        maintainer_name = defaults.get("maintainer_name") or author_name
+        maintainer_email = defaults.get("maintainer_email") or author_email
+        if not validate_email(maintainer_email):
+            raise SystemExit("❌ Invalid maintainer email format in pyproject.toml")
         github_user = require(
             defaults["github_user"],
             "GitHub user (from Repository URL or git remote)",
         )
-        enable_dependabot = False
     else:
         project_name = prompt(
             "Project name (human-readable)",
@@ -297,6 +317,9 @@ def run_configure(
             defaults["description"] or "A short description of your package",
         )
 
+        print("\n  Author: who wrote it. Used for the LICENSE copyright line,")
+        print("  the package metadata and the documentation site.\n")
+
         author_name = prompt("Author name", defaults["author_name"] or "Your Name")
 
         while True:
@@ -308,15 +331,24 @@ def run_configure(
                 break
             Logger.warning("Invalid email format. Please try again.")
 
-        github_user = prompt("GitHub username", defaults["github_user"] or "username")
+        print("\n  Maintainer: who answers for it now. Used for the security")
+        print("  contact address. Press Enter to accept the author.\n")
 
-    # Optional features
-    if auto:
-        enable_dependabot = False
-    else:
-        print()
-        Logger.step("Optional Features")
-        enable_dependabot = prompt_confirm("Enable Dependabot for automatic dependency updates?")
+        maintainer_name = prompt(
+            "Maintainer name",
+            defaults.get("maintainer_name") or author_name,
+        )
+
+        while True:
+            maintainer_email = prompt(
+                "Maintainer email",
+                defaults.get("maintainer_email") or author_email,
+            )
+            if validate_email(maintainer_email):
+                break
+            Logger.warning("Invalid email format. Please try again.")
+
+        github_user = prompt("GitHub username", defaults["github_user"] or "username")
 
     # Confirm configuration
     Logger.header("Configuration Summary")
@@ -325,8 +357,13 @@ def run_configure(
     print(f"PyPI Name:        {pypi_name}")
     print(f"Description:      {description}")
     print(f"Author:           {author_name} <{author_email}>")
+    if (maintainer_name, maintainer_email) != (author_name, author_email):
+        print(f"Maintainer:       {maintainer_name} <{maintainer_email}>")
     print(f"GitHub:           {github_user}")
-    print(f"Dependabot:       {'Enabled' if enable_dependabot else 'Disabled'}")
+    # Stated, not asked. Dependabot is part of the template's automation
+    # surface -- .github/dependabot.yml plus two workflows, a docs page and
+    # their tests -- and ships with every project.
+    print("Dependabot:       Enabled (ships with the template)")
     print("━" * 60)
 
     if not yes and not prompt_confirm("\nProceed with configuration?"):
@@ -384,12 +421,30 @@ def run_configure(
         # GitHub template placeholders (for issue templates, etc.)
         "{owner}": github_user,
         "{repo}": package_name,
-        # Contact email placeholders
-        "security@example.com": author_email,
-        "[INSERT CONTACT EMAIL]": author_email,
+        # Contact email placeholders. These are the security-report address in
+        # .github/SECURITY.md, and they belong to whoever answers for the
+        # project now -- not to whoever wrote it. In an adopted or forked
+        # project the two differ, and using the author routed vulnerability
+        # reports to someone with no involvement (#787). Identical to the
+        # author's address unless [project].maintainers says otherwise.
+        "security@example.com": maintainer_email,
+        "[INSERT CONTACT EMAIL]": maintainer_email,
         # Note: "username" is NOT replaced globally to avoid breaking code
         # variables (e.g. in extensions.md)
     }
+
+    # Install the consumer README before placeholder replacement.
+    #
+    # README.md in the template is the repository's landing page: it describes
+    # the template itself and carries working badges, so browsing the repo does
+    # not show a placeholder title and four broken badge images (#697).
+    # README.template.md is the README the spawned project actually wants.
+    # Moving it into place here means it is then picked up by the
+    # FILES_TO_UPDATE pass below like any other file.
+    consumer_readme = Path("README.template.md")
+    if consumer_readme.exists():
+        print("  ✓ Installing README.template.md as README.md")
+        consumer_readme.replace(Path("README.md"))
 
     # Update files (using shared constant from utils.py)
     for file_path in FILES_TO_UPDATE:
@@ -445,18 +500,18 @@ def run_configure(
         print("  ✓ Updating test files")
         update_test_files(test_dir, package_name)
 
-    # Remove template-only tests (they're only for the template itself)
-    template_tests_dir = Path("tests/template")
-    if template_tests_dir.exists():
-        print("  ✓ Removing template-only tests (tests/template/)")
-        shutil.rmtree(template_tests_dir)
-
-    # Enable Dependabot if requested
-    dependabot_example = Path(".github/dependabot.yml.example")
-    dependabot_config = Path(".github/dependabot.yml")
-    if enable_dependabot and dependabot_example.exists():
-        print("  ✓ Enabling Dependabot")
-        shutil.copy(dependabot_example, dependabot_config)
+    # Shed template-only tests. This must shed exactly what `cleanup --setup`
+    # sheds — ADR-9017 makes TEMPLATE_OWNED_TEST_FILES the single authoritative
+    # list, and cleanup.py already consumes it.
+    #
+    # Removing the whole directory instead (as this did until #731) also deleted
+    # the tests covering tools/doit/ and tools/hooks/ — code that ships to and
+    # runs in the spawned project, and that the coverage gate in pyproject.toml
+    # measures. A spawned project failed its first CI run at 33.98% against a
+    # fail_under of 54.
+    shed = remove_template_owned_tests(Path.cwd())
+    if shed:
+        print(f"  ✓ Removing {len(shed)} template-only test files")
 
     # Seed v0.0.0 baseline tag so `doit release --prerelease=alpha` works on the
     # first release (see issue #447). Idempotent and skipped gracefully when
@@ -469,9 +524,13 @@ def run_configure(
     print("2. Initialize git repository: git init")
     print("3. Install dependencies: uv sync --all-extras --dev")
     print("4. Install pre-commit hooks: uv run doit pre_commit_install")
-    print("5. Run tests: uv run pytest")
-    print("6. Cut a prerelease (if desired): uv run doit release --prerelease=alpha")
-    print("7. Start coding!")
+    # The bootstrap wizard (setup_repo.py) runs this automatically. The manual
+    # route has to be told, or the project keeps a template management suite it
+    # does not use (#731).
+    print("5. Remove the template suite: uv run doit template_clean --all")
+    print("6. Run tests: uv run pytest")
+    print("7. Cut a prerelease (if desired): uv run doit release --prerelease=alpha")
+    print("8. Start coding!")
     print("━" * 60)
 
     # Self-destruct

@@ -525,8 +525,8 @@ def check_env_persistence_in_file_edit(
     tool_name: str, tool_input: dict[str, object]
 ) -> tuple[bool, str]:
     """Block file-edit operations (Edit/Write/MultiEdit for Claude/Codex,
-    write_file/replace for Gemini) that would persist ALLOW_AI_READY_TO_MERGE
-    to a protected file.
+    write_file/replace for Gemini, write_to_file for Antigravity) that would
+    persist ALLOW_AI_READY_TO_MERGE to a protected file.
 
     Triggers when:
     - The target file_path is a persistence-protected target, AND
@@ -546,8 +546,9 @@ def check_env_persistence_in_file_edit(
 
     tool_lower = tool_name.lower()
 
-    if tool_lower in ("write", "write_file"):
-        # Write/write_file: full file content in 'content' key
+    if tool_lower in ("write", "write_file", "write_to_file"):
+        # Write/write_file (Claude/Gemini) and write_to_file (agy, normalized in
+        # _parse_input): full file content lives in the 'content' key.
         content = str(tool_input.get("content", "") or "")
         new_content_parts.append(content)
 
@@ -667,14 +668,35 @@ def _parse_input(input_data: dict) -> tuple[str, str, dict]:
     """
     Parse tool name, command, and tool_input from hook input.
 
-    Handles two input formats:
+    Handles three input formats:
     - Claude/Gemini: {"tool_name": "Bash", "tool_input": {"command": "..."}}
     - Copilot CLI:   {"toolName": "bash", "toolArgs": "{\"command\":\"...\"}"}
+    - Antigravity:   {"toolCall": {"name": "run_command",
+                      "args": {"CommandLine": "..."}}}
 
     Returns:
         (tool_name, command, tool_input) tuple where tool_input is the full
-        parameter dict (used for file-edit operations).
+        parameter dict (used for file-edit operations). For Antigravity the
+        PascalCase args are normalized to the canonical command/file_path/content
+        keys the downstream checks expect.
     """
+    # Antigravity CLI (agy) format: a nested toolCall with PascalCase args
+    # (protojson camelCase envelope). run_command -> args.CommandLine;
+    # write_to_file -> args.TargetFile / args.CodeContent.
+    if "toolCall" in input_data:
+        tool_call = input_data.get("toolCall") or {}
+        tool_name = tool_call.get("name", "")
+        args = tool_call.get("args") or {}
+        if not isinstance(args, dict):
+            args = {}
+        tool_input = {
+            **args,
+            "command": args.get("CommandLine", "") or "",
+            "file_path": args.get("TargetFile", "") or "",
+            "content": args.get("CodeContent", "") or "",
+        }
+        return tool_name, tool_input["command"], tool_input
+
     # Copilot CLI format uses camelCase keys
     if "toolName" in input_data:
         tool_name = input_data.get("toolName", "")
@@ -695,9 +717,19 @@ def _parse_input(input_data: dict) -> tuple[str, str, dict]:
     return tool_name, tool_input.get("command", ""), tool_input
 
 
-def _is_copilot_format(input_data: dict) -> bool:
-    """Return True if input uses Copilot CLI hook format (camelCase keys)."""
-    return "toolName" in input_data
+def _hook_format(input_data: dict) -> str:
+    """Identify which CLI's hook format the input uses.
+
+    Returns one of:
+    - "agy": Antigravity CLI (nested ``toolCall``)
+    - "copilot": Copilot CLI (``toolName``/``toolArgs``)
+    - "default": Claude/Gemini/Codex (``tool_name``/``tool_input``)
+    """
+    if "toolCall" in input_data:
+        return "agy"
+    if "toolName" in input_data:
+        return "copilot"
+    return "default"
 
 
 LOG_FILE = Path(__file__).parent / "hook-debug.jsonl"
@@ -714,39 +746,50 @@ def _log(entry: dict) -> None:
         pass  # Never fail due to logging
 
 
-_BASH_TOOL_NAMES = frozenset({"Bash", "run_shell_command", "bash"})
+# Claude: Bash · Gemini: run_shell_command · Codex/Copilot: bash · Antigravity: run_command
+_BASH_TOOL_NAMES = frozenset({"Bash", "run_shell_command", "bash", "run_command"})
 
 # File-edit tool names across all supported AI CLIs
 # Claude/Codex: Edit, Write, MultiEdit
 # Gemini: write_file, replace
-_FILE_EDIT_TOOL_NAMES = frozenset({"Edit", "Write", "MultiEdit", "write_file", "replace"})
+# Antigravity (agy): write_to_file
+_FILE_EDIT_TOOL_NAMES = frozenset(
+    {"Edit", "Write", "MultiEdit", "write_file", "replace", "write_to_file"}
+)
 
 
-def _block_response(copilot_format: bool, reason: str, command: str) -> int:
-    """Emit a block response and return the appropriate exit code."""
-    if copilot_format:
-        # Copilot CLI: deny via JSON output to stdout
-        output = json.dumps(
-            {
-                "permissionDecision": "deny",
-                "permissionDecisionReason": (
-                    f"Blocked: {reason}. If intentional, ask the user to run it manually."
-                ),
-            }
-        )
-        print(output)
+def _block_response(fmt: str, reason: str, command: str) -> int:
+    """Emit a block response in the format the calling CLI expects.
+
+    - Antigravity ("agy"): print ``{"decision": "deny"}`` to stdout, exit 0.
+      Confirmed by probe to hard-block even under
+      ``--dangerously-skip-permissions``.
+    - Copilot ("copilot"): print ``{"permissionDecision": "deny"}`` to stdout,
+      exit 0.
+    - Claude/Gemini/Codex ("default"): exit code 2 + stderr message.
+    """
+    manual = f"Blocked: {reason}. If intentional, ask the user to run it manually."
+
+    if fmt == "agy":
+        # Antigravity: deny via stdout JSON {"decision": "deny"}; exit 0.
+        print(json.dumps({"decision": "deny", "reason": manual}))
         return 0
-    else:
-        # Claude/Gemini: block via exit code 2 + stderr message
-        print(
-            f"BLOCKED: Operation contains dangerous pattern.\n"
-            f"Reason: {reason}\n"
-            f"Operation: {command}\n"
-            f"\n"
-            f"If this is intentional, ask the user to run it manually.",
-            file=sys.stderr,
-        )
-        return 2  # Exit 2 = Block and show stderr to Claude/Gemini
+
+    if fmt == "copilot":
+        # Copilot CLI: deny via JSON output to stdout
+        print(json.dumps({"permissionDecision": "deny", "permissionDecisionReason": manual}))
+        return 0
+
+    # Claude/Gemini/Codex: block via exit code 2 + stderr message
+    print(
+        f"BLOCKED: Operation contains dangerous pattern.\n"
+        f"Reason: {reason}\n"
+        f"Operation: {command}\n"
+        f"\n"
+        f"If this is intentional, ask the user to run it manually.",
+        file=sys.stderr,
+    )
+    return 2  # Exit 2 = Block and show stderr to Claude/Gemini/Codex
 
 
 def main() -> int:
@@ -758,14 +801,14 @@ def main() -> int:
         return 1
 
     tool_name, command, tool_input = _parse_input(input_data)
-    copilot_format = _is_copilot_format(input_data)
+    fmt = _hook_format(input_data)
 
     _log(
         {
             "raw_input": input_data,
             "tool_name": tool_name,
             "command": command,
-            "copilot_format": copilot_format,
+            "format": fmt,
         }
     )
 
@@ -775,7 +818,7 @@ def main() -> int:
             return 0
         is_dangerous, reason = check_command(command)
         if is_dangerous:
-            return _block_response(copilot_format, reason, command)
+            return _block_response(fmt, reason, command)
         return 0
 
     # --- File-edit tool path (Edit/Write/MultiEdit/write_file/replace) ---
@@ -783,7 +826,7 @@ def main() -> int:
         is_dangerous, reason = check_env_persistence_in_file_edit(tool_name, tool_input)
         if is_dangerous:
             file_path = str(tool_input.get("file_path", ""))
-            return _block_response(copilot_format, reason, f"{tool_name} {file_path}")
+            return _block_response(fmt, reason, f"{tool_name} {file_path}")
         return 0
 
     return 0

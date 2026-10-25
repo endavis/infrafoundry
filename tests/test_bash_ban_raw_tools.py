@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
 import sys
 import time
 import types
@@ -46,19 +47,15 @@ def hook() -> Iterator[types.ModuleType]:
 
 
 @pytest.fixture(autouse=True)
-def _isolate_unlock_file(
-    hook: types.ModuleType,
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """Neutralize the global /tmp/bash-raw-unlock escape hatch for every test.
+def _isolate_unlock_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Neutralize the real project's escape hatch for every test.
 
-    Points UNLOCK_FILE at a nonexistent path so is_unlocked() is deterministically
-    False regardless of developer-machine state (#905). Tests that exercise the
-    escape hatch re-point UNLOCK_FILE explicitly; their monkeypatch runs after this
-    fixture and takes precedence.
+    The hook resolves the unlock file under CLAUDE_PROJECT_DIR (falling back to the
+    payload's ``cwd``). Unsetting it keeps a real ``tmp/agents/claude/bash-raw-unlock``
+    in the developer's checkout from leaking into tests (#905). Tests that exercise
+    the escape hatch supply their own project directory explicitly.
     """
-    monkeypatch.setattr(hook, "UNLOCK_FILE", str(tmp_path / "nonexistent-unlock"))
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
 
 
 def _set_stdin(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
@@ -66,14 +63,29 @@ def _set_stdin(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
     monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
 
 
-def _bash_payload(command: str) -> str:
-    """Build a Bash tool payload for the given command."""
-    return json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+def _bash_payload(command: str, cwd: str | None = None) -> str:
+    """Build a Bash tool payload for the given command.
+
+    If *cwd* is provided it is included in the payload so the hook can resolve
+    the per-project unlock path without relying on ``CLAUDE_PROJECT_DIR``.
+    """
+    data: dict[str, object] = {"tool_name": "Bash", "tool_input": {"command": command}}
+    if cwd is not None:
+        data["cwd"] = cwd
+    return json.dumps(data)
 
 
 def _non_bash_payload(tool_name: str) -> str:
     """Build a non-Bash tool payload."""
     return json.dumps({"tool_name": tool_name, "tool_input": {"file_path": "README.md"}})
+
+
+def _make_unlock(project_root: Path) -> Path:
+    """Create the per-project unlock file and return its path."""
+    unlock = project_root / "tmp" / "agents" / "claude" / "bash-raw-unlock"
+    unlock.parent.mkdir(parents=True, exist_ok=True)
+    unlock.touch()
+    return unlock
 
 
 # ---------------------------------------------------------------------------
@@ -185,11 +197,10 @@ def test_fresh_unlock_file_allows_banned_command(
     tmp_path: Path,
 ) -> None:
     """When unlock file exists and mtime is within window, banned commands are allowed."""
-    unlock = tmp_path / "unlock"
-    unlock.touch()
-    monkeypatch.setattr(hook, "UNLOCK_FILE", str(unlock))
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    _make_unlock(tmp_path)
 
-    _set_stdin(monkeypatch, _bash_payload("cat README.md"))
+    _set_stdin(monkeypatch, _bash_payload("cat README.md", cwd=str(tmp_path)))
     with pytest.raises(SystemExit) as exc_info:
         sys.exit(hook.main())
     assert exc_info.value.code == 0
@@ -201,16 +212,13 @@ def test_stale_unlock_file_blocks_banned_command(
     tmp_path: Path,
 ) -> None:
     """When unlock file mtime is older than UNLOCK_WINDOW_SECONDS, command is blocked."""
-    unlock = tmp_path / "unlock"
-    unlock.touch()
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    unlock = _make_unlock(tmp_path)
     # Set mtime to well past the window
     stale_mtime = time.time() - (hook.UNLOCK_WINDOW_SECONDS + 60)
-    import os
-
     os.utime(str(unlock), (stale_mtime, stale_mtime))
-    monkeypatch.setattr(hook, "UNLOCK_FILE", str(unlock))
 
-    _set_stdin(monkeypatch, _bash_payload("cat README.md"))
+    _set_stdin(monkeypatch, _bash_payload("cat README.md", cwd=str(tmp_path)))
     with pytest.raises(SystemExit) as exc_info:
         sys.exit(hook.main())
     assert exc_info.value.code == 2
@@ -222,11 +230,10 @@ def test_missing_unlock_file_blocks_banned_command(
     tmp_path: Path,
 ) -> None:
     """When unlock file does not exist, banned commands are blocked."""
-    unlock = tmp_path / "unlock"
-    # Do NOT create the file
-    monkeypatch.setattr(hook, "UNLOCK_FILE", str(unlock))
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    # Do NOT create the file; just pass a valid cwd so path resolution works
 
-    _set_stdin(monkeypatch, _bash_payload("grep pattern file.py"))
+    _set_stdin(monkeypatch, _bash_payload("grep pattern file.py", cwd=str(tmp_path)))
     with pytest.raises(SystemExit) as exc_info:
         sys.exit(hook.main())
     assert exc_info.value.code == 2
@@ -244,8 +251,8 @@ def test_stderr_reason_mentions_offending_command(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """The stderr block reason mentions the offending command."""
-    monkeypatch.setattr(hook, "UNLOCK_FILE", str(tmp_path / "unlock"))
-    _set_stdin(monkeypatch, _bash_payload("cat README.md"))
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    _set_stdin(monkeypatch, _bash_payload("cat README.md", cwd=str(tmp_path)))
 
     with pytest.raises(SystemExit):
         sys.exit(hook.main())
@@ -260,13 +267,80 @@ def test_stderr_reason_mentions_unlock_file(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The stderr block reason mentions the escape hatch (UNLOCK_FILE path)."""
-    unlock_path = str(tmp_path / "unlock")
-    monkeypatch.setattr(hook, "UNLOCK_FILE", unlock_path)
-    _set_stdin(monkeypatch, _bash_payload("cat README.md"))
+    """The stderr block reason mentions the escape hatch (per-project unlock path)."""
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    _set_stdin(monkeypatch, _bash_payload("cat README.md", cwd=str(tmp_path)))
 
     with pytest.raises(SystemExit):
         sys.exit(hook.main())
 
     captured = capsys.readouterr()
-    assert unlock_path in captured.err
+    expected_path = str(tmp_path / "tmp" / "agents" / "claude" / "bash-raw-unlock")
+    assert expected_path in captured.err
+
+
+# ---------------------------------------------------------------------------
+# New tests: per-project isolation, fail-closed, env precedence
+# ---------------------------------------------------------------------------
+
+
+def test_unlock_file_in_one_project_does_not_unlock_another(
+    hook: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Unlock file in project_a does NOT unlock commands run with cwd=project_b."""
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    project_a = tmp_path / "project_a"
+    project_b = tmp_path / "project_b"
+    project_a.mkdir()
+    project_b.mkdir()
+
+    # Touch unlock in project_a only
+    _make_unlock(project_a)
+
+    # Run hook as if we're in project_b — should still be blocked
+    _set_stdin(monkeypatch, _bash_payload("cat README.md", cwd=str(project_b)))
+    with pytest.raises(SystemExit) as exc_info:
+        sys.exit(hook.main())
+    assert exc_info.value.code == 2
+
+
+def test_no_project_dir_blocks_with_unlock_unavailable_message(
+    hook: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """No CLAUDE_PROJECT_DIR and no cwd: command is blocked; stderr says hatch unavailable."""
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    # No cwd in payload
+    _set_stdin(monkeypatch, _bash_payload("cat README.md"))
+
+    with pytest.raises(SystemExit) as exc_info:
+        sys.exit(hook.main())
+
+    assert exc_info.value.code == 2
+    captured = capsys.readouterr()
+    assert "unavailable" in captured.err.lower() or "project root" in captured.err.lower()
+
+
+def test_claude_project_dir_env_overrides_cwd(
+    hook: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """CLAUDE_PROJECT_DIR env var wins over cwd in the payload."""
+    project_a = tmp_path / "project_a"
+    project_b = tmp_path / "project_b"
+    project_a.mkdir()
+    project_b.mkdir()
+
+    # Unlock only in project_a; env points to project_a; cwd points to project_b
+    _make_unlock(project_a)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_a))
+
+    # Even though cwd is project_b, env var should win → allowed
+    _set_stdin(monkeypatch, _bash_payload("cat README.md", cwd=str(project_b)))
+    with pytest.raises(SystemExit) as exc_info:
+        sys.exit(hook.main())
+    assert exc_info.value.code == 0
