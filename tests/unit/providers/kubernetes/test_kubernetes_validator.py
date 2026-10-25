@@ -1,7 +1,7 @@
 """Unit tests for KubernetesValidator (composition orchestrator)."""
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -53,7 +53,7 @@ class TestKubernetesValidatorProtocol:
 
     def test_implements_provider_validator_protocol(self, validator: KubernetesValidator) -> None:
         """Test that KubernetesValidator implements ProviderValidator protocol."""
-        assert isinstance(cast(object, validator), ProviderValidator)
+        assert isinstance(validator, ProviderValidator)
         assert hasattr(validator, "env_config")
         assert hasattr(validator, "report")
         assert hasattr(validator, "validate_connectivity")
