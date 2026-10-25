@@ -12,7 +12,13 @@ from typing import IO, Any, cast, override
 from rich.console import Console
 
 from infrafoundry.core.provider import ProviderBase
-from infrafoundry.core.result_types import ApplyResult, BaseResult, DestroyResult, PlanResult
+from infrafoundry.core.result_types import (
+    ApplyResult,
+    BaseResult,
+    DestroyResult,
+    DriftInfo,
+    PlanResult,
+)
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.types import ResourceOutcome
 
@@ -840,14 +846,15 @@ class TerraformRunner(BaseRunner):
 
         return "Unable to parse plan output"
 
-    def parse_plan_for_drift(self, plan_result: dict[str, Any]) -> dict[str, Any]:
+    def parse_plan_for_drift(self, plan_result: PlanResult) -> DriftInfo:
         """Parse Terraform plan output to detect drift.
 
         Args:
-            plan_result: Result dictionary from run() with plan command
+            plan_result: Result of :meth:`plan`
 
         Returns:
-            Dict with drift information
+            Drift information. When the output can't be parsed, ``has_changes``
+            is ``False``, the counts are zero and ``parsed`` is ``False``.
         """
         output = plan_result.get("output", "")
 
@@ -883,12 +890,13 @@ class TerraformRunner(BaseRunner):
                 "raw_output": output,
             }
 
-        # Unknown state
+        # Unknown state: drift can't be determined from this output
         return {
-            "has_changes": None,
-            "to_add": None,
-            "to_change": None,
-            "to_destroy": None,
+            "has_changes": False,
+            "to_add": 0,
+            "to_change": 0,
+            "to_destroy": 0,
+            "parsed": False,
             "summary": "Unable to parse plan output",
             "raw_output": output,
         }
