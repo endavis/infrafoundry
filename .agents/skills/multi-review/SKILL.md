@@ -23,7 +23,7 @@ If the agent list is missing, ask for it before continuing.
 ### Step 0: Parse arguments
 
 Extract the agent list from the user's request.
-Allowed agent names: `claude`, `gemini`, `copilot`, `codex`.
+Allowed agent names: `claude`, `gemini`, `copilot`, `codex`, `antigravity`.
 
 - If no agents are given, ask for the agent list.
 - If any agent name is not in the allowed list, report the unknown name, list allowed names, and stop.
@@ -92,6 +92,14 @@ copilot --allow-all -p 'Review the pull request for the current branch. 1) Run `
 ```
 
 Capture stdout as Copilot's review.
+
+#### If `antigravity` is in the agent list:
+
+```bash
+agy -p 'Review the pull request for the current branch. If an Antigravity review skill (antigravity-review) is available, use it. Otherwise: 1) Run `gh pr view --json number,title,body,headRefName`. 2) Run `gh pr diff`. 3) Read AGENTS.md and .github/CONTRIBUTING.md. 4) Review for correctness, style, testing, security, documentation, architecture, breaking changes. 5) Output ONLY the review: ## PR Review: #<number> — <title> / ### Summary / ### Findings / #### Critical / #### Suggestions / #### Positive / ### Verdict. End with --- and *Review by: Antigravity* | *Date: <today>*. Do NOT post to GitHub.' --dangerously-skip-permissions --add-dir "$(git rev-parse --show-toplevel)" 2>/dev/null
+```
+
+Capture stdout as Antigravity's review.
 
 If any agent fails or produces empty output, report the error and ask whether to continue or retry.
 

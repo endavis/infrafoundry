@@ -12,7 +12,7 @@ tags:
 
 # AI CLI Hooks
 
-The `tools/hooks/ai/` directory contains hooks for AI coding assistants (Claude Code, Gemini CLI, Copilot CLI, Codex CLI).
+The `tools/hooks/ai/` directory contains hooks for AI coding assistants (Claude Code, Gemini CLI, Copilot CLI, Codex CLI, Antigravity CLI).
 
 ## Block Dangerous Commands
 
@@ -40,7 +40,7 @@ The hook uses Python's `shlex` module to properly parse shell quoting:
 4. **Check** for force push to protected branches (main/master)
 5. **Check** for deletion of protected branches
 6. **Check** for merge commits on protected branches (linear history)
-7. **Block** (exit code 2) or **Allow** (exit code 0)
+7. **Block** or **Allow** — Claude/Gemini/Codex block via exit code 2; Copilot and Antigravity block via a stdout decision JSON (exit code 0)
 
 #### Key Feature: Chained Command Detection
 
@@ -78,7 +78,7 @@ EOF
 
 | File | Description |
 |------|-------------|
-| [`block-dangerous-commands.py`](../../../tools/hooks/ai/block-dangerous-commands.py) | The hook script (shared by Claude, Gemini, Copilot, and Codex) |
+| [`block-dangerous-commands.py`](../../../tools/hooks/ai/block-dangerous-commands.py) | The hook script (shared by Claude, Gemini, Copilot, Codex, and Antigravity) |
 | [`test_hook.py`](../../../tools/hooks/ai/test_hook.py) | Test suite to verify hook behavior |
 
 ### Configuration
@@ -196,6 +196,43 @@ statusMessage = "Checking file edit"
 
 Codex uses the shared hook as the primary defense layer. Project docs should not rely on the obsolete `[[approval_policy]]` command-rule format.
 
+#### Antigravity CLI (`agy`)
+
+`.agents/hooks.json`:
+```json
+{
+  "block-dangerous-commands": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ../tools/hooks/ai/block-dangerous-commands.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Antigravity sends a distinct hook payload — a nested `toolCall` with PascalCase args
+(`{"toolCall": {"name": "run_command", "args": {"CommandLine": "..."}}}`); its file-write tool is
+`write_to_file` (`TargetFile` / `CodeContent`). The hook normalizes these to the canonical
+`command` / `file_path` / `content` keys.
+
+Unlike Claude/Gemini/Codex (which block via exit code 2), `agy` blocks only when the hook prints
+`{"decision": "deny", "reason": "..."}` on **stdout** (exit code 0); a safe command prints nothing
+and defers to `agy`'s normal permission flow. A `deny` decision hard-blocks even under
+`--dangerously-skip-permissions`.
+
+The handler's working directory is the directory containing `hooks.json` (`.agents/`), and `agy`
+exposes no project-dir env var, so the command path is relative (`../tools/...`). `agy` only loads
+workspace customizations for an **active/trusted** workspace, so headless `agy -p` invocations must
+pass `--add-dir <repo-root>` for the hook to apply; interactive sessions prompt to trust the
+workspace on first open.
+
 ### Testing
 
 Run the test suite after making changes:
@@ -298,7 +335,7 @@ The hook reads `os.environ` at hook-startup time (the AI CLI's process environme
 
 #### Env-Var Persistence Blocks
 
-The hook fires on **Edit**, **Write**, and **MultiEdit** (Claude/Codex) and **write_file**/**replace** (Gemini) in addition to Bash commands. Any operation whose payload contains the literal string `ALLOW_AI_READY_TO_MERGE` **and** whose target is a known persistence file is blocked.
+The hook fires on **Edit**, **Write**, and **MultiEdit** (Claude/Codex), **write_file**/**replace** (Gemini), and **write_to_file** (Antigravity) in addition to Bash commands. Any operation whose payload contains the literal string `ALLOW_AI_READY_TO_MERGE` **and** whose target is a known persistence file is blocked.
 
 **Protected file basenames** (Bash redirect target or `file_path` argument):
 

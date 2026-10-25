@@ -9,8 +9,11 @@ Blocks:
   - Leading banned commands: cat, head, tail, find, grep, rg, wc
 
 Escape hatch:
-  Touch /tmp/bash-raw-unlock (or the configured UNLOCK_FILE) to allow banned
-  commands for 10 minutes. The file auto-expires — no cleanup needed.
+  Touch <project>/tmp/agents/claude/bash-raw-unlock (where <project> is resolved
+  from the CLAUDE_PROJECT_DIR env var or the cwd field in the hook's stdin payload)
+  to allow banned commands for 10 minutes. The file auto-expires — no cleanup needed.
+  The unlock file is scoped to the project so one project's unlock does not affect
+  any other project running concurrently.
 
 Exit codes:
   0 - Allow command
@@ -23,6 +26,7 @@ For documentation, see: docs/development/ai/token-efficiency-add-ons.md
 """
 
 import json
+import os
 import shlex
 import sys
 import time
@@ -31,8 +35,8 @@ from pathlib import Path
 # Commands that AI agents should never use via Bash when native tools are available
 BANNED_COMMANDS: frozenset[str] = frozenset({"cat", "head", "tail", "find", "grep", "rg", "wc"})
 
-# Escape hatch: touch this file to allow banned commands for UNLOCK_WINDOW_SECONDS
-UNLOCK_FILE: str = "/tmp/bash-raw-unlock"  # nosec B108 - well-known path is intentional; operators must be able to touch it from any shell. Configurable via this constant.
+# Relative path (from project root) of the per-project escape-hatch file
+UNLOCK_FILE_RELATIVE: str = "tmp/agents/claude/bash-raw-unlock"
 
 # How long the escape hatch stays valid after the file is touched (seconds)
 UNLOCK_WINDOW_SECONDS: int = 600
@@ -65,11 +69,26 @@ def tokenize(command: str) -> list[str]:
             return command.split()
 
 
-def is_unlocked() -> bool:
-    """Return True iff UNLOCK_FILE exists and was modified within UNLOCK_WINDOW_SECONDS."""
-    path = Path(UNLOCK_FILE)
+def _resolve_unlock_path(input_data: dict[str, object]) -> Path | None:
+    """
+    Resolve the per-project unlock file path.
+
+    Reads CLAUDE_PROJECT_DIR env var first; falls back to the ``cwd`` field in
+    *input_data*.  Returns ``None`` when neither is available (project root
+    cannot be determined).
+    """
+    project_dir: str = os.environ.get("CLAUDE_PROJECT_DIR", "") or str(input_data.get("cwd", ""))
+    if not project_dir:
+        return None
+    return Path(project_dir) / UNLOCK_FILE_RELATIVE
+
+
+def is_unlocked(unlock_path: Path | None) -> bool:
+    """Return True iff *unlock_path* exists and was modified within UNLOCK_WINDOW_SECONDS."""
+    if unlock_path is None:
+        return False
     try:
-        mtime = path.stat().st_mtime
+        mtime = unlock_path.stat().st_mtime
         return (time.time() - mtime) <= UNLOCK_WINDOW_SECONDS
     except OSError:
         return False
@@ -82,15 +101,26 @@ def find_banned_leading(tokens: list[str]) -> str | None:
     return None
 
 
-def _build_reason(offending: str) -> str:
+def _build_reason(offending: str, unlock_path: Path | None) -> str:
     """Build a human-readable block reason for the given offending command."""
     suggestion = _SUGGESTIONS.get(offending, "a native tool")
+    if unlock_path is not None:
+        hatch_line = (
+            f"Escape hatch: `touch {unlock_path}` (run from any shell) to allow "
+            f"raw commands for {UNLOCK_WINDOW_SECONDS // 60} minutes. "
+            f"The unlock is scoped to this project."
+        )
+    else:
+        hatch_line = (
+            "Escape hatch unavailable: project root could not be determined "
+            "(CLAUDE_PROJECT_DIR is unset and no cwd was provided). "
+            "Set CLAUDE_PROJECT_DIR to the project root to enable the escape hatch."
+        )
     return (
         f"Blocked: `{offending}` is a raw shell command.\n"
         f"Use the native `{suggestion}` tool instead — it produces a better result "
         f"with fewer tokens.\n"
-        f"Escape hatch: `touch {UNLOCK_FILE}` to allow raw commands for "
-        f"{UNLOCK_WINDOW_SECONDS // 60} minutes."
+        f"{hatch_line}"
     )
 
 
@@ -115,8 +145,10 @@ def main() -> int:
     if not isinstance(command, str) or not command:
         return 0
 
+    unlock_path = _resolve_unlock_path(input_data)
+
     # Escape hatch: allow if unlock file is fresh
-    if is_unlocked():
+    if is_unlocked(unlock_path):
         return 0
 
     tokens = tokenize(command)
@@ -124,7 +156,7 @@ def main() -> int:
     # Check for banned leading command
     offending = find_banned_leading(tokens)
     if offending is not None:
-        print(_build_reason(offending), file=sys.stderr)
+        print(_build_reason(offending, unlock_path), file=sys.stderr)
         return 2
 
     return 0
