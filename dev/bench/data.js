@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792954447269,
+  "lastUpdate": 1792958860583,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9889,6 +9889,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011938047909398594",
             "extra": "mean: 100.9683978436596 usec\nrounds: 3710"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "37aaaab85046390756d74a646043b52f9e268742",
+          "message": "chore: synchronize with pyproject-template through 9ab53a0 (merges PR #1058, addresses #1054)\n\nStep 2 of 4 of the template sync (8bea42d..9ab53a0, through 2026-08-31).\n\nSyncs the following template improvements:\n- endavis/pyproject-template#714 (remove Gemini CLI support)\n- endavis/pyproject-template#699, #703, #706, #707, #722, #723, #763, #764\n  (dangerous-command hook: refspecs/wrappers, fail closed, pinned hook\n  path, Codex hook repair, secret-exposure controls, heredoc scanning,\n  commit messages by file)\n- endavis/pyproject-template#747, #771, #718 (commit-msg issue-ref hook;\n  pre-commit config owns the hook set)\n- endavis/pyproject-template#742, #775 (pin actions to commit SHAs, scope\n  benchmark write permissions)\n- endavis/pyproject-template#734, #735, #777 (roster-aware agent tests,\n  cross-agent contract)\n- endavis/pyproject-template#737, #745, #746 (no Hypothesis deadline in\n  CI, hermetic gh stub, reject unmocked gh calls)\n- endavis/pyproject-template#709, #732 (coverage gate includes tools/)\n- endavis/pyproject-template#740, #791, #793 (verify download integrity)\n- endavis/pyproject-template#711, #739, #786 (per-stack rule files)\n- endavis/pyproject-template#720 (current model pins)\n- endavis/pyproject-template#755, #758, #760 (AGENTS.md pointer table and\n  just-in-time index)\n- endavis/pyproject-template#715, #716, #717, #768, #769, #770, #776, #782,\n  #784 (docs fixes, ADRs 9018-9020)\n- endavis/pyproject-template#673, #675, #677 (statusline fixes, agy)\n\nLocal adaptations:\n- verify Terraform downloads against HashiCorp SHA256SUMS (required by\n  #740 for non-GitHub hosts), with tests\n- adopt docs/development/dependabot-automerge.md (was sync-excluded)\n- tests/agent_roster.py taken from template tip (review markers)\n- pytest pythonpath includes tests/ (tests/ is a package here)\n- coverage source named by package (infrafoundry, tools)\n\nDeferred: #705 type/deadcode scope (#1056); doc-debt tests and mkdocs\n--strict (#1057); #748 release tests (local release.py differs).\n\nAddresses #1054\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T20:06:59Z",
+          "tree_id": "9a02527b193639e51b3f99b9477575e31544ba6e",
+          "url": "https://github.com/endavis/infrafoundry/commit/37aaaab85046390756d74a646043b52f9e268742"
+        },
+        "date": 1792958859969,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8001.034964135073,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011080850102974823",
+            "extra": "mean: 124.98383077721019 usec\nrounds: 3847"
           }
         ]
       }
