@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792967533960,
+  "lastUpdate": 1792968550260,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10075,6 +10075,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008850033209966595",
             "extra": "mean: 84.65279533535062 usec\nrounds: 12777"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "572fa3ebb5b031efdfd87255185e509d081d3710",
+          "message": "fix: make TerraformRunner.parse_plan_for_drift match DriftDetectable (merges PR #1078, addresses #1077)\n\nDriftInfo declared added/changed/destroyed and has_changes: bool, while the\nonly implementation returned to_add/to_change/to_destroy, raw_output and\nhas_changes: None for unparsable output, so mypy rejected TerraformRunner\nas a DriftDetectable.\n\n- DriftInfo declares the keys that are produced and consumed:\n  to_add/to_change/to_destroy and raw_output, plus a NotRequired parsed flag\n- parse_plan_for_drift takes PlanResult and returns DriftInfo; unparsable\n  output now returns has_changes False, zero counts and parsed False\n  instead of None values\n- DriftDetector warns \"Could not determine drift\" for unparsed output\n  instead of logging \"No drift detected\"\n- docs: DriftInfo examples and the DRIFT_DETECTED payload match the code\n\nAddresses #1077\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T22:48:22Z",
+          "tree_id": "2d516f804ce41f561cbe47460ef26d0a1317df4a",
+          "url": "https://github.com/endavis/infrafoundry/commit/572fa3ebb5b031efdfd87255185e509d081d3710"
+        },
+        "date": 1792968549628,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14519.166652611071,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022720347938979084",
+            "extra": "mean: 68.87447633367881 usec\nrounds: 16627"
           }
         ]
       }
