@@ -1,3 +1,14 @@
+---
+title: "ADR-9016: Unify ADR directories under docs/decisions"
+description: Keep every ADR in docs/decisions/, numbering template decisions 9XXX and project decisions from 0001
+date: 2026-04-22
+audience:
+  - contributors
+tags:
+  - adr
+  - template
+---
+
 # ADR-9016: Unify ADR directories under docs/decisions
 
 ## Status

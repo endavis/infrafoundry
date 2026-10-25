@@ -1,3 +1,14 @@
+---
+title: "ADR-9004: Auto-discover doit tasks from modules"
+description: Import every task_* function under tools/doit/ automatically instead of listing each one in dodo.py
+date: 2026-01-21
+audience:
+  - contributors
+tags:
+  - adr
+  - doit
+---
+
 # ADR-9004: Auto-discover doit tasks from modules
 
 ## Status

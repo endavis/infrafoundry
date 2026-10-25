@@ -1,3 +1,14 @@
+---
+title: Cross-Agent Delegation Matrix
+description: Commands that let any supported AI CLI hand a plan, implement or review task to any other
+audience:
+  - contributors
+  - ai-agents
+tags:
+  - ai
+  - workflow
+---
+
 # Cross-Agent Delegation Matrix
 
 A consistent, explicit-invocation interface that lets any of the four supported AI CLIs (Claude Code, Codex CLI, Copilot CLI, Antigravity CLI) hand a task — `plan`, `implement`, `review`, or `adversarial-review` — to any of the others.

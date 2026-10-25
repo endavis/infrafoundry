@@ -10,11 +10,15 @@ Thank you for your interest in contributing to this project! We welcome contribu
 - [How to Contribute](#how-to-contribute)
 - [Coding Standards](#coding-standards)
 - [Testing Guidelines](#testing-guidelines)
+- [Dependencies](#dependencies)
 - [Commit Guidelines](#commit-guidelines)
 - [Pull Request Process](#pull-request-process)
 - [Release Process](#release-process)
 - [Reporting Bugs](#reporting-bugs)
 - [Requesting Features](#requesting-features)
+- [Development Workflow](#development-workflow)
+- [Questions?](#questions)
+- [Thank You!](#thank-you)
 
 ## Code of Conduct
 
@@ -50,12 +54,16 @@ direnv allow
 # Optional: Create .envrc.local for personal settings
 cp .envrc.local.example .envrc.local
 
-# Install dependencies (creates venv automatically)
-uv sync --all-extras
+# Install the project and its development tools (creates the venv)
+uv sync --all-extras --dev
 
 # Install pre-commit hooks
 doit pre_commit_install
 ```
+
+The development tools, `doit` included, live in the `dev` and `security` extras, and a plain
+`uv sync` uninstalls them. Every sync after this first one is `doit install_dev`, which runs the
+same command.
 
 ### Available Commands
 
@@ -230,6 +238,60 @@ def test_feature_with_multiple_inputs(input_value, expected):
     """Test feature with various inputs."""
     assert function_to_test(input_value) == expected
 ```
+
+## Dependencies
+
+### Ask First
+
+Get approval before you add any dependency: a runtime dependency, an entry in the `dev` or
+`security` extra, or a type stub. Propose it first — name the package, what it is for, the table
+it belongs in, and why the standard library or an existing dependency will not do. Contributors
+propose it on the issue. AI agents ask the user and wait.
+
+AI agents cannot run `uv add` at all. The dangerous-command hook,
+[`block-dangerous-commands.py`](../tools/hooks/ai/block-dangerous-commands.py), blocks it in any
+form — with flags, chained after another command, even `uv add --help` — and tells the agent to
+suggest the package and let the user run the command. The script is wired into every supported
+agent's hook configuration; see
+[AI Command Blocking](../docs/development/ai/command-blocking.md#blocked-workflow-commands). The
+hook matches the command, not the intent: writing the entry into `pyproject.toml` by hand is the
+same change and needs the same approval.
+
+### Where a Dependency Goes
+
+| `pyproject.toml` table | Holds | Command |
+| :--- | :--- | :--- |
+| `[project] dependencies` | What code under `src/` imports at runtime. It ships to every user of the package, so keep it minimal. | `uv add <package>` |
+| `[project.optional-dependencies] dev` | Tests, linting, type checking, docs, and `doit` tasks. Type stubs go here, even for a runtime package. | `uv add --optional dev <package>` |
+| `[project.optional-dependencies] security` | The tools behind `doit audit`, `doit security`, `doit licenses` and `doit sbom`. | `uv add --optional security <package>` |
+
+There is no `[dependency-groups]` table. uv's `--dev` flags act on a `dev` dependency *group*,
+not on the `dev` extra above.
+
+Give every entry a `>=` lower bound, as the existing entries have, and commit `pyproject.toml`
+and `uv.lock` together.
+
+### Typing
+
+mypy runs without a global `ignore_missing_imports`, so importing a package that ships neither
+inline types nor stubs fails with `[import-untyped]`. Either:
+
+- add its stub package to the `dev` extra, as `types-pyyaml` is there for `pyyaml`; or
+- if no stubs exist, add a `[[tool.mypy.overrides]]` entry with `ignore_missing_imports = true`
+  for that package's modules only, as `pyproject.toml` has for `doit.*`.
+
+### Checks
+
+Both tasks need the `security` extra, which `doit install_dev` installs with the other development
+tools. Then run:
+
+- `doit audit` — `pip-audit` checks the environment for dependencies with known
+  vulnerabilities.
+- `doit licenses` — `pip-licenses` lists every installed package by license. Confirm the new
+  package, and anything it pulls in, is compatible with the project's license.
+
+Without the extra, both tasks print an install hint and exit 0, a pass that checked nothing.
+`doit check` runs `audit` but not `licenses`.
 
 ## Commit Guidelines
 
@@ -426,6 +488,12 @@ Version bumping is handled by [commitizen](https://commitizen-tools.github.io/co
 | `feat:` | Minor (1.0.0 → 1.1.0) |
 | `BREAKING CHANGE:` | Major (1.0.0 → 2.0.0) |
 
+The table assumes `major_version_zero = false` in `[tool.commitizen]`. The template ships it as
+`true` for a project still on 0.x, where a `BREAKING CHANGE:` bumps MINOR (0.3.0 → 0.4.0).
+commitizen applies the setting at every version, not only below 1.0, so set it to `false` before
+the 1.0.0 release: `doit release` refuses to release 1.0.0 or later while it is `true`.
+`doit release --increment=MAJOR` then cuts 1.0.0 from 0.x.
+
 ### Release Workflow
 
 All releases — production and pre-release — go through a pull request.
@@ -457,15 +525,16 @@ See [issue #475](https://github.com/endavis/pyproject-template/issues/475).
 
 **What `doit release` does:**
 
-1. Verifies you're on `main` with a clean working tree
-2. Validates `--prerelease` (must be empty, `alpha`, `beta`, or `rc`)
-3. Pulls latest changes from remote
-4. Validates merge commit format (governance check)
-5. Validates issue links in commits
-6. Runs all checks (`doit check`)
-7. Determines the next version using commitizen (`cz bump --get-next`)
-8. Creates a `release/vX.Y.Z` branch and updates `CHANGELOG.md`
-9. Commits the changelog, pushes the branch, and opens PR `release: vX.Y.Z`
+1. Verifies you're on `main`
+2. Validates `--prerelease` (must be empty, `alpha`, `beta`, or `rc`) and `--increment` (must be empty, `MAJOR`, `MINOR` or `PATCH`, in any case)
+3. Checks for uncommitted changes
+4. Pulls latest changes from remote
+5. Validates merge commit format (governance check)
+6. Validates issue links in commits
+7. Runs all checks (`doit check`)
+8. Determines the next version using commitizen (`cz bump --get-next`)
+9. Creates a `release/vX.Y.Z` branch and updates `CHANGELOG.md`
+10. Commits the changelog, pushes the branch, and opens PR `release: vX.Y.Z`
 
 **What `doit release_tag` does:**
 
@@ -668,7 +737,6 @@ git remote set-url origin https://<token>@github.com/username/repo.git
 Before opening a release PR:
 
 - [ ] All CI checks pass on `main`
-- [ ] CHANGELOG.md is up to date (or will be auto-generated)
 - [ ] No uncommitted changes on your working tree
 - [ ] You have push access to the repository
 - [ ] PyPI/TestPyPI environments are configured in GitHub
@@ -807,6 +875,19 @@ git checkout -b feat/42-add-feature
 
 **Branch naming is enforced by pre-commit hooks.**
 
+**When your checkout holds other work,** create the branch in a worktree instead:
+
+```bash
+doit worktree --branch=feat/42-add-feature
+```
+
+The worktree goes in `worktrees/feat/42-add-feature` (gitignored), with its own `.venv`. Inside it,
+run everything through `uv run` (`uv run doit check`, `uv run doit pr`) and never pass `--active`,
+which installs the worktree into the main checkout's `.venv`. Merge the PR from the main checkout
+with `uv run doit pr_merge --pr=<number>`, which then removes the worktree and its branch and
+fast-forwards `main`. See
+[`doit worktree`](../docs/development/doit-tasks-reference.md#worktree).
+
 #### 3. **Commit:** Use Conventional Commits
 
 **Format:** `<type>: <subject>`
@@ -836,6 +917,32 @@ Features:
 - Auto-detects issue number from branch name (e.g., `feat/42-description` → `Addresses #42`)
 - Pre-fills the PR template with detected issue
 - Validates required fields before creating
+
+**Work that builds on an unmerged branch:** When issue B needs code from issue A's branch before A
+merges, branch B from A and open B's PR against A's branch. The PR then shows only B's changes:
+
+```bash
+git checkout -b feat/43-use-parser feat/42-add-parser
+doit pr --base=feat/42-add-parser --title="feat: use the parser" --body-file=pr.md
+```
+
+`doit pr` then checks that B is up to date with `origin/feat/42-add-parser` instead of
+`origin/main`. While B targets A's branch, `ci.yml` and `merge-gate.yml` do not run on it (both
+filter on `branches: [main]`), and `doit pr_merge` refuses it.
+
+Merge A first. Then replay only B's own commits onto `main`, retarget the PR, and push:
+
+```bash
+lower_tip=$(gh pr view <A's PR number> --json headRefOid --jq .headRefOid)
+git fetch origin
+git rebase --onto origin/main "$lower_tip"
+gh pr edit <B's PR number> --base main
+git push --force-with-lease origin feat/43-use-parser
+```
+
+Do not use a plain `git rebase origin/main` here. A was squash-merged, so B still carries A's
+original commits, and replaying them can conflict. Retarget before pushing: CI starts on the push,
+not on the retarget.
 
 **PR Title:**
 - Must follow conventional commit format: `<type>: <subject>`
@@ -887,9 +994,15 @@ doit pr_merge --delete-branch=false
 
 The task:
 - Fetches PR title, number, and linked issues from GitHub
+- Refuses a PR whose base is not the default branch, before merging or closing anything
 - Validates PR title follows conventional commit format
 - Constructs the merge commit subject automatically
 - Uses squash merge with the formatted subject
+- When a linked worktree has the PR's branch checked out, deletes the branch itself and removes a
+  worktree under `worktrees/`. Run it from the main checkout, with `--pr`. See
+  [`pr_merge`](../docs/development/doit-tasks-reference.md#pr_merge)
+- Fast-forwards the base branch after the merge when it was run from that branch, which is where a
+  worktree's PR is merged from
 
 ### Architecture Decision Records (ADRs)
 

@@ -203,8 +203,8 @@ uv run doit licenses
 
 **Installing Security Tools:**
 ```bash
-# Security tools are optional to keep dev environment lean
-uv sync --extra security
+# The security tools are the `security` extra, which install_dev installs with the dev tools
+uv run doit install_dev
 ```
 
 ### Quality Tasks
@@ -304,8 +304,8 @@ A **Software Bill of Materials (SBOM)** is a machine-readable inventory of all s
 #### Local Usage
 
 ```bash
-# Install security extras (if not already installed)
-uv sync --extra security
+# Install the security extra (if not already installed)
+uv run doit install_dev
 
 # Generate SBOM files
 doit sbom
@@ -577,15 +577,18 @@ uv run doit release         # Create production release (PyPI)
 ### Installation Options
 
 ```bash
-# Standard development setup
-uv sync --dev
+# First development setup: installs the project with the `dev` and `security` extras
+uv sync --all-extras --dev
 
-# Include security tools
-uv sync --dev --extra security
+# Every later sync (runs the same command)
+uv run doit install_dev
 
-# Include all extras
-uv sync --dev --all-extras
+# Run the program only: no development tools
+uv sync
 ```
+
+The development tools, `doit` included, are extras, and `uv sync` uninstalls every extra it is not
+asked for. Keep the plain form for environments that only run the program.
 
 ### Pre-commit
 
@@ -637,11 +640,11 @@ git merge --no-ff feat/99-feature -m "feat: add new feature (merges PR #102, add
 
 ### Security Task Fails: "pip-audit not installed"
 
-**Problem**: Security tools are optional dependencies
+**Problem**: The security tools are the `security` extra, and it is not installed
 
 **Solution**:
 ```bash
-uv sync --extra security
+uv run doit install_dev
 uv run doit audit
 ```
 

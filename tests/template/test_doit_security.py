@@ -72,7 +72,7 @@ class TestSecurityTaskGates:
         action = task_audit()["actions"][0]
         assert isinstance(action, str)
         assert "uv pip show pip-audit" in action
-        assert "pip-audit not installed. Run: uv sync --extra security" in action
+        assert "pip-audit not installed. Run: doit install_dev" in action
         assert "uv run pip-audit --skip-editable" in action
         # Bug-fix invariant: the bare-swallow pattern must be gone.
         assert "|| echo 'pip-audit not installed" not in action
@@ -81,7 +81,7 @@ class TestSecurityTaskGates:
         action = task_security()["actions"][0]
         assert isinstance(action, str)
         assert "uv pip show bandit" in action
-        assert "bandit not installed. Run: uv sync --extra security" in action
+        assert "bandit not installed. Run: doit install_dev" in action
         assert "uv run bandit -c pyproject.toml -r src/ tools/" in action
         assert "|| echo 'bandit not installed" not in action
 
@@ -89,7 +89,7 @@ class TestSecurityTaskGates:
         action = task_licenses()["actions"][0]
         assert isinstance(action, str)
         assert "uv pip show pip-licenses" in action
-        assert "pip-licenses not installed. Run: uv sync --extra security" in action
+        assert "pip-licenses not installed. Run: doit install_dev" in action
         assert "uv run pip-licenses --format=markdown --order=license" in action
         assert "|| echo 'pip-licenses not installed" not in action
 
@@ -103,7 +103,7 @@ class TestSecurityTaskGates:
         assert isinstance(action, str)
         # CLI is ``cyclonedx-py`` but the package name is ``cyclonedx-bom``.
         assert "uv pip show cyclonedx-bom" in action
-        assert "cyclonedx-py not installed. Run: uv sync --extra security" in action
+        assert "cyclonedx-py not installed. Run: doit install_dev" in action
         assert "uv run cyclonedx-py environment --of JSON -o tmp/sbom.json" in action
         assert "uv run cyclonedx-py environment --of XML -o tmp/sbom.xml" in action
         assert "|| echo 'cyclonedx-py not installed" not in action

@@ -43,7 +43,6 @@ Addresses #(issue)
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] All new and existing tests pass (`doit test`)
 - [ ] I have updated the documentation accordingly
-- [ ] I have updated the CHANGELOG.md
 - [ ] My changes generate no new warnings
 
 ## Screenshots (if applicable)

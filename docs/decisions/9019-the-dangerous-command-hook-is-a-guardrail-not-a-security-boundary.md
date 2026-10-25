@@ -1,3 +1,16 @@
+---
+title: "ADR-9019: The dangerous-command hook is a guardrail, not a security boundary"
+description: The dangerous-command hook guards against a non-adversarial agent, not a determined one
+date: 2026-08-29
+audience:
+  - contributors
+tags:
+  - adr
+  - ai
+  - hooks
+  - security
+---
+
 # ADR-9019: The dangerous-command hook is a guardrail, not a security boundary
 
 ## Status

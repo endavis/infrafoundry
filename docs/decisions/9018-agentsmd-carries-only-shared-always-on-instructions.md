@@ -1,3 +1,14 @@
+---
+title: "ADR-9018: AGENTS.md carries only shared, always-on instructions"
+description: Content belongs in AGENTS.md only when it holds for every agent and must be in effect at all times
+date: 2026-08-29
+audience:
+  - contributors
+tags:
+  - adr
+  - ai
+---
+
 # ADR-9018: AGENTS.md carries only shared, always-on instructions
 
 ## Status

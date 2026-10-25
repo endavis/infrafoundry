@@ -56,7 +56,7 @@ Present a status summary and suggest what to do next:
 | On feature branch, code changes, not committed | Review changes, then run `/ghi-finalize` to commit and create PR |
 | On feature branch, committed, no PR | Run `/ghi-finalize` to create the PR |
 | On feature branch, PR exists (open) | PR is open — waiting for review/merge |
-| On feature branch, PR exists (merged) | Run `doit pr_merge --auto-close` or `gh issue close <N>` to close the issue |
+| On feature branch, PR exists (merged) | Close the issue: `gh issue close <N> --comment "Addressed in PR #<PR>"` |
 | Issue is already closed | Work complete — switch back to `main` |
 
 ### Output format

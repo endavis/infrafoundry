@@ -1,3 +1,14 @@
+---
+title: "ADR-9006: Merge-gate workflow requiring ready-to-merge label"
+description: A merge-gate workflow, enforced by branch protection, keeps a PR from merging until it carries the ready-to-merge label
+date: 2026-01-21
+audience:
+  - contributors
+tags:
+  - adr
+  - ci-cd
+---
+
 # ADR-9006: Merge-gate workflow requiring ready-to-merge label
 
 ## Status

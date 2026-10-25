@@ -1,3 +1,13 @@
+---
+title: "ADR-NNNN: Title"
+description: One sentence that says what was decided.
+date: YYYY-MM-DD
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-NNNN: Title
 
 ## Status

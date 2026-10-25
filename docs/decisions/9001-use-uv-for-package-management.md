@@ -1,3 +1,14 @@
+---
+title: "ADR-9001: Use uv for package management"
+description: Use uv for dependency management, virtual environments and package installation
+date: 2026-01-21
+audience:
+  - contributors
+tags:
+  - adr
+  - tooling
+---
+
 # ADR-9001: Use uv for package management
 
 ## Status

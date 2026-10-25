@@ -2,6 +2,8 @@
 
 import io
 import json
+import os
+import re
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -15,21 +17,31 @@ from tools.doit.github import (
     _PR_TITLE_PATTERN,
     _check_branch_up_to_date,
     _close_linked_issues,
+    _current_branch,
+    _delete_remote_branch,
     _ensure_branch_pushed,
     _extract_linked_issues,
+    _fast_forward_base,
     _fetch_github_labels,
+    _finish_branch_in_worktree,
     _format_merge_subject,
+    _get_default_branch,
+    _get_pr_info,
     _gh_env_create,
     _gh_env_exists,
     _gh_env_list,
     _gh_repo_slug,
     _is_transient_gh_error,
     _load_labels_file,
+    _merged_head,
+    _open_editor_with_template,
     _parse_markdown_sections,
     _read_body_file,
     _reconcile_labels,
     _run_gh_with_retry,
+    _run_label_cmd,
     _validate_issue_content,
+    _worktree_holding,
     task_env_create,
     task_env_list,
     task_issue,
@@ -285,6 +297,76 @@ class TestCheckBranchUpToDate:
         assert "abc1234" in output
         assert "def5678" in output
 
+    def test_prints_bracketed_subjects_verbatim(self, mock_subprocess: MagicMock) -> None:
+        """A subject is text, not markup: `[tool.x]` vanished and `[/tmp]` crashed (#900).
+
+        Escaped, it still lost the backslash before `[1]` and turned `:bug:` into an emoji (#914).
+        """
+        console = self._make_console()
+        windows = r"0f1e2d3 fix: :bug: in C:\notes\[1].md"
+        log_out = (
+            "56ad2af chore: move [tool.mutmut] to the keys\nabc1234 fix: strip [/tmp] prefix\n"
+            f"{windows}\n"
+        )
+        mock_subprocess.register(
+            {
+                ("git", "rev-list", "--count"): {"stdout": "2\n"},
+                ("git", "fetch"): {},
+                ("git", "log"): {"stdout": log_out},
+            }
+        )
+
+        with pytest.raises(SystemExit):
+            _check_branch_up_to_date("feat/x", console)
+
+        output = _plain(console.file.getvalue())  # type: ignore[attr-defined]
+        assert "56ad2af chore: move [tool.mutmut] to the keys" in output
+        assert "abc1234 fix: strip [/tmp] prefix" in output
+        assert windows in output
+
+    def test_default_base_is_main(self, mock_subprocess: MagicMock) -> None:
+        mock_subprocess.register(
+            {("git", "rev-list", "--count"): {"stdout": "0\n"}, ("git", "fetch"): {}}
+        )
+        _check_branch_up_to_date("feat/x", self._make_console())
+
+        cmds = [c.args[0] for c in mock_subprocess.call_args_list]
+        assert ["git", "fetch", "origin", "main"] in cmds
+        assert ["git", "rev-list", "--count", "HEAD..origin/main"] in cmds
+
+    def test_compares_against_the_given_base(self, mock_subprocess: MagicMock) -> None:
+        """`doit pr --base` checks the branch the PR builds on, not main (#855)."""
+        console = self._make_console()
+        mock_subprocess.register(
+            {("git", "rev-list", "--count"): {"stdout": "0\n"}, ("git", "fetch"): {}}
+        )
+        _check_branch_up_to_date("feat/2-upper", console, base="feat/1-lower")
+
+        cmds = [c.args[0] for c in mock_subprocess.call_args_list]
+        assert ["git", "fetch", "origin", "feat/1-lower"] in cmds
+        assert ["git", "rev-list", "--count", "HEAD..origin/feat/1-lower"] in cmds
+        output = console.file.getvalue()  # type: ignore[attr-defined]
+        assert "up to date with origin/feat/1-lower" in output
+
+    def test_behind_the_given_base_rebases_onto_it(self, mock_subprocess: MagicMock) -> None:
+        """The layer must contain the tip of the branch it builds on (#855)."""
+        console = self._make_console()
+        mock_subprocess.register(
+            {
+                ("git", "rev-list", "--count"): {"stdout": "1\n"},
+                ("git", "fetch"): {},
+                ("git", "log"): {"stdout": "abc1234 feat: lower change\n"},
+            }
+        )
+
+        with pytest.raises(SystemExit) as excinfo:
+            _check_branch_up_to_date("feat/2-upper", console, base="feat/1-lower")
+
+        assert excinfo.value.code == 1
+        output = console.file.getvalue()  # type: ignore[attr-defined]
+        assert "behind origin/feat/1-lower" in output
+        assert "git rebase origin/feat/1-lower" in output
+
 
 class TestEnsureBranchPushed:
     """Tests for _ensure_branch_pushed helper."""
@@ -345,6 +427,38 @@ class TestEnsureBranchPushed:
         output = console.file.getvalue()  # type: ignore[attr-defined]
         assert "Failed to push" in output
         assert "remote rejected" in output
+
+    def test_prints_gits_rejection_verbatim(self, mock_subprocess: MagicMock) -> None:
+        """git's `[rejected]` marker vanished from this error, and `[/x]` crashed it (#900).
+
+        Escaped, it still lost the backslash before `[1]` and turned `:x:` into an emoji (#914).
+        """
+        console = self._make_console()
+        hook = r"remote: hook C:\hooks\[1].ps1 failed :x:"
+        stderr = (
+            "To github.com:o/r.git\n"
+            " ! [rejected]        feat/x -> feat/x (non-fast-forward)\n"
+            "remote: see [/docs/push-rules] for details\n"
+            f"{hook}\n"
+        )
+        mock_subprocess.register(
+            {
+                ("git", "rev-parse"): subprocess.CalledProcessError(
+                    returncode=128, cmd=["git", "rev-parse"], stderr="no upstream"
+                ),
+                ("git", "push", "-u"): subprocess.CalledProcessError(
+                    returncode=1, cmd=["git", "push", "-u"], stderr=stderr
+                ),
+            }
+        )
+
+        with pytest.raises(SystemExit):
+            _ensure_branch_pushed("feat/x", console, no_push=False)
+
+        output = _plain(console.file.getvalue())  # type: ignore[attr-defined]
+        assert "! [rejected]        feat/x -> feat/x (non-fast-forward)" in output
+        assert "remote: see [/docs/push-rules] for details" in output
+        assert hook in output
 
     def test_no_push_flag_and_no_upstream_aborts(self, mock_subprocess: MagicMock) -> None:
         """no_push=True with missing upstream → SystemExit(1), no push."""
@@ -572,6 +686,127 @@ class TestLabelsSync:
 
         assert excinfo.value.code == 1
         mock_subprocess.assert_not_called()
+
+    @pytest.mark.parametrize("name", ["[x].yml", "[/x].yml", r"C:\notes\[1].yml", ":memo:.yml"])
+    def test_missing_file_keeps_a_bracketed_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+    ) -> None:
+        """The path is the user's `--file` value, text rather than markup (#907).
+
+        Relative to tmp_path, so the only backslash before a `[` is the one a name spells out.
+        A Windows path keeps it, and `:memo:` stays text (#914). The message shows `Path(name)`,
+        which Windows spells `[/x].yml` with a backslash.
+        """
+        monkeypatch.chdir(tmp_path)
+        console = Console(file=io.StringIO(), soft_wrap=True)
+
+        with pytest.raises(SystemExit) as excinfo:
+            _load_labels_file(Path(name), console)
+
+        assert excinfo.value.code == 1
+        output = _plain(console.file.getvalue())  # type: ignore[attr-defined]
+        assert f"Labels file not found: {Path(name)}" in output
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "[x].yml",
+            "[/x].yml",
+            r"x\[1].yml",
+            pytest.param(
+                ":memo:.yml",
+                marks=pytest.mark.skipif(os.name == "nt", reason="Windows refuses : in a name"),
+            ),
+        ],
+    )
+    def test_prints_a_loaded_files_path_verbatim(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        mock_subprocess: MagicMock,
+        name: str,
+    ) -> None:
+        """A `--file` the task has read is still the user's text, not markup (#920).
+
+        #907 printed a missing one as text but left the path of one that loads as markup.
+        """
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("COLUMNS", "1000")
+        path = Path(name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+        self._run_task(file=name)
+        path.write_text("- name: foo\n  color: aaa111\n", encoding="utf-8")
+        self._register_list(mock_subprocess, [])
+        self._run_task(file=name, dry_run=True)
+
+        out = _plain(capsys.readouterr().out)
+        assert f"No labels defined in {name}; nothing to sync." in out
+        assert f"Loaded 1 label(s) from {name}" in out
+
+    @pytest.mark.parametrize("name", ["[x]", "[/x]", r"x\[1]", ":memo:"])
+    def test_reconcile_prints_label_names_verbatim(self, name: str) -> None:
+        """A label name from the file or from GitHub is text, not markup (#920).
+
+        Rich dropped `[x]`, crashed on `[/x]`, dropped the backslash before `[1]` and turned
+        `:memo:` into an emoji.
+        """
+        desired = [
+            {"name": f"new {name}", "color": "aaa111", "description": ""},
+            {"name": f"same {name}", "color": "bbb222", "description": ""},
+            {"name": f"changed {name}", "color": "ccc333", "description": ""},
+        ]
+        current = {
+            f"same {name}": {"name": f"same {name}", "color": "bbb222", "description": ""},
+            f"changed {name}": {"name": f"changed {name}", "color": "999999", "description": ""},
+            f"extra {name}": {"name": f"extra {name}", "color": "111111", "description": ""},
+        }
+        lines: list[str] = []
+        for prune in (False, True):
+            console = self._make_console()
+            _reconcile_labels(desired, current, prune=prune, dry_run=True, console=console)
+            lines += _plain(console.file.getvalue()).splitlines()  # type: ignore[attr-defined]
+
+        assert f"+ would create new {name} (color=aaa111)" in lines
+        assert f"= no change same {name}" in lines
+        assert f"~ would update changed {name} (color=ccc333)" in lines
+        assert f"? skipped extra {name} (not in file; use --prune to delete)" in lines
+        assert f"- would delete extra {name}" in lines
+
+    @pytest.mark.parametrize("name", ["[x]", "[/x]", r"x\[1]", ":memo:"])
+    def test_labels_file_errors_print_the_entry_verbatim(self, tmp_path: Path, name: str) -> None:
+        """Each error that quotes a labels-file entry prints it as text (#920)."""
+        errors = {
+            f"- color: '{name}'\n": f"(entry: {{'color': {name!r}}})",
+            f"- name: '{name}'\n  color: 5\n": (
+                f"Labels file entry '{name}' has a non-string 'color' (got int)."
+            ),
+            f"- name: '{name}'\n  description: 5\n": (
+                f"Labels file entry '{name}' has a non-string 'description' (got int)."
+            ),
+        }
+        for body, message in errors.items():
+            console = self._make_console()
+            with pytest.raises(SystemExit):
+                _load_labels_file(self._labels_file(tmp_path, body), console)
+
+            assert message in _plain(console.file.getvalue())  # type: ignore[attr-defined]
+
+    @pytest.mark.parametrize("name", ["[x]", "[/x]", r"x\[1]", ":memo:"])
+    def test_a_failed_label_command_is_printed_verbatim(self, name: str) -> None:
+        """The command carries a label's name and description, which are text (#920)."""
+        cmd = ["gh", "label", "create", name, "--color", "aaa111", "--description", name]
+        console = self._make_console()
+        error = subprocess.CalledProcessError(1, cmd, stderr="HTTP 422")
+        with (
+            patch("tools.doit.github._run_gh_with_retry", side_effect=error),
+            pytest.raises(SystemExit),
+        ):
+            _run_label_cmd(cmd, console)
+
+        lines = _plain(console.file.getvalue()).splitlines()  # type: ignore[attr-defined]
+        assert f"Command failed: {' '.join(cmd)}" in lines
 
     def test_color_comparison_case_insensitive(
         self, tmp_path: Path, mock_subprocess: MagicMock
@@ -894,6 +1129,27 @@ class TestTaskEnvCreate:
             "repos/acme/widgets/environments/pypi",
         ]
 
+    @pytest.mark.parametrize("name", ["[x]", "[/x]", r"x\[1]", ":memo:"])
+    def test_prints_the_name_verbatim(
+        self, mock_subprocess: MagicMock, capsys: pytest.CaptureFixture[str], name: str
+    ) -> None:
+        """`--name` is the user's text, not markup, created or already there (#920)."""
+        check = ("gh", "api", f"repos/acme/widgets/environments/{name}")
+        mock_subprocess.register(
+            {
+                ("gh", "repo", "view"): {"stdout": "acme/widgets\n"},
+                check: {"returncode": 1, "stderr": "HTTP 404"},
+                ("gh", "api", "-X", "PUT"): {},
+            }
+        )
+        self._action()(name=name)
+        mock_subprocess.register({check: {"returncode": 0}})
+        self._action()(name=name)
+
+        lines = _plain(capsys.readouterr().out).splitlines()
+        assert f"✓ Created environment '{name}' in acme/widgets" in lines
+        assert f"Environment '{name}' already exists in acme/widgets — skipped" in lines
+
 
 class TestTaskEnvList:
     """Tests for the ``env_list`` doit task."""
@@ -936,6 +1192,23 @@ class TestTaskEnvList:
             c for c in mock_subprocess.call_args_list if c.args[0][:4] == ["gh", "api", "-X", "PUT"]
         ]
         assert put_calls == []
+
+    def test_prints_the_names_verbatim(
+        self, mock_subprocess: MagicMock, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Environment names come from GitHub: text, not markup (#920)."""
+        names = sorted(["[x]", "[/x]", r"x\[1]", ":memo:"])
+        mock_subprocess.register(
+            {
+                ("gh", "repo", "view"): {"stdout": "acme/widgets\n"},
+                ("gh", "api", "repos/acme/widgets/environments"): {"stdout": "\n".join(names)},
+            }
+        )
+
+        self._action()()
+
+        lines = _plain(capsys.readouterr().out).splitlines()
+        assert [line for line in lines if line.startswith("  • ")] == [f"  • {n}" for n in names]
 
 
 class TestTaskPublishSetup:
@@ -1113,6 +1386,28 @@ class TestRunGhWithRetry:
 
         assert result.stdout == "ok"
         sleep_mock.assert_not_called()
+
+    @pytest.mark.parametrize("name", ["[x]", "[/x]", r"x\[1]", ":memo:"])
+    def test_prints_the_retried_command_verbatim(
+        self,
+        mock_subprocess: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        name: str,
+    ) -> None:
+        """The command can name an environment, which is the user's text, not markup (#920)."""
+        monkeypatch.setattr(github_mod.time, "sleep", MagicMock())
+        monkeypatch.setattr(github_mod.random, "uniform", lambda *_: 0.0)
+        monkeypatch.setenv("DOIT_GH_RETRIES", "1")
+        monkeypatch.setenv("COLUMNS", "1000")
+        error = subprocess.CalledProcessError(1, ["gh"], stderr="HTTP 502 Bad Gateway")
+        mock_subprocess.register({("gh", "api"): error})
+        path = f"repos/acme/widgets/environments/{name}"
+
+        with pytest.raises(subprocess.CalledProcessError):
+            _run_gh_with_retry(["gh", "api", path, "--silent"], check=True)
+
+        assert f"Retry 1/1: gh api {path} (transient:" in _plain(capsys.readouterr().out)
 
     def test_success_after_one_transient_retry(
         self, mock_subprocess: MagicMock, monkeypatch: pytest.MonkeyPatch
@@ -1412,6 +1707,53 @@ class TestReadBodyFile:
         assert _read_body_file(str(tmp_path), console) is None
         assert "Error reading file" in console.file.getvalue()  # type: ignore[attr-defined]
 
+    def test_error_keeps_a_bracketed_path(self, tmp_path: Path) -> None:
+        """The error quotes the path, which is text, not markup (#900)."""
+        folder = tmp_path / "[draft]"
+        folder.mkdir()
+        # soft_wrap: a long tmp_path would otherwise wrap inside "[draft]".
+        console = Console(file=io.StringIO(), soft_wrap=True)
+
+        assert _read_body_file(str(folder), console) is None
+        assert "[draft]" in _plain(console.file.getvalue())  # type: ignore[attr-defined]
+
+    def test_error_keeps_backslashes_and_shortcodes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Escaped, the error dropped the backslash before `[1]` and replaced `:memo:` (#914).
+
+        `read_text` is patched to raise the message, so the test does not depend on the OS.
+        """
+        body = tmp_path / "body.md"
+        body.write_text("x", encoding="utf-8")
+        message = r"cannot read C:\notes\[1].md :memo:"
+
+        def fail(*_args: object, **_kwargs: object) -> str:
+            raise OSError(message)
+
+        monkeypatch.setattr(Path, "read_text", fail)
+        console = Console(file=io.StringIO(), soft_wrap=True)
+
+        assert _read_body_file(str(body), console) is None
+        output = _plain(console.file.getvalue())  # type: ignore[attr-defined]
+        assert f"Error reading file: {message}" in output
+
+    @pytest.mark.parametrize("name", ["[x].md", "[/x].md", r"C:\notes\[1].md", ":memo:.md"])
+    def test_missing_file_keeps_a_bracketed_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+    ) -> None:
+        """The path is the user's `--body-file` value, text rather than markup (#907).
+
+        Relative to tmp_path, so the only backslash before a `[` is the one a name spells out.
+        A Windows path keeps it, and `:memo:` stays text (#914).
+        """
+        monkeypatch.chdir(tmp_path)
+        console = Console(file=io.StringIO(), soft_wrap=True)
+
+        assert _read_body_file(name, console) is None
+        output = _plain(console.file.getvalue())  # type: ignore[attr-defined]
+        assert f"File not found: {name}" in output
+
 
 def _issue_action() -> Callable[..., None]:
     """Return the `create_issue` action that `doit issue` runs."""
@@ -1467,6 +1809,17 @@ class TestCreateIssue:
             _issue_action()(type="not-a-type", title="x", body="## Problem\ncontent")
 
         assert exc.value.code == 1
+
+    @pytest.mark.parametrize("issue_type", ["[x]", "[/x]", r"bug\[1]", ":bug:"])
+    def test_prints_a_bracketed_type_verbatim(
+        self, capsys: pytest.CaptureFixture[str], issue_type: str
+    ) -> None:
+        """The opening panel prints `--type` before it is validated (#907, #914)."""
+        with pytest.raises(SystemExit) as exc:
+            _issue_action()(type=issue_type, title="x", body="## Problem\ncontent")
+
+        assert exc.value.code == 1
+        assert f"Creating {issue_type} Issue" in _plain(capsys.readouterr().out)
 
     def test_missing_body_file_exits(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc:
@@ -1648,11 +2001,131 @@ class TestCreatePr:
 
         assert exc.value.code == 1
 
+    def test_base_is_forwarded_to_gh_and_the_up_to_date_check(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """`--base` opens the PR against the branch it builds on (#855)."""
+        with (
+            patch(
+                "tools.doit.github.subprocess.run",
+                return_value=self._on_branch("feat/2-upper"),
+            ),
+            patch("tools.doit.github._check_branch_up_to_date") as mock_check,
+            patch("tools.doit.github._ensure_branch_pushed"),
+            patch(
+                "tools.doit.github._run_gh_with_retry",
+                return_value=MagicMock(stdout="https://github.com/o/r/pull/8\n"),
+            ) as mock_gh,
+        ):
+            _pr_action()(title="feat: x", body="## Description\nx", base="feat/1-lower")
+
+        cmd = mock_gh.call_args.args[0]
+        assert cmd[cmd.index("--base") + 1] == "feat/1-lower"
+        assert mock_check.call_args.kwargs["base"] == "feat/1-lower"
+        # doit pr_merge refuses the PR until it targets main, so say how to get there.
+        assert "gh pr edit https://github.com/o/r/pull/8 --base main" in capsys.readouterr().out
+
+    def test_without_base_the_pr_targets_main_as_before(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with (
+            patch(
+                "tools.doit.github.subprocess.run",
+                return_value=self._on_branch("feat/42-thing"),
+            ),
+            patch("tools.doit.github._check_branch_up_to_date") as mock_check,
+            patch("tools.doit.github._ensure_branch_pushed"),
+            patch(
+                "tools.doit.github._run_gh_with_retry", return_value=MagicMock(stdout="url\n")
+            ) as mock_gh,
+        ):
+            _pr_action()(title="feat: x", body="## Description\nx")
+
+        assert "--base" not in mock_gh.call_args.args[0]
+        assert mock_check.call_args.kwargs["base"] == "main"
+        assert "retarget" not in capsys.readouterr().out
+
+
+class TestGetPrInfo:
+    """``_get_pr_info`` — the fields `doit pr_merge` decides on."""
+
+    def test_requests_the_base_branch(self, mock_subprocess: MagicMock) -> None:
+        """The base-branch guard reads ``baseRefName``; without it, the guard never runs (#853)."""
+        pr = {"number": 42, "baseRefName": "main"}
+        mock_subprocess.register({("gh", "pr", "view"): {"stdout": json.dumps(pr)}})
+
+        info = _get_pr_info("42", Console(file=io.StringIO(), width=200))
+
+        cmd = mock_subprocess.call_args.args[0]
+        assert "baseRefName" in cmd[cmd.index("--json") + 1].split(",")
+        assert info == pr
+
+    def test_requests_the_head_branch_and_whether_it_is_a_fork(
+        self, mock_subprocess: MagicMock
+    ) -> None:
+        """`doit pr_merge` looks the branch up among the worktrees, unless a fork owns it (#863)."""
+        mock_subprocess.register({("gh", "pr", "view"): {"stdout": "{}"}})
+
+        _get_pr_info("42", Console(file=io.StringIO(), width=200))
+
+        cmd = mock_subprocess.call_args.args[0]
+        fields = cmd[cmd.index("--json") + 1].split(",")
+        assert {"headRefName", "isCrossRepository"} <= set(fields)
+
+
+class TestGetDefaultBranch:
+    """``_get_default_branch`` — the only base `doit pr_merge` merges into (#853)."""
+
+    @staticmethod
+    def _make_console() -> Console:
+        return Console(file=io.StringIO(), width=200)
+
+    def test_returns_the_repository_default_branch(self, mock_subprocess: MagicMock) -> None:
+        mock_subprocess.register({("gh", "repo", "view"): {"stdout": "trunk\n"}})
+
+        assert _get_default_branch(self._make_console()) == "trunk"
+        cmd = mock_subprocess.call_args.args[0]
+        assert cmd[cmd.index("--json") + 1] == "defaultBranchRef"
+
+    def test_falls_back_to_main_with_a_warning(self, mock_subprocess: MagicMock) -> None:
+        """A lookup failure is reported, not swallowed."""
+        console = self._make_console()
+        mock_subprocess.register(
+            {
+                ("gh", "repo", "view"): subprocess.CalledProcessError(
+                    1, ["gh"], stderr="HTTP 404: Not Found"
+                )
+            }
+        )
+
+        assert _get_default_branch(console) == "main"
+        output = console.file.getvalue()  # type: ignore[attr-defined]
+        assert "HTTP 404" in output
+        assert "Assuming 'main'" in output
+
+
+@pytest.fixture(autouse=True)
+def _no_real_branch_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every test away from a real `git pull` (#891).
+
+    `doit pr_merge` fast-forwards the checkout it starts on when that is the PR's
+    base. Unless a test says otherwise, the checkout is on no branch.
+    """
+    monkeypatch.setattr(github_mod, "_current_branch", lambda: None)
+
 
 def _merge_action() -> Callable[..., None]:
     """Return the `merge_pr` action that `doit pr_merge` runs."""
     action: Callable[..., None] = task_pr_merge()["actions"][0]
     return action
+
+
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain(text: str) -> str:
+    """Remove ANSI color codes, which split substrings such as `[x]` when FORCE_COLOR is set."""
+    return _ANSI.sub("", text)
 
 
 class TestMergePr:
@@ -1687,6 +2160,48 @@ class TestMergePr:
         subject = cmd[cmd.index("--subject") + 1]
         assert "merges PR #42" in subject and "addresses #7" in subject
         assert "merged successfully" in capsys.readouterr().out
+
+    def test_fast_forwards_the_base_it_was_run_from(self) -> None:
+        """gh pulls the base only when it switches to it, so the task does it here (#891)."""
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr(baseRefName="main")),
+            patch("tools.doit.github._get_default_branch", return_value="main"),
+            patch("tools.doit.github._current_branch", return_value="main"),
+            patch("tools.doit.github._run_gh_with_retry"),
+            patch("tools.doit.github._fast_forward_base") as mock_ff,
+        ):
+            _merge_action()(pr="42")
+
+        assert mock_ff.call_args.args[0] == "main"
+
+    def test_leaves_the_base_to_gh_when_run_from_the_prs_branch(self) -> None:
+        """gh's --delete-branch switches to the base and pulls it itself."""
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr(baseRefName="main")),
+            patch("tools.doit.github._get_default_branch", return_value="main"),
+            patch("tools.doit.github._current_branch", return_value="feat/1-x"),
+            patch("tools.doit.github._run_gh_with_retry"),
+            patch("tools.doit.github._fast_forward_base") as mock_ff,
+        ):
+            _merge_action()(pr="42")
+
+        mock_ff.assert_not_called()
+
+    def test_a_failed_merge_pulls_nothing(self) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr(baseRefName="main")),
+            patch("tools.doit.github._get_default_branch", return_value="main"),
+            patch("tools.doit.github._current_branch", return_value="main"),
+            patch(
+                "tools.doit.github._run_gh_with_retry",
+                side_effect=subprocess.CalledProcessError(1, ["gh"], stderr="not mergeable"),
+            ),
+            patch("tools.doit.github._fast_forward_base") as mock_ff,
+            pytest.raises(SystemExit),
+        ):
+            _merge_action()(pr="42")
+
+        mock_ff.assert_not_called()
 
     def test_missing_pr_info_exits(self) -> None:
         with (
@@ -1784,3 +2299,528 @@ class TestMergePr:
             _merge_action()(pr="42")
 
         assert exc.value.code == 1
+
+    @pytest.mark.parametrize(
+        ("base", "default"),
+        [
+            ("feat/1-lower", "main"),  # built on an unmerged branch
+            ("main", "trunk"),  # the default branch is not always main
+        ],
+    )
+    def test_refuses_a_pr_whose_base_is_not_the_default_branch(
+        self, base: str, default: str, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """GitHub merges into the base, so this would land beside `main`, not on it (#853).
+
+        Nothing is merged, and no issue is closed although `--auto-close` asks for it.
+        """
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr(baseRefName=base)),
+            patch("tools.doit.github._get_default_branch", return_value=default),
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+            patch("tools.doit.github._close_linked_issues") as mock_close,
+            pytest.raises(SystemExit) as exc,
+        ):
+            _merge_action()(pr="42", auto_close=True)
+
+        assert exc.value.code == 1
+        mock_gh.assert_not_called()
+        mock_close.assert_not_called()
+        out = capsys.readouterr().out
+        assert f"targets '{base}'" in out
+        assert f"gh pr edit 42 --base {default}" in out
+
+    @pytest.mark.parametrize("branch", ["main", "trunk"])
+    def test_merges_a_pr_that_targets_the_default_branch(self, branch: str) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr(baseRefName=branch)),
+            patch("tools.doit.github._get_default_branch", return_value=branch),
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+        ):
+            _merge_action()(pr="42")
+
+        assert mock_gh.call_args.args[0][:4] == ["gh", "pr", "merge", "42"]
+
+    def test_explains_a_stacked_pr_refusal(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """GitHub's refusal for a PR in a native stack, as observed on #850 (#853)."""
+        stderr = (
+            "GraphQL: This pull request is part of a stack and must be merged using the "
+            "asynchronous merge REST API. (mergePullRequest)"
+        )
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr(baseRefName="main")),
+            patch("tools.doit.github._get_default_branch", return_value="main"),
+            patch(
+                "tools.doit.github._run_gh_with_retry",
+                side_effect=subprocess.CalledProcessError(1, ["gh"], stderr=stderr),
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            _merge_action()(pr="42")
+
+        assert exc.value.code == 1
+        out = capsys.readouterr().out
+        assert "does not support" in out
+        assert "gh stack unstack" in out
+
+    def test_other_merge_failures_get_no_stack_explanation(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch(
+                "tools.doit.github._run_gh_with_retry",
+                side_effect=subprocess.CalledProcessError(1, ["gh"], stderr="not mergeable"),
+            ),
+            pytest.raises(SystemExit),
+        ):
+            _merge_action()(pr="42")
+
+        assert "stack" not in capsys.readouterr().out
+
+    @pytest.mark.parametrize("title", ["fix: read [tool.x]", r"fix: :bug: C:\x\[1]"])
+    def test_prints_a_bracketed_title_verbatim(
+        self, capsys: pytest.CaptureFixture[str], title: str
+    ) -> None:
+        """Rich read `[tool.x]` as a markup tag and dropped it from every line (#893).
+
+        Escaped, it still lost the backslash before `[1]` and turned `:bug:` into an emoji (#914).
+        """
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr(title=title)),
+            patch("tools.doit.github._run_gh_with_retry"),
+        ):
+            _merge_action()(pr="42")
+
+        out = _plain(capsys.readouterr().out)
+        assert f"PR #42: {title}" in out
+        assert f"  {title} (merges PR #42, addresses #7)" in out
+        assert f"Commit: {title} (merges PR #42, addresses #7)" in out
+
+    def test_a_closing_tag_in_the_title_does_not_stop_the_merge(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """`[/tmp]` raised MarkupError on the first print, before `gh pr merge` ran (#893)."""
+        with (
+            patch(
+                "tools.doit.github._get_pr_info",
+                return_value=self._pr(title="fix: strip [/tmp] prefix"),
+            ),
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+        ):
+            _merge_action()(pr="42")
+
+        mock_gh.assert_called_once()
+        assert "PR #42: fix: strip [/tmp] prefix" in _plain(capsys.readouterr().out)
+
+    @pytest.mark.parametrize(
+        "stderr", ["refusing [/x]: not mergeable", r"refusing C:\x\[1]: :x: not mergeable"]
+    )
+    def test_prints_gh_stderr_verbatim(
+        self, capsys: pytest.CaptureFixture[str], stderr: str
+    ) -> None:
+        """gh's error text is printed as text, not parsed as markup (#893).
+
+        Escaped, it still lost the backslash before `[1]` and turned `:x:` into an emoji (#914).
+        """
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch(
+                "tools.doit.github._run_gh_with_retry",
+                side_effect=subprocess.CalledProcessError(1, ["gh"], stderr=stderr),
+            ),
+            pytest.raises(SystemExit) as exc,
+        ):
+            _merge_action()(pr="42")
+
+        assert exc.value.code == 1
+        assert stderr in _plain(capsys.readouterr().out)
+
+
+class TestMergePrWithWorktree:
+    """`doit pr_merge` for a PR whose branch a linked worktree has checked out (#863).
+
+    gh's `--delete-branch` would check out `main` in that worktree, which git
+    refuses while `main` is checked out anywhere else, so the task deletes the
+    branch itself after the merge.
+    """
+
+    WORKTREE = Path("/src/project/worktrees/feat/1-x")
+
+    @staticmethod
+    def _pr(**overrides: object) -> dict[str, object]:
+        info: dict[str, object] = {
+            "number": 42,
+            "title": "feat: add a thing",
+            "body": "## Description\nx\n\nAddresses #7",
+            "state": "OPEN",
+            "headRefName": "feat/1-x",
+            "isCrossRepository": False,
+        }
+        info.update(overrides)
+        return info
+
+    def test_leaves_the_branch_to_the_task(self) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch("tools.doit.github.worktree_for_branch", return_value=self.WORKTREE) as mock_find,
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+            patch("tools.doit.github._finish_branch_in_worktree") as mock_finish,
+        ):
+            _merge_action()(pr="42")
+
+        mock_find.assert_called_once_with("feat/1-x")
+        assert "--delete-branch" not in mock_gh.call_args.args[0]
+        assert mock_finish.call_args.args[:3] == (42, "feat/1-x", self.WORKTREE)
+
+    def test_a_branch_no_worktree_holds_is_left_to_gh(self) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch("tools.doit.github.worktree_for_branch", return_value=None),
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+            patch("tools.doit.github._finish_branch_in_worktree") as mock_finish,
+        ):
+            _merge_action()(pr="42")
+
+        assert "--delete-branch" in mock_gh.call_args.args[0]
+        mock_finish.assert_not_called()
+
+    def test_a_fork_branch_is_never_looked_up(self) -> None:
+        """A fork's branch name can match an unrelated local branch."""
+        with (
+            patch(
+                "tools.doit.github._get_pr_info",
+                return_value=self._pr(isCrossRepository=True),
+            ),
+            patch("tools.doit.github.worktree_for_branch") as mock_find,
+            patch("tools.doit.github._run_gh_with_retry") as mock_gh,
+        ):
+            _merge_action()(pr="42")
+
+        mock_find.assert_not_called()
+        assert "--delete-branch" in mock_gh.call_args.args[0]
+
+    def test_keeping_the_branch_keeps_the_worktree(self) -> None:
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch("tools.doit.github.worktree_for_branch") as mock_find,
+            patch("tools.doit.github._run_gh_with_retry"),
+            patch("tools.doit.github._finish_branch_in_worktree") as mock_finish,
+        ):
+            _merge_action()(pr="42", delete_branch=False)
+
+        mock_find.assert_not_called()
+        mock_finish.assert_not_called()
+
+    def test_a_cleanup_failure_is_not_a_failed_merge(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The PR has merged, so the issues still close and the task still succeeds."""
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr()),
+            patch("tools.doit.github.worktree_for_branch", return_value=self.WORKTREE),
+            patch("tools.doit.github._run_gh_with_retry"),
+            patch("tools.doit.github._close_linked_issues") as mock_close,
+            patch("tools.doit.github._merged_head", return_value="abc123"),
+            patch("tools.doit.github._delete_remote_branch"),
+            patch(
+                "tools.doit.github.remove_merged_worktree",
+                side_effect=subprocess.CalledProcessError(1, ["git"], stderr="disk full"),
+            ),
+        ):
+            _merge_action()(pr="42", auto_close=True)
+
+        mock_close.assert_called_once()
+        out = capsys.readouterr().out
+        assert "merged successfully" in out
+        assert "Cleanup after the merge failed: disk full" in out
+        assert "Failed to merge PR" not in out
+
+    def test_fast_forwards_main_after_removing_the_worktree(self) -> None:
+        """Merged from the main checkout on `main`, which gh neither switches nor pulls (#891)."""
+        steps: list[str] = []
+        with (
+            patch("tools.doit.github._get_pr_info", return_value=self._pr(baseRefName="main")),
+            patch("tools.doit.github._get_default_branch", return_value="main"),
+            patch("tools.doit.github.worktree_for_branch", return_value=self.WORKTREE),
+            patch("tools.doit.github._current_branch", return_value="main"),
+            patch("tools.doit.github._run_gh_with_retry"),
+            patch(
+                "tools.doit.github._finish_branch_in_worktree",
+                side_effect=lambda *_: steps.append("remove worktree"),
+            ),
+            patch(
+                "tools.doit.github._fast_forward_base",
+                side_effect=lambda *_: steps.append("fast-forward main"),
+            ),
+        ):
+            _merge_action()(pr="42")
+
+        assert steps == ["remove worktree", "fast-forward main"]
+
+
+class TestWorktreeHolding:
+    def test_a_git_failure_leaves_the_branch_to_gh(self) -> None:
+        with patch(
+            "tools.doit.github.worktree_for_branch",
+            side_effect=subprocess.CalledProcessError(128, ["git"], stderr="not a git repository"),
+        ):
+            assert _worktree_holding({"headRefName": "feat/1-x"}) is None
+
+    def test_a_pr_without_a_head_branch_is_not_looked_up(self) -> None:
+        with patch("tools.doit.github.worktree_for_branch") as mock_find:
+            assert _worktree_holding({}) is None
+
+        mock_find.assert_not_called()
+
+
+class TestFinishBranchInWorktree:
+    """After the merge: the branch on GitHub, then the worktree and local branch (#863)."""
+
+    WORKTREE = Path("/src/project/worktrees/feat/1-x")
+
+    @staticmethod
+    def _console() -> Console:
+        return Console(file=io.StringIO(), width=200)
+
+    def test_an_unmerged_pr_deletes_nothing(self) -> None:
+        console = self._console()
+        with (
+            patch("tools.doit.github._merged_head", return_value=None),
+            patch("tools.doit.github._delete_remote_branch") as mock_remote,
+            patch("tools.doit.github.remove_merged_worktree") as mock_local,
+        ):
+            _finish_branch_in_worktree(42, "feat/1-x", self.WORKTREE, console)
+
+        mock_remote.assert_not_called()
+        mock_local.assert_not_called()
+        assert "in place" in console.file.getvalue()  # type: ignore[attr-defined]
+
+    @pytest.mark.parametrize("name", ["[x]", "[/x]", r"x\[1]", ":memo:"])
+    def test_an_unmerged_pr_prints_the_worktree_path_verbatim(self, name: str) -> None:
+        """The path is text, not markup (#920)."""
+        worktree = self.WORKTREE.parent / name
+        console = self._console()
+        with patch("tools.doit.github._merged_head", return_value=None):
+            _finish_branch_in_worktree(42, "feat/1-x", worktree, console)
+
+        out = _plain(console.file.getvalue())  # type: ignore[attr-defined]
+        assert f"Left feat/1-x and its worktree {worktree} in place." in out
+
+    def test_a_merged_pr_deletes_its_branch_everywhere(self) -> None:
+        console = self._console()
+        with (
+            patch("tools.doit.github._merged_head", return_value="abc123"),
+            patch("tools.doit.github._delete_remote_branch") as mock_remote,
+            patch("tools.doit.github.remove_merged_worktree") as mock_local,
+        ):
+            _finish_branch_in_worktree(42, "feat/1-x", self.WORKTREE, console)
+
+        mock_remote.assert_called_once_with("feat/1-x", console)
+        mock_local.assert_called_once_with(self.WORKTREE, "feat/1-x", "abc123", console)
+
+    def test_an_os_error_is_reported_not_raised(self) -> None:
+        console = self._console()
+        with (
+            patch("tools.doit.github._merged_head", return_value="abc123"),
+            patch("tools.doit.github._delete_remote_branch"),
+            patch(
+                "tools.doit.github.remove_merged_worktree",
+                side_effect=OSError("Permission denied"),
+            ),
+        ):
+            _finish_branch_in_worktree(42, "feat/1-x", self.WORKTREE, console)
+
+        assert "Permission denied" in console.file.getvalue()  # type: ignore[attr-defined]
+
+
+class TestOpenEditorWithTemplate:
+    """The issue and PR editor."""
+
+    @pytest.mark.parametrize(
+        "editor", ["/opt/[x]/vi", "/opt/[/x]/vi", r"C:\tools\[1]\vi.exe", "/opt/:memo:/vi"]
+    )
+    def test_prints_the_editor_verbatim(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], editor: str
+    ) -> None:
+        """`$EDITOR` is the user's text, not markup (#920). It fails here, so nothing is read."""
+        monkeypatch.setenv("COLUMNS", "1000")
+        with (
+            patch("tools.doit.github._get_editor", return_value=editor),
+            patch("tools.doit.github.subprocess.run", return_value=MagicMock(returncode=1)),
+        ):
+            assert _open_editor_with_template("body") is None
+
+        assert f"Opening {editor}..." in _plain(capsys.readouterr().out).splitlines()
+
+
+class TestCurrentBranch:
+    def test_returns_the_checked_out_branch(self, mock_subprocess: MagicMock) -> None:
+        mock_subprocess.register({("git", "branch", "--show-current"): {"stdout": "main\n"}})
+
+        assert _current_branch() == "main"
+
+    def test_a_detached_head_is_no_branch(self, mock_subprocess: MagicMock) -> None:
+        mock_subprocess.register({("git", "branch", "--show-current"): {"stdout": "\n"}})
+
+        assert _current_branch() is None
+
+    def test_a_git_failure_is_no_branch(self, mock_subprocess: MagicMock) -> None:
+        mock_subprocess.register(
+            {
+                ("git", "branch", "--show-current"): subprocess.CalledProcessError(
+                    128, ["git"], stderr="fatal: not a git repository"
+                )
+            }
+        )
+
+        assert _current_branch() is None
+
+
+class TestFastForwardBase:
+    """After the merge: the checkout the task ran from, when that is the PR's base (#891)."""
+
+    @staticmethod
+    def _console() -> Console:
+        return Console(file=io.StringIO(), width=200, color_system=None)
+
+    def test_pulls_the_base_fast_forward_only(self, mock_subprocess: MagicMock) -> None:
+        console = self._console()
+        mock_subprocess.register({("git", "pull"): {"stdout": ""}})
+
+        _fast_forward_base("main", console)
+
+        assert mock_subprocess.call_args.args[0] == ["git", "pull", "--ff-only", "origin", "main"]
+        assert "Fast-forwarded main" in console.file.getvalue()  # type: ignore[attr-defined]
+
+    def test_a_failed_pull_is_reported_not_raised(self, mock_subprocess: MagicMock) -> None:
+        """The PR has merged, so a pull that cannot fast-forward only warns."""
+        console = self._console()
+        mock_subprocess.register(
+            {
+                ("git", "pull"): subprocess.CalledProcessError(
+                    128, ["git"], stderr="fatal: Not possible to fast-forward, aborting."
+                )
+            }
+        )
+
+        _fast_forward_base("main", console)
+
+        out = console.file.getvalue()  # type: ignore[attr-defined]
+        assert "git pull --ff-only origin main" in out
+        assert "Not possible to fast-forward" in out
+
+
+class TestMergedHead:
+    @staticmethod
+    def _console() -> Console:
+        return Console(file=io.StringIO(), width=200)
+
+    def test_returns_the_head_the_pr_merged(self, mock_subprocess: MagicMock) -> None:
+        pr = {"state": "MERGED", "headRefOid": "abc123"}
+        mock_subprocess.register({("gh", "pr", "view"): {"stdout": json.dumps(pr)}})
+
+        assert _merged_head(42, self._console()) == "abc123"
+        assert mock_subprocess.call_args.args[0] == [
+            "gh",
+            "pr",
+            "view",
+            "42",
+            "--json",
+            "state,headRefOid",
+        ]
+
+    @pytest.mark.parametrize("state", ["OPEN", "CLOSED"])
+    def test_an_unmerged_pr_returns_none(self, mock_subprocess: MagicMock, state: str) -> None:
+        console = self._console()
+        pr = {"state": state, "headRefOid": "abc123"}
+        mock_subprocess.register({("gh", "pr", "view"): {"stdout": json.dumps(pr)}})
+
+        assert _merged_head(42, console) is None
+        assert f"is {state}, not merged" in console.file.getvalue()  # type: ignore[attr-defined]
+
+    def test_a_lookup_failure_returns_none(self, mock_subprocess: MagicMock) -> None:
+        console = self._console()
+        mock_subprocess.register(
+            {
+                ("gh", "pr", "view"): subprocess.CalledProcessError(
+                    1, ["gh"], stderr="GraphQL: Could not resolve to a PullRequest"
+                )
+            }
+        )
+
+        assert _merged_head(42, console) is None
+        assert "Could not resolve" in console.file.getvalue()  # type: ignore[attr-defined]
+
+
+class TestDeleteRemoteBranch:
+    """What `gh pr merge --delete-branch` would have done on GitHub (#863)."""
+
+    SETTING = ("gh", "repo", "view")
+
+    @staticmethod
+    def _console() -> Console:
+        return Console(file=io.StringIO(), width=200)
+
+    @staticmethod
+    def _api_calls(mock_subprocess: MagicMock) -> list[list[str]]:
+        calls = [call.args[0] for call in mock_subprocess.call_args_list]
+        return [cmd for cmd in calls if cmd[:2] == ["gh", "api"]]
+
+    def test_left_to_github_when_the_repository_deletes_head_branches(
+        self, mock_subprocess: MagicMock
+    ) -> None:
+        mock_subprocess.register({self.SETTING: {"stdout": "true\n"}})
+
+        _delete_remote_branch("feat/1-x", self._console())
+
+        assert self._api_calls(mock_subprocess) == []
+
+    def test_deletes_the_branch_through_the_api_otherwise(self, mock_subprocess: MagicMock) -> None:
+        console = self._console()
+        mock_subprocess.register({self.SETTING: {"stdout": "false\n"}, ("gh", "api"): {}})
+
+        _delete_remote_branch("feat/1-x", console)
+
+        assert self._api_calls(mock_subprocess) == [
+            ["gh", "api", "--method", "DELETE", "repos/{owner}/{repo}/git/refs/heads/feat/1-x"]
+        ]
+        assert "Deleted branch feat/1-x on GitHub" in console.file.getvalue()  # type: ignore[attr-defined]
+
+    def test_a_setting_lookup_failure_still_deletes(self, mock_subprocess: MagicMock) -> None:
+        mock_subprocess.register(
+            {
+                self.SETTING: subprocess.CalledProcessError(1, ["gh"], stderr="GraphQL: denied"),
+                ("gh", "api"): {},
+            }
+        )
+
+        _delete_remote_branch("feat/1-x", self._console())
+
+        assert len(self._api_calls(mock_subprocess)) == 1
+
+    def test_quotes_a_name_that_would_cut_the_endpoint_short(
+        self, mock_subprocess: MagicMock
+    ) -> None:
+        """Unquoted, `feat/1-x#y` would delete `feat/1-x`: the rest reads as a URL fragment."""
+        mock_subprocess.register({self.SETTING: {"stdout": "false\n"}, ("gh", "api"): {}})
+
+        _delete_remote_branch("feat/1-x#y", self._console())
+
+        endpoint = self._api_calls(mock_subprocess)[0][-1]
+        assert endpoint.endswith("/git/refs/heads/feat/1-x%23y")
+
+    def test_a_failed_delete_is_reported(self, mock_subprocess: MagicMock) -> None:
+        console = self._console()
+        mock_subprocess.register(
+            {
+                self.SETTING: {"stdout": "false\n"},
+                ("gh", "api"): subprocess.CalledProcessError(
+                    1, ["gh"], stderr="gh: Reference does not exist (HTTP 422)"
+                ),
+            }
+        )
+
+        _delete_remote_branch("feat/1-x", console)
+
+        assert "Reference does not exist" in console.file.getvalue()  # type: ignore[attr-defined]

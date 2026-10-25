@@ -1,3 +1,14 @@
+---
+title: "ADR-9015: install_tools framework: archive extraction and custom URLs"
+description: Extend the install_tools framework with archive extraction and custom download URLs, keeping it backward compatible
+date: 2026-04-07
+audience:
+  - contributors
+tags:
+  - adr
+  - tooling
+---
+
 # ADR-9015: install_tools framework: archive extraction and custom URLs
 
 ## Status

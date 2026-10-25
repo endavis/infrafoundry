@@ -1,3 +1,14 @@
+---
+title: "ADR-9002: Use doit for task automation"
+description: Use doit as the task runner for testing, linting, building and other routine operations
+date: 2026-01-21
+audience:
+  - contributors
+tags:
+  - adr
+  - doit
+---
+
 # ADR-9002: Use doit for task automation
 
 ## Status

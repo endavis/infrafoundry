@@ -1,3 +1,14 @@
+---
+title: "ADR-9020: A template version is a commit SHA"
+description: A template version is a commit SHA, not a release tag or a branch name
+date: 2026-08-29
+audience:
+  - contributors
+tags:
+  - adr
+  - template
+---
+
 # ADR-9020: A template version is a commit SHA
 
 ## Status
@@ -71,6 +82,10 @@ project starts cutting them — the difference is that nothing *depends* on thei
   and pass that same SHA to `manage.py check`. One identifier across the whole path.
 
 ## Related Issues
+- Issue #805: the archive root is named for the resolved commit, which this decision made true and
+  `manage.py` was never updated for — it kept looking for a fixed `pyproject-template-main`, which
+  silently killed the check -> sync handoff. The fix reads the reviewed commit off the archive root's
+  own name, so the identity this ADR defines is now the one recorded as the sync point.
 - Issue #781: the template has never cut a release, and half the update path assumed it had
 - Issue #779: `--template-version` was documented in three places and reachable from none — the flag
   this decision gives a coherent meaning
