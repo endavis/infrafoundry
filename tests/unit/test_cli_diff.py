@@ -28,7 +28,7 @@ def _make_result(
     )
 
 
-def test_diff_no_changes():
+def test_diff_no_changes() -> None:
     """Diff command reports when no differences exist."""
     runner = CliRunner()
 
@@ -45,7 +45,7 @@ def test_diff_no_changes():
         assert "No differences found." in result.output
 
 
-def test_diff_with_changes():
+def test_diff_with_changes() -> None:
     """Diff command outputs settings and resource changes."""
     runner = CliRunner()
 
@@ -72,7 +72,7 @@ def test_diff_with_changes():
         assert "Resources changed" in result.output
 
 
-def test_diff_with_nonexistent_environment():
+def test_diff_with_nonexistent_environment() -> None:
     """Diff command handles nonexistent environment gracefully."""
     from infrafoundry.core.exceptions import EnvironmentNotFoundError
 
@@ -93,7 +93,7 @@ def test_diff_with_nonexistent_environment():
         assert "Failed to diff configurations" in result.output
 
 
-def test_diff_with_verbose_mode():
+def test_diff_with_verbose_mode() -> None:
     """Diff command shows detailed changes in verbose mode."""
     runner = CliRunner()
 

@@ -10,27 +10,29 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     return mock
 
 
 @pytest.fixture
-def mock_dependency_graph():
+def mock_dependency_graph() -> Mock:
     """Mock dependency graph."""
     mock = Mock()
     mock.export_to_mermaid.return_value = "graph TD\n  A --> B\n  B --> C"
     return mock
 
 
-def test_graph_mermaid_format(cli_runner, mock_orchestrator, mock_dependency_graph):
+def test_graph_mermaid_format(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_dependency_graph: Mock
+) -> None:
     """Test graph command with mermaid format."""
     mock_orchestrator.build_dependency_graph.return_value = mock_dependency_graph
 
@@ -43,7 +45,9 @@ def test_graph_mermaid_format(cli_runner, mock_orchestrator, mock_dependency_gra
         mock_dependency_graph.export_to_mermaid.assert_called_once()
 
 
-def test_graph_explicit_mermaid_format(cli_runner, mock_orchestrator, mock_dependency_graph):
+def test_graph_explicit_mermaid_format(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_dependency_graph: Mock
+) -> None:
     """Test graph command with explicit mermaid format flag."""
     mock_orchestrator.build_dependency_graph.return_value = mock_dependency_graph
 
@@ -56,7 +60,7 @@ def test_graph_explicit_mermaid_format(cli_runner, mock_orchestrator, mock_depen
         assert "graph TD" in result.output
 
 
-def test_graph_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_graph_orchestrator_failure(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test graph command when orchestrator.build_dependency_graph raises an error."""
     mock_orchestrator.build_dependency_graph.side_effect = Exception("Graph generation failed")
 

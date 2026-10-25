@@ -21,7 +21,7 @@ def _violation(level: PolicyLevel) -> PolicyViolation:
     )
 
 
-def test_policy_checker_passes_when_no_violations():
+def test_policy_checker_passes_when_no_violations() -> None:
     policy_engine = MagicMock()
     policy_engine.evaluate_resources.return_value = []
     event_manager = MagicMock()
@@ -40,7 +40,7 @@ def test_policy_checker_passes_when_no_violations():
     )
 
 
-def test_policy_checker_warns_without_failing():
+def test_policy_checker_warns_without_failing() -> None:
     policy_engine = MagicMock()
     policy_engine.evaluate_resources.return_value = [_violation(PolicyLevel.WARNING)]
     event_manager = MagicMock()
@@ -66,7 +66,7 @@ def test_policy_checker_warns_without_failing():
     )
 
 
-def test_policy_checker_enforce_errors_raises():
+def test_policy_checker_enforce_errors_raises() -> None:
     policy_engine = MagicMock()
     policy_engine.evaluate_resources.return_value = [_violation(PolicyLevel.ERROR)]
     event_manager = MagicMock()

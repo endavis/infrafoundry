@@ -14,7 +14,7 @@ class TestCredentialLoader:
     """Tests for CredentialLoader class."""
 
     @pytest.fixture
-    def temp_config_dir(self, tmp_path):
+    def temp_config_dir(self, tmp_path: Path) -> Path:
         """Create temporary config directory structure."""
         config_dir = tmp_path / "config"
         secrets_dir = config_dir / "secrets" / "dev"
@@ -22,21 +22,21 @@ class TestCredentialLoader:
         return config_dir
 
     @pytest.fixture
-    def mock_provider(self):
+    def mock_provider(self) -> MagicMock:
         """Create a mock SecretProvider."""
         return MagicMock(spec=SecretProvider)
 
     @pytest.fixture
-    def loader(self, temp_config_dir, mock_provider):
+    def loader(self, temp_config_dir: Path, mock_provider: MagicMock) -> CredentialLoader:
         """Create CredentialLoader instance."""
         return CredentialLoader(config_dir=temp_config_dir, secret_provider=mock_provider)
 
-    def test_init_with_config_dir(self, temp_config_dir):
+    def test_init_with_config_dir(self, temp_config_dir: Path) -> None:
         """Test initialization with explicit config directory."""
         loader = CredentialLoader(config_dir=temp_config_dir)
         assert loader.config_dir == temp_config_dir
 
-    def test_init_with_env_var(self, tmp_path):
+    def test_init_with_env_var(self, tmp_path: Path) -> None:
         """Test initialization using INFRAFOUNDRY_CONFIG_REPO env var."""
         config_dir = tmp_path / "from_env"
         config_dir.mkdir(parents=True)
@@ -45,23 +45,25 @@ class TestCredentialLoader:
             loader = CredentialLoader()
             assert loader.config_dir == config_dir
 
-    def test_init_defaults_to_cwd(self, monkeypatch):
+    def test_init_defaults_to_cwd(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test initialization defaults to current working directory."""
         monkeypatch.delenv("INFRAFOUNDRY_CONFIG_REPO", raising=False)
         loader = CredentialLoader()
         assert loader.config_dir == Path.cwd()
 
-    def test_get_secrets_dir(self, loader, temp_config_dir):
+    def test_get_secrets_dir(self, loader: CredentialLoader, temp_config_dir: Path) -> None:
         """Test getting secrets directory for environment."""
         secrets_dir = loader.get_secrets_dir("dev")
         assert secrets_dir == temp_config_dir / "envs" / "dev"
 
-    def test_load_no_secrets_dir(self, loader):
+    def test_load_no_secrets_dir(self, loader: CredentialLoader) -> None:
         """Test loading when secrets directory doesn't exist."""
         credentials = loader.load("nonexistent")
         assert credentials == {}
 
-    def test_load_kubernetes_credentials(self, loader, mock_provider, temp_config_dir):
+    def test_load_kubernetes_credentials(
+        self, loader: CredentialLoader, mock_provider: MagicMock, temp_config_dir: Path
+    ) -> None:
         """Test loading Kubernetes credentials."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -76,7 +78,9 @@ class TestCredentialLoader:
 
         assert credentials == {"KUBECONFIG": "/path/to/kubeconfig"}
 
-    def test_load_all_providers(self, loader, mock_provider, temp_config_dir):
+    def test_load_all_providers(
+        self, loader: CredentialLoader, mock_provider: MagicMock, temp_config_dir: Path
+    ) -> None:
         """Test loading credentials for all providers."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -90,7 +94,9 @@ class TestCredentialLoader:
 
         assert "KUBECONFIG" in credentials
 
-    def test_load_partial_credentials(self, loader, mock_provider, temp_config_dir):
+    def test_load_partial_credentials(
+        self, loader: CredentialLoader, mock_provider: MagicMock, temp_config_dir: Path
+    ) -> None:
         """Test loading when some credential fields are missing."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -107,7 +113,7 @@ class TestCredentialLoader:
         # Only the available field is returned
         assert credentials == {"KUBECONFIG": "/path/to/kubeconfig"}
 
-    def test_load_unknown_provider(self, loader, temp_config_dir):
+    def test_load_unknown_provider(self, loader: CredentialLoader, temp_config_dir: Path) -> None:
         """Test loading credentials for unknown provider."""
         # Create secrets dir so it passes exists() check
         secrets_dir = temp_config_dir / "envs" / "dev"
@@ -118,7 +124,9 @@ class TestCredentialLoader:
             assert credentials == {}
             mock_logger.warning.assert_called_once()
 
-    def test_set_age_key(self, loader, temp_config_dir, monkeypatch):
+    def test_set_age_key(
+        self, loader: CredentialLoader, temp_config_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test setting per-environment age key."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -129,7 +137,9 @@ class TestCredentialLoader:
         loader._set_age_key(secrets_dir)
         assert os.environ.get("SOPS_AGE_KEY_FILE") == str(age_key_file)
 
-    def test_set_age_key_not_exists(self, loader, temp_config_dir, monkeypatch):
+    def test_set_age_key_not_exists(
+        self, loader: CredentialLoader, temp_config_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test setting age key when file doesn't exist."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -138,7 +148,9 @@ class TestCredentialLoader:
         loader._set_age_key(secrets_dir)
         assert "SOPS_AGE_KEY_FILE" not in os.environ
 
-    def test_apply_to_environment(self, loader, monkeypatch):
+    def test_apply_to_environment(
+        self, loader: CredentialLoader, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test applying credentials to environment."""
         credentials = {
             "TEST_VAR_1": "value1",
@@ -151,14 +163,22 @@ class TestCredentialLoader:
         assert os.environ["TEST_VAR_1"] == "value1"
         assert os.environ["TEST_VAR_2"] == "value2"
 
-    def test_apply_to_environment_empty(self, loader, monkeypatch):
+    def test_apply_to_environment_empty(
+        self, loader: CredentialLoader, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test applying empty credentials dict."""
         monkeypatch.setenv("EXISTING", "value")
         loader.apply_to_environment({})
         # Existing vars should remain
         assert os.environ["EXISTING"] == "value"
 
-    def test_load_and_apply(self, loader, mock_provider, temp_config_dir, monkeypatch):
+    def test_load_and_apply(
+        self,
+        loader: CredentialLoader,
+        mock_provider: MagicMock,
+        temp_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Test convenience method that loads and applies."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -176,8 +196,12 @@ class TestCredentialLoader:
         assert os.environ["KUBECONFIG"] == "/path/to/kubeconfig"
 
     def test_temporary_credentials_context_manager(
-        self, loader, mock_provider, temp_config_dir, monkeypatch
-    ):
+        self,
+        loader: CredentialLoader,
+        mock_provider: MagicMock,
+        temp_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Test temporary credentials context manager."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -199,8 +223,12 @@ class TestCredentialLoader:
         assert os.environ["KUBECONFIG"] == "original"
 
     def test_temporary_credentials_new_vars_removed(
-        self, loader, mock_provider, temp_config_dir, monkeypatch
-    ):
+        self,
+        loader: CredentialLoader,
+        mock_provider: MagicMock,
+        temp_config_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Test that new vars added by context manager are removed after."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)
@@ -219,7 +247,7 @@ class TestCredentialLoader:
         # After context, var should be removed
         assert "KUBECONFIG" not in os.environ
 
-    def test_register_provider(self, loader):
+    def test_register_provider(self, loader: CredentialLoader) -> None:
         """Test registering a custom provider."""
         loader.register_provider(
             "aws",
@@ -231,7 +259,9 @@ class TestCredentialLoader:
         assert loader.provider_credentials["aws"]["file"] == "aws.yaml"
         assert loader.provider_credentials["aws"]["fields"]["access_key"] == "AWS_ACCESS_KEY_ID"
 
-    def test_load_custom_provider(self, loader, mock_provider, temp_config_dir):
+    def test_load_custom_provider(
+        self, loader: CredentialLoader, mock_provider: MagicMock, temp_config_dir: Path
+    ) -> None:
         """Test loading credentials for a custom registered provider."""
         loader.register_provider("custom", "custom.yaml", {"api_key": "CUSTOM_API_KEY"})
 
@@ -246,19 +276,23 @@ class TestCredentialLoader:
         credentials = loader.load("dev", providers=["custom"])
         assert credentials == {"CUSTOM_API_KEY": "secret123"}
 
-    def test_debug_logging_enabled(self, temp_config_dir):
+    def test_debug_logging_enabled(self, temp_config_dir: Path) -> None:
         """Test debug logging when INFRAFOUNDRY_LOG_LEVEL=DEBUG."""
         with patch.dict(os.environ, {"INFRAFOUNDRY_LOG_LEVEL": "DEBUG"}):
             loader = CredentialLoader(config_dir=temp_config_dir)
             assert loader._debug_mode is True
 
-    def test_debug_logging_disabled(self, temp_config_dir, monkeypatch):
+    def test_debug_logging_disabled(
+        self, temp_config_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test debug logging when not in debug mode."""
         monkeypatch.delenv("INFRAFOUNDRY_LOG_LEVEL", raising=False)
         loader = CredentialLoader(config_dir=temp_config_dir)
         assert loader._debug_mode is False
 
-    def test_load_with_decryption_error(self, loader, mock_provider, temp_config_dir):
+    def test_load_with_decryption_error(
+        self, loader: CredentialLoader, mock_provider: MagicMock, temp_config_dir: Path
+    ) -> None:
         """Test graceful handling of decryption errors."""
         secrets_dir = temp_config_dir / "envs" / "dev"
         secrets_dir.mkdir(parents=True)

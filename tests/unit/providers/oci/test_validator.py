@@ -1,5 +1,7 @@
 """Unit tests for OCI validator."""
 
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,7 +19,7 @@ from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
-def env_config():
+def env_config() -> Any:
     """Create a mock environment config."""
     return make_env_config(
         provider_settings={
@@ -34,13 +36,13 @@ def env_config():
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(env_config, report):
+def validator(env_config: Any, report: MagicMock) -> OCIValidator:
     """Create an OCIValidator instance."""
     return OCIValidator(env_config, report)
 
@@ -48,7 +50,7 @@ def validator(env_config, report):
 class TestComposition:
     """Tests for validator composition."""
 
-    def test_specialized_validators_initialized(self, validator):
+    def test_specialized_validators_initialized(self, validator: OCIValidator) -> None:
         """Specialized validators are created during init."""
         assert isinstance(validator.compartment_validator, CompartmentValidator)
         assert isinstance(validator.network_validator, NetworkValidator)
@@ -58,7 +60,7 @@ class TestComposition:
 class TestValidateReferences:
     """Tests for validate_references method."""
 
-    def test_valid_subnet_vcn_reference(self, validator, report):
+    def test_valid_subnet_vcn_reference(self, validator: OCIValidator, report: MagicMock) -> None:
         """Test valid subnet -> VCN reference."""
         resources = [
             ResourceConfig(
@@ -85,7 +87,7 @@ class TestValidateReferences:
         assert len(subnet_check) == 1
         assert subnet_check[0][1]["passed"] is True
 
-    def test_invalid_subnet_vcn_reference(self, validator, report):
+    def test_invalid_subnet_vcn_reference(self, validator: OCIValidator, report: MagicMock) -> None:
         """Test invalid subnet -> VCN reference."""
         resources = [
             ResourceConfig(
@@ -105,7 +107,9 @@ class TestValidateReferences:
         assert subnet_check[0][1]["passed"] is False
         assert "nonexistent-vcn" in subnet_check[0][1]["message"]
 
-    def test_valid_instance_subnet_reference(self, validator, report):
+    def test_valid_instance_subnet_reference(
+        self, validator: OCIValidator, report: MagicMock
+    ) -> None:
         """Test valid instance -> subnet reference."""
         resources = [
             ResourceConfig(
@@ -130,7 +134,9 @@ class TestValidateReferences:
         assert len(instance_check) == 1
         assert instance_check[0][1]["passed"] is True
 
-    def test_invalid_instance_subnet_reference(self, validator, report):
+    def test_invalid_instance_subnet_reference(
+        self, validator: OCIValidator, report: MagicMock
+    ) -> None:
         """Test invalid instance -> subnet reference."""
         resources = [
             ResourceConfig(
@@ -154,7 +160,7 @@ class TestValidateReferences:
         assert instance_check[0][1]["passed"] is False
         assert "missing-subnet" in instance_check[0][1]["message"]
 
-    def test_no_references_to_validate(self, validator, report):
+    def test_no_references_to_validate(self, validator: OCIValidator, report: MagicMock) -> None:
         """Test resources with no cross-references."""
         resources = [
             ResourceConfig(
@@ -171,7 +177,9 @@ class TestValidateReferences:
         # No checks for VCN-only resources
         report.add_check.assert_not_called()
 
-    def test_instance_without_subnet_field(self, validator, report):
+    def test_instance_without_subnet_field(
+        self, validator: OCIValidator, report: MagicMock
+    ) -> None:
         """Test instance without subnet field does not fail."""
         resources = [
             ResourceConfig(
@@ -192,7 +200,9 @@ class TestValidateReferences:
         assert len(instance_checks) == 1
         assert instance_checks[0][1]["passed"] is True
 
-    def test_multiple_resources_validation(self, validator, report):
+    def test_multiple_resources_validation(
+        self, validator: OCIValidator, report: MagicMock
+    ) -> None:
         """Test validation with multiple resources."""
         resources = [
             ResourceConfig(
@@ -239,7 +249,7 @@ class TestValidateReferences:
 class TestValidateAPIReferences:
     """Tests for _validate_api_references method."""
 
-    def test_skipped_when_no_compartment_ocid(self, report):
+    def test_skipped_when_no_compartment_ocid(self, report: MagicMock) -> None:
         """API validation skipped when compartment_ocid is missing."""
         env_config = make_env_config(
             provider_settings={
@@ -260,7 +270,7 @@ class TestValidateAPIReferences:
             validator._validate_api_references([])
             mock_create.assert_not_called()
 
-    def test_skipped_when_no_region(self, report):
+    def test_skipped_when_no_region(self, report: MagicMock) -> None:
         """API validation skipped when region is missing."""
         env_config = make_env_config(
             provider_settings={
@@ -280,7 +290,7 @@ class TestValidateAPIReferences:
             validator._validate_api_references([])
             mock_create.assert_not_called()
 
-    def test_skipped_when_client_creation_fails(self, validator):
+    def test_skipped_when_client_creation_fails(self, validator: OCIValidator) -> None:
         """API validation skips gracefully when client creation fails."""
         validator._create_client = MagicMock(return_value=None)
 
@@ -296,7 +306,7 @@ class TestValidateAPIReferences:
         # Should not raise
         validator._validate_api_references(resources)
 
-    def test_fetches_and_delegates_to_validators(self, validator):
+    def test_fetches_and_delegates_to_validators(self, validator: OCIValidator) -> None:
         """API references fetches data and delegates to specialized validators."""
         mock_client = MagicMock()
         mock_client.identity_url.return_value = "https://identity.us-ashburn-1.oraclecloud.com"
@@ -307,7 +317,7 @@ class TestValidateAPIReferences:
         subnets = [{"displayName": "existing-subnet", "id": "ocid1.subnet.oc1..aaa"}]
         images = [{"id": "ocid1.image.oc1..aaa", "displayName": "Oracle-Linux-8"}]
 
-        def mock_list(base_url, path):
+        def mock_list(base_url: Any, path: Any) -> list[Any]:
             if "compartments" in path:
                 return compartments
             elif "vcns" in path:
@@ -349,7 +359,7 @@ class TestValidateAPIReferences:
 class TestSafeList:
     """Tests for _safe_list helper."""
 
-    def test_returns_list_on_success(self, validator):
+    def test_returns_list_on_success(self, validator: OCIValidator) -> None:
         """Returns list when client succeeds."""
         mock_client = MagicMock()
         mock_client.list_resources.return_value = [{"id": "test"}]
@@ -358,7 +368,7 @@ class TestSafeList:
 
         assert result == [{"id": "test"}]
 
-    def test_returns_none_on_api_error(self, validator):
+    def test_returns_none_on_api_error(self, validator: OCIValidator) -> None:
         """Returns None when client raises APIError."""
         mock_client = MagicMock()
         mock_client.list_resources.side_effect = APIError("failed", provider="oci")
@@ -371,7 +381,7 @@ class TestSafeList:
 class TestValidateConnectivity:
     """Tests for validate_connectivity method."""
 
-    def test_missing_credentials(self, report):
+    def test_missing_credentials(self, report: MagicMock) -> None:
         """Test connectivity validation with missing credentials."""
         env_config = make_env_config(provider_settings={"oci": {}})
         validator = OCIValidator(env_config, report)
@@ -380,7 +390,9 @@ class TestValidateConnectivity:
 
         # Should not crash, credentials check should fail gracefully
 
-    def test_connectivity_with_valid_credentials(self, validator, report):
+    def test_connectivity_with_valid_credentials(
+        self, validator: OCIValidator, report: MagicMock
+    ) -> None:
         """Test that connectivity creates a client and calls list_resources."""
         validator.api_validator.get_credentials = MagicMock(
             return_value={
@@ -402,7 +414,9 @@ class TestValidateConnectivity:
         mock_client.list_resources.assert_called_once()
         validator.api_validator.add_success.assert_called()
 
-    def test_connectivity_client_creation_fails(self, validator, report):
+    def test_connectivity_client_creation_fails(
+        self, validator: OCIValidator, report: MagicMock
+    ) -> None:
         """Test connectivity when client creation fails."""
         validator.api_validator.get_credentials = MagicMock(
             return_value={
@@ -423,7 +437,7 @@ class TestValidateConnectivity:
 class TestCreateClient:
     """Tests for _create_client helper."""
 
-    def test_returns_none_on_configuration_error(self, validator):
+    def test_returns_none_on_configuration_error(self, validator: OCIValidator) -> None:
         """Returns None and reports warning when client creation fails."""
         validator.api_validator.add_error = MagicMock()
         with patch(
@@ -435,7 +449,7 @@ class TestCreateClient:
         assert result is None
         validator.api_validator.add_error.assert_called_once()
 
-    def test_returns_client_on_success(self, validator, tmp_path):
+    def test_returns_client_on_success(self, validator: OCIValidator, tmp_path: Path) -> None:
         """Returns OCIClient when creation succeeds."""
         mock_client = MagicMock()
         with patch(

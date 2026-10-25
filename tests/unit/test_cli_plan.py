@@ -11,19 +11,19 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     return mock
 
 
-def test_plan_basic(cli_runner, mock_orchestrator):
+def test_plan_basic(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test basic plan command."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "plan", "--env", "test"])
@@ -43,7 +43,7 @@ def test_plan_basic(cli_runner, mock_orchestrator):
         )
 
 
-def test_plan_with_dry_run(cli_runner, mock_orchestrator):
+def test_plan_with_dry_run(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test plan command with dry-run flag."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "plan", "--env", "test", "--dry-run"])
@@ -62,7 +62,7 @@ def test_plan_with_dry_run(cli_runner, mock_orchestrator):
         )
 
 
-def test_plan_with_resource_filter(cli_runner, mock_orchestrator):
+def test_plan_with_resource_filter(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test plan command with resource filter."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -83,7 +83,7 @@ def test_plan_with_resource_filter(cli_runner, mock_orchestrator):
         )
 
 
-def test_plan_with_enforce_policies(cli_runner, mock_orchestrator):
+def test_plan_with_enforce_policies(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test plan command with enforce policies flag."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -104,7 +104,7 @@ def test_plan_with_enforce_policies(cli_runner, mock_orchestrator):
         )
 
 
-def test_plan_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_plan_orchestrator_failure(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test plan command when orchestrator.plan raises an error."""
     mock_orchestrator.plan.side_effect = Exception("Plan failed")
 
@@ -115,7 +115,7 @@ def test_plan_orchestrator_failure(cli_runner, mock_orchestrator):
         assert "Plan failed" in result.output
 
 
-def test_plan_with_single_provider_filter(cli_runner, mock_orchestrator):
+def test_plan_with_single_provider_filter(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """A single --provider value is passed through as a one-element list."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -136,7 +136,7 @@ def test_plan_with_single_provider_filter(cli_runner, mock_orchestrator):
         )
 
 
-def test_plan_with_short_provider_flag(cli_runner, mock_orchestrator):
+def test_plan_with_short_provider_flag(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """The -P short option is equivalent to --provider."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -157,7 +157,7 @@ def test_plan_with_short_provider_flag(cli_runner, mock_orchestrator):
         )
 
 
-def test_plan_with_multiple_provider_filter(cli_runner, mock_orchestrator):
+def test_plan_with_multiple_provider_filter(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Multiple --provider flags accumulate into a list."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -187,7 +187,9 @@ def test_plan_with_multiple_provider_filter(cli_runner, mock_orchestrator):
         )
 
 
-def test_plan_provider_and_package_mutually_exclusive(cli_runner, mock_orchestrator):
+def test_plan_provider_and_package_mutually_exclusive(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """--provider with --package raises UsageError; orchestrator is not called."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -200,7 +202,9 @@ def test_plan_provider_and_package_mutually_exclusive(cli_runner, mock_orchestra
         mock_orchestrator.plan.assert_not_called()
 
 
-def test_plan_provider_and_resource_mutually_exclusive(cli_runner, mock_orchestrator):
+def test_plan_provider_and_resource_mutually_exclusive(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """--provider with --resource raises UsageError; orchestrator is not called."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -213,7 +217,7 @@ def test_plan_provider_and_resource_mutually_exclusive(cli_runner, mock_orchestr
         mock_orchestrator.plan.assert_not_called()
 
 
-def test_plan_three_way_mutex(cli_runner, mock_orchestrator):
+def test_plan_three_way_mutex(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """All three of --provider, --package, --resource together fail."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -237,7 +241,9 @@ def test_plan_three_way_mutex(cli_runner, mock_orchestrator):
         mock_orchestrator.plan.assert_not_called()
 
 
-def test_plan_unknown_provider_filter_surfaces_error(cli_runner, mock_orchestrator):
+def test_plan_unknown_provider_filter_surfaces_error(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """Unknown provider names surface as ProviderFilterError via the orchestrator."""
     mock_orchestrator.plan.side_effect = ProviderFilterError(
         requested=["nope"], available=["opnsense", "proxmox"]
@@ -260,7 +266,7 @@ def test_plan_unknown_provider_filter_surfaces_error(cli_runner, mock_orchestrat
 # ---------------------------------------------------------------------------
 
 
-def test_plan_with_verbose_long_flag(cli_runner, mock_orchestrator):
+def test_plan_with_verbose_long_flag(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """``--verbose`` forwards ``verbose=True`` to the orchestrator."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "plan", "--env", "test", "--verbose"])
@@ -278,7 +284,7 @@ def test_plan_with_verbose_long_flag(cli_runner, mock_orchestrator):
         )
 
 
-def test_plan_with_verbose_short_flag(cli_runner, mock_orchestrator):
+def test_plan_with_verbose_short_flag(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """``-v`` is equivalent to ``--verbose``."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "plan", "--env", "test", "-v"])
@@ -296,7 +302,7 @@ def test_plan_with_verbose_short_flag(cli_runner, mock_orchestrator):
         )
 
 
-def test_plan_default_verbose_is_false(cli_runner, mock_orchestrator):
+def test_plan_default_verbose_is_false(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Without ``--verbose``/``-v``, the orchestrator receives ``verbose=False``."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "plan", "--env", "test"])

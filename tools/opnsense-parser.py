@@ -679,7 +679,7 @@ class OPNsenseParser:
         print(f"\nAll configuration files written to: {output_dir}")
 
 
-def main():
+def main() -> int:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="Parse OPNsense config.xml and generate InfraFoundry YAML configurations"

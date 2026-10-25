@@ -39,7 +39,7 @@ class StubProviderImplementation(ProviderBase):
 class TestProviderBase:
     """Tests for ProviderBase abstract class."""
 
-    def test_init(self, temp_dir):
+    def test_init(self, temp_dir: Path) -> None:
         """Test ProviderBase initialization."""
         config_dir = temp_dir / "config"
         output_dir = temp_dir / "output"
@@ -48,7 +48,7 @@ class TestProviderBase:
         assert provider.terraform_dir == output_dir / "terraform" / "test"
         assert provider.ansible_dir == output_dir / "ansible" / "test"
 
-    def test_ensure_directories(self, temp_dir):
+    def test_ensure_directories(self, temp_dir: Path) -> None:
         """Test ensure_directories creates output directories."""
         config_dir = temp_dir / "config"
         output_dir = temp_dir / "output"
@@ -58,7 +58,7 @@ class TestProviderBase:
         assert provider.terraform_dir.exists()
         assert provider.ansible_dir.exists()
 
-    def test_get_dependencies_default(self, temp_dir):
+    def test_get_dependencies_default(self, temp_dir: Path) -> None:
         """Test get_dependencies returns empty dict by default."""
         config_dir = temp_dir / "config"
         output_dir = temp_dir / "output"
@@ -66,12 +66,12 @@ class TestProviderBase:
         deps = provider.get_dependencies()
         assert deps == {}
 
-    def test_terraform_parallelism_defaults_to_none(self, temp_dir):
+    def test_terraform_parallelism_defaults_to_none(self, temp_dir: Path) -> None:
         """Test terraform_parallelism defaults to None (terraform default of 10)."""
         provider = StubProviderImplementation("test", temp_dir / "cfg", temp_dir / "out")
         assert provider.terraform_parallelism is None
 
-    def test_resource_config_creation(self):
+    def test_resource_config_creation(self) -> None:
         """Test ResourceConfig dataclass."""
         resource = ResourceConfig(
             provider="test",

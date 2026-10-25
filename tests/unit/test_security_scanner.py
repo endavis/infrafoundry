@@ -16,7 +16,7 @@ from infrafoundry.core.security import (
 class TestScanSeverity:
     """Tests for ScanSeverity enum."""
 
-    def test_severity_values(self):
+    def test_severity_values(self) -> None:
         """Test severity enum values."""
         assert ScanSeverity.CRITICAL.value == "critical"
         assert ScanSeverity.HIGH.value == "high"
@@ -28,7 +28,7 @@ class TestScanSeverity:
 class TestSecurityViolation:
     """Tests for SecurityViolation dataclass."""
 
-    def test_create_violation(self):
+    def test_create_violation(self) -> None:
         """Test creating a security violation."""
         violation = SecurityViolation(
             check_id="CKV_AWS_1",
@@ -43,7 +43,7 @@ class TestSecurityViolation:
         assert violation.check_id == "CKV_AWS_1"
         assert violation.severity == ScanSeverity.HIGH
 
-    def test_violation_to_dict(self):
+    def test_violation_to_dict(self) -> None:
         """Test converting violation to dictionary."""
         violation = SecurityViolation(
             check_id="CKV_AWS_1",
@@ -62,13 +62,13 @@ class TestSecurityViolation:
 class TestScanResult:
     """Tests for ScanResult dataclass."""
 
-    def test_create_passed_result(self):
+    def test_create_passed_result(self) -> None:
         """Test creating a passed scan result."""
         result = ScanResult(passed=True, passed_checks=10)
         assert result.passed is True
         assert result.total_checks == 10
 
-    def test_create_failed_result(self):
+    def test_create_failed_result(self) -> None:
         """Test creating a failed scan result."""
         violation = SecurityViolation(
             check_id="CKV_AWS_1",
@@ -88,7 +88,7 @@ class TestScanResult:
         assert result.total_checks == 6
         assert len(result.violations) == 1
 
-    def test_get_violations_by_severity(self):
+    def test_get_violations_by_severity(self) -> None:
         """Test filtering violations by severity."""
         violations = [
             SecurityViolation(
@@ -120,7 +120,7 @@ class TestScanResult:
         high_violations = result.get_violations_by_severity(ScanSeverity.HIGH)
         assert len(high_violations) == 2
 
-    def test_result_to_dict(self):
+    def test_result_to_dict(self) -> None:
         """Test converting result to dictionary."""
         result = ScanResult(
             passed=True,
@@ -139,14 +139,14 @@ class TestScanResult:
 class TestSecurityScanner:
     """Tests for SecurityScanner class."""
 
-    def test_init_defaults(self):
+    def test_init_defaults(self) -> None:
         """Test scanner initialization with defaults."""
         scanner = SecurityScanner()
         assert scanner.severity_threshold == ScanSeverity.HIGH
         assert scanner.skip_checks == []
         assert scanner.frameworks == ["terraform", "ansible"]
 
-    def test_init_custom(self):
+    def test_init_custom(self) -> None:
         """Test scanner initialization with custom options."""
         scanner = SecurityScanner(
             severity_threshold=ScanSeverity.MEDIUM,
@@ -157,19 +157,19 @@ class TestSecurityScanner:
         assert scanner.skip_checks == ["CKV_AWS_1", "CKV_AWS_2"]
         assert scanner.frameworks == ["terraform"]
 
-    def test_is_available_when_checkov_installed(self):
+    def test_is_available_when_checkov_installed(self) -> None:
         """Test is_available returns True when checkov is found."""
         scanner = SecurityScanner()
         with patch("shutil.which", return_value="/usr/bin/checkov"):
             assert scanner.is_available() is True
 
-    def test_is_available_when_checkov_not_installed(self):
+    def test_is_available_when_checkov_not_installed(self) -> None:
         """Test is_available returns False when checkov is not found."""
         scanner = SecurityScanner()
         with patch("shutil.which", return_value=None):
             assert scanner.is_available() is False
 
-    def test_checkov_path_raises_when_not_found(self):
+    def test_checkov_path_raises_when_not_found(self) -> None:
         """Test checkov_path raises FileNotFoundError when not found."""
         scanner = SecurityScanner()
         with patch("shutil.which", return_value=None):
@@ -177,7 +177,7 @@ class TestSecurityScanner:
                 _ = scanner.checkov_path
             assert "checkov not found" in str(exc_info.value)
 
-    def test_get_version_success(self):
+    def test_get_version_success(self) -> None:
         """Test getting checkov version."""
         scanner = SecurityScanner()
         mock_result = MagicMock()
@@ -191,21 +191,21 @@ class TestSecurityScanner:
             version = scanner.get_version()
             assert version == "2.3.0"
 
-    def test_get_version_failure(self):
+    def test_get_version_failure(self) -> None:
         """Test getting version when checkov not available."""
         scanner = SecurityScanner()
         with patch("shutil.which", return_value=None):
             version = scanner.get_version()
             assert version is None
 
-    def test_scan_directory_not_found(self):
+    def test_scan_directory_not_found(self) -> None:
         """Test scanning a non-existent directory."""
         scanner = SecurityScanner()
         result = scanner.scan(Path("/nonexistent/path"))
         assert result.passed is False
         assert "not found" in result.error
 
-    def test_scan_success(self, tmp_path: Path):
+    def test_scan_success(self, tmp_path: Path) -> None:
         """Test successful scan with no violations."""
         scanner = SecurityScanner()
 
@@ -225,7 +225,7 @@ class TestSecurityScanner:
             result = scanner.scan(tmp_path)
             assert result.passed is True
 
-    def test_scan_with_violations(self, tmp_path: Path):
+    def test_scan_with_violations(self, tmp_path: Path) -> None:
         """Test scan that finds violations."""
         scanner = SecurityScanner()
 
@@ -261,7 +261,7 @@ class TestSecurityScanner:
             assert result.failed_checks == 1
             assert result.passed_checks == 1
 
-    def test_scan_timeout(self, tmp_path: Path):
+    def test_scan_timeout(self, tmp_path: Path) -> None:
         """Test scan timeout handling."""
         import subprocess
 
@@ -276,19 +276,19 @@ class TestSecurityScanner:
             assert result.passed is False
             assert "timed out" in result.error
 
-    def test_cleanup(self):
+    def test_cleanup(self) -> None:
         """Test cleanup method."""
         scanner = SecurityScanner()
         # Should not raise
         scanner.cleanup()
 
-    def test_parse_checkov_empty_output(self):
+    def test_parse_checkov_empty_output(self) -> None:
         """Test parsing empty checkov output."""
         scanner = SecurityScanner()
         result = scanner._parse_checkov_output("", "")
         assert result.passed is True
 
-    def test_severity_threshold_filtering(self, tmp_path: Path):
+    def test_severity_threshold_filtering(self, tmp_path: Path) -> None:
         """Test that violations below threshold don't fail scan."""
         scanner = SecurityScanner(severity_threshold=ScanSeverity.HIGH)
 

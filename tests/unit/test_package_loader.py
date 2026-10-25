@@ -1,6 +1,7 @@
 """Unit tests for PackageLoader."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -11,7 +12,14 @@ from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.exceptions import InvalidConfigurationError
 
 
-def _create_package(base_dir, env_name, provider, package_name, manifest, resource_files=None):
+def _create_package(
+    base_dir: Any,
+    env_name: Any,
+    provider: Any,
+    package_name: Any,
+    manifest: Any,
+    resource_files: Any = None,
+) -> Any:
     """Helper to create a package directory structure.
 
     Args:
@@ -46,7 +54,7 @@ def _create_package(base_dir, env_name, provider, package_name, manifest, resour
 class TestDiscoverPackages:
     """Tests for PackageLoader.discover_packages."""
 
-    def test_discover_packages_finds_manifest(self, temp_dir):
+    def test_discover_packages_finds_manifest(self, temp_dir: Path) -> None:
         """Subdirectory with infrafoundry.yml is discovered."""
         loader = PackageLoader(temp_dir)
         _create_package(
@@ -61,7 +69,7 @@ class TestDiscoverPackages:
         assert len(packages) == 1
         assert packages[0].name == "my-pkg"
 
-    def test_discover_packages_sorted_order(self, temp_dir):
+    def test_discover_packages_sorted_order(self, temp_dir: Path) -> None:
         """Multiple packages are returned sorted by name."""
         loader = PackageLoader(temp_dir)
         _create_package(temp_dir, "dev", "proxmox", "zeta-pkg", {"name": "zeta"})
@@ -72,7 +80,7 @@ class TestDiscoverPackages:
         names = [p.name for p in packages]
         assert names == ["alpha-pkg", "mid-pkg", "zeta-pkg"]
 
-    def test_discover_packages_skips_excluded_dirs(self, temp_dir):
+    def test_discover_packages_skips_excluded_dirs(self, temp_dir: Path) -> None:
         """Directories in EXCLUDED_DIRS are skipped even with manifest."""
         loader = PackageLoader(temp_dir)
         # Create excluded dir with manifest
@@ -87,7 +95,7 @@ class TestDiscoverPackages:
         assert len(packages) == 1
         assert packages[0].name == "valid-pkg"
 
-    def test_discover_packages_no_manifest(self, temp_dir):
+    def test_discover_packages_no_manifest(self, temp_dir: Path) -> None:
         """Subdirectory without manifest is ignored."""
         loader = PackageLoader(temp_dir)
         no_manifest_dir = temp_dir / "dev" / "proxmox" / "no-manifest"
@@ -97,7 +105,7 @@ class TestDiscoverPackages:
         packages = loader.discover_packages("dev", "proxmox")
         assert packages == []
 
-    def test_discover_packages_empty_provider(self, temp_dir):
+    def test_discover_packages_empty_provider(self, temp_dir: Path) -> None:
         """No subdirs returns empty list."""
         loader = PackageLoader(temp_dir)
         provider_dir = temp_dir / "dev" / "proxmox"
@@ -106,13 +114,13 @@ class TestDiscoverPackages:
         packages = loader.discover_packages("dev", "proxmox")
         assert packages == []
 
-    def test_discover_packages_nonexistent_provider(self, temp_dir):
+    def test_discover_packages_nonexistent_provider(self, temp_dir: Path) -> None:
         """Non-existent provider dir returns empty list."""
         loader = PackageLoader(temp_dir)
         packages = loader.discover_packages("dev", "nonexistent")
         assert packages == []
 
-    def test_discover_packages_skips_files(self, temp_dir):
+    def test_discover_packages_skips_files(self, temp_dir: Path) -> None:
         """Files in provider dir are not treated as packages."""
         loader = PackageLoader(temp_dir)
         provider_dir = temp_dir / "dev" / "proxmox"
@@ -127,7 +135,7 @@ class TestDiscoverPackages:
 class TestParseManifest:
     """Tests for PackageLoader._parse_manifest."""
 
-    def test_parse_manifest_full(self, temp_dir):
+    def test_parse_manifest_full(self, temp_dir: Path) -> None:
         """All fields parse correctly."""
         loader = PackageLoader(temp_dir)
         manifest_data = {
@@ -150,7 +158,7 @@ class TestParseManifest:
         assert manifest.resources == ["vm.yaml", "network.yaml"]
         assert len(manifest.events["AFTER_APPLY"]) == 1
 
-    def test_parse_manifest_minimal(self, temp_dir):
+    def test_parse_manifest_minimal(self, temp_dir: Path) -> None:
         """Name-only manifest works."""
         loader = PackageLoader(temp_dir)
         pkg_dir = temp_dir / "pkg"
@@ -165,7 +173,7 @@ class TestParseManifest:
         assert manifest.resources == []
         assert manifest.events == {}
 
-    def test_parse_manifest_invalid_yaml(self, temp_dir):
+    def test_parse_manifest_invalid_yaml(self, temp_dir: Path) -> None:
         """Invalid YAML raises InvalidConfigurationError."""
         loader = PackageLoader(temp_dir)
         pkg_dir = temp_dir / "pkg"
@@ -176,7 +184,7 @@ class TestParseManifest:
         with pytest.raises(InvalidConfigurationError, match="Invalid YAML"):
             loader._parse_manifest(manifest_path)
 
-    def test_parse_manifest_missing_name(self, temp_dir):
+    def test_parse_manifest_missing_name(self, temp_dir: Path) -> None:
         """Missing required 'name' raises InvalidConfigurationError."""
         loader = PackageLoader(temp_dir)
         pkg_dir = temp_dir / "pkg"
@@ -187,7 +195,7 @@ class TestParseManifest:
         with pytest.raises(InvalidConfigurationError, match="Invalid package manifest"):
             loader._parse_manifest(manifest_path)
 
-    def test_parse_manifest_missing_file(self, temp_dir):
+    def test_parse_manifest_missing_file(self, temp_dir: Path) -> None:
         """Missing manifest file raises InvalidConfigurationError."""
         loader = PackageLoader(temp_dir)
         manifest_path = temp_dir / "nonexistent" / "infrafoundry.yml"
@@ -195,7 +203,7 @@ class TestParseManifest:
         with pytest.raises(InvalidConfigurationError, match="not found"):
             loader._parse_manifest(manifest_path)
 
-    def test_parse_manifest_empty_file(self, temp_dir):
+    def test_parse_manifest_empty_file(self, temp_dir: Path) -> None:
         """Empty manifest file raises InvalidConfigurationError."""
         loader = PackageLoader(temp_dir)
         pkg_dir = temp_dir / "pkg"
@@ -211,7 +219,7 @@ class TestParseManifest:
 class TestRenderResourceFile:
     """Tests for PackageLoader._render_resource_file."""
 
-    def test_render_resource_variables(self, temp_dir):
+    def test_render_resource_variables(self, temp_dir: Path) -> None:
         """Jinja2 variables are substituted correctly."""
         loader = PackageLoader(temp_dir)
         resource_path = temp_dir / "vm.yaml"
@@ -223,7 +231,7 @@ class TestRenderResourceFile:
         assert data["vm"][0]["name"] == "lab-node1"
         assert data["vm"][0]["cores"] == 4
 
-    def test_render_resource_undefined_var(self, temp_dir):
+    def test_render_resource_undefined_var(self, temp_dir: Path) -> None:
         """StrictUndefined raises error for missing variables."""
         loader = PackageLoader(temp_dir)
         resource_path = temp_dir / "vm.yaml"
@@ -232,7 +240,7 @@ class TestRenderResourceFile:
         with pytest.raises(InvalidConfigurationError, match="Undefined variable"):
             loader._render_resource_file(resource_path, {})
 
-    def test_render_resource_missing_file(self, temp_dir):
+    def test_render_resource_missing_file(self, temp_dir: Path) -> None:
         """Missing resource file raises InvalidConfigurationError."""
         loader = PackageLoader(temp_dir)
         resource_path = temp_dir / "nonexistent.yaml"
@@ -240,7 +248,7 @@ class TestRenderResourceFile:
         with pytest.raises(InvalidConfigurationError, match="not found"):
             loader._render_resource_file(resource_path, {})
 
-    def test_render_resource_template_syntax_error(self, temp_dir):
+    def test_render_resource_template_syntax_error(self, temp_dir: Path) -> None:
         """Template syntax error raises InvalidConfigurationError."""
         loader = PackageLoader(temp_dir)
         resource_path = temp_dir / "bad.yaml"
@@ -249,7 +257,7 @@ class TestRenderResourceFile:
         with pytest.raises(InvalidConfigurationError, match="Template syntax error"):
             loader._render_resource_file(resource_path, {})
 
-    def test_render_resource_empty_result(self, temp_dir):
+    def test_render_resource_empty_result(self, temp_dir: Path) -> None:
         """Empty YAML after rendering returns empty dict."""
         loader = PackageLoader(temp_dir)
         resource_path = temp_dir / "empty.yaml"
@@ -258,7 +266,7 @@ class TestRenderResourceFile:
         data = loader._render_resource_file(resource_path, {})
         assert data == {}
 
-    def test_render_resource_provider_variable_available(self, temp_dir):
+    def test_render_resource_provider_variable_available(self, temp_dir: Path) -> None:
         """Provider kwarg is available as {{ provider }} in templates."""
         loader = PackageLoader(temp_dir)
         resource_path = temp_dir / "vm.yaml"
@@ -267,7 +275,7 @@ class TestRenderResourceFile:
         data = loader._render_resource_file(resource_path, {}, provider="proxmox")
         assert data["vm"][0]["name"] == "node-proxmox"
 
-    def test_render_resource_provider_not_injected_when_none(self, temp_dir):
+    def test_render_resource_provider_not_injected_when_none(self, temp_dir: Path) -> None:
         """Default provider=None does not inject a provider variable."""
         loader = PackageLoader(temp_dir)
         resource_path = temp_dir / "vm.yaml"
@@ -276,7 +284,7 @@ class TestRenderResourceFile:
         data = loader._render_resource_file(resource_path, {})
         assert data["vm"][0]["name"] == "simple-node"
 
-    def test_render_resource_provider_does_not_clobber_user_variable(self, temp_dir):
+    def test_render_resource_provider_does_not_clobber_user_variable(self, temp_dir: Path) -> None:
         """User-defined 'provider' in variables takes precedence over injected value."""
         loader = PackageLoader(temp_dir)
         resource_path = temp_dir / "vm.yaml"
@@ -292,7 +300,7 @@ class TestRenderResourceFile:
 class TestParseResourcesFromData:
     """Tests for PackageLoader._parse_resources_from_data."""
 
-    def test_parse_resources_singular_key(self, temp_dir):
+    def test_parse_resources_singular_key(self, temp_dir: Path) -> None:
         """Singular key (vm) works."""
         loader = PackageLoader(temp_dir)
         data = {"vm": [{"name": "node1", "cores": 4}]}
@@ -302,14 +310,14 @@ class TestParseResourcesFromData:
         assert resources[0].type == "vm"
         assert resources[0].provider == "proxmox"
 
-    def test_parse_resources_plural_key(self, temp_dir):
+    def test_parse_resources_plural_key(self, temp_dir: Path) -> None:
         """Plural key (vms) works as fallback."""
         loader = PackageLoader(temp_dir)
         data = {"vms": [{"name": "node1"}, {"name": "node2"}]}
         resources = loader._parse_resources_from_data(data, "vm.yaml", "proxmox")
         assert len(resources) == 2
 
-    def test_parse_resources_hyphenated_filename(self, temp_dir):
+    def test_parse_resources_hyphenated_filename(self, temp_dir: Path) -> None:
         """Hyphenated filename extracts type from first segment."""
         loader = PackageLoader(temp_dir)
         data = {"vm": [{"name": "web-01"}]}
@@ -317,20 +325,20 @@ class TestParseResourcesFromData:
         assert len(resources) == 1
         assert resources[0].type == "vm"
 
-    def test_parse_resources_empty_data(self, temp_dir):
+    def test_parse_resources_empty_data(self, temp_dir: Path) -> None:
         """Empty data returns empty list."""
         loader = PackageLoader(temp_dir)
         resources = loader._parse_resources_from_data({}, "vm.yaml", "proxmox")
         assert resources == []
 
-    def test_parse_resources_non_list_raises(self, temp_dir):
+    def test_parse_resources_non_list_raises(self, temp_dir: Path) -> None:
         """Non-list resource value raises InvalidConfigurationError."""
         loader = PackageLoader(temp_dir)
         data = {"vm": {"name": "node1"}}
         with pytest.raises(InvalidConfigurationError, match="Expected list"):
             loader._parse_resources_from_data(data, "vm.yaml", "proxmox")
 
-    def test_parse_resources_skips_non_dict_items(self, temp_dir):
+    def test_parse_resources_skips_non_dict_items(self, temp_dir: Path) -> None:
         """Non-dict items in resource list are skipped."""
         loader = PackageLoader(temp_dir)
         data = {"vm": ["not-a-dict", {"name": "valid-vm"}]}
@@ -338,7 +346,7 @@ class TestParseResourcesFromData:
         assert len(resources) == 1
         assert resources[0].name == "valid-vm"
 
-    def test_parse_resources_skips_items_without_name(self, temp_dir):
+    def test_parse_resources_skips_items_without_name(self, temp_dir: Path) -> None:
         """Dict items without 'name' key are skipped."""
         loader = PackageLoader(temp_dir)
         data = {"vm": [{"cores": 4}, {"name": "valid-vm"}]}
@@ -351,7 +359,7 @@ class TestParseResourcesFromData:
 class TestRewriteEventScripts:
     """Tests for PackageLoader._rewrite_event_scripts."""
 
-    def test_rewrite_event_scripts(self, temp_dir):
+    def test_rewrite_event_scripts(self, temp_dir: Path) -> None:
         """Script paths are rewritten relative to env dir."""
         loader = PackageLoader(temp_dir)
         events = {"AFTER_APPLY": [{"type": "script", "script": "scripts/setup.sh"}]}
@@ -361,7 +369,7 @@ class TestRewriteEventScripts:
         rewritten = loader._rewrite_event_scripts(events, package_dir, env_dir)
         assert rewritten["AFTER_APPLY"][0]["script"] == "proxmox/ontap-cluster/scripts/setup.sh"
 
-    def test_rewrite_event_scripts_non_script_handler(self, temp_dir):
+    def test_rewrite_event_scripts_non_script_handler(self, temp_dir: Path) -> None:
         """Webhook and python handlers are unchanged."""
         loader = PackageLoader(temp_dir)
         events = {
@@ -377,7 +385,7 @@ class TestRewriteEventScripts:
         assert rewritten["AFTER_APPLY"][0]["url"] == "https://example.com/hook"
         assert rewritten["AFTER_APPLY"][1]["module"] == "hooks.notify"
 
-    def test_rewrite_event_scripts_empty(self, temp_dir):
+    def test_rewrite_event_scripts_empty(self, temp_dir: Path) -> None:
         """Empty events returns empty dict."""
         loader = PackageLoader(temp_dir)
         package_dir = temp_dir / "dev" / "proxmox" / "pkg"
@@ -386,7 +394,7 @@ class TestRewriteEventScripts:
         rewritten = loader._rewrite_event_scripts({}, package_dir, env_dir)
         assert rewritten == {}
 
-    def test_rewrite_event_scripts_does_not_mutate_original(self, temp_dir):
+    def test_rewrite_event_scripts_does_not_mutate_original(self, temp_dir: Path) -> None:
         """Original events dict is not mutated."""
         loader = PackageLoader(temp_dir)
         events = {"AFTER_APPLY": [{"type": "script", "script": "scripts/setup.sh"}]}
@@ -397,7 +405,7 @@ class TestRewriteEventScripts:
         # Original should be unchanged
         assert events["AFTER_APPLY"][0]["script"] == "scripts/setup.sh"
 
-    def test_rewrite_event_scripts_multiple_events(self, temp_dir):
+    def test_rewrite_event_scripts_multiple_events(self, temp_dir: Path) -> None:
         """Multiple event types are all rewritten."""
         loader = PackageLoader(temp_dir)
         events = {
@@ -416,7 +424,7 @@ class TestRewriteEventScripts:
 class TestLoadPackage:
     """Tests for PackageLoader.load_package end-to-end."""
 
-    def test_load_package_full(self, temp_dir):
+    def test_load_package_full(self, temp_dir: Path) -> None:
         """End-to-end: manifest + templated resources + events."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -453,7 +461,7 @@ class TestLoadPackage:
         assert "AFTER_APPLY" in events
         assert events["AFTER_APPLY"][0]["script"] == "proxmox/ontap-cluster/scripts/setup.sh"
 
-    def test_load_package_resources_only(self, temp_dir):
+    def test_load_package_resources_only(self, temp_dir: Path) -> None:
         """Package with no events."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -476,7 +484,7 @@ class TestLoadPackage:
         assert resources[0].name == "web-01"
         assert events == {}
 
-    def test_load_package_events_only(self, temp_dir):
+    def test_load_package_events_only(self, temp_dir: Path) -> None:
         """Package with no resources."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -495,7 +503,7 @@ class TestLoadPackage:
         assert resources == []
         assert "BEFORE_PLAN" in events
 
-    def test_load_package_missing_resource_file(self, temp_dir):
+    def test_load_package_missing_resource_file(self, temp_dir: Path) -> None:
         """Package referencing non-existent resource file raises error."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -517,7 +525,7 @@ class TestLoadPackage:
 class TestMultiProviderResources:
     """Tests for multi-provider resource support in packages."""
 
-    def test_resource_centric_format(self, temp_dir):
+    def test_resource_centric_format(self, temp_dir: Path) -> None:
         """Resource-centric format with explicit provider and type per item."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -556,7 +564,7 @@ resources:
         assert resources[1].provider == "opnsense"
         assert resources[1].type == "kea.dhcp4.reservations"
 
-    def test_resource_centric_default_provider(self, temp_dir):
+    def test_resource_centric_default_provider(self, temp_dir: Path) -> None:
         """Resource-centric items without provider use parent provider."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -584,7 +592,7 @@ resources:
         assert resources[0].provider == "proxmox"
         assert resources[0].type == "vm"
 
-    def test_resource_centric_missing_type(self, temp_dir):
+    def test_resource_centric_missing_type(self, temp_dir: Path) -> None:
         """Resource-centric item without type raises error."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -610,7 +618,7 @@ resources:
         with pytest.raises(InvalidConfigurationError, match="missing 'type'"):
             loader.load_package(pkg_dir, "proxmox", "dev")
 
-    def test_provider_centric_with_provider_override(self, temp_dir):
+    def test_provider_centric_with_provider_override(self, temp_dir: Path) -> None:
         """Provider-centric format items can override provider."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -639,7 +647,7 @@ vms:
         assert resources[0].provider == "proxmox"
         assert resources[1].provider == "esxi"
 
-    def test_resource_centric_with_variables(self, temp_dir):
+    def test_resource_centric_with_variables(self, temp_dir: Path) -> None:
         """Resource-centric format works with Jinja2 variable rendering."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -670,7 +678,7 @@ resources:
         assert resources[0].config["vmid"] == 220
 
 
-def _create_blueprint(base_dir, name, manifest_data, extra_files=None):
+def _create_blueprint(base_dir: Any, name: Any, manifest_data: Any, extra_files: Any = None) -> Any:
     """Helper to create a blueprint directory under config_repo/blueprints/.
 
     Args:
@@ -703,7 +711,7 @@ def _create_blueprint(base_dir, name, manifest_data, extra_files=None):
 class TestBlueprintIntegration:
     """Tests for blueprint resolution in PackageLoader."""
 
-    def test_blueprint_defaults_merged(self, temp_dir):
+    def test_blueprint_defaults_merged(self, temp_dir: Path) -> None:
         """Blueprint defaults are merged under package variables."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -739,7 +747,7 @@ class TestBlueprintIntegration:
         assert variables["cluster_name"] == "prod-cluster"
         assert variables["node_count"] == 2
 
-    def test_blueprint_resources_inherited(self, temp_dir):
+    def test_blueprint_resources_inherited(self, temp_dir: Path) -> None:
         """Package without resources inherits from blueprint."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -771,7 +779,7 @@ class TestBlueprintIntegration:
         assert len(resources) == 1
         assert resources[0].name == "web-01"
 
-    def test_blueprint_events_inherited(self, temp_dir):
+    def test_blueprint_events_inherited(self, temp_dir: Path) -> None:
         """Package without events inherits from blueprint."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -803,7 +811,7 @@ class TestBlueprintIntegration:
         # Script resolves to blueprint (absolute path) since not in package
         assert str(bp_dir) in events["AFTER_APPLY"][0]["script"]
 
-    def test_package_overrides_blueprint_resources(self, temp_dir):
+    def test_package_overrides_blueprint_resources(self, temp_dir: Path) -> None:
         """Package's own resources take priority over blueprint."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -838,7 +846,7 @@ class TestBlueprintIntegration:
         assert len(resources) == 1
         assert resources[0].name == "custom-custom"
 
-    def test_blueprint_file_fallback(self, temp_dir):
+    def test_blueprint_file_fallback(self, temp_dir: Path) -> None:
         """Resource files fall back to blueprint dir when not in package."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -872,7 +880,7 @@ class TestBlueprintIntegration:
         assert len(resources) == 1
         assert resources[0].name == "web-server"
 
-    def test_package_file_preferred_over_blueprint(self, temp_dir):
+    def test_package_file_preferred_over_blueprint(self, temp_dir: Path) -> None:
         """Package's own resource file is used even if blueprint has same name."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -905,7 +913,7 @@ class TestBlueprintIntegration:
         assert len(resources) == 1
         assert resources[0].name == "package-vm"
 
-    def test_no_blueprint_works_unchanged(self, temp_dir):
+    def test_no_blueprint_works_unchanged(self, temp_dir: Path) -> None:
         """Packages without blueprint: key work exactly as before."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -929,7 +937,7 @@ class TestBlueprintIntegration:
         assert len(resources) == 1
         assert resources[0].name == "app-01"
 
-    def test_blueprint_without_resolver_raises(self, temp_dir):
+    def test_blueprint_without_resolver_raises(self, temp_dir: Path) -> None:
         """Package referencing blueprint without resolver raises error."""
         loader = PackageLoader(temp_dir)  # No resolver
 
@@ -947,7 +955,7 @@ class TestBlueprintIntegration:
         with pytest.raises(InvalidConfigurationError, match="no blueprint resolver"):
             loader.load_package(pkg_dir, "proxmox", "dev")
 
-    def test_blueprint_inventory_inherited(self, temp_dir):
+    def test_blueprint_inventory_inherited(self, temp_dir: Path) -> None:
         """Inventory from blueprint is inherited and generated."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -993,7 +1001,7 @@ class TestBlueprintIntegration:
 
         assert data["groups"]["servers"]["hosts"]["server-01"]["ansible_host"] == "10.0.0.1"
 
-    def test_package_inventory_overrides_blueprint(self, temp_dir):
+    def test_package_inventory_overrides_blueprint(self, temp_dir: Path) -> None:
         """Package's own inventory overrides blueprint inventory."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -1031,7 +1039,7 @@ class TestBlueprintIntegration:
         assert "package_group" in data["groups"]
         assert "blueprint_group" not in data["groups"]
 
-    def test_blueprint_handler_tagged_with_blueprint_dir(self, temp_dir):
+    def test_blueprint_handler_tagged_with_blueprint_dir(self, temp_dir: Path) -> None:
         """Event handlers from blueprint packages have _blueprint_dir tag."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -1063,7 +1071,9 @@ class TestBlueprintIntegration:
         assert handler["_blueprint_dir"] == str(bp_dir)
         assert handler["_package"] == "tagged-pkg"
 
-    def test_blueprint_inventory_with_loop_renders_via_consumer_variables(self, temp_dir):
+    def test_blueprint_inventory_with_loop_renders_via_consumer_variables(
+        self, temp_dir: Path
+    ) -> None:
         """Blueprint inventory `{% for %}` expands using consumer-supplied workers."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -1107,7 +1117,7 @@ class TestBlueprintIntegration:
         assert hosts["worker-01"]["ansible_host"] == "10.0.0.11"
         assert hosts["worker-02"]["ansible_host"] == "10.0.0.12"
 
-    def test_package_inventory_with_loop(self, temp_dir):
+    def test_package_inventory_with_loop(self, temp_dir: Path) -> None:
         """Package-level inventory with `{% for %}` expands using package variables."""
         loader = PackageLoader(temp_dir)
         pkg_dir = temp_dir / "dev" / "proxmox" / "pkg-loop"
@@ -1141,7 +1151,7 @@ class TestBlueprintIntegration:
         assert hosts["n1"]["ansible_host"] == "1.1.1.1"
         assert hosts["n2"]["ansible_host"] == "2.2.2.2"
 
-    def test_blueprint_inventory_raw_inheritance(self, temp_dir):
+    def test_blueprint_inventory_raw_inheritance(self, temp_dir: Path) -> None:
         """Blueprint `inventory_raw` is inherited onto a consumer with no inventory."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -1180,7 +1190,7 @@ class TestBlueprintIntegration:
             data = yaml.safe_load(f)
         assert data["groups"]["only"]["hosts"]["sole"]["ansible_host"] == "10.0.0.99"
 
-    def test_secrets_override_blueprint_defaults(self, temp_dir):
+    def test_secrets_override_blueprint_defaults(self, temp_dir: Path) -> None:
         """Secrets take priority over both blueprint defaults and package vars."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -1222,7 +1232,9 @@ class TestBlueprintIntegration:
 class TestHandlerConfigTagging:
     """Tests for _package_dir/_package/_blueprint_dir injection on handler configs."""
 
-    def test_load_package_tags_package_event_handlers_with_package_dir(self, temp_dir):
+    def test_load_package_tags_package_event_handlers_with_package_dir(
+        self, temp_dir: Path
+    ) -> None:
         """Package-level event handlers carry _package_dir pointing at the package."""
         loader = PackageLoader(temp_dir)
         pkg_dir = _create_package(
@@ -1246,7 +1258,9 @@ class TestHandlerConfigTagging:
         assert handler["_package_dir"] == str(pkg_dir)
         assert "_blueprint_dir" not in handler
 
-    def test_load_package_tags_resource_event_handlers_with_package_dir(self, temp_dir):
+    def test_load_package_tags_resource_event_handlers_with_package_dir(
+        self, temp_dir: Path
+    ) -> None:
         """Resource-level event handlers carry _package and _package_dir tags."""
         loader = PackageLoader(temp_dir)
         pkg_dir = _create_package(
@@ -1281,7 +1295,9 @@ class TestHandlerConfigTagging:
         assert handler["_package_dir"] == str(pkg_dir)
         assert "_blueprint_dir" not in handler
 
-    def test_load_package_handler_package_dir_matches_inventory_output_dir(self, temp_dir):
+    def test_load_package_handler_package_dir_matches_inventory_output_dir(
+        self, temp_dir: Path
+    ) -> None:
         """_package_dir on handlers points at the dir where inventory was generated."""
         loader = PackageLoader(temp_dir)
         pkg_dir = _create_package(
@@ -1316,7 +1332,9 @@ class TestHandlerConfigTagging:
         assert (pkg_dir / GENERATED_INVENTORY_FILENAME).exists()
         assert handler["_package_dir"] == str(pkg_dir)
 
-    def test_blueprint_consumer_tags_resource_handlers_with_blueprint_dir(self, temp_dir):
+    def test_blueprint_consumer_tags_resource_handlers_with_blueprint_dir(
+        self, temp_dir: Path
+    ) -> None:
         """When a package consumes a blueprint, resource-level handlers also get _blueprint_dir."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"

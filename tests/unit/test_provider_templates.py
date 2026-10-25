@@ -15,6 +15,7 @@ Verifies:
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -492,7 +493,7 @@ class TestOPNsenseTemplates:
             """Regex replace filter (mimics Ansible filter)."""
             return re.sub(pattern, replacement, value)
 
-        def lookup_filter(plugin: str, *args, **kwargs) -> str:
+        def lookup_filter(plugin: str, *args: Any, **kwargs: Any) -> str:
             """Lookup filter (mimics Ansible lookup)."""
             # Return empty string for env lookups in tests
             return ""
@@ -504,12 +505,12 @@ class TestOPNsenseTemplates:
         # Patch template.render to inject test variables
         original_get_template = provider.jinja_env.get_template
 
-        def get_template_with_vars(name):
+        def get_template_with_vars(name: Any) -> Any:
             """Get template and wrap render method to inject variables."""
             template = original_get_template(name)
             original_render = template.render
 
-            def render_with_test_vars(**kwargs):
+            def render_with_test_vars(**kwargs: Any) -> Any:
                 """Inject test variables into template context."""
                 test_vars = {
                     "opnsense_api_url": "https://opnsense.test",
@@ -716,7 +717,7 @@ class TestKubernetesTemplates:
         # which are only available at Ansible runtime. We need to provide
         # a mock 'item' object for the template to render.
         # Add Ansible-specific functions to Jinja2 environment
-        def lookup_filter(plugin: str, *args, **kwargs) -> str:
+        def lookup_filter(plugin: str, *args: Any, **kwargs: Any) -> str:
             """Lookup filter (mimics Ansible lookup)."""
             return ""
 
@@ -743,12 +744,12 @@ class TestKubernetesTemplates:
         # Patch template.render to inject mock item
         original_get_template = provider.jinja_env.get_template
 
-        def get_template_with_mock_item(name):
+        def get_template_with_mock_item(name: Any) -> Any:
             """Get template and wrap render method to inject mock item."""
             template = original_get_template(name)
             original_render = template.render
 
-            def render_with_mock(**kwargs):
+            def render_with_mock(**kwargs: Any) -> Any:
                 """Inject mock item into template context."""
                 kwargs["item"] = mock_item
                 return original_render(**kwargs)
@@ -930,7 +931,7 @@ class TestProviderResourceGrouping:
 class TestProviderValidation:
     """Test provider config validation methods."""
 
-    def test_proxmox_validate_config(self, tmp_path: Path):
+    def test_proxmox_validate_config(self, tmp_path: Path) -> None:
         """Test Proxmox config validation."""
         provider = ProxmoxProvider(tmp_path / "config", tmp_path / "output")
 
@@ -940,7 +941,7 @@ class TestProviderValidation:
         # Invalid config missing 'name'
         assert provider.validate_config({"other": "value"}) is False
 
-    def test_opnsense_validate_config(self, tmp_path: Path):
+    def test_opnsense_validate_config(self, tmp_path: Path) -> None:
         """Test OPNsense config validation."""
         provider = OPNsenseProvider(tmp_path / "config", tmp_path / "output")
 
@@ -950,7 +951,7 @@ class TestProviderValidation:
         # Invalid config missing 'name'
         assert provider.validate_config({"action": "pass"}) is False
 
-    def test_kubernetes_validate_config(self, tmp_path: Path):
+    def test_kubernetes_validate_config(self, tmp_path: Path) -> None:
         """Test Kubernetes config validation."""
         provider = KubernetesProvider(tmp_path / "config", tmp_path / "output")
 
@@ -964,7 +965,7 @@ class TestProviderValidation:
 class TestProviderDependencies:
     """Test provider dependency methods."""
 
-    def test_proxmox_get_dependencies(self, tmp_path: Path):
+    def test_proxmox_get_dependencies(self, tmp_path: Path) -> None:
         """Test Proxmox resource dependencies."""
         provider = ProxmoxProvider(tmp_path / "config", tmp_path / "output")
         deps = provider.get_dependencies()
@@ -974,7 +975,7 @@ class TestProviderDependencies:
         assert "template" in deps["vm"]
         assert "network" in deps["vm"]
 
-    def test_opnsense_get_dependencies(self, tmp_path: Path):
+    def test_opnsense_get_dependencies(self, tmp_path: Path) -> None:
         """Test OPNsense resource dependencies."""
         provider = OPNsenseProvider(tmp_path / "config", tmp_path / "output")
         deps = provider.get_dependencies()
@@ -988,7 +989,7 @@ class TestProviderDependencies:
         assert "interfaces.assignments" in deps["firewall.rules"]
         assert "routing.gateways" in deps["firewall.rules"]
 
-    def test_kubernetes_get_dependencies(self, tmp_path: Path):
+    def test_kubernetes_get_dependencies(self, tmp_path: Path) -> None:
         """Test Kubernetes resource dependencies."""
         provider = KubernetesProvider(tmp_path / "config", tmp_path / "output")
         deps = provider.get_dependencies()

@@ -2,6 +2,7 @@
 
 import shutil
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -571,7 +572,7 @@ class TestExecuteRollback:
             # Make shutil.rmtree fail during rollback (target cleanup)
             original_rmtree = shutil.rmtree
 
-            def rmtree_that_fails_on_target(path, *args, **kwargs):
+            def rmtree_that_fails_on_target(path: Any, *args: Any, **kwargs: Any) -> Any:
                 if "staging" in str(path) and "my-cluster" in str(path):
                     raise OSError("Cannot remove target during rollback")
                 return original_rmtree(path, *args, **kwargs)

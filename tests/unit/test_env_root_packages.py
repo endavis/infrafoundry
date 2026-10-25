@@ -1,6 +1,8 @@
 """Unit tests for env-root package discovery and integration."""
 
 import warnings
+from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -11,7 +13,7 @@ from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoad
 from infrafoundry.core.exceptions import InvalidConfigurationError, PackageNotFoundError
 
 
-def _create_env(base_dir, env_name):
+def _create_env(base_dir: Any, env_name: Any) -> Any:
     """Create a minimal environment directory with settings.yaml."""
     env_dir = base_dir / env_name
     env_dir.mkdir(parents=True, exist_ok=True)
@@ -20,7 +22,14 @@ def _create_env(base_dir, env_name):
     return env_dir
 
 
-def _create_package(base_dir, env_name, package_name, manifest, resource_files=None, provider=None):
+def _create_package(
+    base_dir: Any,
+    env_name: Any,
+    package_name: Any,
+    manifest: Any,
+    resource_files: Any = None,
+    provider: Any = None,
+) -> Any:
     """Create a package directory structure.
 
     Args:
@@ -54,7 +63,9 @@ def _create_package(base_dir, env_name, package_name, manifest, resource_files=N
     return package_dir
 
 
-def _create_loose_resources(base_dir, env_name, provider, resource_file, content):
+def _create_loose_resources(
+    base_dir: Any, env_name: Any, provider: Any, resource_file: Any, content: Any
+) -> Any:
     """Create loose resource files under a provider directory."""
     provider_dir = base_dir / env_name / provider
     provider_dir.mkdir(parents=True, exist_ok=True)
@@ -71,7 +82,7 @@ def _create_loose_resources(base_dir, env_name, provider, resource_file, content
 class TestDiscoverEnvRootPackages:
     """Tests for PackageLoader.discover_env_root_packages."""
 
-    def test_discovers_packages_at_env_root(self, temp_dir):
+    def test_discovers_packages_at_env_root(self, temp_dir: Path) -> None:
         """Subdirectory of env root with infrafoundry.yml is discovered."""
         loader = PackageLoader(temp_dir)
         _create_env(temp_dir, "dev")
@@ -81,7 +92,7 @@ class TestDiscoverEnvRootPackages:
         assert len(packages) == 1
         assert packages[0].name == "my-pkg"
 
-    def test_discovers_multiple_packages_sorted(self, temp_dir):
+    def test_discovers_multiple_packages_sorted(self, temp_dir: Path) -> None:
         """Multiple packages are returned sorted by name."""
         loader = PackageLoader(temp_dir)
         _create_env(temp_dir, "dev")
@@ -92,7 +103,7 @@ class TestDiscoverEnvRootPackages:
         names = [p.name for p in packages]
         assert names == ["alpha-pkg", "zeta-pkg"]
 
-    def test_skips_excluded_dirs(self, temp_dir):
+    def test_skips_excluded_dirs(self, temp_dir: Path) -> None:
         """Directories in EXCLUDED_DIRS and ENV_ROOT_EXCLUDED_DIRS are skipped."""
         loader = PackageLoader(temp_dir)
         _create_env(temp_dir, "dev")
@@ -110,7 +121,7 @@ class TestDiscoverEnvRootPackages:
         assert len(packages) == 1
         assert packages[0].name == "valid-pkg"
 
-    def test_skips_dirs_without_manifest(self, temp_dir):
+    def test_skips_dirs_without_manifest(self, temp_dir: Path) -> None:
         """Subdirectories without infrafoundry.yml are not discovered."""
         loader = PackageLoader(temp_dir)
         _create_env(temp_dir, "dev")
@@ -121,7 +132,7 @@ class TestDiscoverEnvRootPackages:
         packages = loader.discover_env_root_packages("dev")
         assert packages == []
 
-    def test_skips_files(self, temp_dir):
+    def test_skips_files(self, temp_dir: Path) -> None:
         """Files at env root are not treated as packages."""
         loader = PackageLoader(temp_dir)
         _create_env(temp_dir, "dev")
@@ -130,7 +141,7 @@ class TestDiscoverEnvRootPackages:
         packages = loader.discover_env_root_packages("dev")
         assert packages == []
 
-    def test_nonexistent_env(self, temp_dir):
+    def test_nonexistent_env(self, temp_dir: Path) -> None:
         """Non-existent environment returns empty list."""
         loader = PackageLoader(temp_dir)
         packages = loader.discover_env_root_packages("nonexistent")
@@ -141,7 +152,7 @@ class TestDiscoverEnvRootPackages:
 class TestManifestProviderField:
     """Tests for the provider field on PackageManifest."""
 
-    def test_manifest_provider_parsed(self, temp_dir):
+    def test_manifest_provider_parsed(self, temp_dir: Path) -> None:
         """Provider field is parsed from manifest."""
         loader = PackageLoader(temp_dir)
         pkg_dir = temp_dir / "pkg"
@@ -152,7 +163,7 @@ class TestManifestProviderField:
         manifest = loader._parse_manifest(manifest_path)
         assert manifest.provider == "proxmox"
 
-    def test_manifest_provider_defaults_to_none(self, temp_dir):
+    def test_manifest_provider_defaults_to_none(self, temp_dir: Path) -> None:
         """Provider field defaults to None when not specified."""
         loader = PackageLoader(temp_dir)
         pkg_dir = temp_dir / "pkg"
@@ -163,7 +174,7 @@ class TestManifestProviderField:
         manifest = loader._parse_manifest(manifest_path)
         assert manifest.provider is None
 
-    def test_manifest_provider_overrides_directory_inferred(self, temp_dir):
+    def test_manifest_provider_overrides_directory_inferred(self, temp_dir: Path) -> None:
         """Manifest provider overrides directory-inferred provider in load_package."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -186,7 +197,7 @@ class TestManifestProviderField:
         # Should use manifest provider "esxi", not directory-inferred "proxmox"
         assert resources[0].provider == "esxi"
 
-    def test_directory_inferred_provider_used_as_fallback(self, temp_dir):
+    def test_directory_inferred_provider_used_as_fallback(self, temp_dir: Path) -> None:
         """When manifest has no provider, directory-inferred provider is used."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -212,7 +223,7 @@ class TestManifestProviderField:
 class TestDiscoverProvidersSkipsPackages:
     """Tests for discover_providers() skipping env-root package dirs."""
 
-    def test_skips_directory_with_manifest(self, temp_dir):
+    def test_skips_directory_with_manifest(self, temp_dir: Path) -> None:
         """Directory containing infrafoundry.yml is not treated as a provider."""
         loader = ProviderCentricLoader(temp_dir)
         _create_env(temp_dir, "dev")
@@ -228,7 +239,7 @@ class TestDiscoverProvidersSkipsPackages:
         assert "proxmox" in providers
         assert "my-pkg" not in providers
 
-    def test_provider_dir_without_manifest_still_discovered(self, temp_dir):
+    def test_provider_dir_without_manifest_still_discovered(self, temp_dir: Path) -> None:
         """Regular directories without infrafoundry.yml are still providers."""
         loader = ProviderCentricLoader(temp_dir)
         _create_env(temp_dir, "dev")
@@ -244,7 +255,7 @@ class TestDiscoverProvidersSkipsPackages:
 class TestEnvRootPackageIntegration:
     """Tests for env-root packages in get_all_resources_all_providers."""
 
-    def test_env_root_packages_loaded(self, temp_dir):
+    def test_env_root_packages_loaded(self, temp_dir: Path) -> None:
         """Env-root packages are loaded alongside provider-scoped resources."""
         _create_env(temp_dir, "dev")
 
@@ -275,7 +286,7 @@ class TestEnvRootPackageIntegration:
         assert "loose-vm" in names
         assert "pkg-vm" in names
 
-    def test_env_root_package_without_provider_raises(self, temp_dir):
+    def test_env_root_package_without_provider_raises(self, temp_dir: Path) -> None:
         """Env-root package without provider field raises InvalidConfigurationError."""
         _create_env(temp_dir, "dev")
         _create_package(
@@ -290,7 +301,7 @@ class TestEnvRootPackageIntegration:
         with pytest.raises(InvalidConfigurationError, match="must declare a 'provider' field"):
             manager.get_all_resources_all_providers("dev")
 
-    def test_env_root_package_events_accumulated(self, temp_dir):
+    def test_env_root_package_events_accumulated(self, temp_dir: Path) -> None:
         """Events from env-root packages are accumulated in package events."""
         _create_env(temp_dir, "dev")
         _create_package(
@@ -311,7 +322,7 @@ class TestEnvRootPackageIntegration:
         events = manager.get_package_events()
         assert "AFTER_APPLY" in events
 
-    def test_env_root_package_duplicate_name_detected(self, temp_dir):
+    def test_env_root_package_duplicate_name_detected(self, temp_dir: Path) -> None:
         """Duplicate resource names between env-root package and loose resources raise."""
         _create_env(temp_dir, "dev")
 
@@ -343,7 +354,7 @@ class TestEnvRootPackageIntegration:
 class TestLooseResourceDeprecationWarning:
     """Tests for deprecation warnings on loose resources."""
 
-    def test_loose_resources_emit_deprecation_warning(self, temp_dir):
+    def test_loose_resources_emit_deprecation_warning(self, temp_dir: Path) -> None:
         """Loose resource files trigger a DeprecationWarning."""
         _create_env(temp_dir, "dev")
         _create_loose_resources(
@@ -364,7 +375,7 @@ class TestLooseResourceDeprecationWarning:
         assert "Loose resources" in str(deprecation_warnings[0].message)
         assert "deprecated" in str(deprecation_warnings[0].message)
 
-    def test_no_warning_when_only_packages(self, temp_dir):
+    def test_no_warning_when_only_packages(self, temp_dir: Path) -> None:
         """No deprecation warning when all resources are in packages."""
         _create_env(temp_dir, "dev")
         _create_package(
@@ -383,7 +394,7 @@ class TestLooseResourceDeprecationWarning:
         deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
         assert len(deprecation_warnings) == 0
 
-    def test_resource_centric_loose_files_emit_warning(self, temp_dir):
+    def test_resource_centric_loose_files_emit_warning(self, temp_dir: Path) -> None:
         """Resource-centric loose files also trigger deprecation warning."""
         _create_env(temp_dir, "dev")
 
@@ -403,7 +414,7 @@ class TestLooseResourceDeprecationWarning:
         deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
         assert len(deprecation_warnings) == 1
 
-    def test_no_warning_when_no_resources(self, temp_dir):
+    def test_no_warning_when_no_resources(self, temp_dir: Path) -> None:
         """No deprecation warning when environment has no resources at all."""
         _create_env(temp_dir, "dev")
 
@@ -420,7 +431,7 @@ class TestLooseResourceDeprecationWarning:
 class TestPackageNotFoundError:
     """Tests for PackageNotFoundError exception."""
 
-    def test_exception_exists_and_inherits(self):
+    def test_exception_exists_and_inherits(self) -> None:
         """PackageNotFoundError exists and inherits from InfraFoundryError."""
         from infrafoundry.core.exceptions import InfraFoundryError
 
@@ -428,7 +439,7 @@ class TestPackageNotFoundError:
         assert isinstance(error, InfraFoundryError)
         assert str(error) == "test package not found"
 
-    def test_exception_with_context(self):
+    def test_exception_with_context(self) -> None:
         """PackageNotFoundError accepts context dict."""
         error = PackageNotFoundError(
             "Package 'my-pkg' not found",

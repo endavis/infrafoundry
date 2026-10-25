@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 import yaml
 from click.testing import CliRunner
@@ -10,13 +13,13 @@ from infrafoundry.cli.main import main
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def temp_config_dir(tmp_path):
+def temp_config_dir(tmp_path: Path) -> Path:
     """Create a temporary config directory with sample environment."""
     config_dir = tmp_path / "config"
     envs_dir = config_dir / "envs"
@@ -55,7 +58,9 @@ def temp_config_dir(tmp_path):
 class TestConfigCreate:
     """Tests for config create command."""
 
-    def test_create_creates_minimal_environment(self, cli_runner, tmp_path):
+    def test_create_creates_minimal_environment(
+        self, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
         """Test create creates minimal environment structure."""
         config_dir = tmp_path / "config"
         envs_dir = config_dir / "envs"
@@ -80,7 +85,7 @@ class TestConfigCreate:
             settings = yaml.safe_load(f)
         assert settings["name"] == "staging"
 
-    def test_create_with_description(self, cli_runner, tmp_path):
+    def test_create_with_description(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Test create with custom description."""
         config_dir = tmp_path / "config"
         envs_dir = config_dir / "envs"
@@ -105,7 +110,9 @@ class TestConfigCreate:
             settings = yaml.safe_load(f)
         assert settings["description"] == "Production environment"
 
-    def test_create_from_existing_environment(self, cli_runner, temp_config_dir):
+    def test_create_from_existing_environment(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """Test create --from scaffolds from existing environment."""
         result = cli_runner.invoke(
             main,
@@ -135,7 +142,9 @@ class TestConfigCreate:
             settings = yaml.safe_load(f)
         assert settings["name"] == "staging"
 
-    def test_create_from_nonexistent_environment(self, cli_runner, temp_config_dir):
+    def test_create_from_nonexistent_environment(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """Test create --from with nonexistent source fails."""
         result = cli_runner.invoke(
             main,
@@ -153,7 +162,9 @@ class TestConfigCreate:
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
-    def test_create_existing_environment_fails_without_force(self, cli_runner, temp_config_dir):
+    def test_create_existing_environment_fails_without_force(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """Test create fails if environment exists without --force."""
         result = cli_runner.invoke(
             main,
@@ -163,7 +174,9 @@ class TestConfigCreate:
         assert result.exit_code != 0
         assert "already exists" in result.output
 
-    def test_create_existing_environment_with_force(self, cli_runner, temp_config_dir):
+    def test_create_existing_environment_with_force(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """Test create --force overwrites existing environment."""
         result = cli_runner.invoke(
             main,
@@ -186,7 +199,9 @@ class TestConfigCreate:
             settings = yaml.safe_load(f)
         assert settings["description"] == "Recreated dev"
 
-    def test_create_without_config_dir(self, cli_runner, monkeypatch):
+    def test_create_without_config_dir(
+        self, cli_runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test create fails without config directory."""
         # Clear the env var to ensure no config dir is set
         monkeypatch.delenv("INFRAFOUNDRY_CONFIG_REPO", raising=False)
@@ -198,7 +213,9 @@ class TestConfigCreate:
             assert result.exit_code != 0
             assert "Config directory not set" in result.output or "config" in result.output.lower()
 
-    def test_create_from_sops_encrypted_settings(self, cli_runner, tmp_path):
+    def test_create_from_sops_encrypted_settings(
+        self, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
         """Test create --from handles SOPS-encrypted settings.yaml."""
         config_dir = tmp_path / "config"
         envs_dir = config_dir / "envs"
@@ -221,7 +238,7 @@ class TestConfigCreate:
         mock_decrypt = type("Result", (), {"stdout": decrypted_yaml, "returncode": 0})()
         mock_encrypt = type("Result", (), {"stdout": "", "returncode": 0})()
 
-        def mock_run(cmd, **kwargs):
+        def mock_run(cmd: Any, **kwargs: Any) -> Any:
             if "--decrypt" in cmd:
                 return mock_decrypt
             if "--encrypt" in cmd:
@@ -247,7 +264,9 @@ class TestConfigCreate:
         assert result.exit_code == 0
         assert "Environment 'staging' created from 'dev'" in result.output
 
-    def test_create_from_unencrypted_settings_unchanged(self, cli_runner, temp_config_dir):
+    def test_create_from_unencrypted_settings_unchanged(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """Test create --from with unencrypted settings works without SOPS calls."""
         from unittest.mock import patch
 
@@ -278,7 +297,9 @@ class TestConfigCreate:
 class TestConfigShow:
     """Tests for config show command."""
 
-    def test_show_displays_environment_info(self, cli_runner, temp_config_dir):
+    def test_show_displays_environment_info(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """Test show displays environment information."""
         result = cli_runner.invoke(
             main,
@@ -289,7 +310,7 @@ class TestConfigShow:
         assert "dev" in result.output
         assert "Development environment" in result.output or "Description" in result.output
 
-    def test_show_settings_only(self, cli_runner, temp_config_dir):
+    def test_show_settings_only(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Test show --settings-only displays only settings."""
         result = cli_runner.invoke(
             main,
@@ -307,7 +328,7 @@ class TestConfigShow:
         assert result.exit_code == 0
         assert "dev" in result.output
 
-    def test_show_yaml_format(self, cli_runner, temp_config_dir):
+    def test_show_yaml_format(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Test show --format yaml outputs YAML."""
         result = cli_runner.invoke(
             main,
@@ -327,7 +348,7 @@ class TestConfigShow:
         # YAML output should contain these patterns
         assert "environment:" in result.output or "name:" in result.output
 
-    def test_show_json_format(self, cli_runner, temp_config_dir):
+    def test_show_json_format(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Test show --format json outputs JSON."""
         result = cli_runner.invoke(
             main,
@@ -347,7 +368,7 @@ class TestConfigShow:
         # JSON output should contain these patterns
         assert '"environment"' in result.output or '"name"' in result.output
 
-    def test_show_filter_by_provider(self, cli_runner, temp_config_dir):
+    def test_show_filter_by_provider(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Test show --provider filters resources."""
         result = cli_runner.invoke(
             main,
@@ -365,7 +386,9 @@ class TestConfigShow:
 
         assert result.exit_code == 0
 
-    def test_show_filter_by_resource_type(self, cli_runner, temp_config_dir):
+    def test_show_filter_by_resource_type(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """Test show --resource-type filters resources."""
         result = cli_runner.invoke(
             main,
@@ -383,7 +406,7 @@ class TestConfigShow:
 
         assert result.exit_code == 0
 
-    def test_show_specific_resource(self, cli_runner, temp_config_dir):
+    def test_show_specific_resource(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Test show --resource shows specific resource."""
         result = cli_runner.invoke(
             main,
@@ -401,7 +424,9 @@ class TestConfigShow:
 
         assert result.exit_code == 0
 
-    def test_show_nonexistent_environment(self, cli_runner, temp_config_dir):
+    def test_show_nonexistent_environment(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """Test show with nonexistent environment fails."""
         result = cli_runner.invoke(
             main,
@@ -417,7 +442,7 @@ class TestConfigShow:
 
         assert result.exit_code != 0
 
-    def test_show_no_matching_resources(self, cli_runner, temp_config_dir):
+    def test_show_no_matching_resources(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Test show with no matching filter shows warning."""
         result = cli_runner.invoke(
             main,
@@ -440,7 +465,7 @@ class TestConfigShow:
 class TestConfigCreateShowIntegration:
     """Integration tests for create and show commands working together."""
 
-    def test_create_then_show(self, cli_runner, temp_config_dir):
+    def test_create_then_show(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Test creating environment with create then viewing with show."""
         # Create new environment from dev
         create_result = cli_runner.invoke(

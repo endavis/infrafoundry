@@ -8,13 +8,13 @@ from infrafoundry.core.exceptions import TerraformError
 from infrafoundry.core.runner_results import raise_on_runner_failure
 
 
-def test_raise_on_runner_failure_no_op_on_success():
+def test_raise_on_runner_failure_no_op_on_success() -> None:
     """A successful run_result returns None and raises nothing."""
     result = {"success": True, "output": "ok"}
     assert raise_on_runner_failure(result, provider_name="proxmox", phase="apply") is None
 
 
-def test_raise_on_runner_failure_raises_with_error_field():
+def test_raise_on_runner_failure_raises_with_error_field() -> None:
     """A failed run_result with ``error`` raises TerraformError with context."""
     result = {
         "success": False,
@@ -36,7 +36,7 @@ def test_raise_on_runner_failure_raises_with_error_field():
     assert err.stdout == "stdout body"
 
 
-def test_raise_on_runner_failure_falls_back_to_stderr_when_no_error():
+def test_raise_on_runner_failure_falls_back_to_stderr_when_no_error() -> None:
     """When ``error`` is absent, the message falls back to ``stderr``."""
     result = {"success": False, "stderr": "boom"}
 
@@ -48,7 +48,7 @@ def test_raise_on_runner_failure_falls_back_to_stderr_when_no_error():
     assert "apply" in str(exc_info.value)
 
 
-def test_raise_on_runner_failure_handles_missing_keys():
+def test_raise_on_runner_failure_handles_missing_keys() -> None:
     """A bare ``success: False`` still raises cleanly with 'Unknown error'."""
     result = {"success": False}
 

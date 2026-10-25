@@ -12,13 +12,13 @@ from infrafoundry.providers.esxi.validators.portgroup_reference_validator import
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> PortgroupReferenceValidator:
     """Create a PortgroupReferenceValidator instance."""
     return PortgroupReferenceValidator(report)
 
@@ -43,7 +43,7 @@ def _make_vm(
     return ResourceConfig(name=name, type="vm", provider="esxi", config=config)
 
 
-def test_valid_reference(validator, report):
+def test_valid_reference(validator: PortgroupReferenceValidator, report: MagicMock) -> None:
     """Test VM referencing existing portgroup on same host."""
     resources = [
         _make_portgroup("VM Network", "esxi-01"),
@@ -57,7 +57,9 @@ def test_valid_reference(validator, report):
     assert "VM Network" in call_args["message"]
 
 
-def test_invalid_reference_wrong_host(validator, report):
+def test_invalid_reference_wrong_host(
+    validator: PortgroupReferenceValidator, report: MagicMock
+) -> None:
     """Test VM referencing portgroup on different host."""
     resources = [
         _make_portgroup("VM Network", "esxi-01"),
@@ -70,7 +72,9 @@ def test_invalid_reference_wrong_host(validator, report):
     assert "does not exist" in call_args["message"]
 
 
-def test_invalid_reference_missing_portgroup(validator, report):
+def test_invalid_reference_missing_portgroup(
+    validator: PortgroupReferenceValidator, report: MagicMock
+) -> None:
     """Test VM referencing non-existent portgroup."""
     resources = [
         _make_vm("vm1", network=[{"portgroup": "ghost-pg"}], host="esxi-01"),
@@ -82,7 +86,7 @@ def test_invalid_reference_missing_portgroup(validator, report):
     assert "ghost-pg" in call_args["message"]
 
 
-def test_vm_with_no_network(validator, report):
+def test_vm_with_no_network(validator: PortgroupReferenceValidator, report: MagicMock) -> None:
     """Test VM without network config produces no checks."""
     resources = [
         _make_portgroup("VM Network", "esxi-01"),
@@ -92,7 +96,7 @@ def test_vm_with_no_network(validator, report):
     report.add_check.assert_not_called()
 
 
-def test_vm_with_dict_network(validator, report):
+def test_vm_with_dict_network(validator: PortgroupReferenceValidator, report: MagicMock) -> None:
     """Test VM with single dict network config."""
     resources = [
         _make_portgroup("VM Network", "esxi-01"),
@@ -104,7 +108,7 @@ def test_vm_with_dict_network(validator, report):
     assert call_args["passed"] is True
 
 
-def test_vm_with_multiple_nics(validator, report):
+def test_vm_with_multiple_nics(validator: PortgroupReferenceValidator, report: MagicMock) -> None:
     """Test VM with multiple NICs referencing different portgroups."""
     resources = [
         _make_portgroup("pg-mgmt", "esxi-01"),
@@ -124,7 +128,9 @@ def test_vm_with_multiple_nics(validator, report):
         assert call[1]["passed"] is True
 
 
-def test_vm_nic_without_portgroup_ref(validator, report):
+def test_vm_nic_without_portgroup_ref(
+    validator: PortgroupReferenceValidator, report: MagicMock
+) -> None:
     """Test VM NIC without portgroup reference is skipped."""
     resources = [
         _make_vm("vm1", network=[{"virtual_network": "VM Network"}], host="esxi-01"),
@@ -133,14 +139,14 @@ def test_vm_nic_without_portgroup_ref(validator, report):
     report.add_check.assert_not_called()
 
 
-def test_no_vms(validator, report):
+def test_no_vms(validator: PortgroupReferenceValidator, report: MagicMock) -> None:
     """Test with no VM resources."""
     resources = [_make_portgroup("VM Network")]
     validator.validate(resources)
     report.add_check.assert_not_called()
 
 
-def test_no_resources(validator, report):
+def test_no_resources(validator: PortgroupReferenceValidator, report: MagicMock) -> None:
     """Test with empty resource list."""
     validator.validate([])
     report.add_check.assert_not_called()

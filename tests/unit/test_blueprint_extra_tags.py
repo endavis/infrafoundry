@@ -5,6 +5,7 @@ merge hardcoded tags with the extra_tags variable.
 """
 
 from pathlib import Path
+from typing import Any
 
 import jinja2
 import pytest
@@ -49,17 +50,17 @@ def _render_tag_expression(base_tags: list[str], extra_tags: list[str]) -> list[
 class TestExtraTagsExpression:
     """Test that Jinja2 list concatenation produces correct tag lists."""
 
-    def test_empty_extra_tags_preserves_base(self):
+    def test_empty_extra_tags_preserves_base(self) -> None:
         """Default extra_tags=[] produces only the base tags."""
         result = _render_tag_expression(["ontap", "aiqum"], [])
         assert result == ["ontap", "aiqum"]
 
-    def test_single_extra_tag_appended(self):
+    def test_single_extra_tag_appended(self) -> None:
         """A single extra tag is appended after the base tags."""
         result = _render_tag_expression(["ontap", "aiqum"], ["test"])
         assert result == ["ontap", "aiqum", "test"]
 
-    def test_multiple_extra_tags_appended(self):
+    def test_multiple_extra_tags_appended(self) -> None:
         """Multiple extra tags are appended in order."""
         result = _render_tag_expression(["ontap", "aiqum"], ["test", "dev"])
         assert result == ["ontap", "aiqum", "test", "dev"]
@@ -83,7 +84,7 @@ class TestExtraTagsExpression:
             "ubuntu-template",
         ],
     )
-    def test_all_blueprints_empty_extra(self, base_tags):
+    def test_all_blueprints_empty_extra(self, base_tags: Any) -> None:
         """Each blueprint's base tags are preserved when extra_tags is empty."""
         result = _render_tag_expression(base_tags, [])
         assert result == base_tags
@@ -107,7 +108,7 @@ class TestExtraTagsExpression:
             "ubuntu-template",
         ],
     )
-    def test_all_blueprints_with_extra(self, base_tags):
+    def test_all_blueprints_with_extra(self, base_tags: Any) -> None:
         """Each blueprint's base tags are extended when extra_tags is non-empty."""
         result = _render_tag_expression(base_tags, ["custom", "env-test"])
         assert result == [*base_tags, "custom", "env-test"]
@@ -127,7 +128,7 @@ class TestBlueprintDefaultsIncludeExtraTags:
             "ubuntu-template",
         ],
     )
-    def test_extra_tags_in_defaults(self, blueprint):
+    def test_extra_tags_in_defaults(self, blueprint: Any) -> None:
         """Blueprint inputs must declare extra_tags with an empty list default."""
         blueprint_path = BLUEPRINTS_DIR / blueprint / "blueprint.yaml"
         data = yaml.safe_load(blueprint_path.read_text())
@@ -157,7 +158,7 @@ class TestResourceTemplatesUseExtraTags:
             ("ubuntu-template", "template.yaml"),
         ],
     )
-    def test_template_contains_extra_tags(self, blueprint, resource_file):
+    def test_template_contains_extra_tags(self, blueprint: Any, resource_file: Any) -> None:
         """Resource template must contain '+ extra_tags' in a tags expression."""
         resource_path = BLUEPRINTS_DIR / blueprint / resource_file
         content = resource_path.read_text()

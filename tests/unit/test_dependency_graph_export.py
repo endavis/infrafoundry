@@ -3,7 +3,7 @@
 from infrafoundry.core.dependencies import DependencyGraph
 
 
-def test_export_to_mermaid():
+def test_export_to_mermaid() -> None:
     """Ensure mermaid export includes nodes and edges."""
     graph = DependencyGraph()
     graph.add_resource("proxmox", "network", "net1")

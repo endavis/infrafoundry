@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import click
+import pytest
 from click.testing import CliRunner
 
 from infrafoundry.core.plugin_system.exceptions import PluginDiscoveryError
@@ -27,7 +28,7 @@ def _fresh_provider_group() -> click.Group:
     return provider_group
 
 
-def test_provider_group_registered():
+def test_provider_group_registered() -> None:
     """``foundry --help`` lists the ``provider`` group."""
     from infrafoundry.cli.main import foundry
 
@@ -37,7 +38,7 @@ def test_provider_group_registered():
     assert "provider" in result.output
 
 
-def test_provider_discovers_proxmox():
+def test_provider_discovers_proxmox() -> None:
     """Proxmox's ``register()`` is invoked and its commands are attached."""
     from infrafoundry.cli.main import foundry
 
@@ -48,7 +49,7 @@ def test_provider_discovers_proxmox():
     assert "export" in result.output
 
 
-def test_provider_ignores_provider_without_cli_hook():
+def test_provider_ignores_provider_without_cli_hook() -> None:
     """A provider whose ProviderMetadata has no cli_registration is skipped."""
 
     fake_plugin = PluginMetadata(
@@ -72,7 +73,7 @@ def test_provider_ignores_provider_without_cli_hook():
     assert "fakeprov" not in result.output
 
 
-def test_provider_handles_discovery_error(caplog):
+def test_provider_handles_discovery_error(caplog: pytest.LogCaptureFixture) -> None:
     """A broken entry point is logged, not fatal."""
 
     grp = _fresh_provider_group()
@@ -91,7 +92,7 @@ def test_provider_handles_discovery_error(caplog):
     assert any("discovery failed" in rec.message.lower() for rec in caplog.records)
 
 
-def test_provider_invokes_cli_registration_for_each_plugin():
+def test_provider_invokes_cli_registration_for_each_plugin() -> None:
     """The ``cli_registration`` callable receives the subgroup for each plugin."""
 
     calls: list[click.Group] = []
@@ -125,7 +126,7 @@ def test_provider_invokes_cli_registration_for_each_plugin():
     assert len(calls) == 1
 
 
-def test_config_no_longer_has_export_command():
+def test_config_no_longer_has_export_command() -> None:
     """The old ``foundry config export`` path is gone (breaking change)."""
     from infrafoundry.cli.main import foundry
 

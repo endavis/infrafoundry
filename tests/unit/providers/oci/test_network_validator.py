@@ -10,13 +10,13 @@ from infrafoundry.providers.oci.validators.network_validator import NetworkValid
 
 
 @pytest.fixture
-def report():
+def report() -> ValidationReport:
     """Create a validation report."""
     return ValidationReport()
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: ValidationReport) -> NetworkValidator:
     """Create a NetworkValidator instance."""
     return NetworkValidator(report)
 
@@ -40,7 +40,9 @@ def _subnet(name: str, vcn: str, display_name: str | None = None) -> ResourceCon
 class TestVCNCollisions:
     """Tests for VCN name collision detection."""
 
-    def test_vcn_name_collision(self, validator, report):
+    def test_vcn_name_collision(
+        self, validator: NetworkValidator, report: ValidationReport
+    ) -> None:
         """VCN name collision with existing resource produces WARNING."""
         resources = [_vcn("my-vcn")]
         existing_vcns = [{"displayName": "my-vcn", "id": "ocid1.vcn.oc1..aaa"}]
@@ -52,7 +54,7 @@ class TestVCNCollisions:
         assert vcn_checks[0].level == ValidationLevel.WARNING
         assert "already exists" in vcn_checks[0].message
 
-    def test_no_vcn_collision(self, validator, report):
+    def test_no_vcn_collision(self, validator: NetworkValidator, report: ValidationReport) -> None:
         """Clean config with no collisions produces no warnings."""
         resources = [_vcn("new-vcn")]
         existing_vcns = [{"displayName": "other-vcn", "id": "ocid1.vcn.oc1..aaa"}]
@@ -63,7 +65,9 @@ class TestVCNCollisions:
         assert len(vcn_checks) == 1
         assert "does not conflict" in vcn_checks[0].message
 
-    def test_vcn_with_display_name(self, validator, report):
+    def test_vcn_with_display_name(
+        self, validator: NetworkValidator, report: ValidationReport
+    ) -> None:
         """VCN with explicit display_name uses it for collision check."""
         resources = [_vcn("my-vcn", display_name="Custom VCN Name")]
         existing_vcns = [{"displayName": "Custom VCN Name", "id": "ocid1.vcn.oc1..aaa"}]
@@ -74,7 +78,7 @@ class TestVCNCollisions:
         assert len(vcn_checks) == 1
         assert vcn_checks[0].level == ValidationLevel.WARNING
 
-    def test_none_vcns_skips(self, validator, report):
+    def test_none_vcns_skips(self, validator: NetworkValidator, report: ValidationReport) -> None:
         """None VCN data skips collision checks."""
         resources = [_vcn("my-vcn")]
 
@@ -87,7 +91,9 @@ class TestVCNCollisions:
 class TestSubnetCollisions:
     """Tests for subnet name collision detection."""
 
-    def test_subnet_name_collision(self, validator, report):
+    def test_subnet_name_collision(
+        self, validator: NetworkValidator, report: ValidationReport
+    ) -> None:
         """Subnet name collision produces WARNING."""
         resources = [_subnet("my-subnet", "my-vcn")]
         existing_subnets = [{"displayName": "my-subnet", "id": "ocid1.subnet.oc1..aaa"}]
@@ -98,7 +104,9 @@ class TestSubnetCollisions:
         assert len(subnet_checks) == 1
         assert subnet_checks[0].level == ValidationLevel.WARNING
 
-    def test_no_subnet_collision(self, validator, report):
+    def test_no_subnet_collision(
+        self, validator: NetworkValidator, report: ValidationReport
+    ) -> None:
         """No collision produces clean message."""
         resources = [_subnet("new-subnet", "my-vcn")]
         existing_subnets = [{"displayName": "other-subnet", "id": "ocid1.subnet.oc1..aaa"}]
@@ -109,7 +117,9 @@ class TestSubnetCollisions:
         assert len(subnet_checks) == 1
         assert "does not conflict" in subnet_checks[0].message
 
-    def test_none_subnets_skips(self, validator, report):
+    def test_none_subnets_skips(
+        self, validator: NetworkValidator, report: ValidationReport
+    ) -> None:
         """None subnet data skips collision checks."""
         resources = [_subnet("my-subnet", "my-vcn")]
 

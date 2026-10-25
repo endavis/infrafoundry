@@ -1,5 +1,8 @@
 """Unit tests for multi-provider blueprint support in PackageLoader."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 import yaml
 
@@ -8,7 +11,14 @@ from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.exceptions import InvalidConfigurationError
 
 
-def _create_package(base_dir, env_name, provider, package_name, manifest, resource_files=None):
+def _create_package(
+    base_dir: Any,
+    env_name: Any,
+    provider: Any,
+    package_name: Any,
+    manifest: Any,
+    resource_files: Any = None,
+) -> Any:
     """Helper to create a package directory structure.
 
     Args:
@@ -39,7 +49,7 @@ def _create_package(base_dir, env_name, provider, package_name, manifest, resour
     return package_dir
 
 
-def _create_blueprint(base_dir, name, manifest_data, extra_files=None):
+def _create_blueprint(base_dir: Any, name: Any, manifest_data: Any, extra_files: Any = None) -> Any:
     """Helper to create a blueprint directory under config_repo/blueprints/.
 
     Args:
@@ -72,7 +82,7 @@ def _create_blueprint(base_dir, name, manifest_data, extra_files=None):
 class TestMultiProviderBlueprint:
     """Tests for provider-conditional resource selection in blueprints."""
 
-    def test_selects_correct_resources_for_provider(self, temp_dir):
+    def test_selects_correct_resources_for_provider(self, temp_dir: Path) -> None:
         """Blueprint with providers section selects correct resource files."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -115,7 +125,7 @@ class TestMultiProviderBlueprint:
         assert resources[0].name == "node-proxmox"
         assert resources[0].provider == "proxmox"
 
-    def test_selects_oci_provider_resources(self, temp_dir):
+    def test_selects_oci_provider_resources(self, temp_dir: Path) -> None:
         """Blueprint with providers section selects OCI resources when provider is oci."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -158,7 +168,7 @@ class TestMultiProviderBlueprint:
         assert resources[0].name == "node-oci"
         assert resources[0].provider == "oci"
 
-    def test_backward_compat_no_providers_section(self, temp_dir):
+    def test_backward_compat_no_providers_section(self, temp_dir: Path) -> None:
         """Blueprint without providers section works as before."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -190,7 +200,7 @@ class TestMultiProviderBlueprint:
         assert len(resources) == 1
         assert resources[0].name == "legacy-01"
 
-    def test_shared_defaults_merge_order(self, temp_dir):
+    def test_shared_defaults_merge_order(self, temp_dir: Path) -> None:
         """Defaults merge: blueprint.defaults < providers[x].defaults < package.variables."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -250,7 +260,7 @@ class TestMultiProviderBlueprint:
         # provider default: target_node=pve1, not in blueprint defaults
         assert variables["target_node"] == "pve1"
 
-    def test_package_variables_override_provider_defaults(self, temp_dir):
+    def test_package_variables_override_provider_defaults(self, temp_dir: Path) -> None:
         """Package variables take priority over provider-specific defaults."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -291,7 +301,7 @@ class TestMultiProviderBlueprint:
 
         assert variables["target_node"] == "pve2"
 
-    def test_missing_provider_in_providers_section_raises(self, temp_dir):
+    def test_missing_provider_in_providers_section_raises(self, temp_dir: Path) -> None:
         """Blueprint with providers section but package's provider not listed raises error."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -325,7 +335,7 @@ class TestMultiProviderBlueprint:
         with pytest.raises(InvalidConfigurationError, match="no resources for provider 'esxi'"):
             loader.load_package(pkg_dir, "esxi", "dev")
 
-    def test_providers_section_but_no_provider_in_package_raises(self, temp_dir):
+    def test_providers_section_but_no_provider_in_package_raises(self, temp_dir: Path) -> None:
         """Blueprint with providers section but no provider for package raises error.
 
         This tests the edge case where both manifest.provider and the directory-
@@ -364,7 +374,7 @@ class TestMultiProviderBlueprint:
         with pytest.raises(InvalidConfigurationError, match="has no provider"):
             loader.load_package(pkg_dir, "", "dev")
 
-    def test_package_own_resources_override_provider_resources(self, temp_dir):
+    def test_package_own_resources_override_provider_resources(self, temp_dir: Path) -> None:
         """Package's own resources take priority even with providers section."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -404,7 +414,7 @@ class TestMultiProviderBlueprint:
         assert len(resources) == 1
         assert resources[0].name == "node-custom"
 
-    def test_provider_from_manifest_field(self, temp_dir):
+    def test_provider_from_manifest_field(self, temp_dir: Path) -> None:
         """Provider from manifest's provider field is used for provider lookup."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -445,7 +455,7 @@ class TestMultiProviderBlueprint:
         assert resources[0].name == "node-oci"
         assert resources[0].provider == "oci"
 
-    def test_selects_provider_specific_events(self, temp_dir):
+    def test_selects_provider_specific_events(self, temp_dir: Path) -> None:
         """Blueprint with provider-specific events selects correct events for provider."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -521,7 +531,7 @@ class TestMultiProviderBlueprint:
         assert events["on_create"][0]["name"] == "proxmox-setup"
         assert "before_destroy" not in events
 
-    def test_selects_oci_provider_specific_events(self, temp_dir):
+    def test_selects_oci_provider_specific_events(self, temp_dir: Path) -> None:
         """Blueprint with provider-specific events selects OCI events when provider is oci."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -599,7 +609,7 @@ class TestMultiProviderBlueprint:
         assert len(events["before_destroy"]) == 1
         assert events["before_destroy"][0]["name"] == "oci-cleanup"
 
-    def test_package_events_override_provider_events(self, temp_dir):
+    def test_package_events_override_provider_events(self, temp_dir: Path) -> None:
         """Package's own events take priority over provider-specific events."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -660,7 +670,7 @@ class TestMultiProviderBlueprint:
         assert len(events["on_create"]) == 1
         assert events["on_create"][0]["name"] == "pkg-setup"
 
-    def test_provider_events_not_inherited_when_no_providers_section(self, temp_dir):
+    def test_provider_events_not_inherited_when_no_providers_section(self, temp_dir: Path) -> None:
         """Blueprint without providers section uses top-level events as before."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -706,7 +716,7 @@ class TestMultiProviderBlueprint:
         assert len(events["on_create"]) == 1
         assert events["on_create"][0]["name"] == "classic-setup"
 
-    def test_providers_without_defaults_key(self, temp_dir):
+    def test_providers_without_defaults_key(self, temp_dir: Path) -> None:
         """Provider block without defaults key works (no provider-specific defaults)."""
         resolver = BlueprintResolver(temp_dir)
         resolver.blueprints_dir = temp_dir.parent / "blueprints"
@@ -748,7 +758,7 @@ class TestMultiProviderBlueprint:
 class TestProviderTemplateVariable:
     """Tests for the injected ``provider`` template variable."""
 
-    def test_shared_resource_with_provider_conditional(self, temp_dir):
+    def test_shared_resource_with_provider_conditional(self, temp_dir: Path) -> None:
         """Single shared resource file uses provider conditionals for different providers.
 
         Uses the resource-centric format (``resources:`` key) because the
@@ -820,7 +830,7 @@ class TestProviderTemplateVariable:
         assert resources_oci[0].type == "instance"
         assert resources_oci[0].provider == "oci"
 
-    def test_provider_variable_in_plain_package(self, temp_dir):
+    def test_provider_variable_in_plain_package(self, temp_dir: Path) -> None:
         """Non-blueprint package can use {{ provider }} in resource templates."""
         loader = PackageLoader(temp_dir)
         manifest = {
@@ -843,7 +853,7 @@ class TestProviderTemplateVariable:
         assert len(resources) == 1
         assert resources[0].name == "web-proxmox"
 
-    def test_provider_available_in_events_template(self, temp_dir):
+    def test_provider_available_in_events_template(self, temp_dir: Path) -> None:
         """Event handler config can reference {{ provider }}."""
         loader = PackageLoader(temp_dir)
         manifest = {

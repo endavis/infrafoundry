@@ -1,5 +1,7 @@
 """Integration tests for Orchestrator workflows."""
 
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,7 +14,7 @@ from infrafoundry.core.state import StateManager
 
 
 @pytest.fixture
-def mock_secret_manager(mock_secrets_dir):
+def mock_secret_manager(mock_secrets_dir: Any) -> SecretManager:
     """Create a mock SecretManager."""
     with (
         patch("infrafoundry.core.secrets.secret_manager.SecretManager.__init__", return_value=None),
@@ -29,8 +31,12 @@ class TestOrchestratorWorkflow:
     """Integration tests for complete workflows."""
 
     def test_orchestrator_initialization(
-        self, mock_config_dir, mock_secret_manager, mock_policy_dir, temp_dir
-    ):
+        self,
+        mock_config_dir: Any,
+        mock_secret_manager: SecretManager,
+        mock_policy_dir: Any,
+        temp_dir: Path,
+    ) -> None:
         """Test Orchestrator initialization with all components."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
@@ -57,7 +63,9 @@ class TestOrchestratorWorkflow:
         assert orchestrator.policy_engine is not None
         assert orchestrator.output_dir == output_dir
 
-    def test_load_environment_configuration(self, mock_config_dir, mock_secret_manager, temp_dir):
+    def test_load_environment_configuration(
+        self, mock_config_dir: Any, mock_secret_manager: SecretManager, temp_dir: Path
+    ) -> None:
         """Test loading environment configuration."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
@@ -74,7 +82,9 @@ class TestOrchestratorWorkflow:
         assert env.description == "Development environment"
         assert "datacenter" in env.variables
 
-    def test_get_resources_from_config(self, mock_config_dir, mock_secret_manager, temp_dir):
+    def test_get_resources_from_config(
+        self, mock_config_dir: Any, mock_secret_manager: SecretManager, temp_dir: Path
+    ) -> None:
         """Test retrieving resources from configuration."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
@@ -90,8 +100,12 @@ class TestOrchestratorWorkflow:
         assert len(resources) > 0
 
     def test_event_system_integration(
-        self, mock_config_dir, mock_secret_manager, mock_policy_dir, temp_dir
-    ):
+        self,
+        mock_config_dir: Any,
+        mock_secret_manager: SecretManager,
+        mock_policy_dir: Any,
+        temp_dir: Path,
+    ) -> None:
         """Test that event system is integrated."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
@@ -99,7 +113,7 @@ class TestOrchestratorWorkflow:
         event_manager = EventManager()
         events_received = []
 
-        def event_handler(event):
+        def event_handler(event: Any) -> None:
             events_received.append(event.event_type)
 
         # Subscribe to all events
@@ -117,8 +131,12 @@ class TestOrchestratorWorkflow:
         assert orchestrator.event_manager == event_manager
 
     def test_policy_engine_loaded(
-        self, mock_config_dir, mock_secret_manager, mock_policy_dir, temp_dir
-    ):
+        self,
+        mock_config_dir: Any,
+        mock_secret_manager: SecretManager,
+        mock_policy_dir: Any,
+        temp_dir: Path,
+    ) -> None:
         """Test that policy engine loads policies."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
@@ -139,7 +157,9 @@ class TestOrchestratorWorkflow:
         assert "resource_limits" in policy_names
         assert "require_tags" in policy_names
 
-    def test_state_tracking_integration(self, mock_config_dir, mock_secret_manager, temp_dir):
+    def test_state_tracking_integration(
+        self, mock_config_dir: Any, mock_secret_manager: SecretManager, temp_dir: Path
+    ) -> None:
         """Test state tracking functionality."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
@@ -172,7 +192,9 @@ class TestOrchestratorWorkflow:
         assert deployment.command == "plan"
         assert deployment.user == "test-user"
 
-    def test_output_directory_created(self, mock_config_dir, mock_secret_manager, temp_dir):
+    def test_output_directory_created(
+        self, mock_config_dir: Any, mock_secret_manager: SecretManager, temp_dir: Path
+    ) -> None:
         """Test that output directory is created automatically."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "custom_output"
@@ -187,7 +209,9 @@ class TestOrchestratorWorkflow:
         assert output_dir.is_dir()
         assert orchestrator.output_dir == output_dir
 
-    def test_notification_manager_integration(self, mock_config_dir, mock_secret_manager, temp_dir):
+    def test_notification_manager_integration(
+        self, mock_config_dir: Any, mock_secret_manager: SecretManager, temp_dir: Path
+    ) -> None:
         """Test that notification manager is initialized."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
@@ -200,7 +224,9 @@ class TestOrchestratorWorkflow:
         # Notification manager should exist
         assert orchestrator.notification_manager is not None
 
-    def test_default_state_manager_created(self, mock_config_dir, mock_secret_manager, temp_dir):
+    def test_default_state_manager_created(
+        self, mock_config_dir: Any, mock_secret_manager: SecretManager, temp_dir: Path
+    ) -> None:
         """Test that default state manager is created if not provided."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
@@ -213,7 +239,9 @@ class TestOrchestratorWorkflow:
         # Default state manager should be created
         assert orchestrator.state_manager is not None
 
-    def test_default_event_manager_created(self, mock_config_dir, mock_secret_manager, temp_dir):
+    def test_default_event_manager_created(
+        self, mock_config_dir: Any, mock_secret_manager: SecretManager, temp_dir: Path
+    ) -> None:
         """Test that default event manager is created if not provided."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"
@@ -226,7 +254,9 @@ class TestOrchestratorWorkflow:
         # Default event manager should be created
         assert orchestrator.event_manager is not None
 
-    def test_provider_registry_initialized(self, mock_config_dir, mock_secret_manager, temp_dir):
+    def test_provider_registry_initialized(
+        self, mock_config_dir: Any, mock_secret_manager: SecretManager, temp_dir: Path
+    ) -> None:
         """Test that provider registry is initialized."""
         config = ConfigManager(mock_config_dir / "envs")
         output_dir = temp_dir / "output"

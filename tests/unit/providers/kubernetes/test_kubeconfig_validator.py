@@ -16,13 +16,13 @@ from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
-def validation_report():
+def validation_report() -> ValidationReport:
     """Create a ValidationReport instance."""
     return ValidationReport()
 
 
 @pytest.fixture
-def api_validator(validation_report):
+def api_validator(validation_report: ValidationReport) -> BaseAPIValidator:
     """Create a BaseAPIValidator instance."""
     env_config = make_env_config(
         name="test-env",
@@ -32,7 +32,9 @@ def api_validator(validation_report):
 
 
 @pytest.fixture
-def validator(api_validator, validation_report):
+def validator(
+    api_validator: BaseAPIValidator, validation_report: ValidationReport
+) -> KubeconfigValidator:
     """Create a KubeconfigValidator instance."""
     return KubeconfigValidator(api_validator, validation_report)
 
@@ -83,7 +85,9 @@ def _make_kubeconfig(
 class TestKubeconfigValidatorResolve:
     """Tests for kubeconfig path resolution."""
 
-    def test_existing_kubeconfig(self, validator, validation_report, tmp_path):
+    def test_existing_kubeconfig(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test with an existing kubeconfig file."""
         kubeconfig = tmp_path / "config"
         kubeconfig.write_text("apiVersion: v1\nkind: Config\ncurrent-context: x\n")
@@ -91,18 +95,24 @@ class TestKubeconfigValidatorResolve:
         validator.validate(str(kubeconfig))
         assert any(r.passed and "Kubeconfig found" in r.message for r in validation_report.results)
 
-    def test_missing_kubeconfig(self, validator, validation_report):
+    def test_missing_kubeconfig(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport
+    ) -> None:
         """Test with a missing kubeconfig file."""
         validator.validate("/nonexistent/kubeconfig")
         assert any(not r.passed and "not found" in r.message for r in validation_report.results)
 
-    def test_no_path_default_exists(self, validator, validation_report):
+    def test_no_path_default_exists(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport
+    ) -> None:
         """Test fallback to default kubeconfig when it exists."""
         with patch.object(Path, "exists", return_value=True):
             validator.validate(None)
         assert any("default kubeconfig" in r.message for r in validation_report.results)
 
-    def test_no_path_no_default(self, validator, validation_report):
+    def test_no_path_no_default(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport
+    ) -> None:
         """Test warning when no kubeconfig path and no default."""
         with patch.object(Path, "exists", return_value=False):
             validator.validate(None)
@@ -115,14 +125,18 @@ class TestKubeconfigValidatorResolve:
 class TestKubeconfigValidatorParsing:
     """Tests for kubeconfig parsing."""
 
-    def test_invalid_yaml(self, validator, validation_report, tmp_path):
+    def test_invalid_yaml(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test error on invalid YAML."""
         kubeconfig = tmp_path / "config"
         kubeconfig.write_text("{{invalid yaml")
         validator.validate(str(kubeconfig))
         assert any(not r.passed and "parse" in r.message.lower() for r in validation_report.results)
 
-    def test_missing_current_context(self, validator, validation_report, tmp_path):
+    def test_missing_current_context(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test error when current-context is missing."""
         kubeconfig = tmp_path / "config"
         kubeconfig.write_text("apiVersion: v1\nkind: Config\n")
@@ -131,7 +145,9 @@ class TestKubeconfigValidatorParsing:
             not r.passed and "current-context" in r.message for r in validation_report.results
         )
 
-    def test_context_not_found(self, validator, validation_report, tmp_path):
+    def test_context_not_found(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test error when named context doesn't exist."""
         kubeconfig = tmp_path / "config"
         data = _make_kubeconfig(context_name="real-context")
@@ -141,7 +157,9 @@ class TestKubeconfigValidatorParsing:
         validator.validate(str(kubeconfig), context_override="nonexistent")
         assert any(not r.passed and "nonexistent" in r.message for r in validation_report.results)
 
-    def test_explicit_context_override(self, validator, validation_report, tmp_path):
+    def test_explicit_context_override(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test that context override takes precedence."""
         kubeconfig = tmp_path / "config"
         data = _make_kubeconfig(context_name="override-ctx")
@@ -162,7 +180,9 @@ class TestKubeconfigValidatorParsing:
 class TestKubeconfigValidatorAuth:
     """Tests for authentication extraction."""
 
-    def test_bearer_token(self, validator, validation_report, tmp_path):
+    def test_bearer_token(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test bearer token extraction."""
         kubeconfig = tmp_path / "config"
         data = _make_kubeconfig(token="my-secret-token")
@@ -173,7 +193,9 @@ class TestKubeconfigValidatorAuth:
         validator.validate(str(kubeconfig))
         assert validator.connection_info.headers.get("Authorization") == "Bearer my-secret-token"
 
-    def test_token_file(self, validator, validation_report, tmp_path):
+    def test_token_file(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test tokenFile extraction."""
         token_file = tmp_path / "token"
         token_file.write_text("file-based-token\n")
@@ -187,7 +209,9 @@ class TestKubeconfigValidatorAuth:
         validator.validate(str(kubeconfig))
         assert validator.connection_info.headers.get("Authorization") == "Bearer file-based-token"
 
-    def test_exec_auth_warning(self, validator, validation_report, tmp_path):
+    def test_exec_auth_warning(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test that exec-based auth produces a warning."""
         kubeconfig = tmp_path / "config"
         data = _make_kubeconfig(token=None, exec_auth=True)
@@ -206,7 +230,9 @@ class TestKubeconfigValidatorAuth:
 class TestKubeconfigValidatorConnectivity:
     """Tests for API connectivity."""
 
-    def test_connectivity_success(self, validator, validation_report, tmp_path):
+    def test_connectivity_success(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test successful connectivity."""
         kubeconfig = tmp_path / "config"
         data = _make_kubeconfig(insecure=True)
@@ -219,7 +245,9 @@ class TestKubeconfigValidatorConnectivity:
         validator.validate(str(kubeconfig))
         assert validator.is_connected
 
-    def test_connectivity_failure(self, validator, validation_report, tmp_path):
+    def test_connectivity_failure(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test connectivity failure produces warning."""
         kubeconfig = tmp_path / "config"
         data = _make_kubeconfig(insecure=True)
@@ -235,7 +263,9 @@ class TestKubeconfigValidatorConnectivity:
             for r in validation_report.results
         )
 
-    def test_no_auth_skips_connectivity(self, validator, validation_report, tmp_path):
+    def test_no_auth_skips_connectivity(
+        self, validator: KubeconfigValidator, validation_report: ValidationReport, tmp_path: Path
+    ) -> None:
         """Test that missing auth skips connectivity test."""
         kubeconfig = tmp_path / "config"
         data = _make_kubeconfig(token=None, insecure=True)

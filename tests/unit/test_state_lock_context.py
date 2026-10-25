@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 import threading
 import time
+from collections.abc import Iterator
 from datetime import UTC
 from pathlib import Path
 from typing import Any
@@ -18,13 +19,13 @@ from infrafoundry.core.state.lock_context import environment_lock
 
 
 @pytest.fixture
-def temp_db():
+def temp_db() -> Iterator[str]:
     with tempfile.TemporaryDirectory() as tmpdir:
         yield f"sqlite:///{Path(tmpdir) / 'lock_ctx.db'}"
 
 
 @pytest.fixture
-def state_manager(temp_db):
+def state_manager(temp_db: str) -> StateManager:
     manager = StateManager(connection_string=temp_db)
     manager.initialize()
     return manager
@@ -145,7 +146,7 @@ class TestEnvironmentLock:
         assert EventType.LOCK_TIMEOUT in types
 
 
-def _as_utc(value):
+def _as_utc(value: Any) -> Any:
     """Normalize a (possibly naive) datetime to UTC for comparison."""
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
@@ -174,7 +175,7 @@ class TestEnvironmentLockHeartbeat:
         calls: list[tuple[str, str]] = []
         original = state_manager.extend_lock
 
-        def recording_extend(env_name, locked_by, new_expires_at):
+        def recording_extend(env_name: Any, locked_by: Any, new_expires_at: Any) -> Any:
             calls.append((env_name, locked_by))
             return original(env_name, locked_by, new_expires_at)
 
@@ -219,7 +220,7 @@ class TestEnvironmentLockHeartbeat:
         original = state_manager.extend_lock
         call_count = {"n": 0}
 
-        def flaky_extend(env_name, locked_by, new_expires_at):
+        def flaky_extend(env_name: Any, locked_by: Any, new_expires_at: Any) -> Any:
             call_count["n"] += 1
             if call_count["n"] == 1:
                 return False  # transient failure

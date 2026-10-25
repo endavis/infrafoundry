@@ -1,6 +1,7 @@
 """Unit tests for StateManager."""
 
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ from infrafoundry.core.state import (
 
 
 @pytest.fixture
-def temp_db():
+def temp_db() -> Iterator[str]:
     """Create a temporary database for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test_state.db"
@@ -24,7 +25,7 @@ def temp_db():
 
 
 @pytest.fixture
-def state_manager(temp_db):
+def state_manager(temp_db: str) -> StateManager:
     """Create a StateManager with temporary database."""
     manager = StateManager(connection_string=temp_db)
     manager.initialize()
@@ -34,19 +35,19 @@ def state_manager(temp_db):
 class TestStateManager:
     """Tests for StateManager."""
 
-    def test_init_default_location(self):
+    def test_init_default_location(self) -> None:
         """Test initialization with default SQLite location."""
         manager = StateManager()
         assert manager.engine is not None
         assert "sqlite:///" in str(manager.engine.url)
 
-    def test_init_custom_connection(self, temp_db):
+    def test_init_custom_connection(self, temp_db: str) -> None:
         """Test initialization with custom connection string."""
         manager = StateManager(connection_string=temp_db)
         assert manager.engine is not None
         assert str(manager.engine.url) == temp_db
 
-    def test_initialize_schema(self, temp_db):
+    def test_initialize_schema(self, temp_db: str) -> None:
         """Test database schema initialization."""
         manager = StateManager(connection_string=temp_db)
         manager.initialize()
@@ -57,7 +58,7 @@ class TestStateManager:
             session.query(Deployment).first()
             session.query(Resource).first()
 
-    def test_create_deployment(self, state_manager):
+    def test_create_deployment(self, state_manager: StateManager) -> None:
         """Test creating a new deployment record."""
         deployment_id = state_manager.create_deployment(
             environment="dev",
@@ -83,7 +84,7 @@ class TestStateManager:
             assert deployment.dry_run is False
             assert deployment.extra_data == {"key": "value"}
 
-    def test_create_deployment_minimal(self, state_manager):
+    def test_create_deployment_minimal(self, state_manager: StateManager) -> None:
         """Test creating deployment with minimal parameters."""
         deployment_id = state_manager.create_deployment(
             environment="prod",
@@ -100,7 +101,7 @@ class TestStateManager:
             assert deployment.commit_sha is None
             assert deployment.dry_run is False
 
-    def test_update_deployment_status(self, state_manager):
+    def test_update_deployment_status(self, state_manager: StateManager) -> None:
         """Test updating deployment status."""
         deployment_id = state_manager.create_deployment(
             environment="dev",
@@ -117,7 +118,7 @@ class TestStateManager:
             assert deployment.status == DeploymentStatus.COMPLETED
             assert deployment.completed_at is not None
 
-    def test_update_deployment_status_with_error(self, state_manager):
+    def test_update_deployment_status_with_error(self, state_manager: StateManager) -> None:
         """Test updating deployment status to failed with error message."""
         deployment_id = state_manager.create_deployment(
             environment="dev",
@@ -137,7 +138,7 @@ class TestStateManager:
             assert deployment.error_message == error_msg
             assert deployment.completed_at is not None
 
-    def test_add_resource(self, state_manager):
+    def test_add_resource(self, state_manager: StateManager) -> None:
         """Test adding a resource to deployment."""
         deployment_id = state_manager.create_deployment(
             environment="dev",
@@ -165,7 +166,7 @@ class TestStateManager:
         assert resource.config == {"cores": 4, "memory": 8192}
         assert resource.extra_data == {"tags": {"env": "dev"}}
 
-    def test_update_resource_state(self, state_manager):
+    def test_update_resource_state(self, state_manager: StateManager) -> None:
         """Test updating resource state."""
         deployment_id = state_manager.create_deployment(
             environment="dev",
@@ -195,7 +196,7 @@ class TestStateManager:
         assert updated.state == ResourceState.ACTIVE
         assert updated.terraform_id == "proxmox_vm.web_01"
 
-    def test_get_deployment(self, state_manager):
+    def test_get_deployment(self, state_manager: StateManager) -> None:
         """Test retrieving a deployment."""
         deployment_id = state_manager.create_deployment(
             environment="dev",
@@ -211,12 +212,12 @@ class TestStateManager:
         assert deployment.user == "testuser"
         assert deployment.status == DeploymentStatus.IN_PROGRESS
 
-    def test_get_deployment_not_found(self, state_manager):
+    def test_get_deployment_not_found(self, state_manager: StateManager) -> None:
         """Test retrieving non-existent deployment."""
         deployment = state_manager.get_deployment_by_id(99999)
         assert deployment is None
 
-    def test_list_deployments(self, state_manager):
+    def test_list_deployments(self, state_manager: StateManager) -> None:
         """Test listing deployments."""
         # Create multiple deployments
         state_manager.create_deployment(environment="dev", command="plan")
@@ -227,7 +228,7 @@ class TestStateManager:
         deployments = state_manager.get_deployment_history()
         assert len(deployments) == 3
 
-    def test_list_deployments_filtered_by_environment(self, state_manager):
+    def test_list_deployments_filtered_by_environment(self, state_manager: StateManager) -> None:
         """Test listing deployments filtered by environment."""
         state_manager.create_deployment(environment="dev", command="plan")
         state_manager.create_deployment(environment="dev", command="apply")
@@ -238,7 +239,7 @@ class TestStateManager:
         assert len(dev_deployments) == 2
         assert all(d.environment == "dev" for d in dev_deployments)
 
-    def test_list_deployments_with_limit(self, state_manager):
+    def test_list_deployments_with_limit(self, state_manager: StateManager) -> None:
         """Test listing deployments with limit."""
         for _ in range(5):
             state_manager.create_deployment(environment="dev", command="apply")
@@ -246,7 +247,7 @@ class TestStateManager:
         deployments = state_manager.get_deployment_history(limit=3)
         assert len(deployments) == 3
 
-    def test_get_resources_by_deployment(self, state_manager):
+    def test_get_resources_by_deployment(self, state_manager: StateManager) -> None:
         """Test getting resources for a deployment."""
         deployment_id = state_manager.create_deployment(
             environment="dev",
@@ -281,7 +282,7 @@ class TestStateManager:
         assert "web-01" in names
         assert "web-02" in names
 
-    def test_get_resources_by_environment(self, state_manager):
+    def test_get_resources_by_environment(self, state_manager: StateManager) -> None:
         """Test getting resources by environment."""
         deployment_id = state_manager.create_deployment(
             environment="dev",
@@ -301,7 +302,7 @@ class TestStateManager:
         assert len(resources) >= 1
         assert any(r.name == "web-01" for r in resources)
 
-    def test_get_resource_history(self, state_manager):
+    def test_get_resource_history(self, state_manager: StateManager) -> None:
         """Test getting resource history across deployments."""
         # First deployment - create resource
         deployment1 = state_manager.create_deployment(
@@ -342,7 +343,7 @@ class TestStateManager:
         assert len(web01_resources) == 2
         assert {r.state for r in web01_resources} == {ResourceState.ACTIVE, ResourceState.UPDATING}
 
-    def test_add_deployment_event(self, state_manager):
+    def test_add_deployment_event(self, state_manager: StateManager) -> None:
         """Test adding an event to a deployment."""
         deployment_id = state_manager.create_deployment(
             environment="dev",
@@ -369,7 +370,7 @@ class TestStateManager:
             assert event.message == "VM created successfully"
             assert event.extra_data == {"duration": "45s"}
 
-    def test_deployment_status_enum(self):
+    def test_deployment_status_enum(self) -> None:
         """Test DeploymentStatus enum values."""
         assert DeploymentStatus.PLANNED.value == "planned"
         assert DeploymentStatus.IN_PROGRESS.value == "in_progress"
@@ -377,7 +378,7 @@ class TestStateManager:
         assert DeploymentStatus.FAILED.value == "failed"
         assert DeploymentStatus.ROLLED_BACK.value == "rolled_back"
 
-    def test_resource_state_enum(self):
+    def test_resource_state_enum(self) -> None:
         """Test ResourceState enum values."""
         assert ResourceState.PLANNED.value == "planned"
         assert ResourceState.CREATING.value == "creating"
@@ -387,7 +388,7 @@ class TestStateManager:
         assert ResourceState.DELETED.value == "deleted"
         assert ResourceState.ERROR.value == "error"
 
-    def test_update_resource(self, state_manager):
+    def test_update_resource(self, state_manager: StateManager) -> None:
         """Test updating resource terraform_id."""
         # Create deployment and resource
         deployment_id = state_manager.create_deployment(
@@ -412,7 +413,7 @@ class TestStateManager:
         assert len(resources) == 1
         assert resources[0].terraform_id == "proxmox_vm.test_vm"
 
-    def test_add_resource_dependency(self, state_manager):
+    def test_add_resource_dependency(self, state_manager: StateManager) -> None:
         """Test adding resource dependencies."""
         # Create deployment
         deployment_id = state_manager.create_deployment(

@@ -9,13 +9,13 @@ from infrafoundry.providers.oci.validators.compartment_validator import Compartm
 
 
 @pytest.fixture
-def report():
+def report() -> ValidationReport:
     """Create a validation report."""
     return ValidationReport()
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: ValidationReport) -> CompartmentValidator:
     """Create a CompartmentValidator instance."""
     return CompartmentValidator(report)
 
@@ -23,7 +23,9 @@ def validator(report):
 class TestCompartmentValidator:
     """Tests for CompartmentValidator.validate method."""
 
-    def test_compartment_found(self, validator, report):
+    def test_compartment_found(
+        self, validator: CompartmentValidator, report: ValidationReport
+    ) -> None:
         """Compartment found in list produces SUCCESS with name."""
         compartments = [
             {"id": "ocid1.compartment.oc1..aaa", "name": "my-compartment"},
@@ -38,7 +40,9 @@ class TestCompartmentValidator:
         assert "my-compartment" in result.message
         assert "ocid1.compartment.oc1..aaa" in result.message
 
-    def test_compartment_not_found(self, validator, report):
+    def test_compartment_not_found(
+        self, validator: CompartmentValidator, report: ValidationReport
+    ) -> None:
         """Compartment not found produces ERROR with available names."""
         compartments = [
             {"id": "ocid1.compartment.oc1..aaa", "name": "my-compartment"},
@@ -55,13 +59,17 @@ class TestCompartmentValidator:
         assert "my-compartment" in result.message
         assert "other-compartment" in result.message
 
-    def test_none_compartments_skips(self, validator, report):
+    def test_none_compartments_skips(
+        self, validator: CompartmentValidator, report: ValidationReport
+    ) -> None:
         """None compartments (API failure) produces no checks."""
         validator.validate("ocid1.compartment.oc1..aaa", None)
 
         assert len(report.results) == 0
 
-    def test_empty_compartment_list(self, validator, report):
+    def test_empty_compartment_list(
+        self, validator: CompartmentValidator, report: ValidationReport
+    ) -> None:
         """Empty compartment list produces ERROR."""
         validator.validate("ocid1.compartment.oc1..aaa", [])
 

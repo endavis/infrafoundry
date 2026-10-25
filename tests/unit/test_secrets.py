@@ -3,7 +3,9 @@
 import os
 import stat
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any, Never
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,14 +21,14 @@ from infrafoundry.core.secrets.secret_manager import SecretManager
 
 
 @pytest.fixture
-def temp_secrets_dir():
+def temp_secrets_dir() -> Iterator[Path]:
     """Create a temporary secrets directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
 
 
 @pytest.fixture
-def mock_sops_age():
+def mock_sops_age() -> Iterator[Any]:
     """Mock sops and age availability via subprocess."""
     with patch("subprocess.run") as mock_run:
         # Default: sops --version succeeds
@@ -35,14 +37,14 @@ def mock_sops_age():
 
 
 @pytest.fixture
-def mock_provider():
+def mock_provider() -> MagicMock:
     """Create a mock SecretProvider."""
     provider = MagicMock(spec=SecretProvider)
     return provider
 
 
 @pytest.fixture
-def mock_age_key(temp_secrets_dir):
+def mock_age_key(temp_secrets_dir: Path) -> Iterator[Any]:
     """Mock age key file."""
     age_key_file = temp_secrets_dir / "age.key"
     age_key_file.write_text("AGE-SECRET-KEY-1234567890ABCDEF")
@@ -53,25 +55,29 @@ def mock_age_key(temp_secrets_dir):
 class TestSecretManager:
     """Tests for SecretManager."""
 
-    def test_init_default_location(self, mock_sops_age, mock_age_key):
+    def test_init_default_location(self, mock_sops_age: Any, mock_age_key: Any) -> None:
         """Test initialization with default secrets directory."""
         manager = SecretManager(env_name="dev")
         assert manager.secrets_dir is not None
         assert "envs" in str(manager.secrets_dir) and "dev" in str(manager.secrets_dir)
 
-    def test_init_custom_directory(self, mock_sops_age, mock_age_key, temp_secrets_dir):
+    def test_init_custom_directory(
+        self, mock_sops_age: Any, mock_age_key: Any, temp_secrets_dir: Path
+    ) -> None:
         """Test initialization with custom secrets directory."""
         manager = SecretManager(env_name="dev", secrets_dir=temp_secrets_dir)
         assert manager.secrets_dir == temp_secrets_dir
 
-    def test_init_with_provider(self, temp_secrets_dir, mock_provider):
+    def test_init_with_provider(self, temp_secrets_dir: Path, mock_provider: MagicMock) -> None:
         """Test initialization with injected provider."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
         )
         assert manager.provider == mock_provider
 
-    def test_init_with_config_repo_env(self, mock_sops_age, mock_age_key, temp_secrets_dir):
+    def test_init_with_config_repo_env(
+        self, mock_sops_age: Any, mock_age_key: Any, temp_secrets_dir: Path
+    ) -> None:
         """Test initialization uses INFRAFOUNDRY_CONFIG_REPO environment variable."""
         config_repo = temp_secrets_dir / "config-repo"
         config_repo.mkdir()
@@ -81,7 +87,9 @@ class TestSecretManager:
             manager = SecretManager(env_name="dev")
             assert manager.secrets_dir == config_repo / "envs" / "dev"
 
-    def test_init_no_age_key_env(self, mock_sops_age, temp_secrets_dir, monkeypatch):
+    def test_init_no_age_key_env(
+        self, mock_sops_age: Any, temp_secrets_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test initialization fails when SOPS_AGE_KEY_FILE is not set."""
         monkeypatch.setenv("INFRAFOUNDRY_CONFIG_REPO", str(temp_secrets_dir))
         monkeypatch.delenv("SOPS_AGE_KEY_FILE", raising=False)
@@ -90,7 +98,7 @@ class TestSecretManager:
         with pytest.raises(ValueError, match="SOPS_AGE_KEY_FILE not set"):
             SecretManager(env_name="dev")
 
-    def test_init_age_key_file_missing(self, mock_sops_age):
+    def test_init_age_key_file_missing(self, mock_sops_age: Any) -> None:
         """Test initialization fails when age key file doesn't exist."""
         with (
             patch.dict(
@@ -104,7 +112,7 @@ class TestSecretManager:
         ):
             SecretManager(env_name="dev")
 
-    def test_decrypt_file(self, temp_secrets_dir, mock_provider):
+    def test_decrypt_file(self, temp_secrets_dir: Path, mock_provider: MagicMock) -> None:
         """Test decrypting a file using injected provider."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -121,7 +129,7 @@ class TestSecretManager:
         assert result == decrypted_data
         mock_provider.load_secret.assert_called_with(temp_secrets_dir / "proxmox.yaml")
 
-    def test_decrypt_file_not_found(self, temp_secrets_dir, mock_provider):
+    def test_decrypt_file_not_found(self, temp_secrets_dir: Path, mock_provider: MagicMock) -> None:
         """Test decrypting non-existent file raises error."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -132,7 +140,9 @@ class TestSecretManager:
         with pytest.raises(SecretNotFoundError):
             manager.decrypt_file("nonexistent.yaml")
 
-    def test_decrypt_file_provider_fails(self, temp_secrets_dir, mock_provider):
+    def test_decrypt_file_provider_fails(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test decryption failure when provider fails."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -143,7 +153,7 @@ class TestSecretManager:
         with pytest.raises(SecretDecryptionError, match="Decryption failed"):
             manager.decrypt_file("proxmox.yaml")
 
-    def test_encrypt_file(self, temp_secrets_dir, mock_provider):
+    def test_encrypt_file(self, temp_secrets_dir: Path, mock_provider: MagicMock) -> None:
         """Test encrypting data using injected provider."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -155,7 +165,9 @@ class TestSecretManager:
 
         mock_provider.save_secret.assert_called_with(temp_secrets_dir / "proxmox.yaml", data)
 
-    def test_encrypt_file_creates_directory(self, temp_secrets_dir, mock_provider):
+    def test_encrypt_file_creates_directory(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test encrypt_file creates secrets directory if it doesn't exist."""
         secrets_dir = temp_secrets_dir / "nested" / "secrets"
         manager = SecretManager(env_name="dev", secrets_dir=secrets_dir, provider=mock_provider)
@@ -166,7 +178,9 @@ class TestSecretManager:
         assert secrets_dir.exists()
         mock_provider.save_secret.assert_called()
 
-    def test_encrypt_file_provider_fails(self, temp_secrets_dir, mock_provider):
+    def test_encrypt_file_provider_fails(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test encryption failure when provider fails."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -178,7 +192,7 @@ class TestSecretManager:
         with pytest.raises(SecretError, match="Encryption failed"):
             manager.encrypt_file("test.yaml", data)
 
-    def test_get_secret(self, temp_secrets_dir, mock_provider):
+    def test_get_secret(self, temp_secrets_dir: Path, mock_provider: MagicMock) -> None:
         """Test retrieving a specific secret value."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -198,7 +212,9 @@ class TestSecretManager:
         db_config = manager.get_secret("config.yaml", "database")
         assert db_config == {"password": "dbpass"}
 
-    def test_get_secret_key_not_found(self, temp_secrets_dir, mock_provider):
+    def test_get_secret_key_not_found(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test get_secret raises KeyError when key doesn't exist."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -210,7 +226,9 @@ class TestSecretManager:
         with pytest.raises(KeyError):
             manager.get_secret("config.yaml", "nonexistent.key")
 
-    def test_create_sops_config(self, mock_sops_age, mock_age_key, temp_secrets_dir):
+    def test_create_sops_config(
+        self, mock_sops_age: Any, mock_age_key: Any, temp_secrets_dir: Path
+    ) -> None:
         """Test creating .sops.yaml configuration file."""
         # This still uses legacy method in SecretManager
         # which calls create_sops_config from age_key_manager
@@ -226,7 +244,7 @@ class TestSecretManager:
         assert "creation_rules" in config
         assert config["creation_rules"][0]["age"] == age_public_key
 
-    def test_export_for_terraform(self, temp_secrets_dir, mock_provider):
+    def test_export_for_terraform(self, temp_secrets_dir: Path, mock_provider: MagicMock) -> None:
         """Test exporting secrets as Terraform variables file."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -248,7 +266,7 @@ class TestSecretManager:
         assert 'api_token = "secret123"' in content
         assert 'config = {"nested": "value"}' in content
 
-    def test_export_for_ansible(self, temp_secrets_dir, mock_provider):
+    def test_export_for_ansible(self, temp_secrets_dir: Path, mock_provider: MagicMock) -> None:
         """Test exporting secrets as Ansible vars file."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -269,8 +287,8 @@ class TestSecretManager:
         assert exported_data == decrypted_data
 
     def test_export_for_terraform_sets_restrictive_permissions(
-        self, temp_secrets_dir, mock_provider
-    ):
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test that export_for_terraform creates files with 0o600 permissions."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -282,7 +300,9 @@ class TestSecretManager:
 
         assert stat.S_IMODE(os.stat(output_file).st_mode) == 0o600
 
-    def test_export_for_ansible_sets_restrictive_permissions(self, temp_secrets_dir, mock_provider):
+    def test_export_for_ansible_sets_restrictive_permissions(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test that export_for_ansible creates files with 0o600 permissions."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -294,7 +314,9 @@ class TestSecretManager:
 
         assert stat.S_IMODE(os.stat(output_file).st_mode) == 0o600
 
-    def test_temporary_export_cleans_up_file(self, temp_secrets_dir, mock_provider):
+    def test_temporary_export_cleans_up_file(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test that temporary_export removes the file after context manager exits."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -308,7 +330,9 @@ class TestSecretManager:
 
         assert not output_file.exists()
 
-    def test_temporary_export_cleans_up_on_exception(self, temp_secrets_dir, mock_provider):
+    def test_temporary_export_cleans_up_on_exception(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> Never:
         """Test that temporary_export cleans up even when an exception occurs."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -325,7 +349,9 @@ class TestSecretManager:
 
         assert not output_file.exists()
 
-    def test_temporary_export_ansible_format(self, temp_secrets_dir, mock_provider):
+    def test_temporary_export_ansible_format(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test that temporary_export works with ansible format."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -340,7 +366,9 @@ class TestSecretManager:
 
         assert not output_file.exists()
 
-    def test_temporary_export_invalid_format(self, temp_secrets_dir, mock_provider):
+    def test_temporary_export_invalid_format(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test that temporary_export raises ValueError for unsupported format."""
         manager = SecretManager(
             env_name="dev", secrets_dir=temp_secrets_dir, provider=mock_provider
@@ -353,7 +381,7 @@ class TestSecretManager:
         ):
             pass  # pragma: no cover
 
-    def test_cleanup_secret_files(self, temp_secrets_dir):
+    def test_cleanup_secret_files(self, temp_secrets_dir: Path) -> None:
         """Test that cleanup_secret_files removes specified files."""
         file1 = temp_secrets_dir / "secret1.tfvars"
         file2 = temp_secrets_dir / "secret2.yml"
@@ -365,7 +393,7 @@ class TestSecretManager:
         assert not file1.exists()
         assert not file2.exists()
 
-    def test_cleanup_secret_files_missing_file(self, temp_secrets_dir):
+    def test_cleanup_secret_files_missing_file(self, temp_secrets_dir: Path) -> None:
         """Test that cleanup_secret_files handles already-deleted files gracefully."""
         missing_file = temp_secrets_dir / "nonexistent.tfvars"
         # Should not raise

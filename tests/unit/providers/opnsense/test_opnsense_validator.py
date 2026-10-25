@@ -1,5 +1,6 @@
 """Unit tests for OPNsense OPNsenseValidator orchestration."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,7 +20,7 @@ from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
-def env_config():
+def env_config() -> Any:
     """Create a valid environment config."""
     return make_env_config(
         provider_settings={
@@ -33,13 +34,13 @@ def env_config():
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(env_config, report):
+def validator(env_config: Any, report: MagicMock) -> OPNsenseValidator:
     """Create an OPNsenseValidator instance."""
     return OPNsenseValidator(env_config, report)
 
@@ -47,11 +48,11 @@ def validator(env_config, report):
 class TestComposition:
     """Tests for validator composition."""
 
-    def test_api_validator_initialized(self, validator):
+    def test_api_validator_initialized(self, validator: OPNsenseValidator) -> None:
         """BaseAPIValidator is composed during init."""
         assert isinstance(validator.api_validator, BaseAPIValidator)
 
-    def test_specialized_validators_initialized(self, validator):
+    def test_specialized_validators_initialized(self, validator: OPNsenseValidator) -> None:
         """All specialized validators are created."""
         assert isinstance(validator.firewall_rule_validator, FirewallRuleValidator)
         assert isinstance(validator.vlan_validator, VLANValidator)
@@ -63,7 +64,7 @@ class TestComposition:
 class TestValidateConnectivity:
     """Tests for validate_connectivity."""
 
-    def test_missing_credentials_returns_early(self, validator):
+    def test_missing_credentials_returns_early(self, validator: OPNsenseValidator) -> None:
         """Returns early when credentials are missing."""
         validator.api_validator.get_credentials = MagicMock(return_value=None)
 
@@ -71,7 +72,7 @@ class TestValidateConnectivity:
 
         validator.api_validator.get_credentials.assert_called_once()
 
-    def test_api_200_reports_success(self, validator):
+    def test_api_200_reports_success(self, validator: OPNsenseValidator) -> None:
         """Reports success on 200 response."""
         validator.api_validator.get_credentials = MagicMock(
             return_value={
@@ -90,7 +91,7 @@ class TestValidateConnectivity:
 
         assert validator.api_validator.add_success.call_count == 2  # connection + version
 
-    def test_api_200_without_version(self, validator):
+    def test_api_200_without_version(self, validator: OPNsenseValidator) -> None:
         """Reports success without version when not in response."""
         validator.api_validator.get_credentials = MagicMock(
             return_value={
@@ -109,7 +110,7 @@ class TestValidateConnectivity:
 
         assert validator.api_validator.add_success.call_count == 1  # connection only
 
-    def test_api_401_reports_auth_error(self, validator):
+    def test_api_401_reports_auth_error(self, validator: OPNsenseValidator) -> None:
         """Reports authentication error on 401."""
         validator.api_validator.get_credentials = MagicMock(
             return_value={
@@ -128,7 +129,7 @@ class TestValidateConnectivity:
         validator.api_validator.add_error.assert_called_once()
         assert "401" in validator.api_validator.add_error.call_args[1]["message"]
 
-    def test_api_500_reports_warning(self, validator):
+    def test_api_500_reports_warning(self, validator: OPNsenseValidator) -> None:
         """Reports warning on 500 response."""
         validator.api_validator.get_credentials = MagicMock(
             return_value={
@@ -147,7 +148,7 @@ class TestValidateConnectivity:
         validator.api_validator.add_error.assert_called_once()
         assert "500" in validator.api_validator.add_error.call_args[1]["message"]
 
-    def test_request_failure_returns_early(self, validator):
+    def test_request_failure_returns_early(self, validator: OPNsenseValidator) -> None:
         """Returns early when API request fails entirely."""
         validator.api_validator.get_credentials = MagicMock(
             return_value={
@@ -169,13 +170,13 @@ class TestValidateConnectivity:
 class TestValidateReferences:
     """Tests for validate_references."""
 
-    def test_missing_credentials_returns_early(self, validator):
+    def test_missing_credentials_returns_early(self, validator: OPNsenseValidator) -> None:
         """Returns early when credentials are missing."""
         validator.api_validator.get_credentials = MagicMock(return_value=None)
 
         validator.validate_references([])
 
-    def test_delegates_to_specialized_validators(self, validator):
+    def test_delegates_to_specialized_validators(self, validator: OPNsenseValidator) -> None:
         """Delegates to all specialized validators."""
         validator.api_validator.get_credentials = MagicMock(
             return_value={
@@ -203,7 +204,7 @@ class TestValidateReferences:
         validator.resource_name_validator.validate.assert_called_once()
         validator.interface_assignment_validator.validate.assert_called_once()
 
-    def test_exception_caught_gracefully(self, validator):
+    def test_exception_caught_gracefully(self, validator: OPNsenseValidator) -> None:
         """Exceptions during validation are caught and reported."""
         validator.api_validator.get_credentials = MagicMock(
             return_value={
@@ -229,7 +230,7 @@ class TestValidateReferences:
 class TestCollectResourceReferences:
     """Tests for _collect_resource_references."""
 
-    def test_collects_aliases(self, validator):
+    def test_collects_aliases(self, validator: OPNsenseValidator) -> None:
         """Collects alias resources."""
         resources = [
             ResourceConfig(
@@ -242,7 +243,7 @@ class TestCollectResourceReferences:
         assert "my-alias" in refs["alias_names"]
         assert len(refs["aliases"]) == 1
 
-    def test_collects_vlans(self, validator):
+    def test_collects_vlans(self, validator: OPNsenseValidator) -> None:
         """Collects VLAN resources."""
         resources = [
             ResourceConfig(name="vlan10", type="interfaces.vlans", provider="opnsense", config={}),
@@ -253,7 +254,7 @@ class TestCollectResourceReferences:
         assert "vlan10" in refs["vlan_names"]
         assert len(refs["vlans"]) == 1
 
-    def test_collects_firewall_rules(self, validator):
+    def test_collects_firewall_rules(self, validator: OPNsenseValidator) -> None:
         """Collects firewall rule resources."""
         resources = [
             ResourceConfig(name="rule1", type="firewall.rules", provider="opnsense", config={}),
@@ -263,7 +264,7 @@ class TestCollectResourceReferences:
 
         assert len(refs["firewall_rules"]) == 1
 
-    def test_collects_unbound_host_overrides(self, validator):
+    def test_collects_unbound_host_overrides(self, validator: OPNsenseValidator) -> None:
         """Collects unbound host override resources."""
         resources = [
             ResourceConfig(
@@ -275,7 +276,7 @@ class TestCollectResourceReferences:
 
         assert len(refs["unbound_host_overrides"]) == 1
 
-    def test_collects_interface_assignments(self, validator):
+    def test_collects_interface_assignments(self, validator: OPNsenseValidator) -> None:
         """Collects interface_assignment resources."""
         resources = [
             ResourceConfig(
@@ -291,7 +292,7 @@ class TestCollectResourceReferences:
         assert len(refs["interface_assignments"]) == 1
         assert "lan" in refs["interface_assignment_names"]
 
-    def test_empty_resources(self, validator):
+    def test_empty_resources(self, validator: OPNsenseValidator) -> None:
         """Returns empty collections for empty resources."""
         refs = validator._collect_resource_references([])
 
@@ -305,7 +306,7 @@ class TestCollectResourceReferences:
 class TestGetExistingAliases:
     """Tests for _get_existing_aliases."""
 
-    def test_success_returns_aliases(self, validator):
+    def test_success_returns_aliases(self, validator: OPNsenseValidator) -> None:
         """Returns alias dict on successful API call."""
         validator.api_validator.fetch_json = MagicMock(
             return_value={
@@ -321,7 +322,7 @@ class TestGetExistingAliases:
         assert "alias1" in result
         assert "alias2" in result
 
-    def test_api_failure_returns_empty(self, validator):
+    def test_api_failure_returns_empty(self, validator: OPNsenseValidator) -> None:
         """Returns empty dict on API failure."""
         validator.api_validator.fetch_json = MagicMock(return_value=None)
 
@@ -329,7 +330,7 @@ class TestGetExistingAliases:
 
         assert result == {}
 
-    def test_skips_rows_without_name(self, validator):
+    def test_skips_rows_without_name(self, validator: OPNsenseValidator) -> None:
         """Skips rows that don't have a name field."""
         validator.api_validator.fetch_json = MagicMock(
             return_value={"rows": [{"name": "alias1"}, {"type": "host"}]}
@@ -344,7 +345,7 @@ class TestGetExistingAliases:
 class TestGetExistingInterfaces:
     """Tests for _get_existing_interfaces."""
 
-    def test_success_with_dict_format(self, validator):
+    def test_success_with_dict_format(self, validator: OPNsenseValidator) -> None:
         """Returns interfaces from dict format."""
         validator.api_validator.fetch_json = MagicMock(
             return_value={
@@ -358,7 +359,7 @@ class TestGetExistingInterfaces:
         assert "lan" in result
         assert "wan" in result
 
-    def test_success_with_list_format(self, validator):
+    def test_success_with_list_format(self, validator: OPNsenseValidator) -> None:
         """Returns interfaces from list format."""
         validator.api_validator.fetch_json = MagicMock(
             return_value=[
@@ -372,7 +373,7 @@ class TestGetExistingInterfaces:
         assert "lan" in result
         assert "wan" in result
 
-    def test_api_failure_returns_empty(self, validator):
+    def test_api_failure_returns_empty(self, validator: OPNsenseValidator) -> None:
         """Returns empty dict on API failure."""
         validator.api_validator.fetch_json = MagicMock(return_value=None)
 
@@ -384,7 +385,7 @@ class TestGetExistingInterfaces:
 class TestNormalizeInterfaceData:
     """Tests for _normalize_interface_data."""
 
-    def test_dict_format(self, validator):
+    def test_dict_format(self, validator: OPNsenseValidator) -> None:
         """Normalizes dict format to list."""
         data = {"lan": {"device": "igc0"}, "wan": {"device": "igc1"}}
 
@@ -395,7 +396,7 @@ class TestNormalizeInterfaceData:
         assert "lan" in names
         assert "wan" in names
 
-    def test_list_format(self, validator):
+    def test_list_format(self, validator: OPNsenseValidator) -> None:
         """Passes through list format."""
         data = [{"name": "lan"}, {"name": "wan"}]
 
@@ -403,7 +404,7 @@ class TestNormalizeInterfaceData:
 
         assert len(result) == 2
 
-    def test_non_dict_values_skipped(self, validator):
+    def test_non_dict_values_skipped(self, validator: OPNsenseValidator) -> None:
         """Skips non-dict values in dict format."""
         data = {"lan": {"device": "igc0"}, "count": 42}
 
@@ -411,7 +412,7 @@ class TestNormalizeInterfaceData:
 
         assert len(result) == 1
 
-    def test_non_dict_items_skipped_in_list(self, validator):
+    def test_non_dict_items_skipped_in_list(self, validator: OPNsenseValidator) -> None:
         """Skips non-dict items in list format."""
         data = [{"name": "lan"}, "not-a-dict", 42]
 
@@ -419,7 +420,7 @@ class TestNormalizeInterfaceData:
 
         assert len(result) == 1
 
-    def test_unknown_type_returns_empty(self, validator):
+    def test_unknown_type_returns_empty(self, validator: OPNsenseValidator) -> None:
         """Returns empty list for unknown data types."""
         result = validator._normalize_interface_data("unexpected")
 
@@ -429,26 +430,26 @@ class TestNormalizeInterfaceData:
 class TestExtractInterfaceName:
     """Tests for _extract_interface_name."""
 
-    def test_name_field(self, validator):
+    def test_name_field(self, validator: OPNsenseValidator) -> None:
         """Extracts from 'name' field."""
         assert validator._extract_interface_name({"name": "lan"}) == "lan"
 
-    def test_device_field(self, validator):
+    def test_device_field(self, validator: OPNsenseValidator) -> None:
         """Falls back to 'device' field."""
         assert validator._extract_interface_name({"device": "igc0"}) == "igc0"
 
-    def test_if_field(self, validator):
+    def test_if_field(self, validator: OPNsenseValidator) -> None:
         """Falls back to 'if' field."""
         assert validator._extract_interface_name({"if": "em0"}) == "em0"
 
-    def test_interface_field(self, validator):
+    def test_interface_field(self, validator: OPNsenseValidator) -> None:
         """Falls back to 'interface' field."""
         assert validator._extract_interface_name({"interface": "eth0"}) == "eth0"
 
-    def test_priority_order(self, validator):
+    def test_priority_order(self, validator: OPNsenseValidator) -> None:
         """Returns 'name' over 'device' when both present."""
         assert validator._extract_interface_name({"name": "lan", "device": "igc0"}) == "lan"
 
-    def test_no_fields_returns_none(self, validator):
+    def test_no_fields_returns_none(self, validator: OPNsenseValidator) -> None:
         """Returns None when no recognized fields."""
         assert validator._extract_interface_name({"type": "ethernet"}) is None

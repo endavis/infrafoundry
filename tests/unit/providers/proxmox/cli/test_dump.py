@@ -12,13 +12,13 @@ from infrafoundry.providers.proxmox.cli.dump import dump
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """CLI runner for invoking the command."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_config_manager():
+def mock_config_manager() -> Mock:
     """Config manager stub returning Proxmox provider settings."""
     mock = Mock()
     mock_env = Mock()
@@ -35,7 +35,7 @@ def mock_config_manager():
 
 
 @pytest.fixture
-def mock_dumper():
+def mock_dumper() -> Mock:
     """ProxmoxStateDumper stub returning a canned result dict."""
     mock = Mock()
     mock.dump.return_value = {
@@ -45,7 +45,9 @@ def mock_dumper():
     return mock
 
 
-def test_dump_success(cli_runner, tmp_path, mock_config_manager, mock_dumper):
+def test_dump_success(
+    cli_runner: CliRunner, tmp_path: Path, mock_config_manager: Mock, mock_dumper: Mock
+) -> None:
     """Happy-path: dumper is invoked and reports the section count."""
     output_file = tmp_path / "dump.json"
 
@@ -74,7 +76,9 @@ def test_dump_success(cli_runner, tmp_path, mock_config_manager, mock_dumper):
         mock_dumper.dump.assert_called_once_with(output_file)
 
 
-def test_dump_custom_timeout(cli_runner, tmp_path, mock_config_manager, mock_dumper):
+def test_dump_custom_timeout(
+    cli_runner: CliRunner, tmp_path: Path, mock_config_manager: Mock, mock_dumper: Mock
+) -> None:
     """``--timeout`` is forwarded to the dumper constructor."""
     output_file = tmp_path / "dump.json"
 
@@ -99,7 +103,7 @@ def test_dump_custom_timeout(cli_runner, tmp_path, mock_config_manager, mock_dum
         assert kwargs["timeout"] == 60
 
 
-def test_dump_missing_env(cli_runner, tmp_path):
+def test_dump_missing_env(cli_runner: CliRunner, tmp_path: Path) -> None:
     """Without ``--env`` Click reports a usage error."""
     output_file = tmp_path / "dump.json"
     result = cli_runner.invoke(
@@ -111,7 +115,7 @@ def test_dump_missing_env(cli_runner, tmp_path):
     assert "Missing option '--env'" in result.output or "Error" in result.output
 
 
-def test_dump_missing_output(cli_runner):
+def test_dump_missing_output(cli_runner: CliRunner) -> None:
     """Without ``--output`` Click reports a usage error."""
     result = cli_runner.invoke(
         dump,
@@ -122,7 +126,9 @@ def test_dump_missing_output(cli_runner):
     assert "Missing option '--output'" in result.output or "Error" in result.output
 
 
-def test_dump_reports_dumper_error(cli_runner, tmp_path, mock_config_manager):
+def test_dump_reports_dumper_error(
+    cli_runner: CliRunner, tmp_path: Path, mock_config_manager: Mock
+) -> None:
     """Exceptions from the dumper are translated into Click errors."""
     output_file = tmp_path / "dump.json"
     mock_dumper = Mock()
@@ -147,7 +153,7 @@ def test_dump_reports_dumper_error(cli_runner, tmp_path, mock_config_manager):
         assert "Failed to dump Proxmox state" in result.output
 
 
-def test_dump_without_config_dir(cli_runner, tmp_path, mock_dumper):
+def test_dump_without_config_dir(cli_runner: CliRunner, tmp_path: Path, mock_dumper: Mock) -> None:
     """Dump works when no config_dir is in context (falls back to default)."""
     output_file = tmp_path / "dump.json"
 

@@ -2,7 +2,9 @@
 
 import stat
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,7 +20,7 @@ from infrafoundry.core.secrets.secret_manager import SecretManager
 
 
 @pytest.fixture
-def temp_config_dir():
+def temp_config_dir() -> Iterator[Path]:
     """Create a temporary config directory with env structure."""
     with tempfile.TemporaryDirectory() as tmpdir:
         config_dir = Path(tmpdir)
@@ -29,7 +31,7 @@ def temp_config_dir():
 
 
 @pytest.fixture
-def executable_script(temp_config_dir):
+def executable_script(temp_config_dir: Path) -> Any:
     """Create an executable script that prints environment variables."""
     env_dir = temp_config_dir / "envs" / "test-env"
     scripts_dir = env_dir / "scripts"
@@ -46,7 +48,7 @@ exit 0
 
 
 @pytest.fixture
-def failing_script(temp_config_dir):
+def failing_script(temp_config_dir: Path) -> Any:
     """Create a script that exits with non-zero."""
     env_dir = temp_config_dir / "envs" / "test-env"
     scripts_dir = env_dir / "scripts"
@@ -60,7 +62,7 @@ exit 1
 
 
 @pytest.fixture
-def timeout_script(temp_config_dir):
+def timeout_script(temp_config_dir: Path) -> Any:
     """Create a script that takes too long."""
     env_dir = temp_config_dir / "envs" / "test-env"
     scripts_dir = env_dir / "scripts"
@@ -74,7 +76,7 @@ exit 0
 
 
 @pytest.fixture
-def mock_secret_manager_factory():
+def mock_secret_manager_factory() -> Any:
     """Create a mock secret manager factory."""
 
     def factory(env_name: str) -> SecretManager:
@@ -88,7 +90,7 @@ def mock_secret_manager_factory():
 class TestHookConfig:
     """Tests for HookConfig model."""
 
-    def test_minimal_config(self):
+    def test_minimal_config(self) -> None:
         """Test creating HookConfig with minimal fields."""
         config = HookConfig(script="scripts/test.sh")
         assert config.script == "scripts/test.sh"
@@ -97,7 +99,7 @@ class TestHookConfig:
         assert config.continue_on_error is False
         assert config.timeout == 300
 
-    def test_full_config(self):
+    def test_full_config(self) -> None:
         """Test creating HookConfig with all fields."""
         config = HookConfig(
             script="scripts/test.sh",
@@ -112,12 +114,12 @@ class TestHookConfig:
         assert config.continue_on_error is True
         assert config.timeout == 60
 
-    def test_timeout_validation_min(self):
+    def test_timeout_validation_min(self) -> None:
         """Test timeout minimum validation."""
         with pytest.raises(ValueError):
             HookConfig(script="test.sh", timeout=0)
 
-    def test_timeout_validation_max(self):
+    def test_timeout_validation_max(self) -> None:
         """Test timeout maximum validation."""
         with pytest.raises(ValueError):
             HookConfig(script="test.sh", timeout=3601)
@@ -126,7 +128,7 @@ class TestHookConfig:
 class TestHooksConfig:
     """Tests for HooksConfig model."""
 
-    def test_empty_config(self):
+    def test_empty_config(self) -> None:
         """Test creating empty HooksConfig."""
         config = HooksConfig()
         assert config.before_plan == []
@@ -136,7 +138,7 @@ class TestHooksConfig:
         assert config.before_destroy == []
         assert config.after_destroy == []
 
-    def test_config_with_hooks(self):
+    def test_config_with_hooks(self) -> None:
         """Test creating HooksConfig with hooks defined."""
         hook = HookConfig(script="scripts/test.sh")
         config = HooksConfig(
@@ -151,7 +153,7 @@ class TestHooksConfig:
 class TestHookResult:
     """Tests for HookResult model."""
 
-    def test_successful_result(self):
+    def test_successful_result(self) -> None:
         """Test creating successful HookResult."""
         result = HookResult(
             script="test.sh",
@@ -166,7 +168,7 @@ class TestHookResult:
         assert result.timed_out is False
         assert result.error_message is None
 
-    def test_failed_result(self):
+    def test_failed_result(self) -> None:
         """Test creating failed HookResult."""
         result = HookResult(
             script="test.sh",
@@ -180,7 +182,7 @@ class TestHookResult:
         assert result.success is False
         assert result.exit_code == 1
 
-    def test_timeout_result(self):
+    def test_timeout_result(self) -> None:
         """Test creating timeout HookResult."""
         result = HookResult(
             script="test.sh",
@@ -198,7 +200,7 @@ class TestHookResult:
 class TestHookManager:
     """Tests for HookManager."""
 
-    def test_init(self, temp_config_dir, mock_secret_manager_factory):
+    def test_init(self, temp_config_dir: Path, mock_secret_manager_factory: Any) -> None:
         """Test HookManager initialization."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -206,7 +208,9 @@ class TestHookManager:
         )
         assert manager.config_base_dir == temp_config_dir
 
-    def test_execute_environment_hooks_empty(self, temp_config_dir, mock_secret_manager_factory):
+    def test_execute_environment_hooks_empty(
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any
+    ) -> None:
         """Test executing with no hooks defined."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -220,8 +224,8 @@ class TestHookManager:
         assert results == []
 
     def test_execute_environment_hooks_no_hooks_for_stage(
-        self, temp_config_dir, mock_secret_manager_factory
-    ):
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any
+    ) -> None:
         """Test executing when no hooks defined for the stage."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -236,8 +240,8 @@ class TestHookManager:
         assert results == []
 
     def test_execute_single_hook_success(
-        self, temp_config_dir, mock_secret_manager_factory, executable_script
-    ):
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any, executable_script: Any
+    ) -> None:
         """Test successful hook execution."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -261,7 +265,9 @@ class TestHookManager:
         assert "ENV: test-env" in results[0].stdout
         assert "CUSTOM_VAR: custom-value" in results[0].stdout
 
-    def test_execute_hook_script_not_found(self, temp_config_dir, mock_secret_manager_factory):
+    def test_execute_hook_script_not_found(
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any
+    ) -> None:
         """Test hook execution when script doesn't exist."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -281,8 +287,8 @@ class TestHookManager:
         assert exc_info.value.result.success is False
 
     def test_execute_hook_failure_raises_error(
-        self, temp_config_dir, mock_secret_manager_factory, failing_script
-    ):
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any, failing_script: Any
+    ) -> None:
         """Test that hook failure raises HookExecutionError."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -302,8 +308,8 @@ class TestHookManager:
         assert exc_info.value.result.exit_code == 1
 
     def test_execute_hook_failure_continue_on_error(
-        self, temp_config_dir, mock_secret_manager_factory, failing_script
-    ):
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any, failing_script: Any
+    ) -> None:
         """Test that continue_on_error allows execution to proceed."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -327,8 +333,8 @@ class TestHookManager:
         assert results[0].exit_code == 1
 
     def test_execute_hook_timeout(
-        self, temp_config_dir, mock_secret_manager_factory, timeout_script
-    ):
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any, timeout_script: Any
+    ) -> None:
         """Test hook timeout handling."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -351,8 +357,8 @@ class TestHookManager:
         assert "Timeout" in exc_info.value.result.error_message
 
     def test_execute_resource_hooks(
-        self, temp_config_dir, mock_secret_manager_factory, executable_script
-    ):
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any, executable_script: Any
+    ) -> None:
         """Test resource-level hook execution."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -372,7 +378,9 @@ class TestHookManager:
         assert len(results) == 1
         assert results[0].success is True
 
-    def test_environment_variables_injection(self, temp_config_dir, mock_secret_manager_factory):
+    def test_environment_variables_injection(
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any
+    ) -> None:
         """Test that environment variables are properly injected."""
         env_dir = temp_config_dir / "envs" / "test-env" / "scripts"
         script_path = env_dir / "check-env.sh"
@@ -407,7 +415,9 @@ exit 0
         assert "INFRAFOUNDRY_RESOURCE=my-vm" in stdout
         assert "INFRAFOUNDRY_PROVIDER=oci" in stdout
 
-    def test_secret_template_resolution(self, temp_config_dir, mock_secret_manager_factory):
+    def test_secret_template_resolution(
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any
+    ) -> None:
         """Test that {{ secrets.xxx }} templates are resolved."""
         env_dir = temp_config_dir / "envs" / "test-env" / "scripts"
         script_path = env_dir / "check-secret.sh"
@@ -436,7 +446,7 @@ exit 0
         assert results[0].success is True
         assert "SECRET=secret-value-from-manager" in results[0].stdout
 
-    def test_secret_template_not_found(self, temp_config_dir):
+    def test_secret_template_not_found(self, temp_config_dir: Path) -> None:
         """Test that missing secrets result in empty string with warning."""
         env_dir = temp_config_dir / "envs" / "test-env" / "scripts"
         script_path = env_dir / "check-secret.sh"
@@ -471,7 +481,9 @@ exit 0
         assert results[0].success is True
         assert "SECRET=" in results[0].stdout
 
-    def test_multiple_hooks_execution_order(self, temp_config_dir, mock_secret_manager_factory):
+    def test_multiple_hooks_execution_order(
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any
+    ) -> None:
         """Test that multiple hooks are executed in order."""
         env_dir = temp_config_dir / "envs" / "test-env" / "scripts"
 
@@ -513,7 +525,9 @@ exit 0
         assert results[1].success is True
         assert "hook2" in results[1].stdout
 
-    def test_non_executable_script(self, temp_config_dir, mock_secret_manager_factory):
+    def test_non_executable_script(
+        self, temp_config_dir: Path, mock_secret_manager_factory: Any
+    ) -> None:
         """Test that non-executable script fails properly."""
         env_dir = temp_config_dir / "envs" / "test-env" / "scripts"
         script_path = env_dir / "non-exec.sh"
@@ -543,7 +557,7 @@ exit 0
 class TestHookExecutionError:
     """Tests for HookExecutionError."""
 
-    def test_error_with_result(self):
+    def test_error_with_result(self) -> None:
         """Test HookExecutionError contains result."""
         result = HookResult(
             script="test.sh",
@@ -563,8 +577,8 @@ class TestHookEventsIntegration:
     """Tests for hook events integration."""
 
     def test_hook_emits_events_on_success(
-        self, temp_config_dir, executable_script, mock_secret_manager_factory
-    ):
+        self, temp_config_dir: Path, executable_script: Any, mock_secret_manager_factory: Any
+    ) -> None:
         """Test that successful hook emits HOOK_STARTED and HOOK_COMPLETED events."""
         from unittest.mock import MagicMock
 
@@ -602,8 +616,8 @@ class TestHookEventsIntegration:
         assert calls[1][0][2]["success"] is True
 
     def test_hook_emits_events_on_failure(
-        self, temp_config_dir, failing_script, mock_secret_manager_factory
-    ):
+        self, temp_config_dir: Path, failing_script: Any, mock_secret_manager_factory: Any
+    ) -> None:
         """Test that failing hook emits HOOK_STARTED and HOOK_FAILED events."""
         from unittest.mock import MagicMock
 
@@ -638,8 +652,8 @@ class TestHookEventsIntegration:
         assert "error_message" in calls[1][0][2]
 
     def test_hook_no_events_without_event_manager(
-        self, temp_config_dir, executable_script, mock_secret_manager_factory
-    ):
+        self, temp_config_dir: Path, executable_script: Any, mock_secret_manager_factory: Any
+    ) -> None:
         """Test that hooks work without event manager (no events emitted)."""
         manager = HookManager(
             config_base_dir=temp_config_dir,
@@ -660,8 +674,8 @@ class TestHookEventsIntegration:
         assert results[0].success is True
 
     def test_hook_events_include_resource_info(
-        self, temp_config_dir, executable_script, mock_secret_manager_factory
-    ):
+        self, temp_config_dir: Path, executable_script: Any, mock_secret_manager_factory: Any
+    ) -> None:
         """Test that resource hooks include resource info in events."""
         from unittest.mock import MagicMock
 

@@ -1,6 +1,7 @@
 """Unit tests for ProxmoxConfigExporter."""
 
-from unittest.mock import Mock, patch
+from typing import Any
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import requests
@@ -14,7 +15,7 @@ class TestProxmoxConfigExporter:
     """Tests for ProxmoxConfigExporter."""
 
     @pytest.fixture
-    def env_config(self):
+    def env_config(self) -> dict[str, Any]:
         """Create a sample environment config."""
         return {
             "provider_settings": {
@@ -29,7 +30,7 @@ class TestProxmoxConfigExporter:
         }
 
     @pytest.fixture
-    def env_config_no_ssl(self):
+    def env_config_no_ssl(self) -> dict[str, Any]:
         """Create a sample environment config with SSL verification disabled."""
         return {
             "provider_settings": {
@@ -43,11 +44,11 @@ class TestProxmoxConfigExporter:
         }
 
     @pytest.fixture
-    def exporter(self, env_config):
+    def exporter(self, env_config: dict[str, Any]) -> ProxmoxConfigExporter:
         """Create ProxmoxConfigExporter instance."""
         return ProxmoxConfigExporter(env_config)
 
-    def test_init(self, exporter):
+    def test_init(self, exporter: ProxmoxConfigExporter) -> None:
         """Test ProxmoxConfigExporter initialization."""
         assert exporter.api_url == "https://proxmox.example.com:8006/api2/json"
         assert exporter.api_token_id == "user@pam!token"
@@ -55,7 +56,7 @@ class TestProxmoxConfigExporter:
         assert exporter.verify_ssl is True
         assert exporter.node == "pve1"
 
-    def test_init_defaults_verify_ssl_to_true(self):
+    def test_init_defaults_verify_ssl_to_true(self) -> None:
         """Test that verify_ssl defaults to True for security."""
         config = {
             "provider_settings": {
@@ -69,17 +70,17 @@ class TestProxmoxConfigExporter:
         exporter = ProxmoxConfigExporter(config)
         assert exporter.verify_ssl is True
 
-    def test_init_respects_verify_ssl_false(self, env_config_no_ssl):
+    def test_init_respects_verify_ssl_false(self, env_config_no_ssl: dict[str, Any]) -> None:
         """Test that verify_ssl can be explicitly set to False."""
         exporter = ProxmoxConfigExporter(env_config_no_ssl)
         assert exporter.verify_ssl is False
 
-    def test_build_token_from_separate_fields(self, exporter):
+    def test_build_token_from_separate_fields(self, exporter: ProxmoxConfigExporter) -> None:
         """Test token building from api_token_id and api_token_secret."""
         token = exporter._build_token()
         assert token == "user@pam!token=secret-value"
 
-    def test_build_token_from_api_token(self):
+    def test_build_token_from_api_token(self) -> None:
         """Test token building from api_token directly."""
         config = {
             "provider_settings": {
@@ -93,7 +94,7 @@ class TestProxmoxConfigExporter:
         token = exporter._build_token()
         assert token == "user@pam!token=secret-value"
 
-    def test_build_token_raises_when_no_credentials(self):
+    def test_build_token_raises_when_no_credentials(self) -> None:
         """Test that _build_token raises ValueError when no credentials provided."""
         config = {
             "provider_settings": {
@@ -106,7 +107,7 @@ class TestProxmoxConfigExporter:
         with pytest.raises(ValueError, match="Proxmox API token not configured"):
             exporter._build_token()
 
-    def test_session_property_creates_session(self, exporter):
+    def test_session_property_creates_session(self, exporter: ProxmoxConfigExporter) -> None:
         """Test that session property creates and configures a session."""
         session = exporter.session
         assert session is not None
@@ -114,19 +115,19 @@ class TestProxmoxConfigExporter:
         assert "Authorization" in session.headers
         assert session.verify is True
 
-    def test_session_property_reuses_session(self, exporter):
+    def test_session_property_reuses_session(self, exporter: ProxmoxConfigExporter) -> None:
         """Test that session property reuses the same session."""
         session1 = exporter.session
         session2 = exporter.session
         assert session1 is session2
 
-    def test_close_closes_session(self, exporter):
+    def test_close_closes_session(self, exporter: ProxmoxConfigExporter) -> None:
         """Test that close() closes the session."""
         _ = exporter.session  # Create session first
         exporter.close()
         assert exporter._session is None
 
-    def test_fetch_success(self, exporter):
+    def test_fetch_success(self, exporter: ProxmoxConfigExporter) -> None:
         """Test successful API fetch."""
         mock_response = Mock()
         mock_response.json.return_value = {"data": [{"id": 1, "name": "test"}]}
@@ -144,7 +145,7 @@ class TestProxmoxConfigExporter:
             timeout=30,
         )
 
-    def test_fetch_handles_non_list_data(self, exporter):
+    def test_fetch_handles_non_list_data(self, exporter: ProxmoxConfigExporter) -> None:
         """Test _fetch returns empty list when data is not a list."""
         mock_response = Mock()
         mock_response.json.return_value = {"data": {"single": "object"}}
@@ -158,7 +159,7 @@ class TestProxmoxConfigExporter:
 
         assert result == []
 
-    def test_fetch_handles_http_error(self, exporter):
+    def test_fetch_handles_http_error(self, exporter: ProxmoxConfigExporter) -> None:
         """Test _fetch raises exception on HTTP error."""
         mock_session = Mock()
         mock_session.get.side_effect = requests.exceptions.HTTPError("404 Not Found")
@@ -167,7 +168,7 @@ class TestProxmoxConfigExporter:
         with pytest.raises(requests.exceptions.HTTPError):
             exporter._fetch("/test")
 
-    def test_fetch_handles_timeout(self, exporter):
+    def test_fetch_handles_timeout(self, exporter: ProxmoxConfigExporter) -> None:
         """Test _fetch raises exception on timeout."""
         mock_session = Mock()
         mock_session.get.side_effect = requests.exceptions.Timeout("Timeout")
@@ -176,7 +177,7 @@ class TestProxmoxConfigExporter:
         with pytest.raises(requests.exceptions.Timeout):
             exporter._fetch("/test")
 
-    def test_fetch_nodes(self, exporter):
+    def test_fetch_nodes(self, exporter: ProxmoxConfigExporter) -> None:
         """Test fetching nodes."""
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -197,13 +198,13 @@ class TestProxmoxConfigExporter:
         assert nodes[0]["node"] == "pve1"
         assert nodes[1]["node"] == "pve2"
 
-    def test_export_vms(self, exporter):
+    def test_export_vms(self, exporter: ProxmoxConfigExporter) -> None:
         """Test exporting VMs."""
         # Mock nodes
         nodes = [{"node": "pve1"}, {"node": "pve2"}]
 
         # Mock VMs
-        def mock_get_side_effect(url, **kwargs):
+        def mock_get_side_effect(url: Any, **kwargs: Any) -> Mock:
             response = Mock()
             response.raise_for_status = Mock()
             if "/pve1/qemu" in url:
@@ -241,7 +242,7 @@ class TestProxmoxConfigExporter:
         # Verify memory conversion: 2147483648 bytes = 2048 MiB
         assert vm_data["resources"][0]["config"]["memory"] == 2048
 
-    def test_export_vms_generates_name_when_missing(self, exporter):
+    def test_export_vms_generates_name_when_missing(self, exporter: ProxmoxConfigExporter) -> None:
         """Test that VM export generates name from vmid when name is missing."""
         nodes = [{"node": "pve1"}]
 
@@ -267,7 +268,7 @@ class TestProxmoxConfigExporter:
         vm_data = yaml.safe_load(result["pve1-vms.yaml"])
         assert vm_data["resources"][0]["name"] == "vm-100"
 
-    def test_export_vms_memory_conversion(self, exporter):
+    def test_export_vms_memory_conversion(self, exporter: ProxmoxConfigExporter) -> None:
         """Test that VM memory is correctly converted from bytes to MiB."""
         nodes = [{"node": "pve1"}]
 
@@ -297,7 +298,7 @@ class TestProxmoxConfigExporter:
         assert vm_data["resources"][2]["config"]["memory"] == 512
         assert vm_data["resources"][3]["config"]["memory"] is None
 
-    def test_export_networks(self, exporter):
+    def test_export_networks(self, exporter: ProxmoxConfigExporter) -> None:
         """Test exporting networks."""
         nodes = [{"node": "pve1"}]
 
@@ -323,7 +324,7 @@ class TestProxmoxConfigExporter:
         assert network_data["resources"][0]["type"] == "network"
         assert network_data["resources"][0]["config"]["bridge"] == "vmbr0"
 
-    def test_export_storage(self, exporter):
+    def test_export_storage(self, exporter: ProxmoxConfigExporter) -> None:
         """Test exporting storage."""
         mock_response = Mock()
         mock_response.raise_for_status = Mock()
@@ -357,8 +358,14 @@ class TestProxmoxConfigExporter:
     @patch.object(ProxmoxConfigExporter, "_export_storage")
     @patch.object(ProxmoxConfigExporter, "close")
     def test_export_all_resources(
-        self, mock_close, mock_storage, mock_networks, mock_vms, mock_nodes, exporter
-    ):
+        self,
+        mock_close: MagicMock,
+        mock_storage: MagicMock,
+        mock_networks: MagicMock,
+        mock_vms: MagicMock,
+        mock_nodes: MagicMock,
+        exporter: ProxmoxConfigExporter,
+    ) -> None:
         """Test export without filters exports all resource types."""
         mock_nodes.return_value = [{"node": "pve1"}]
         mock_vms.return_value = {"pve1-vms.yaml": "vm: content"}
@@ -382,8 +389,14 @@ class TestProxmoxConfigExporter:
     @patch.object(ProxmoxConfigExporter, "_export_storage")
     @patch.object(ProxmoxConfigExporter, "close")
     def test_export_with_node_filter(
-        self, mock_close, mock_storage, mock_networks, mock_vms, mock_nodes, exporter
-    ):
+        self,
+        mock_close: MagicMock,
+        mock_storage: MagicMock,
+        mock_networks: MagicMock,
+        mock_vms: MagicMock,
+        mock_nodes: MagicMock,
+        exporter: ProxmoxConfigExporter,
+    ) -> None:
         """Test export with node filter."""
         mock_nodes.return_value = [{"node": "pve1"}, {"node": "pve2"}]
         mock_vms.return_value = {}
@@ -403,8 +416,14 @@ class TestProxmoxConfigExporter:
     @patch.object(ProxmoxConfigExporter, "_export_storage")
     @patch.object(ProxmoxConfigExporter, "close")
     def test_export_with_vm_filter(
-        self, mock_close, mock_storage, mock_networks, mock_vms, mock_nodes, exporter
-    ):
+        self,
+        mock_close: MagicMock,
+        mock_storage: MagicMock,
+        mock_networks: MagicMock,
+        mock_vms: MagicMock,
+        mock_nodes: MagicMock,
+        exporter: ProxmoxConfigExporter,
+    ) -> None:
         """Test export with resource_filter='vm' only exports VMs."""
         mock_nodes.return_value = [{"node": "pve1"}]
         mock_vms.return_value = {"pve1-vms.yaml": "content"}
@@ -421,8 +440,14 @@ class TestProxmoxConfigExporter:
     @patch.object(ProxmoxConfigExporter, "_export_storage")
     @patch.object(ProxmoxConfigExporter, "close")
     def test_export_with_network_filter(
-        self, mock_close, mock_storage, mock_networks, mock_vms, mock_nodes, exporter
-    ):
+        self,
+        mock_close: MagicMock,
+        mock_storage: MagicMock,
+        mock_networks: MagicMock,
+        mock_vms: MagicMock,
+        mock_nodes: MagicMock,
+        exporter: ProxmoxConfigExporter,
+    ) -> None:
         """Test export with resource_filter='network' only exports networks."""
         mock_nodes.return_value = [{"node": "pve1"}]
         mock_networks.return_value = {"pve1-networks.yaml": "content"}
@@ -439,8 +464,14 @@ class TestProxmoxConfigExporter:
     @patch.object(ProxmoxConfigExporter, "_export_storage")
     @patch.object(ProxmoxConfigExporter, "close")
     def test_export_with_storage_filter(
-        self, mock_close, mock_storage, mock_networks, mock_vms, mock_nodes, exporter
-    ):
+        self,
+        mock_close: MagicMock,
+        mock_storage: MagicMock,
+        mock_networks: MagicMock,
+        mock_vms: MagicMock,
+        mock_nodes: MagicMock,
+        exporter: ProxmoxConfigExporter,
+    ) -> None:
         """Test export with resource_filter='storage' only exports storage."""
         mock_nodes.return_value = [{"node": "pve1"}]
         mock_storage.return_value = {"storage.yaml": "content"}
@@ -451,7 +482,7 @@ class TestProxmoxConfigExporter:
         mock_networks.assert_not_called()
         mock_storage.assert_called_once()
 
-    def test_export_raises_when_no_api_url(self):
+    def test_export_raises_when_no_api_url(self) -> None:
         """Test export raises ValueError when api_url not configured."""
         config = {"provider_settings": {"proxmox": {}}}
         exporter = ProxmoxConfigExporter(config)
@@ -459,7 +490,7 @@ class TestProxmoxConfigExporter:
         with pytest.raises(ValueError, match="Proxmox api_url not configured"):
             exporter.export()
 
-    def test_session_respects_verify_ssl_setting(self, env_config_no_ssl):
+    def test_session_respects_verify_ssl_setting(self, env_config_no_ssl: dict[str, Any]) -> None:
         """Test that session respects the verify_ssl setting."""
         exporter = ProxmoxConfigExporter(env_config_no_ssl)
         session = exporter.session

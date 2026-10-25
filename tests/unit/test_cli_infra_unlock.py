@@ -19,7 +19,7 @@ def cli_runner() -> CliRunner:
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     mock = Mock(spec=Orchestrator)
     mock.state_manager = Mock()
     return mock
@@ -29,7 +29,7 @@ def _make_lock(
     environment: str = "dev",
     locked_by: str = "alice@host:1",
     expires_delta: timedelta = timedelta(hours=1),
-):
+) -> Mock:
     lock = Mock()
     lock.environment = environment
     lock.locked_by = locked_by
@@ -38,7 +38,7 @@ def _make_lock(
     return lock
 
 
-def test_unlock_active_lock_refused(cli_runner, mock_orchestrator):
+def test_unlock_active_lock_refused(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     mock_orchestrator.state_manager.get_lock.return_value = _make_lock()
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
@@ -49,7 +49,7 @@ def test_unlock_active_lock_refused(cli_runner, mock_orchestrator):
     mock_orchestrator.state_manager.release_lock.assert_not_called()
 
 
-def test_unlock_force_releases_active_lock(cli_runner, mock_orchestrator):
+def test_unlock_force_releases_active_lock(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     mock_orchestrator.state_manager.get_lock.return_value = _make_lock()
     mock_orchestrator.state_manager.release_lock.return_value = True
 
@@ -60,7 +60,9 @@ def test_unlock_force_releases_active_lock(cli_runner, mock_orchestrator):
     mock_orchestrator.state_manager.release_lock.assert_called_once_with("dev", force=True)
 
 
-def test_unlock_expired_lock_succeeds_without_force(cli_runner, mock_orchestrator):
+def test_unlock_expired_lock_succeeds_without_force(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     expired = _make_lock(expires_delta=timedelta(hours=-1))
     mock_orchestrator.state_manager.get_lock.return_value = expired
     mock_orchestrator.state_manager.release_lock.return_value = True
@@ -73,7 +75,7 @@ def test_unlock_expired_lock_succeeds_without_force(cli_runner, mock_orchestrato
     mock_orchestrator.state_manager.release_lock.assert_called_once_with("dev", force=True)
 
 
-def test_unlock_list_shows_all_locks(cli_runner, mock_orchestrator):
+def test_unlock_list_shows_all_locks(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     mock_orchestrator.state_manager.list_locks.return_value = [
         _make_lock(environment="dev"),
         _make_lock(environment="prod", expires_delta=timedelta(hours=-1)),
@@ -110,7 +112,9 @@ def test_unlock_list_shows_all_locks(cli_runner, mock_orchestrator):
     assert re.search(r"\d{2}:\d{2}:\d{2}\s+UTC", result.output)
 
 
-def test_unlock_nonexistent_env_reports_no_lock(cli_runner, mock_orchestrator):
+def test_unlock_nonexistent_env_reports_no_lock(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     mock_orchestrator.state_manager.get_lock.return_value = None
 
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
@@ -121,7 +125,7 @@ def test_unlock_nonexistent_env_reports_no_lock(cli_runner, mock_orchestrator):
     mock_orchestrator.state_manager.release_lock.assert_not_called()
 
 
-def test_unlock_without_env_or_list_errors(cli_runner, mock_orchestrator):
+def test_unlock_without_env_or_list_errors(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "unlock"])
 

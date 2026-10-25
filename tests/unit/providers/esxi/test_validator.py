@@ -1,5 +1,6 @@
 """Unit tests for ESXi EsxiValidator (integration of sub-validators)."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,12 +13,12 @@ from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
-def _make_env_config(hosts: dict | None = None):
+def _make_env_config(hosts: dict | None = None) -> Any:
     """Create an ``EnvironmentConfig`` populated with ESXi provider settings."""
     esxi_settings: dict = {}
     if hosts is not None:
@@ -28,13 +29,13 @@ def _make_env_config(hosts: dict | None = None):
 class TestComposition:
     """Tests for validator composition."""
 
-    def test_api_validator_initialized(self, report):
+    def test_api_validator_initialized(self, report: MagicMock) -> None:
         """BaseAPIValidator is composed during init."""
         env_config = _make_env_config(hosts={"esxi-01": {}})
         validator = EsxiValidator(env_config, report)
         assert isinstance(validator.api_validator, BaseAPIValidator)
 
-    def test_provider_settings_accessible(self, report):
+    def test_provider_settings_accessible(self, report: MagicMock) -> None:
         """Provider settings are accessible via api_validator."""
         env_config = _make_env_config(hosts={"esxi-01": {"hostname": "192.168.1.10"}})
         validator = EsxiValidator(env_config, report)
@@ -44,7 +45,7 @@ class TestComposition:
 class TestValidateConnectivity:
     """Tests for EsxiValidator.validate_connectivity."""
 
-    def test_no_hosts_configured(self, report):
+    def test_no_hosts_configured(self, report: MagicMock) -> None:
         """Should report error when no hosts are configured."""
         env_config = _make_env_config(hosts={})
         validator = EsxiValidator(env_config, report)
@@ -56,7 +57,7 @@ class TestValidateConnectivity:
         assert "No ESXi hosts configured" in call_args["message"]
 
     @patch("socket.create_connection")
-    def test_hosts_connectivity_checked(self, mock_conn, report):
+    def test_hosts_connectivity_checked(self, mock_conn: MagicMock, report: MagicMock) -> None:
         """Should check connectivity for each configured host."""
         mock_conn.return_value = MagicMock()
         env_config = _make_env_config(
@@ -71,7 +72,9 @@ class TestValidateConnectivity:
         assert report.add_check.call_count == 2
 
     @patch("socket.create_connection")
-    def test_host_uses_name_as_default_hostname(self, mock_conn, report):
+    def test_host_uses_name_as_default_hostname(
+        self, mock_conn: MagicMock, report: MagicMock
+    ) -> None:
         """Should use host name as hostname if not explicitly set."""
         mock_conn.return_value = MagicMock()
         env_config = _make_env_config(hosts={"esxi-01": {}})
@@ -87,7 +90,7 @@ class TestValidateConnectivity:
 class TestValidateReferences:
     """Tests for EsxiValidator.validate_references."""
 
-    def test_validates_vswitch_and_portgroup_refs(self, report):
+    def test_validates_vswitch_and_portgroup_refs(self, report: MagicMock) -> None:
         """Should validate both vswitch and portgroup references."""
         env_config = _make_env_config(hosts={"esxi-01": {}})
         validator = EsxiValidator(env_config, report)
@@ -123,7 +126,7 @@ class TestValidateReferences:
         calls = [c[1] for c in report.add_check.call_args_list]
         assert all(c["passed"] for c in calls)
 
-    def test_empty_resources(self, report):
+    def test_empty_resources(self, report: MagicMock) -> None:
         """Should handle empty resource list gracefully."""
         env_config = _make_env_config(hosts={"esxi-01": {}})
         validator = EsxiValidator(env_config, report)

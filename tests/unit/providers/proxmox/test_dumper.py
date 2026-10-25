@@ -16,7 +16,7 @@ from infrafoundry.providers.proxmox.dumper import ProxmoxStateDumper
 
 
 @pytest.fixture
-def env_config():
+def env_config() -> dict[str, Any]:
     """Environment config with usable Proxmox credentials."""
     return {
         "provider_settings": {
@@ -29,14 +29,14 @@ def env_config():
     }
 
 
-def _make_responder(mapping: Mapping[str, Any], default: Any = None):
+def _make_responder(mapping: Mapping[str, Any], default: Any = None) -> Any:
     """Build a ``get_json`` stub returning the configured payloads.
 
     ``mapping`` maps endpoint path -> raw ``data`` value (the dumper unwraps
     the PVE ``{"data": ...}`` envelope, so tests pre-unwrap for clarity).
     """
 
-    def _fake_get_json(path: str, **_kwargs):
+    def _fake_get_json(path: str, **_kwargs: Any) -> dict[str, Any]:
         if path in mapping:
             return {"data": mapping[path]}
         return {"data": default or []}
@@ -56,7 +56,7 @@ def _minimal_cluster_mapping() -> dict[str, object]:
     }
 
 
-def test_dump_writes_expected_sections(env_config, tmp_path):
+def test_dump_writes_expected_sections(env_config: dict[str, Any], tmp_path: Path) -> None:
     """Dumper writes a JSON file containing the top-level sections we expect."""
     output = tmp_path / "dump.json"
     mapping = _minimal_cluster_mapping()
@@ -80,7 +80,7 @@ def test_dump_writes_expected_sections(env_config, tmp_path):
     assert on_disk == result
 
 
-def test_dump_unwraps_data_envelope(env_config, tmp_path):
+def test_dump_unwraps_data_envelope(env_config: dict[str, Any], tmp_path: Path) -> None:
     """The dumper stores the inner ``data`` value, not the full envelope."""
     output = tmp_path / "dump.json"
     mapping = {
@@ -101,12 +101,12 @@ def test_dump_unwraps_data_envelope(env_config, tmp_path):
     assert result["storage"] == []
 
 
-def test_dump_captures_timeout(env_config, tmp_path):
+def test_dump_captures_timeout(env_config: dict[str, Any], tmp_path: Path) -> None:
     """A timeout on one endpoint is recorded inline; the rest of the dump completes."""
     output = tmp_path / "dump.json"
     mapping = _minimal_cluster_mapping()
 
-    def responder(path: str, **_kwargs):
+    def responder(path: str, **_kwargs: Any) -> dict[str, Any]:
         if path == "cluster/status":
             raise APIError(
                 "Proxmox API request timed out",
@@ -126,12 +126,12 @@ def test_dump_captures_timeout(env_config, tmp_path):
     assert result["nodes"] == ["pve1", "pve2"]
 
 
-def test_dump_captures_api_error(env_config, tmp_path):
+def test_dump_captures_api_error(env_config: dict[str, Any], tmp_path: Path) -> None:
     """A non-timeout APIError is captured inline and the dump keeps going."""
     output = tmp_path / "dump.json"
     mapping = _minimal_cluster_mapping()
 
-    def responder(path: str, **_kwargs):
+    def responder(path: str, **_kwargs: Any) -> dict[str, Any]:
         if path == "access/users":
             raise APIError("Permission denied", status_code=403, provider="proxmox")
         if path in mapping:
@@ -150,7 +150,7 @@ def test_dump_captures_api_error(env_config, tmp_path):
     assert result["nodes"] == ["pve1", "pve2"]
 
 
-def test_dump_incremental_save(env_config, tmp_path):
+def test_dump_incremental_save(env_config: dict[str, Any], tmp_path: Path) -> None:
     """Partial dumps on disk remain valid JSON mid-run.
 
     We simulate a crash after the ``nodes`` enumeration by having the first
@@ -163,7 +163,7 @@ def test_dump_incremental_save(env_config, tmp_path):
     class BoomError(RuntimeError):
         pass
 
-    def responder(path: str, **_kwargs):
+    def responder(path: str, **_kwargs: Any) -> dict[str, Any]:
         if path == "nodes/pve1/status":
             raise BoomError("kaboom")
         if path in mapping:
@@ -184,13 +184,13 @@ def test_dump_incremental_save(env_config, tmp_path):
     assert "storage" in partial
 
 
-def test_dump_enumerates_nodes_and_vms(env_config, tmp_path):
+def test_dump_enumerates_nodes_and_vms(env_config: dict[str, Any], tmp_path: Path) -> None:
     """Per-VM endpoints are called for every VM on every node."""
     output = tmp_path / "dump.json"
     mapping = _minimal_cluster_mapping()
     calls: list[str] = []
 
-    def responder(path: str, **_kwargs):
+    def responder(path: str, **_kwargs: Any) -> dict[str, Any]:
         calls.append(path)
         if path in mapping:
             return {"data": mapping[path]}
@@ -207,14 +207,14 @@ def test_dump_enumerates_nodes_and_vms(env_config, tmp_path):
     assert len(pending_calls) == 4
 
 
-def test_dump_missing_credentials():
+def test_dump_missing_credentials() -> None:
     """Dumper raises a clear error when credentials are missing."""
     env_config = {"provider_settings": {"proxmox": {}}}
     with pytest.raises(ValueError, match="credentials"):
         ProxmoxStateDumper(env_config, timeout=5)  # type: ignore[arg-type]
 
 
-def test_dump_atomic_write_no_tmp_left(env_config, tmp_path):
+def test_dump_atomic_write_no_tmp_left(env_config: dict[str, Any], tmp_path: Path) -> None:
     """A successful dump leaves no ``.tmp`` file next to the output."""
     output = tmp_path / "dump.json"
     mapping = _minimal_cluster_mapping()
@@ -229,7 +229,9 @@ def test_dump_atomic_write_no_tmp_left(env_config, tmp_path):
     assert stray == []
 
 
-def test_dump_storage_detail_discovered_from_listing(env_config, tmp_path):
+def test_dump_storage_detail_discovered_from_listing(
+    env_config: dict[str, Any], tmp_path: Path
+) -> None:
     """Each storage ID in the ``storage`` listing gets a per-storage detail call."""
     output = tmp_path / "dump.json"
     mapping = _minimal_cluster_mapping()
@@ -241,13 +243,13 @@ def test_dump_storage_detail_discovered_from_listing(env_config, tmp_path):
     assert set(result["storage.detail"].keys()) == {"local", "rbd"}
 
 
-def test_dump_timeout_overrides_client_timeout(env_config, tmp_path):
+def test_dump_timeout_overrides_client_timeout(env_config: dict[str, Any], tmp_path: Path) -> None:
     """The --timeout value is propagated to the underlying ProxmoxClient."""
     dumper = ProxmoxStateDumper(env_config, timeout=60)
     assert dumper._client.timeout == 60
 
 
-def test_dump_creates_parent_directory(env_config, tmp_path):
+def test_dump_creates_parent_directory(env_config: dict[str, Any], tmp_path: Path) -> None:
     """The output parent directory is created if it doesn't exist."""
     output = tmp_path / "nested" / "deep" / "dump.json"
     mapping = _minimal_cluster_mapping()
@@ -259,7 +261,9 @@ def test_dump_creates_parent_directory(env_config, tmp_path):
     assert output.exists()
 
 
-def test_dump_node_section_includes_expected_labels(env_config, tmp_path):
+def test_dump_node_section_includes_expected_labels(
+    env_config: dict[str, Any], tmp_path: Path
+) -> None:
     """The per-node section contains the canonical label set."""
     output = tmp_path / "dump.json"
     mapping = _minimal_cluster_mapping()
@@ -273,7 +277,7 @@ def test_dump_node_section_includes_expected_labels(env_config, tmp_path):
         assert label in node_section
 
 
-def test_dump_returns_final_dict(env_config, tmp_path: Path):
+def test_dump_returns_final_dict(env_config: dict[str, Any], tmp_path: Path) -> None:
     """The return value of ``dump`` equals the final on-disk JSON."""
     output = tmp_path / "dump.json"
     mapping = _minimal_cluster_mapping()

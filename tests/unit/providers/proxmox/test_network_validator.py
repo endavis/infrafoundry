@@ -11,24 +11,26 @@ from infrafoundry.providers.proxmox.validators.network_validator import NetworkV
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def client():
+def client() -> MagicMock:
     """Create a mock Proxmox API client."""
     return MagicMock(spec=ProxmoxClient)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> NetworkValidator:
     """Create a NetworkValidator instance."""
     return NetworkValidator(report)
 
 
-def test_validate_bridge_exists(validator, client, report):
+def test_validate_bridge_exists(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation of existing bridge."""
     client.get_json.return_value = {
         "data": [
@@ -45,7 +47,9 @@ def test_validate_bridge_exists(validator, client, report):
     assert "exists" in call_args["message"]
 
 
-def test_validate_bridge_not_found(validator, client, report):
+def test_validate_bridge_not_found(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation of non-existent bridge."""
     client.get_json.return_value = {
         "data": [
@@ -62,7 +66,9 @@ def test_validate_bridge_not_found(validator, client, report):
     assert "vmbr0" in str(call_args["message"])  # Shows available bridges
 
 
-def test_validate_non_bridge_interfaces_ignored(validator, client, report):
+def test_validate_non_bridge_interfaces_ignored(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test that non-bridge interfaces are ignored."""
     client.get_json.return_value = {
         "data": [
@@ -78,7 +84,9 @@ def test_validate_non_bridge_interfaces_ignored(validator, client, report):
     assert call_args["passed"] is True
 
 
-def test_validate_api_fetch_failure(validator, client, report):
+def test_validate_api_fetch_failure(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation when API fetch fails."""
     client.get_json.side_effect = APIError("failed", provider="proxmox")
 
@@ -90,7 +98,9 @@ def test_validate_api_fetch_failure(validator, client, report):
     assert "not accessible" in call_args["message"]
 
 
-def test_validate_duplicate_bridges(validator, client, report):
+def test_validate_duplicate_bridges(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test that duplicate bridges are only checked once."""
     client.get_json.return_value = {
         "data": [
@@ -105,7 +115,9 @@ def test_validate_duplicate_bridges(validator, client, report):
     report.add_check.assert_called_once()
 
 
-def test_validate_multiple_bridges(validator, client, report):
+def test_validate_multiple_bridges(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation of multiple bridges."""
     client.get_json.side_effect = [
         {"data": [{"type": "bridge", "iface": "vmbr0"}]},
@@ -118,7 +130,9 @@ def test_validate_multiple_bridges(validator, client, report):
     assert report.add_check.call_count == 2
 
 
-def test_validate_empty_bridges(validator, client, report):
+def test_validate_empty_bridges(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation with empty bridge set."""
     validator.validate(client, set())
 

@@ -79,23 +79,23 @@ def _resource(name: str, terraform_secrets: list[str] | None = None) -> Resource
 class TestSanitization:
     """Sanitization rules for dotted secret refs → TF variable names."""
 
-    def test_basic(self):
+    def test_basic(self) -> None:
         assert (
             sanitize_secret_ref_to_tf_var("tailscale.oauth_client_secret")
             == "tailscale_oauth_client_secret"
         )
 
-    def test_lowercases(self):
+    def test_lowercases(self) -> None:
         assert sanitize_secret_ref_to_tf_var("Tailscale.OAuthSecret") == "tailscale_oauthsecret"
 
-    def test_deeply_nested(self):
+    def test_deeply_nested(self) -> None:
         assert sanitize_secret_ref_to_tf_var("a.b.c.d") == "a_b_c_d"
 
-    def test_rejects_leading_digit(self):
+    def test_rejects_leading_digit(self) -> None:
         with pytest.raises(ValueError, match="not a valid Terraform variable name"):
             sanitize_secret_ref_to_tf_var("1bad.key")
 
-    def test_rejects_special_chars(self):
+    def test_rejects_special_chars(self) -> None:
         with pytest.raises(ValueError, match="not a valid Terraform variable name"):
             sanitize_secret_ref_to_tf_var("bad-key.x")
 
@@ -108,14 +108,14 @@ class TestSanitization:
 class TestBuildTerraformEnvVarsSecrets:
     """Resource ``terraform_secrets`` are resolved into ``TF_VAR_*`` entries."""
 
-    def test_no_resources_no_secret_vars(self):
+    def test_no_resources_no_secret_vars(self) -> None:
         env = _make_env(secrets={"tailscale": {"oauth_client_secret": "abc"}})
         harness = _BridgeHarness(env)
 
         result = harness.build_terraform_env_vars(provider_name="test", mapping={}, resources=None)
         assert result == {}
 
-    def test_resource_without_terraform_secrets_emits_nothing(self):
+    def test_resource_without_terraform_secrets_emits_nothing(self) -> None:
         env = _make_env(secrets={"tailscale": {"oauth_client_secret": "abc"}})
         harness = _BridgeHarness(env)
 
@@ -126,7 +126,7 @@ class TestBuildTerraformEnvVarsSecrets:
         )
         assert result == {}
 
-    def test_single_secret_reference_emits_tf_var(self):
+    def test_single_secret_reference_emits_tf_var(self) -> None:
         env = _make_env(secrets={"tailscale": {"oauth_client_secret": "abc-secret"}})
         harness = _BridgeHarness(env)
 
@@ -137,7 +137,7 @@ class TestBuildTerraformEnvVarsSecrets:
         )
         assert result == {"TF_VAR_tailscale_oauth_client_secret": "abc-secret"}
 
-    def test_multiple_resources_dedupe_secret_refs(self):
+    def test_multiple_resources_dedupe_secret_refs(self) -> None:
         env = _make_env(
             secrets={
                 "tailscale": {
@@ -172,7 +172,7 @@ class TestBuildTerraformEnvVarsSecrets:
             "TF_VAR_tailscale_oauth_client_secret": "secret-value",
         }
 
-    def test_unknown_secret_raises_keyerror(self):
+    def test_unknown_secret_raises_keyerror(self) -> None:
         env = _make_env(secrets={"tailscale": {"oauth_client_id": "id"}})
         harness = _BridgeHarness(env)
 
@@ -183,7 +183,7 @@ class TestBuildTerraformEnvVarsSecrets:
                 resources=[_resource("vm-1", terraform_secrets=["tailscale.oauth_client_secret"])],
             )
 
-    def test_secret_ref_with_no_secrets_loaded_raises(self):
+    def test_secret_ref_with_no_secrets_loaded_raises(self) -> None:
         env = _make_env(secrets=None)
         harness = _BridgeHarness(env)
 
@@ -194,7 +194,7 @@ class TestBuildTerraformEnvVarsSecrets:
                 resources=[_resource("vm-1", terraform_secrets=["tailscale.oauth_client_secret"])],
             )
 
-    def test_provider_settings_and_secrets_coexist(self):
+    def test_provider_settings_and_secrets_coexist(self) -> None:
         env = _make_env(
             provider_settings={"test": {"api_url": "https://api.example.com"}},
             secrets={"tailscale": {"auth_key": "tskey-xyz"}},
@@ -211,7 +211,7 @@ class TestBuildTerraformEnvVarsSecrets:
             "TF_VAR_tailscale_auth_key": "tskey-xyz",
         }
 
-    def test_collect_terraform_secret_refs_rejects_non_list(self):
+    def test_collect_terraform_secret_refs_rejects_non_list(self) -> None:
         bad = ResourceConfig(
             name="vm-1",
             type="instance",
@@ -221,7 +221,7 @@ class TestBuildTerraformEnvVarsSecrets:
         with pytest.raises(TypeError, match="non-list"):
             TerraformGeneratorMixin.collect_terraform_secret_refs([bad])
 
-    def test_collect_terraform_secret_refs_rejects_non_string_entries(self):
+    def test_collect_terraform_secret_refs_rejects_non_string_entries(self) -> None:
         bad = ResourceConfig(
             name="vm-1",
             type="instance",
@@ -240,7 +240,7 @@ class TestBuildTerraformEnvVarsSecrets:
 class TestTerraformSecretsValidator:
     """Validator surfaces missing/invalid refs as ValidationReport entries."""
 
-    def test_resource_without_terraform_secrets_is_skipped(self):
+    def test_resource_without_terraform_secrets_is_skipped(self) -> None:
         env = _make_env(secrets={"tailscale": {"auth_key": "x"}})
         report = ValidationReport()
 
@@ -249,7 +249,7 @@ class TestTerraformSecretsValidator:
         # No checks should have been added.
         assert all("terraform_secrets" not in c.check_name for c in report.results)
 
-    def test_valid_reference_passes(self):
+    def test_valid_reference_passes(self) -> None:
         env = _make_env(secrets={"tailscale": {"oauth_client_secret": "abc"}})
         report = ValidationReport()
 
@@ -264,7 +264,7 @@ class TestTerraformSecretsValidator:
         assert len(matching) == 1
         assert matching[0].passed is True
 
-    def test_missing_reference_fails(self):
+    def test_missing_reference_fails(self) -> None:
         env = _make_env(secrets={"tailscale": {"oauth_client_id": "id"}})
         report = ValidationReport()
 
@@ -280,7 +280,7 @@ class TestTerraformSecretsValidator:
         assert matching[0].passed is False
         assert "tailscale.oauth_client_secret" in matching[0].message
 
-    def test_non_list_terraform_secrets_fails(self):
+    def test_non_list_terraform_secrets_fails(self) -> None:
         env = _make_env(secrets={"tailscale": {"auth_key": "x"}})
         report = ValidationReport()
         bad = ResourceConfig(
@@ -297,7 +297,7 @@ class TestTerraformSecretsValidator:
         assert matching[0].passed is False
         assert "non-list" in matching[0].message
 
-    def test_non_string_entry_fails(self):
+    def test_non_string_entry_fails(self) -> None:
         env = _make_env(secrets={"tailscale": {"auth_key": "x"}})
         report = ValidationReport()
         bad = ResourceConfig(

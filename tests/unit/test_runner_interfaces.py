@@ -1,5 +1,7 @@
 """Unit tests for runner interface segregation."""
 
+from typing import Any
+
 from infrafoundry.core.protocols import (
     Applyable,
     Destroyable,
@@ -16,7 +18,7 @@ from infrafoundry.core.runners.terraform_runner import TerraformRunner
 class TestTerraformRunnerInterfaces:
     """Test TerraformRunner protocol compliance."""
 
-    def test_implements_all_protocols(self):
+    def test_implements_all_protocols(self) -> None:
         """TerraformRunner should implement all runner protocols."""
         runner = TerraformRunner()
         assert isinstance(runner, Plannable)
@@ -29,13 +31,13 @@ class TestTerraformRunnerInterfaces:
 class TestAnsibleRunnerInterfaces:
     """Test AnsibleRunner protocol compliance."""
 
-    def test_implements_core_protocols(self):
+    def test_implements_core_protocols(self) -> None:
         """AnsibleRunner should implement core operations."""
         runner = AnsibleRunner()
         assert isinstance(runner, Plannable)  # via check mode
         assert isinstance(runner, Applyable)
 
-    def test_does_not_implement_unsupported_protocols(self):
+    def test_does_not_implement_unsupported_protocols(self) -> None:
         """AnsibleRunner should NOT implement unsupported operations."""
         runner = AnsibleRunner()
         assert not isinstance(runner, Destroyable)
@@ -46,13 +48,13 @@ class TestAnsibleRunnerInterfaces:
 class TestPyInfraRunnerInterfaces:
     """Test PyInfraRunner protocol compliance."""
 
-    def test_implements_core_protocols(self):
+    def test_implements_core_protocols(self) -> None:
         """PyInfraRunner should implement core operations."""
         runner = PyInfraRunner()
         assert isinstance(runner, Plannable)  # via dry-run
         assert isinstance(runner, Applyable)
 
-    def test_does_not_implement_unsupported_protocols(self):
+    def test_does_not_implement_unsupported_protocols(self) -> None:
         """PyInfraRunner should NOT implement unsupported operations."""
         runner = PyInfraRunner()
         assert not isinstance(runner, Destroyable)
@@ -63,20 +65,20 @@ class TestPyInfraRunnerInterfaces:
 class TestBaseRunnerInterfaces:
     """Test BaseRunner protocol compliance (should be minimal)."""
 
-    def test_base_runner_does_not_implement_optional_protocols(self):
+    def test_base_runner_does_not_implement_optional_protocols(self) -> None:
         """BaseRunner should not implement optional protocols by default."""
 
         class ConcreteRunner(BaseRunner):
-            def tool_name(self):
+            def tool_name(self) -> str:
                 return "test"
 
-            def is_available(self):
+            def is_available(self) -> bool:
                 return True
 
-            def initialize(self, wd, **kw):
+            def initialize(self, wd: Any, **kw: Any) -> dict[str, Any]:
                 return {}
 
-            def run(self, p, c, a=False):
+            def run(self, p: Any, c: Any, a: Any = False) -> dict[str, Any]:
                 return {}
 
         runner = ConcreteRunner()

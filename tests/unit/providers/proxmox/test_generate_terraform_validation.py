@@ -9,6 +9,9 @@ Covers the wiring (not the validator logic — those are covered in
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.exceptions import SchemaValidationError
@@ -17,7 +20,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 @pytest.fixture
-def provider(tmp_path):
+def provider(tmp_path: Path) -> ProxmoxProvider:
     """Create a ProxmoxProvider with ``test`` as the active environment."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -28,7 +31,7 @@ def provider(tmp_path):
     return p
 
 
-def _storage(name: str, **config) -> ResourceConfig:
+def _storage(name: str, **config: Any) -> ResourceConfig:
     """Build a Proxmox storage ResourceConfig for testing."""
     return ResourceConfig(
         name=name,
@@ -38,7 +41,7 @@ def _storage(name: str, **config) -> ResourceConfig:
     )
 
 
-def _vm(name: str, **config) -> ResourceConfig:
+def _vm(name: str, **config: Any) -> ResourceConfig:
     """Build a minimal Proxmox VM ResourceConfig for testing."""
     base: dict = {
         "name": name,
@@ -50,7 +53,7 @@ def _vm(name: str, **config) -> ResourceConfig:
     return ResourceConfig(name=name, type="vm", provider="proxmox", config=base)
 
 
-def _container(name: str, **config) -> ResourceConfig:
+def _container(name: str, **config: Any) -> ResourceConfig:
     """Build a minimal Proxmox LXC container ResourceConfig for testing."""
     base: dict = {
         "name": name,
@@ -64,7 +67,7 @@ def _container(name: str, **config) -> ResourceConfig:
 class TestStorageValidationWiring:
     """Wiring tests for StorageConfigValidator via ProxmoxProvider.generate_terraform."""
 
-    def test_missing_backend_raises(self, provider):
+    def test_missing_backend_raises(self, provider: ProxmoxProvider) -> None:
         """A storage resource using ``type: nfs`` (not ``backend:``) raises.
 
         Reproduces the exact bug from issue #621 — schema mismatch on the
@@ -82,7 +85,7 @@ class TestStorageValidationWiring:
         assert "nas01-infra" in message
         assert "backend" in message
 
-    def test_invalid_content_types_raises(self, provider):
+    def test_invalid_content_types_raises(self, provider: ProxmoxProvider) -> None:
         """A storage resource with an unknown content type raises."""
         storage = _storage(
             "nas01-infra",
@@ -101,7 +104,7 @@ class TestStorageValidationWiring:
 class TestVMValidationWiring:
     """Wiring tests for VMConfigValidator via ProxmoxProvider.generate_terraform."""
 
-    def test_invalid_machine_type_raises(self, provider):
+    def test_invalid_machine_type_raises(self, provider: ProxmoxProvider) -> None:
         """A VM with an unsupported ``machine`` value raises."""
         vm = _vm("web01", machine="invalid-machine")
         with pytest.raises(SchemaValidationError) as exc_info:
@@ -110,7 +113,7 @@ class TestVMValidationWiring:
         assert "web01" in message
         assert "machine" in message
 
-    def test_invalid_bios_raises(self, provider):
+    def test_invalid_bios_raises(self, provider: ProxmoxProvider) -> None:
         """A VM with an unsupported ``bios`` value raises."""
         vm = _vm("web01", bios="award")
         with pytest.raises(SchemaValidationError) as exc_info:
@@ -119,7 +122,7 @@ class TestVMValidationWiring:
         assert "web01" in message
         assert "bios" in message
 
-    def test_negative_balloon_raises(self, provider):
+    def test_negative_balloon_raises(self, provider: ProxmoxProvider) -> None:
         """A VM with a negative ``balloon`` value raises."""
         vm = _vm("web01", balloon=-1)
         with pytest.raises(SchemaValidationError) as exc_info:
@@ -132,7 +135,7 @@ class TestVMValidationWiring:
 class TestContainerValidationWiring:
     """Wiring tests for ContainerConfigValidator via ProxmoxProvider.generate_terraform."""
 
-    def test_missing_ostemplate_raises(self, provider):
+    def test_missing_ostemplate_raises(self, provider: ProxmoxProvider) -> None:
         """A container without ``ostemplate`` (and no ``clone``) raises."""
         ct = _container("app01")  # no ostemplate, no clone
         with pytest.raises(SchemaValidationError) as exc_info:
@@ -141,7 +144,7 @@ class TestContainerValidationWiring:
         assert "app01" in message
         assert "ostemplate" in message
 
-    def test_zero_cores_raises(self, provider):
+    def test_zero_cores_raises(self, provider: ProxmoxProvider) -> None:
         """A container with ``cores: 0`` raises."""
         ct = _container(
             "app01",
@@ -158,7 +161,7 @@ class TestContainerValidationWiring:
 class TestValidConfigPasses:
     """Wiring tests confirming valid configs do not raise."""
 
-    def test_minimal_valid_storage_vm_container(self, provider):
+    def test_minimal_valid_storage_vm_container(self, provider: ProxmoxProvider) -> None:
         """A canonical valid mix of storage, VM, and container generates without raising."""
         storage = _storage(
             "nas01-infra",
@@ -178,7 +181,7 @@ class TestValidConfigPasses:
 class TestErrorAggregation:
     """Wiring tests for multi-resource error collection."""
 
-    def test_multiple_bad_resources_single_raise(self, provider):
+    def test_multiple_bad_resources_single_raise(self, provider: ProxmoxProvider) -> None:
         """Multiple invalid resources produce a single raise listing every failure."""
         resources = [
             _storage("bad-nfs", type="nfs", server="1.2.3.4", export="/e"),  # wrong key
@@ -204,7 +207,7 @@ class TestErrorAggregation:
 class TestWarningsDoNotBlock:
     """Wiring tests confirming WARNING-level findings do not raise."""
 
-    def test_cifs_without_username_is_warning_only(self, provider):
+    def test_cifs_without_username_is_warning_only(self, provider: ProxmoxProvider) -> None:
         """CIFS storage without ``username`` emits a WARNING — generation must succeed."""
         storage = _storage(
             "backup-share",

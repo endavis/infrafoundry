@@ -1,6 +1,8 @@
 """Tests for audit logger service."""
 
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,7 +16,7 @@ from infrafoundry.core.state.models import Base
 
 
 @pytest.fixture
-def db_session_factory():
+def db_session_factory() -> Iterator[Any]:
     """Create an in-memory SQLite database session factory."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -24,7 +26,7 @@ def db_session_factory():
 
 
 @pytest.fixture
-def audit_logger(db_session_factory):
+def audit_logger(db_session_factory: Any) -> AuditLogger:
     """Create an AuditLogger instance for testing."""
     return AuditLogger(
         session_factory=db_session_factory,
@@ -35,12 +37,12 @@ def audit_logger(db_session_factory):
 class TestAuditLoggerInit:
     """Tests for AuditLogger initialization."""
 
-    def test_init_with_defaults(self, db_session_factory):
+    def test_init_with_defaults(self, db_session_factory: Any) -> None:
         """Test initializing audit logger with default user getter."""
         logger = AuditLogger(session_factory=db_session_factory)
         assert logger is not None
 
-    def test_init_with_custom_user_getter(self, db_session_factory):
+    def test_init_with_custom_user_getter(self, db_session_factory: Any) -> None:
         """Test initializing with custom user getter."""
         logger = AuditLogger(
             session_factory=db_session_factory,
@@ -53,7 +55,7 @@ class TestAuditLoggerInit:
         )
         assert entry.user_identifier == "custom_user"
 
-    def test_init_with_event_bus(self, db_session_factory):
+    def test_init_with_event_bus(self, db_session_factory: Any) -> None:
         """Test initializing with event bus subscribes to events."""
         mock_event_bus = MagicMock()
         logger = AuditLogger(
@@ -67,7 +69,7 @@ class TestAuditLoggerInit:
 class TestAuditLoggerLog:
     """Tests for AuditLogger.log method."""
 
-    def test_log_basic_entry(self, audit_logger):
+    def test_log_basic_entry(self, audit_logger: AuditLogger) -> None:
         """Test logging a basic audit entry."""
         entry = audit_logger.log(
             event_type=EventType.AFTER_PLAN,
@@ -82,7 +84,7 @@ class TestAuditLoggerLog:
         assert entry.user_identifier == "testuser"
         assert entry.checksum is not None
 
-    def test_log_with_all_fields(self, audit_logger):
+    def test_log_with_all_fields(self, audit_logger: AuditLogger) -> None:
         """Test logging with all optional fields."""
         entry = audit_logger.log(
             event_type=EventType.AFTER_APPLY,
@@ -103,7 +105,7 @@ class TestAuditLoggerLog:
         assert entry.resource_name == "web-server"
         assert entry.message == "Applied successfully"
 
-    def test_log_derives_command_from_action(self, audit_logger):
+    def test_log_derives_command_from_action(self, audit_logger: AuditLogger) -> None:
         """Test that command is derived from action if not provided."""
         for action, expected_cmd in [
             ("plan_started", "plan"),
@@ -118,7 +120,7 @@ class TestAuditLoggerLog:
             )
             assert entry.command == expected_cmd
 
-    def test_log_creates_checksum(self, audit_logger):
+    def test_log_creates_checksum(self, audit_logger: AuditLogger) -> None:
         """Test that logging creates a valid checksum."""
         entry = audit_logger.log(
             event_type=EventType.AFTER_PLAN,
@@ -134,7 +136,7 @@ class TestAuditLoggerLog:
 class TestAuditLoggerQuery:
     """Tests for AuditLogger.query method."""
 
-    def test_query_returns_entries(self, audit_logger):
+    def test_query_returns_entries(self, audit_logger: AuditLogger) -> None:
         """Test basic query returns entries."""
         # Create some entries
         for _ in range(5):
@@ -147,7 +149,7 @@ class TestAuditLoggerQuery:
         entries = audit_logger.query()
         assert len(entries) == 5
 
-    def test_query_with_limit(self, audit_logger):
+    def test_query_with_limit(self, audit_logger: AuditLogger) -> None:
         """Test query respects limit parameter."""
         for _ in range(10):
             audit_logger.log(
@@ -159,7 +161,7 @@ class TestAuditLoggerQuery:
         entries = audit_logger.query(limit=5)
         assert len(entries) == 5
 
-    def test_query_by_environment(self, audit_logger):
+    def test_query_by_environment(self, audit_logger: AuditLogger) -> None:
         """Test filtering query by environment."""
         audit_logger.log(
             event_type=EventType.AFTER_PLAN,
@@ -178,7 +180,7 @@ class TestAuditLoggerQuery:
         assert len(dev_entries) == 1
         assert dev_entries[0].environment == "dev"
 
-    def test_query_by_user(self, db_session_factory):
+    def test_query_by_user(self, db_session_factory: Any) -> None:
         """Test filtering query by user."""
         logger1 = AuditLogger(
             session_factory=db_session_factory,
@@ -204,7 +206,7 @@ class TestAuditLoggerQuery:
         assert len(alice_entries) == 1
         assert alice_entries[0].user_identifier == "alice"
 
-    def test_query_by_action(self, audit_logger):
+    def test_query_by_action(self, audit_logger: AuditLogger) -> None:
         """Test filtering query by action."""
         audit_logger.log(
             event_type=EventType.BEFORE_PLAN,
@@ -221,7 +223,7 @@ class TestAuditLoggerQuery:
         assert len(entries) == 1
         assert entries[0].action == "plan_completed"
 
-    def test_query_by_date_range(self, audit_logger):
+    def test_query_by_date_range(self, audit_logger: AuditLogger) -> None:
         """Test filtering query by date range."""
         now = datetime.now(UTC)
         yesterday = now - timedelta(days=1)
@@ -244,7 +246,7 @@ class TestAuditLoggerQuery:
         )
         assert len(past_entries) == 0
 
-    def test_query_with_offset(self, audit_logger):
+    def test_query_with_offset(self, audit_logger: AuditLogger) -> None:
         """Test query with offset for pagination."""
         for i in range(5):
             audit_logger.log(
@@ -256,7 +258,7 @@ class TestAuditLoggerQuery:
         entries = audit_logger.query(limit=2, offset=2)
         assert len(entries) == 2
 
-    def test_query_returns_ordered_by_timestamp_desc(self, audit_logger):
+    def test_query_returns_ordered_by_timestamp_desc(self, audit_logger: AuditLogger) -> None:
         """Test that query returns entries ordered by timestamp descending."""
         for i in range(3):
             audit_logger.log(
@@ -273,7 +275,7 @@ class TestAuditLoggerQuery:
 class TestAuditLoggerGetById:
     """Tests for AuditLogger.get_by_id method."""
 
-    def test_get_by_id_returns_entry(self, audit_logger):
+    def test_get_by_id_returns_entry(self, audit_logger: AuditLogger) -> None:
         """Test getting an entry by ID."""
         created = audit_logger.log(
             event_type=EventType.AFTER_PLAN,
@@ -285,7 +287,7 @@ class TestAuditLoggerGetById:
         assert fetched is not None
         assert fetched.id == created.id
 
-    def test_get_by_id_returns_none_for_nonexistent(self, audit_logger):
+    def test_get_by_id_returns_none_for_nonexistent(self, audit_logger: AuditLogger) -> None:
         """Test that get_by_id returns None for nonexistent ID."""
         result = audit_logger.get_by_id(99999)
         assert result is None
@@ -294,7 +296,7 @@ class TestAuditLoggerGetById:
 class TestAuditLoggerVerifyIntegrity:
     """Tests for AuditLogger.verify_integrity method."""
 
-    def test_verify_integrity_valid_entry(self, audit_logger):
+    def test_verify_integrity_valid_entry(self, audit_logger: AuditLogger) -> None:
         """Test verifying integrity of a valid entry."""
         entry = audit_logger.log(
             event_type=EventType.AFTER_PLAN,
@@ -305,7 +307,9 @@ class TestAuditLoggerVerifyIntegrity:
 
         assert audit_logger.verify_integrity(entry.id) is True
 
-    def test_verify_integrity_tampered_entry(self, audit_logger, db_session_factory):
+    def test_verify_integrity_tampered_entry(
+        self, audit_logger: AuditLogger, db_session_factory: Any
+    ) -> None:
         """Test detecting tampered entry."""
         entry = audit_logger.log(
             event_type=EventType.AFTER_PLAN,
@@ -323,11 +327,13 @@ class TestAuditLoggerVerifyIntegrity:
         # Integrity check should fail
         assert audit_logger.verify_integrity(entry.id) is False
 
-    def test_verify_integrity_nonexistent_entry(self, audit_logger):
+    def test_verify_integrity_nonexistent_entry(self, audit_logger: AuditLogger) -> None:
         """Test verifying nonexistent entry returns False."""
         assert audit_logger.verify_integrity(99999) is False
 
-    def test_verify_integrity_entry_without_checksum(self, audit_logger, db_session_factory):
+    def test_verify_integrity_entry_without_checksum(
+        self, audit_logger: AuditLogger, db_session_factory: Any
+    ) -> None:
         """Test verifying entry without checksum returns False."""
         entry = audit_logger.log(
             event_type=EventType.AFTER_PLAN,
@@ -347,7 +353,7 @@ class TestAuditLoggerVerifyIntegrity:
 class TestAuditLoggerEventHandling:
     """Tests for AuditLogger event handling."""
 
-    def test_handle_event_creates_entry(self, db_session_factory):
+    def test_handle_event_creates_entry(self, db_session_factory: Any) -> None:
         """Test that handling an event creates an audit entry."""
         logger = AuditLogger(
             session_factory=db_session_factory,
@@ -369,7 +375,7 @@ class TestAuditLoggerEventHandling:
         assert entries[0].environment == "dev"
         assert entries[0].status == "success"
 
-    def test_handle_event_sets_status_based_on_event_type(self, db_session_factory):
+    def test_handle_event_sets_status_based_on_event_type(self, db_session_factory: Any) -> None:
         """Test that status is correctly set based on event type."""
         logger = AuditLogger(
             session_factory=db_session_factory,
@@ -401,7 +407,7 @@ class TestAuditLoggerEventHandling:
         assert ("plan_completed", "success") in statuses
         assert ("plan_failed", "failed") in statuses
 
-    def test_handle_event_extracts_message_from_data(self, db_session_factory):
+    def test_handle_event_extracts_message_from_data(self, db_session_factory: Any) -> None:
         """Test that message is extracted from event data."""
         logger = AuditLogger(
             session_factory=db_session_factory,
@@ -420,7 +426,7 @@ class TestAuditLoggerEventHandling:
         entries = logger.query()
         assert entries[0].message == "Connection timeout"
 
-    def test_handle_event_skips_unaudited_events(self, db_session_factory):
+    def test_handle_event_skips_unaudited_events(self, db_session_factory: Any) -> None:
         """Test that unaudited events are skipped."""
         logger = AuditLogger(
             session_factory=db_session_factory,
@@ -443,34 +449,38 @@ class TestAuditLoggerEventHandling:
 class TestAuditLoggerHelpers:
     """Tests for AuditLogger helper methods."""
 
-    def test_default_get_user(self, db_session_factory):
+    def test_default_get_user(self, db_session_factory: Any) -> None:
         """Test default user getter from environment."""
         with patch.dict("os.environ", {"USER": "envuser"}):
             logger = AuditLogger(session_factory=db_session_factory)
             assert logger._default_get_user() == "envuser"
 
-    def test_default_get_user_fallback_username(self, db_session_factory, monkeypatch):
+    def test_default_get_user_fallback_username(
+        self, db_session_factory: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test default user getter fallback to USERNAME."""
         monkeypatch.delenv("USER", raising=False)
         monkeypatch.setenv("USERNAME", "winuser")
         logger = AuditLogger(session_factory=db_session_factory)
         assert logger._default_get_user() == "winuser"
 
-    def test_default_get_user_unknown(self, db_session_factory, monkeypatch):
+    def test_default_get_user_unknown(
+        self, db_session_factory: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test default user getter returns unknown when no env vars."""
         monkeypatch.delenv("USER", raising=False)
         monkeypatch.delenv("USERNAME", raising=False)
         logger = AuditLogger(session_factory=db_session_factory)
         assert logger._default_get_user() == "unknown"
 
-    def test_get_ip_address(self, audit_logger):
+    def test_get_ip_address(self, audit_logger: AuditLogger) -> None:
         """Test getting local IP address."""
         ip = audit_logger._get_ip_address()
         # Should return a valid IP or None
         if ip:
             assert isinstance(ip, str)
 
-    def test_calculate_checksum_deterministic(self, audit_logger):
+    def test_calculate_checksum_deterministic(self, audit_logger: AuditLogger) -> None:
         """Test that checksum calculation is deterministic."""
         entry = AuditEntry(
             timestamp=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
@@ -486,7 +496,9 @@ class TestAuditLoggerHelpers:
 
         assert checksum1 == checksum2
 
-    def test_calculate_checksum_different_for_different_data(self, audit_logger):
+    def test_calculate_checksum_different_for_different_data(
+        self, audit_logger: AuditLogger
+    ) -> None:
         """Test that checksum differs for different data."""
         entry1 = AuditEntry(
             timestamp=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
@@ -507,6 +519,6 @@ class TestAuditLoggerHelpers:
 
         assert audit_logger._calculate_checksum(entry1) != audit_logger._calculate_checksum(entry2)
 
-    def test_cleanup(self, audit_logger):
+    def test_cleanup(self, audit_logger: AuditLogger) -> None:
         """Test cleanup method runs without error."""
         audit_logger.cleanup()  # Should not raise

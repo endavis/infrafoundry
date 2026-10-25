@@ -38,7 +38,7 @@ class TestEventDoubleFireBug:
             "RUNNER_COMPLETED": [self._sample_handler_config()],
         }
 
-    def test_clear_then_load_gives_one_handler(self):
+    def test_clear_then_load_gives_one_handler(self) -> None:
         """After clear + load, exactly 1 handler should exist."""
         bus = self._create_event_bus()
 
@@ -48,7 +48,7 @@ class TestEventDoubleFireBug:
         count = len(bus._handlers[EventType.RUNNER_COMPLETED])
         assert count == 1, f"Expected 1 handler, got {count}"
 
-    def test_load_without_clear_accumulates(self):
+    def test_load_without_clear_accumulates(self) -> None:
         """Loading twice without clearing should give 2 handlers."""
         bus = self._create_event_bus()
 
@@ -58,7 +58,7 @@ class TestEventDoubleFireBug:
         count = len(bus._handlers[EventType.RUNNER_COMPLETED])
         assert count == 2, f"Expected 2 handlers, got {count}"
 
-    def test_clear_between_loads_gives_one_handler(self):
+    def test_clear_between_loads_gives_one_handler(self) -> None:
         """Clear between loads should give exactly 1 handler."""
         bus = self._create_event_bus()
 
@@ -69,7 +69,7 @@ class TestEventDoubleFireBug:
         count = len(bus._handlers[EventType.RUNNER_COMPLETED])
         assert count == 1, f"Expected 1 handler, got {count}"
 
-    def test_simulated_plan_then_apply_flow(self):
+    def test_simulated_plan_then_apply_flow(self) -> None:
         """Simulate the exact orchestrator.apply() flow.
 
         Flow:
@@ -99,7 +99,7 @@ class TestEventDoubleFireBug:
         apply_count = len(bus._handlers[EventType.RUNNER_COMPLETED])
         assert apply_count == 1, f"Apply phase: expected 1 handler, got {apply_count}"
 
-    def test_simulated_flow_without_clear_between_phases(self):
+    def test_simulated_flow_without_clear_between_phases(self) -> None:
         """If clear_handlers is NOT called between plan and apply, handlers double up.
 
         This simulates the bug scenario where package events are loaded
@@ -118,7 +118,7 @@ class TestEventDoubleFireBug:
         apply_count = len(bus._handlers[EventType.RUNNER_COMPLETED])
         assert apply_count == 2, f"Expected 2 handlers (bug), got {apply_count}"
 
-    def test_env_events_plus_package_events(self):
+    def test_env_events_plus_package_events(self) -> None:
         """Env settings events and package events should coexist."""
         bus = self._create_event_bus()
         env_events = {
@@ -138,7 +138,7 @@ class TestEventDoubleFireBug:
         assert env_count == 1, f"Expected 1 env handler, got {env_count}"
         assert pkg_count == 1, f"Expected 1 package handler, got {pkg_count}"
 
-    def test_provider_centric_loader_clears_pending_events(self):
+    def test_provider_centric_loader_clears_pending_events(self) -> None:
         """get_package_events should return events and clear the buffer."""
         from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 
@@ -156,7 +156,7 @@ class TestEventDoubleFireBug:
         events2 = loader.get_package_events()
         assert events2 == {}
 
-    def test_full_load_resources_flow(self):
+    def test_full_load_resources_flow(self) -> None:
         """Simulate _load_resources with mocked config_manager.
 
         Verifies that get_all_resources_all_providers populates events
@@ -182,7 +182,7 @@ class TestEventDoubleFireBug:
 
         assert len(bus._handlers[EventType.RUNNER_COMPLETED]) == 1
 
-    def test_stale_pending_events_cleared_on_reload(self):
+    def test_stale_pending_events_cleared_on_reload(self) -> None:
         """Verify fix for #352: stale _pending_package_events from callers
         that don't drain the buffer (e.g., build_dependency_graph).
 
@@ -209,7 +209,7 @@ class TestEventDoubleFireBug:
         events = cm.get_package_events()
         assert events == {}, f"Expected empty events, got {events}"
 
-    def test_pending_events_not_stale_across_calls(self):
+    def test_pending_events_not_stale_across_calls(self) -> None:
         """Verify that consecutive get_all_resources_all_providers calls
         each return exactly the events from that call, not accumulated.
         """

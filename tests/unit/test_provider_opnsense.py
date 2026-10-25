@@ -1,6 +1,7 @@
 """Unit tests for OPNsense provider reset and migrate functionality."""
 
 import warnings
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -13,36 +14,44 @@ class TestOPNsenseProviderReset:
     """Tests for OPNsense provider reset methods (delegation to manager)."""
 
     @pytest.fixture
-    def provider(self):
+    def provider(self) -> OPNsenseProvider:
         """Create OPNsense provider instance for testing."""
         return OPNsenseProvider(config_dir=Path("."), output_dir=Path("."))
 
     @pytest.fixture
-    def mock_manager(self):
+    def mock_manager(self) -> Iterator[MagicMock]:
         """Mock KeaDHCPManager for component operations."""
         with patch("infrafoundry.providers.opnsense.components.kea_dhcp.KeaDHCPManager") as mock:
             mock_instance = MagicMock()
             mock.return_value = mock_instance
             yield mock_instance
 
-    def test_reset_kea_dhcpv4_delegates_to_manager(self, provider, mock_manager):
+    def test_reset_kea_dhcpv4_delegates_to_manager(
+        self, provider: OPNsenseProvider, mock_manager: MagicMock
+    ) -> None:
         """Test reset_kea_dhcpv4 delegates to manager."""
         provider.reset_kea_dhcpv4("test_env")
         mock_manager.reset_dhcpv4.assert_called_once_with("test_env", "opnsense")
 
-    def test_reset_kea_dhcpv4_handles_errors(self, provider, mock_manager):
+    def test_reset_kea_dhcpv4_handles_errors(
+        self, provider: OPNsenseProvider, mock_manager: MagicMock
+    ) -> None:
         """Test reset_kea_dhcpv4 propagates errors from manager."""
         mock_manager.reset_dhcpv4.side_effect = ValueError("Test error")
 
         with pytest.raises(ValueError, match="Test error"):
             provider.reset_kea_dhcpv4("test_env")
 
-    def test_reset_kea_dhcpv6_delegates_to_manager(self, provider, mock_manager):
+    def test_reset_kea_dhcpv6_delegates_to_manager(
+        self, provider: OPNsenseProvider, mock_manager: MagicMock
+    ) -> None:
         """Test reset_kea_dhcpv6 delegates to manager."""
         provider.reset_kea_dhcpv6("test_env")
         mock_manager.reset_dhcpv6.assert_called_once_with("test_env", "opnsense")
 
-    def test_reset_kea_dhcpv6_handles_errors(self, provider, mock_manager):
+    def test_reset_kea_dhcpv6_handles_errors(
+        self, provider: OPNsenseProvider, mock_manager: MagicMock
+    ) -> None:
         """Test reset_kea_dhcpv6 propagates errors from manager."""
         mock_manager.reset_dhcpv6.side_effect = ValueError("Test error")
 
@@ -61,11 +70,11 @@ class TestOPNsenseProviderMigrate:
     """
 
     @pytest.fixture
-    def provider(self):
+    def provider(self) -> OPNsenseProvider:
         """Create OPNsense provider instance for testing."""
         return OPNsenseProvider(config_dir=Path("."), output_dir=Path("."))
 
-    def test_migrate_kea_dhcp_delegates_via_registry(self, provider):
+    def test_migrate_kea_dhcp_delegates_via_registry(self, provider: OPNsenseProvider) -> None:
         """``migrate_kea_dhcp`` returns the registry extractor's YAML."""
         from infrafoundry.core.extractors import get_extractor
 
@@ -87,7 +96,7 @@ class TestOPNsenseProviderMigrate:
         deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
         assert len(deprecations) >= 1
 
-    def test_migrate_kea_dhcp_handles_errors(self, provider):
+    def test_migrate_kea_dhcp_handles_errors(self, provider: OPNsenseProvider) -> None:
         """``migrate_kea_dhcp`` propagates errors from the manager."""
         from infrafoundry.core.extractors import get_extractor
 
@@ -108,13 +117,13 @@ class TestOPNsenseProviderMigrate:
 class TestOPNsenseProviderBasic:
     """Basic OPNsense provider tests."""
 
-    def test_provider_initialization(self):
+    def test_provider_initialization(self) -> None:
         """Test provider initializes correctly."""
         provider = OPNsenseProvider(config_dir=Path("."), output_dir=Path("."))
         assert provider.config_dir == Path(".")
         assert provider.output_dir == Path(".")
 
-    def test_provider_name(self):
+    def test_provider_name(self) -> None:
         """Test provider name is correct."""
         provider = OPNsenseProvider(config_dir=Path("."), output_dir=Path("."))
         assert provider.name == "opnsense"

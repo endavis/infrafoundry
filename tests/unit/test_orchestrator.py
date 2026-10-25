@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -19,7 +20,7 @@ from infrafoundry.core.state import StateManager
 class TestOrchestratorInit:
     """Tests for Orchestrator initialization."""
 
-    def test_init_with_defaults(self, tmp_path):
+    def test_init_with_defaults(self, tmp_path: Path) -> None:
         """Test initialization with default parameters."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -36,7 +37,7 @@ class TestOrchestratorInit:
         assert isinstance(orchestrator.notification_manager, NotificationManager)
         assert orchestrator.providers == {}
 
-    def test_init_with_custom_output_dir(self, tmp_path):
+    def test_init_with_custom_output_dir(self, tmp_path: Path) -> None:
         """Test initialization with custom output directory."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -50,7 +51,7 @@ class TestOrchestratorInit:
         assert orchestrator.output_dir == output_dir
         assert output_dir.exists()
 
-    def test_init_with_custom_managers(self, tmp_path):
+    def test_init_with_custom_managers(self, tmp_path: Path) -> None:
         """Test initialization with custom manager instances."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -67,7 +68,7 @@ class TestOrchestratorInit:
         assert orchestrator.state_manager == state_manager
         assert orchestrator.event_manager == event_manager
 
-    def test_init_creates_output_directory(self, tmp_path):
+    def test_init_creates_output_directory(self, tmp_path: Path) -> None:
         """Test that initialization creates output directory if it doesn't exist."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -82,7 +83,7 @@ class TestOrchestratorInit:
 
         assert output_dir.exists()
 
-    def test_init_sets_current_user(self, tmp_path):
+    def test_init_sets_current_user(self, tmp_path: Path) -> None:
         """Test that initialization captures current user from environment."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -93,7 +94,7 @@ class TestOrchestratorInit:
             )
             assert orchestrator._get_current_user() == "testuser"
 
-    def test_init_fallback_user(self, tmp_path, monkeypatch):
+    def test_init_fallback_user(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test user fallback when USER env var not set."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -110,7 +111,7 @@ class TestOrchestratorInit:
 class TestOrchestratorNotifications:
     """Tests for notification setup and handling."""
 
-    def test_setup_notifications_with_channels(self, tmp_path):
+    def test_setup_notifications_with_channels(self, tmp_path: Path) -> None:
         """Test that notifications are set up when channels exist."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -130,7 +131,7 @@ class TestOrchestratorNotifications:
 
             mock_setup.assert_called()
 
-    def test_setup_notifications_without_channels(self, tmp_path):
+    def test_setup_notifications_without_channels(self, tmp_path: Path) -> None:
         """Test that notifications are skipped when no channels configured."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -146,7 +147,7 @@ class TestOrchestratorNotifications:
 class TestOrchestratorProviderManagement:
     """Tests for provider registration and management."""
 
-    def test_register_provider(self, tmp_path):
+    def test_register_provider(self, tmp_path: Path) -> None:
         """Test registering a provider."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -160,7 +161,7 @@ class TestOrchestratorProviderManagement:
         assert "test_provider" in orchestrator.providers
         assert orchestrator.providers["test_provider"] == provider
 
-    def test_register_multiple_providers(self, tmp_path):
+    def test_register_multiple_providers(self, tmp_path: Path) -> None:
         """Test registering multiple providers."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -178,7 +179,7 @@ class TestOrchestratorProviderManagement:
         assert orchestrator.providers["proxmox"] == provider1
         assert orchestrator.providers["opnsense"] == provider2
 
-    def test_register_provider_overwrites_existing(self, tmp_path):
+    def test_register_provider_overwrites_existing(self, tmp_path: Path) -> None:
         """Test that registering a provider with same name overwrites."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -194,7 +195,7 @@ class TestOrchestratorProviderManagement:
 
         assert orchestrator.providers["test"] == provider2
 
-    def test_register_provider_applies_strict_snippet_flag(self, tmp_path):
+    def test_register_provider_applies_strict_snippet_flag(self, tmp_path: Path) -> None:
         """Provider inherits strict snippet config when registered."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -214,7 +215,7 @@ class TestOrchestratorProviderManagement:
 class TestOrchestratorValidateResources:
     """Tests for resource validation."""
 
-    def test_validate_resources_all_valid(self, tmp_path):
+    def test_validate_resources_all_valid(self, tmp_path: Path) -> None:
         """Test validation succeeds when all resources are valid."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -240,7 +241,7 @@ class TestOrchestratorValidateResources:
         # Should not raise
         orchestrator.validate_resources([resource1, resource2])
 
-    def test_validate_resources_provider_not_registered(self, tmp_path):
+    def test_validate_resources_provider_not_registered(self, tmp_path: Path) -> None:
         """Test validation fails when provider not registered."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -254,7 +255,7 @@ class TestOrchestratorValidateResources:
         with pytest.raises(ValueError, match="Provider 'nonexistent' not registered"):
             orchestrator.validate_resources([resource])
 
-    def test_validate_resources_type_not_supported(self, tmp_path):
+    def test_validate_resources_type_not_supported(self, tmp_path: Path) -> None:
         """Test validation fails when resource type not supported."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -276,7 +277,7 @@ class TestOrchestratorValidateResources:
         ):
             orchestrator.validate_resources([resource])
 
-    def test_validate_resources_empty_list(self, tmp_path):
+    def test_validate_resources_empty_list(self, tmp_path: Path) -> None:
         """Test validation succeeds with empty resource list."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -289,7 +290,7 @@ class TestOrchestratorValidateResources:
 class TestOrchestratorBuildDependencyGraph:
     """Tests for dependency graph building."""
 
-    def test_build_dependency_graph_basic(self, tmp_path):
+    def test_build_dependency_graph_basic(self, tmp_path: Path) -> None:
         """Test building a basic dependency graph."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -321,7 +322,7 @@ class TestOrchestratorBuildDependencyGraph:
         assert "proxmox:ubuntu-template" in graph.nodes
         assert "proxmox:web-server" in graph.nodes
 
-    def test_build_dependency_graph_multi_provider(self, tmp_path):
+    def test_build_dependency_graph_multi_provider(self, tmp_path: Path) -> None:
         """Test building dependency graph with multiple providers."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -363,7 +364,7 @@ class TestOrchestratorBuildDependencyGraph:
 class TestOrchestratorStatus:
     """Tests for status reporting."""
 
-    def test_status_no_resources(self, tmp_path, capsys):
+    def test_status_no_resources(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Test status when no resources exist."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -376,7 +377,7 @@ class TestOrchestratorStatus:
         # Verify config manager was called
         config_manager.get_all_resources_all_providers.assert_called_once_with("dev")
 
-    def test_status_with_resources(self, tmp_path):
+    def test_status_with_resources(self, tmp_path: Path) -> None:
         """Test status with resources."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -401,7 +402,7 @@ class TestOrchestratorStatus:
 
         config_manager.get_all_resources_all_providers.assert_called_once_with("dev")
 
-    def test_status_with_unregistered_provider(self, tmp_path):
+    def test_status_with_unregistered_provider(self, tmp_path: Path) -> None:
         """Test status with resource from unregistered provider."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -432,7 +433,7 @@ class TestPlanOrchestratorStrictMode:
 class TestIterProviderBatchesResourceFilter:
     """Tests for resource filter validation in _iter_provider_batches."""
 
-    def _make_orchestrator(self, tmp_path):
+    def _make_orchestrator(self, tmp_path: Path) -> Orchestrator:
         """Create a minimal Orchestrator for testing _iter_provider_batches."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
@@ -440,12 +441,12 @@ class TestIterProviderBatchesResourceFilter:
         config_manager.get_all_resources_all_providers.return_value = []
         return Orchestrator(config_manager)
 
-    def _resource(self, name, provider="proxmox", type_="vm"):
+    def _resource(self, name: Any, provider: Any = "proxmox", type_: Any = "vm") -> Any:
         from infrafoundry.core.provider import ResourceConfig
 
         return ResourceConfig(name=name, provider=provider, type=type_, config={"id": name})
 
-    def test_no_filter_returns_all_batches(self, tmp_path):
+    def test_no_filter_returns_all_batches(self, tmp_path: Path) -> None:
         """No resource filter returns all provider batches."""
         orchestrator = self._make_orchestrator(tmp_path)
         resources_by_provider = {
@@ -457,7 +458,7 @@ class TestIterProviderBatchesResourceFilter:
         assert len(batches) == 1
         assert len(batches[0].resources) == 2
 
-    def test_full_match_returns_filtered_batches(self, tmp_path):
+    def test_full_match_returns_filtered_batches(self, tmp_path: Path) -> None:
         """Filter matching all names returns those resources without error."""
         orchestrator = self._make_orchestrator(tmp_path)
         resources_by_provider = {
@@ -469,7 +470,7 @@ class TestIterProviderBatchesResourceFilter:
         assert len(batches) == 1
         assert {r.name for r in batches[0].resources} == {"vm1", "vm2"}
 
-    def test_zero_matches_raises_resource_filter_error(self, tmp_path):
+    def test_zero_matches_raises_resource_filter_error(self, tmp_path: Path) -> None:
         """Filter matching zero resources raises ResourceFilterError."""
         orchestrator = self._make_orchestrator(tmp_path)
         resources_by_provider = {
@@ -479,7 +480,7 @@ class TestIterProviderBatchesResourceFilter:
         with pytest.raises(ResourceFilterError, match="No resources matched filter"):
             orchestrator._iter_provider_batches(resources_by_provider, ["nonexistent"])
 
-    def test_zero_matches_error_includes_available_names(self, tmp_path):
+    def test_zero_matches_error_includes_available_names(self, tmp_path: Path) -> None:
         """Error message includes unmatched and available resource names."""
         orchestrator = self._make_orchestrator(tmp_path)
         resources_by_provider = {
@@ -494,7 +495,9 @@ class TestIterProviderBatchesResourceFilter:
         assert "vm1" in error_msg
         assert "vm2" in error_msg
 
-    def test_partial_match_warns_but_succeeds(self, tmp_path, capsys):
+    def test_partial_match_warns_but_succeeds(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Partial filter match warns about unmatched names but returns results."""
         orchestrator = self._make_orchestrator(tmp_path)
         resources_by_provider = {
@@ -506,7 +509,7 @@ class TestIterProviderBatchesResourceFilter:
         assert len(batches) == 1
         assert batches[0].resources[0].name == "vm1"
 
-    def test_partial_match_across_providers(self, tmp_path):
+    def test_partial_match_across_providers(self, tmp_path: Path) -> None:
         """Partial match works across multiple providers."""
         orchestrator = self._make_orchestrator(tmp_path)
         resources_by_provider = {
@@ -524,7 +527,7 @@ class TestIterProviderBatchesResourceFilter:
 class TestOrchestratorLocking:
     """Tests for environment locking around apply/destroy."""
 
-    def _make_orchestrator(self, tmp_path):
+    def _make_orchestrator(self, tmp_path: Path) -> Orchestrator:
         from infrafoundry.core.state import StateManager
 
         config_manager = Mock(spec=ConfigManager)
@@ -544,12 +547,12 @@ class TestOrchestratorLocking:
         orchestrator.destroy_orchestrator.destroy = Mock(return_value={})
         return orchestrator
 
-    def test_apply_acquires_lock_around_workflow(self, tmp_path):
+    def test_apply_acquires_lock_around_workflow(self, tmp_path: Path) -> None:
         orchestrator = self._make_orchestrator(tmp_path)
 
         captured = {}
 
-        def record_apply(**kwargs):
+        def record_apply(**kwargs: Any) -> dict[str, Any]:
             captured["lock"] = orchestrator.state_manager.get_lock("dev")
             return {}
 
@@ -560,7 +563,7 @@ class TestOrchestratorLocking:
         assert captured["lock"] is not None
         assert orchestrator.state_manager.get_lock("dev") is None
 
-    def test_apply_releases_lock_on_failure(self, tmp_path):
+    def test_apply_releases_lock_on_failure(self, tmp_path: Path) -> None:
         orchestrator = self._make_orchestrator(tmp_path)
         orchestrator.apply_orchestrator.apply.side_effect = RuntimeError("boom")
 
@@ -569,7 +572,7 @@ class TestOrchestratorLocking:
 
         assert orchestrator.state_manager.get_lock("dev") is None
 
-    def test_apply_fails_when_locked(self, tmp_path):
+    def test_apply_fails_when_locked(self, tmp_path: Path) -> None:
         from infrafoundry.core.exceptions import LockAcquisitionError
 
         orchestrator = self._make_orchestrator(tmp_path)
@@ -583,12 +586,12 @@ class TestOrchestratorLocking:
         assert lock is not None
         assert lock.locked_by == "someone@else:99"
 
-    def test_destroy_acquires_lock_around_workflow(self, tmp_path):
+    def test_destroy_acquires_lock_around_workflow(self, tmp_path: Path) -> None:
         orchestrator = self._make_orchestrator(tmp_path)
 
         captured = {}
 
-        def record_destroy(*args, **kwargs):
+        def record_destroy(*args: Any, **kwargs: Any) -> dict[str, Any]:
             captured["lock"] = orchestrator.state_manager.get_lock("dev")
             return {}
 
@@ -599,14 +602,14 @@ class TestOrchestratorLocking:
         assert captured["lock"] is not None
         assert orchestrator.state_manager.get_lock("dev") is None
 
-    def test_apply_default_ttl_is_600(self, tmp_path):
+    def test_apply_default_ttl_is_600(self, tmp_path: Path) -> None:
         from datetime import UTC
 
         orchestrator = self._make_orchestrator(tmp_path)
 
         captured: dict = {}
 
-        def record_apply(**kwargs):
+        def record_apply(**kwargs: Any) -> dict[str, Any]:
             captured["lock"] = orchestrator.state_manager.get_lock("dev")
             return {}
 
@@ -627,7 +630,7 @@ class TestOrchestratorLocking:
         # extensions that might have fired before we captured the row.
         assert 590 <= delta <= 1200
 
-    def test_plan_does_not_acquire_lock(self, tmp_path):
+    def test_plan_does_not_acquire_lock(self, tmp_path: Path) -> None:
         orchestrator = self._make_orchestrator(tmp_path)
         # Pre-seed an active lock; plan should still proceed.
         orchestrator.state_manager.acquire_lock("dev", ttl_seconds=60, locked_by="someone@else:99")

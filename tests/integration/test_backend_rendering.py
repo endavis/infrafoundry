@@ -1,5 +1,7 @@
 """Integration tests for backend rendering."""
 
+from pathlib import Path
+
 import pytest
 import yaml
 
@@ -9,7 +11,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 @pytest.fixture
-def mock_config_dir_with_backend(temp_dir):
+def mock_config_dir_with_backend(temp_dir: Path) -> Path:
     """Create a mock configuration directory with backend configuration."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
@@ -52,7 +54,7 @@ def mock_config_dir_with_backend(temp_dir):
 
 
 @pytest.fixture
-def mock_config_dir_with_gcs_backend(temp_dir):
+def mock_config_dir_with_gcs_backend(temp_dir: Path) -> Path:
     """Create a mock configuration directory with GCS backend."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
@@ -90,7 +92,7 @@ def mock_config_dir_with_gcs_backend(temp_dir):
 
 
 @pytest.fixture
-def mock_config_dir_with_azure_backend(temp_dir):
+def mock_config_dir_with_azure_backend(temp_dir: Path) -> Path:
     """Create a mock configuration directory with Azure backend."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
@@ -130,7 +132,7 @@ def mock_config_dir_with_azure_backend(temp_dir):
 
 
 @pytest.fixture
-def mock_config_dir_with_postgres_backend(temp_dir):
+def mock_config_dir_with_postgres_backend(temp_dir: Path) -> Path:
     """Create a mock configuration directory with Postgres backend."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
@@ -167,7 +169,7 @@ def mock_config_dir_with_postgres_backend(temp_dir):
 
 
 @pytest.fixture
-def mock_config_dir_with_terraform_cloud_backend(temp_dir):
+def mock_config_dir_with_terraform_cloud_backend(temp_dir: Path) -> Path:
     """Create a mock configuration directory with Terraform Cloud backend."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
@@ -205,7 +207,7 @@ def mock_config_dir_with_terraform_cloud_backend(temp_dir):
 
 
 @pytest.fixture
-def mock_config_dir_no_backend(temp_dir):
+def mock_config_dir_no_backend(temp_dir: Path) -> Path:
     """Create a mock configuration directory without backend configuration."""
     config_dir = temp_dir / "config"
     config_dir.mkdir()
@@ -239,7 +241,7 @@ def mock_config_dir_no_backend(temp_dir):
 class TestBackendRendering:
     """Integration tests for backend rendering."""
 
-    def test_s3_backend_rendering(self, mock_config_dir_with_backend, temp_dir):
+    def test_s3_backend_rendering(self, mock_config_dir_with_backend: Path, temp_dir: Path) -> None:
         """Test S3 backend.tf is rendered correctly."""
         config_manager = ConfigManager(mock_config_dir_with_backend / "envs")
         output_dir = temp_dir / "output"
@@ -277,7 +279,9 @@ class TestBackendRendering:
         assert "encrypt        = true" in content
         assert "# State Locking: Enabled" in content
 
-    def test_gcs_backend_rendering(self, mock_config_dir_with_gcs_backend, temp_dir):
+    def test_gcs_backend_rendering(
+        self, mock_config_dir_with_gcs_backend: Path, temp_dir: Path
+    ) -> None:
         """Test GCS backend.tf is rendered correctly."""
         config_manager = ConfigManager(mock_config_dir_with_gcs_backend / "envs")
         output_dir = temp_dir / "output"
@@ -306,7 +310,9 @@ class TestBackendRendering:
         assert 'credentials = "/path/to/service-account.json"' in content
         assert "# State Locking: Enabled" in content
 
-    def test_azure_backend_rendering(self, mock_config_dir_with_azure_backend, temp_dir):
+    def test_azure_backend_rendering(
+        self, mock_config_dir_with_azure_backend: Path, temp_dir: Path
+    ) -> None:
         """Test Azure backend.tf is rendered correctly."""
         config_manager = ConfigManager(mock_config_dir_with_azure_backend / "envs")
         output_dir = temp_dir / "output"
@@ -337,7 +343,9 @@ class TestBackendRendering:
         assert "use_azuread_auth     = true" in content
         assert "# State Locking: Enabled" in content
 
-    def test_postgres_backend_rendering(self, mock_config_dir_with_postgres_backend, temp_dir):
+    def test_postgres_backend_rendering(
+        self, mock_config_dir_with_postgres_backend: Path, temp_dir: Path
+    ) -> None:
         """Test Postgres backend.tf is rendered correctly."""
         config_manager = ConfigManager(mock_config_dir_with_postgres_backend / "envs")
         output_dir = temp_dir / "output"
@@ -369,8 +377,8 @@ class TestBackendRendering:
         assert "# State Locking: Enabled" in content
 
     def test_terraform_cloud_backend_rendering(
-        self, mock_config_dir_with_terraform_cloud_backend, temp_dir
-    ):
+        self, mock_config_dir_with_terraform_cloud_backend: Path, temp_dir: Path
+    ) -> None:
         """Test Terraform Cloud backend.tf is rendered correctly."""
         config_manager = ConfigManager(mock_config_dir_with_terraform_cloud_backend / "envs")
         output_dir = temp_dir / "output"
@@ -400,7 +408,9 @@ class TestBackendRendering:
         assert 'hostname     = "app.terraform.io"' in content
         assert "# State Locking: Enabled" in content
 
-    def test_no_backend_no_file_generated(self, mock_config_dir_no_backend, temp_dir):
+    def test_no_backend_no_file_generated(
+        self, mock_config_dir_no_backend: Path, temp_dir: Path
+    ) -> None:
         """Test that backend.tf is not generated when no backend configured."""
         config_manager = ConfigManager(mock_config_dir_no_backend / "envs")
         output_dir = temp_dir / "output"
@@ -421,7 +431,7 @@ class TestBackendRendering:
         backend_file = output_dir / "dev" / "terraform" / "proxmox" / "backend.tf"
         assert not backend_file.exists()
 
-    def test_local_backend_no_file_generated(self, temp_dir):
+    def test_local_backend_no_file_generated(self, temp_dir: Path) -> None:
         """Test that backend.tf is not generated for local backend."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -468,7 +478,7 @@ class TestBackendRendering:
         backend_file = output_dir / "dev" / "terraform" / "proxmox" / "backend.tf"
         assert not backend_file.exists()
 
-    def test_backend_validation_in_rendering(self, temp_dir):
+    def test_backend_validation_in_rendering(self, temp_dir: Path) -> None:
         """Test that invalid backend configuration is caught during rendering."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()

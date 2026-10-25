@@ -14,13 +14,13 @@ from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
-def validation_report():
+def validation_report() -> ValidationReport:
     """Create a ValidationReport instance."""
     return ValidationReport()
 
 
 @pytest.fixture
-def api_validator(validation_report):
+def api_validator(validation_report: ValidationReport) -> BaseAPIValidator:
     """Create a BaseAPIValidator instance."""
     env_config = make_env_config(
         name="test-env",
@@ -30,7 +30,7 @@ def api_validator(validation_report):
 
 
 @pytest.fixture
-def validator(api_validator, validation_report):
+def validator(api_validator: BaseAPIValidator, validation_report: ValidationReport) -> CRDValidator:
     """Create a CRDValidator instance."""
     return CRDValidator(api_validator, validation_report)
 
@@ -46,7 +46,12 @@ def _crd_api_response(groups: list[str]) -> dict:
 class TestCRDValidator:
     """Tests for CRDValidator."""
 
-    def test_existing_crd(self, validator, validation_report, api_validator):
+    def test_existing_crd(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that existing CRDs produce success."""
         api_validator.fetch_json = MagicMock(
             return_value=_crd_api_response(["cert-manager.io", "traefik.io"])
@@ -67,7 +72,12 @@ class TestCRDValidator:
         )
         assert any(r.passed and "cert-manager.io" in r.message for r in validation_report.results)
 
-    def test_missing_crd_error(self, validator, validation_report, api_validator):
+    def test_missing_crd_error(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that missing CRDs produce ERROR."""
         api_validator.fetch_json = MagicMock(return_value=_crd_api_response(["some-other.io"]))
         manifests = [
@@ -89,7 +99,12 @@ class TestCRDValidator:
             for r in validation_report.results
         )
 
-    def test_standard_api_groups_skipped(self, validator, validation_report, api_validator):
+    def test_standard_api_groups_skipped(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that standard K8s API groups are not checked."""
         api_validator.fetch_json = MagicMock(return_value=_crd_api_response([]))
         manifests = [
@@ -109,7 +124,12 @@ class TestCRDValidator:
         # No CRD checks should be emitted for standard groups
         api_validator.fetch_json.assert_not_called()
 
-    def test_no_manifests_skips(self, validator, validation_report, api_validator):
+    def test_no_manifests_skips(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that empty manifests list makes no API calls."""
         api_validator.fetch_json = MagicMock()
         validator.validate(
@@ -120,7 +140,12 @@ class TestCRDValidator:
         )
         api_validator.fetch_json.assert_not_called()
 
-    def test_api_failure_graceful(self, validator, validation_report, api_validator):
+    def test_api_failure_graceful(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test graceful handling when CRD API call fails."""
         api_validator.fetch_json = MagicMock(return_value=None)
         manifests = [

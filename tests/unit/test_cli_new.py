@@ -1,6 +1,7 @@
 """Unit tests for the 'new' CLI command group."""
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -10,13 +11,13 @@ from infrafoundry.cli.main import main
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_blueprint_manager():
+def mock_blueprint_manager() -> Mock:
     """Mock BlueprintManager for testing."""
     from infrafoundry.core.blueprints import BlueprintManager
 
@@ -25,7 +26,7 @@ def mock_blueprint_manager():
 
 
 @pytest.fixture
-def sample_blueprints():
+def sample_blueprints() -> list[Any]:
     """Sample blueprint data."""
     bp1 = Mock()
     bp1.name = "basic-vm"
@@ -40,7 +41,9 @@ def sample_blueprints():
     return [bp1, bp2]
 
 
-def test_new_list_blueprints(cli_runner, mock_blueprint_manager, sample_blueprints):
+def test_new_list_blueprints(
+    cli_runner: CliRunner, mock_blueprint_manager: Mock, sample_blueprints: list[Any]
+) -> None:
     """Test new command lists available blueprints."""
     mock_blueprint_manager.list_blueprints.return_value = sample_blueprints
 
@@ -55,7 +58,7 @@ def test_new_list_blueprints(cli_runner, mock_blueprint_manager, sample_blueprin
         assert "kubernetes-cluster" in result.output
 
 
-def test_new_no_blueprints(cli_runner, mock_blueprint_manager):
+def test_new_no_blueprints(cli_runner: CliRunner, mock_blueprint_manager: Mock) -> None:
     """Test new command when no blueprints are found."""
     mock_blueprint_manager.list_blueprints.return_value = []
 
@@ -68,7 +71,9 @@ def test_new_no_blueprints(cli_runner, mock_blueprint_manager):
         assert "No blueprints found" in result.output
 
 
-def test_new_create_blueprint(cli_runner, mock_blueprint_manager, tmp_path):
+def test_new_create_blueprint(
+    cli_runner: CliRunner, mock_blueprint_manager: Mock, tmp_path: Path
+) -> None:
     """Test new create command."""
     target_dir = tmp_path / "new-project"
 
@@ -84,7 +89,9 @@ def test_new_create_blueprint(cli_runner, mock_blueprint_manager, tmp_path):
         )
 
 
-def test_new_create_blueprint_not_found(cli_runner, mock_blueprint_manager, tmp_path):
+def test_new_create_blueprint_not_found(
+    cli_runner: CliRunner, mock_blueprint_manager: Mock, tmp_path: Path
+) -> None:
     """Test new create command when blueprint doesn't exist."""
     target_dir = tmp_path / "new-project"
     mock_blueprint_manager.instantiate_blueprint.side_effect = ValueError("Blueprint not found")
@@ -100,7 +107,9 @@ def test_new_create_blueprint_not_found(cli_runner, mock_blueprint_manager, tmp_
         assert "Error:" in result.output
 
 
-def test_new_create_blueprint_unexpected_error(cli_runner, mock_blueprint_manager, tmp_path):
+def test_new_create_blueprint_unexpected_error(
+    cli_runner: CliRunner, mock_blueprint_manager: Mock, tmp_path: Path
+) -> None:
     """Test new create command with unexpected error."""
     target_dir = tmp_path / "new-project"
     mock_blueprint_manager.instantiate_blueprint.side_effect = Exception("Unexpected error")
