@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792969949982,
+  "lastUpdate": 1792971075753,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10137,6 +10137,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011834552007520867",
             "extra": "mean: 125.3967612392704 usec\nrounds: 8586"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "333c627c4bbb28e95a1a93018f645e60f29ee3f6",
+          "message": "chore: backfill docs frontmatter and adopt test_docs_frontmatter (merges PR #1080, addresses #1057)\n\nEvery document under docs/ now carries title, description, audience and tags\nfrontmatter, so tools/generate_doc_toc.py can place it, and the template's\ntest_docs_frontmatter.py is adopted.\n\n- 113 docs gain frontmatter; audience is users for configuration, guides,\n  providers, runners, usage, examples, tools and reference, and contributors\n  elsewhere; InfraFoundry ADR titles use the ADR-NNNN form\n- test_docs_frontmatter.py types _frontmatter as dict[str, Any] for the local\n  disallow_any_generics setting, recorded in the divergences doc\n- the divergences doc and test_documented_paths drop the deferral entries\n- ssh-authentication.md describes the OpenSSH key format without quoting the\n  key header, which the detect-private-key hook rejects\n\nPart 2 of 3 for #1057.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T23:30:23Z",
+          "tree_id": "1608118bda9d78aab1772bee3a866c83f7af99da",
+          "url": "https://github.com/endavis/infrafoundry/commit/333c627c4bbb28e95a1a93018f645e60f29ee3f6"
+        },
+        "date": 1792971074742,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13354.085551373517,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002332624484753448",
+            "extra": "mean: 74.88345017357975 usec\nrounds: 14410"
           }
         ]
       }
