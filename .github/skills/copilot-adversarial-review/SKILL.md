@@ -40,7 +40,7 @@ Be skeptical and steerable. Pressure-test:
 - **Failure Modes:** What are the auth, data loss, race condition, rollback, and reliability failure modes? What happens at scale or under adversarial input?
 - **Alternatives Worth Considering:** What other approaches exist? Are there simpler paths that achieve the same goal with less risk or complexity?
 
-Apply the optional focus area if the user supplied one.
+Apply the optional focus area if the user supplied one. If the focus area names any of `errors`, `tests`, `types`, `comments`, read `docs/development/ai/review-focus-areas.md` and apply those checklists in addition to the general review.
 
 ### Step 3: Present findings
 

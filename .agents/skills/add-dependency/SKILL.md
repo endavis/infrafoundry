@@ -173,8 +173,8 @@ The justification belongs in the PR description, not only in this conversation: 
 ruled out, the table the package went into, and what Step 3 found. A reviewer should not have to ask
 why the project now depends on it.
 
-When the task is done, hand off to the `ghi-finalize` skill, and make sure the PR body it drafts
-carries this record.
+When the task is done, return to the `implement-issue` run, or commit and open a PR per
+`.github/CONTRIBUTING.md` — either way, make sure the PR body carries this record.
 
 ## Notes
 

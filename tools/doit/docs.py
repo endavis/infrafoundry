@@ -18,9 +18,7 @@ def task_docs_serve() -> dict[str, Any]:
 def task_docs_build() -> dict[str, Any]:
     """Build documentation site."""
     return {
-        # Not --strict yet: existing nav gaps and anchors must be fixed first
-        # (pyproject-template #715; tracked as an InfraFoundry follow-up).
-        "actions": ["uv run mkdocs build"],
+        "actions": ["uv run mkdocs build --strict"],
         "title": title_with_actions,
     }
 

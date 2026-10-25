@@ -693,6 +693,181 @@ def task_pr() -> dict[str, Any]:
     }
 
 
+def _fetch_issue_context(number: str, out_dir: Path, console: "ConsoleType") -> None:
+    """Fetch an issue's metadata and comments and write them as JSON files.
+
+    Writes ``issue.json`` (``number``/``title``/``body``/``labels``/``assignees``) and
+    ``comments.json`` (``{"comments": [...]}}``) under *out_dir*, creating it if needed.
+    Nothing is written until both the fetch succeeds, so a failure never leaves a
+    partial or empty file behind.
+
+    Args:
+        number: Issue number.
+        out_dir: Directory to write ``issue.json``/``comments.json`` into.
+        console: Rich console for output.
+
+    Raises:
+        SystemExit: Via ``sys.exit(1)`` if the issue cannot be fetched.
+    """
+    try:
+        result = _run_gh_with_retry(
+            [
+                "gh",
+                "issue",
+                "view",
+                number,
+                "--json",
+                "number,title,body,labels,assignees,comments",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").strip()
+        console.print(verbatim(f"Failed to fetch issue #{number}: {stderr}", "red"))
+        sys.exit(1)
+
+    data: dict[str, Any] = json.loads(result.stdout)
+    comments = data.pop("comments", [])
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "issue.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+    (out_dir / "comments.json").write_text(
+        json.dumps({"comments": comments}, indent=2), encoding="utf-8"
+    )
+    console.print(
+        verbatim(f"Wrote {out_dir / 'issue.json'} and {out_dir / 'comments.json'}", "green")
+    )
+
+
+def _fetch_pr_context(number: str, out_dir: Path, console: "ConsoleType") -> None:
+    """Fetch a PR's metadata and diff and write them to files.
+
+    Writes ``pr.json`` (``number``/``title``/``body``/``baseRefName``/``headRefName``) and
+    ``diff.txt`` (the raw ``gh pr diff`` output) under *out_dir*, creating it if needed.
+    Nothing is written until both fetches succeed, so a failure never leaves a partial or
+    empty file behind.
+
+    Args:
+        number: PR number.
+        out_dir: Directory to write ``pr.json``/``diff.txt`` into.
+        console: Rich console for output.
+
+    Raises:
+        SystemExit: Via ``sys.exit(1)`` if the PR cannot be fetched.
+    """
+    try:
+        pr_result = _run_gh_with_retry(
+            [
+                "gh",
+                "pr",
+                "view",
+                number,
+                "--json",
+                "number,title,body,baseRefName,headRefName",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").strip()
+        console.print(verbatim(f"Failed to fetch PR #{number}: {stderr}", "red"))
+        sys.exit(1)
+
+    try:
+        diff_result = _run_gh_with_retry(
+            ["gh", "pr", "diff", number],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").strip()
+        console.print(verbatim(f"Failed to fetch diff for PR #{number}: {stderr}", "red"))
+        sys.exit(1)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "pr.json").write_text(pr_result.stdout, encoding="utf-8")
+    (out_dir / "diff.txt").write_text(diff_result.stdout, encoding="utf-8")
+    console.print(verbatim(f"Wrote {out_dir / 'pr.json'} and {out_dir / 'diff.txt'}", "green"))
+
+
+def task_delegation_context() -> dict[str, Any]:
+    """Fetch GitHub data a delegated agent needs and write it to files it reads instead of `gh`.
+
+    A delegated agent (another CLI invoked non-interactively) has no trusted, un-sandboxed
+    `gh` of its own in every host (see `.codex/rules/gh.rules`). The **host** — the CLI the
+    user is driving, which does have one — runs this task before delegating, and the
+    delegated prompt reads the files it writes instead of shelling out to `gh` itself.
+
+    Two modes:
+    - ``--kind=issue``: writes ``issue.json`` (number/title/body/labels/assignees) and
+      ``comments.json`` (``{"comments": [...]}}``).
+    - ``--kind=pr``: writes ``pr.json`` (number/title/body/baseRefName/headRefName) and
+      ``diff.txt`` (the PR's diff).
+
+    A missing or inaccessible issue/PR aborts with `sys.exit(1)` and a clear message —
+    never a silent empty file.
+
+    By convention, *out* is ``tmp/agents/<host>/<task>-<n>/`` (for example
+    ``tmp/agents/claude/multi-review-123/``). The orchestrating skill that creates it is
+    responsible for deleting it once every delegated agent has returned.
+
+    Examples:
+        doit delegation_context --kind=issue --n=985 --out=tmp/agents/claude/multi-plan-985
+        doit delegation_context --kind=pr --n=42 --out=tmp/agents/claude/multi-review-42
+    """
+
+    def fetch_context(kind: str = "", n: str = "", out: str = "") -> None:
+        console = Console()
+        console.print()
+        console.print(
+            Panel.fit(
+                verbatim("Fetching Delegation Context", "bold cyan"),
+                border_style="cyan",
+            )
+        )
+        console.print()
+
+        if kind not in ("issue", "pr"):
+            console.print(verbatim("--kind must be 'issue' or 'pr'", "red"))
+            sys.exit(1)
+        if not n:
+            console.print(verbatim("--n (issue or PR number) is required", "red"))
+            sys.exit(1)
+        if not out:
+            console.print(verbatim("--out (output directory) is required", "red"))
+            sys.exit(1)
+
+        out_dir = Path(out)
+        if kind == "issue":
+            _fetch_issue_context(n, out_dir, console)
+        else:
+            _fetch_pr_context(n, out_dir, console)
+
+    return {
+        "actions": [fetch_context],
+        "params": [
+            {
+                "name": "kind",
+                "long": "kind",
+                "default": "",
+                "help": "Context kind: 'issue' or 'pr'",
+            },
+            {"name": "n", "long": "n", "default": "", "help": "Issue or PR number"},
+            {
+                "name": "out",
+                "long": "out",
+                "default": "",
+                "help": "Output directory to write context files into (created if missing)",
+            },
+        ],
+        "title": title_with_actions,
+    }
+
+
 def _get_pr_info(pr_number: str | None, console: "ConsoleType") -> dict[str, Any] | None:
     """Get PR information from GitHub API.
 

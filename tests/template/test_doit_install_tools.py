@@ -704,6 +704,135 @@ class TestInstallTool:
         mock_run.assert_not_called()
         mock_urlretrieve.assert_called_once()
 
+    @patch("tools.doit.install_tools.urllib.request.urlretrieve")
+    @patch("tools.doit.install_tools.get_install_dir")
+    @patch("tools.doit.install_tools._get_arch", return_value="amd64")
+    @patch("tools.doit.install_tools.get_latest_github_release", return_value="jq-1.8.2")
+    @patch("tools.doit.install_tools.platform.system", return_value="Linux")
+    @patch("tools.doit.install_tools.shutil.which", return_value=None)
+    def test_install_with_per_os_url_template_resolves_linux(
+        self,
+        mock_which: MagicMock,
+        mock_system: MagicMock,
+        mock_get_release: MagicMock,
+        mock_arch: MagicMock,
+        mock_get_install_dir: MagicMock,
+        mock_urlretrieve: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Test that a per-OS url_template dict resolves to the linux entry."""
+        mock_get_install_dir.return_value = tmp_path
+        mock_urlretrieve.side_effect = lambda url, dest: Path(dest).touch()
+
+        install_tool(
+            name="jq",
+            repo="jqlang/jq",
+            asset_patterns={},
+            url_template={
+                "linux": "https://github.com/jqlang/jq/releases/download/{version}/jq-linux-{arch}",
+                "darwin": "https://github.com/jqlang/jq/releases/download/{version}/jq-macos-{arch}",
+            },
+        )
+
+        called_url = mock_urlretrieve.call_args.args[0]
+        assert called_url == (
+            "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-amd64"
+        )
+
+    @patch("tools.doit.install_tools.urllib.request.urlretrieve")
+    @patch("tools.doit.install_tools.get_install_dir")
+    @patch("tools.doit.install_tools._get_arch", return_value="arm64")
+    @patch("tools.doit.install_tools.subprocess.run")
+    @patch("tools.doit.install_tools.get_latest_github_release", return_value="jq-1.8.2")
+    @patch("tools.doit.install_tools.platform.system", return_value="Darwin")
+    @patch("tools.doit.install_tools.shutil.which", return_value=None)
+    def test_install_with_per_os_url_template_resolves_darwin_and_skips_brew(
+        self,
+        mock_which: MagicMock,
+        mock_system: MagicMock,
+        mock_get_release: MagicMock,
+        mock_run: MagicMock,
+        mock_arch: MagicMock,
+        mock_get_install_dir: MagicMock,
+        mock_urlretrieve: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """Test that a per-OS url_template dict resolves to the darwin entry and bypasses brew."""
+        mock_get_install_dir.return_value = tmp_path
+        mock_urlretrieve.side_effect = lambda url, dest: Path(dest).touch()
+
+        install_tool(
+            name="jq",
+            repo="jqlang/jq",
+            asset_patterns={},
+            url_template={
+                "linux": "https://github.com/jqlang/jq/releases/download/{version}/jq-linux-{arch}",
+                "darwin": "https://github.com/jqlang/jq/releases/download/{version}/jq-macos-{arch}",
+            },
+        )
+
+        mock_run.assert_not_called()
+        called_url = mock_urlretrieve.call_args.args[0]
+        assert called_url == (
+            "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-macos-arm64"
+        )
+
+    @patch("tools.doit.install_tools.get_latest_github_release", return_value="1.0.0")
+    @patch("tools.doit.install_tools.platform.system", return_value="Windows")
+    @patch("tools.doit.install_tools.shutil.which", return_value=None)
+    def test_install_with_per_os_url_template_missing_platform_exits(
+        self,
+        mock_which: MagicMock,
+        mock_system: MagicMock,
+        mock_get_release: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that a per-OS url_template dict missing the current OS exits without downloading."""
+        with pytest.raises(SystemExit):
+            install_tool(
+                name="jq",
+                repo="jqlang/jq",
+                asset_patterns={},
+                url_template={
+                    "linux": "https://example.com/{version}/jq-linux-{arch}",
+                    "darwin": "https://example.com/{version}/jq-macos-{arch}",
+                },
+            )
+
+        captured = capsys.readouterr()
+        assert "Unsupported OS for jq: windows" in captured.out
+
+    @patch("tools.doit.install_tools.urllib.request.urlretrieve")
+    @patch("tools.doit.install_tools.get_install_dir")
+    @patch("tools.doit.install_tools._get_arch", return_value="amd64")
+    @patch("tools.doit.install_tools.get_latest_github_release", return_value="1.0.0")
+    @patch("tools.doit.install_tools.platform.system", return_value="Linux")
+    @patch("tools.doit.install_tools.shutil.which", return_value=None)
+    def test_install_with_plain_string_url_template_unchanged(
+        self,
+        mock_which: MagicMock,
+        mock_system: MagicMock,
+        mock_get_release: MagicMock,
+        mock_arch: MagicMock,
+        mock_get_install_dir: MagicMock,
+        mock_urlretrieve: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        """A plain string url_template must not be mistaken for a dict and must behave as before."""
+        mock_get_install_dir.return_value = tmp_path
+        mock_urlretrieve.side_effect = lambda url, dest: Path(dest).touch()
+
+        install_tool(
+            name="mytool",
+            repo="owner/repo",
+            asset_patterns={},
+            url_template="https://releases.example.com/{version}/mytool_{os}_{arch}",
+            sha256=_EMPTY_SHA256,
+        )
+
+        called_url = mock_urlretrieve.call_args.args[0]
+        assert called_url == "https://releases.example.com/1.0.0/mytool_linux_amd64"
+
 
 class TestCreateInstallTask:
     """Tests for create_install_task function."""
@@ -813,6 +942,24 @@ class TestCreateInstallTask:
         result = create_install_task(
             name="terraform",
             repo="hashicorp/terraform",
+            asset_patterns={},
+            url_template=template,
+        )
+
+        result["actions"][0]()
+
+        assert mock_install.call_args.kwargs["url_template"] == template
+
+    @patch("tools.doit.install_tools.install_tool")
+    def test_forwards_dict_url_template(self, mock_install: MagicMock) -> None:
+        """Test that a per-OS url_template dict is forwarded unchanged."""
+        template = {
+            "linux": "https://github.com/jqlang/jq/releases/download/{version}/jq-linux-{arch}",
+            "darwin": "https://github.com/jqlang/jq/releases/download/{version}/jq-macos-{arch}",
+        }
+        result = create_install_task(
+            name="jq",
+            repo="jqlang/jq",
             asset_patterns={},
             url_template=template,
         )

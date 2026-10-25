@@ -24,11 +24,11 @@ are the ones this skill exists for.
 Use this skill when the user wants to bring an existing Python project onto the template, or wants
 to know what that would involve.
 
-Expected prompt shape:
+Expected request shape:
 
-- `$template-migrate plan our migration to pyproject-template`
-- `$template-migrate what would it take to adopt this template here?`
-- `$template-migrate plan the migration against v2.2.0`
+- "plan our migration to pyproject-template"
+- "what would it take to adopt this template here?"
+- "plan the migration against v2.2.0"
 
 The user may supply an optional template ref (tag, branch, or commit SHA) to plan against. Default
 is `main`.

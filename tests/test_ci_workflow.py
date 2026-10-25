@@ -15,6 +15,10 @@ pyproject-template#424:
 3. The ``workflow_call`` trigger exposes a ``full_matrix`` boolean input
    (default ``false``) so the sibling ``ci-full-matrix.yml`` workflow can
    dispatch the full-matrix run via ``uses: ./.github/workflows/ci.yml``.
+
+A fourth was added for issue #952: the ``lint`` job runs every check
+``doit check`` runs (``test`` aside), and each runs even when one before it
+failed, so a PR shows every failing check at once.
 """
 
 from __future__ import annotations
@@ -166,3 +170,48 @@ class TestWorkflowCallInputs:
         assert triggers is not None
         fm = triggers["workflow_call"]["inputs"]["full_matrix"]
         assert fm["default"] is False
+
+
+def _lint_steps() -> list[dict[str, Any]]:
+    """Return the steps of the ``lint`` job."""
+    steps: list[dict[str, Any]] = _load_workflow()["jobs"]["lint"]["steps"]
+    return steps
+
+
+def _lint_check_steps() -> list[dict[str, Any]]:
+    """Return the ``lint`` job's steps that run a ``doit`` task."""
+    return [step for step in _lint_steps() if "doit " in step.get("run", "")]
+
+
+class TestLintJob:
+    """The lint job runs each check and reports every failing one (#952)."""
+
+    def test_lint_runs_every_check_but_test(self) -> None:
+        """Every ``doit check`` task runs in CI; ``test`` and ``docs_build`` have own jobs.
+
+        ``deadcode`` was in ``task_check`` but in no CI job, so a PR could add
+        dead code that only the daily check caught.
+        """
+        from tools.doit.quality import task_check
+
+        expected = set(task_check()["task_dep"]) - {"test", "docs_build"}
+        run = {step["run"].split("doit ", 1)[1].split()[0] for step in _lint_check_steps()}
+        assert run == expected
+
+    def test_docs_job_runs_docs_build(self) -> None:
+        """``docs_build`` is left out of the lint job only because the docs job runs it (#974)."""
+        steps: list[dict[str, Any]] = _load_workflow()["jobs"]["docs"]["steps"]
+        assert any("doit docs_build" in step.get("run", "") for step in steps)
+
+    def test_each_check_runs_after_an_earlier_failure(self) -> None:
+        """A failing check must not skip the checks after it."""
+        for step in _lint_check_steps():
+            condition = step.get("if", "")
+            assert "!cancelled()" in condition, f"{step['name']!r} is skipped after a failure"
+
+    def test_no_check_runs_without_dependencies(self) -> None:
+        """When the install fails, the checks are skipped, not each failed on its own."""
+        install = next(s for s in _lint_steps() if s.get("name") == "Install dependencies")
+        assert install.get("id") == "install"
+        for step in _lint_check_steps():
+            assert "steps.install.outcome == 'success'" in step.get("if", ""), step["name"]

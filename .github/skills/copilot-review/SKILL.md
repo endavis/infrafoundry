@@ -53,7 +53,7 @@ Evaluate the diff for:
 - **Architecture:** does it respect layering rules from `docs/development/ai/architectural-conventions.md`?
 - **Breaking changes:** any signature changes, removed APIs, or behavior changes?
 
-Apply the optional focus area if the user supplied one.
+Apply the optional focus area if the user supplied one. If the focus area names any of `errors`, `tests`, `types`, `comments`, read `docs/development/ai/review-focus-areas.md` and apply those checklists in addition to the general review.
 
 ### Step 4: Present findings and post review
 
