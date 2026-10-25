@@ -248,7 +248,8 @@ class PathBasedManager(BaseManager):
 
         value = os.getenv(var_name)
         if value:
-            self._log_debug(f"Using {var_name}", value=value)
+            # Log the name only: the value may be a secret.
+            self._log_debug(f"Using {var_name}")
         return value
 
     def _ensure_directory_exists(self, path: Path) -> None:
