@@ -1,15 +1,15 @@
 ---
 name: delegate-claude-review
-description: Delegate a read-only code review of current changes from a Codex session to Claude Code. Hands the review to Claude via `claude -p` and returns findings to Codex.
+description: Delegate a read-only code review of current changes to Claude Code. Hands the review to Claude via `claude -p` and returns findings to the calling agent.
 ---
 
 # Delegate Review to Claude
 
-Hand off a read-only code review of current changes to Claude Code from a Codex session.
+Hand off a read-only code review of current changes to Claude Code.
 
 ## When to use
 
-Use this skill when the user explicitly wants a review done by Claude (not Codex itself).
+Use this skill when the user explicitly wants a review done by Claude (not the host agent itself).
 
 Expected prompt shape:
 

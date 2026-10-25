@@ -23,7 +23,7 @@ If the agent list is missing, ask for it before continuing.
 ### Step 0: Parse arguments
 
 Extract the agent list from the user's request.
-Allowed agent names: `claude`, `gemini`, `copilot`, `codex`.
+Allowed agent names: `claude`, `gemini`, `copilot`, `codex`, `antigravity`.
 
 - If no agents are given, ask for the agent list.
 - If any agent name is not in the allowed list, report the unknown name, list allowed names, and stop.
@@ -81,6 +81,14 @@ copilot --allow-all -p 'Run an adversarial review of the current uncommitted cha
 ```
 
 Capture stdout as Copilot's adversarial review.
+
+#### If `antigravity` is in the agent list:
+
+```bash
+agy -p 'Run an adversarial review of the current uncommitted changes and the current branch vs main. Read-only. Be skeptical: pressure-test design choices, hidden assumptions, tradeoffs, alternatives, failure modes (auth, data loss, races, rollback, reliability). 1) Run `git status`, `git diff`, `git log main..HEAD`. 2) Read AGENTS.md and related ADRs. 3) Ask: right approach? Safer or simpler alternative? Edge cases missed? Hidden coupling? 4) Output ONLY the review: ## Adversarial Review / ### Direction Critique / ### Hidden Assumptions / ### Failure Modes / ### Alternatives Worth Considering. End with --- and *Adversarial Review by: Antigravity* | *Date: <today>*. Do NOT modify any files.' --dangerously-skip-permissions --add-dir "$(git rev-parse --show-toplevel)" 2>/dev/null
+```
+
+Capture stdout as Antigravity's adversarial review.
 
 If any agent fails or produces empty output, report the error and ask whether to continue or retry.
 

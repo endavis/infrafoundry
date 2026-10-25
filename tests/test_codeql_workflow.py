@@ -11,6 +11,7 @@ this advanced workflow file).
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -163,30 +164,58 @@ class TestAnalyzeJob:
         job = workflow["jobs"]["analyze"]
         assert job["strategy"]["fail-fast"] is False
 
-    def test_analyze_uses_checkout_v6(self) -> None:
-        """``actions/checkout`` should be pinned to ``@v6`` (repo convention)."""
+    def test_analyze_pins_checkout_major_version(self) -> None:
+        """``actions/checkout`` must be pinned to a major-version tag (``@vN``).
+
+        The exact major version is intentionally not asserted. Dependabot bumps
+        ``actions/checkout`` routinely; pinning this test to a specific number
+        turns every such bump into a false CI failure (see #625). The repo
+        convention this guards is that the action is pinned to a version tag,
+        not a floating ref/branch.
+        """
         steps = _analyze_steps()
         checkout_steps = [s for s in steps if s.get("uses", "").startswith("actions/checkout@")]
         assert checkout_steps, "expected an actions/checkout step"
-        assert checkout_steps[0]["uses"] == "actions/checkout@v6"
+        uses = checkout_steps[0]["uses"]
+        assert re.fullmatch(r"actions/checkout@v\d+", uses), (
+            f"expected actions/checkout pinned to a major-version tag, got {uses!r}"
+        )
 
-    def test_analyze_uses_codeql_init_v4(self) -> None:
-        """``github/codeql-action/init`` should be pinned to ``@v4``."""
+    def test_analyze_pins_codeql_init_major_version(self) -> None:
+        """``github/codeql-action/init`` must be pinned to a major-version tag (``@vN``).
+
+        The exact major version is intentionally not asserted. Dependabot bumps
+        ``github/codeql-action`` routinely; pinning this test to a specific
+        number turns every such bump into a false CI failure (see #626). The
+        repo convention this guards is that the action is pinned to a version
+        tag, not a floating ref/branch.
+        """
         steps = _analyze_steps()
         init_steps = [
             s for s in steps if s.get("uses", "").startswith("github/codeql-action/init@")
         ]
         assert init_steps, "expected a github/codeql-action/init step"
-        assert init_steps[0]["uses"] == "github/codeql-action/init@v4"
+        uses = init_steps[0]["uses"]
+        assert re.fullmatch(r"github/codeql-action/init@v\d+", uses), (
+            f"expected github/codeql-action/init pinned to a major-version tag, got {uses!r}"
+        )
 
-    def test_analyze_uses_codeql_analyze_v4(self) -> None:
-        """``github/codeql-action/analyze`` should be pinned to ``@v4``."""
+    def test_analyze_pins_codeql_analyze_major_version(self) -> None:
+        """``github/codeql-action/analyze`` must be pinned to a major-version tag (``@vN``).
+
+        See ``test_analyze_pins_codeql_init_major_version`` for the rationale
+        (#626): the exact major version is intentionally not asserted so routine
+        dependabot bumps don't turn into false CI failures.
+        """
         steps = _analyze_steps()
         analyze_steps = [
             s for s in steps if s.get("uses", "").startswith("github/codeql-action/analyze@")
         ]
         assert analyze_steps, "expected a github/codeql-action/analyze step"
-        assert analyze_steps[0]["uses"] == "github/codeql-action/analyze@v4"
+        uses = analyze_steps[0]["uses"]
+        assert re.fullmatch(r"github/codeql-action/analyze@v\d+", uses), (
+            f"expected github/codeql-action/analyze pinned to a major-version tag, got {uses!r}"
+        )
 
     def test_analyze_init_passes_matrix_language(self) -> None:
         """The init step must receive the matrix language via ``with.languages``."""

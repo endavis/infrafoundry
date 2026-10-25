@@ -20,6 +20,14 @@ session than a paragraph buried in a large reference file.
 > For the Claude and Gemini variants, see those directories. For the GitHub Copilot variant, see
 > [`.github/instructions/README.md`](../../.github/instructions/README.md).
 
+> **Shared with Antigravity CLI (`agy`):** This `.agents/skills/` directory is also read by
+> Antigravity, which uses the identical `SKILL.md` format (`name`/`description` frontmatter,
+> description-gated activation). The `antigravity-*` workflow skills live here alongside the
+> `codex-*` skills, and any rule-shaped skill added here is discovered by both CLIs. Because both
+> read this directory, each sees the other's skills (the same bleed dynamic handled for Gemini via
+> `.gemini/settings.json` `skills.disabled` and noted for Copilot); Antigravity-side suppression via
+> `.agents/skills.json` `exclude` is planned for a later phase.
+
 ## When to author a rule-shaped skill
 
 Write a rule-shaped skill when all three conditions hold:

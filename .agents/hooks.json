@@ -1,0 +1,15 @@
+{
+  "block-dangerous-commands": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ../tools/hooks/ai/block-dangerous-commands.py"
+          }
+        ]
+      }
+    ]
+  }
+}

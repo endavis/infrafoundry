@@ -23,7 +23,7 @@ If the agent list or issue number is missing, ask for it before continuing.
 ### Step 0: Parse arguments
 
 Extract the agent list and issue number from the user's request.
-Allowed agent names: `claude`, `gemini`, `copilot`, `codex`.
+Allowed agent names: `claude`, `gemini`, `copilot`, `codex`, `antigravity`.
 
 - If the issue number is missing, ask for it.
 - If any agent name is not in the allowed list, report the unknown name, list allowed names, and stop.
@@ -87,10 +87,18 @@ Capture stdout as Gemini's plan.
 #### If `copilot` is in the agent list:
 
 ```bash
-copilot --allow-all -p 'Plan the implementation for GitHub issue #<issue> in the current repository. If the /copilot:plan command is available, run it for this issue. Otherwise: 1) Run `gh issue view <issue> --json title,body,labels`. 2) Read AGENTS.md. 3) Explore relevant files. 4) Draft a plan: ## Implementation Plan for #<number>: <title> / ### Overview / ### Files to Create/Modify / ### Test Plan / ### Documentation / ### Validation / ### Risks and Considerations. End with --- and *Plan by: Copilot* | *Date: <today>*. 5) Print ONLY the plan to stdout. Do NOT post to GitHub.' 2>/dev/null
+copilot --allow-all -p 'Plan the implementation for GitHub issue #<issue> in the current repository. If the /copilot-plan skill is available, activate it for this issue. Otherwise: 1) Run `gh issue view <issue> --json title,body,labels`. 2) Read AGENTS.md. 3) Explore relevant files. 4) Draft a plan: ## Implementation Plan for #<number>: <title> / ### Overview / ### Files to Create/Modify / ### Test Plan / ### Documentation / ### Validation / ### Risks and Considerations. End with --- and *Plan by: Copilot* | *Date: <today>*. 5) Print ONLY the plan to stdout. Do NOT post to GitHub.' 2>/dev/null
 ```
 
 Capture stdout as Copilot's plan.
+
+#### If `antigravity` is in the agent list:
+
+```bash
+agy -p 'Plan the implementation for GitHub issue #<issue> in the current repository. If an Antigravity planning skill (antigravity-plan) is available, use it for this issue. Otherwise: 1) Run `gh issue view <issue> --json title,body,labels`. 2) Read AGENTS.md. 3) Explore relevant files. 4) Draft a plan: ## Implementation Plan for #<number>: <title> / ### Overview / ### Files to Create/Modify / ### Test Plan / ### Documentation / ### Validation / ### Risks and Considerations. End with --- and *Plan by: Antigravity* | *Date: <today>*. 5) Print ONLY the plan to stdout. Do NOT post to GitHub.' --dangerously-skip-permissions --add-dir "$(git rev-parse --show-toplevel)" 2>/dev/null
+```
+
+Capture stdout as Antigravity's plan.
 
 If any agent fails or produces empty output, report the error and ask whether to continue or retry.
 

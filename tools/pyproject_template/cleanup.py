@@ -34,7 +34,7 @@ _script_dir = Path(__file__).parent
 if str(_script_dir) not in sys.path:
     sys.path.insert(0, str(_script_dir))
 
-from utils import Logger  # noqa: E402
+from utils import TEMPLATE_OWNED_TEST_FILES, Logger  # noqa: E402
 
 
 class CleanupMode(Enum):
@@ -54,13 +54,15 @@ class CleanupResult(NamedTuple):
 
 
 # Files to delete when removing setup files only
-# These are only needed for initial project creation
+# These are only needed for initial project creation.
+# TEMPLATE_OWNED_TEST_FILES are included so that SETUP_ONLY sheds tooling
+# tests from downstream projects (they only run in the template's own CI).
 SETUP_FILES = [
     "bootstrap.py",
     "tools/pyproject_template/setup_repo.py",
-    "tools/pyproject_template/migrate_existing_project.py",
     "docs/template/new-project.md",
     "docs/template/migration.md",
+    *TEMPLATE_OWNED_TEST_FILES,
 ]
 
 # Additional files to delete when removing all template files
@@ -239,26 +241,6 @@ _PYPROJECT_TEMPLATE_MYPY_EXCLUDE_ENTRY_RE = re.compile(
     r'"tools/pyproject_template/",\s*',
 )
 
-# README.md block containing both template-only top-level setup sections.
-# Starts at ``## Quick Setup (Automated)`` and runs up to (but not including)
-# the next top-level heading ``## Development Setup``. The non-greedy body
-# match plus explicit terminator keeps the scrubber from devouring unrelated
-# sections if the consumer has reshuffled headings.
-_README_TEMPLATE_SECTIONS_RE = re.compile(
-    r"## Quick Setup \(Automated\)\n.*?(?=## Development Setup\b)",
-    re.DOTALL,
-)
-
-# README.md ``### Migrating an Existing Project`` and ``### Keeping Up to
-# Date`` subsections (under ``## Versioning & Releases``). Both reference
-# template-management scripts that no longer exist in the consumer project
-# (``migrate_existing_project.py`` and ``check_template_updates.py``). The
-# terminator ``### Creating a Release`` is the next subsection that stays.
-_README_TEMPLATE_SUBSECTIONS_RE = re.compile(
-    r"### Migrating an Existing Project\n.*?(?=### Creating a Release\b)",
-    re.DOTALL,
-)
-
 # doit-tasks-reference.md ``### template_clean`` section. Runs from the heading
 # up to (but not including) the next ``### build`` heading. The non-greedy body
 # match guards against consuming adjacent sections.
@@ -338,13 +320,14 @@ def scrub_template_references(root: Path | None = None, dry_run: bool = False) -
       entry (and its explanatory comment), and the mypy override (in both
       stanza and inline-array form, because ``doit fmt_pyproject`` rewrites
       the file before cleanup runs in the wizard).
-    * ``README.md`` — removes the ``## Quick Setup (Automated)`` and
-      ``## Using This Template (Manual)`` top-level sections plus the
-      ``### Migrating an Existing Project`` and ``### Keeping Up to Date``
-      subsections of ``## Versioning & Releases``.
     * ``docs/development/doit-tasks-reference.md`` — removes the
       ``### template_clean`` section and rewrites the TOC table row so the
       remaining ``cleanup`` entry is listed alone.
+
+    ``README.md`` is deliberately absent from this list. It used to be scrubbed
+    of template-only sections here; since #697 the consumer README ships
+    separately as ``README.template.md``, which ``configure`` moves into place
+    and which never contained those sections.
     * ``docs/development/github-repository-settings.md`` — strips the
       broken-link sentence in the intro paragraph that points at
       ``tools/pyproject_template/repo_settings.py``, and removes the
@@ -399,23 +382,7 @@ def scrub_template_references(root: Path | None = None, dry_run: bool = False) -
                 Logger.success("Removed template-only references from pyproject.toml")
             changed.append(pyproject)
 
-    # 2. README.md — scrub both top-level template sections and the two
-    #    template-management subsections under "Versioning & Releases".
-    readme = root / "README.md"
-    if readme.is_file():
-        original = readme.read_text(encoding="utf-8")
-        new_content = original
-        new_content = _README_TEMPLATE_SECTIONS_RE.sub("", new_content)
-        new_content = _README_TEMPLATE_SUBSECTIONS_RE.sub("", new_content)
-        if new_content != original:
-            if dry_run:
-                Logger.info("Would scrub template-only sections in README.md")
-            else:
-                readme.write_text(new_content, encoding="utf-8")
-                Logger.success("Removed template-only sections from README.md")
-            changed.append(readme)
-
-    # 3. docs/development/doit-tasks-reference.md — remove the template_clean
+    # 2. docs/development/doit-tasks-reference.md — remove the template_clean
     #    section and rewrite the TOC row.
     doit_ref = root / "docs" / "development" / "doit-tasks-reference.md"
     if doit_ref.is_file():
@@ -437,7 +404,7 @@ def scrub_template_references(root: Path | None = None, dry_run: bool = False) -
                 )
             changed.append(doit_ref)
 
-    # 4. docs/development/github-repository-settings.md — strip the broken
+    # 3. docs/development/github-repository-settings.md — strip the broken
     #    intro-link sentence and the Security Settings introductory paragraph.
     github_settings = root / "docs" / "development" / "github-repository-settings.md"
     if github_settings.is_file():
@@ -459,7 +426,7 @@ def scrub_template_references(root: Path | None = None, dry_run: bool = False) -
                 )
             changed.append(github_settings)
 
-    # 5. docs/development/release-and-automation.md — rewrite the "New
+    # 4. docs/development/release-and-automation.md — rewrite the "New
     #    projects (bootstrap flow)" paragraph so the broken configure.py link
     #    is gone but the surrounding instruction and code block survive.
     release_auto = root / "docs" / "development" / "release-and-automation.md"
@@ -720,7 +687,7 @@ def prompt_cleanup(root: Path | None = None) -> CleanupMode | None:
     print("Would you like to remove template-specific files?")
     print()
     print("  [1] Remove setup files only (keep update checking)")
-    print("      Removes: bootstrap.py, setup_repo.py, migrate_existing_project.py")
+    print("      Removes: bootstrap.py, setup_repo.py")
     print("      Keeps: manage.py, check_template_updates.py (for future updates)")
     print()
     print("  [2] Remove all template files (no future update checking)")
@@ -770,7 +737,11 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    # Determine mode
+    # Determine mode. Annotated up front because ``prompt_cleanup()`` in the
+    # else-branch returns ``CleanupMode | None``; without this, mypy infers
+    # ``CleanupMode`` from the first branch and then reports the ``is None``
+    # guard below as unreachable.
+    mode: CleanupMode | None
     if args.setup and args.all:
         Logger.error("Cannot specify both --setup and --all")
         return 1

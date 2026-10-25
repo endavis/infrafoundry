@@ -1,15 +1,15 @@
 ---
 name: delegate-copilot-adversarial-review
-description: Delegate a steerable adversarial review of current changes from a Codex session to GitHub Copilot CLI. Hands the challenge to Copilot via `copilot --allow-all -p` and returns it to Codex.
+description: Delegate a steerable adversarial review of current changes to GitHub Copilot CLI. Hands the challenge to Copilot via `copilot --allow-all -p` and returns it to the calling agent.
 ---
 
 # Delegate Adversarial Review to Copilot
 
-Hand off a steerable adversarial review to GitHub Copilot CLI from a Codex session — pressure-tests design choices, assumptions, and alternative approaches.
+Hand off a steerable adversarial review to GitHub Copilot CLI — pressure-tests design choices, assumptions, and alternative approaches.
 
 ## When to use
 
-Use this skill when the user explicitly wants an adversarial / challenge review done by Copilot (not Codex itself).
+Use this skill when the user explicitly wants an adversarial / challenge review done by Copilot (not the host agent itself).
 
 Expected prompt shape:
 

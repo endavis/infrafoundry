@@ -59,6 +59,7 @@ from utils import (  # noqa: E402
     get_git_config,
     prompt,
     prompt_confirm,
+    remove_template_owned_tests,
     update_file,
     update_test_files,
 )
@@ -355,6 +356,19 @@ class RepositorySetup:
                 "A short description of your package": self.config["description"],
                 "Your Name": self.config["author_name"],
                 "your.email@example.com": self.config["author_email"],
+                # Security-report address in .github/SECURITY.md. Absent from
+                # this map until #787, so every spawned project shipped a
+                # policy telling reporters to email security@example.com --
+                # a real-looking address nobody owns. The file was already in
+                # FILES_TO_UPDATE; only the mapping was missing.
+                #
+                # This is the author's address, unlike configure.py's, and for
+                # the same reason: `setup_repo` creates a brand-new project,
+                # where the person who wrote it is the person who answers for
+                # it. configure.py runs against projects that may have been
+                # adopted, so it reads [project].maintainers first.
+                "security@example.com": self.config["author_email"],
+                "[INSERT CONTACT EMAIL]": self.config["author_email"],
             }
 
             # Update main configuration files (using shared constant from utils.py)
@@ -374,11 +388,12 @@ class RepositorySetup:
             if tests_dir.exists():
                 update_test_files(tests_dir, self.config["package_name"])
 
-            # Remove template-only tests (they're only for the template itself)
-            template_tests_dir = Path("tests/template")
-            if template_tests_dir.exists():
-                shutil.rmtree(template_tests_dir)
-                Logger.info("Removed template-only tests (tests/template/)")
+            # Shed template-only tests. Shares one implementation with
+            # configure.py so the two wizard paths cannot disagree about what
+            # "template-owned" means; see remove_template_owned_tests (#731).
+            shed = remove_template_owned_tests(Path.cwd())
+            if shed:
+                Logger.info(f"Removed {len(shed)} template-only test files")
 
             # Update source files
             src_dir = Path("src")
@@ -649,8 +664,8 @@ Auto-removed by setup_repo.py to keep the consumer project free of
 template-only tooling:
 
 - tools/pyproject_template/ (manage.py, setup_repo.py, configure.py,
-  cleanup.py, check_template_updates.py, migrate_existing_project.py,
-  settings.py, repo_settings.py, utils.py, __init__.py)
+  cleanup.py, check_template_updates.py, settings.py, repo_settings.py,
+  utils.py, __init__.py)
 - docs/template/
 - bootstrap.py
 - Template nav section in mkdocs.yml

@@ -164,24 +164,24 @@ reason = "BLOCKED: Use 'doit pr' instead of 'gh pr create'. See AGENTS.md."
 
 > **Note**: GitHub settings require repository admin access to configure. See Settings → Rules → Rulesets.
 
-### By AI Agent Enforcement (Claude, Gemini, Copilot, Codex)
+### By AI Agent Enforcement (Claude, Gemini, Copilot, Codex, Antigravity)
 
-These patterns are blocked across all AI agents. Claude, Gemini, and Copilot all use the shared hook at `tools/hooks/ai/block-dangerous-commands.py` (wired via `.claude/settings.json`, `.gemini/settings.json`, and `.github/hooks/copilot-hooks.json` respectively). Codex uses the shared hook through `.codex/config.toml`, and the approval policies in that same file remain a secondary defense layer.
+These patterns are blocked across all AI agents. Claude, Gemini, and Copilot all use the shared hook at `tools/hooks/ai/block-dangerous-commands.py` (wired via `.claude/settings.json`, `.gemini/settings.json`, and `.github/hooks/copilot-hooks.json` respectively). Codex uses the shared hook through `.codex/config.toml`, and the approval policies in that same file remain a secondary defense layer. Antigravity uses the shared hook through `.agents/hooks.json`, blocking via a stdout `{"decision":"deny"}` contract that holds even under `--dangerously-skip-permissions`.
 
-| Pattern | Command | Claude | Gemini | Copilot | Codex |
-|---------|---------|--------|--------|---------|-------|
-| `--admin` flag | `gh pr merge --admin` | Hook | Hook | Hook | Hook + Config |
-| `--no-verify` flag | `git commit --no-verify`, `git push --no-verify` | Hook | Hook | Hook | Hook + Config |
-| `--hard` flag | `git reset --hard` | Hook | Hook | Hook | Hook + Config |
-| `rm -rf /` or `rm -rf ~` | Any shell | Hook | Hook | Hook | Hook + Config |
-| `sudo rm` | Any shell | Hook | Hook | Hook | Hook + Config |
-| Force push to protected branch | `git push --force origin main` | Hook | Hook | Hook | Hook + Config |
-| Delete protected branch | `git push origin --delete main`, `git branch -D main` | Hook | Hook | Hook | Hook |
-| Merge commit on protected branch | `git merge` (without `--ff-only`) on `main` | Hook | Hook | Hook | Hook |
-| `gh pr create` | Use `doit pr` instead | Hook | Hook | Hook | Hook + Config |
-| `gh issue create` | Use `doit issue` instead | Hook | Hook | Hook | Hook + Config |
-| `uv add` | User runs manually | Hook | Hook | Hook | Hook + Config |
-| `doit release*` | User runs manually | Hook | Hook | Hook | Hook + Config |
+| Pattern | Command | Claude | Gemini | Copilot | Codex | Antigravity |
+|---------|---------|--------|--------|---------|-------|-------------|
+| `--admin` flag | `gh pr merge --admin` | Hook | Hook | Hook | Hook + Config | Hook |
+| `--no-verify` flag | `git commit --no-verify`, `git push --no-verify` | Hook | Hook | Hook | Hook + Config | Hook |
+| `--hard` flag | `git reset --hard` | Hook | Hook | Hook | Hook + Config | Hook |
+| `rm -rf /` or `rm -rf ~` | Any shell | Hook | Hook | Hook | Hook + Config | Hook |
+| `sudo rm` | Any shell | Hook | Hook | Hook | Hook + Config | Hook |
+| Force push to protected branch | `git push --force origin main` | Hook | Hook | Hook | Hook + Config | Hook |
+| Delete protected branch | `git push origin --delete main`, `git branch -D main` | Hook | Hook | Hook | Hook | Hook |
+| Merge commit on protected branch | `git merge` (without `--ff-only`) on `main` | Hook | Hook | Hook | Hook | Hook |
+| `gh pr create` | Use `doit pr` instead | Hook | Hook | Hook | Hook + Config | Hook |
+| `gh issue create` | Use `doit issue` instead | Hook | Hook | Hook | Hook + Config | Hook |
+| `uv add` | User runs manually | Hook | Hook | Hook | Hook + Config | Hook |
+| `doit release*` | User runs manually | Hook | Hook | Hook | Hook + Config | Hook |
 
 > **Note**: "Hook" = `block-dangerous-commands.py` through each agent's hook wiring. For Codex, "Config" refers to the additional approval-policy rules in `.codex/config.toml`.
 

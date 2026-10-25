@@ -1,15 +1,15 @@
 ---
 name: delegate-claude-adversarial-review
-description: Delegate a steerable adversarial review of current changes from a Codex session to Claude Code. Hands an adversarial-review to Claude via `claude -p` and returns the challenge to Codex.
+description: Delegate a steerable adversarial review of current changes to Claude Code. Hands an adversarial-review to Claude via `claude -p` and returns the challenge to the calling agent.
 ---
 
 # Delegate Adversarial Review to Claude
 
-Hand off a steerable adversarial review to Claude Code from a Codex session — pressure-tests design choices, assumptions, and alternative approaches.
+Hand off a steerable adversarial review to Claude Code — pressure-tests design choices, assumptions, and alternative approaches.
 
 ## When to use
 
-Use this skill when the user explicitly wants an adversarial / challenge review done by Claude (not Codex itself).
+Use this skill when the user explicitly wants an adversarial / challenge review done by Claude (not the host agent itself).
 
 Expected prompt shape:
 
