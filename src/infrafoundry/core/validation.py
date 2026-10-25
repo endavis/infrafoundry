@@ -7,8 +7,8 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from infrafoundry.core.config.models import EnvironmentConfig
     from infrafoundry.core.provider import ResourceConfig
-    from infrafoundry.core.types import EnvironmentData
 
 
 class ValidationLevel(Enum):
@@ -138,7 +138,7 @@ class ProviderValidator(Protocol):
         class MyProviderValidator:
             def __init__(
                 self,
-                env_config: EnvironmentData,
+                env_config: EnvironmentConfig,
                 report: ValidationReport,
             ) -> None:
                 self.env_config = env_config
@@ -153,7 +153,7 @@ class ProviderValidator(Protocol):
                 ...
     """
 
-    env_config: EnvironmentData
+    env_config: EnvironmentConfig
     report: ValidationReport
 
     def validate_connectivity(self) -> None:

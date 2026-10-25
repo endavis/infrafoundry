@@ -469,6 +469,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_provider_registry_service.py",
     "tests/unit/test_provider_templates.py",
     "tests/unit/test_provider_validation.py",
+    "tests/unit/test_provider_validator_protocol.py",
     "tests/unit/test_proxmox_k3s_cluster_blueprint.py",
     "tests/unit/test_pyinfra_runner.py",
     "tests/unit/test_resource_lifecycle_events.py",
