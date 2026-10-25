@@ -1,3 +1,12 @@
+---
+title: "Visualizing Infrastructure Topology"
+description: "Render the resource dependency graph as Mermaid or DOT with foundry infra analyze graph"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # Visualizing Infrastructure Topology
 
 ## Overview

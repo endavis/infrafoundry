@@ -1,3 +1,12 @@
+---
+title: "Orchestration Refactoring Plan"
+description: "A plan to fix operation ordering in hooks and events, written against the pre-refactor layout"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # InfraFoundry Orchestration Refactoring Plan
 
 ## Summary

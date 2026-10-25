@@ -1,3 +1,12 @@
+---
+title: "Example: .env"
+description: "A legacy .env file defining config paths and credentials for CI or local use"
+audience:
+  - users
+tags:
+  - examples
+---
+
 # Example: .env
 
 ## Overview

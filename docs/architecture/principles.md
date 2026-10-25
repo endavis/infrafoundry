@@ -1,3 +1,12 @@
+---
+title: "Design Principles"
+description: "The SOLID and general design principles the codebase follows"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 High-level and design principles
 SOLID principles: A set of five principles for object-oriented programming that leads to more flexible, understandable, and maintainable code.
 Single Responsibility Principle (SRP): A module should have only one reason to change.

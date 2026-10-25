@@ -1,3 +1,12 @@
+---
+title: "CI/CD Testing Guide"
+description: "What CI runs to guard against regressions, and how to run it locally"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # CI/CD Testing Guide
 
 ## Overview

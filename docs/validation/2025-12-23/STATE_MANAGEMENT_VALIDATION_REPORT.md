@@ -1,3 +1,12 @@
+---
+title: "State Management Validation Report (2025-12-23)"
+description: "A dated check of the state management docs against the code"
+audience:
+  - contributors
+tags:
+  - validation
+---
+
 # State Management Documentation Validation Report
 
 **Date:** 2025-12-23

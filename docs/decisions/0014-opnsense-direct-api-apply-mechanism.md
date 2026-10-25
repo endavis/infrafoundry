@@ -1,3 +1,12 @@
+---
+title: "ADR-0014: OPNsense Direct-API Apply Mechanism"
+description: "Manage OPNsense resources through a direct-API mechanism instead of Terraform and Ansible"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-0014: OPNsense Direct-API Apply Mechanism
 
 **Date:** 2026-04-30

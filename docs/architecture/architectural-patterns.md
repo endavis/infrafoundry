@@ -1,3 +1,12 @@
+---
+title: "Architectural Patterns"
+description: "How managers, providers and runners share logging, error handling, templating and path handling"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # Architectural Patterns
 
 ## Overview

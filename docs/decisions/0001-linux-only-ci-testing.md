@@ -1,3 +1,12 @@
+---
+title: "ADR-0001: Linux-only CI testing"
+description: "Run CI tests on Ubuntu only, without Windows or macOS in the matrix"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-0001: Linux-only CI testing
 
 ## Status

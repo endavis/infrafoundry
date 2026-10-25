@@ -1,3 +1,12 @@
+---
+title: "Configuration Blueprints Guide"
+description: "Use blueprints to scaffold configuration repositories and services"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Configuration Blueprints Guide
 
 ## Overview

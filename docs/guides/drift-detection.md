@@ -1,3 +1,12 @@
+---
+title: "Drift Detection Guide"
+description: "Find where deployed infrastructure differs from the declared configuration"
+audience:
+  - users
+tags:
+  - guides
+---
+
 # Drift Detection Guide
 
 ## Overview

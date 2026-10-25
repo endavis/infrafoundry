@@ -1,3 +1,12 @@
+---
+title: "Documentation Template"
+description: "The baseline structure for new and refactored docs"
+audience:
+  - contributors
+tags:
+  - meta
+---
+
 # InfraFoundry Documentation Template
 
 Use this template as the baseline for new or refactored docs so content stays consistent across guides. Not every section is mandatory, but keep the order to aid scanability.

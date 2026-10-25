@@ -1,3 +1,12 @@
+---
+title: "Setting Up Your Configuration"
+description: "Set up InfraFoundry with Proxmox and OPNsense, automatically or by hand"
+audience:
+  - users
+tags:
+  - getting-started
+---
+
 # Setting Up Your InfraFoundry Configuration
 
 ## Overview

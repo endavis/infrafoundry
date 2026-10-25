@@ -1,3 +1,12 @@
+---
+title: "Provider Implementation Guide Validation Report (2025-12-23)"
+description: "A dated check of the provider implementation guide against the code"
+audience:
+  - contributors
+tags:
+  - validation
+---
+
 # Provider Implementation Guide Validation Report
 
 **Date:** 2025-12-23

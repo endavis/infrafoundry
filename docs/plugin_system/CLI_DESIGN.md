@@ -1,3 +1,12 @@
+---
+title: "Plugin CLI Design"
+description: "Proposed CLI commands, errors and help for the plugin system"
+audience:
+  - contributors
+tags:
+  - plugins
+---
+
 # CLI Design and User Experience
 
 **Version:** 1.0

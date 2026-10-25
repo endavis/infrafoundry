@@ -1,3 +1,12 @@
+---
+title: "Settings File Structure"
+description: "The fields of each environment's SOPS-encrypted settings.yaml"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Settings File Structure
 
 ## Overview

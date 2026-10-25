@@ -1,3 +1,12 @@
+---
+title: "DHCP Reservations and VM Integration"
+description: "Pair OPNsense Kea DHCP reservations with Proxmox VMs for predictable IPs"
+audience:
+  - users
+tags:
+  - guides
+---
+
 # DHCP Reservations and VM Integration
 
 ## Overview

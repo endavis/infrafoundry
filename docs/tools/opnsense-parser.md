@@ -1,3 +1,12 @@
+---
+title: "OPNsense Configuration Parser"
+description: "Convert OPNsense config.xml backups into organized YAML"
+audience:
+  - users
+tags:
+  - tools
+---
+
 # OPNsense Configuration Parser
 
 ## Overview

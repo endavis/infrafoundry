@@ -1,3 +1,12 @@
+---
+title: "Runner Protocol Proposal (Archive)"
+description: "Archived answers and impact analysis for the protocol-based runner interface design"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # Pure Protocol-Based Approach: Proposed Answers & Impact Analysis
 
 **Date:** 2025-12-04

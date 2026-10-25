@@ -1,3 +1,12 @@
+---
+title: "Pluggable Runner System"
+description: "How runners execute generated configs and how new tools plug in without core changes"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # Pluggable Runner System
 
 ## Overview

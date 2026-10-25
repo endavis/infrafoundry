@@ -1,3 +1,12 @@
+---
+title: "Design Principles Assessment"
+description: "An evaluation of the codebase against SOLID and related design principles"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # Design Principles Assessment
 
 **Assessment Date:** 2025-12-01

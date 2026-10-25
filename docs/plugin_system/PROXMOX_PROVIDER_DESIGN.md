@@ -1,3 +1,12 @@
+---
+title: "Proxmox Provider Plugin Design"
+description: "Proposed design of the Proxmox provider as a separate plugin package"
+audience:
+  - contributors
+tags:
+  - plugins
+---
+
 # Proxmox Provider Plugin Design
 
 **Version:** 1.0

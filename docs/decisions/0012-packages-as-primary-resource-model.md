@@ -1,3 +1,12 @@
+---
+title: "ADR-0012: Packages as Primary Resource Model"
+description: "Make infrastructure packages the primary resource model"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # 6. Packages as Primary Resource Model
 
 **Date:** 2026-03-14

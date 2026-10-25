@@ -1,3 +1,12 @@
+---
+title: "Infrastructure Architecture"
+description: "How providers, code generation, the orchestrator, state and events fit together"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # Infrastructure Architecture
 
 ## Overview

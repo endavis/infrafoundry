@@ -1,3 +1,12 @@
+---
+title: "ADR-0007: Use Repository Pattern for State Management"
+description: "Abstract state database access behind repository classes"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # 1. Use Repository Pattern for State Management
 
 **Date:** 2025-12-01

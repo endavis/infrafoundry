@@ -1,3 +1,12 @@
+---
+title: "Doit Tasks Reference"
+description: "Every doit task in the project and what it does"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Doit Tasks Reference
 
 Complete reference for all available `doit` tasks in InfraFoundry.

@@ -1,3 +1,12 @@
+---
+title: "ADR-0016: Direct-OPNsense Nested YAML Schema Convention"
+description: "Nest the direct-OPNsense YAML schema under an API-aligned opnsense namespace"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-0016: Direct-OPNsense Nested YAML Schema Convention
 
 **Date:** 2026-05-08

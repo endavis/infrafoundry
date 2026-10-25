@@ -1,3 +1,12 @@
+---
+title: "Configuration Guide"
+description: "How environments, settings and resource files are laid out in YAML"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # InfraFoundry Configuration Guide
 
 ## Overview

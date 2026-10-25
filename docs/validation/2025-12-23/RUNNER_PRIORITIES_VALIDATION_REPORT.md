@@ -1,3 +1,12 @@
+---
+title: "Runner Priorities Validation Report (2025-12-23)"
+description: "A dated check of the runner priority docs against the code"
+audience:
+  - contributors
+tags:
+  - validation
+---
+
 # Runner Priorities Documentation Validation Report
 
 **Date:** 2025-12-23

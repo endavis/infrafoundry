@@ -1,3 +1,12 @@
+---
+title: "Implementing Custom Secret Providers"
+description: "Write a SecretProvider for a secret backend other than SOPS/age"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Implementing Custom Secret Providers
 
 ## Overview

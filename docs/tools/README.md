@@ -1,3 +1,12 @@
+---
+title: "InfraFoundry Tools"
+description: "Index of the utility tools included with InfraFoundry"
+audience:
+  - users
+tags:
+  - tools
+---
+
 # InfraFoundry Tools
 
 This directory contains documentation for the various utility tools included in InfraFoundry.

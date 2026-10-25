@@ -1,3 +1,12 @@
+---
+title: "Validation and Pre-Flight Checks"
+description: "The three tiers of validation that run before plan and apply"
+audience:
+  - users
+tags:
+  - usage
+---
+
 # Validation and Pre-Flight Checks
 
 ## Overview

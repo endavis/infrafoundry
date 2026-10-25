@@ -1,3 +1,12 @@
+---
+title: "Vaultwarden / Bitwarden Secret Provider"
+description: "Manage secrets in Vaultwarden or Bitwarden instead of SOPS files"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Vaultwarden / Bitwarden Secret Provider
 
 InfraFoundry can integrate with Vaultwarden (or official Bitwarden) to manage secrets, offering an alternative to the file-based SOPS backend.

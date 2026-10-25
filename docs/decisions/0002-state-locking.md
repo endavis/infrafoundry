@@ -1,3 +1,12 @@
+---
+title: "ADR-0002: State locking via deployment_locks table"
+description: "Serialize apply and destroy per environment with a uniquely indexed deployment_locks table"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-0002: State locking via deployment_locks table
 
 ## Status

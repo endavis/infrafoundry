@@ -1,3 +1,12 @@
+---
+title: "CI/CD Infrastructure Deployment Guide"
+description: "Set up pipelines that deploy infrastructure with InfraFoundry"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # CI/CD Infrastructure Deployment Guide
 
 ## Overview

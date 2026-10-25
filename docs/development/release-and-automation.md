@@ -1,3 +1,12 @@
+---
+title: "Release Automation & Security"
+description: "Versioning, releases, governance validation and security tooling"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Release Automation & Security
 
 This guide covers the automated versioning, release management, governance validation, and security tooling available in InfraFoundry.

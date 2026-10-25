@@ -1,3 +1,12 @@
+---
+title: "Examples"
+description: "Index of the practical examples and reference configurations"
+audience:
+  - users
+tags:
+  - examples
+---
+
 # Examples
 
 Practical examples and reference configurations for InfraFoundry.

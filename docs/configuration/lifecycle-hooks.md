@@ -1,3 +1,12 @@
+---
+title: "Lifecycle Hooks"
+description: "Run custom scripts before and after plan, apply and destroy"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Lifecycle Hooks
 
 ## Overview

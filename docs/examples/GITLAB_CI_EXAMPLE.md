@@ -1,3 +1,12 @@
+---
+title: "Example: GitLab CI"
+description: "A GitLab CI pipeline that runs InfraFoundry checks and deployments"
+audience:
+  - users
+tags:
+  - examples
+---
+
 # Example: GitLab CI
 
 ## Overview

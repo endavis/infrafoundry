@@ -1,3 +1,12 @@
+---
+title: "Kubernetes Provider"
+description: "Manage Kubernetes deployments, services, secrets, RBAC, Helm releases and manifests"
+audience:
+  - users
+tags:
+  - providers
+---
+
 # Kubernetes Provider
 
 The Kubernetes provider manages Kubernetes resources including deployments, services, secrets, RBAC, Helm releases, and custom manifests (CRDs).

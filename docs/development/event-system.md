@@ -1,3 +1,12 @@
+---
+title: "Event System Guide"
+description: "Use the event system for notifications, auditing and lifecycle hooks"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Event System Guide
 
 ## Overview

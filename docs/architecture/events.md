@@ -1,3 +1,12 @@
+---
+title: "Event System Architecture"
+description: "The synchronous publish-subscribe event system and the payloads its lifecycle events carry"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # Event System Architecture
 
 ## Overview

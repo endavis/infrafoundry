@@ -1,3 +1,12 @@
+---
+title: "Documentation Validation Checklist (2025-12-23)"
+description: "A dated checklist of documentation validated against the implementation"
+audience:
+  - contributors
+tags:
+  - validation
+---
+
 # Documentation Validation Checklist
 
 This checklist tracks validation of documentation against actual implementation.

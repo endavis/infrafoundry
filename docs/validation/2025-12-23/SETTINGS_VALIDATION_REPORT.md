@@ -1,3 +1,12 @@
+---
+title: "Settings File Structure Validation Report (2025-12-23)"
+description: "A dated check of the settings file docs against the code"
+audience:
+  - contributors
+tags:
+  - validation
+---
+
 # Settings File Structure Validation Report
 
 **Date:** 2025-12-23

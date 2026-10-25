@@ -1,3 +1,12 @@
+---
+title: "ADR-0004: Use inputs as the single blueprint variable section"
+description: "inputs replaces defaults as the one variable-declaration section in blueprint manifests"
+audience:
+  - contributors
+tags:
+  - adr
+---
+
 # ADR-0004: Use `inputs:` as the single blueprint variable declaration section
 
 ## Status

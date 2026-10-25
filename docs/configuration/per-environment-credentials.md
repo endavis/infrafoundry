@@ -1,3 +1,12 @@
+---
+title: "Per-Environment Credentials"
+description: "How credentials for the targeted environment are decrypted and exported automatically"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # Per-Environment Credentials
 
 ## Overview

@@ -1,3 +1,12 @@
+---
+title: "OCI K3s Cluster with Tailscale"
+description: "Deploy a K3s cluster on OCI Always Free ARM instances, managed over Tailscale"
+audience:
+  - users
+tags:
+  - examples
+---
+
 # OCI K3s Cluster with Tailscale
 
 A complete example of deploying a K3s Kubernetes cluster on Oracle Cloud Infrastructure (OCI) using Always Free Tier ARM instances with Tailscale for secure management access.

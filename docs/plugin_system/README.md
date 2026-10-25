@@ -1,3 +1,12 @@
+---
+title: "Plugin System Documentation"
+description: "Index of the plugin system design documents"
+audience:
+  - contributors
+tags:
+  - plugins
+---
+
 # InfraFoundry Plugin System Documentation
 
 This directory contains comprehensive design documentation for InfraFoundry's plugin system.

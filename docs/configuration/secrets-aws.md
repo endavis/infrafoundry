@@ -1,3 +1,12 @@
+---
+title: "AWS Secrets Manager Provider"
+description: "Read and store secrets in AWS Secrets Manager"
+audience:
+  - users
+tags:
+  - configuration
+---
+
 # AWS Secrets Manager Provider
 
 InfraFoundry can integrate with AWS Secrets Manager to retrieve and store secrets.

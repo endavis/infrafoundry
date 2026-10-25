@@ -1,3 +1,12 @@
+---
+title: "Secrets Handling Security"
+description: "The controls applied to plaintext secrets delivered to Terraform and Ansible"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Secrets Handling Security
 
 ## Overview

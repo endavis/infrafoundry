@@ -1,3 +1,12 @@
+---
+title: "Comprehensive Architectural Review"
+description: "An architectural review and refactor plan, written against the pre-refactor layout"
+audience:
+  - contributors
+tags:
+  - architecture
+---
+
 # InfraFoundry Comprehensive Architectural Review
 
 ## Executive Summary

@@ -1,3 +1,12 @@
+---
+title: "CLI Reference Validation Report (2025-12-23)"
+description: "A dated check of the CLI reference against the implementation"
+audience:
+  - contributors
+tags:
+  - validation
+---
+
 # CLI Reference Validation Report
 
 **Date:** 2025-12-23

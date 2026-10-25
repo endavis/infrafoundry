@@ -1,3 +1,12 @@
+---
+title: "Credential Loader System"
+description: "How provider credentials are decrypted and exported as environment variables"
+audience:
+  - contributors
+tags:
+  - development
+---
+
 # Credential Loader System
 
 ## Overview
