@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792968550260,
+  "lastUpdate": 1792969949982,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10106,6 +10106,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022720347938979084",
             "extra": "mean: 68.87447633367881 usec\nrounds: 16627"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "70bb161e9062caf611e31c58040fcd4312257909",
+          "message": "chore: fix doc links and paths and adopt the deferred template doc tests (merges PR #1079, addresses #1057)\n\nAdopt test_markdown_links, test_documented_paths, test_workflow_action_pinning,\ntest_hermetic_suite and test_instruction_pointers from pyproject-template, plus\ntests/template/test_utils_properties.py, and fix what they found.\n\n- links and documented paths: skip targets that sync-exclude.toml keeps out\n  (new tests/sync_excluded.py), scan committed files only, exempt dated\n  records and design proposals, accept package, provider and example-config\n  relative shorthand, and fix the stale paths in current docs\n- action pinning: doc samples use the same SHA pins as the workflows\n- hermetic suite: the python3-absent wrapper test points PATH at an empty\n  directory instead of hardcoding an empty PATH\n- instruction pointers: AGENTS.md's Breaking Changes Policy is a level-2\n  heading as the deprecate-api skill expects; CONTRIBUTING drops a pointer\n  to a release-doc section this repository does not have yet\n- sync-exclude: the skeleton package's tests/template/test_properties.py\n- divergences doc records the local test changes and the deferrals\n\nPart 1 of 3 for #1057.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T23:11:33Z",
+          "tree_id": "97e20051a45085b2268ad8c563825668db82b8a3",
+          "url": "https://github.com/endavis/infrafoundry/commit/70bb161e9062caf611e31c58040fcd4312257909"
+        },
+        "date": 1792969949099,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7974.687624442654,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011834552007520867",
+            "extra": "mean: 125.3967612392704 usec\nrounds: 8586"
           }
         ]
       }
