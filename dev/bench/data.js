@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792945400652,
+  "lastUpdate": 1792954447269,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9858,6 +9858,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006524149858020156",
             "extra": "mean: 70.4491948577692 usec\nrounds: 4706"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9fd96eae5059fde06ba7505ac84974f25dd62e3d",
+          "message": "chore: synchronize with pyproject-template through 8bea42d (merges PR #1055, addresses #1054)\n\nStep 1 of 4 of the template sync (ba12770..8bea42d, through 2026-07-27).\n\nSyncs the following template improvements:\n- endavis/pyproject-template#583, #584 (Copilot reads skills/, not\n  commands/: .github/skills/ review skills, routing in delegate/multi skills)\n- endavis/pyproject-template#585, #586 (bash-ban-raw-tools unlock file\n  scoped to the project directory)\n- endavis/pyproject-template#625-#628 (CodeQL workflow tests resilient to\n  dependabot bumps)\n- endavis/pyproject-template#640-#643 (Antigravity CLI: review skills,\n  cross-agent bridges, .agents/hooks.json safety hook, multi-* support)\n- ADR-9017 (template tooling and its tests are template-owned)\n- daily-check.yml (scheduled doit check on main, opens issue on failure)\n\nAlso:\n- refresh tools/pyproject_template/ via bootstrap --sync; record sync\n  point 8bea42d in settings.toml\n- remove the 7 template-owned tests under tests/template/ (ADR-9017)\n- adapt the test_bash_ban_raw_tools isolation fixture (#905) to the\n  project-scoped unlock file\n\nDeferred to later steps: plan/implement matrix (replaced by\nimplement-issue), Gemini removal, roster-aware tests, action SHA pinning,\ndev-dependency adoption.\n\nAddresses #1054\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T18:53:40Z",
+          "tree_id": "eff2cff0d4285d00c66e4f8da5b787ed3583b946",
+          "url": "https://github.com/endavis/infrafoundry/commit/9fd96eae5059fde06ba7505ac84974f25dd62e3d"
+        },
+        "date": 1792954446090,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9904.08901553939,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011938047909398594",
+            "extra": "mean: 100.9683978436596 usec\nrounds: 3710"
           }
         ]
       }
