@@ -84,9 +84,10 @@ include them in actionable drift.
 - `docs/development/extensions.md`,
   `docs/development/install-tools-framework.md`,
   `docs/development/tooling-roles.md`,
-  `docs/development/github-repository-settings.md`,
-  `docs/development/dependabot-automerge.md` — skeleton/meta docs about the
+  `docs/development/github-repository-settings.md` — skeleton/meta docs about the
   template's own tooling choices.
+  (`docs/development/dependabot-automerge.md` was excluded here until #1054: upstream
+  moved the Dependabot rebase procedure out of `AGENTS.md` into it, so it is now adopted.)
 - `docs/TABLE_OF_CONTENTS.md` — skeleton table of contents. Superseded by the
   mkdocs-generated nav.
 

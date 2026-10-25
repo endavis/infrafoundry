@@ -25,33 +25,36 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "codespell>=2.4.3",
-    "commitizen>=4.17.0",
+    "commitizen>=4.18.0",
     "coverage-badge>=1.1.0",
-    "hypothesis>=6.165.2",
+    "doit>=0.36.0",
+    "hypothesis>=6.165.10",
     "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=1.0.6",
     "mutmut>=3.7.0",
-    "mypy>=2.3.0",
-    "pre-commit>=4.6.1",
-    "pyproject-fmt>=2.27.0",
+    "mypy>=2.3.1",
+    "pre-commit>=4.6.2",
+    "pymdown-extensions>=11.0.1",
+    "pyproject-fmt>=2.28.0",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
-    "pytest-benchmark>=4.0",
-    "pytest-cov>=4.0.0",
+    "pytest-benchmark>=5.3.0",
+    "pytest-cov>=5.0",
     "pytest-xdist>=3.5",
+    "pyyaml>=6.0",
     "radon>=6.0",
-    "ruff>=0.16.2",
-    "types-PyYAML>=6.0.0",
+    "ruff>=0.16.4",
     "types-boto3>=1.43.67",
+    "types-PyYAML>=6.0.12.20260815",
     "types-requests>=2.33.0.20260712",
-    "vulture>=2.0",
+    "vulture>=2.11",
 ]
 security = [
+    "bandit>=1.7",
+    "cyclonedx-bom>=7.3.1",
     "pip>=26.2.1",
     "pip-audit>=2.10.1",
-    "bandit>=1.7",
     "pip-licenses>=4.0",
-    "cyclonedx-bom>=7.3.1",
 ]
 # Optional SOCKS proxy support for the OPNsense provider's `proxy` setting
 # (httpx requires the `socksio` package to handle `socks5://` proxy URLs).
@@ -76,7 +79,7 @@ env_secrets = "infrafoundry.secrets.backends.env_secrets:register"
 file = "infrafoundry.secrets.backends.file:register"
 
 [build-system]
-requires = ["hatchling>=1.31.0", "hatch-vcs>=0.5.0"]
+requires = ["hatchling>=1.32.0", "hatch-vcs>=0.5.0"]
 build-backend = "hatchling.build"
 
 [tool.uv]
@@ -175,7 +178,7 @@ no_implicit_optional = true
 strict_equality = true
 warn_redundant_casts = true
 warn_unreachable = true
-exclude = ["tools/pyproject_template/", ".claude/", ".gemini/", ".codex/"]
+exclude = ["tools/pyproject_template/", ".claude/", ".codex/"]
 
 [[tool.mypy.overrides]]
 module = "doit.*"
@@ -192,6 +195,9 @@ minversion = "8.0"
 cache_dir = "tmp/.pytest_cache"
 addopts = "-v --tb=short --strict-config --strict-markers --benchmark-disable"
 testpaths = ["tests"]
+# tests/ is a package here (tests/__init__.py), so pytest does not put it on
+# sys.path by itself; shared helpers like tests/agent_roster.py need it.
+pythonpath = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -237,7 +243,6 @@ exclude_dirs = [
     ".ruff_cache",
     "site",
     ".claude",
-    ".gemini",
     ".codex",
     ".devcontainer",
     ".vscode",
@@ -255,8 +260,12 @@ ignore-words-list = "applyable"
 [tool.coverage.run]
 branch = true
 data_file = "tmp/.coverage"
-source = ["src/infrafoundry"]
+# `tools/` is the code that runs releases, creates PRs and blocks dangerous
+# commands, so it is gated alongside the package (pyproject-template #709).
+source = ["infrafoundry", "tools"]
 omit = [
+    # The template's own management suite; its tests are template-owned (ADR-9017).
+    "tools/pyproject_template/*",
     "*/tests/*",
     "*/__pycache__/*",
     "*/site-packages/*",
@@ -332,6 +341,9 @@ exclude = [
     "**/site",        # mkdocs build output
     "**/.git",
 ]
+# tests/ is not a package, so pytest puts it on sys.path; mirror that here so
+# shared test helpers (tests/agent_roster.py) resolve for the LSP too.
+extraPaths = ["tests"]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"

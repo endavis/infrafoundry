@@ -31,8 +31,11 @@ input=$(cat)
 model=$(echo "$input" | jq -r '.model.display_name // .model.id // "?"')
 cwd=$(echo "$input" | jq -r '.cwd // empty')
 dir=$(basename "$cwd" 2>/dev/null || echo "?")
-gh_user=$(gh api user --jq ".login" 2>/dev/null || echo "")
-python_version=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:3])))" || echo "")
+# `gh api` writes the HTTP error body to stdout on failure (only the summary
+# line goes to stderr), so clear the capture on non-zero exit — `|| echo ""`
+# would append to the error body instead of replacing it.
+gh_user=$(gh api user --jq ".login" 2>/dev/null) || gh_user=""
+python_version=$(python -c "import sys; print('.'.join(map(str, sys.version_info[:3])))" 2>/dev/null || echo "")
 
 # Extract Python .venv
 venv_name=""

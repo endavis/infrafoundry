@@ -2,7 +2,7 @@
   "env": {
     "ENABLE_PROMPT_CACHING_1H": "1",
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-4-6"
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-5"
   },
   "statusLine": {
     "type": "command",

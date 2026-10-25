@@ -414,11 +414,17 @@ doit publish_setup
 
 ### `pre_commit_install`
 
-Install pre-commit hooks (including post-merge and post-checkout).
+Install every hook type declared by `default_install_hook_types` in `.pre-commit-config.yaml`:
+`pre-commit`, `commit-msg`, `post-merge` and `post-checkout`.
 
 ```bash
 doit pre_commit_install
 ```
+
+**Why `commit-msg` matters:** it carries conventional-commit validation and the check that a
+commit's issue reference matches its branch. A clone that installed hooks *before* that type was
+declared does not have it, and neither check runs — silently, because a hook that was never
+installed cannot fail. Run this task again to pick it up, then confirm with `ls .git/hooks/`.
 
 ### `completions`
 

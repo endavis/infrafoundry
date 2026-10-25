@@ -4,6 +4,8 @@ Run a steerable adversarial review using Claude — pressure-tests design choice
 
 ## Instructions
 
+**Read-only.** Review and report — do not edit files, commit, or push. Findings go to the user and the PR; any fix is a separate change the user asks for.
+
 This command runs in the main conversation context. Claude performs the adversarial review directly — no external CLI invocation needed.
 
 ### Step 1: Gather review context

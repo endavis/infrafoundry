@@ -6,12 +6,17 @@
 # script to change blocked patterns instead of adding obsolete approval-policy
 # rule tables here.
 
-# Prompt before running untrusted commands.
-approval_policy = "untrusted"
+# Let the model decide when to ask for approval. Codex removed the "untrusted"
+# value; as of codex-cli 0.128.0 the supported values are "on-request" and
+# "never", and an unsupported value is a *fatal* config error -- Codex refuses
+# to start at all, taking the hook with it (#681).
+approval_policy = "on-request"
 
 [features]
 # Enable lifecycle hook support for the shared dangerous-command policy.
-codex_hooks = true
+# `codex_hooks` was the old name and is deprecated; Codex warns on it today
+# and a removed flag would silently disable the hook (#681).
+hooks = true
 
 # =============================================================================
 # PRE-TOOL-USE HOOK — Primary defense
@@ -30,11 +35,12 @@ statusMessage = "Checking Bash command"
 # =============================================================================
 # FILE-EDIT HOOK — Blocks env-var persistence attempts
 # =============================================================================
-# Fires before Edit, Write, and MultiEdit to prevent AI from persisting
-# governance bypass env vars to shell or project config files.
-# See: docs/development/ai/command-blocking.md
+# Codex's file-edit tool is `apply_patch`, not Claude's Edit/Write/MultiEdit
+# triple -- verified by probe, see docs/development/ai/command-blocking.md.
+# Its payload is command-shaped, so the hook checks it both as a command and as
+# a set of file edits.
 [[hooks.PreToolUse]]
-matcher = "^(Edit|Write|MultiEdit)$"
+matcher = "^apply_patch$"
 
 [[hooks.PreToolUse.hooks]]
 type = "command"

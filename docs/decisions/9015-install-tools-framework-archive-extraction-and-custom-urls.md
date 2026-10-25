@@ -16,6 +16,12 @@ Supporting refactors: a private `_get_arch()` helper that maps `platform.machine
 
 `extract_binaries` also accepts an optional per-platform `dict[str, list[str]]` keyed by `platform.system().lower()` (same convention as `asset_patterns`), for tools whose archive members differ per OS (e.g., `.exe` suffix on Windows).
 
+4. **Integrity verification (#694)** — an optional `sha256` parameter (a single digest, or a per-platform mapping) verified before the archive is opened and before the executable bit is set; a mismatch deletes the file and aborts. A digest is **mandatory** for hosts outside `IMPLICITLY_TRUSTED_HOSTS`, i.e. for the `url_template` escape hatch this ADR introduced.
+
+   The asymmetry is deliberate. `url_template` exists to fetch from arbitrary third parties such as `releases.hashicorp.com`, which bypasses even the implicit trust already extended to GitHub by cloning this template. A caller reaching outside that boundary must state what it expects to receive; a GitHub-release install rests on trust the user has already granted.
+
+   We explicitly did **not** adopt fetching upstream `*.sha256` sibling files. Served over HTTPS from the same origin as the asset, that defends against almost nothing: TLS already covers the transport, and an attacker able to replace the asset can replace the checksum beside it. Shipping it would have read as integrity assurance while providing close to none. Verification value comes from a digest the *caller* pinned.
+
 ## Rationale
 
 Downstream consumers (e.g., InfraFoundry) need to install five tools, but only direnv-style single binaries from GitHub releases work today. age and sops ship as multi-binary tar.gz archives; terraform and opentofu ship from non-GitHub URLs. Without these extensions every downstream consumer reinvents download/extract code with inconsistent (often missing) security handling.
@@ -33,10 +39,14 @@ The three capabilities are intentionally orthogonal so simple cases stay simple 
 **Negative:**
 - Larger public API surface to maintain.
 - The framework is now responsible for safe archive extraction; security regressions here affect every downstream consumer.
+- Custom-URL callers must now supply a digest. This is a breaking change for any downstream that already passes `url_template` for a non-GitHub host — the call aborts with an `IntegrityError` naming the missing parameter until a digest is added.
+
+**Known limitation:**
+- `install_tool` resolves the latest release at run time, so a caller-supplied digest is only valid for a known version. Pinning versions alongside digests is what would deliver reproducibility and detect a retagged upstream asset; it was deferred because the resulting digest matrix ages and would change `doit install_gh` from "install current gh" to "install the version the template froze" (#694).
 
 **Future work:**
-- SHA256 checksum verification.
-- GPG signature verification.
+- Pinned versions alongside pinned digests, with a refresh task.
+- GPG signature verification — meaningful against a compromised release host in a way a sibling checksum file is not, because the signing key is not served alongside the asset.
 - Local archive caching between runs.
 - Windows binary download support.
 
@@ -44,7 +54,8 @@ The three capabilities are intentionally orthogonal so simple cases stay simple 
 
 - Issue #326: install_tools framework: archive extraction and custom URLs
 - Issue #477: support per-platform `extract_binaries` in install_tool framework
+- Issue #694: verify checksums for binaries and scripts downloaded by install_tools and bootstrap
 
 ## Related Documentation
 
-- [install_tools Framework](../../development/install-tools-framework.md)
+- [install_tools Framework](../development/install-tools-framework.md)

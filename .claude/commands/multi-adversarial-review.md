@@ -9,12 +9,12 @@ Run multiple AI agents in parallel to independently challenge the current change
 Arguments: `<ais...>`
 
 All arguments are agent names. No issue number is needed — the review targets current uncommitted changes and the current branch vs main.
-Allowed agent names: `claude`, `gemini`, `copilot`, `codex`.
+Allowed agent names: `claude`, `copilot`, `codex`, `antigravity`.
 
 - If no agents are given, tell the user the required syntax and stop.
 - If any agent name is not in the allowed list, report the unknown name, list allowed names, and stop.
 
-Example: `/multi-adversarial-review claude gemini` → agents: [claude, gemini]
+Example: `/multi-adversarial-review claude codex` → agents: [claude, codex]
 
 ### Step 1: Verify there are changes to review
 
@@ -53,14 +53,6 @@ Use the Task tool to spawn a subagent with this prompt:
 
 Save the subagent's output as Claude's adversarial review.
 
-#### If `gemini` is in the agent list:
-
-```bash
-gemini -y -p 'Run an adversarial review of the current uncommitted changes and the current branch vs main. Read-only. Be skeptical: pressure-test design choices, hidden assumptions, tradeoffs, alternatives, failure modes (auth, data loss, races, rollback, reliability). 1) Run `git status`, `git diff`, `git log main..HEAD`. 2) Read AGENTS.md and related ADRs. 3) Ask: was this the right approach? Safer or simpler alternative? Edge cases missed? Hidden coupling? 4) Output ONLY the review in this format: ## Adversarial Review / ### Direction Critique / ### Hidden Assumptions / ### Failure Modes / ### Alternatives Worth Considering. End with --- and *Adversarial Review by: Gemini* | *Date: <today>*. Do NOT modify any files.' 2>/dev/null
-```
-
-Capture stdout as Gemini's adversarial review.
-
 #### If `copilot` is in the agent list:
 
 ```bash
@@ -72,10 +64,18 @@ Capture stdout as Copilot's adversarial review.
 #### If `codex` is in the agent list:
 
 ```bash
-codex -a never exec 'Run an adversarial review of the current uncommitted changes and the current branch vs main. Read-only. Be skeptical: pressure-test design choices, hidden assumptions, tradeoffs, alternatives, failure modes (auth, data loss, races, rollback, reliability). 1) Run `git status`, `git diff`, `git log main..HEAD`. 2) Read AGENTS.md and related ADRs. 3) Ask: was this the right approach? Safer or simpler alternative? Edge cases missed? Hidden coupling? 4) Output ONLY the review in this format: ## Adversarial Review / ### Direction Critique / ### Hidden Assumptions / ### Failure Modes / ### Alternatives Worth Considering. End with --- and *Adversarial Review by: Codex* | *Date: <today>*. Do NOT modify any files.'
+codex -a never --dangerously-bypass-hook-trust exec 'Run an adversarial review of the current uncommitted changes and the current branch vs main. Read-only. Be skeptical: pressure-test design choices, hidden assumptions, tradeoffs, alternatives, failure modes (auth, data loss, races, rollback, reliability). 1) Run `git status`, `git diff`, `git log main..HEAD`. 2) Read AGENTS.md and related ADRs. 3) Ask: was this the right approach? Safer or simpler alternative? Edge cases missed? Hidden coupling? 4) Output ONLY the review in this format: ## Adversarial Review / ### Direction Critique / ### Hidden Assumptions / ### Failure Modes / ### Alternatives Worth Considering. End with --- and *Adversarial Review by: Codex* | *Date: <today>*. Do NOT modify any files.'
 ```
 
 Capture stdout as Codex's adversarial review.
+
+#### If `antigravity` is in the agent list:
+
+```bash
+agy -p 'Run an adversarial review of the current uncommitted changes and the current branch vs main. Read-only. Be skeptical: pressure-test design choices, hidden assumptions, tradeoffs, alternatives, failure modes (auth, data loss, races, rollback, reliability). 1) Run `git status`, `git diff`, `git log main..HEAD`. 2) Read AGENTS.md and related ADRs. 3) Ask: right approach? Safer or simpler alternative? Edge cases missed? Hidden coupling? 4) Output ONLY the review: ## Adversarial Review / ### Direction Critique / ### Hidden Assumptions / ### Failure Modes / ### Alternatives Worth Considering. End with --- and *Adversarial Review by: Antigravity* | *Date: <today>*. Do NOT modify any files.' --dangerously-skip-permissions --add-dir "$(git rev-parse --show-toplevel)" 2>/dev/null
+```
+
+Capture stdout as Antigravity's adversarial review.
 
 If any agent fails or produces empty output, report the error and ask the user whether to continue with remaining reviews or retry.
 
