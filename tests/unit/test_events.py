@@ -1173,14 +1173,17 @@ class TestScriptHandlerJumphostReexec:
         script.chmod(script.stat().st_mode | stat.S_IEXEC)
 
         remote_bash = _build_remote_bash(str(tmp_path), "dump.sh")
-        # Use absolute path to bash and clear PATH so the wrapper's
-        # `command -v python3` check cannot find python3.
+        # Use absolute path to bash and point PATH at an empty directory so the
+        # wrapper's `command -v python3` check cannot find python3. That reaches
+        # no real binary either, so the suite stays hermetic (#1057).
+        empty_bin = tmp_path / "empty-bin"
+        empty_bin.mkdir()
         proc = subprocess.run(  # nosec B603
             [bash_path, "-c", remote_bash],
             input="{}",
             capture_output=True,
             text=True,
-            env={"PATH": ""},
+            env={"PATH": str(empty_bin)},
             timeout=10,
         )
 

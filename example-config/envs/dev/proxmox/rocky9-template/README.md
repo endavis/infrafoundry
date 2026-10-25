@@ -42,5 +42,5 @@ rocky9-template/
   README.md           # This file
 ```
 
-The resource definitions live in `blueprints/rocky9-template/vm.yaml`, not
+The resource definitions live in `blueprints/rocky9-template/template.yaml`, not
 in this directory.

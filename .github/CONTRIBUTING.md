@@ -536,9 +536,6 @@ See [issue #475](https://github.com/endavis/pyproject-template/issues/475).
 9. Creates a `release/vX.Y.Z` branch and updates `CHANGELOG.md`
 10. Commits the changelog, pushes the branch, and opens PR `release: vX.Y.Z`
 
-A project with a static version or a hand-written changelog gets two more
-steps here — see [Release Automation — Downstream opt-ins](../docs/development/release-and-automation.md#downstream-opt-ins-static-version-and-hand-written-changelog).
-
 **What `doit release_tag` does:**
 
 1. Verifies you're on `main`, pulls latest changes

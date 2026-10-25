@@ -7,7 +7,7 @@ InfraFoundry’s synchronous event system enables decoupled notifications, audit
 ## Audience and Prerequisites
 
 - **Audience:** Contributors adding integrations, notifications, or custom side effects.
-- **Prereqs:** Familiarity with Python and access to `src/infrafoundry/core/events.py`.
+- **Prereqs:** Familiarity with Python and access to `src/infrafoundry/core/events/`.
 
 ## When to Use This
 

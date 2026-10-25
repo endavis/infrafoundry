@@ -38,7 +38,7 @@ This section provides comprehensive guides for developing and extending InfraFou
 ## See Also
 
 - [Architecture Overview](../architecture/overview.md) - High-level system architecture
-- [AGENTS.md](../AGENTS.md) - Issue-driven development workflow
+- [AGENTS.md](../../AGENTS.md) - Issue-driven development workflow
 - [Examples](../examples/README.md) - Working examples and tutorials
 
 ---

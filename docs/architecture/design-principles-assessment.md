@@ -45,7 +45,7 @@ Each manager has a single, well-defined responsibility:
 - **`SecretManager`** (`src/infrafoundry/core/secrets/secret_manager.py`)
   Sole responsibility: Handle SOPS/age encryption and decryption
 
-- **`EventManager`** (`src/infrafoundry/core/events.py`)
+- **`EventManager`** (`src/infrafoundry/core/events/`)
   Sole responsibility: Dispatch lifecycle events to subscribers
 
 - **`NotificationManager`** (`src/infrafoundry/core/notifications/manager.py`)
@@ -1059,7 +1059,7 @@ class ProxmoxProvider(ProviderBase,
 
 ### 6. Observer/Event Pattern ⭐
 
-**Location**: `src/infrafoundry/core/events.py`
+**Location**: `src/infrafoundry/core/events/`
 
 **Purpose**: Define a one-to-many dependency between objects so that when one object changes state, all its dependents are notified
 

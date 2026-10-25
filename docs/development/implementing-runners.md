@@ -1120,7 +1120,7 @@ def apply(self, provider: ProviderBase, auto_approve: bool = True, **kwargs: Any
 **Symptom:** `ImportError: cannot import name 'MyCustomRunner'`
 
 **Solutions:**
-1. Check runner is in `__all__` in `runners/__init__.py`
+1. Check runner is in `__all__` in `core/runners/__init__.py`
 2. Verify file is in correct directory
 3. Check for circular imports
 4. Ensure Python can find the module: `python -c "from infrafoundry.core.runners import MyCustomRunner"`

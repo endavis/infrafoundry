@@ -9,5 +9,5 @@ applying.**
 foundry -c example-config infra apply --env dev --package ontap-cluster
 ```
 
-See `blueprints/ontap-cluster/README.md` for the full variable reference,
+See `blueprints/ontap-cluster/blueprint.yaml` for the full variable reference,
 prerequisites, and the description of the post-deploy event handler.

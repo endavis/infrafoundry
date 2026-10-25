@@ -93,7 +93,7 @@ When a Python version starts failing CI:
 
 ## Pipeline Details (GitHub Actions)
 
-- **Workflow:** `.github/workflows/tests.yml`
+- **Workflow:** `.github/workflows/ci.yml`
 - **Triggers:** Push to main/dev/develop; PR to main/dev; manual dispatch.
 - **Jobs:**
   - `test`: Python 3.12, installs via `uv pip install -e ".[dev]"`; runs ruff (non-blocking), `pytest --cov=src/infrafoundry --cov-fail-under=69`; uploads coverage artifacts and Codecov.

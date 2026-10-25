@@ -10,7 +10,7 @@ For test automation and code quality CI, see [CI/CD Testing Guide](ci-cd-testing
 
 ## Test Automation (GitHub Actions)
 
-**Workflow:** `.github/workflows/tests.yml`
+**Workflow:** `.github/workflows/ci.yml`
 
 **Purpose:** Automated testing, coverage reporting, and code quality checks
 
@@ -53,7 +53,7 @@ doit format        # Format code
 
 ## Infrastructure Deployment (GitHub Actions)
 
-**Workflow:** `.github/workflows/infra-deploy.yml`
+**Workflow:** none ships with InfraFoundry; add a deployment workflow (for example `infra-deploy.yml`) to your configuration repository.
 
 **Purpose:** Automated infrastructure deployment
 
@@ -68,7 +68,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: ./ci/setup-ci.sh dev
       - run: infra apply --env dev --auto-approve
 ```
