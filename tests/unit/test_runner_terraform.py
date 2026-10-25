@@ -305,10 +305,33 @@ def test_get_resource_ids_parses_state(runner: TerraformRunner, provider: MagicM
     assert resource_ids == {"vm1": "proxmox_vm.vm1", "rule1": "opnsense_fw.rule1"}
 
 
+def test_parse_plan_for_drift_unparsable_output_is_unknown(runner: TerraformRunner) -> None:
+    """Output with no plan line maps to no changes, flagged as not parsed (#1077)."""
+    output = "Error: provider crashed"
+    result = runner.parse_plan_for_drift({"success": False, "output": output})
+    assert result == {
+        "has_changes": False,
+        "to_add": 0,
+        "to_change": 0,
+        "to_destroy": 0,
+        "parsed": False,
+        "summary": "Unable to parse plan output",
+        "raw_output": output,
+    }
+
+
+def test_parse_plan_for_drift_no_changes_is_parsed(runner: TerraformRunner) -> None:
+    """Terraform's "No changes" message is a parsed result with zero counts."""
+    result = runner.parse_plan_for_drift({"success": True, "output": "No changes."})
+    assert result["has_changes"] is False
+    assert result["to_add"] == result["to_change"] == result["to_destroy"] == 0
+    assert "parsed" not in result
+
+
 def test_parse_plan_for_drift_detects_changes(runner: TerraformRunner) -> None:
     """Plan parser returns counts and summary."""
     output = "Plan: 1 to add, 2 to change, 0 to destroy"
-    result = runner.parse_plan_for_drift({"output": output})
+    result = runner.parse_plan_for_drift({"success": True, "output": output})
     assert result["has_changes"] is True
     assert result["to_add"] == 1
     assert result["to_change"] == 2
@@ -372,7 +395,7 @@ class TestExtractPlanSummary:
         helper must agree on the visible summary string.
         """
         output = "Plan: 5 to add, 3 to change, 0 to destroy."
-        drift = runner.parse_plan_for_drift({"output": output})
+        drift = runner.parse_plan_for_drift({"success": True, "output": output})
         assert drift["summary"] == TerraformRunner.extract_plan_summary(output)
         assert drift["summary"] == "5 to add, 3 to change"
 

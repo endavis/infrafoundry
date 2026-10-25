@@ -147,12 +147,17 @@ from infrafoundry.core.result_types import DriftInfo
 
 drift: DriftInfo = {
     "has_changes": True,
-    "summary": "2 resources changed, 1 added",
-    "added": 1,
-    "changed": 2,
-    "destroyed": 0,
+    "summary": "1 to add, 2 to change",
+    "to_add": 1,
+    "to_change": 2,
+    "to_destroy": 0,
+    "raw_output": "...",
 }
 ```
+
+`parsed` is `False` when the runner could not interpret the plan output. `has_changes` is then
+`False` because drift is unknown, not because there is none. Omit `parsed` when the output was
+parsed.
 
 ## Implementing a Runner
 

@@ -1,13 +1,15 @@
 """Unit tests for DriftDetector."""
 
+from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.drift_detector import DriftDetector
-from infrafoundry.core.events import EventManager
+from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.runners.terraform_runner import TerraformRunner
 
 
 @pytest.fixture
@@ -213,3 +215,68 @@ class TestDriftDetector:
 
         # Should fall back to "terraform"
         mock_runner_registry.create_runner.assert_called_once_with("terraform")
+
+
+@pytest.mark.unit
+class TestDriftDetectorUnparsedPlan:
+    """An unparsable plan is reported as unknown drift, not as no drift (#1077)."""
+
+    def _detect(
+        self, plan_output: str, mock_runner_registry: MagicMock, mock_event_manager: MagicMock
+    ) -> tuple[dict[str, Any], list[str], list[str]]:
+        """Run ``detect`` on one provider whose plan prints ``plan_output``.
+
+        Returns:
+            The results, the warning messages and the info messages logged
+        """
+        config_manager = MagicMock()
+        config_manager.load_environment.side_effect = FileNotFoundError("no config")
+        config_manager.get_all_resources_all_providers.return_value = [
+            SimpleNamespace(provider="proxmox")
+        ]
+        runner = TerraformRunner()
+        mock_runner_registry.create_runner.return_value = runner
+        detector = DriftDetector(
+            config_manager=config_manager,
+            runner_registry=mock_runner_registry,
+            event_manager=mock_event_manager,
+            providers={"proxmox": MagicMock()},
+        )
+
+        with (
+            patch.object(runner, "plan", return_value={"success": True, "output": plan_output}),
+            patch.object(detector, "_log_warning") as warn,
+            patch.object(detector, "_log_info") as info,
+        ):
+            results = detector.detect("dev")
+
+        warnings = [c.args[0] for c in warn.call_args_list]
+        infos = [c.args[0] for c in info.call_args_list]
+        return results, warnings, infos
+
+    def test_unparsable_plan_warns_instead_of_reporting_no_drift(
+        self, mock_runner_registry: MagicMock, mock_event_manager: MagicMock
+    ) -> None:
+        results, warnings, infos = self._detect(
+            "Error: provider crashed", mock_runner_registry, mock_event_manager
+        )
+
+        assert results["proxmox"]["parsed"] is False
+        assert results["proxmox"]["has_changes"] is False
+        assert warnings == ["Could not determine drift for proxmox: Unable to parse plan output"]
+        assert "No drift detected for proxmox" not in infos
+        emitted = [c.args[0] for c in mock_event_manager.emit_event.call_args_list]
+        assert EventType.DRIFT_DETECTED not in emitted
+
+    def test_no_changes_plan_reports_no_drift(
+        self, mock_runner_registry: MagicMock, mock_event_manager: MagicMock
+    ) -> None:
+        results, warnings, infos = self._detect(
+            "No changes. Your infrastructure matches the configuration.",
+            mock_runner_registry,
+            mock_event_manager,
+        )
+
+        assert "parsed" not in results["proxmox"]
+        assert warnings == []
+        assert "No drift detected for proxmox" in infos

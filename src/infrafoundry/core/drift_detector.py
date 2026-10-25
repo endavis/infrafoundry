@@ -59,7 +59,8 @@ class DriftDetector(BaseManager):
                         "to_change": int,
                         "to_destroy": int,
                         "summary": str,
-                        "raw_output": str
+                        "raw_output": str,
+                        "parsed": False  # only when the plan output was unparsable
                     }
                 }
         """
@@ -139,6 +140,10 @@ class DriftDetector(BaseManager):
                             "provider": provider_name,
                             "changes": drift_info,
                         },
+                    )
+                elif drift_info.get("parsed") is False:
+                    self._log_warning(
+                        f"Could not determine drift for {provider_name}: {drift_info['summary']}"
                     )
                 else:
                     self._log_info(f"No drift detected for {provider_name}")

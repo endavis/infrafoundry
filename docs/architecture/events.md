@@ -258,14 +258,19 @@ events:
 
 ### Drift Events
 
+`DRIFT_DETECTED` carries the provider and the runner's `DriftInfo`:
+
 ```python
 {
     "provider": "opnsense-gateway",
-    "has_changes": true,
-    "resources_added": 0,
-    "resources_changed": 2,
-    "resources_destroyed": 0,
-    "summary": "2 resources drifted"
+    "changes": {
+        "has_changes": True,
+        "to_add": 0,
+        "to_change": 2,
+        "to_destroy": 0,
+        "summary": "2 to change",
+        "raw_output": "...",
+    },
 }
 ```
 
