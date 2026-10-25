@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792962655145,
+  "lastUpdate": 1792965872030,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9982,6 +9982,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010591164338549538",
             "extra": "mean: 126.13048031129439 usec\nrounds: 8482"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ebdcf2c96351bffbade6813f39176ae55fb57c1c",
+          "message": "chore: burn down mypy and vulture findings and gate them in doit check (merges PR #1072, addresses #1056)\n\n* chore: add mechanical type annotations to tests and tools\n\nFirst batch for #1056 (mypy over src/ tools/ tests/):\n- return annotations from ruff's ANN2xx autofix (mostly `-> None`)\n- fixture return types inferred from what each fixture returns or yields\n- test parameters typed from the fixture they request, pytest's built-in\n  fixtures (tmp_path, monkeypatch, capsys, ...), MagicMock for\n  @patch-injected mocks, and Any for *args/**kwargs and the rest\n\nAnnotations only; no behavior change. mypy errors: 3,175 -> 493.\n\nAddresses #1056\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* chore: clear the remaining mypy errors in tests and tools\n\nSecond batch for #1056. `uv run mypy src/ tools/ tests/` is now clean.\n\n- pyproject: adopt the template's mypy override for the\n  tools/pyproject_template sibling imports (instead of excluding the\n  directory), keep disallow_any_generics off for template-owned tooling as\n  the template does, and suppress the bare `agent_roster` import that\n  pytest resolves via pythonpath\n- tests: type-arg arguments, `# type: ignore[method-assign]` where a test\n  replaces a method with a mock, None-narrowing asserts, TypedDict-typed\n  locals and fixtures (EnvironmentData, ClusterVM, provider settings),\n  casts where a mock stands in for a typed object, and targeted ignores\n  where a test passes a wrong type on purpose to exercise validation\n- tools/opnsense-parser.py: annotate the parsed collections, fix\n  parse_nat_outbound's return type (it returned a dict, not a list) and\n  return the same dict shape when there is no NAT section; tested in\n  tests/unit/test_opnsense_parser_tool.py\n- tools/hooks/ai/test_hook.py, tools/doit/install_tools.py: annotations\n\nAddresses #1056\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* chore: gate mypy over tools and tests and vulture in doit check\n\nAdopts pyproject-template #705 now that both are clean (#1056):\n- `doit type_check` and the pre-commit mypy hook run\n  `mypy src/ tools/ tests/ bootstrap.py`\n- `deadcode` joins `task_check`, and the CI lint job runs it (the step\n  deferred from #952)\n- vulture scans `tools` too; `ConsoleType` (TYPE_CHECKING import used in\n  string annotations), the `state backend migrate` --from/--to options and\n  the provider contract's abstract-method parameters are documented\n  `ignore_names` entries\n- unused `__exit__` parameters are `_`-prefixed\n- tests/template/test_doit_quality.py takes upstream's scope tests, keeping\n  the local lint_blueprints assertions\n- docs: type_check/deadcode/check entries and the divergences notes\n\nAddresses #1056\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* fix: keep the __exit__ parameter names and whitelist them in vulture\n\nThe `_`-prefix renamed parameters of BaseManager.__exit__ (public API), which\nthe API breaking-change check reports as removed parameters, and touching\nbase_manager.py surfaced its pre-existing CodeQL alerts on this PR. Keep the\noriginal names and add a commented `ignore_names` entry instead; this PR no\nlonger changes src/.\n\nAddresses #1056\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* fix: stop logging environment variable values in PathBasedManager\n\n`_get_env_var` logged `value=<value>` at debug level, so a manager reading a\nsecret through it wrote the secret to the log in clear text. CodeQL flagged\nit (\"clear-text logging of sensitive information\") on this PR once the new\ntest annotations let its dataflow reach the helper. Log the variable name\nonly; tests/unit/core/test_base_manager_env_var.py checks the value never\nreaches the log.\n\nAddresses #1056\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T22:03:40Z",
+          "tree_id": "742c956540b7619e01e55cb21e6beb739fab8849",
+          "url": "https://github.com/endavis/infrafoundry/commit/ebdcf2c96351bffbade6813f39176ae55fb57c1c"
+        },
+        "date": 1792965870922,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7415.736612240724,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002750694418843572",
+            "extra": "mean: 134.84837074031975 usec\nrounds: 8510"
           }
         ]
       }
