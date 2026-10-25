@@ -27,7 +27,7 @@ class TestTerraformRunnerInterfaces:
         assert isinstance(runner, Destroyable)
         assert isinstance(runner, StateAware)
         # parse_plan_for_drift returns to_add/to_change/to_destroy, not DriftInfo's
-        # added/changed/destroyed, so mypy rejects the protocol statically (#1073 report).
+        # added/changed/destroyed, so mypy rejects the protocol statically (#1077).
         assert isinstance(cast(object, runner), DriftDetectable)
 
 
