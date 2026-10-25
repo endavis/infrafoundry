@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792960284564,
+  "lastUpdate": 1792962655145,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -9951,6 +9951,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001021791776764552",
             "extra": "mean: 123.22558961340886 usec\nrounds: 8665"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5ae23665481266768b8ba7ec8e065c4d2bcc3258",
+          "message": "chore: synchronize with pyproject-template through 72dd3cd (merges PR #1071, addresses #1054)\n\n* chore: synchronize with pyproject-template through 72dd3cd\n\nStep 4 of 4 of the template sync (7b7bbf9..72dd3cd, through 2026-10-25).\n\nSyncs the following template improvements:\n- endavis/pyproject-template#972, #975, #976 (shared skills generated for\n  Claude by doit skills_sync; implement-issue replaces the per-agent\n  plan/implement matrix and ghi-finalize; multi-* as shared skills)\n- endavis/pyproject-template#980, #984, #985, #986 (doit\n  delegation_context, Codex gh rule, delegation fixes)\n- endavis/pyproject-template#956 (review focus areas)\n- endavis/pyproject-template#957, #958 (rule-files doc out of the\n  always-loaded glob; template layers in AGENTS.md)\n- endavis/pyproject-template#974 (strict docs build in doit check)\n- endavis/pyproject-template#837, #937 (doit wheel_check in doit check\n  and the publish workflows)\n- endavis/pyproject-template#952, #954 (CI lint runs every check after a\n  failure; daily check --continue)\n- endavis/pyproject-template#929, #930, #959, #960, #998, #1000, #1004\n  (actionlint config, install_jq, statusline and worktree fixes)\n- dependency floors and action pins\n\nLocal adaptations:\n- strict docs build: ~25 pages added to the nav, archives/spikes/\n  validation reports in not_in_nav, AGENTS.md nav entry as a URL,\n  version-policy and which-tests-run sections in ci-cd-testing.md\n- src/infrafoundry/py.typed added (wheel_check requires it)\n- CI lint job runs lint_blueprints and wheel_check; no deadcode job\n- README AI section rewritten (still described Gemini)\n\nDeferred: release.py changes (#1059), deadcode in CI (#1056),\ndoc-debt tests (#1057).\n\nAddresses #1054\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* fix: track .github/actionlint.yaml despite the *.yaml ignore rule\n\nThe secrets rule `*.yaml` in .gitignore kept the actionlint config adopted\nin this sync out of the commit, so tests/template/test_actionlint_config.py\nfailed in CI. Add an explicit exception for it.\n\nAddresses #1054\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T21:10:00Z",
+          "tree_id": "32b46fb0b3692ccda5bd07c71f3dec80aeee90b4",
+          "url": "https://github.com/endavis/infrafoundry/commit/5ae23665481266768b8ba7ec8e065c4d2bcc3258"
+        },
+        "date": 1792962654030,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7928.297724166002,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010591164338549538",
+            "extra": "mean: 126.13048031129439 usec\nrounds: 8482"
           }
         ]
       }
