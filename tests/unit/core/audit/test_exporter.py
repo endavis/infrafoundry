@@ -3,6 +3,8 @@
 import csv
 import json
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -11,7 +13,7 @@ from infrafoundry.core.audit.models import AuditEntry
 
 
 @pytest.fixture
-def sample_entries():
+def sample_entries() -> list[Any]:
     """Create sample audit entries for testing."""
     return [
         AuditEntry(
@@ -54,7 +56,7 @@ def sample_entries():
 
 
 @pytest.fixture
-def exporter():
+def exporter() -> AuditExporter:
     """Create an AuditExporter instance."""
     return AuditExporter()
 
@@ -62,12 +64,12 @@ def exporter():
 class TestAuditExporterInit:
     """Tests for AuditExporter initialization."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Test basic initialization."""
         exporter = AuditExporter()
         assert exporter is not None
 
-    def test_csv_fields_defined(self):
+    def test_csv_fields_defined(self) -> None:
         """Test that CSV fields are properly defined."""
         assert AuditExporter.CSV_FIELDS is not None
         assert "id" in AuditExporter.CSV_FIELDS
@@ -79,7 +81,9 @@ class TestAuditExporterInit:
 class TestExportJson:
     """Tests for AuditExporter.export_json method."""
 
-    def test_export_json_creates_file(self, exporter, sample_entries, tmp_path):
+    def test_export_json_creates_file(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that export_json creates the output file."""
         output_path = tmp_path / "audit.json"
         result = exporter.export_json(sample_entries, output_path)
@@ -87,7 +91,9 @@ class TestExportJson:
         assert output_path.exists()
         assert result == str(output_path)
 
-    def test_export_json_content_structure(self, exporter, sample_entries, tmp_path):
+    def test_export_json_content_structure(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test the structure of exported JSON."""
         output_path = tmp_path / "audit.json"
         exporter.export_json(sample_entries, output_path)
@@ -101,7 +107,9 @@ class TestExportJson:
         assert data["export_metadata"]["export_format"] == "json"
         assert len(data["audit_entries"]) == 2
 
-    def test_export_json_entry_fields(self, exporter, sample_entries, tmp_path):
+    def test_export_json_entry_fields(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that exported entries have all fields."""
         output_path = tmp_path / "audit.json"
         exporter.export_json(sample_entries, output_path)
@@ -116,7 +124,9 @@ class TestExportJson:
         assert entry["action"] == "apply_completed"
         assert entry["changes_summary"]["added"] == 2
 
-    def test_export_json_pretty_format(self, exporter, sample_entries, tmp_path):
+    def test_export_json_pretty_format(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that pretty=True formats the JSON."""
         output_path = tmp_path / "audit.json"
         exporter.export_json(sample_entries, output_path, pretty=True)
@@ -126,7 +136,9 @@ class TestExportJson:
         assert "\n" in content
         assert "  " in content
 
-    def test_export_json_compact_format(self, exporter, sample_entries, tmp_path):
+    def test_export_json_compact_format(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that pretty=False creates compact JSON."""
         output_path = tmp_path / "audit.json"
         exporter.export_json(sample_entries, output_path, pretty=False)
@@ -136,14 +148,16 @@ class TestExportJson:
         lines = content.strip().split("\n")
         assert len(lines) == 1
 
-    def test_export_json_creates_parent_dirs(self, exporter, sample_entries, tmp_path):
+    def test_export_json_creates_parent_dirs(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that export_json creates parent directories."""
         output_path = tmp_path / "nested" / "path" / "audit.json"
         exporter.export_json(sample_entries, output_path)
 
         assert output_path.exists()
 
-    def test_export_json_empty_list(self, exporter, tmp_path):
+    def test_export_json_empty_list(self, exporter: AuditExporter, tmp_path: Path) -> None:
         """Test exporting empty list of entries."""
         output_path = tmp_path / "empty.json"
         exporter.export_json([], output_path)
@@ -154,7 +168,7 @@ class TestExportJson:
         assert data["export_metadata"]["total_entries"] == 0
         assert len(data["audit_entries"]) == 0
 
-    def test_export_json_handles_none_values(self, exporter, tmp_path):
+    def test_export_json_handles_none_values(self, exporter: AuditExporter, tmp_path: Path) -> None:
         """Test that export handles None values correctly."""
         entry = AuditEntry(
             id=1,
@@ -179,7 +193,9 @@ class TestExportJson:
 class TestExportCsv:
     """Tests for AuditExporter.export_csv method."""
 
-    def test_export_csv_creates_file(self, exporter, sample_entries, tmp_path):
+    def test_export_csv_creates_file(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that export_csv creates the output file."""
         output_path = tmp_path / "audit.csv"
         result = exporter.export_csv(sample_entries, output_path)
@@ -187,7 +203,9 @@ class TestExportCsv:
         assert output_path.exists()
         assert result == str(output_path)
 
-    def test_export_csv_has_header(self, exporter, sample_entries, tmp_path):
+    def test_export_csv_has_header(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that CSV has header row."""
         output_path = tmp_path / "audit.csv"
         exporter.export_csv(sample_entries, output_path)
@@ -200,7 +218,9 @@ class TestExportCsv:
         assert "timestamp" in header
         assert "user_identifier" in header
 
-    def test_export_csv_row_count(self, exporter, sample_entries, tmp_path):
+    def test_export_csv_row_count(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that CSV has correct number of rows."""
         output_path = tmp_path / "audit.csv"
         exporter.export_csv(sample_entries, output_path)
@@ -212,7 +232,9 @@ class TestExportCsv:
         # Header + 2 data rows
         assert len(rows) == 3
 
-    def test_export_csv_content(self, exporter, sample_entries, tmp_path):
+    def test_export_csv_content(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test CSV content matches entries."""
         output_path = tmp_path / "audit.csv"
         exporter.export_csv(sample_entries, output_path)
@@ -227,14 +249,16 @@ class TestExportCsv:
         assert rows[1]["user_identifier"] == "bob"
         assert rows[1]["environment"] == "dev"
 
-    def test_export_csv_creates_parent_dirs(self, exporter, sample_entries, tmp_path):
+    def test_export_csv_creates_parent_dirs(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that export_csv creates parent directories."""
         output_path = tmp_path / "nested" / "dir" / "audit.csv"
         exporter.export_csv(sample_entries, output_path)
 
         assert output_path.exists()
 
-    def test_export_csv_empty_list(self, exporter, tmp_path):
+    def test_export_csv_empty_list(self, exporter: AuditExporter, tmp_path: Path) -> None:
         """Test exporting empty list creates file with header only."""
         output_path = tmp_path / "empty.csv"
         exporter.export_csv([], output_path)
@@ -247,7 +271,7 @@ class TestExportCsv:
         assert len(rows) == 1
         assert "id" in rows[0]
 
-    def test_export_csv_handles_none_values(self, exporter, tmp_path):
+    def test_export_csv_handles_none_values(self, exporter: AuditExporter, tmp_path: Path) -> None:
         """Test that CSV handles None values as empty strings."""
         entry = AuditEntry(
             id=1,
@@ -266,7 +290,9 @@ class TestExportCsv:
 
         assert row["environment"] == "None" or row["environment"] == ""
 
-    def test_export_csv_serializes_complex_types(self, exporter, sample_entries, tmp_path):
+    def test_export_csv_serializes_complex_types(
+        self, exporter: AuditExporter, sample_entries: list[Any], tmp_path: Path
+    ) -> None:
         """Test that complex types (dict, list) are JSON serialized."""
         output_path = tmp_path / "audit.csv"
         exporter.export_csv(sample_entries, output_path)
@@ -283,7 +309,7 @@ class TestExportCsv:
 class TestAuditExporterHelpers:
     """Tests for AuditExporter helper methods."""
 
-    def test_entry_to_csv_row(self, exporter, sample_entries):
+    def test_entry_to_csv_row(self, exporter: AuditExporter, sample_entries: list[Any]) -> None:
         """Test converting entry to CSV row dict."""
         row = exporter._entry_to_csv_row(sample_entries[0])
 
@@ -291,13 +317,15 @@ class TestAuditExporterHelpers:
         assert row["user_identifier"] == "alice"
         assert row["environment"] == "prod"
 
-    def test_entry_to_csv_row_only_csv_fields(self, exporter, sample_entries):
+    def test_entry_to_csv_row_only_csv_fields(
+        self, exporter: AuditExporter, sample_entries: list[Any]
+    ) -> None:
         """Test that only CSV fields are included in row."""
         row = exporter._entry_to_csv_row(sample_entries[0])
 
         for key in row:
             assert key in AuditExporter.CSV_FIELDS
 
-    def test_cleanup(self, exporter):
+    def test_cleanup(self, exporter: AuditExporter) -> None:
         """Test cleanup method runs without error."""
         exporter.cleanup()  # Should not raise

@@ -5,6 +5,7 @@ Focus on high-coverage commands: plan, apply, destroy, validate.
 """
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -14,13 +15,13 @@ from infrafoundry.cli import main as cli
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Create CLI test runner."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Create mock orchestrator with all required methods."""
     orch = Mock()
     orch.plan.return_value = None
@@ -32,7 +33,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def test_env(tmp_path: Path):
+def test_env(tmp_path: Path) -> dict[str, Any]:
     """Create test environment directory structure."""
     config_dir = tmp_path / "config" / "envs"
     secrets_dir = tmp_path / "secrets"
@@ -58,7 +59,9 @@ def test_env(tmp_path: Path):
 class TestCLIPlan:
     """Test plan command execution."""
 
-    def test_plan_basic(self, cli_runner, test_env, mock_orchestrator):
+    def test_plan_basic(
+        self, cli_runner: CliRunner, test_env: dict[str, Any], mock_orchestrator: Mock
+    ) -> None:
         """Test basic plan execution."""
         with (
             patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
@@ -78,7 +81,9 @@ class TestCLIPlan:
             assert args[0][0] == "dev"
             assert "Plan generated successfully" in result.output
 
-    def test_plan_dry_run(self, cli_runner, test_env, mock_orchestrator):
+    def test_plan_dry_run(
+        self, cli_runner: CliRunner, test_env: dict[str, Any], mock_orchestrator: Mock
+    ) -> None:
         """Test plan with --dry-run."""
         with (
             patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
@@ -98,7 +103,9 @@ class TestCLIPlan:
             assert mock_orchestrator.plan.call_args[1]["dry_run"] is True
             assert "Dry run complete" in result.output
 
-    def test_plan_with_policies(self, cli_runner, test_env, mock_orchestrator):
+    def test_plan_with_policies(
+        self, cli_runner: CliRunner, test_env: dict[str, Any], mock_orchestrator: Mock
+    ) -> None:
         """Test plan with --enforce-policies."""
         with (
             patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
@@ -117,7 +124,9 @@ class TestCLIPlan:
             assert result.exit_code == 0
             assert mock_orchestrator.plan.call_args[1]["enforce_policies"] is True
 
-    def test_plan_error(self, cli_runner, test_env, mock_orchestrator):
+    def test_plan_error(
+        self, cli_runner: CliRunner, test_env: dict[str, Any], mock_orchestrator: Mock
+    ) -> None:
         """Test plan error handling."""
         mock_orchestrator.plan.side_effect = Exception("Plan failed")
 
@@ -141,7 +150,9 @@ class TestCLIPlan:
 class TestCLIApply:
     """Test apply command execution."""
 
-    def test_apply_auto_approve(self, cli_runner, test_env, mock_orchestrator):
+    def test_apply_auto_approve(
+        self, cli_runner: CliRunner, test_env: dict[str, Any], mock_orchestrator: Mock
+    ) -> None:
         """Test apply with --auto-approve."""
         with (
             patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
@@ -161,7 +172,9 @@ class TestCLIApply:
             mock_orchestrator.apply.assert_called_once()
             assert "Apply complete" in result.output
 
-    def test_apply_parallel(self, cli_runner, test_env, mock_orchestrator):
+    def test_apply_parallel(
+        self, cli_runner: CliRunner, test_env: dict[str, Any], mock_orchestrator: Mock
+    ) -> None:
         """Test apply with --parallel."""
         with (
             patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
@@ -182,7 +195,9 @@ class TestCLIApply:
             assert result.exit_code == 0
             assert mock_orchestrator.apply.call_args[1]["parallel"] is True
 
-    def test_apply_error(self, cli_runner, test_env, mock_orchestrator):
+    def test_apply_error(
+        self, cli_runner: CliRunner, test_env: dict[str, Any], mock_orchestrator: Mock
+    ) -> None:
         """Test apply error handling."""
         mock_orchestrator.apply.side_effect = Exception("Apply failed")
 
@@ -208,7 +223,9 @@ class TestCLIApply:
 class TestCLIDestroy:
     """Test destroy command execution."""
 
-    def test_destroy_auto_approve(self, cli_runner, test_env, mock_orchestrator):
+    def test_destroy_auto_approve(
+        self, cli_runner: CliRunner, test_env: dict[str, Any], mock_orchestrator: Mock
+    ) -> None:
         """Test destroy with --auto-approve."""
         with (
             patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
@@ -228,7 +245,9 @@ class TestCLIDestroy:
             mock_orchestrator.destroy.assert_called_once()
             assert "Destroy complete" in result.output
 
-    def test_destroy_error(self, cli_runner, test_env, mock_orchestrator):
+    def test_destroy_error(
+        self, cli_runner: CliRunner, test_env: dict[str, Any], mock_orchestrator: Mock
+    ) -> None:
         """Test destroy error handling."""
         mock_orchestrator.destroy.side_effect = Exception("Destroy failed")
 
@@ -253,7 +272,7 @@ class TestCLIDestroy:
 class TestCLIEnvs:
     """Test envs command."""
 
-    def test_envs_list(self, cli_runner, test_env):
+    def test_envs_list(self, cli_runner: CliRunner, test_env: dict[str, Any]) -> None:
         """Test listing environments."""
         with (
             patch(

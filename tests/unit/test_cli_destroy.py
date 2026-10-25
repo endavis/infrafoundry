@@ -11,19 +11,21 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     return mock
 
 
-def test_destroy_confirms_then_auto_approves(cli_runner, mock_orchestrator):
+def test_destroy_confirms_then_auto_approves(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """Test that confirming at CLI level passes auto_approve=True to orchestrator."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "destroy", "--env", "test"], input="y\n")
@@ -37,7 +39,7 @@ def test_destroy_confirms_then_auto_approves(cli_runner, mock_orchestrator):
         assert "confirm_callback" not in call_args[1]
 
 
-def test_destroy_cancelled(cli_runner, mock_orchestrator):
+def test_destroy_cancelled(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test that declining confirmation cancels destroy."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "destroy", "--env", "test"], input="n\n")
@@ -47,7 +49,7 @@ def test_destroy_cancelled(cli_runner, mock_orchestrator):
         mock_orchestrator.destroy.assert_not_called()
 
 
-def test_destroy_with_auto_approve(cli_runner, mock_orchestrator):
+def test_destroy_with_auto_approve(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test destroy command with auto-approve flag skips confirmation."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "destroy", "--env", "test", "--auto-approve"])
@@ -58,7 +60,7 @@ def test_destroy_with_auto_approve(cli_runner, mock_orchestrator):
         assert call_args[1]["auto_approve"] is True
 
 
-def test_destroy_with_resource_filter(cli_runner, mock_orchestrator):
+def test_destroy_with_resource_filter(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test destroy command with resource filter."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -71,7 +73,9 @@ def test_destroy_with_resource_filter(cli_runner, mock_orchestrator):
         assert call_args[1]["resource_filter"] == ["vm-01", "vm-02"]
 
 
-def test_destroy_shows_resource_names_in_prompt(cli_runner, mock_orchestrator):
+def test_destroy_shows_resource_names_in_prompt(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """Test that resource names are shown in the confirmation prompt."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -85,7 +89,7 @@ def test_destroy_shows_resource_names_in_prompt(cli_runner, mock_orchestrator):
         assert "vm-02" in result.output
 
 
-def test_destroy_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_destroy_orchestrator_failure(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test destroy command when orchestrator.destroy raises an error."""
     mock_orchestrator.destroy.side_effect = Exception("Destroy failed")
 
@@ -96,7 +100,9 @@ def test_destroy_orchestrator_failure(cli_runner, mock_orchestrator):
         assert "Destroy failed" in result.output
 
 
-def test_destroy_cli_does_not_print_success_on_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_destroy_cli_does_not_print_success_on_orchestrator_failure(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """Regression for #510: TerraformError from orchestrator must not show 'Destroy complete!'."""
     mock_orchestrator.destroy.side_effect = TerraformError(
         "Terraform destroy failed for provider 'proxmox': Instance cannot be destroyed",
@@ -114,7 +120,9 @@ def test_destroy_cli_does_not_print_success_on_orchestrator_failure(cli_runner, 
     assert "Destroy failed" in result.output
 
 
-def test_destroy_with_single_provider_filter(cli_runner, mock_orchestrator):
+def test_destroy_with_single_provider_filter(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """A single --provider value is passed through as a one-element list."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -129,7 +137,7 @@ def test_destroy_with_single_provider_filter(cli_runner, mock_orchestrator):
         assert call_args[1]["package_filter"] is None
 
 
-def test_destroy_with_short_provider_flag(cli_runner, mock_orchestrator):
+def test_destroy_with_short_provider_flag(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """The -P short option is equivalent to --provider."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -142,7 +150,9 @@ def test_destroy_with_short_provider_flag(cli_runner, mock_orchestrator):
         assert call_args[1]["provider_filter"] == ["opnsense"]
 
 
-def test_destroy_with_multiple_provider_filter(cli_runner, mock_orchestrator):
+def test_destroy_with_multiple_provider_filter(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """Multiple --provider flags accumulate into a list."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -165,7 +175,9 @@ def test_destroy_with_multiple_provider_filter(cli_runner, mock_orchestrator):
         assert call_args[1]["provider_filter"] == ["opnsense", "proxmox"]
 
 
-def test_destroy_provider_and_package_mutually_exclusive(cli_runner, mock_orchestrator):
+def test_destroy_provider_and_package_mutually_exclusive(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """--provider with --package raises UsageError; orchestrator is not called."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -188,7 +200,9 @@ def test_destroy_provider_and_package_mutually_exclusive(cli_runner, mock_orches
         mock_orchestrator.destroy.assert_not_called()
 
 
-def test_destroy_provider_and_resource_mutually_exclusive(cli_runner, mock_orchestrator):
+def test_destroy_provider_and_resource_mutually_exclusive(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """--provider with --resource raises UsageError; orchestrator is not called."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -211,7 +225,7 @@ def test_destroy_provider_and_resource_mutually_exclusive(cli_runner, mock_orche
         mock_orchestrator.destroy.assert_not_called()
 
 
-def test_destroy_three_way_mutex(cli_runner, mock_orchestrator):
+def test_destroy_three_way_mutex(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """All three of --provider, --package, --resource together fail."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -236,7 +250,9 @@ def test_destroy_three_way_mutex(cli_runner, mock_orchestrator):
         mock_orchestrator.destroy.assert_not_called()
 
 
-def test_destroy_unknown_provider_filter_surfaces_error(cli_runner, mock_orchestrator):
+def test_destroy_unknown_provider_filter_surfaces_error(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """Unknown provider names surface as ProviderFilterError via the orchestrator."""
     mock_orchestrator.destroy.side_effect = ProviderFilterError(
         requested=["nope"], available=["opnsense", "proxmox"]

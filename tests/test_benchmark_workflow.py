@@ -29,13 +29,13 @@ WORKFLOW_PATH = Path(__file__).parent.parent / ".github" / "workflows" / "benchm
 WRITE_SCOPES = {"write", "write-all"}
 
 
-def _load_workflow() -> dict:
+def _load_workflow() -> dict[str, Any]:
     """Load and parse the benchmark workflow YAML."""
     # Windows read_text() defaults to cp1252 which can't decode non-ASCII
     # characters like ✅ in workflow files — always specify utf-8.
     # Bind to an annotated local first: yaml.safe_load returns Any,
     # and returning Any from a typed function trips warn_return_any.
-    data: dict = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    data: dict[str, Any] = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     return data
 
 
@@ -69,17 +69,17 @@ class TestBenchmarkWorkflowTriggers:
     """Triggers are unchanged by #695 — only what each one may do changed."""
 
     def test_has_push_trigger(self) -> None:
-        triggers = _load_workflow()[True]  # YAML 'on' parses as boolean True
+        triggers = _load_workflow()[True]  # type: ignore[index]  # YAML 'on' parses as boolean True
         assert "push" in triggers
         assert "main" in triggers["push"]["branches"]
 
     def test_has_pull_request_trigger(self) -> None:
-        triggers = _load_workflow()[True]
+        triggers = _load_workflow()[True]  # type: ignore[index]
         assert "pull_request" in triggers
         assert "main" in triggers["pull_request"]["branches"]
 
     def test_has_workflow_dispatch_trigger(self) -> None:
-        assert "workflow_dispatch" in _load_workflow()[True]
+        assert "workflow_dispatch" in _load_workflow()[True]  # type: ignore[index]
 
 
 class TestLeastPrivilege:
@@ -140,8 +140,8 @@ class TestBenchmarkJob:
     """The read-only half: run the benchmarks, publish the numbers as an artifact."""
 
     @staticmethod
-    def _steps() -> list[dict]:
-        steps: list[dict] = _jobs()["benchmark"]["steps"]
+    def _steps() -> list[dict[str, Any]]:
+        steps: list[dict[str, Any]] = _jobs()["benchmark"]["steps"]
         return steps
 
     def test_runs_benchmarks(self) -> None:
@@ -172,8 +172,8 @@ class TestStoreJob:
     """The write half: rewrite the gh-benchmarks branch, on main only."""
 
     @staticmethod
-    def _steps() -> list[dict]:
-        steps: list[dict] = _jobs()["store"]["steps"]
+    def _steps() -> list[dict[str, Any]]:
+        steps: list[dict[str, Any]] = _jobs()["store"]["steps"]
         return steps
 
     def test_depends_on_the_benchmark_job(self) -> None:

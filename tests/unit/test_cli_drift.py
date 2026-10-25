@@ -10,19 +10,19 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     return mock
 
 
-def test_drift_no_drift_detected(cli_runner, mock_orchestrator):
+def test_drift_no_drift_detected(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test drift detect command when no drift is detected."""
     mock_orchestrator.detect_drift.return_value = {
         "proxmox": {"has_changes": False},
@@ -37,7 +37,7 @@ def test_drift_no_drift_detected(cli_runner, mock_orchestrator):
         mock_orchestrator.detect_drift.assert_called_once_with("test")
 
 
-def test_drift_detected(cli_runner, mock_orchestrator):
+def test_drift_detected(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test drift detect command when drift is detected."""
     mock_orchestrator.detect_drift.return_value = {
         "proxmox": {
@@ -58,7 +58,7 @@ def test_drift_detected(cli_runner, mock_orchestrator):
         assert "Run 'infra plan' to see detailed changes" in result.output
 
 
-def test_drift_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_drift_orchestrator_failure(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test drift detect command when orchestrator.detect_drift raises an error."""
     mock_orchestrator.detect_drift.side_effect = Exception("Drift detection failed")
 

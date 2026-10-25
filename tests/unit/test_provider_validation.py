@@ -1,6 +1,8 @@
 """Tests for provider validation methods."""
 
-from unittest.mock import Mock, patch
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -14,7 +16,7 @@ class TestProxmoxValidation:
     """Tests for Proxmox provider validation."""
 
     @pytest.fixture
-    def proxmox_provider(self, tmp_path):
+    def proxmox_provider(self, tmp_path: Path) -> ProxmoxProvider:
         """Create a Proxmox provider instance."""
         config_dir = tmp_path / "config"
         output_dir = tmp_path / "output"
@@ -23,7 +25,7 @@ class TestProxmoxValidation:
         return ProxmoxProvider(config_dir, output_dir)
 
     @pytest.fixture
-    def env_config(self):
+    def env_config(self) -> Any:
         """Sample environment configuration."""
         return make_env_config(
             provider_settings={
@@ -35,7 +37,9 @@ class TestProxmoxValidation:
             },
         )
 
-    def test_validate_connectivity_missing_credentials(self, proxmox_provider):
+    def test_validate_connectivity_missing_credentials(
+        self, proxmox_provider: ProxmoxProvider
+    ) -> None:
         """Test validation fails when credentials are missing."""
         report = ValidationReport()
         env_config = make_env_config(provider_settings={"proxmox": {}})
@@ -47,7 +51,9 @@ class TestProxmoxValidation:
         assert summary["errors"] == 1
 
     @patch("requests.get")
-    def test_validate_connectivity_success(self, mock_get, proxmox_provider, env_config):
+    def test_validate_connectivity_success(
+        self, mock_get: MagicMock, proxmox_provider: ProxmoxProvider, env_config: Any
+    ) -> None:
         """Test successful API connectivity validation."""
         # Mock successful API responses
         mock_response = Mock()
@@ -65,7 +71,9 @@ class TestProxmoxValidation:
         assert summary["passed"] >= 1
 
     @patch("requests.get")
-    def test_validate_connectivity_api_error(self, mock_get, proxmox_provider, env_config):
+    def test_validate_connectivity_api_error(
+        self, mock_get: MagicMock, proxmox_provider: ProxmoxProvider, env_config: Any
+    ) -> None:
         """Test validation handles API errors."""
         # Mock failed API response
         mock_response = Mock()
@@ -81,7 +89,9 @@ class TestProxmoxValidation:
         assert report.has_errors()
 
     @patch("requests.get")
-    def test_validate_connectivity_timeout(self, mock_get, proxmox_provider, env_config):
+    def test_validate_connectivity_timeout(
+        self, mock_get: MagicMock, proxmox_provider: ProxmoxProvider, env_config: Any
+    ) -> None:
         """Test validation handles connection timeout."""
         import requests
 
@@ -93,7 +103,9 @@ class TestProxmoxValidation:
         assert report.has_errors()
 
     @patch("requests.get")
-    def test_validate_connectivity_connection_error(self, mock_get, proxmox_provider, env_config):
+    def test_validate_connectivity_connection_error(
+        self, mock_get: MagicMock, proxmox_provider: ProxmoxProvider, env_config: Any
+    ) -> None:
         """Test validation handles connection errors."""
         import requests
 
@@ -105,11 +117,13 @@ class TestProxmoxValidation:
         assert report.has_errors()
 
     @patch("requests.get")
-    def test_validate_references_template_exists(self, mock_get, proxmox_provider, env_config):
+    def test_validate_references_template_exists(
+        self, mock_get: MagicMock, proxmox_provider: ProxmoxProvider, env_config: Any
+    ) -> None:
         """Test validation passes when referenced template exists."""
 
         # Mock different API responses based on URL
-        def mock_get_side_effect(url, **kwargs):
+        def mock_get_side_effect(url: Any, **kwargs: Any) -> Mock:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.ok = True
@@ -155,11 +169,13 @@ class TestProxmoxValidation:
         assert not report.has_errors()
 
     @patch("requests.get")
-    def test_validate_references_template_missing(self, mock_get, proxmox_provider, env_config):
+    def test_validate_references_template_missing(
+        self, mock_get: MagicMock, proxmox_provider: ProxmoxProvider, env_config: Any
+    ) -> None:
         """Test validation fails when referenced template doesn't exist."""
 
         # Mock different API responses based on URL
-        def mock_get_side_effect(url, **kwargs):
+        def mock_get_side_effect(url: Any, **kwargs: Any) -> Mock:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.ok = True
@@ -199,7 +215,7 @@ class TestProxmoxValidation:
         summary = report.get_summary()
         assert summary["errors"] >= 1
 
-    def test_validate_references_no_credentials(self, proxmox_provider):
+    def test_validate_references_no_credentials(self, proxmox_provider: ProxmoxProvider) -> None:
         """Test reference validation skips when no credentials."""
         report = ValidationReport()
         env_config = make_env_config(provider_settings={"proxmox": {}})
@@ -220,11 +236,13 @@ class TestProxmoxValidation:
         assert summary["total"] == 0
 
     @patch("requests.get")
-    def test_validate_references_multiple_templates(self, mock_get, proxmox_provider, env_config):
+    def test_validate_references_multiple_templates(
+        self, mock_get: MagicMock, proxmox_provider: ProxmoxProvider, env_config: Any
+    ) -> None:
         """Test validation of multiple template references."""
 
         # Mock different API responses based on URL
-        def mock_get_side_effect(url, **kwargs):
+        def mock_get_side_effect(url: Any, **kwargs: Any) -> Mock:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.ok = True
@@ -278,11 +296,13 @@ class TestProxmoxValidation:
         assert summary["passed"] >= 2
 
     @patch("requests.get")
-    def test_validate_references_api_error(self, mock_get, proxmox_provider, env_config):
+    def test_validate_references_api_error(
+        self, mock_get: MagicMock, proxmox_provider: ProxmoxProvider, env_config: Any
+    ) -> None:
         """Test validation handles API errors gracefully."""
 
         # Mock different API responses based on URL
-        def mock_get_side_effect(url, **kwargs):
+        def mock_get_side_effect(url: Any, **kwargs: Any) -> Mock:
             mock_response = Mock()
 
             if "/nodes/pve01/status" in url:

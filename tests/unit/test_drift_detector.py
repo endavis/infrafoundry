@@ -1,5 +1,6 @@
 """Unit tests for DriftDetector."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,31 +11,36 @@ from infrafoundry.core.events import EventManager
 
 
 @pytest.fixture
-def mock_config_manager():
+def mock_config_manager() -> MagicMock:
     """Create a mock config manager."""
     return MagicMock()
 
 
 @pytest.fixture
-def mock_runner_registry():
+def mock_runner_registry() -> MagicMock:
     """Create a mock runner registry."""
     return MagicMock()
 
 
 @pytest.fixture
-def mock_event_manager():
+def mock_event_manager() -> MagicMock:
     """Create a mock event manager."""
     return MagicMock(spec=EventManager)
 
 
 @pytest.fixture
-def mock_providers():
+def mock_providers() -> dict[str, Any]:
     """Create a mock providers dict."""
     return {}
 
 
 @pytest.fixture
-def drift_detector(mock_config_manager, mock_runner_registry, mock_event_manager, mock_providers):
+def drift_detector(
+    mock_config_manager: MagicMock,
+    mock_runner_registry: MagicMock,
+    mock_event_manager: MagicMock,
+    mock_providers: dict[str, Any],
+) -> DriftDetector:
     """Create a DriftDetector instance for testing."""
     return DriftDetector(
         config_manager=mock_config_manager,
@@ -48,7 +54,7 @@ def drift_detector(mock_config_manager, mock_runner_registry, mock_event_manager
 class TestDriftDetector:
     """Tests for DriftDetector."""
 
-    def test_inherits_from_base_manager(self, drift_detector):
+    def test_inherits_from_base_manager(self, drift_detector: DriftDetector) -> None:
         """Test that DriftDetector inherits from BaseManager."""
         assert isinstance(drift_detector, BaseManager)
         # Should have BaseManager methods
@@ -58,14 +64,18 @@ class TestDriftDetector:
         assert hasattr(drift_detector, "_log_debug")
         assert hasattr(drift_detector, "cleanup")
 
-    def test_cleanup_method(self, drift_detector):
+    def test_cleanup_method(self, drift_detector: DriftDetector) -> None:
         """Test that cleanup method works."""
         # cleanup() should not raise any exceptions
         drift_detector.cleanup()
 
     def test_context_manager(
-        self, mock_config_manager, mock_runner_registry, mock_event_manager, mock_providers
-    ):
+        self,
+        mock_config_manager: MagicMock,
+        mock_runner_registry: MagicMock,
+        mock_event_manager: MagicMock,
+        mock_providers: dict[str, Any],
+    ) -> None:
         """Test that DriftDetector can be used as context manager."""
         with DriftDetector(
             config_manager=mock_config_manager,
@@ -77,8 +87,12 @@ class TestDriftDetector:
         # Exiting context should call cleanup without error
 
     def test_init_stores_dependencies(
-        self, mock_config_manager, mock_runner_registry, mock_event_manager, mock_providers
-    ):
+        self,
+        mock_config_manager: MagicMock,
+        mock_runner_registry: MagicMock,
+        mock_event_manager: MagicMock,
+        mock_providers: dict[str, Any],
+    ) -> None:
         """Test that __init__ properly stores dependencies."""
         detector = DriftDetector(
             config_manager=mock_config_manager,
@@ -93,8 +107,12 @@ class TestDriftDetector:
         assert detector.providers is mock_providers
 
     def test_detect_emits_started_event(
-        self, mock_config_manager, mock_runner_registry, mock_event_manager, mock_providers
-    ):
+        self,
+        mock_config_manager: MagicMock,
+        mock_runner_registry: MagicMock,
+        mock_event_manager: MagicMock,
+        mock_providers: dict[str, Any],
+    ) -> None:
         """Test that detect emits DRIFT_CHECK_STARTED event."""
         # Set up mocks
         mock_runner = MagicMock()
@@ -117,8 +135,12 @@ class TestDriftDetector:
         assert first_call[0][1] == "test-env"  # environment name
 
     def test_detect_returns_empty_dict_when_no_providers(
-        self, mock_config_manager, mock_runner_registry, mock_event_manager, mock_providers
-    ):
+        self,
+        mock_config_manager: MagicMock,
+        mock_runner_registry: MagicMock,
+        mock_event_manager: MagicMock,
+        mock_providers: dict[str, Any],
+    ) -> None:
         """Test that detect returns empty dict when no providers have resources."""
         # Set up mocks
         mock_runner = MagicMock()
@@ -137,8 +159,12 @@ class TestDriftDetector:
         assert results == {}
 
     def test_detect_uses_configured_iac_tool(
-        self, mock_config_manager, mock_runner_registry, mock_event_manager, mock_providers
-    ):
+        self,
+        mock_config_manager: MagicMock,
+        mock_runner_registry: MagicMock,
+        mock_event_manager: MagicMock,
+        mock_providers: dict[str, Any],
+    ) -> None:
         """Test that detect resolves the IaC tool from environment config."""
         from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 
@@ -163,8 +189,11 @@ class TestDriftDetector:
         mock_runner_registry.create_runner.assert_called_once_with("opentofu")
 
     def test_detect_defaults_to_terraform_when_no_env_config(
-        self, mock_runner_registry, mock_event_manager, mock_providers
-    ):
+        self,
+        mock_runner_registry: MagicMock,
+        mock_event_manager: MagicMock,
+        mock_providers: dict[str, Any],
+    ) -> None:
         """Test that detect falls back to terraform when env config is missing."""
         mock_config_manager = MagicMock()
         mock_config_manager.load_environment.side_effect = FileNotFoundError("no config")

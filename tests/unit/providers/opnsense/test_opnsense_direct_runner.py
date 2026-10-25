@@ -267,7 +267,7 @@ class TestPlanDelegation:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             result = runner.plan(provider_with_env)
         assert result["success"] is True
-        assert result["has_changes"] is False  # type: ignore[typeddict-item]
+        assert result["has_changes"] is False
         manager_cls.assert_not_called()
 
     def test_returns_no_changes_when_dispatch_empty(self, provider_with_env: MagicMock) -> None:
@@ -280,7 +280,7 @@ class TestPlanDelegation:
         ):
             result = runner.plan(provider_with_env)
         assert result["success"] is True
-        assert result["has_changes"] is False  # type: ignore[typeddict-item]
+        assert result["has_changes"] is False
 
     def test_calls_manager_plan_with_add_only(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
@@ -301,9 +301,9 @@ class TestPlanDelegation:
         manager_cls.assert_called_once_with(provider_with_env.config_dir)
         manager_mock.plan.assert_called_once_with("test-env", resources, add_only=True)
         assert result["success"] is True
-        assert result["has_changes"] is True  # type: ignore[typeddict-item]
-        assert "1 to add" in result["changes_summary"]  # type: ignore[typeddict-item]
-        assert "add-only mode" in result["changes_summary"]  # type: ignore[typeddict-item]
+        assert result["has_changes"] is True
+        assert "1 to add" in result["changes_summary"]
+        assert "add-only mode" in result["changes_summary"]
 
     def test_plan_failure_returns_error(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
@@ -321,7 +321,7 @@ class TestPlanDelegation:
             result = runner.plan(provider_with_env)
 
         assert result["success"] is False
-        assert "boom" in result["error"]  # type: ignore[typeddict-item]
+        assert "boom" in result["error"]
 
 
 class TestApplyDelegation:
@@ -336,9 +336,9 @@ class TestApplyDelegation:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             result = runner.apply(provider_with_env)
         assert result["success"] is True
-        assert result["resources_created"] == 0  # type: ignore[typeddict-item]
-        assert result["resources_updated"] == 0  # type: ignore[typeddict-item]
-        assert result["resources_deleted"] == 0  # type: ignore[typeddict-item]
+        assert result["resources_created"] == 0
+        assert result["resources_updated"] == 0
+        assert result["resources_deleted"] == 0
         assert result["resource_outcomes"] == []  # type: ignore[typeddict-item]
         manager_cls.assert_not_called()
 
@@ -365,7 +365,7 @@ class TestApplyDelegation:
         manager_mock.apply.assert_called_once_with(
             "test-env", resources, auto_approve=True, add_only=False
         )
-        assert result["resources_created"] == 1  # type: ignore[typeddict-item]
+        assert result["resources_created"] == 1
         assert result["resource_outcomes"] == [outcome]  # type: ignore[typeddict-item]
 
     def test_apply_threads_add_only(self, provider_with_env: MagicMock) -> None:
@@ -400,7 +400,7 @@ class TestApplyDelegation:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.apply(provider_with_env)
         assert result["success"] is False
-        assert "api down" in result["error"]  # type: ignore[typeddict-item]
+        assert "api down" in result["error"]
 
 
 class TestDestroyDelegation:
@@ -415,7 +415,7 @@ class TestDestroyDelegation:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             result = runner.destroy(provider_with_env)
         assert result["success"] is True
-        assert result["resources_destroyed"] == 0  # type: ignore[typeddict-item]
+        assert result["resources_destroyed"] == 0
 
     def test_calls_manager_destroy(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
@@ -432,7 +432,7 @@ class TestDestroyDelegation:
         }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.destroy(provider_with_env, auto_approve=True)
-        assert result["resources_destroyed"] == 1  # type: ignore[typeddict-item]
+        assert result["resources_destroyed"] == 1
         manager_mock.destroy.assert_called_once_with("test-env", resources, auto_approve=True)
 
 
@@ -522,8 +522,8 @@ class TestMultiComponentDispatch:
 
         assert result["success"] is True
         # vlans diff has an add → has_changes is True overall.
-        assert result["has_changes"] is True  # type: ignore[typeddict-item]
-        summary = result["changes_summary"]  # type: ignore[typeddict-item]
+        assert result["has_changes"] is True
+        summary = result["changes_summary"]
         assert "interfaces.vlans:" in summary
         assert "interfaces.assignments:" in summary
         assert "read-only" in summary
@@ -560,7 +560,7 @@ class TestMultiComponentDispatch:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.apply(provider_with_env)
 
-        assert result["resources_created"] == 1  # type: ignore[typeddict-item]
+        assert result["resources_created"] == 1
         assert result["resource_outcomes"] == [outcome]  # type: ignore[typeddict-item]
         # Each manager dispatched exactly once.
         vlan_manager.apply.assert_called_once()
@@ -591,7 +591,7 @@ class TestMultiComponentDispatch:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.destroy(provider_with_env)
 
-        assert result["resources_destroyed"] == 1  # type: ignore[typeddict-item]
+        assert result["resources_destroyed"] == 1
 
     def test_get_resource_ids_merges_across_components(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
@@ -786,7 +786,7 @@ class TestFinalizationHookPlumbing:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.apply(provider)  # type: ignore[arg-type]
         # No hooks dict, no error.
-        assert result["success"] is True  # type: ignore[typeddict-item]
+        assert result["success"] is True
 
     def test_hook_error_propagates_and_fails_apply(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
@@ -820,7 +820,7 @@ class TestFinalizationHookPlumbing:
 
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.apply(provider_with_env)
-        assert result["success"] is True  # type: ignore[typeddict-item]
+        assert result["success"] is True
 
     def test_hooks_skip_on_destroy(self, provider_with_env: MagicMock) -> None:
         # Destroy must NOT fire finalization hooks — the contract is

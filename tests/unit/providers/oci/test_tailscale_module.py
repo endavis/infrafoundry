@@ -9,6 +9,9 @@ reference the right ``var.<sanitized>`` for auth, declare the
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any, cast
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -16,7 +19,7 @@ from infrafoundry.providers.oci import OCIProvider
 
 
 @pytest.fixture
-def tmp_dirs(tmp_path):
+def tmp_dirs(tmp_path: Path) -> Any:
     """Create temporary config and output directories."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -26,7 +29,7 @@ def tmp_dirs(tmp_path):
 
 
 @pytest.fixture
-def provider(tmp_dirs):
+def provider(tmp_dirs: Any) -> OCIProvider:
     """OCIProvider with the test environment set."""
     config_dir, output_dir = tmp_dirs
     p = OCIProvider(config_dir, output_dir)
@@ -34,7 +37,9 @@ def provider(tmp_dirs):
     return p
 
 
-def _instance(name: str, *, tailscale: dict | None = None, **extra_config) -> ResourceConfig:
+def _instance(
+    name: str, *, tailscale: dict[str, Any] | None = None, **extra_config: Any
+) -> ResourceConfig:
     """Build a minimal OCI instance ResourceConfig with optional tailscale block."""
     config = {
         "shape": "VM.Standard.A1.Flex",
@@ -47,14 +52,14 @@ def _instance(name: str, *, tailscale: dict | None = None, **extra_config) -> Re
     return ResourceConfig(name=name, type="instance", provider="oci", config=config)
 
 
-def _read_tf(output_dir, filename: str) -> str:
-    return (output_dir / "test" / "terraform" / "oci" / filename).read_text()
+def _read_tf(output_dir: Any, filename: str) -> str:
+    return cast("str", (output_dir / "test" / "terraform" / "oci" / filename).read_text())
 
 
 class TestOCITailscaleAuthKey:
     """Cover the static auth_key auth mode."""
 
-    def test_module_block_emitted(self, provider, tmp_dirs):
+    def test_module_block_emitted(self, provider: OCIProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         instance = _instance(
             "ts-control",
@@ -75,7 +80,7 @@ class TestOCITailscaleAuthKey:
         assert "client_id" not in instances_tf
         assert "client_secret" not in instances_tf
 
-    def test_user_data_uses_module_rendered(self, provider, tmp_dirs):
+    def test_user_data_uses_module_rendered(self, provider: OCIProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         instance = _instance(
             "ts-control",
@@ -88,7 +93,9 @@ class TestOCITailscaleAuthKey:
         # Existing cloud_init_merged path should NOT be used for this instance
         assert "cloud_init_merged" not in instances_tf
 
-    def test_variables_tf_declares_sensitive_var(self, provider, tmp_dirs):
+    def test_variables_tf_declares_sensitive_var(
+        self, provider: OCIProvider, tmp_dirs: Any
+    ) -> None:
         _, output_dir = tmp_dirs
         instance = _instance(
             "ts-control",
@@ -100,7 +107,7 @@ class TestOCITailscaleAuthKey:
         assert 'variable "tailscale_auth_key"' in variables_tf
         assert "sensitive   = true" in variables_tf
 
-    def test_advertise_tags_rendered(self, provider, tmp_dirs):
+    def test_advertise_tags_rendered(self, provider: OCIProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         instance = _instance(
             "ts-control",
@@ -120,7 +127,7 @@ class TestOCITailscaleAuthKey:
 class TestOCITailscaleOAuth:
     """Cover the OAuth client credentials auth mode."""
 
-    def test_oauth_module_block_emitted(self, provider, tmp_dirs):
+    def test_oauth_module_block_emitted(self, provider: OCIProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         instance = _instance(
             "ts-control",
@@ -141,7 +148,9 @@ class TestOCITailscaleOAuth:
         assert "client_secret = var.tailscale_oauth_client_secret" in instances_tf
         assert "auth_key" not in instances_tf
 
-    def test_oauth_variables_tf_has_both_secrets(self, provider, tmp_dirs):
+    def test_oauth_variables_tf_has_both_secrets(
+        self, provider: OCIProvider, tmp_dirs: Any
+    ) -> None:
         _, output_dir = tmp_dirs
         instance = _instance(
             "ts-control",
@@ -164,7 +173,7 @@ class TestOCITailscaleOAuth:
 class TestOCITailscaleAdditionalParts:
     """Cover the ``additional_parts`` escape hatch."""
 
-    def test_additional_parts_rendered(self, provider, tmp_dirs):
+    def test_additional_parts_rendered(self, provider: OCIProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         instance = _instance(
             "ts-control",
@@ -190,7 +199,7 @@ class TestOCITailscaleAdditionalParts:
 class TestOCITailscaleValidation:
     """Cover schema enforcement (mutual exclusion, both auth modes)."""
 
-    def test_both_auth_modes_rejected(self, provider, tmp_dirs):
+    def test_both_auth_modes_rejected(self, provider: OCIProvider, tmp_dirs: Any) -> None:
         from infrafoundry.core.tailscale import TailscaleSchemaError
 
         instance = _instance(
@@ -209,7 +218,7 @@ class TestOCITailscaleValidation:
         with pytest.raises(TailscaleSchemaError, match="exactly one"):
             provider.generate_terraform([instance])
 
-    def test_no_auth_mode_rejected(self, provider, tmp_dirs):
+    def test_no_auth_mode_rejected(self, provider: OCIProvider, tmp_dirs: Any) -> None:
         from infrafoundry.core.tailscale import TailscaleSchemaError
 
         instance = _instance("ts-control", tailscale={"auth": {}})
@@ -217,7 +226,9 @@ class TestOCITailscaleValidation:
         with pytest.raises(TailscaleSchemaError, match="exactly one"):
             provider.generate_terraform([instance])
 
-    def test_tailscale_and_cloud_init_snippets_rejected(self, provider, tmp_dirs):
+    def test_tailscale_and_cloud_init_snippets_rejected(
+        self, provider: OCIProvider, tmp_dirs: Any
+    ) -> None:
         from infrafoundry.core.tailscale import TailscaleSchemaError
 
         instance = _instance(
@@ -229,7 +240,7 @@ class TestOCITailscaleValidation:
         with pytest.raises(TailscaleSchemaError, match="mutually exclusive"):
             provider.generate_terraform([instance])
 
-    def test_invalid_tag_format_rejected(self, provider, tmp_dirs):
+    def test_invalid_tag_format_rejected(self, provider: OCIProvider, tmp_dirs: Any) -> None:
         from infrafoundry.core.tailscale import TailscaleSchemaError
 
         instance = _instance(
@@ -247,7 +258,9 @@ class TestOCITailscaleValidation:
 class TestOCITailscaleMultipleInstances:
     """Cover deduplication when multiple instances share the same auth secret."""
 
-    def test_multiple_instances_one_var_declaration(self, provider, tmp_dirs):
+    def test_multiple_instances_one_var_declaration(
+        self, provider: OCIProvider, tmp_dirs: Any
+    ) -> None:
         _, output_dir = tmp_dirs
         instances = [
             _instance(
@@ -275,7 +288,9 @@ class TestOCITailscaleMultipleInstances:
 class TestOCITailscaleRegression:
     """Cover that the existing cloud_init_snippets path still works."""
 
-    def test_instance_without_tailscale_uses_existing_path(self, provider, tmp_dirs):
+    def test_instance_without_tailscale_uses_existing_path(
+        self, provider: OCIProvider, tmp_dirs: Any
+    ) -> None:
         config_dir, output_dir = tmp_dirs
         snippets_dir = config_dir / "test" / "files" / "cloud-init-snippets"
         snippets_dir.mkdir(parents=True)
@@ -290,7 +305,9 @@ class TestOCITailscaleRegression:
         # Should NOT have a module block
         assert 'module "tailscale_' not in instances_tf
 
-    def test_provider_tf_declares_cloudinit_provider_unconditionally(self, provider, tmp_dirs):
+    def test_provider_tf_declares_cloudinit_provider_unconditionally(
+        self, provider: OCIProvider, tmp_dirs: Any
+    ) -> None:
         _, output_dir = tmp_dirs
         # Even without any tailscale-using instance, the provider declaration
         # is unconditional (simpler than gating on instance content).

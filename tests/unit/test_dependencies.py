@@ -10,7 +10,7 @@ from infrafoundry.core.dependencies.graph_algorithms import CircularDependencyEr
 from infrafoundry.core.dependencies.impact_analyzer import ResourceNode as RNImpl
 
 
-def test_dependencies_reexports():
+def test_dependencies_reexports() -> None:
     """Ensure backward-compatible re-exports stay wired."""
     assert DependencyGraph is DGImpl
     assert CircularDependencyError is CDEImpl

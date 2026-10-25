@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -10,20 +12,20 @@ from infrafoundry.providers.oci.validators.image_validator import ImageValidator
 
 
 @pytest.fixture
-def report():
+def report() -> ValidationReport:
     """Create a validation report."""
     return ValidationReport()
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: ValidationReport) -> ImageValidator:
     """Create an ImageValidator instance."""
     return ImageValidator(report)
 
 
 def _instance(name: str, image_ocid: str = "") -> ResourceConfig:
     """Helper to create an instance resource config."""
-    config: dict = {"shape": "VM.Standard.A1.Flex", "subnet": "my-subnet"}
+    config: dict[str, Any] = {"shape": "VM.Standard.A1.Flex", "subnet": "my-subnet"}
     if image_ocid:
         config["image_ocid"] = image_ocid
     return ResourceConfig(name=name, type="instance", provider="oci", config=config)
@@ -32,7 +34,7 @@ def _instance(name: str, image_ocid: str = "") -> ResourceConfig:
 class TestImageValidator:
     """Tests for ImageValidator.validate method."""
 
-    def test_image_found(self, validator, report):
+    def test_image_found(self, validator: ImageValidator, report: ValidationReport) -> None:
         """Image OCID found produces SUCCESS with display name."""
         resources = [_instance("my-instance", "ocid1.image.oc1..aaa")]
         images = [
@@ -48,7 +50,7 @@ class TestImageValidator:
         assert "Oracle-Linux-8" in result.message
         assert "my-instance" in result.message
 
-    def test_image_not_found(self, validator, report):
+    def test_image_not_found(self, validator: ImageValidator, report: ValidationReport) -> None:
         """Image OCID not found produces ERROR with instance names."""
         resources = [_instance("my-instance", "ocid1.image.oc1..missing")]
         images = [{"id": "ocid1.image.oc1..aaa", "displayName": "Oracle-Linux-8"}]
@@ -62,7 +64,7 @@ class TestImageValidator:
         assert "not found" in result.message
         assert "my-instance" in result.message
 
-    def test_none_images_skips(self, validator, report):
+    def test_none_images_skips(self, validator: ImageValidator, report: ValidationReport) -> None:
         """None images (API failure) produces no checks."""
         resources = [_instance("my-instance", "ocid1.image.oc1..aaa")]
 
@@ -70,7 +72,7 @@ class TestImageValidator:
 
         assert len(report.results) == 0
 
-    def test_no_instances_skips(self, validator, report):
+    def test_no_instances_skips(self, validator: ImageValidator, report: ValidationReport) -> None:
         """No instance resources produces no checks."""
         resources = [
             ResourceConfig(
@@ -86,7 +88,7 @@ class TestImageValidator:
 
         assert len(report.results) == 0
 
-    def test_no_image_ocid_skips(self, validator, report):
+    def test_no_image_ocid_skips(self, validator: ImageValidator, report: ValidationReport) -> None:
         """Instance without image_ocid produces no checks."""
         resources = [_instance("my-instance")]
         images = [{"id": "ocid1.image.oc1..aaa", "displayName": "Oracle-Linux-8"}]
@@ -95,7 +97,9 @@ class TestImageValidator:
 
         assert len(report.results) == 0
 
-    def test_multiple_instances_same_image(self, validator, report):
+    def test_multiple_instances_same_image(
+        self, validator: ImageValidator, report: ValidationReport
+    ) -> None:
         """Multiple instances referencing same image produce one check."""
         resources = [
             _instance("instance-1", "ocid1.image.oc1..aaa"),
@@ -111,7 +115,7 @@ class TestImageValidator:
         assert "instance-1" in result.message
         assert "instance-2" in result.message
 
-    def test_empty_image_list(self, validator, report):
+    def test_empty_image_list(self, validator: ImageValidator, report: ValidationReport) -> None:
         """Empty image list with references produces errors."""
         resources = [_instance("my-instance", "ocid1.image.oc1..aaa")]
 

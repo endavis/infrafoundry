@@ -1,7 +1,9 @@
 """Unit tests for list_environments on repositories and StateManager."""
 
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine
@@ -17,7 +19,7 @@ from infrafoundry.core.state.resource_repository import ResourceRepository
 
 
 @pytest.fixture
-def temp_db():
+def temp_db() -> Iterator[str]:
     """Create a temporary database connection string."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test_state.db"
@@ -25,7 +27,7 @@ def temp_db():
 
 
 @pytest.fixture
-def session_factory(temp_db):
+def session_factory(temp_db: str) -> Any:
     """Create a session factory with initialized schema."""
     engine = create_engine(temp_db)
     Base.metadata.create_all(engine)
@@ -33,19 +35,19 @@ def session_factory(temp_db):
 
 
 @pytest.fixture
-def resource_repo(session_factory) -> ResourceRepository:
+def resource_repo(session_factory: Any) -> ResourceRepository:
     """Create a ResourceRepository."""
     return ResourceRepository(session_factory)
 
 
 @pytest.fixture
-def deployment_repo(session_factory) -> DeploymentRepository:
+def deployment_repo(session_factory: Any) -> DeploymentRepository:
     """Create a DeploymentRepository."""
     return DeploymentRepository(session_factory)
 
 
 @pytest.fixture
-def state_manager(temp_db) -> StateManager:
+def state_manager(temp_db: str) -> StateManager:
     """Create and initialize a StateManager."""
     mgr = StateManager(connection_string=temp_db)
     mgr.initialize()

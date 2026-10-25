@@ -164,7 +164,7 @@ class TestPrepareTerraformGeneration:
     def test_missing_ensure_directories_raises(self, tmp_path: Path) -> None:
         """Raises AttributeError if ensure_directories is missing."""
         mixin = TerraformGeneratorMixin()
-        mixin.terraform_dir = tmp_path  # type: ignore[attr-defined]
+        mixin.terraform_dir = tmp_path
 
         with pytest.raises(AttributeError, match="ensure_directories"):
             mixin.prepare_terraform_generation([])

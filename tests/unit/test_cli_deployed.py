@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -14,13 +15,13 @@ from infrafoundry.core.state.models import ResourceState
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     mock.state_manager = Mock()
@@ -28,7 +29,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def sample_deployment():
+def sample_deployment() -> Mock:
     """A single completed apply deployment."""
     dep = Mock()
     dep.id = 42
@@ -43,7 +44,7 @@ def sample_deployment():
 
 
 @pytest.fixture
-def sample_resources():
+def sample_resources() -> list[Any]:
     """Sample resources across two providers."""
     r1 = Mock()
     r1.name = "aiqum"
@@ -73,8 +74,11 @@ def sample_resources():
 
 
 def test_deployed_shows_deployment_info(
-    cli_runner, mock_orchestrator, sample_deployment, sample_resources
-):
+    cli_runner: CliRunner,
+    mock_orchestrator: Mock,
+    sample_deployment: Mock,
+    sample_resources: list[Any],
+) -> None:
     """Test that deployed command shows latest deployment info and resources."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployment]
     mock_orchestrator.state_manager.get_resources.return_value = sample_resources
@@ -104,7 +108,7 @@ def test_deployed_shows_deployment_info(
     mock_orchestrator.state_manager.get_resources.assert_called_once_with(environment="prod")
 
 
-def test_deployed_no_deployments(cli_runner, mock_orchestrator):
+def test_deployed_no_deployments(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test deployed command when no deployments exist."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = []
     mock_orchestrator.state_manager.get_resources.return_value = []
@@ -117,7 +121,9 @@ def test_deployed_no_deployments(cli_runner, mock_orchestrator):
     assert "No tracked resources for environment 'staging'" in result.output
 
 
-def test_deployed_no_resources(cli_runner, mock_orchestrator, sample_deployment):
+def test_deployed_no_resources(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployment: Mock
+) -> None:
     """Test deployed command when deployment exists but no resources tracked."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployment]
     mock_orchestrator.state_manager.get_resources.return_value = []
@@ -130,7 +136,12 @@ def test_deployed_no_resources(cli_runner, mock_orchestrator, sample_deployment)
     assert "No tracked resources for environment 'prod'" in result.output
 
 
-def test_deployed_json_output(cli_runner, mock_orchestrator, sample_deployment, sample_resources):
+def test_deployed_json_output(
+    cli_runner: CliRunner,
+    mock_orchestrator: Mock,
+    sample_deployment: Mock,
+    sample_resources: list[Any],
+) -> None:
     """Test JSON output has correct structure."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployment]
     mock_orchestrator.state_manager.get_resources.return_value = sample_resources
@@ -153,7 +164,7 @@ def test_deployed_json_output(cli_runner, mock_orchestrator, sample_deployment, 
     assert data["resources"]["opnsense"][0]["updated"] == "2026-04-12 14:30"
 
 
-def test_deployed_json_no_deployments(cli_runner, mock_orchestrator):
+def test_deployed_json_no_deployments(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test JSON output when no deployments exist."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = []
     mock_orchestrator.state_manager.get_resources.return_value = []
@@ -171,7 +182,9 @@ def test_deployed_json_no_deployments(cli_runner, mock_orchestrator):
     assert data["resources"] == {}
 
 
-def test_deployed_missing_ip_and_node(cli_runner, mock_orchestrator, sample_deployment):
+def test_deployed_missing_ip_and_node(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployment: Mock
+) -> None:
     """Test that missing IP/node fields show dash placeholder."""
     resource = Mock()
     resource.name = "some-service"
@@ -194,7 +207,9 @@ def test_deployed_missing_ip_and_node(cli_runner, mock_orchestrator, sample_depl
     assert "\u2014" in result.output
 
 
-def test_deployed_null_config(cli_runner, mock_orchestrator, sample_deployment):
+def test_deployed_null_config(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployment: Mock
+) -> None:
     """Test resource with None config does not crash."""
     resource = Mock()
     resource.name = "orphan"
@@ -216,7 +231,7 @@ def test_deployed_null_config(cli_runner, mock_orchestrator, sample_deployment):
     assert "\u2014" in result.output
 
 
-def test_deployed_state_error(cli_runner, mock_orchestrator):
+def test_deployed_state_error(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test handling of state DB not initialized."""
     from infrafoundry.core.exceptions import StateError
 
@@ -231,7 +246,7 @@ def test_deployed_state_error(cli_runner, mock_orchestrator):
     assert "infra init" in result.output
 
 
-def test_deployed_requires_env(cli_runner, mock_orchestrator):
+def test_deployed_requires_env(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test that --env is required."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "deployed"])
@@ -240,7 +255,9 @@ def test_deployed_requires_env(cli_runner, mock_orchestrator):
     assert "Missing option" in result.output or "required" in result.output.lower()
 
 
-def test_deployed_alternative_ip_keys(cli_runner, mock_orchestrator, sample_deployment):
+def test_deployed_alternative_ip_keys(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployment: Mock
+) -> None:
     """Test that alternative config keys (address, ip, node) are recognized."""
     r1 = Mock()
     r1.name = "host-with-address"

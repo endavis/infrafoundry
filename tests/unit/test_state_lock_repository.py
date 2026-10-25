@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import threading
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from infrafoundry.core.state.models import Base, DeploymentLock
 
 
 @pytest.fixture
-def temp_db():
+def temp_db() -> Iterator[str]:
     """Create a temporary database for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test_locks.db"
@@ -26,7 +27,7 @@ def temp_db():
 
 
 @pytest.fixture
-def state_manager(temp_db):
+def state_manager(temp_db: str) -> StateManager:
     """Create a StateManager with temporary database."""
     manager = StateManager(connection_string=temp_db)
     manager.initialize()

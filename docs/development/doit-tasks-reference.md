@@ -139,6 +139,8 @@ Run mypy type checking.
 doit type_check
 ```
 
+Runs `mypy src/ tools/ tests/ bootstrap.py` with the strict settings in `[tool.mypy]`. The pre-commit mypy hook uses the same scope.
+
 ### `check`
 
 Run all quality checks in sequence.
@@ -147,7 +149,7 @@ Run all quality checks in sequence.
 doit check
 ```
 
-Runs format check, lint, blueprint lint, type check, security, audit, spelling, a wheel smoke test (`wheel_check`), a strict docs build (`docs_build`), and tests. Stops on first failure.
+Runs format check, lint, blueprint lint, type check, dead code (`deadcode`), security, audit, spelling, a wheel smoke test (`wheel_check`), a strict docs build (`docs_build`), and tests. Stops on first failure.
 
 ### `wheel_check`
 
@@ -195,6 +197,8 @@ Detect unused code with vulture.
 ```bash
 doit deadcode
 ```
+
+Scans the `paths` in `[tool.vulture]` (`src`, `tests`, `tools`) and is part of `doit check`. Each `ignore_names` entry carries a comment naming the reference vulture cannot see.
 
 ---
 

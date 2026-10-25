@@ -1,6 +1,8 @@
 """Unit tests for the 'infra list' CLI command."""
 
 import json
+from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -13,13 +15,13 @@ from infrafoundry.core.exceptions import EnvironmentNotFoundError
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_config_manager():
+def mock_config_manager() -> Mock:
     """Mock ConfigManager for testing."""
     mock = Mock(spec=ConfigManager)
     mock.provider_centric = Mock()
@@ -42,7 +44,9 @@ def _make_manifest(
     )
 
 
-def test_list_packages_text(cli_runner, mock_config_manager, tmp_path):
+def test_list_packages_text(
+    cli_runner: CliRunner, mock_config_manager: Mock, tmp_path: Path
+) -> None:
     """Test listing packages in text format."""
     mock_config_manager.provider_centric.discover_providers.return_value = {"proxmox"}
 
@@ -66,7 +70,9 @@ def test_list_packages_text(cli_runner, mock_config_manager, tmp_path):
     assert "Test cluster" in result.output
 
 
-def test_list_packages_json(cli_runner, mock_config_manager, tmp_path):
+def test_list_packages_json(
+    cli_runner: CliRunner, mock_config_manager: Mock, tmp_path: Path
+) -> None:
     """Test listing packages in JSON format."""
     mock_config_manager.provider_centric.discover_providers.return_value = {"proxmox"}
 
@@ -95,7 +101,7 @@ def test_list_packages_json(cli_runner, mock_config_manager, tmp_path):
     assert pkg["blueprint"] == "base-vm"
 
 
-def test_list_packages_empty(cli_runner, mock_config_manager):
+def test_list_packages_empty(cli_runner: CliRunner, mock_config_manager: Mock) -> None:
     """Test listing packages when none exist."""
     mock_config_manager.provider_centric.discover_providers.return_value = set()
     mock_config_manager._package_loader.discover_env_root_packages.return_value = []
@@ -110,7 +116,7 @@ def test_list_packages_empty(cli_runner, mock_config_manager):
     assert "No packages found" in result.output
 
 
-def test_list_packages_empty_json(cli_runner, mock_config_manager):
+def test_list_packages_empty_json(cli_runner: CliRunner, mock_config_manager: Mock) -> None:
     """Test listing packages in JSON format when none exist."""
     mock_config_manager.provider_centric.discover_providers.return_value = set()
     mock_config_manager._package_loader.discover_env_root_packages.return_value = []
@@ -127,7 +133,7 @@ def test_list_packages_empty_json(cli_runner, mock_config_manager):
     assert data["packages"] == []
 
 
-def test_list_packages_invalid_env(cli_runner, mock_config_manager):
+def test_list_packages_invalid_env(cli_runner: CliRunner, mock_config_manager: Mock) -> None:
     """Test listing packages with an invalid environment name."""
     mock_config_manager.provider_centric.discover_providers.side_effect = EnvironmentNotFoundError(
         "Environment 'nonexistent' not found"
@@ -142,7 +148,9 @@ def test_list_packages_invalid_env(cli_runner, mock_config_manager):
     assert result.exit_code != 0
 
 
-def test_list_packages_no_description(cli_runner, mock_config_manager, tmp_path):
+def test_list_packages_no_description(
+    cli_runner: CliRunner, mock_config_manager: Mock, tmp_path: Path
+) -> None:
     """Test listing a package without a description."""
     mock_config_manager.provider_centric.discover_providers.return_value = {"proxmox"}
 
@@ -166,7 +174,9 @@ def test_list_packages_no_description(cli_runner, mock_config_manager, tmp_path)
     assert "bare-pkg —" not in result.output
 
 
-def test_list_packages_multiple_providers(cli_runner, mock_config_manager, tmp_path):
+def test_list_packages_multiple_providers(
+    cli_runner: CliRunner, mock_config_manager: Mock, tmp_path: Path
+) -> None:
     """Test listing packages across multiple providers."""
     mock_config_manager.provider_centric.discover_providers.return_value = {
         "proxmox",
@@ -178,7 +188,7 @@ def test_list_packages_multiple_providers(cli_runner, mock_config_manager, tmp_p
     opnsense_pkg = tmp_path / "prod" / "opnsense" / "firewall"
     opnsense_pkg.mkdir(parents=True)
 
-    def discover_packages(_env_name, provider):
+    def discover_packages(_env_name: Any, provider: Any) -> list[Any]:
         if provider == "proxmox":
             return [proxmox_pkg]
         if provider == "opnsense":
@@ -193,7 +203,7 @@ def test_list_packages_multiple_providers(cli_runner, mock_config_manager, tmp_p
         str(opnsense_pkg): _make_manifest(name="firewall", description="Firewall rules"),
     }
 
-    def parse_manifest(path):
+    def parse_manifest(path: Any) -> Any:
         # Match on the parent directory
         parent = str(path.parent)
         return manifests[parent]
@@ -211,7 +221,9 @@ def test_list_packages_multiple_providers(cli_runner, mock_config_manager, tmp_p
     assert "proxmox/cluster" in result.output
 
 
-def test_list_packages_env_root_packages(cli_runner, mock_config_manager, tmp_path):
+def test_list_packages_env_root_packages(
+    cli_runner: CliRunner, mock_config_manager: Mock, tmp_path: Path
+) -> None:
     """Test listing env-root packages (not under a provider directory)."""
     mock_config_manager.provider_centric.discover_providers.return_value = set()
 
@@ -233,7 +245,9 @@ def test_list_packages_env_root_packages(cli_runner, mock_config_manager, tmp_pa
     assert "Shared package" in result.output
 
 
-def test_list_packages_with_config_dir(cli_runner, mock_config_manager, tmp_path):
+def test_list_packages_with_config_dir(
+    cli_runner: CliRunner, mock_config_manager: Mock, tmp_path: Path
+) -> None:
     """Test listing packages with a custom config directory."""
     mock_config_manager.provider_centric.discover_providers.return_value = {"proxmox"}
 

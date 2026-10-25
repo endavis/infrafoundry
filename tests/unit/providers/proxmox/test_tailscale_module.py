@@ -10,6 +10,9 @@ path is unchanged for VMs without a tailscale block.
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any, cast
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -17,7 +20,7 @@ from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 @pytest.fixture
-def tmp_dirs(tmp_path):
+def tmp_dirs(tmp_path: Path) -> Any:
     """Create temporary config and output directories."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -27,7 +30,7 @@ def tmp_dirs(tmp_path):
 
 
 @pytest.fixture
-def provider(tmp_dirs):
+def provider(tmp_dirs: Any) -> ProxmoxProvider:
     """ProxmoxProvider with the test environment set."""
     config_dir, output_dir = tmp_dirs
     p = ProxmoxProvider(config_dir, output_dir)
@@ -35,7 +38,9 @@ def provider(tmp_dirs):
     return p
 
 
-def _vm(name: str, *, tailscale: dict | None = None, **extra_config) -> ResourceConfig:
+def _vm(
+    name: str, *, tailscale: dict[str, Any] | None = None, **extra_config: Any
+) -> ResourceConfig:
     """Build a minimal Proxmox VM ResourceConfig with optional tailscale block."""
     config = {
         "name": name,
@@ -49,14 +54,14 @@ def _vm(name: str, *, tailscale: dict | None = None, **extra_config) -> Resource
     return ResourceConfig(name=name, type="vm", provider="proxmox", config=config)
 
 
-def _read_tf(output_dir, filename: str) -> str:
-    return (output_dir / "test" / "terraform" / "proxmox" / filename).read_text()
+def _read_tf(output_dir: Any, filename: str) -> str:
+    return cast("str", (output_dir / "test" / "terraform" / "proxmox" / filename).read_text())
 
 
 class TestProxmoxTailscaleAuthKey:
     """Cover the static auth_key auth mode."""
 
-    def test_module_block_emitted(self, provider, tmp_dirs):
+    def test_module_block_emitted(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         vm = _vm(
             "ts-control",
@@ -74,7 +79,7 @@ class TestProxmoxTailscaleAuthKey:
         assert 'version = "0.0.11"' in vms_tf
         assert "auth_key = var.tailscale_auth_key" in vms_tf
 
-    def test_base64_encode_is_false(self, provider, tmp_dirs):
+    def test_base64_encode_is_false(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         vm = _vm(
             "ts-control",
@@ -87,7 +92,9 @@ class TestProxmoxTailscaleAuthKey:
         # base64-encode its output or Proxmox would store gibberish.
         assert "base64_encode = false" in vms_tf
 
-    def test_file_resource_uses_module_rendered(self, provider, tmp_dirs):
+    def test_file_resource_uses_module_rendered(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
         _, output_dir = tmp_dirs
         vm = _vm(
             "ts-control",
@@ -104,7 +111,9 @@ class TestProxmoxTailscaleAuthKey:
             "cloud_init_user_data_ts_control.id"
         ) in vms_tf
 
-    def test_variables_tf_declares_sensitive_var(self, provider, tmp_dirs):
+    def test_variables_tf_declares_sensitive_var(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
         _, output_dir = tmp_dirs
         vm = _vm(
             "ts-control",
@@ -116,7 +125,7 @@ class TestProxmoxTailscaleAuthKey:
         assert 'variable "tailscale_auth_key"' in variables_tf
         assert "sensitive   = true" in variables_tf
 
-    def test_advertise_tags_rendered(self, provider, tmp_dirs):
+    def test_advertise_tags_rendered(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         vm = _vm(
             "ts-control",
@@ -136,7 +145,7 @@ class TestProxmoxTailscaleAuthKey:
 class TestProxmoxTailscaleOAuth:
     """Cover the OAuth client credentials auth mode."""
 
-    def test_oauth_module_block_emitted(self, provider, tmp_dirs):
+    def test_oauth_module_block_emitted(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         vm = _vm(
             "ts-control",
@@ -157,7 +166,9 @@ class TestProxmoxTailscaleOAuth:
         assert "client_secret = var.tailscale_oauth_client_secret" in vms_tf
         assert "auth_key" not in vms_tf
 
-    def test_oauth_variables_tf_has_both_secrets(self, provider, tmp_dirs):
+    def test_oauth_variables_tf_has_both_secrets(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
         _, output_dir = tmp_dirs
         vm = _vm(
             "ts-control",
@@ -180,7 +191,7 @@ class TestProxmoxTailscaleOAuth:
 class TestProxmoxTailscaleAdditionalParts:
     """Cover the ``additional_parts`` escape hatch."""
 
-    def test_additional_parts_rendered(self, provider, tmp_dirs):
+    def test_additional_parts_rendered(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         vm = _vm(
             "ts-control",
@@ -206,7 +217,7 @@ class TestProxmoxTailscaleAdditionalParts:
 class TestProxmoxTailscaleValidation:
     """Cover schema enforcement (mutual exclusion, both auth modes)."""
 
-    def test_both_auth_modes_rejected(self, provider, tmp_dirs):
+    def test_both_auth_modes_rejected(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         from infrafoundry.core.tailscale import TailscaleSchemaError
 
         vm = _vm(
@@ -225,7 +236,7 @@ class TestProxmoxTailscaleValidation:
         with pytest.raises(TailscaleSchemaError, match="exactly one"):
             provider.generate_terraform([vm])
 
-    def test_no_auth_mode_rejected(self, provider, tmp_dirs):
+    def test_no_auth_mode_rejected(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         from infrafoundry.core.tailscale import TailscaleSchemaError
 
         vm = _vm("ts-control", tailscale={"auth": {}})
@@ -233,7 +244,9 @@ class TestProxmoxTailscaleValidation:
         with pytest.raises(TailscaleSchemaError, match="exactly one"):
             provider.generate_terraform([vm])
 
-    def test_tailscale_and_cloud_init_snippets_rejected(self, provider, tmp_dirs):
+    def test_tailscale_and_cloud_init_snippets_rejected(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
         from infrafoundry.core.tailscale import TailscaleSchemaError
 
         vm = _vm(
@@ -245,7 +258,7 @@ class TestProxmoxTailscaleValidation:
         with pytest.raises(TailscaleSchemaError, match="mutually exclusive"):
             provider.generate_terraform([vm])
 
-    def test_invalid_tag_format_rejected(self, provider, tmp_dirs):
+    def test_invalid_tag_format_rejected(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         from infrafoundry.core.tailscale import TailscaleSchemaError
 
         vm = _vm(
@@ -263,7 +276,9 @@ class TestProxmoxTailscaleValidation:
 class TestProxmoxTailscaleMultipleVMs:
     """Cover deduplication when multiple VMs share the same auth secret."""
 
-    def test_multiple_vms_one_var_declaration(self, provider, tmp_dirs):
+    def test_multiple_vms_one_var_declaration(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
         _, output_dir = tmp_dirs
         vms = [
             _vm(
@@ -290,7 +305,9 @@ class TestProxmoxTailscaleMultipleVMs:
 class TestProxmoxTailscaleRegression:
     """Cover that the existing cloud_init_snippets path still works."""
 
-    def test_vm_without_tailscale_uses_existing_path(self, provider, tmp_dirs):
+    def test_vm_without_tailscale_uses_existing_path(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
         config_dir, output_dir = tmp_dirs
         snippets_dir = config_dir / "test" / "files" / "cloud-init-snippets"
         snippets_dir.mkdir(parents=True)
@@ -305,7 +322,9 @@ class TestProxmoxTailscaleRegression:
         # Should NOT have a module block
         assert 'module "tailscale_' not in vms_tf
 
-    def test_provider_tf_declares_cloudinit_provider_unconditionally(self, provider, tmp_dirs):
+    def test_provider_tf_declares_cloudinit_provider_unconditionally(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
         _, output_dir = tmp_dirs
         vm = _vm("plain")
         provider.generate_terraform([vm])

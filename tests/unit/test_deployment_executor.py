@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -11,11 +12,12 @@ from infrafoundry.core.deployment_executor import DeploymentExecutor
 from infrafoundry.core.events import EventAbortedError, EventType
 from infrafoundry.core.events.context import EventResult
 from infrafoundry.core.exceptions import ResourceFilterError, TerraformError
+from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.state import ResourceState
 from infrafoundry.core.types import ResourceOutcome
 
 
-def _resource(name: str, provider: str = "proxmox", type_: str = "vm"):
+def _resource(name: str, provider: str = "proxmox", type_: str = "vm") -> MagicMock:
     res = MagicMock()
     res.name = name
     res.provider = provider
@@ -24,7 +26,7 @@ def _resource(name: str, provider: str = "proxmox", type_: str = "vm"):
     return res
 
 
-def test_apply_serial_orders_providers_and_tracks_states():
+def test_apply_serial_orders_providers_and_tracks_states() -> None:
     """Serial apply honors provider order and updates resource state transitions."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -46,12 +48,12 @@ def test_apply_serial_orders_providers_and_tracks_states():
     ]
     event_manager = MagicMock()
 
-    providers = {
+    providers: dict[str, ProviderBase] = {
         "opnsense": MagicMock(),
         "proxmox": MagicMock(),
     }
 
-    resources_by_provider = {
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
         "opnsense": [_resource("fw")],
         "proxmox": [_resource("vm1")],
     }
@@ -98,7 +100,7 @@ def test_apply_serial_orders_providers_and_tracks_states():
     )
 
 
-def test_apply_parallel_uses_executor_and_handles_runner_errors():
+def test_apply_parallel_uses_executor_and_handles_runner_errors() -> None:
     """Parallel apply aggregates results and captures runner exceptions."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -110,7 +112,7 @@ def test_apply_parallel_uses_executor_and_handles_runner_errors():
     tf_runner.destroy = MagicMock()
     tf_runner.get_resource_ids = MagicMock()
 
-    def create_runner(name, console=None):
+    def create_runner(name: Any, console: Any = None) -> Any:
         return tf_runner
 
     runner_registry.create_runner.side_effect = create_runner
@@ -120,14 +122,14 @@ def test_apply_parallel_uses_executor_and_handles_runner_errors():
 
     provider_ok = MagicMock()
     provider_err = MagicMock()
-    providers = {"proxmox": provider_ok, "opnsense": provider_err}
+    providers: dict[str, ProviderBase] = {"proxmox": provider_ok, "opnsense": provider_err}
 
-    resources_by_provider = {
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
         "proxmox": [_resource("vm1", provider="proxmox")],
         "opnsense": [_resource("fw1", provider="opnsense")],
     }
 
-    def runner_apply(provider, auto_approve=True, **kwargs):
+    def runner_apply(provider: Any, auto_approve: Any = True, **kwargs: Any) -> dict[str, Any]:
         if provider is provider_err:
             raise RuntimeError("boom")
         return {"success": True}
@@ -155,7 +157,7 @@ def test_apply_parallel_uses_executor_and_handles_runner_errors():
     assert results["opnsense"]["error"] == "boom"
 
 
-def test_apply_single_provider_tracks_resources_and_emits_events():
+def test_apply_single_provider_tracks_resources_and_emits_events() -> None:
     """Single provider apply tracks each resource through state transitions."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform", "ansible"]
@@ -178,7 +180,7 @@ def test_apply_single_provider_tracks_resources_and_emits_events():
     ansible_runner.plan = MagicMock()
     # Not setting get_resource_ids/destroy for ansible_runner
 
-    def create_runner(name, console=None):
+    def create_runner(name: Any, console: Any = None) -> Any:
         return tf_runner if name == "terraform" else ansible_runner
 
     runner_registry.create_runner.side_effect = create_runner
@@ -192,9 +194,9 @@ def test_apply_single_provider_tracks_resources_and_emits_events():
     event_manager = MagicMock()
 
     provider = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
-    resources = [
+    resources: list[ResourceConfig] = [
         _resource("vm1", provider="proxmox"),
         _resource("vm2", provider="proxmox"),
     ]
@@ -256,7 +258,7 @@ def test_apply_single_provider_tracks_resources_and_emits_events():
     assert len(created_calls) == 2
 
 
-def test_apply_single_provider_runs_runners_in_priority_order():
+def test_apply_single_provider_runs_runners_in_priority_order() -> None:
     """Single provider apply respects runner priority ordering."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["ansible", "terraform"]
@@ -267,7 +269,7 @@ def test_apply_single_provider_runs_runners_in_priority_order():
     tf_runner.priority = 0
 
     # Set protocol methods with side effects for execution tracking
-    def tf_apply(provider, auto_approve=True, **kwargs):
+    def tf_apply(provider: Any, auto_approve: Any = True, **kwargs: Any) -> dict[str, Any]:
         execution_order.append("terraform")
         return {"success": True}
 
@@ -279,7 +281,7 @@ def test_apply_single_provider_runs_runners_in_priority_order():
     ansible_runner = MagicMock()
     ansible_runner.priority = 50
 
-    def ansible_apply(provider, auto_approve=True, **kwargs):
+    def ansible_apply(provider: Any, auto_approve: Any = True, **kwargs: Any) -> dict[str, Any]:
         execution_order.append("ansible")
         return {"success": True}
 
@@ -287,7 +289,7 @@ def test_apply_single_provider_runs_runners_in_priority_order():
     ansible_runner.apply = MagicMock(side_effect=ansible_apply)
     ansible_runner.plan = MagicMock()
 
-    def create_runner(name, console=None):
+    def create_runner(name: Any, console: Any = None) -> Any:
         return tf_runner if name == "terraform" else ansible_runner
 
     runner_registry.create_runner.side_effect = create_runner
@@ -297,8 +299,8 @@ def test_apply_single_provider_runs_runners_in_priority_order():
     event_manager = MagicMock()
 
     provider = MagicMock()
-    providers = {"proxmox": provider}
-    resources = [_resource("vm1")]
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
+    resources: list[ResourceConfig] = [_resource("vm1")]
 
     executor = DeploymentExecutor(
         runner_registry=runner_registry,
@@ -320,7 +322,7 @@ def test_apply_single_provider_runs_runners_in_priority_order():
     assert execution_order == ["terraform", "ansible"]
 
 
-def test_get_sorted_runners_respects_priority_overrides():
+def test_get_sorted_runners_respects_priority_overrides() -> None:
     """Runner sorting uses priority overrides from environment config."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform", "ansible", "pyinfra"]
@@ -334,7 +336,7 @@ def test_get_sorted_runners_respects_priority_overrides():
     pyinfra_runner = MagicMock()
     pyinfra_runner.priority = 50
 
-    def create_runner(name, console=None):
+    def create_runner(name: Any, console: Any = None) -> Any:
         if name == "terraform":
             return tf_runner
         elif name == "ansible":
@@ -346,7 +348,7 @@ def test_get_sorted_runners_respects_priority_overrides():
 
     state_manager = MagicMock()
     event_manager = MagicMock()
-    providers = {}
+    providers: dict[str, ProviderBase] = {}
 
     # Override terraform to run last
     runner_priorities = {"terraform": 100}
@@ -367,13 +369,13 @@ def test_get_sorted_runners_respects_priority_overrides():
     assert names.index("terraform") > names.index("pyinfra")
 
 
-def test_apply_serial_with_empty_resources():
+def test_apply_serial_with_empty_resources() -> None:
     """Serial apply handles empty resource list gracefully."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
     state_manager = MagicMock()
     event_manager = MagicMock()
-    providers = {}
+    providers: dict[str, ProviderBase] = {}
 
     executor = DeploymentExecutor(
         runner_registry=runner_registry,
@@ -395,7 +397,7 @@ def test_apply_serial_with_empty_resources():
     assert state_manager.track_resource.call_count == 0
 
 
-def test_apply_parallel_with_all_providers_failing():
+def test_apply_parallel_with_all_providers_failing() -> None:
     """Parallel apply captures all provider failures."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -413,12 +415,12 @@ def test_apply_parallel_with_all_providers_failing():
     state_manager = MagicMock()
     event_manager = MagicMock()
 
-    providers = {
+    providers: dict[str, ProviderBase] = {
         "proxmox": MagicMock(),
         "opnsense": MagicMock(),
     }
 
-    resources_by_provider = {
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
         "proxmox": [_resource("vm1")],
         "opnsense": [_resource("fw1")],
     }
@@ -446,7 +448,7 @@ def test_apply_parallel_with_all_providers_failing():
     assert "Connection timeout" in results["opnsense"]["error"]
 
 
-def test_apply_single_provider_handles_multiple_resources():
+def test_apply_single_provider_handles_multiple_resources() -> None:
     """Single provider apply processes multiple resources correctly."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -470,10 +472,10 @@ def test_apply_single_provider_handles_multiple_resources():
     event_manager = MagicMock()
 
     provider = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
     # Multiple resources
-    resources = [
+    resources: list[ResourceConfig] = [
         _resource("vm1"),
         _resource("vm2"),
         _resource("net1", type_="network"),
@@ -501,7 +503,7 @@ def test_apply_single_provider_handles_multiple_resources():
     assert results["terraform"]["success"] is True
 
 
-def test_apply_single_provider_tracks_state_for_opentofu_runner():
+def test_apply_single_provider_tracks_state_for_opentofu_runner() -> None:
     """StateAware check works for opentofu runner (not just terraform)."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["opentofu"]
@@ -522,9 +524,9 @@ def test_apply_single_provider_tracks_state_for_opentofu_runner():
     event_manager = MagicMock()
 
     provider = MagicMock()
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
-    resources = [_resource("vm1")]
+    resources: list[ResourceConfig] = [_resource("vm1")]
 
     executor = DeploymentExecutor(
         runner_registry=runner_registry,
@@ -549,7 +551,7 @@ def test_apply_single_provider_tracks_state_for_opentofu_runner():
     state_manager.update_resource.assert_called_with(resource_id=1, terraform_id="proxmox_vm.vm1")
 
 
-def test_get_sorted_runners_filters_inactive_iac_tool():
+def test_get_sorted_runners_filters_inactive_iac_tool() -> None:
     """Only the configured IaC runner is included; the other is skipped."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform", "opentofu", "ansible"]
@@ -563,7 +565,7 @@ def test_get_sorted_runners_filters_inactive_iac_tool():
     ansible_runner = MagicMock()
     ansible_runner.priority = 50
 
-    def create_runner(name, console=None):
+    def create_runner(name: Any, console: Any = None) -> Any:
         if name == "terraform":
             return tf_runner
         elif name == "opentofu":
@@ -575,7 +577,7 @@ def test_get_sorted_runners_filters_inactive_iac_tool():
 
     state_manager = MagicMock()
     event_manager = MagicMock()
-    providers = {}
+    providers: dict[str, ProviderBase] = {}
 
     executor = DeploymentExecutor(
         runner_registry=runner_registry,
@@ -599,7 +601,7 @@ def test_get_sorted_runners_filters_inactive_iac_tool():
     assert "ansible" in names
 
 
-def test_apply_emits_runner_starting_and_completed():
+def test_apply_emits_runner_starting_and_completed() -> None:
     """Runner events are emitted around each runner.apply() call."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -618,8 +620,8 @@ def test_apply_emits_runner_starting_and_completed():
     event_manager = MagicMock()
 
     provider = MagicMock()
-    providers = {"proxmox": provider}
-    resources = [_resource("vm1")]
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
+    resources: list[ResourceConfig] = [_resource("vm1")]
 
     executor = DeploymentExecutor(
         runner_registry=runner_registry,
@@ -685,7 +687,7 @@ def test_apply_emits_runner_starting_and_completed():
     assert starting_idx < completed_idx
 
 
-def test_apply_emits_runner_failed_on_exception():
+def test_apply_emits_runner_failed_on_exception() -> None:
     """RUNNER_FAILED is emitted when runner.apply() raises, and exception propagates."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -704,8 +706,8 @@ def test_apply_emits_runner_failed_on_exception():
     event_manager = MagicMock()
 
     provider = MagicMock()
-    providers = {"proxmox": provider}
-    resources = [_resource("vm1")]
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
+    resources: list[ResourceConfig] = [_resource("vm1")]
 
     executor = DeploymentExecutor(
         runner_registry=runner_registry,
@@ -761,7 +763,7 @@ def test_apply_emits_runner_failed_on_exception():
     assert len(completed_calls) == 0
 
 
-def test_apply_single_provider_raises_on_runner_failure():
+def test_apply_single_provider_raises_on_runner_failure() -> None:
     """When runner.apply returns success=False the executor raises TerraformError.
 
     The RUNNER_FAILED event must be emitted (via the existing except handler)
@@ -792,8 +794,8 @@ def test_apply_single_provider_raises_on_runner_failure():
     event_manager = MagicMock()
 
     provider = MagicMock()
-    providers = {"proxmox": provider}
-    resources = [_resource("vm1")]
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
+    resources: list[ResourceConfig] = [_resource("vm1")]
 
     executor = DeploymentExecutor(
         runner_registry=runner_registry,
@@ -831,7 +833,7 @@ def test_apply_single_provider_raises_on_runner_failure():
     assert len(completed_calls) == 0
 
 
-def _make_executor(providers=None):
+def _make_executor(providers: Any = None) -> DeploymentExecutor:
     """Create a minimal DeploymentExecutor for resource filter tests."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = []
@@ -846,10 +848,10 @@ def _make_executor(providers=None):
     )
 
 
-def test_validate_resource_filter_zero_matches_raises():
+def test_validate_resource_filter_zero_matches_raises() -> None:
     """Zero resource filter matches raises ResourceFilterError."""
     executor = _make_executor()
-    resources_by_provider = {
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
         "proxmox": [_resource("vm1"), _resource("vm2")],
     }
 
@@ -857,10 +859,10 @@ def test_validate_resource_filter_zero_matches_raises():
         executor._validate_resource_filter(resources_by_provider, {"nonexistent"})
 
 
-def test_validate_resource_filter_error_includes_names():
+def test_validate_resource_filter_error_includes_names() -> None:
     """Error message includes unmatched filter names and available resource names."""
     executor = _make_executor()
-    resources_by_provider = {
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
         "proxmox": [_resource("vm1"), _resource("vm2")],
     }
 
@@ -873,10 +875,10 @@ def test_validate_resource_filter_error_includes_names():
     assert "vm2" in error_msg
 
 
-def test_validate_resource_filter_partial_match_warns():
+def test_validate_resource_filter_partial_match_warns() -> None:
     """Partial match warns but does not raise."""
     executor = _make_executor()
-    resources_by_provider = {
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
         "proxmox": [_resource("vm1"), _resource("vm2")],
     }
 
@@ -884,10 +886,10 @@ def test_validate_resource_filter_partial_match_warns():
     executor._validate_resource_filter(resources_by_provider, {"vm1", "nonexistent"})
 
 
-def test_validate_resource_filter_full_match_succeeds():
+def test_validate_resource_filter_full_match_succeeds() -> None:
     """Full match does not raise or warn."""
     executor = _make_executor()
-    resources_by_provider = {
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
         "proxmox": [_resource("vm1"), _resource("vm2")],
     }
 
@@ -895,11 +897,11 @@ def test_validate_resource_filter_full_match_succeeds():
     executor._validate_resource_filter(resources_by_provider, {"vm1", "vm2"})
 
 
-def test_apply_serial_raises_on_zero_filter_matches():
+def test_apply_serial_raises_on_zero_filter_matches() -> None:
     """apply_serial raises ResourceFilterError when filter matches nothing."""
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
     executor = _make_executor(providers=providers)
-    resources_by_provider = {
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
         "proxmox": [_resource("vm1")],
     }
 
@@ -913,11 +915,11 @@ def test_apply_serial_raises_on_zero_filter_matches():
         )
 
 
-def test_apply_parallel_raises_on_zero_filter_matches():
+def test_apply_parallel_raises_on_zero_filter_matches() -> None:
     """apply_parallel raises ResourceFilterError when filter matches nothing."""
-    providers = {"proxmox": MagicMock()}
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
     executor = _make_executor(providers=providers)
-    resources_by_provider = {
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
         "proxmox": [_resource("vm1")],
     }
 
@@ -941,8 +943,8 @@ def _resource_with_events(
     name: str,
     provider: str = "proxmox",
     type_: str = "vm",
-    events: dict | None = None,
-):
+    events: dict[str, Any] | None = None,
+) -> MagicMock:
     """Create a mock resource with event handlers configured."""
     res = MagicMock()
     res.name = name
@@ -957,7 +959,7 @@ def _resource_with_events(
 def _make_executor_with_outcomes(
     outcomes: list[ResourceOutcome],
     emit_results: list[EventResult] | None = None,
-):
+) -> Any:
     """Build an executor whose IaC runner returns *outcomes* and whose
     event_manager.emit_event returns *emit_results* for lifecycle events.
 
@@ -990,7 +992,7 @@ def _make_executor_with_outcomes(
             EventType.RESOURCE_DELETED,
         }
 
-        def emit_side_effect(event_type, *args, **kwargs):
+        def emit_side_effect(event_type: Any, *args: Any, **kwargs: Any) -> list[Any]:
             if event_type in lifecycle_types:
                 return emit_results
             return []
@@ -1003,7 +1005,7 @@ def _make_executor_with_outcomes(
         "vm": ["proxmox_virtual_environment_vm"],
     }
 
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
     executor = DeploymentExecutor(
         runner_registry=runner_registry,
@@ -1015,7 +1017,7 @@ def _make_executor_with_outcomes(
     return executor, event_manager, provider
 
 
-def test_event_handler_failure_abort_raises_from_lifecycle_events():
+def test_event_handler_failure_abort_raises_from_lifecycle_events() -> None:
     """Handler failure with abort=True raises EventAbortedError."""
     outcomes = [
         ResourceOutcome(
@@ -1051,7 +1053,7 @@ def test_event_handler_failure_abort_raises_from_lifecycle_events():
         )
 
 
-def test_event_handler_failure_continue_on_error_does_not_raise():
+def test_event_handler_failure_continue_on_error_does_not_raise() -> None:
     """Handler failure with abort=False (continue_on_error) does not raise."""
     outcomes = [
         ResourceOutcome(
@@ -1089,7 +1091,7 @@ def test_event_handler_failure_continue_on_error_does_not_raise():
     assert "terraform" in result
 
 
-def test_event_handler_success_does_not_raise():
+def test_event_handler_success_does_not_raise() -> None:
     """Successful handler results do not raise."""
     outcomes = [
         ResourceOutcome(
@@ -1126,7 +1128,7 @@ def test_event_handler_success_does_not_raise():
     assert "terraform" in result
 
 
-def test_aggregate_group_handler_failure_raises_from_apply_serial():
+def test_aggregate_group_handler_failure_raises_from_apply_serial() -> None:
     """Aggregate RESOURCE_CREATED handler abort raises EventAbortedError."""
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -1163,7 +1165,7 @@ def test_aggregate_group_handler_failure_raises_from_apply_serial():
     event_manager = MagicMock()
     call_count = 0
 
-    def emit_side_effect(event_type, *args, **kwargs):
+    def emit_side_effect(event_type: Any, *args: Any, **kwargs: Any) -> list[Any]:
         nonlocal call_count
         call_count += 1
         # The aggregate RESOURCE_CREATED call in apply_serial is the one
@@ -1182,7 +1184,7 @@ def test_aggregate_group_handler_failure_raises_from_apply_serial():
 
     provider = MagicMock()
     provider.get_terraform_resource_types.return_value = {}
-    providers = {"proxmox": provider}
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
 
     resource = _resource_with_events("web")
 

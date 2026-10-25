@@ -1,6 +1,8 @@
 """Integration tests for CLI automatic credential loading."""
 
 import os
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,13 +12,13 @@ from infrafoundry.cli import main as cli
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Create a Click CLI test runner."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_credentials_setup(tmp_path):
+def mock_credentials_setup(tmp_path: Path) -> Path:
     """Set up mock credential files for testing."""
     # Create secrets directory structure
     secrets_dir = tmp_path / "secrets" / "dev"
@@ -29,10 +31,10 @@ def mock_credentials_setup(tmp_path):
 
 
 @pytest.fixture
-def mock_credential_loader():
+def mock_credential_loader() -> Any:
     """Create a mock CredentialLoader that returns predetermined credentials."""
 
-    def _create_mock(return_value=None):
+    def _create_mock(return_value: Any = None) -> MagicMock:
         mock_loader = MagicMock()
         mock_loader.load_and_apply.return_value = return_value or {}
         return mock_loader
@@ -44,7 +46,9 @@ def mock_credential_loader():
 class TestCLICredentialLoading:
     """Tests for automatic credential loading in CLI commands."""
 
-    def test_plan_command_loads_credentials(self, cli_runner, mock_credentials_setup):
+    def test_plan_command_loads_credentials(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that plan command loads credentials automatically."""
         mock_creds = {
             "KUBECONFIG": "/path/to/kubeconfig",
@@ -68,7 +72,9 @@ class TestCLICredentialLoading:
                 assert mock_loader.load_and_apply.call_count == 1
                 assert mock_loader.load_and_apply.call_args[0][0] == "dev"
 
-    def test_apply_command_loads_credentials(self, cli_runner, mock_credentials_setup):
+    def test_apply_command_loads_credentials(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that apply command loads credentials automatically."""
         # Credentials defined for test setup reference
         _ = {
@@ -101,7 +107,9 @@ class TestCLICredentialLoading:
             assert mock_load.call_count == 1
             assert mock_load.call_args[0][0] == "prod"
 
-    def test_destroy_command_loads_credentials(self, cli_runner, mock_credentials_setup):
+    def test_destroy_command_loads_credentials(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that destroy command loads credentials automatically."""
         with (
             patch(
@@ -130,7 +138,9 @@ class TestCLICredentialLoading:
             assert mock_load.call_count == 1
             assert mock_load.call_args[0][0] == "staging"
 
-    def test_status_command_loads_credentials(self, cli_runner, mock_credentials_setup):
+    def test_status_command_loads_credentials(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that status command loads credentials automatically."""
         with (
             patch(
@@ -158,7 +168,9 @@ class TestCLICredentialLoading:
             assert mock_load.call_count == 1
             assert mock_load.call_args[0][0] == "dev"
 
-    def test_drift_command_loads_credentials(self, cli_runner, mock_credentials_setup):
+    def test_drift_command_loads_credentials(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that drift command loads credentials automatically."""
         with (
             patch(
@@ -188,7 +200,9 @@ class TestCLICredentialLoading:
             assert mock_load.call_count == 1
             assert mock_load.call_args[0][0] == "prod"
 
-    def test_credentials_set_in_environment(self, cli_runner, mock_credentials_setup):
+    def test_credentials_set_in_environment(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that loaded credentials are set in os.environ."""
         mock_creds = {
             "KUBECONFIG": "/path/to/kubeconfig",
@@ -196,7 +210,7 @@ class TestCLICredentialLoading:
 
         original_env = os.environ.copy()
 
-        def mock_load_creds(env_name, config_dir):
+        def mock_load_creds(env_name: Any, config_dir: Any) -> Any:
             # Simulate what _load_env_credentials does
             os.environ.update(mock_creds)
             return mock_creds
@@ -233,7 +247,9 @@ class TestCLICredentialLoading:
             os.environ.clear()
             os.environ.update(original_env)
 
-    def test_credential_loading_failure_doesnt_crash(self, cli_runner, mock_credentials_setup):
+    def test_credential_loading_failure_doesnt_crash(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that credential loading failures don't crash the CLI."""
         # Mock credential loading to raise an exception
         with (
@@ -256,8 +272,8 @@ class TestCLICredentialLoading:
             assert result.exit_code in [0, 1]  # Success or expected error, not crash
 
     def test_multiple_commands_with_different_environments(
-        self, cli_runner, mock_credentials_setup
-    ):
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that different commands can load different environment credentials."""
         dev_creds = {
             "KUBECONFIG": "/path/to/dev/kubeconfig",
@@ -271,7 +287,7 @@ class TestCLICredentialLoading:
         prod_secrets.mkdir(parents=True)
         (prod_secrets / "kubernetes.yaml").write_text("encrypted prod credentials")
 
-        def mock_load_env(env_name):
+        def mock_load_env(env_name: Any) -> dict[str, Any]:
             if env_name == "dev":
                 return dev_creds
             elif env_name == "prod":
@@ -307,7 +323,9 @@ class TestCLICredentialLoading:
             assert calls[0].args[0] == "dev"
             assert calls[1].args[0] == "prod"
 
-    def test_config_dir_flag_passed_to_credential_loader(self, cli_runner, tmp_path):
+    def test_config_dir_flag_passed_to_credential_loader(
+        self, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
         """Test that --config-dir flag is passed to credential loader."""
         custom_config_dir = tmp_path / "custom-config"
         custom_config_dir.mkdir()
@@ -335,7 +353,9 @@ class TestCLICredentialLoading:
             assert mock_load.call_count == 1
             assert mock_load.call_args[0][0] == "dev"
 
-    def test_no_config_dir_uses_default(self, cli_runner, mock_credentials_setup):
+    def test_no_config_dir_uses_default(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that not specifying --config-dir uses default behavior."""
         with (
             patch(
@@ -359,7 +379,9 @@ class TestCLICredentialLoading:
 class TestCredentialLoadingDebugLogging:
     """Tests for debug logging of credential loading."""
 
-    def test_debug_logging_when_enabled(self, cli_runner, mock_credentials_setup):
+    def test_debug_logging_when_enabled(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that debug logging shows credential loading when enabled."""
         mock_creds = {"KUBECONFIG": "/path/to/kubeconfig"}
 
@@ -383,7 +405,9 @@ class TestCredentialLoadingDebugLogging:
             # Command should run
             assert result.exit_code in [0, 1]
 
-    def test_no_debug_logging_by_default(self, cli_runner, mock_credentials_setup):
+    def test_no_debug_logging_by_default(
+        self, cli_runner: CliRunner, mock_credentials_setup: Path
+    ) -> None:
         """Test that credential loading is silent by default."""
         mock_creds = {"KUBECONFIG": "/path/to/kubeconfig"}
 

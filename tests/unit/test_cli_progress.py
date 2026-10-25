@@ -18,7 +18,7 @@ from infrafoundry.cli.progress import (
 class TestOperationTimer:
     """Tests for the OperationTimer class."""
 
-    def test_timer_basic_usage(self):
+    def test_timer_basic_usage(self) -> None:
         """Test basic timer start/stop functionality."""
         timer = OperationTimer()
         timer.start()
@@ -28,7 +28,7 @@ class TestOperationTimer:
         assert timer.elapsed >= 0.1
         assert timer.elapsed < 0.5
 
-    def test_timer_context_manager(self):
+    def test_timer_context_manager(self) -> None:
         """Test timer as context manager."""
         with OperationTimer() as timer:
             time.sleep(0.1)
@@ -36,7 +36,7 @@ class TestOperationTimer:
         assert timer.elapsed >= 0.1
         assert timer.elapsed < 0.5
 
-    def test_timer_elapsed_str_seconds(self):
+    def test_timer_elapsed_str_seconds(self) -> None:
         """Test elapsed time string formatting for seconds."""
         timer = OperationTimer()
         timer.start()
@@ -48,7 +48,7 @@ class TestOperationTimer:
         # Should not have minutes for < 60 seconds
         assert "m" not in elapsed_str
 
-    def test_timer_elapsed_str_minutes(self):
+    def test_timer_elapsed_str_minutes(self) -> None:
         """Test elapsed time string formatting for minutes."""
         timer = OperationTimer()
         timer._start_time = time.time() - 125  # 2m 5s ago
@@ -58,7 +58,7 @@ class TestOperationTimer:
         assert "2m" in elapsed_str
         assert "5s" in elapsed_str
 
-    def test_timer_not_started(self):
+    def test_timer_not_started(self) -> None:
         """Test elapsed time when timer not started."""
         timer = OperationTimer()
         assert timer.elapsed == 0.0
@@ -68,31 +68,31 @@ class TestOperationTimer:
 class TestProgressTracker:
     """Tests for the ProgressTracker class."""
 
-    def test_tracker_creation(self):
+    def test_tracker_creation(self) -> None:
         """Test progress tracker can be created."""
         tracker = ProgressTracker()
         assert tracker._current_status == ""
         assert tracker._start_time is None
 
-    def test_tracker_with_custom_console(self):
+    def test_tracker_with_custom_console(self) -> None:
         """Test progress tracker with custom console."""
         console = Console(force_terminal=True)
         tracker = ProgressTracker(console=console)
         assert tracker._console is console
 
-    def test_tracker_format_elapsed_not_started(self):
+    def test_tracker_format_elapsed_not_started(self) -> None:
         """Test elapsed formatting when not started."""
         tracker = ProgressTracker()
         assert tracker._format_elapsed() == ""
 
-    def test_tracker_format_elapsed_seconds(self):
+    def test_tracker_format_elapsed_seconds(self) -> None:
         """Test elapsed formatting for seconds."""
         tracker = ProgressTracker()
         tracker._start_time = time.time() - 30
         elapsed = tracker._format_elapsed()
         assert "30s" in elapsed
 
-    def test_tracker_format_elapsed_minutes(self):
+    def test_tracker_format_elapsed_minutes(self) -> None:
         """Test elapsed formatting for minutes."""
         tracker = ProgressTracker()
         tracker._start_time = time.time() - 90  # 1m 30s
@@ -104,7 +104,7 @@ class TestProgressTracker:
 class TestProgressSpinner:
     """Tests for the progress_spinner context manager."""
 
-    def test_spinner_context_manager(self):
+    def test_spinner_context_manager(self) -> None:
         """Test spinner as context manager."""
         console = Console(force_terminal=True, force_interactive=False)
 
@@ -118,7 +118,7 @@ class TestProgressSpinner:
             mock_start.assert_called_once_with("Testing...")
             mock_stop.assert_called_once()
 
-    def test_spinner_with_success_message(self):
+    def test_spinner_with_success_message(self) -> None:
         """Test spinner with success message."""
         console = Console(force_terminal=True, force_interactive=False)
 
@@ -135,7 +135,7 @@ class TestProgressSpinner:
 class TestOperationStatus:
     """Tests for the operation_status context manager."""
 
-    def test_operation_status_basic(self):
+    def test_operation_status_basic(self) -> None:
         """Test operation_status context manager."""
         console = Console(force_terminal=True, force_interactive=False)
 
@@ -149,7 +149,7 @@ class TestOperationStatus:
             mock_start.assert_called_once_with("Planning...")
             mock_stop.assert_called_once()
 
-    def test_operation_status_handles_exception(self):
+    def test_operation_status_handles_exception(self) -> None:
         """Test operation_status handles exceptions."""
         console = Console(force_terminal=True, force_interactive=False)
 
@@ -169,22 +169,22 @@ class TestOperationStatus:
 class TestFormatHelpers:
     """Tests for format helper functions."""
 
-    def test_format_resource_count(self):
+    def test_format_resource_count(self) -> None:
         """Test resource count formatting."""
         result = format_resource_count(3, 10, "Applying")
         assert result == "Applying resource 3/10..."
 
-    def test_format_resource_count_default_action(self):
+    def test_format_resource_count_default_action(self) -> None:
         """Test resource count with default action."""
         result = format_resource_count(1, 5)
         assert result == "Processing resource 1/5..."
 
-    def test_format_provider_status(self):
+    def test_format_provider_status(self) -> None:
         """Test provider status formatting."""
         result = format_provider_status("proxmox", "Planning")
         assert result == "Planning proxmox..."
 
-    def test_format_provider_status_default_action(self):
+    def test_format_provider_status_default_action(self) -> None:
         """Test provider status with default action."""
         result = format_provider_status("kubernetes")
         assert result == "Processing kubernetes..."

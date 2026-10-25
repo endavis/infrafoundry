@@ -13,7 +13,7 @@ Covers:
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 from infrafoundry.core.provider import ResourceConfig
@@ -111,8 +111,10 @@ class TestIaCRunnerClassification:
         # We can't instantiate BaseRunner directly, so check via a non-IaC runner
         runner = AnsibleRunner()
         # Verify it comes from the base class default
-        assert BaseRunner.is_iac_runner.fget is not None  # type: ignore[union-attr]
-        assert BaseRunner.is_iac_runner.fget(runner) is False  # type: ignore[union-attr]
+        prop = vars(BaseRunner)["is_iac_runner"]
+        assert isinstance(prop, property)
+        assert prop.fget is not None
+        assert prop.fget(runner) is False
 
 
 # --- Terraform JSON output parsing ---
@@ -409,7 +411,7 @@ class TestTypeAwareEventFiring:
         return provider
 
     def _make_resource(
-        self, name: str, resource_type: str, events: dict | None = None
+        self, name: str, resource_type: str, events: dict[str, Any] | None = None
     ) -> ResourceConfig:
         """Create a ResourceConfig for testing."""
         return ResourceConfig(
@@ -667,7 +669,7 @@ class TestAggregateEventDeduplication:
             if isinstance(result_val, dict):
                 for tool_result in result_val.values():
                     if isinstance(tool_result, dict):
-                        for outcome in tool_result.get("resource_outcomes", []):
+                        for outcome in cast(list[Any], tool_result.get("resource_outcomes", [])):
                             name = (
                                 outcome.get("resource_name", "")
                                 if isinstance(outcome, dict)

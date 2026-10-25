@@ -10,13 +10,13 @@ from infrafoundry.providers.kubernetes.validators.helm_validator import HelmVali
 
 
 @pytest.fixture
-def validation_report():
+def validation_report() -> ValidationReport:
     """Create a ValidationReport instance."""
     return ValidationReport()
 
 
 @pytest.fixture
-def validator(validation_report):
+def validator(validation_report: ValidationReport) -> HelmValidator:
     """Create a HelmValidator instance."""
     return HelmValidator(validation_report)
 
@@ -25,7 +25,9 @@ def validator(validation_report):
 class TestHelmValidator:
     """Tests for HelmValidator."""
 
-    def test_valid_release(self, validator, validation_report):
+    def test_valid_release(
+        self, validator: HelmValidator, validation_report: ValidationReport
+    ) -> None:
         """Test that a valid helm release with chart and repository succeeds."""
         releases = [
             ResourceConfig(
@@ -42,7 +44,9 @@ class TestHelmValidator:
         assert any(r.passed and "nginx" in r.message for r in validation_report.results)
         assert not validation_report.has_errors()
 
-    def test_missing_chart(self, validator, validation_report):
+    def test_missing_chart(
+        self, validator: HelmValidator, validation_report: ValidationReport
+    ) -> None:
         """Test that missing chart field produces ERROR."""
         releases = [
             ResourceConfig(
@@ -58,7 +62,9 @@ class TestHelmValidator:
             for r in validation_report.results
         )
 
-    def test_missing_repository(self, validator, validation_report):
+    def test_missing_repository(
+        self, validator: HelmValidator, validation_report: ValidationReport
+    ) -> None:
         """Test that missing repository field produces ERROR."""
         releases = [
             ResourceConfig(
@@ -74,7 +80,9 @@ class TestHelmValidator:
             for r in validation_report.results
         )
 
-    def test_missing_both(self, validator, validation_report):
+    def test_missing_both(
+        self, validator: HelmValidator, validation_report: ValidationReport
+    ) -> None:
         """Test that missing both chart and repository produce two ERRORs."""
         releases = [
             ResourceConfig(
@@ -88,7 +96,9 @@ class TestHelmValidator:
         errors = [r for r in validation_report.results if not r.passed]
         assert len(errors) == 2
 
-    def test_empty_releases(self, validator, validation_report):
+    def test_empty_releases(
+        self, validator: HelmValidator, validation_report: ValidationReport
+    ) -> None:
         """Test that empty releases list produces no checks."""
         validator.validate([])
         assert len(validation_report.results) == 0

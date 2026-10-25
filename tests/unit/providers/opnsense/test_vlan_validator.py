@@ -9,6 +9,7 @@ Coverage:
       ``device`` (which is what the YAML/template surface uses).
 """
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,18 +20,18 @@ from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValida
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> VLANValidator:
     """Create a VLANValidator instance."""
     return VLANValidator(report)
 
 
-def _vlan(name: str, **config_overrides) -> ResourceConfig:
+def _vlan(name: str, **config_overrides: Any) -> ResourceConfig:
     base = {
         "device": "em0",
         "tag": 100,
@@ -46,7 +47,7 @@ def _vlan(name: str, **config_overrides) -> ResourceConfig:
 # ---------------------------------------------------------------------------
 
 
-def test_validate_device_found(validator, report):
+def test_validate_device_found(validator: VLANValidator, report: MagicMock) -> None:
     """VLAN with existing parent NIC passes the device check."""
     validator.validate([_vlan("vlan100", device="em0")], {"em0": {"device": "em0"}})
 
@@ -62,7 +63,7 @@ def test_validate_device_found(validator, report):
     assert device_calls[0][1]["level"] == ValidationLevel.INFO
 
 
-def test_validate_device_not_found(validator, report):
+def test_validate_device_not_found(validator: VLANValidator, report: MagicMock) -> None:
     """Bad device reference is reported as ERROR."""
     validator.validate([_vlan("vlan100", device="missing")], {"em0": {}})
 
@@ -77,7 +78,7 @@ def test_validate_device_not_found(validator, report):
     assert device_calls[0][1]["level"] == ValidationLevel.ERROR
 
 
-def test_validate_no_device_skipped(validator, report):
+def test_validate_no_device_skipped(validator: VLANValidator, report: MagicMock) -> None:
     """Absence of ``device`` is not a validator concern (caught by config loader)."""
     vlan = ResourceConfig(
         name="v",
@@ -92,13 +93,13 @@ def test_validate_no_device_skipped(validator, report):
     assert device_calls == []
 
 
-def test_validate_empty_vlans(validator, report):
+def test_validate_empty_vlans(validator: VLANValidator, report: MagicMock) -> None:
     """Empty VLAN list yields no checks."""
     validator.validate([], {"em0": {}})
     report.add_check.assert_not_called()
 
 
-def test_validate_multiple_vlans(validator, report):
+def test_validate_multiple_vlans(validator: VLANValidator, report: MagicMock) -> None:
     """Each VLAN is validated independently."""
     vlans = [
         _vlan("vlan100", device="em0"),
@@ -116,7 +117,7 @@ def test_validate_multiple_vlans(validator, report):
         assert call[1]["passed"] is True
 
 
-def test_validate_mixed_results(validator, report):
+def test_validate_mixed_results(validator: VLANValidator, report: MagicMock) -> None:
     """Pass + fail in the same batch."""
     vlans = [
         _vlan("vlan100", device="em0"),
@@ -140,27 +141,27 @@ def test_validate_mixed_results(validator, report):
 # ---------------------------------------------------------------------------
 
 
-def test_validate_tag_in_range_emits_no_error(validator, report):
+def test_validate_tag_in_range_emits_no_error(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1", tag=100)], {"em0": {}})
     tag_errors = [c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_tag"]
     assert tag_errors == []
 
 
-def test_validate_tag_out_of_range_high(validator, report):
+def test_validate_tag_out_of_range_high(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1", tag=5000)], {"em0": {}})
     tag_calls = [c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_tag"]
     assert len(tag_calls) == 1
     assert tag_calls[0][1]["passed"] is False
 
 
-def test_validate_tag_out_of_range_low(validator, report):
+def test_validate_tag_out_of_range_low(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1", tag=0)], {"em0": {}})
     tag_calls = [c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_tag"]
     assert len(tag_calls) == 1
     assert tag_calls[0][1]["passed"] is False
 
 
-def test_validate_tag_non_integer(validator, report):
+def test_validate_tag_non_integer(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1", tag="not-int")], {"em0": {}})
     tag_calls = [c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_tag"]
     assert len(tag_calls) == 1
@@ -172,7 +173,9 @@ def test_validate_tag_non_integer(validator, report):
 # ---------------------------------------------------------------------------
 
 
-def test_validate_priority_in_range_emits_no_error(validator, report):
+def test_validate_priority_in_range_emits_no_error(
+    validator: VLANValidator, report: MagicMock
+) -> None:
     validator.validate([_vlan("v1", priority=3)], {"em0": {}})
     priority_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_priority"
@@ -180,7 +183,7 @@ def test_validate_priority_in_range_emits_no_error(validator, report):
     assert priority_calls == []
 
 
-def test_validate_priority_out_of_range(validator, report):
+def test_validate_priority_out_of_range(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1", priority=9)], {"em0": {}})
     priority_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_priority"
@@ -189,7 +192,7 @@ def test_validate_priority_out_of_range(validator, report):
     assert priority_calls[0][1]["passed"] is False
 
 
-def test_validate_priority_non_integer(validator, report):
+def test_validate_priority_non_integer(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1", priority="x")], {"em0": {}})
     priority_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_priority"
@@ -203,7 +206,7 @@ def test_validate_priority_non_integer(validator, report):
 # ---------------------------------------------------------------------------
 
 
-def test_validate_lock_boolean_true_passes(validator, report):
+def test_validate_lock_boolean_true_passes(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1", lock=True)], {"em0": {}})
     lock_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_lock"
@@ -212,7 +215,7 @@ def test_validate_lock_boolean_true_passes(validator, report):
     assert lock_calls == []
 
 
-def test_validate_lock_boolean_false_passes(validator, report):
+def test_validate_lock_boolean_false_passes(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1", lock=False)], {"em0": {}})
     lock_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_lock"
@@ -220,7 +223,7 @@ def test_validate_lock_boolean_false_passes(validator, report):
     assert lock_calls == []
 
 
-def test_validate_lock_must_be_boolean(validator, report):
+def test_validate_lock_must_be_boolean(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1", lock="yes")], {"em0": {}})
     lock_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_lock"
@@ -230,7 +233,7 @@ def test_validate_lock_must_be_boolean(validator, report):
     assert "boolean" in lock_calls[0][1]["message"]
 
 
-def test_validate_lock_absent_skipped(validator, report):
+def test_validate_lock_absent_skipped(validator: VLANValidator, report: MagicMock) -> None:
     validator.validate([_vlan("v1")], {"em0": {}})
     lock_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_lock"

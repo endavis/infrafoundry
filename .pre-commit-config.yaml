@@ -75,7 +75,7 @@ repos:
       # cost of the wider scope is ~60ms.
       - id: mypy
         name: mypy
-        entry: uv run mypy src/
+        entry: uv run mypy src/ tools/ tests/ bootstrap.py
         language: system
         types: [python]
         pass_filenames: false

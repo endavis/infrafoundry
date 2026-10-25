@@ -1,7 +1,10 @@
 """Unit tests for ProviderRegistryService."""
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+
+import pytest
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.provider import ProviderBase
@@ -12,7 +15,7 @@ from infrafoundry.core.runners import RunnerRegistry
 class TestProviderRegistryService:
     """Tests for ProviderRegistryService."""
 
-    def test_init_with_defaults(self, tmp_path):
+    def test_init_with_defaults(self, tmp_path: Path) -> None:
         """Test initialization with default parameters."""
         config_manager = Mock(spec=ConfigManager)
         service = ProviderRegistryService(
@@ -25,7 +28,7 @@ class TestProviderRegistryService:
         assert isinstance(service.runner_registry, RunnerRegistry)
         assert service.providers == {}
 
-    def test_init_with_custom_runner_registry(self, tmp_path):
+    def test_init_with_custom_runner_registry(self, tmp_path: Path) -> None:
         """Test initialization with custom runner registry factory."""
         config_manager = Mock(spec=ConfigManager)
         mock_registry = Mock(spec=RunnerRegistry)
@@ -40,7 +43,7 @@ class TestProviderRegistryService:
         assert service.runner_registry == mock_registry
         factory.assert_called_once()
 
-    def test_register_provider(self, tmp_path):
+    def test_register_provider(self, tmp_path: Path) -> None:
         """Test registering a provider."""
         config_manager = Mock(spec=ConfigManager)
         service = ProviderRegistryService(
@@ -56,7 +59,7 @@ class TestProviderRegistryService:
         assert "test_provider" in service.providers
         assert service.providers["test_provider"] == provider
 
-    def test_get_runner_priorities_with_config(self, tmp_path):
+    def test_get_runner_priorities_with_config(self, tmp_path: Path) -> None:
         """Test fetching runner priorities when config exists."""
         config_manager = Mock(spec=ConfigManager)
         env_config = SimpleNamespace(runner_priorities={"terraform": 10, "ansible": 20})
@@ -72,7 +75,7 @@ class TestProviderRegistryService:
         assert priorities == {"terraform": 10, "ansible": 20}
         config_manager.load_environment.assert_called_once_with("dev")
 
-    def test_get_runner_priorities_no_config(self, tmp_path):
+    def test_get_runner_priorities_no_config(self, tmp_path: Path) -> None:
         """Test fetching runner priorities when config is missing."""
         config_manager = Mock(spec=ConfigManager)
         config_manager.load_environment.return_value = None
@@ -87,7 +90,9 @@ class TestProviderRegistryService:
         assert priorities == {}
         config_manager.load_environment.assert_called_once_with("dev")
 
-    def test_register_default_runners(self, tmp_path, monkeypatch):
+    def test_register_default_runners(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that default runners are registered on init."""
         config_manager = Mock(spec=ConfigManager)
         mock_registry = Mock(spec=RunnerRegistry)
@@ -105,7 +110,7 @@ class TestProviderRegistryService:
         # OpenTofuRunner, AnsibleRunner, PyInfraRunner
         assert mock_registry.register.call_count == 5
 
-    def test_register_experimental_runners(self, tmp_path):
+    def test_register_experimental_runners(self, tmp_path: Path) -> None:
         """Test that experimental runners are registered when enabled."""
         config_manager = Mock(spec=ConfigManager)
         mock_registry = Mock(spec=RunnerRegistry)
@@ -122,7 +127,9 @@ class TestProviderRegistryService:
         # OpenTofuRunner, AnsibleRunner, PyInfraRunner, PulumiRunner
         assert mock_registry.register.call_count == 6
 
-    def test_both_iac_runners_registered(self, tmp_path, monkeypatch):
+    def test_both_iac_runners_registered(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that both TerraformRunner and OpenTofuRunner are registered."""
         from infrafoundry.core.runners import OpenTofuRunner, TerraformRunner
 

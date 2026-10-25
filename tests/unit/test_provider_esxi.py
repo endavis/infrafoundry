@@ -1,5 +1,7 @@
 """Unit tests for EsxiProvider."""
 
+from pathlib import Path
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -10,7 +12,7 @@ from infrafoundry.providers.esxi import EsxiProvider
 class TestEsxiProvider:
     """Tests for EsxiProvider."""
 
-    def test_init(self, temp_dir):
+    def test_init(self, temp_dir: Path) -> None:
         """Test EsxiProvider initialization."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -22,7 +24,7 @@ class TestEsxiProvider:
         )
         assert provider.name == "esxi"
 
-    def test_get_resource_types(self, temp_dir):
+    def test_get_resource_types(self, temp_dir: Path) -> None:
         """Test getting supported resource types."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -37,7 +39,7 @@ class TestEsxiProvider:
         assert "vm" in types
         assert "ovf_deployment" in types
 
-    def test_get_dependencies(self, temp_dir):
+    def test_get_dependencies(self, temp_dir: Path) -> None:
         """Test dependency resolution."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -56,7 +58,7 @@ class TestEsxiProvider:
         assert "vswitch" in deps["portgroup"]
         assert deps["vswitch"] == []
 
-    def test_validate_config_valid(self, temp_dir):
+    def test_validate_config_valid(self, temp_dir: Path) -> None:
         """Test validate_config with valid config."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -67,7 +69,7 @@ class TestEsxiProvider:
         )
         assert provider.validate_config({"name": "test-vswitch"}) is True
 
-    def test_validate_config_missing_name(self, temp_dir):
+    def test_validate_config_missing_name(self, temp_dir: Path) -> None:
         """Test validate_config with missing name."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -78,14 +80,14 @@ class TestEsxiProvider:
         )
         assert provider.validate_config({"host": "esxi-01"}) is False
 
-    def test_host_alias(self):
+    def test_host_alias(self) -> None:
         """Test host name to Terraform alias conversion."""
         assert EsxiProvider._host_alias("esxi-ontap-01") == "esxi_ontap_01"
         assert EsxiProvider._host_alias("esxi.local") == "esxi_local"
         assert EsxiProvider._host_alias("simple") == "simple"
         assert EsxiProvider._host_alias("host-with.mixed-chars") == "host_with_mixed_chars"
 
-    def test_collect_hosts(self, temp_dir):
+    def test_collect_hosts(self, temp_dir: Path) -> None:
         """Test host collection from resources."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -123,7 +125,7 @@ class TestEsxiProvider:
         assert hosts[1]["name"] == "esxi-02"
         assert hosts[1]["alias"] == "esxi_02"
 
-    def test_normalize_vm_config_dict_to_list(self, temp_dir):
+    def test_normalize_vm_config_dict_to_list(self, temp_dir: Path) -> None:
         """Test that single dict network is wrapped in a list."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -143,7 +145,7 @@ class TestEsxiProvider:
         assert isinstance(result.config["network"], list)
         assert len(result.config["network"]) == 1
 
-    def test_normalize_vm_config_list_unchanged(self, temp_dir):
+    def test_normalize_vm_config_list_unchanged(self, temp_dir: Path) -> None:
         """Test that list network remains unchanged."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -164,7 +166,7 @@ class TestEsxiProvider:
         assert isinstance(result.config["network"], list)
         assert len(result.config["network"]) == 2
 
-    def test_normalize_vm_config_no_network(self, temp_dir):
+    def test_normalize_vm_config_no_network(self, temp_dir: Path) -> None:
         """Test that no network key remains absent."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()
@@ -183,7 +185,7 @@ class TestEsxiProvider:
         result = provider._normalize_vm_config(vm)
         assert "network" not in result.config
 
-    def test_normalize_does_not_mutate_original(self, temp_dir):
+    def test_normalize_does_not_mutate_original(self, temp_dir: Path) -> None:
         """Test that original VM config is not modified."""
         config_dir = temp_dir / "config"
         config_dir.mkdir()

@@ -1,6 +1,7 @@
 """Unit tests for BlueprintValidator."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -22,12 +23,12 @@ def _write_template(directory: Path, filename: str, content: str) -> None:
 def _make_resolved(
     tmp_path: Path,
     name: str = "test-bp",
-    defaults: dict | None = None,
+    defaults: dict[str, Any] | None = None,
     resources: list[str] | None = None,
-    providers: dict | None = None,
-) -> dict:
+    providers: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build a resolved-blueprint dict suitable for BlueprintValidator."""
-    result: dict = {
+    result: dict[str, Any] = {
         "name": name,
         "description": "test blueprint",
         "version": "1.0.0",
@@ -51,7 +52,7 @@ def _make_resolved(
 class TestProviderValidationResult:
     """Tests for ProviderValidationResult dataclass."""
 
-    def test_default_fields(self):
+    def test_default_fields(self) -> None:
         """Default fields are empty."""
         r = ProviderValidationResult(provider="test")
         assert r.provider == "test"
@@ -65,7 +66,7 @@ class TestProviderValidationResult:
 class TestBlueprintValidationResult:
     """Tests for BlueprintValidationResult dataclass."""
 
-    def test_has_errors_false_when_clean(self):
+    def test_has_errors_false_when_clean(self) -> None:
         """has_errors is False when no provider has errors."""
         r = BlueprintValidationResult(
             blueprint_name="bp",
@@ -74,7 +75,7 @@ class TestBlueprintValidationResult:
         )
         assert r.has_errors is False
 
-    def test_has_errors_true(self):
+    def test_has_errors_true(self) -> None:
         """has_errors is True when a provider has errors."""
         r = BlueprintValidationResult(
             blueprint_name="bp",
@@ -85,7 +86,7 @@ class TestBlueprintValidationResult:
         )
         assert r.has_errors is True
 
-    def test_has_warnings_true(self):
+    def test_has_warnings_true(self) -> None:
         """has_warnings is True when a provider has warnings."""
         r = BlueprintValidationResult(
             blueprint_name="bp",
@@ -106,7 +107,7 @@ class TestBlueprintValidationResult:
 class TestSingleProviderValidation:
     """Tests for single-provider blueprint validation."""
 
-    def test_clean_single_provider(self, tmp_path):
+    def test_clean_single_provider(self, tmp_path: Path) -> None:
         """All template vars covered by defaults produces no errors."""
         _write_template(tmp_path, "vm.yaml", "name: {{ vm_name }}\ncores: {{ cores }}")
         resolved = _make_resolved(
@@ -120,7 +121,7 @@ class TestSingleProviderValidation:
         assert result.is_multi_provider is False
         assert result.providers[0].provider == "default"
 
-    def test_missing_vars_produces_errors(self, tmp_path):
+    def test_missing_vars_produces_errors(self, tmp_path: Path) -> None:
         """Template vars not in defaults produce errors."""
         _write_template(tmp_path, "vm.yaml", "name: {{ vm_name }}\nip: {{ ip_address }}")
         resolved = _make_resolved(
@@ -133,7 +134,7 @@ class TestSingleProviderValidation:
         assert len(result.providers[0].errors) == 1
         assert "ip_address" in result.providers[0].errors[0]
 
-    def test_for_loop_vars_excluded(self, tmp_path):
+    def test_for_loop_vars_excluded(self, tmp_path: Path) -> None:
         """Variables bound by for loops are not reported as undeclared."""
         template = "{% for item in items %}\n  name: {{ item.name }}\n{% endfor %}\n"
         _write_template(tmp_path, "loop.yaml", template)
@@ -157,7 +158,7 @@ class TestSingleProviderValidation:
 class TestMultiProviderValidation:
     """Tests for multi-provider blueprint validation."""
 
-    def test_clean_multi_provider(self, tmp_path):
+    def test_clean_multi_provider(self, tmp_path: Path) -> None:
         """All vars covered produces no errors or warnings."""
         _write_template(
             tmp_path, "providers/a/vm.yaml", "name: {{ cluster_name }}\ncpu: {{ cores }}"
@@ -184,7 +185,7 @@ class TestMultiProviderValidation:
         assert not result.has_warnings
         assert result.is_multi_provider is True
 
-    def test_asymmetric_warning(self, tmp_path):
+    def test_asymmetric_warning(self, tmp_path: Path) -> None:
         """Global default used by one provider but not another produces warning."""
         _write_template(
             tmp_path, "providers/a/vm.yaml", "name: {{ cluster_name }}\ncpu: {{ shared_var }}"
@@ -211,7 +212,7 @@ class TestMultiProviderValidation:
         b_result = next(p for p in result.providers if p.provider == "b")
         assert any("shared_var" in w for w in b_result.warnings)
 
-    def test_undefined_error_multi_provider(self, tmp_path):
+    def test_undefined_error_multi_provider(self, tmp_path: Path) -> None:
         """Variable not in any defaults layer produces error in multi-provider."""
         _write_template(tmp_path, "providers/a/vm.yaml", "ip: {{ ip_address }}")
         resolved = _make_resolved(
@@ -239,7 +240,7 @@ class TestMultiProviderValidation:
 class TestInputsSchemaValidation:
     """Tests covering the new ``input_names``-based validation path."""
 
-    def test_required_input_without_default_is_accepted(self, tmp_path):
+    def test_required_input_without_default_is_accepted(self, tmp_path: Path) -> None:
         """A declared input without a ``default:`` is not flagged as undefined."""
         _write_template(tmp_path, "vm.yaml", "name: {{ vm_name }}\ncores: {{ cores }}")
         resolved = _make_resolved(
@@ -252,7 +253,7 @@ class TestInputsSchemaValidation:
         result = BlueprintValidator(resolved).validate()
         assert not result.has_errors
 
-    def test_truly_undefined_variable_is_still_flagged(self, tmp_path):
+    def test_truly_undefined_variable_is_still_flagged(self, tmp_path: Path) -> None:
         """Typos / vars not declared as inputs must still error."""
         _write_template(tmp_path, "vm.yaml", "name: {{ vm_nmae }}")
         resolved = _make_resolved(tmp_path, defaults={}, resources=["vm.yaml"])
@@ -262,7 +263,7 @@ class TestInputsSchemaValidation:
         # New error message wording.
         assert any("not declared in inputs" in e for e in result.providers[0].errors)
 
-    def test_provider_scoped_input_not_visible_to_sibling(self, tmp_path):
+    def test_provider_scoped_input_not_visible_to_sibling(self, tmp_path: Path) -> None:
         """A variable declared only for provider A is undefined for provider B."""
         _write_template(tmp_path, "providers/a/vm.yaml", "name: {{ only_in_a }}")
         _write_template(tmp_path, "providers/b/vm.yaml", "name: {{ only_in_a }}")
@@ -299,7 +300,7 @@ class TestInputsSchemaValidation:
 class TestCustomFilters:
     """Tests for custom Jinja2 filter handling."""
 
-    def test_generate_mac_filter_no_parse_error(self, tmp_path):
+    def test_generate_mac_filter_no_parse_error(self, tmp_path: Path) -> None:
         """Templates using generate_mac filter parse without error."""
         _write_template(
             tmp_path,
@@ -329,7 +330,7 @@ class TestRealBlueprints:
         """Get a resolver that finds real framework blueprints."""
         return BlueprintResolver(base_dir=Path("."))
 
-    def test_aiqum_blueprint_no_errors(self):
+    def test_aiqum_blueprint_no_errors(self) -> None:
         """Real aiqum blueprint should have zero validation errors.
 
         All template variables (including per-instance ones like ``vm_name``,
@@ -351,7 +352,7 @@ class TestRealBlueprints:
         for required in ("vm_name", "vmid", "target_node", "ip_address", "dhcp_subnet"):
             assert required in prov.defaults
 
-    def test_k3s_cluster_blueprint_validation(self):
+    def test_k3s_cluster_blueprint_validation(self) -> None:
         """Real k3s-cluster blueprint validates cleanly post-migration.
 
         Top-level and per-provider ``inputs:`` should cover every template
@@ -381,7 +382,7 @@ class TestRealBlueprints:
         for required in ("image", "ssh_public_key"):
             assert required in oci.defaults
 
-    def test_all_real_blueprints_validate(self):
+    def test_all_real_blueprints_validate(self) -> None:
         """Every blueprint shipped in the framework should validate cleanly."""
         resolver = self._get_real_resolver()
         for name in resolver.list_blueprints():

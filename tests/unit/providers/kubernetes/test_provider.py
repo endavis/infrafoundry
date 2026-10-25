@@ -1,5 +1,8 @@
 """Unit tests for Kubernetes provider."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
@@ -7,7 +10,7 @@ from infrafoundry.providers.kubernetes import KubernetesProvider
 
 
 @pytest.fixture
-def tmp_dirs(tmp_path):
+def tmp_dirs(tmp_path: Path) -> Any:
     """Create temporary config and output directories."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -17,18 +20,18 @@ def tmp_dirs(tmp_path):
 
 
 @pytest.fixture
-def provider(tmp_dirs):
+def provider(tmp_dirs: Any) -> KubernetesProvider:
     """Create a KubernetesProvider instance."""
     config_dir, output_dir = tmp_dirs
     return KubernetesProvider(config_dir, output_dir)
 
 
-def test_provider_init(provider):
+def test_provider_init(provider: KubernetesProvider) -> None:
     """Test provider initializes with correct name."""
     assert provider.name == "kubernetes"
 
 
-def test_get_resource_types(provider):
+def test_get_resource_types(provider: KubernetesProvider) -> None:
     """Test supported resource types."""
     types = provider.get_resource_types()
     # Core resources
@@ -54,7 +57,7 @@ def test_get_resource_types(provider):
     assert "manifests" in types
 
 
-def test_get_dependencies(provider):
+def test_get_dependencies(provider: KubernetesProvider) -> None:
     """Test resource dependency graph."""
     deps = provider.get_dependencies()
     # Namespaces are base
@@ -78,17 +81,17 @@ def test_get_dependencies(provider):
     assert "helm_releases" in deps["manifests"]
 
 
-def test_validate_config_valid(provider):
+def test_validate_config_valid(provider: KubernetesProvider) -> None:
     """Test config validation with required fields."""
     assert provider.validate_config({"name": "test"}) is True
 
 
-def test_validate_config_invalid(provider):
+def test_validate_config_invalid(provider: KubernetesProvider) -> None:
     """Test config validation with missing fields."""
     assert provider.validate_config({}) is False
 
 
-def test_generate_terraform_creates_files(provider, tmp_dirs):
+def test_generate_terraform_creates_files(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test that generate_terraform creates expected files."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -121,7 +124,7 @@ def test_generate_terraform_creates_files(provider, tmp_dirs):
     assert (terraform_dir / "outputs.tf").exists()
 
 
-def test_generate_terraform_secrets(provider, tmp_dirs):
+def test_generate_terraform_secrets(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test secrets terraform generation."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -149,7 +152,7 @@ def test_generate_terraform_secrets(provider, tmp_dirs):
     assert "Opaque" in content
 
 
-def test_generate_terraform_ingress(provider, tmp_dirs):
+def test_generate_terraform_ingress(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test ingress terraform generation."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -193,7 +196,7 @@ def test_generate_terraform_ingress(provider, tmp_dirs):
     assert "example.com" in content
 
 
-def test_generate_terraform_pvc(provider, tmp_dirs):
+def test_generate_terraform_pvc(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test persistent volume claim terraform generation."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -222,7 +225,7 @@ def test_generate_terraform_pvc(provider, tmp_dirs):
     assert "standard" in content
 
 
-def test_generate_terraform_job(provider, tmp_dirs):
+def test_generate_terraform_job(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test job terraform generation."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -252,7 +255,7 @@ def test_generate_terraform_job(provider, tmp_dirs):
     assert "backoff_limit = 3" in content
 
 
-def test_generate_terraform_cronjob(provider, tmp_dirs):
+def test_generate_terraform_cronjob(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test cron job terraform generation."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -279,7 +282,7 @@ def test_generate_terraform_cronjob(provider, tmp_dirs):
     assert "0 2 * * *" in content
 
 
-def test_generate_terraform_rbac(provider, tmp_dirs):
+def test_generate_terraform_rbac(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test RBAC terraform generation."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -328,7 +331,7 @@ def test_generate_terraform_rbac(provider, tmp_dirs):
     assert "kubernetes_role_binding" in content
 
 
-def test_generate_terraform_helm_release(provider, tmp_dirs):
+def test_generate_terraform_helm_release(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test Helm release terraform generation."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -365,7 +368,9 @@ def test_generate_terraform_helm_release(provider, tmp_dirs):
     assert "4.8.3" in helm_content
 
 
-def test_generate_terraform_no_helm_provider_without_releases(provider, tmp_dirs):
+def test_generate_terraform_no_helm_provider_without_releases(
+    provider: KubernetesProvider, tmp_dirs: Any
+) -> None:
     """Test that Helm provider is not included when no helm releases."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -387,7 +392,7 @@ def test_generate_terraform_no_helm_provider_without_releases(provider, tmp_dirs
     assert 'provider "helm"' not in provider_content
 
 
-def test_generate_terraform_cluster_role(provider, tmp_dirs):
+def test_generate_terraform_cluster_role(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test cluster role terraform generation."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -418,7 +423,7 @@ def test_generate_terraform_cluster_role(provider, tmp_dirs):
     assert "cluster_admin" in content
 
 
-def test_generate_terraform_manifest(provider, tmp_dirs):
+def test_generate_terraform_manifest(provider: KubernetesProvider, tmp_dirs: Any) -> None:
     """Test custom manifest (CRD) terraform generation."""
     _config_dir, output_dir = tmp_dirs
     provider.set_environment("test")
@@ -462,7 +467,7 @@ def test_generate_terraform_manifest(provider, tmp_dirs):
 class TestBuildDependencyRefs:
     """Tests for _build_dependency_refs() method."""
 
-    def test_builds_refs_for_present_dependencies(self, provider):
+    def test_builds_refs_for_present_dependencies(self, provider: KubernetesProvider) -> None:
         """Test that refs are built only for dependency types that have resources."""
         resources_by_type = {
             "namespaces": [
@@ -484,7 +489,7 @@ class TestBuildDependencyRefs:
         # namespaces have no dependencies
         assert refs["namespaces"] == []
 
-    def test_empty_refs_for_missing_dependencies(self, provider):
+    def test_empty_refs_for_missing_dependencies(self, provider: KubernetesProvider) -> None:
         """Test that refs are empty when dependency types have no resources."""
         resources_by_type = {
             "secrets": [
@@ -501,7 +506,7 @@ class TestBuildDependencyRefs:
         # secrets depends on namespaces, but no namespaces in resources_by_type
         assert refs["secrets"] == []
 
-    def test_builds_multiple_refs(self, provider):
+    def test_builds_multiple_refs(self, provider: KubernetesProvider) -> None:
         """Test that multiple resources of a dependency type produce multiple refs."""
         resources_by_type = {
             "namespaces": [
@@ -523,7 +528,7 @@ class TestBuildDependencyRefs:
         assert "kubernetes_namespace.ns_b" in refs["configmaps"]
         assert len(refs["configmaps"]) == 2
 
-    def test_complex_dependency_chain(self, provider):
+    def test_complex_dependency_chain(self, provider: KubernetesProvider) -> None:
         """Test refs for types with multiple dependency types (e.g. deployments)."""
         resources_by_type = {
             "namespaces": [
@@ -564,7 +569,7 @@ class TestBuildDependencyRefs:
         assert "kubernetes_secret.db_creds" in deployment_refs
         assert "kubernetes_config_map.app_config" in deployment_refs
 
-    def test_manifests_get_helm_refs(self, provider):
+    def test_manifests_get_helm_refs(self, provider: KubernetesProvider) -> None:
         """Test that manifests get dependency refs for helm_releases."""
         resources_by_type = {
             "namespaces": [
@@ -599,9 +604,9 @@ class TestBuildDependencyRefs:
         assert "kubernetes_namespace.my_ns" in manifest_refs
         assert "helm_release.cert_manager" in manifest_refs
 
-    def test_all_types_have_entries(self, provider):
+    def test_all_types_have_entries(self, provider: KubernetesProvider) -> None:
         """Test that all resource types from get_dependencies() appear in result."""
-        resources_by_type = {}
+        resources_by_type: dict[str, Any] = {}
         refs = provider._build_dependency_refs(resources_by_type)
         deps = provider.get_dependencies()
         for resource_type in deps:
@@ -611,7 +616,9 @@ class TestBuildDependencyRefs:
 class TestGenerateTerraformDependsOn:
     """Integration tests for depends_on in generated Terraform files."""
 
-    def test_secrets_have_depends_on_with_namespaces(self, provider, tmp_dirs):
+    def test_secrets_have_depends_on_with_namespaces(
+        self, provider: KubernetesProvider, tmp_dirs: Any
+    ) -> None:
         """Test that generated secrets.tf has depends_on for namespaces."""
         _config_dir, output_dir = tmp_dirs
         provider.set_environment("test")
@@ -642,7 +649,9 @@ class TestGenerateTerraformDependsOn:
         assert "depends_on" in content
         assert "kubernetes_namespace.my_ns" in content
 
-    def test_no_depends_on_when_no_dependencies_present(self, provider, tmp_dirs):
+    def test_no_depends_on_when_no_dependencies_present(
+        self, provider: KubernetesProvider, tmp_dirs: Any
+    ) -> None:
         """Test that secrets.tf has no depends_on when no namespaces exist."""
         _config_dir, output_dir = tmp_dirs
         provider.set_environment("test")
@@ -666,7 +675,9 @@ class TestGenerateTerraformDependsOn:
         content = (terraform_dir / "secrets.tf").read_text()
         assert "depends_on" not in content
 
-    def test_helm_releases_have_depends_on_with_namespaces(self, provider, tmp_dirs):
+    def test_helm_releases_have_depends_on_with_namespaces(
+        self, provider: KubernetesProvider, tmp_dirs: Any
+    ) -> None:
         """Test that generated helm_releases.tf has depends_on for namespaces."""
         _config_dir, output_dir = tmp_dirs
         provider.set_environment("test")
@@ -696,7 +707,9 @@ class TestGenerateTerraformDependsOn:
         assert "depends_on" in content
         assert "kubernetes_namespace.my_ns" in content
 
-    def test_manifests_have_depends_on_with_namespaces_and_helm(self, provider, tmp_dirs):
+    def test_manifests_have_depends_on_with_namespaces_and_helm(
+        self, provider: KubernetesProvider, tmp_dirs: Any
+    ) -> None:
         """Test that manifests.tf has depends_on for namespaces and helm releases."""
         _config_dir, output_dir = tmp_dirs
         provider.set_environment("test")

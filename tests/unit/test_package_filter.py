@@ -13,13 +13,13 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     mock.config_manager = Mock(spec=ConfigManager)
@@ -32,7 +32,7 @@ def mock_orchestrator():
 class TestResolvePackageFilter:
     """Tests for ConfigManager.resolve_package_filter."""
 
-    def test_known_package_resolves_to_resource_names(self, tmp_path: Path):
+    def test_known_package_resolves_to_resource_names(self, tmp_path: Path) -> None:
         """Known package resolves to correct resource names."""
         # Set up env with a provider-scoped package
         env_dir = tmp_path / "test-env"
@@ -56,7 +56,7 @@ class TestResolvePackageFilter:
 
         assert sorted(result) == ["cluster-node1", "cluster-node2"]
 
-    def test_unknown_package_raises_error(self, tmp_path: Path):
+    def test_unknown_package_raises_error(self, tmp_path: Path) -> None:
         """Unknown package raises PackageNotFoundError."""
         env_dir = tmp_path / "test-env"
         env_dir.mkdir(parents=True)
@@ -67,7 +67,7 @@ class TestResolvePackageFilter:
         with pytest.raises(PackageNotFoundError, match="nonexistent"):
             cm.resolve_package_filter("test-env", "nonexistent")
 
-    def test_package_with_multiple_resources(self, tmp_path: Path):
+    def test_package_with_multiple_resources(self, tmp_path: Path) -> None:
         """Package with multiple resource files resolves all resource names."""
         env_dir = tmp_path / "test-env"
         provider_dir = env_dir / "proxmox"
@@ -88,7 +88,7 @@ class TestResolvePackageFilter:
 
         assert sorted(result) == ["net-a", "vm-a", "vm-b"]
 
-    def test_env_root_package_resolves(self, tmp_path: Path):
+    def test_env_root_package_resolves(self, tmp_path: Path) -> None:
         """Env-root package (with provider field) resolves correctly."""
         env_dir = tmp_path / "test-env"
         pkg_dir = env_dir / "standalone-pkg"
@@ -112,7 +112,9 @@ class TestResolvePackageFilter:
 class TestPackageResourceMutualExclusivity:
     """Tests for --package and --resource mutual exclusivity."""
 
-    def test_plan_package_and_resource_mutually_exclusive(self, cli_runner, mock_orchestrator):
+    def test_plan_package_and_resource_mutually_exclusive(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Plan rejects --package and --resource together."""
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
             result = cli_runner.invoke(
@@ -123,7 +125,9 @@ class TestPackageResourceMutualExclusivity:
             assert result.exit_code != 0
             assert "mutually exclusive" in result.output
 
-    def test_apply_package_and_resource_mutually_exclusive(self, cli_runner, mock_orchestrator):
+    def test_apply_package_and_resource_mutually_exclusive(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Apply rejects --package and --resource together."""
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
             result = cli_runner.invoke(
@@ -144,7 +148,9 @@ class TestPackageResourceMutualExclusivity:
             assert result.exit_code != 0
             assert "mutually exclusive" in result.output
 
-    def test_destroy_package_and_resource_mutually_exclusive(self, cli_runner, mock_orchestrator):
+    def test_destroy_package_and_resource_mutually_exclusive(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Destroy rejects --package and --resource together."""
         with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
             result = cli_runner.invoke(
@@ -172,7 +178,9 @@ class TestPackageResourceMutualExclusivity:
 class TestPlanWithPackage:
     """Tests for plan --package."""
 
-    def test_plan_with_package_resolves_filter(self, cli_runner, mock_orchestrator):
+    def test_plan_with_package_resolves_filter(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Plan --package resolves package to resource filter."""
         mock_orchestrator.config_manager.resolve_package_filter.return_value = [
             "vm-01",
@@ -197,7 +205,9 @@ class TestPlanWithPackage:
                 verbose=False,
             )
 
-    def test_plan_with_unknown_package_fails(self, cli_runner, mock_orchestrator):
+    def test_plan_with_unknown_package_fails(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Plan --package with unknown package raises error."""
         mock_orchestrator.config_manager.resolve_package_filter.side_effect = PackageNotFoundError(
             "Package 'bad-pkg' not found in environment 'test'"
@@ -213,7 +223,9 @@ class TestPlanWithPackage:
 class TestApplyWithPackage:
     """Tests for apply --package."""
 
-    def test_apply_with_package_resolves_filter(self, cli_runner, mock_orchestrator):
+    def test_apply_with_package_resolves_filter(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Apply --package resolves package to resource filter."""
         mock_orchestrator.config_manager.resolve_package_filter.return_value = [
             "vm-01",
@@ -250,7 +262,9 @@ class TestApplyWithPackage:
                 provider_filter=None,
             )
 
-    def test_apply_with_package_shows_package_in_prompt(self, cli_runner, mock_orchestrator):
+    def test_apply_with_package_shows_package_in_prompt(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Apply --package shows package name in confirmation prompt."""
         mock_orchestrator.config_manager.resolve_package_filter.return_value = [
             "vm-01",
@@ -270,7 +284,9 @@ class TestApplyWithPackage:
 class TestDestroyWithPackage:
     """Tests for destroy --package."""
 
-    def test_destroy_with_package_resolves_filter(self, cli_runner, mock_orchestrator):
+    def test_destroy_with_package_resolves_filter(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Destroy --package resolves package to resource filter."""
         mock_orchestrator.config_manager.resolve_package_filter.return_value = [
             "vm-01",
@@ -299,7 +315,9 @@ class TestDestroyWithPackage:
             assert call_args[1]["resource_filter"] == ["vm-01", "vm-02"]
             assert call_args[1]["package_filter"] == "my-cluster"
 
-    def test_destroy_with_package_shows_package_in_prompt(self, cli_runner, mock_orchestrator):
+    def test_destroy_with_package_shows_package_in_prompt(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Destroy --package shows package name in confirmation prompt."""
         mock_orchestrator.config_manager.resolve_package_filter.return_value = [
             "vm-01",
@@ -315,7 +333,9 @@ class TestDestroyWithPackage:
             assert result.exit_code == 0
             assert "package: my-cluster" in result.output
 
-    def test_destroy_with_unknown_package_fails(self, cli_runner, mock_orchestrator):
+    def test_destroy_with_unknown_package_fails(
+        self, cli_runner: CliRunner, mock_orchestrator: Mock
+    ) -> None:
         """Destroy --package with unknown package raises error."""
         mock_orchestrator.config_manager.resolve_package_filter.side_effect = PackageNotFoundError(
             "Package 'bad-pkg' not found in environment 'test'"

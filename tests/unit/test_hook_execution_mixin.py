@@ -1,5 +1,6 @@
 """Unit tests for HookExecutionMixin."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -27,19 +28,19 @@ class MockOrchestrator(HookExecutionMixin):
 
 
 @pytest.fixture
-def mock_console():
+def mock_console() -> MagicMock:
     """Create a mock console."""
     return MagicMock(spec=Console)
 
 
 @pytest.fixture
-def mock_hook_manager():
+def mock_hook_manager() -> MagicMock:
     """Create a mock hook manager."""
     return MagicMock(spec=HookManager)
 
 
 @pytest.fixture
-def orchestrator(mock_console, mock_hook_manager):
+def orchestrator(mock_console: MagicMock, mock_hook_manager: MagicMock) -> MockOrchestrator:
     """Create a MockOrchestrator instance for testing."""
     return MockOrchestrator(console=mock_console, hook_manager=mock_hook_manager)
 
@@ -48,7 +49,7 @@ def orchestrator(mock_console, mock_hook_manager):
 class TestHookExecutionMixin:
     """Tests for HookExecutionMixin."""
 
-    def test_execute_env_hooks_no_hook_manager(self, mock_console):
+    def test_execute_env_hooks_no_hook_manager(self, mock_console: MagicMock) -> None:
         """Test _execute_env_hooks when no hook manager is set."""
         orchestrator = MockOrchestrator(console=mock_console, hook_manager=None)
         env_config = MagicMock(spec=EnvironmentConfig)
@@ -57,13 +58,13 @@ class TestHookExecutionMixin:
         # Should not raise, just return early
         orchestrator._execute_env_hooks("test-env", "before_plan", env_config)
 
-    def test_execute_env_hooks_no_env_config(self, orchestrator):
+    def test_execute_env_hooks_no_env_config(self, orchestrator: Any) -> None:
         """Test _execute_env_hooks when env_config is None."""
         # Should not raise, just return early
         orchestrator._execute_env_hooks("test-env", "before_plan", None)
         orchestrator._hook_manager.execute_environment_hooks.assert_not_called()
 
-    def test_execute_env_hooks_no_hooks_in_config(self, orchestrator):
+    def test_execute_env_hooks_no_hooks_in_config(self, orchestrator: Any) -> None:
         """Test _execute_env_hooks when env_config has no hooks."""
         env_config = MagicMock(spec=EnvironmentConfig)
         env_config.hooks = None
@@ -72,7 +73,7 @@ class TestHookExecutionMixin:
         orchestrator._execute_env_hooks("test-env", "before_plan", env_config)
         orchestrator._hook_manager.execute_environment_hooks.assert_not_called()
 
-    def test_execute_env_hooks_success(self, orchestrator):
+    def test_execute_env_hooks_success(self, orchestrator: Any) -> None:
         """Test _execute_env_hooks calls hook manager correctly."""
         env_config = MagicMock(spec=EnvironmentConfig)
         env_config.hooks = MagicMock(spec=HooksConfig)
@@ -85,7 +86,7 @@ class TestHookExecutionMixin:
             hooks_config=env_config.hooks,
         )
 
-    def test_execute_env_hooks_error(self, orchestrator, mock_console):
+    def test_execute_env_hooks_error(self, orchestrator: Any, mock_console: MagicMock) -> None:
         """Test _execute_env_hooks handles errors correctly."""
         env_config = MagicMock(spec=EnvironmentConfig)
         env_config.hooks = MagicMock(spec=HooksConfig)
@@ -107,7 +108,7 @@ class TestHookExecutionMixin:
         mock_console.print.assert_called_once()
         assert "Hook failed" in mock_console.print.call_args[0][0]
 
-    def test_execute_resource_hooks_no_hook_manager(self, mock_console):
+    def test_execute_resource_hooks_no_hook_manager(self, mock_console: MagicMock) -> None:
         """Test _execute_resource_hooks when no hook manager is set."""
         orchestrator = MockOrchestrator(console=mock_console, hook_manager=None)
         resource = MagicMock(spec=ResourceConfig)
@@ -116,7 +117,7 @@ class TestHookExecutionMixin:
         # Should not raise, just return early
         orchestrator._execute_resource_hooks("test-env", "before_plan", resource, "proxmox")
 
-    def test_execute_resource_hooks_no_hooks_in_resource(self, orchestrator):
+    def test_execute_resource_hooks_no_hooks_in_resource(self, orchestrator: Any) -> None:
         """Test _execute_resource_hooks when resource has no hooks."""
         resource = MagicMock(spec=ResourceConfig)
         resource.hooks = None
@@ -125,7 +126,7 @@ class TestHookExecutionMixin:
         orchestrator._execute_resource_hooks("test-env", "before_plan", resource, "proxmox")
         orchestrator._hook_manager.execute_resource_hooks.assert_not_called()
 
-    def test_execute_resource_hooks_success(self, orchestrator):
+    def test_execute_resource_hooks_success(self, orchestrator: Any) -> None:
         """Test _execute_resource_hooks calls hook manager correctly."""
         resource = MagicMock(spec=ResourceConfig)
         resource.name = "test-resource"
@@ -141,7 +142,7 @@ class TestHookExecutionMixin:
             hooks_config=resource.hooks,
         )
 
-    def test_execute_resource_hooks_error(self, orchestrator, mock_console):
+    def test_execute_resource_hooks_error(self, orchestrator: Any, mock_console: MagicMock) -> None:
         """Test _execute_resource_hooks handles errors correctly."""
         resource = MagicMock(spec=ResourceConfig)
         resource.name = "test-resource"
@@ -169,7 +170,7 @@ class TestHookExecutionMixin:
 class TestOrchestratorIntegration:
     """Tests verifying the mixin works with orchestrator classes."""
 
-    def test_plan_orchestrator_has_mixin_methods(self):
+    def test_plan_orchestrator_has_mixin_methods(self) -> None:
         """Test that PlanOrchestrator has the mixin methods."""
         from infrafoundry.core.orchestrator_workflows import PlanOrchestrator
 
@@ -177,7 +178,7 @@ class TestOrchestratorIntegration:
         assert hasattr(PlanOrchestrator, "_execute_resource_hooks")
         assert issubclass(PlanOrchestrator, HookExecutionMixin)
 
-    def test_apply_orchestrator_has_mixin_methods(self):
+    def test_apply_orchestrator_has_mixin_methods(self) -> None:
         """Test that ApplyOrchestrator has the mixin methods."""
         from infrafoundry.core.orchestrator_workflows import ApplyOrchestrator
 
@@ -185,7 +186,7 @@ class TestOrchestratorIntegration:
         assert hasattr(ApplyOrchestrator, "_execute_resource_hooks")
         assert issubclass(ApplyOrchestrator, HookExecutionMixin)
 
-    def test_destroy_orchestrator_has_mixin_methods(self):
+    def test_destroy_orchestrator_has_mixin_methods(self) -> None:
         """Test that DestroyOrchestrator has the mixin methods."""
         from infrafoundry.core.orchestrator_workflows import DestroyOrchestrator
 
@@ -198,7 +199,7 @@ class TestOrchestratorIntegration:
 class TestLoadEventConfig:
     """Tests for _load_event_config in HookExecutionMixin."""
 
-    def test_load_event_config_with_events(self, mock_console):
+    def test_load_event_config_with_events(self, mock_console: MagicMock) -> None:
         """Test _load_event_config calls clear_handlers and load_config."""
         event_manager = MagicMock()
         orchestrator = MockOrchestrator(console=mock_console, event_manager=event_manager)
@@ -213,7 +214,7 @@ class TestLoadEventConfig:
         event_manager.clear_handlers.assert_called_once()
         event_manager.load_config.assert_called_once_with(events)
 
-    def test_load_event_config_empty_events(self, mock_console):
+    def test_load_event_config_empty_events(self, mock_console: MagicMock) -> None:
         """Test _load_event_config clears handlers but skips load when events empty."""
         event_manager = MagicMock()
         orchestrator = MockOrchestrator(console=mock_console, event_manager=event_manager)
@@ -225,7 +226,7 @@ class TestLoadEventConfig:
         event_manager.clear_handlers.assert_called_once()
         event_manager.load_config.assert_not_called()
 
-    def test_load_event_config_none_env_config(self, mock_console):
+    def test_load_event_config_none_env_config(self, mock_console: MagicMock) -> None:
         """Test _load_event_config clears handlers but skips load when env_config is None."""
         event_manager = MagicMock()
         orchestrator = MockOrchestrator(console=mock_console, event_manager=event_manager)

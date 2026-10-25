@@ -1,6 +1,8 @@
 """Tests for audit trail models."""
 
+from collections.abc import Iterator
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine
@@ -11,7 +13,7 @@ from infrafoundry.core.state.models import Base
 
 
 @pytest.fixture
-def db_session():
+def db_session() -> Iterator[Any]:
     """Create an in-memory SQLite database for testing."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -25,22 +27,22 @@ def db_session():
 class TestAuditStatus:
     """Tests for AuditStatus enum."""
 
-    def test_status_values(self):
+    def test_status_values(self) -> None:
         """Test that all expected status values exist."""
         assert AuditStatus.SUCCESS.value == "success"
         assert AuditStatus.FAILED.value == "failed"
         assert AuditStatus.IN_PROGRESS.value == "in_progress"
 
-    def test_status_is_string_enum(self):
+    def test_status_is_string_enum(self) -> None:
         """Test that AuditStatus is a string enum."""
         assert isinstance(AuditStatus.SUCCESS, str)
-        assert AuditStatus.SUCCESS == "success"
+        assert AuditStatus.SUCCESS == "success"  # type: ignore[comparison-overlap]
 
 
 class TestAuditEntry:
     """Tests for AuditEntry model."""
 
-    def test_create_audit_entry(self, db_session):
+    def test_create_audit_entry(self, db_session: Any) -> None:
         """Test creating a basic audit entry."""
         entry = AuditEntry(
             timestamp=datetime.now(UTC),
@@ -59,7 +61,7 @@ class TestAuditEntry:
         assert entry.user_identifier == "testuser"
         assert entry.environment == "dev"
 
-    def test_create_audit_entry_with_all_fields(self, db_session):
+    def test_create_audit_entry_with_all_fields(self, db_session: Any) -> None:
         """Test creating an audit entry with all optional fields."""
         entry = AuditEntry(
             timestamp=datetime.now(UTC),
@@ -83,10 +85,12 @@ class TestAuditEntry:
 
         assert entry.provider == "proxmox"
         assert entry.resource_name == "web-server-1"
+        assert entry.changes_summary is not None
         assert entry.changes_summary["added"] == 3
+        assert entry.request_metadata is not None
         assert entry.request_metadata["cli_args"] == ["apply", "--env", "prod"]
 
-    def test_to_dict(self, db_session):
+    def test_to_dict(self, db_session: Any) -> None:
         """Test converting audit entry to dictionary."""
         timestamp = datetime.now(UTC)
         entry = AuditEntry(
@@ -111,7 +115,7 @@ class TestAuditEntry:
         assert entry_dict["action"] == "plan_completed"
         assert entry_dict["status"] == "success"
 
-    def test_to_dict_with_none_timestamp(self, db_session):
+    def test_to_dict_with_none_timestamp(self, db_session: Any) -> None:
         """Test to_dict handles None timestamp gracefully."""
         entry = AuditEntry(
             event_type="test",
@@ -124,7 +128,7 @@ class TestAuditEntry:
         entry_dict = entry.to_dict()
         assert entry_dict["timestamp"] is None
 
-    def test_repr(self, db_session):
+    def test_repr(self, db_session: Any) -> None:
         """Test audit entry string representation."""
         entry = AuditEntry(
             timestamp=datetime.now(UTC),
@@ -143,7 +147,7 @@ class TestAuditEntry:
         assert "admin" in repr_str
         assert "prod" in repr_str
 
-    def test_query_by_environment(self, db_session):
+    def test_query_by_environment(self, db_session: Any) -> None:
         """Test querying audit entries by environment."""
         # Create entries in different environments
         for env in ["dev", "staging", "prod", "dev"]:
@@ -161,7 +165,7 @@ class TestAuditEntry:
         dev_entries = db_session.query(AuditEntry).filter(AuditEntry.environment == "dev").all()
         assert len(dev_entries) == 2
 
-    def test_query_by_user(self, db_session):
+    def test_query_by_user(self, db_session: Any) -> None:
         """Test querying audit entries by user identifier."""
         for user in ["alice", "bob", "alice"]:
             entry = AuditEntry(
@@ -179,7 +183,7 @@ class TestAuditEntry:
         )
         assert len(alice_entries) == 2
 
-    def test_query_by_action(self, db_session):
+    def test_query_by_action(self, db_session: Any) -> None:
         """Test querying audit entries by action."""
         for action in ["plan_started", "plan_completed", "apply_started", "apply_completed"]:
             entry = AuditEntry(
@@ -195,7 +199,7 @@ class TestAuditEntry:
         plan_entries = db_session.query(AuditEntry).filter(AuditEntry.action.like("plan%")).all()
         assert len(plan_entries) == 2
 
-    def test_nullable_fields(self, db_session):
+    def test_nullable_fields(self, db_session: Any) -> None:
         """Test that optional fields can be null."""
         entry = AuditEntry(
             timestamp=datetime.now(UTC),

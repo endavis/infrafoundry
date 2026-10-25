@@ -1,5 +1,8 @@
 """Unit tests for BlueprintResolver."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 import yaml
 
@@ -7,14 +10,14 @@ from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
 from infrafoundry.core.exceptions import InvalidConfigurationError
 
 
-def _make_resolver(base_dir):
+def _make_resolver(base_dir: Any) -> BlueprintResolver:
     """Create a BlueprintResolver with blueprints_dir overridden for testing."""
     resolver = BlueprintResolver(base_dir)
     resolver.blueprints_dir = base_dir.parent / "blueprints"
     return resolver
 
 
-def _create_blueprint(base_dir, name, manifest_data, extra_files=None):
+def _create_blueprint(base_dir: Any, name: Any, manifest_data: Any, extra_files: Any = None) -> Any:
     """Helper to create a blueprint directory structure.
 
     Args:
@@ -48,7 +51,7 @@ def _create_blueprint(base_dir, name, manifest_data, extra_files=None):
 class TestBlueprintResolverResolve:
     """Tests for BlueprintResolver.resolve."""
 
-    def test_resolve_full_blueprint(self, temp_dir):
+    def test_resolve_full_blueprint(self, temp_dir: Path) -> None:
         """All fields are parsed and returned correctly."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -81,7 +84,7 @@ class TestBlueprintResolverResolve:
         assert "host1" in result["inventory_raw"]
         assert result["blueprint_dir"].name == "ontap-cluster"
 
-    def test_resolve_minimal_blueprint(self, temp_dir):
+    def test_resolve_minimal_blueprint(self, temp_dir: Path) -> None:
         """Name-only blueprint works with defaults for optional fields."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -99,7 +102,7 @@ class TestBlueprintResolverResolve:
         assert result["events"] == {}
         assert result["inventory"] is None
 
-    def test_resolve_nonexistent_blueprint(self, temp_dir):
+    def test_resolve_nonexistent_blueprint(self, temp_dir: Path) -> None:
         """Resolving a missing blueprint raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -108,7 +111,7 @@ class TestBlueprintResolverResolve:
         with pytest.raises(InvalidConfigurationError, match="not found"):
             resolver.resolve("nonexistent")
 
-    def test_resolve_missing_manifest(self, temp_dir):
+    def test_resolve_missing_manifest(self, temp_dir: Path) -> None:
         """Directory without blueprint.yaml raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -121,7 +124,7 @@ class TestBlueprintResolverResolve:
         with pytest.raises(InvalidConfigurationError, match="manifest not found"):
             resolver.resolve("no-manifest")
 
-    def test_resolve_invalid_yaml(self, temp_dir):
+    def test_resolve_invalid_yaml(self, temp_dir: Path) -> None:
         """Invalid YAML in manifest raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -134,7 +137,7 @@ class TestBlueprintResolverResolve:
         with pytest.raises(InvalidConfigurationError, match="Invalid YAML"):
             resolver.resolve("bad-yaml")
 
-    def test_resolve_missing_name_field(self, temp_dir):
+    def test_resolve_missing_name_field(self, temp_dir: Path) -> None:
         """Manifest without name field raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -145,7 +148,7 @@ class TestBlueprintResolverResolve:
         with pytest.raises(InvalidConfigurationError, match="missing required 'name'"):
             resolver.resolve("no-name")
 
-    def test_resolve_empty_manifest(self, temp_dir):
+    def test_resolve_empty_manifest(self, temp_dir: Path) -> None:
         """Empty manifest file raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -163,7 +166,7 @@ class TestBlueprintResolverResolve:
 class TestBlueprintResolverInputs:
     """Tests for the ``inputs:`` schema parsing in ``resolve``."""
 
-    def test_inputs_with_defaults_synthesises_defaults_dict(self, temp_dir):
+    def test_inputs_with_defaults_synthesises_defaults_dict(self, temp_dir: Path) -> None:
         """Inputs carrying ``default:`` populate the synthesised ``defaults``."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -186,7 +189,7 @@ class TestBlueprintResolverInputs:
         # ``input_names`` contains every declared input (required + optional).
         assert result["input_names"] == frozenset({"required_var", "cores", "bridge"})
 
-    def test_inputs_in_provider_block(self, temp_dir):
+    def test_inputs_in_provider_block(self, temp_dir: Path) -> None:
         """Per-provider ``inputs:`` are parsed and exposed."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -214,7 +217,7 @@ class TestBlueprintResolverInputs:
         assert proxmox["defaults"] == {"cores": 2}
         assert proxmox["input_names"] == frozenset({"server_name", "cores"})
 
-    def test_both_inputs_and_defaults_raises(self, temp_dir):
+    def test_both_inputs_and_defaults_raises(self, temp_dir: Path) -> None:
         """Declaring both sections at the top level is a hard error."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -230,7 +233,7 @@ class TestBlueprintResolverInputs:
         with pytest.raises(InvalidConfigurationError, match="both 'inputs:' and 'defaults:'"):
             resolver.resolve("bp")
 
-    def test_both_inputs_and_defaults_in_provider_raises(self, temp_dir):
+    def test_both_inputs_and_defaults_in_provider_raises(self, temp_dir: Path) -> None:
         """Declaring both sections inside a provider block is a hard error."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -251,7 +254,7 @@ class TestBlueprintResolverInputs:
         with pytest.raises(InvalidConfigurationError, match="provider 'proxmox'"):
             resolver.resolve("bp")
 
-    def test_input_entry_missing_name_raises(self, temp_dir):
+    def test_input_entry_missing_name_raises(self, temp_dir: Path) -> None:
         """An input entry without a ``name`` key is rejected."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -266,7 +269,7 @@ class TestBlueprintResolverInputs:
         with pytest.raises(InvalidConfigurationError, match="missing 'name'"):
             resolver.resolve("bp")
 
-    def test_input_entry_unknown_key_raises(self, temp_dir):
+    def test_input_entry_unknown_key_raises(self, temp_dir: Path) -> None:
         """Unknown keys in an input entry are rejected."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -281,7 +284,7 @@ class TestBlueprintResolverInputs:
         with pytest.raises(InvalidConfigurationError, match="unknown keys"):
             resolver.resolve("bp")
 
-    def test_input_section_must_be_list(self, temp_dir):
+    def test_input_section_must_be_list(self, temp_dir: Path) -> None:
         """``inputs:`` must be a list of entries."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -293,7 +296,7 @@ class TestBlueprintResolverInputs:
         with pytest.raises(InvalidConfigurationError, match="non-list 'inputs:'"):
             resolver.resolve("bp")
 
-    def test_duplicate_input_name_raises(self, temp_dir):
+    def test_duplicate_input_name_raises(self, temp_dir: Path) -> None:
         """Declaring the same input twice is rejected."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -316,7 +319,7 @@ class TestBlueprintResolverInputs:
 class TestBlueprintResolverExists:
     """Tests for BlueprintResolver.exists."""
 
-    def test_exists_returns_true(self, temp_dir):
+    def test_exists_returns_true(self, temp_dir: Path) -> None:
         """Returns True for valid blueprint."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -326,7 +329,7 @@ class TestBlueprintResolverExists:
 
         assert resolver.exists("test-bp") is True
 
-    def test_exists_returns_false_missing(self, temp_dir):
+    def test_exists_returns_false_missing(self, temp_dir: Path) -> None:
         """Returns False for non-existent blueprint."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -334,7 +337,7 @@ class TestBlueprintResolverExists:
 
         assert resolver.exists("nonexistent") is False
 
-    def test_exists_returns_false_no_manifest(self, temp_dir):
+    def test_exists_returns_false_no_manifest(self, temp_dir: Path) -> None:
         """Returns False for directory without blueprint.yaml."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -350,7 +353,7 @@ class TestBlueprintResolverExists:
 class TestBlueprintResolverListBlueprints:
     """Tests for BlueprintResolver.list_blueprints."""
 
-    def test_list_blueprints(self, temp_dir):
+    def test_list_blueprints(self, temp_dir: Path) -> None:
         """Lists all valid blueprints sorted by name."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -362,7 +365,7 @@ class TestBlueprintResolverListBlueprints:
         result = resolver.list_blueprints()
         assert result == ["alpha-bp", "zeta-bp"]
 
-    def test_list_blueprints_empty(self, temp_dir):
+    def test_list_blueprints_empty(self, temp_dir: Path) -> None:
         """Returns empty list when no blueprints directory exists."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -370,7 +373,7 @@ class TestBlueprintResolverListBlueprints:
 
         assert resolver.list_blueprints() == []
 
-    def test_list_blueprints_skips_invalid(self, temp_dir):
+    def test_list_blueprints_skips_invalid(self, temp_dir: Path) -> None:
         """Skips directories without blueprint.yaml."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -388,7 +391,7 @@ class TestBlueprintResolverListBlueprints:
 class TestBlueprintResolverResolveFile:
     """Tests for BlueprintResolver.resolve_file."""
 
-    def test_resolve_file_from_package(self, temp_dir):
+    def test_resolve_file_from_package(self, temp_dir: Path) -> None:
         """File in package dir is preferred over blueprint."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -405,7 +408,7 @@ class TestBlueprintResolverResolveFile:
         result = resolver.resolve_file("vm.yaml", package_dir, blueprint_dir)
         assert result == package_dir / "vm.yaml"
 
-    def test_resolve_file_fallback_to_blueprint(self, temp_dir):
+    def test_resolve_file_fallback_to_blueprint(self, temp_dir: Path) -> None:
         """File not in package falls back to blueprint."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -421,7 +424,7 @@ class TestBlueprintResolverResolveFile:
         result = resolver.resolve_file("vm.yaml", package_dir, blueprint_dir)
         assert result == blueprint_dir / "vm.yaml"
 
-    def test_resolve_file_nested_path(self, temp_dir):
+    def test_resolve_file_nested_path(self, temp_dir: Path) -> None:
         """Nested paths (scripts/setup.sh) resolve correctly."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -438,7 +441,7 @@ class TestBlueprintResolverResolveFile:
         result = resolver.resolve_file("scripts/setup.sh", package_dir, blueprint_dir)
         assert result == blueprint_dir / "scripts" / "setup.sh"
 
-    def test_resolve_file_not_found(self, temp_dir):
+    def test_resolve_file_not_found(self, temp_dir: Path) -> None:
         """File in neither location raises InvalidConfigurationError."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from rich.panel import Panel
+from rich.text import Text
 
 from infrafoundry.core.warnings import (
     ENV_VAR,
@@ -19,13 +20,13 @@ from infrafoundry.core.warnings import (
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch):
+def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure INFRAFOUNDRY_WARNINGS_FILE doesn't leak between tests."""
     monkeypatch.delenv(ENV_VAR, raising=False)
 
 
 @pytest.mark.unit
-def test_emit_warning_writes_jsonl(tmp_path: Path):
+def test_emit_warning_writes_jsonl(tmp_path: Path) -> None:
     """A single emit_warning call produces one well-formed JSON line."""
     target = tmp_path / "warnings.jsonl"
 
@@ -38,7 +39,7 @@ def test_emit_warning_writes_jsonl(tmp_path: Path):
 
 
 @pytest.mark.unit
-def test_emit_warning_appends_multiple(tmp_path: Path):
+def test_emit_warning_appends_multiple(tmp_path: Path) -> None:
     """Repeated calls accumulate, one line each."""
     target = tmp_path / "warnings.jsonl"
 
@@ -56,7 +57,7 @@ def test_emit_warning_appends_multiple(tmp_path: Path):
 
 
 @pytest.mark.unit
-def test_emit_warning_no_op_when_unset(tmp_path: Path, monkeypatch):
+def test_emit_warning_no_op_when_unset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """With env var unset and no file_path, emit_warning silently no-ops."""
     monkeypatch.delenv(ENV_VAR, raising=False)
 
@@ -68,7 +69,9 @@ def test_emit_warning_no_op_when_unset(tmp_path: Path, monkeypatch):
 
 
 @pytest.mark.unit
-def test_emit_warning_uses_env_var_when_no_file_path(tmp_path: Path, monkeypatch):
+def test_emit_warning_uses_env_var_when_no_file_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """When file_path is None, the env var is used as the target."""
     target = tmp_path / "env-warnings.jsonl"
     monkeypatch.setenv(ENV_VAR, str(target))
@@ -84,7 +87,9 @@ def test_emit_warning_uses_env_var_when_no_file_path(tmp_path: Path, monkeypatch
 
 
 @pytest.mark.unit
-def test_emit_warning_explicit_path_overrides_env(tmp_path: Path, monkeypatch):
+def test_emit_warning_explicit_path_overrides_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """An explicit file_path argument wins over the env var."""
     env_target = tmp_path / "env.jsonl"
     explicit_target = tmp_path / "explicit.jsonl"
@@ -97,7 +102,7 @@ def test_emit_warning_explicit_path_overrides_env(tmp_path: Path, monkeypatch):
 
 
 @pytest.mark.unit
-def test_emit_warning_concurrent_appends_dont_interleave(tmp_path: Path):
+def test_emit_warning_concurrent_appends_dont_interleave(tmp_path: Path) -> None:
     """50 threads emitting 5KB messages each produce 50 intact JSON objects.
 
     This exercises the fcntl lock: POSIX O_APPEND is only atomic up to
@@ -133,13 +138,13 @@ def test_emit_warning_concurrent_appends_dont_interleave(tmp_path: Path):
 
 
 @pytest.mark.unit
-def test_read_warnings_returns_empty_for_missing_file(tmp_path: Path):
+def test_read_warnings_returns_empty_for_missing_file(tmp_path: Path) -> None:
     """Missing file → empty list; no exception raised."""
     assert read_warnings(tmp_path / "does-not-exist.jsonl") == []
 
 
 @pytest.mark.unit
-def test_read_warnings_returns_empty_for_empty_file(tmp_path: Path):
+def test_read_warnings_returns_empty_for_empty_file(tmp_path: Path) -> None:
     """Empty file → empty list."""
     target = tmp_path / "empty.jsonl"
     target.write_text("", encoding="utf-8")
@@ -148,7 +153,7 @@ def test_read_warnings_returns_empty_for_empty_file(tmp_path: Path):
 
 
 @pytest.mark.unit
-def test_read_warnings_parses_jsonl(tmp_path: Path):
+def test_read_warnings_parses_jsonl(tmp_path: Path) -> None:
     """Multi-line file → list of dicts in order."""
     target = tmp_path / "multi.jsonl"
     target.write_text(
@@ -167,7 +172,9 @@ def test_read_warnings_parses_jsonl(tmp_path: Path):
 
 
 @pytest.mark.unit
-def test_read_warnings_skips_malformed_lines(tmp_path: Path, caplog):
+def test_read_warnings_skips_malformed_lines(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """Malformed JSON lines are skipped; other lines parse; no exception raised."""
     target = tmp_path / "mixed.jsonl"
     target.write_text(
@@ -189,7 +196,7 @@ def test_read_warnings_skips_malformed_lines(tmp_path: Path, caplog):
 
 
 @pytest.mark.unit
-def test_render_warnings_panel_groups_by_source():
+def test_render_warnings_panel_groups_by_source() -> None:
     """Panel body groups messages by their source identifier."""
     console = MagicMock()
     warnings_list = [
@@ -208,6 +215,7 @@ def test_render_warnings_panel_groups_by_source():
     assert "Warnings" in title
     assert "3" in title
     # Body groups by source. Render the Text object to plain to inspect.
+    assert isinstance(printed.renderable, Text)
     rendered_body = printed.renderable.plain
     assert "handler-a" in rendered_body
     assert "handler-b" in rendered_body
@@ -225,7 +233,7 @@ def test_render_warnings_panel_groups_by_source():
 
 
 @pytest.mark.unit
-def test_render_warnings_panel_no_op_when_empty():
+def test_render_warnings_panel_no_op_when_empty() -> None:
     """Empty list → no print call; callers can render unconditionally."""
     console = MagicMock()
 

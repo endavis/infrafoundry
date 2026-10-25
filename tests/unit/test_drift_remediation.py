@@ -12,7 +12,7 @@ from infrafoundry.core.events import EventManager
 
 
 @pytest.fixture
-def mock_drift_detector():
+def mock_drift_detector() -> MagicMock:
     """Create a mock drift detector."""
     detector = MagicMock()
     detector.detect = MagicMock()
@@ -20,13 +20,13 @@ def mock_drift_detector():
 
 
 @pytest.fixture
-def mock_event_manager():
+def mock_event_manager() -> MagicMock:
     """Create a mock event manager."""
     return MagicMock(spec=EventManager)
 
 
 @pytest.fixture
-def temp_history_dir(tmp_path):
+def temp_history_dir(tmp_path: Path) -> Path:
     """Create a temporary history directory."""
     history_dir = tmp_path / ".drift_history"
     history_dir.mkdir()
@@ -34,7 +34,9 @@ def temp_history_dir(tmp_path):
 
 
 @pytest.fixture
-def remediator(mock_drift_detector, mock_event_manager, temp_history_dir):
+def remediator(
+    mock_drift_detector: MagicMock, mock_event_manager: MagicMock, temp_history_dir: Path
+) -> DriftRemediator:
     """Create a DriftRemediator instance for testing."""
     return DriftRemediator(
         drift_detector=mock_drift_detector,
@@ -47,7 +49,7 @@ def remediator(mock_drift_detector, mock_event_manager, temp_history_dir):
 class TestDriftRemediationConfig:
     """Tests for DriftRemediationConfig model."""
 
-    def test_default_config(self):
+    def test_default_config(self) -> None:
         """Test default configuration values."""
         config = DriftRemediationConfig()
 
@@ -61,7 +63,7 @@ class TestDriftRemediationConfig:
         assert config.notify_on_remediation is True
         assert config.dry_run is False
 
-    def test_custom_config(self):
+    def test_custom_config(self) -> None:
         """Test custom configuration values."""
         config = DriftRemediationConfig(
             enabled=True,
@@ -81,12 +83,12 @@ class TestDriftRemediationConfig:
         assert config.max_to_destroy == 2
         assert config.dry_run is True
 
-    def test_validation_minimum_interval(self):
+    def test_validation_minimum_interval(self) -> None:
         """Test validation of minimum check interval."""
         with pytest.raises(ValueError):
             DriftRemediationConfig(check_interval_minutes=0)
 
-    def test_validation_negative_thresholds(self):
+    def test_validation_negative_thresholds(self) -> None:
         """Test validation prevents negative thresholds."""
         with pytest.raises(ValueError):
             DriftRemediationConfig(auto_apply_threshold=-1)
@@ -99,7 +101,9 @@ class TestDriftRemediationConfig:
 class TestDriftRemediatorInit:
     """Tests for DriftRemediator initialization."""
 
-    def test_initialization(self, mock_drift_detector, mock_event_manager, temp_history_dir):
+    def test_initialization(
+        self, mock_drift_detector: MagicMock, mock_event_manager: MagicMock, temp_history_dir: Path
+    ) -> None:
         """Test remediator initialization."""
         remediator = DriftRemediator(
             drift_detector=mock_drift_detector,
@@ -111,7 +115,9 @@ class TestDriftRemediatorInit:
         assert remediator.event_manager == mock_event_manager
         assert remediator.history_dir == temp_history_dir
 
-    def test_default_event_manager(self, mock_drift_detector, temp_history_dir):
+    def test_default_event_manager(
+        self, mock_drift_detector: MagicMock, temp_history_dir: Path
+    ) -> None:
         """Test default event manager creation."""
         remediator = DriftRemediator(
             drift_detector=mock_drift_detector,
@@ -121,7 +127,7 @@ class TestDriftRemediatorInit:
         assert remediator.event_manager is not None
         assert isinstance(remediator.event_manager, EventManager)
 
-    def test_default_history_dir(self, mock_drift_detector):
+    def test_default_history_dir(self, mock_drift_detector: MagicMock) -> None:
         """Test default history directory creation."""
         remediator = DriftRemediator(drift_detector=mock_drift_detector)
 
@@ -132,7 +138,7 @@ class TestDriftRemediatorInit:
 class TestShouldAutoApply:
     """Tests for should_auto_apply method."""
 
-    def test_disabled_remediation(self, remediator):
+    def test_disabled_remediation(self, remediator: DriftRemediator) -> None:
         """Test that disabled remediation is not auto-applied."""
         config = DriftRemediationConfig(enabled=False)
         drift_info = {"has_changes": True, "to_add": 1, "to_change": 1, "to_destroy": 0}
@@ -142,7 +148,7 @@ class TestShouldAutoApply:
         assert should_apply is False
         assert "disabled" in reason.lower()
 
-    def test_dry_run_mode(self, remediator):
+    def test_dry_run_mode(self, remediator: DriftRemediator) -> None:
         """Test that dry-run mode prevents auto-apply."""
         config = DriftRemediationConfig(enabled=True, dry_run=True)
         drift_info = {"has_changes": True, "to_add": 1, "to_change": 1, "to_destroy": 0}
@@ -152,7 +158,7 @@ class TestShouldAutoApply:
         assert should_apply is False
         assert "dry-run" in reason.lower()
 
-    def test_no_changes(self, remediator):
+    def test_no_changes(self, remediator: DriftRemediator) -> None:
         """Test that no drift means no auto-apply."""
         config = DriftRemediationConfig(enabled=True)
         drift_info = {"has_changes": False, "to_add": 0, "to_change": 0, "to_destroy": 0}
@@ -162,7 +168,7 @@ class TestShouldAutoApply:
         assert should_apply is False
         assert "no drift" in reason.lower()
 
-    def test_zero_threshold(self, remediator):
+    def test_zero_threshold(self, remediator: DriftRemediator) -> None:
         """Test that zero threshold disables auto-apply."""
         config = DriftRemediationConfig(enabled=True, auto_apply_threshold=0)
         drift_info = {"has_changes": True, "to_add": 1, "to_change": 0, "to_destroy": 0}
@@ -172,7 +178,7 @@ class TestShouldAutoApply:
         assert should_apply is False
         assert "threshold is 0" in reason.lower()
 
-    def test_exceeds_total_threshold(self, remediator):
+    def test_exceeds_total_threshold(self, remediator: DriftRemediator) -> None:
         """Test that exceeding total threshold prevents auto-apply."""
         config = DriftRemediationConfig(enabled=True, auto_apply_threshold=3)
         drift_info = {"has_changes": True, "to_add": 2, "to_change": 2, "to_destroy": 0}
@@ -182,7 +188,7 @@ class TestShouldAutoApply:
         assert should_apply is False
         assert "exceeds threshold" in reason.lower()
 
-    def test_exceeds_add_threshold(self, remediator):
+    def test_exceeds_add_threshold(self, remediator: DriftRemediator) -> None:
         """Test that exceeding add threshold prevents auto-apply."""
         config = DriftRemediationConfig(
             enabled=True,
@@ -196,7 +202,7 @@ class TestShouldAutoApply:
         assert should_apply is False
         assert "to add" in reason.lower()
 
-    def test_exceeds_change_threshold(self, remediator):
+    def test_exceeds_change_threshold(self, remediator: DriftRemediator) -> None:
         """Test that exceeding change threshold prevents auto-apply."""
         config = DriftRemediationConfig(
             enabled=True,
@@ -210,7 +216,7 @@ class TestShouldAutoApply:
         assert should_apply is False
         assert "to change" in reason.lower()
 
-    def test_exceeds_destroy_threshold(self, remediator):
+    def test_exceeds_destroy_threshold(self, remediator: DriftRemediator) -> None:
         """Test that exceeding destroy threshold prevents auto-apply."""
         config = DriftRemediationConfig(
             enabled=True,
@@ -224,7 +230,7 @@ class TestShouldAutoApply:
         assert should_apply is False
         assert "to destroy" in reason.lower()
 
-    def test_within_all_thresholds(self, remediator):
+    def test_within_all_thresholds(self, remediator: DriftRemediator) -> None:
         """Test successful auto-apply when within all thresholds."""
         config = DriftRemediationConfig(
             enabled=True,
@@ -245,7 +251,9 @@ class TestShouldAutoApply:
 class TestRemediate:
     """Tests for remediate method."""
 
-    def test_no_drift_detected(self, remediator, mock_drift_detector):
+    def test_no_drift_detected(
+        self, remediator: DriftRemediator, mock_drift_detector: MagicMock
+    ) -> None:
         """Test remediation when no drift is detected."""
         mock_drift_detector.detect.return_value = {
             "proxmox": {"has_changes": False, "to_add": 0, "to_change": 0, "to_destroy": 0}
@@ -261,7 +269,9 @@ class TestRemediate:
         assert result["providers_with_drift"] == []
         mock_apply.assert_not_called()
 
-    def test_drift_detected_not_applied(self, remediator, mock_drift_detector):
+    def test_drift_detected_not_applied(
+        self, remediator: DriftRemediator, mock_drift_detector: MagicMock
+    ) -> None:
         """Test drift detection without auto-apply (exceeds threshold)."""
         mock_drift_detector.detect.return_value = {
             "proxmox": {"has_changes": True, "to_add": 10, "to_change": 5, "to_destroy": 0}
@@ -281,7 +291,9 @@ class TestRemediate:
         assert "exceeds threshold" in result["reason"]
         mock_apply.assert_not_called()
 
-    def test_drift_detected_and_applied(self, remediator, mock_drift_detector):
+    def test_drift_detected_and_applied(
+        self, remediator: DriftRemediator, mock_drift_detector: MagicMock
+    ) -> None:
         """Test successful drift remediation with auto-apply."""
         mock_drift_detector.detect.return_value = {
             "proxmox": {"has_changes": True, "to_add": 2, "to_change": 1, "to_destroy": 0}
@@ -303,7 +315,9 @@ class TestRemediate:
         assert "within thresholds" in result["reason"].lower()
         mock_apply.assert_called_once_with(env_name="dev", auto_approve=True)
 
-    def test_drift_multiple_providers(self, remediator, mock_drift_detector):
+    def test_drift_multiple_providers(
+        self, remediator: DriftRemediator, mock_drift_detector: MagicMock
+    ) -> None:
         """Test drift detection across multiple providers."""
         mock_drift_detector.detect.return_value = {
             "proxmox": {"has_changes": True, "to_add": 1, "to_change": 1, "to_destroy": 0},
@@ -321,7 +335,9 @@ class TestRemediate:
         assert result["drift_info"]["to_add"] == 2
         assert result["drift_info"]["to_change"] == 1
 
-    def test_dry_run_mode(self, remediator, mock_drift_detector):
+    def test_dry_run_mode(
+        self, remediator: DriftRemediator, mock_drift_detector: MagicMock
+    ) -> None:
         """Test that dry-run mode doesn't apply changes."""
         mock_drift_detector.detect.return_value = {
             "proxmox": {"has_changes": True, "to_add": 1, "to_change": 0, "to_destroy": 0}
@@ -337,7 +353,9 @@ class TestRemediate:
         assert "dry-run" in result["reason"].lower()
         mock_apply.assert_not_called()
 
-    def test_remediation_failure(self, remediator, mock_drift_detector):
+    def test_remediation_failure(
+        self, remediator: DriftRemediator, mock_drift_detector: MagicMock
+    ) -> None:
         """Test handling of remediation failures."""
         mock_drift_detector.detect.side_effect = Exception("Drift detection failed")
 
@@ -347,7 +365,12 @@ class TestRemediate:
         with pytest.raises(DriftRemediationError, match="Drift detection failed"):
             remediator.remediate("dev", config, mock_apply)
 
-    def test_event_emissions(self, remediator, mock_drift_detector, mock_event_manager):
+    def test_event_emissions(
+        self,
+        remediator: DriftRemediator,
+        mock_drift_detector: MagicMock,
+        mock_event_manager: MagicMock,
+    ) -> None:
         """Test that appropriate events are emitted during remediation."""
         mock_drift_detector.detect.return_value = {
             "proxmox": {"has_changes": True, "to_add": 1, "to_change": 1, "to_destroy": 0}
@@ -372,7 +395,9 @@ class TestRemediate:
 class TestHistory:
     """Tests for remediation history functionality."""
 
-    def test_save_history(self, remediator, mock_drift_detector, temp_history_dir):
+    def test_save_history(
+        self, remediator: DriftRemediator, mock_drift_detector: MagicMock, temp_history_dir: Path
+    ) -> None:
         """Test that remediation results are saved to history."""
         mock_drift_detector.detect.return_value = {
             "proxmox": {"has_changes": False, "to_add": 0, "to_change": 0, "to_destroy": 0}
@@ -393,13 +418,15 @@ class TestHistory:
             assert history["env_name"] == "dev"
             assert history["drift_detected"] is False
 
-    def test_get_history_empty(self, remediator):
+    def test_get_history_empty(self, remediator: DriftRemediator) -> None:
         """Test retrieving history when none exists."""
         history = remediator.get_history()
 
         assert history == []
 
-    def test_get_history_with_entries(self, remediator, temp_history_dir):
+    def test_get_history_with_entries(
+        self, remediator: DriftRemediator, temp_history_dir: Path
+    ) -> None:
         """Test retrieving history entries."""
         # Create some history files
         for i in range(3):
@@ -417,7 +444,9 @@ class TestHistory:
 
         assert len(history) == 3
 
-    def test_get_history_with_env_filter(self, remediator, temp_history_dir):
+    def test_get_history_with_env_filter(
+        self, remediator: DriftRemediator, temp_history_dir: Path
+    ) -> None:
         """Test filtering history by environment."""
         # Create history for different environments with unique timestamps
         for i, env in enumerate(["dev", "prod", "dev"]):
@@ -431,7 +460,9 @@ class TestHistory:
         assert len(history) == 2
         assert all(h["env_name"] == "dev" for h in history)
 
-    def test_get_history_with_limit(self, remediator, temp_history_dir):
+    def test_get_history_with_limit(
+        self, remediator: DriftRemediator, temp_history_dir: Path
+    ) -> None:
         """Test limiting history results."""
         # Create more entries than the limit
         for i in range(15):
@@ -444,7 +475,9 @@ class TestHistory:
 
         assert len(history) == 5
 
-    def test_history_corrupted_file_skipped(self, remediator, temp_history_dir):
+    def test_history_corrupted_file_skipped(
+        self, remediator: DriftRemediator, temp_history_dir: Path
+    ) -> None:
         """Test that corrupted history files are skipped."""
         # Create a valid history file
         valid_file = temp_history_dir / "remediation_dev_20250101_000001.yaml"

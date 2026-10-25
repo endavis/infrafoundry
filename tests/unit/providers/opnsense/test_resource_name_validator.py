@@ -12,18 +12,18 @@ from infrafoundry.providers.opnsense.validators.resource_name_validator import (
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> ResourceNameValidator:
     """Create a ResourceNameValidator instance."""
     return ResourceNameValidator(report)
 
 
-def test_validate_unique_names(validator, report):
+def test_validate_unique_names(validator: ResourceNameValidator, report: MagicMock) -> None:
     """Test validation with all unique names."""
     resources = [
         ResourceConfig(name="alias1", type="firewall.aliases", provider="opnsense", config={}),
@@ -36,7 +36,9 @@ def test_validate_unique_names(validator, report):
     report.add_check.assert_not_called()
 
 
-def test_validate_duplicate_names_same_type(validator, report):
+def test_validate_duplicate_names_same_type(
+    validator: ResourceNameValidator, report: MagicMock
+) -> None:
     """Test validation with duplicate names in same type."""
     resources = [
         ResourceConfig(name="web_servers", type="firewall.aliases", provider="opnsense", config={}),
@@ -54,7 +56,9 @@ def test_validate_duplicate_names_same_type(validator, report):
     assert call_args["level"] == ValidationLevel.ERROR
 
 
-def test_validate_same_name_different_types(validator, report):
+def test_validate_same_name_different_types(
+    validator: ResourceNameValidator, report: MagicMock
+) -> None:
     """Test validation with same name across different types (allowed)."""
     resources = [
         ResourceConfig(name="web", type="firewall.aliases", provider="opnsense", config={}),
@@ -68,7 +72,9 @@ def test_validate_same_name_different_types(validator, report):
     report.add_check.assert_not_called()
 
 
-def test_validate_multiple_duplicates_same_type(validator, report):
+def test_validate_multiple_duplicates_same_type(
+    validator: ResourceNameValidator, report: MagicMock
+) -> None:
     """Test validation with multiple duplicate names in same type."""
     resources = [
         ResourceConfig(name="alias1", type="firewall.aliases", provider="opnsense", config={}),
@@ -82,7 +88,9 @@ def test_validate_multiple_duplicates_same_type(validator, report):
     assert report.add_check.call_count == 2
 
 
-def test_validate_duplicates_in_multiple_types(validator, report):
+def test_validate_duplicates_in_multiple_types(
+    validator: ResourceNameValidator, report: MagicMock
+) -> None:
     """Test validation with duplicates in multiple types."""
     resources = [
         ResourceConfig(name="dup1", type="firewall.aliases", provider="opnsense", config={}),
@@ -96,14 +104,14 @@ def test_validate_duplicates_in_multiple_types(validator, report):
     assert report.add_check.call_count == 2
 
 
-def test_validate_empty_resources(validator, report):
+def test_validate_empty_resources(validator: ResourceNameValidator, report: MagicMock) -> None:
     """Test validation with no resources."""
     validator.validate([])
 
     report.add_check.assert_not_called()
 
 
-def test_validate_single_resource(validator, report):
+def test_validate_single_resource(validator: ResourceNameValidator, report: MagicMock) -> None:
     """Test validation with single resource."""
     resources = [
         ResourceConfig(name="alias1", type="firewall.aliases", provider="opnsense", config={}),
@@ -114,7 +122,9 @@ def test_validate_single_resource(validator, report):
     report.add_check.assert_not_called()
 
 
-def test_validate_many_unique_resources(validator, report):
+def test_validate_many_unique_resources(
+    validator: ResourceNameValidator, report: MagicMock
+) -> None:
     """Test validation with many unique resources."""
     resources = [
         ResourceConfig(name=f"alias{i}", type="firewall.aliases", provider="opnsense", config={})
@@ -126,7 +136,7 @@ def test_validate_many_unique_resources(validator, report):
     report.add_check.assert_not_called()
 
 
-def test_validate_check_name_format(validator, report):
+def test_validate_check_name_format(validator: ResourceNameValidator, report: MagicMock) -> None:
     """Test that check name includes resource type and name."""
     resources = [
         ResourceConfig(name="duplicate", type="firewall.aliases", provider="opnsense", config={}),
@@ -140,7 +150,7 @@ def test_validate_check_name_format(validator, report):
     assert "duplicate" in call_args["check_name"]
 
 
-def test_validate_case_sensitive_names(validator, report):
+def test_validate_case_sensitive_names(validator: ResourceNameValidator, report: MagicMock) -> None:
     """Test that name comparison is case-sensitive."""
     resources = [
         ResourceConfig(name="WebServers", type="firewall.aliases", provider="opnsense", config={}),

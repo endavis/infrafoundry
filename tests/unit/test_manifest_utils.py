@@ -10,7 +10,7 @@ from infrafoundry.core.exceptions import InvalidConfigurationError
 class TestExtractInventoryBlock:
     """Tests for extract_inventory_block."""
 
-    def test_no_inventory_returns_original_text_and_none(self):
+    def test_no_inventory_returns_original_text_and_none(self) -> None:
         """A manifest without an inventory key returns unchanged text and None."""
         text = "name: pkg\nvariables:\n  foo: bar\n"
         stripped, raw = extract_inventory_block(text)
@@ -18,7 +18,7 @@ class TestExtractInventoryBlock:
         assert stripped == text
         assert raw is None
 
-    def test_simple_inventory_is_extracted_and_dedented(self):
+    def test_simple_inventory_is_extracted_and_dedented(self) -> None:
         """A basic block is extracted with its leading key stripped and body dedented."""
         text = (
             "name: pkg\n"
@@ -41,7 +41,7 @@ class TestExtractInventoryBlock:
         assert "inventory: null" in stripped
         assert "web-01" not in stripped
 
-    def test_inventory_with_jinja_for_loop_preserved_literally(self):
+    def test_inventory_with_jinja_for_loop_preserved_literally(self) -> None:
         """Jinja control-flow tags survive extraction unchanged."""
         text = (
             "name: pkg\n"
@@ -61,7 +61,7 @@ class TestExtractInventoryBlock:
         assert "{% endfor %}" in raw
         assert "{{ w.name }}" in raw
 
-    def test_inventory_followed_by_other_keys_stops_at_next_column_0(self):
+    def test_inventory_followed_by_other_keys_stops_at_next_column_0(self) -> None:
         """Only the inventory section is captured; trailing top-level keys stay."""
         text = (
             "name: pkg\n"
@@ -85,7 +85,7 @@ class TestExtractInventoryBlock:
         assert "variables:\n  foo: bar\n" in stripped
         assert "events:\n  AFTER_APPLY: []\n" in stripped
 
-    def test_inventory_at_eof_captures_to_end(self):
+    def test_inventory_at_eof_captures_to_end(self) -> None:
         """A trailing inventory block is captured all the way to EOF."""
         text = "name: pkg\ninventory:\n  groups:\n    g1:\n      hosts:\n        h1: {}\n"
         _, raw = extract_inventory_block(text)
@@ -94,7 +94,7 @@ class TestExtractInventoryBlock:
         assert "groups:" in raw
         assert "h1: {}" in raw
 
-    def test_preserves_line_count_for_parser_error_messages(self):
+    def test_preserves_line_count_for_parser_error_messages(self) -> None:
         """The stripped text must have the same line count as the original."""
         text = (
             "name: pkg\n"  # line 1
@@ -112,7 +112,7 @@ class TestExtractInventoryBlock:
 
         assert text.count("\n") == stripped.count("\n")
 
-    def test_flow_style_inventory_raises(self):
+    def test_flow_style_inventory_raises(self) -> None:
         """Single-line flow-style inventory declarations are rejected."""
         text = "name: pkg\ninventory: {groups: {g1: {hosts: {h1: {}}}}}\n"
         with pytest.raises(InvalidConfigurationError, match="block style"):

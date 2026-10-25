@@ -1,7 +1,8 @@
 """Tests for provider registry."""
 
 from pathlib import Path
-from unittest.mock import Mock, patch
+from typing import Any
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -13,7 +14,7 @@ class TestProviderRegistry:
     """Tests for ProviderRegistry."""
 
     @pytest.fixture
-    def registry(self, tmp_path):
+    def registry(self, tmp_path: Path) -> ProviderRegistry:
         """Create a provider registry instance."""
         config_dir = tmp_path / "config"
         output_dir = tmp_path / "output"
@@ -21,7 +22,7 @@ class TestProviderRegistry:
         output_dir.mkdir()
         return ProviderRegistry(config_dir, output_dir)
 
-    def test_init(self, tmp_path):
+    def test_init(self, tmp_path: Path) -> None:
         """Test registry initialization."""
         config_dir = tmp_path / "config"
         output_dir = tmp_path / "output"
@@ -34,7 +35,7 @@ class TestProviderRegistry:
         assert registry.output_dir == output_dir
         assert registry._providers == {}
 
-    def test_register_provider(self, registry):
+    def test_register_provider(self, registry: ProviderRegistry) -> None:
         """Test registering a provider."""
         mock_provider = Mock(spec=ProviderBase)
         mock_provider.name = "test_provider"
@@ -44,12 +45,12 @@ class TestProviderRegistry:
         assert registry.has_provider("test_provider")
         assert registry.get_provider("test_provider") == mock_provider
 
-    def test_get_provider_not_found(self, registry):
+    def test_get_provider_not_found(self, registry: ProviderRegistry) -> None:
         """Test getting a non-existent provider."""
         result = registry.get_provider("nonexistent")
         assert result is None
 
-    def test_has_provider(self, registry):
+    def test_has_provider(self, registry: ProviderRegistry) -> None:
         """Test checking provider existence."""
         mock_provider = Mock(spec=ProviderBase)
         mock_provider.name = "test_provider"
@@ -60,7 +61,7 @@ class TestProviderRegistry:
 
         assert registry.has_provider("test_provider")
 
-    def test_get_all_providers(self, registry):
+    def test_get_all_providers(self, registry: ProviderRegistry) -> None:
         """Test getting all registered providers."""
         mock_provider1 = Mock(spec=ProviderBase)
         mock_provider1.name = "provider1"
@@ -79,7 +80,7 @@ class TestProviderRegistry:
         assert providers["provider1"] == mock_provider1
         assert providers["provider2"] == mock_provider2
 
-    def test_get_all_providers_returns_copy(self, registry):
+    def test_get_all_providers_returns_copy(self, registry: ProviderRegistry) -> None:
         """Test that get_all_providers returns a copy."""
         mock_provider = Mock(spec=ProviderBase)
         mock_provider.name = "test_provider"
@@ -97,7 +98,9 @@ class TestProviderRegistry:
         assert not registry.has_provider("new_provider")
 
     @patch("infrafoundry.core.provider_registry.importlib.import_module")
-    def test_discover_and_register_proxmox(self, mock_import, registry):
+    def test_discover_and_register_proxmox(
+        self, mock_import: MagicMock, registry: ProviderRegistry
+    ) -> None:
         """Test discovering and registering Proxmox provider."""
         # Mock the Proxmox provider
         mock_module = Mock()
@@ -108,19 +111,19 @@ class TestProviderRegistry:
             def __init__(self, config_dir: Path, output_dir: Path) -> None:
                 super().__init__("proxmox", config_dir, output_dir)
 
-            def validate_config(self, config):
+            def validate_config(self, config: Any) -> bool:
                 return True
 
-            def generate_terraform(self, resources):
+            def generate_terraform(self, resources: Any) -> None:
                 pass
 
-            def generate_ansible(self, resources):
+            def generate_ansible(self, resources: Any) -> None:
                 pass
 
-            def get_resource_types(self):
+            def get_resource_types(self) -> list[Any]:
                 return ["vm"]
 
-            def get_terraform_resource_types(self):
+            def get_terraform_resource_types(self) -> dict[str, Any]:
                 return {"vm": ["proxmox_virtual_environment_vm"]}
 
         mock_module.ProxmoxProvider = MockProxmoxProvider
@@ -133,7 +136,9 @@ class TestProviderRegistry:
         assert registry.has_provider("proxmox")
 
     @patch("infrafoundry.core.provider_registry.importlib.import_module")
-    def test_discover_import_error(self, mock_import, registry):
+    def test_discover_import_error(
+        self, mock_import: MagicMock, registry: ProviderRegistry
+    ) -> None:
         """Test handling import errors during discovery."""
         mock_import.side_effect = ImportError("Module not found")
 
@@ -143,7 +148,7 @@ class TestProviderRegistry:
         # Provider should not be registered
         assert not registry.has_provider("nonexistent")
 
-    def test_find_provider_class(self, registry):
+    def test_find_provider_class(self, registry: ProviderRegistry) -> None:
         """Test finding provider class in module."""
         # Create a mock module with a provider class
         mock_module = Mock()
@@ -152,16 +157,16 @@ class TestProviderRegistry:
             def __init__(self, config_dir: Path, output_dir: Path) -> None:
                 super().__init__("mock", config_dir, output_dir)
 
-            def validate_config(self, config):
+            def validate_config(self, config: Any) -> bool:
                 return True
 
-            def generate_terraform(self, resources):
+            def generate_terraform(self, resources: Any) -> None:
                 pass
 
-            def generate_ansible(self, resources):
+            def generate_ansible(self, resources: Any) -> None:
                 pass
 
-            def get_resource_types(self):
+            def get_resource_types(self) -> list[Any]:
                 return ["test"]
 
         # Add the class to the mock module
@@ -177,7 +182,7 @@ class TestProviderRegistry:
 
         assert result == MockProvider
 
-    def test_find_provider_class_not_found(self, registry):
+    def test_find_provider_class_not_found(self, registry: ProviderRegistry) -> None:
         """Test finding provider class when none exists."""
         mock_module = Mock()
         mock_module.SomeClass = str  # Not a provider
@@ -187,7 +192,7 @@ class TestProviderRegistry:
 
         assert result is None
 
-    def test_discover_all_no_providers_dir(self, registry):
+    def test_discover_all_no_providers_dir(self, registry: ProviderRegistry) -> None:
         """Test discovery when providers directory doesn't exist."""
         with patch("pathlib.Path.exists", return_value=False):
             # Should not raise exception

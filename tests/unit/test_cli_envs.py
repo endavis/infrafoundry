@@ -1,5 +1,6 @@
 """Unit tests for the 'envs' CLI command."""
 
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -13,19 +14,19 @@ _DB_MOCK = "infrafoundry.cli.commands.config.envs._get_state_db_environments"
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_config_manager():
+def mock_config_manager() -> Mock:
     """Mock ConfigManager for testing."""
     mock = Mock(spec=ConfigManager)
     return mock
 
 
-def test_envs_list_environments(cli_runner, mock_config_manager):
+def test_envs_list_environments(cli_runner: CliRunner, mock_config_manager: Mock) -> None:
     """Test envs command lists available environments."""
     # Mock environment data
     mock_env1 = Mock(spec=EnvironmentConfig)
@@ -56,7 +57,7 @@ def test_envs_list_environments(cli_runner, mock_config_manager):
         assert "proxmox, opnsense" in result.output
 
 
-def test_envs_no_environments(cli_runner, mock_config_manager):
+def test_envs_no_environments(cli_runner: CliRunner, mock_config_manager: Mock) -> None:
     """Test envs command when no environments are found."""
     mock_config_manager.list_environments.return_value = []
 
@@ -73,7 +74,9 @@ def test_envs_no_environments(cli_runner, mock_config_manager):
         assert "No environments found" in result.output
 
 
-def test_envs_with_config_dir(cli_runner, mock_config_manager, tmp_path):
+def test_envs_with_config_dir(
+    cli_runner: CliRunner, mock_config_manager: Mock, tmp_path: Path
+) -> None:
     """Test envs command with custom config directory."""
     mock_config_manager.list_environments.return_value = ["test"]
     mock_env = Mock(spec=EnvironmentConfig)
@@ -97,7 +100,7 @@ def test_envs_with_config_dir(cli_runner, mock_config_manager, tmp_path):
         assert "Available environments:" in result.output
 
 
-def test_envs_no_description(cli_runner, mock_config_manager):
+def test_envs_no_description(cli_runner: CliRunner, mock_config_manager: Mock) -> None:
     """Test envs command when environment has no description."""
     mock_env = Mock(spec=EnvironmentConfig)
     mock_env.description = None

@@ -11,19 +11,19 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     return mock
 
 
-def test_apply_with_confirmation(cli_runner, mock_orchestrator):
+def test_apply_with_confirmation(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test apply command with user confirmation."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         # User confirms
@@ -46,7 +46,7 @@ def test_apply_with_confirmation(cli_runner, mock_orchestrator):
         )
 
 
-def test_apply_user_cancels(cli_runner, mock_orchestrator):
+def test_apply_user_cancels(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test apply command when user cancels confirmation."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         # User cancels
@@ -57,7 +57,7 @@ def test_apply_user_cancels(cli_runner, mock_orchestrator):
         mock_orchestrator.apply.assert_not_called()
 
 
-def test_apply_with_auto_approve(cli_runner, mock_orchestrator):
+def test_apply_with_auto_approve(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test apply command with auto-approve flag."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "apply", "--env", "test", "--auto-approve"])
@@ -78,7 +78,7 @@ def test_apply_with_auto_approve(cli_runner, mock_orchestrator):
         )
 
 
-def test_apply_with_resource_filter(cli_runner, mock_orchestrator):
+def test_apply_with_resource_filter(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test apply command with resource filter."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -101,7 +101,7 @@ def test_apply_with_resource_filter(cli_runner, mock_orchestrator):
         )
 
 
-def test_apply_with_parallel(cli_runner, mock_orchestrator):
+def test_apply_with_parallel(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test apply command with parallel execution."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -133,7 +133,7 @@ def test_apply_with_parallel(cli_runner, mock_orchestrator):
         )
 
 
-def test_apply_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_apply_orchestrator_failure(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test apply command when orchestrator.apply raises an error."""
     mock_orchestrator.apply.side_effect = Exception("Apply failed")
 
@@ -144,7 +144,7 @@ def test_apply_orchestrator_failure(cli_runner, mock_orchestrator):
         assert "Apply failed" in result.output
 
 
-def test_apply_with_single_provider_filter(cli_runner, mock_orchestrator):
+def test_apply_with_single_provider_filter(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """A single --provider value is passed through as a one-element list."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -167,7 +167,7 @@ def test_apply_with_single_provider_filter(cli_runner, mock_orchestrator):
         )
 
 
-def test_apply_with_short_provider_flag(cli_runner, mock_orchestrator):
+def test_apply_with_short_provider_flag(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """The -P short option is equivalent to --provider."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -190,7 +190,9 @@ def test_apply_with_short_provider_flag(cli_runner, mock_orchestrator):
         )
 
 
-def test_apply_with_multiple_provider_filter(cli_runner, mock_orchestrator):
+def test_apply_with_multiple_provider_filter(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """Multiple --provider flags accumulate into a list."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -223,7 +225,9 @@ def test_apply_with_multiple_provider_filter(cli_runner, mock_orchestrator):
         )
 
 
-def test_apply_provider_and_package_mutually_exclusive(cli_runner, mock_orchestrator):
+def test_apply_provider_and_package_mutually_exclusive(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """--provider with --package raises UsageError; orchestrator is not called."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -246,7 +250,9 @@ def test_apply_provider_and_package_mutually_exclusive(cli_runner, mock_orchestr
         mock_orchestrator.apply.assert_not_called()
 
 
-def test_apply_provider_and_resource_mutually_exclusive(cli_runner, mock_orchestrator):
+def test_apply_provider_and_resource_mutually_exclusive(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """--provider with --resource raises UsageError; orchestrator is not called."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -269,7 +275,7 @@ def test_apply_provider_and_resource_mutually_exclusive(cli_runner, mock_orchest
         mock_orchestrator.apply.assert_not_called()
 
 
-def test_apply_three_way_mutex(cli_runner, mock_orchestrator):
+def test_apply_three_way_mutex(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """All three of --provider, --package, --resource together fail."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(
@@ -294,7 +300,9 @@ def test_apply_three_way_mutex(cli_runner, mock_orchestrator):
         mock_orchestrator.apply.assert_not_called()
 
 
-def test_apply_unknown_provider_filter_surfaces_error(cli_runner, mock_orchestrator):
+def test_apply_unknown_provider_filter_surfaces_error(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
     """Unknown provider names surface as ProviderFilterError via the orchestrator."""
     mock_orchestrator.apply.side_effect = ProviderFilterError(
         requested=["nope"], available=["opnsense", "proxmox"]

@@ -10,27 +10,29 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     return mock
 
 
 @pytest.fixture
-def mock_dependency_graph():
+def mock_dependency_graph() -> Mock:
     """Mock dependency graph."""
     mock = Mock()
     mock.nodes = {"proxmox:vm-01": None, "proxmox:vm-02": None}
     return mock
 
 
-def test_impact_low_risk(cli_runner, mock_orchestrator, mock_dependency_graph):
+def test_impact_low_risk(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_dependency_graph: Mock
+) -> None:
     """Test impact command with low risk resource."""
     analysis = {
         "risk_level": "LOW",
@@ -54,7 +56,9 @@ def test_impact_low_risk(cli_runner, mock_orchestrator, mock_dependency_graph):
         mock_dependency_graph.get_impact_analysis.assert_called_once_with("proxmox:vm-01")
 
 
-def test_impact_medium_risk(cli_runner, mock_orchestrator, mock_dependency_graph):
+def test_impact_medium_risk(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_dependency_graph: Mock
+) -> None:
     """Test impact command with medium risk resource."""
     analysis = {
         "risk_level": "MEDIUM",
@@ -76,7 +80,9 @@ def test_impact_medium_risk(cli_runner, mock_orchestrator, mock_dependency_graph
         assert "proxmox:vm-02" in result.output
 
 
-def test_impact_high_risk(cli_runner, mock_orchestrator, mock_dependency_graph):
+def test_impact_high_risk(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_dependency_graph: Mock
+) -> None:
     """Test impact command with high risk resource."""
     analysis = {
         "risk_level": "HIGH",
@@ -97,7 +103,9 @@ def test_impact_high_risk(cli_runner, mock_orchestrator, mock_dependency_graph):
         assert "8 resource(s) will be affected" in result.output
 
 
-def test_impact_resource_not_found(cli_runner, mock_orchestrator, mock_dependency_graph):
+def test_impact_resource_not_found(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_dependency_graph: Mock
+) -> None:
     """Test impact command when resource is not found."""
     mock_dependency_graph.get_impact_analysis.return_value = {"error": "not found"}
     mock_orchestrator.build_dependency_graph.return_value = mock_dependency_graph
@@ -112,7 +120,7 @@ def test_impact_resource_not_found(cli_runner, mock_orchestrator, mock_dependenc
         assert "Available resources:" in result.output
 
 
-def test_impact_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_impact_orchestrator_failure(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test impact command when orchestrator.build_dependency_graph raises an error."""
     mock_orchestrator.build_dependency_graph.side_effect = Exception("Impact analysis failed")
 

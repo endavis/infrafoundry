@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -14,13 +15,13 @@ from tests.helpers.env import make_env_config
 
 
 @pytest.fixture
-def validation_report():
+def validation_report() -> ValidationReport:
     """Create a ValidationReport instance."""
     return ValidationReport()
 
 
 @pytest.fixture
-def api_validator(validation_report):
+def api_validator(validation_report: ValidationReport) -> BaseAPIValidator:
     """Create a BaseAPIValidator instance."""
     env_config = make_env_config(
         name="test-env",
@@ -30,12 +31,12 @@ def api_validator(validation_report):
 
 
 @pytest.fixture
-def validator(api_validator, validation_report):
+def validator(api_validator: BaseAPIValidator, validation_report: ValidationReport) -> CRDValidator:
     """Create a CRDValidator instance."""
     return CRDValidator(api_validator, validation_report)
 
 
-def _crd_api_response(groups: list[str]) -> dict:
+def _crd_api_response(groups: list[str]) -> dict[str, Any]:
     """Build a mock CRD list response."""
     return {
         "items": [{"spec": {"group": g}} for g in groups],
@@ -46,9 +47,14 @@ def _crd_api_response(groups: list[str]) -> dict:
 class TestCRDValidator:
     """Tests for CRDValidator."""
 
-    def test_existing_crd(self, validator, validation_report, api_validator):
+    def test_existing_crd(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that existing CRDs produce success."""
-        api_validator.fetch_json = MagicMock(
+        api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
             return_value=_crd_api_response(["cert-manager.io", "traefik.io"])
         )
         manifests = [
@@ -67,9 +73,14 @@ class TestCRDValidator:
         )
         assert any(r.passed and "cert-manager.io" in r.message for r in validation_report.results)
 
-    def test_missing_crd_error(self, validator, validation_report, api_validator):
+    def test_missing_crd_error(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that missing CRDs produce ERROR."""
-        api_validator.fetch_json = MagicMock(return_value=_crd_api_response(["some-other.io"]))
+        api_validator.fetch_json = MagicMock(return_value=_crd_api_response(["some-other.io"]))  # type: ignore[method-assign]
         manifests = [
             ResourceConfig(
                 provider="kubernetes",
@@ -89,9 +100,14 @@ class TestCRDValidator:
             for r in validation_report.results
         )
 
-    def test_standard_api_groups_skipped(self, validator, validation_report, api_validator):
+    def test_standard_api_groups_skipped(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that standard K8s API groups are not checked."""
-        api_validator.fetch_json = MagicMock(return_value=_crd_api_response([]))
+        api_validator.fetch_json = MagicMock(return_value=_crd_api_response([]))  # type: ignore[method-assign]
         manifests = [
             ResourceConfig(
                 provider="kubernetes",
@@ -109,9 +125,14 @@ class TestCRDValidator:
         # No CRD checks should be emitted for standard groups
         api_validator.fetch_json.assert_not_called()
 
-    def test_no_manifests_skips(self, validator, validation_report, api_validator):
+    def test_no_manifests_skips(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test that empty manifests list makes no API calls."""
-        api_validator.fetch_json = MagicMock()
+        api_validator.fetch_json = MagicMock()  # type: ignore[method-assign]
         validator.validate(
             server_url="https://k8s:6443",
             headers={"Authorization": "Bearer tok"},
@@ -120,9 +141,14 @@ class TestCRDValidator:
         )
         api_validator.fetch_json.assert_not_called()
 
-    def test_api_failure_graceful(self, validator, validation_report, api_validator):
+    def test_api_failure_graceful(
+        self,
+        validator: CRDValidator,
+        validation_report: ValidationReport,
+        api_validator: BaseAPIValidator,
+    ) -> None:
         """Test graceful handling when CRD API call fails."""
-        api_validator.fetch_json = MagicMock(return_value=None)
+        api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
         manifests = [
             ResourceConfig(
                 provider="kubernetes",

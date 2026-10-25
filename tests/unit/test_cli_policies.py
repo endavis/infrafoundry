@@ -1,5 +1,6 @@
 """Unit tests for the 'policies' CLI command."""
 
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -10,13 +11,13 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     mock.policy_engine = Mock()
@@ -24,7 +25,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def sample_policies():
+def sample_policies() -> list[Any]:
     """Sample policy data."""
     policy1 = Mock()
     policy1.name = "naming_convention"
@@ -45,7 +46,9 @@ def sample_policies():
     return [policy1, policy2]
 
 
-def test_policies_list_all(cli_runner, mock_orchestrator, sample_policies):
+def test_policies_list_all(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_policies: list[Any]
+) -> None:
     """Test policies command lists all policies."""
     mock_orchestrator.policy_engine.policies = sample_policies
 
@@ -60,7 +63,9 @@ def test_policies_list_all(cli_runner, mock_orchestrator, sample_policies):
         assert "Total: 2" in result.output
 
 
-def test_policies_list_for_environment(cli_runner, mock_orchestrator, sample_policies):
+def test_policies_list_for_environment(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_policies: list[Any]
+) -> None:
     """Test policies command for specific environment."""
     mock_orchestrator.policy_engine.get_policies_for_environment.return_value = [sample_policies[0]]
 
@@ -74,7 +79,7 @@ def test_policies_list_for_environment(cli_runner, mock_orchestrator, sample_pol
         mock_orchestrator.policy_engine.get_policies_for_environment.assert_called_once_with("dev")
 
 
-def test_policies_no_policies_found(cli_runner, mock_orchestrator):
+def test_policies_no_policies_found(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test policies command when no policies are found."""
     mock_orchestrator.policy_engine.policies = []
 

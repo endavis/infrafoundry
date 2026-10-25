@@ -1,6 +1,8 @@
 """Unit tests for the 'migrate' CLI command."""
 
 import warnings
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -11,13 +13,13 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     mock.providers = {}
@@ -25,7 +27,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def real_opnsense_provider(tmp_path):
+def real_opnsense_provider(tmp_path: Path) -> Any:
     """Concrete OPNsense provider instance.
 
     Instantiating populates the extractor registry as a side effect, so
@@ -38,7 +40,7 @@ def real_opnsense_provider(tmp_path):
 
 
 @pytest.fixture
-def mock_opnsense_provider(real_opnsense_provider):
+def mock_opnsense_provider(real_opnsense_provider: Any) -> Mock:
     """Mock OPNsense provider whose presence triggers registry population.
 
     The real provider is instantiated alongside the mock so the registry
@@ -56,7 +58,9 @@ def mock_opnsense_provider(real_opnsense_provider):
     return mock
 
 
-def test_migrate_kea_dhcp(cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path):
+def test_migrate_kea_dhcp(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """Test migrate command for Kea DHCP via the extractor registry."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
     output_file = tmp_path / "migrated-kea_dhcp.yaml"
@@ -93,7 +97,9 @@ def test_migrate_kea_dhcp(cli_runner, mock_orchestrator, mock_opnsense_provider,
         fake_extractor.extract.assert_called_once_with("test")
 
 
-def test_migrate_isc_to_kea(cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path):
+def test_migrate_isc_to_kea(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """Test migrate command for ISC to Kea DHCP via the extractor registry."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
     output_file = tmp_path / "migrated-isc_to_kea.yaml"
@@ -130,7 +136,9 @@ def test_migrate_isc_to_kea(cli_runner, mock_orchestrator, mock_opnsense_provide
         fake_extractor.extract.assert_called_once_with("test")
 
 
-def test_migrate_with_interfaces(cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path):
+def test_migrate_with_interfaces(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """Test migrate command with specific interfaces.
 
     The CLI must convert click's ``tuple[str, ...]`` to a ``list[str]``
@@ -175,8 +183,8 @@ def test_migrate_with_interfaces(cli_runner, mock_orchestrator, mock_opnsense_pr
 
 
 def test_migrate_vlans_via_registry(
-    cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path
-):
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """Test that the registry-driven path reaches new components.
 
     Before #726 this would have failed with ``Invalid value for '--component'``;
@@ -217,7 +225,9 @@ def test_migrate_vlans_via_registry(
         fake_extractor.extract.assert_called_once_with("test")
 
 
-def test_migrate_with_dry_run(cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path):
+def test_migrate_with_dry_run(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """Test migrate command with dry-run flag."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
     output_file = tmp_path / "dry-run-output.yaml"
@@ -258,8 +268,8 @@ def test_migrate_with_dry_run(cli_runner, mock_orchestrator, mock_opnsense_provi
 
 
 def test_migrate_with_custom_output(
-    cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path
-):
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """Test migrate command with custom output path."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
     output_file = tmp_path / "custom-output.yaml"
@@ -296,8 +306,8 @@ def test_migrate_with_custom_output(
 
 
 def test_migrate_default_output_uses_snake_case_component(
-    cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path
-):
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """Default output filename uses the snake-case component verbatim.
 
     Before #726 the default filename ran ``component.replace("/", "-")``
@@ -341,7 +351,9 @@ def test_migrate_default_output_uses_snake_case_component(
         assert expected.exists()
 
 
-def test_migrate_provider_not_found(cli_runner, mock_orchestrator, tmp_path):
+def test_migrate_provider_not_found(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
     """Test migrate command when provider is not loaded for the env.
 
     The registry knows ``opnsense`` because some prior fixture loaded it,
@@ -378,8 +390,8 @@ def test_migrate_provider_not_found(cli_runner, mock_orchestrator, tmp_path):
 
 
 def test_migrate_unsupported_component_lists_registered(
-    cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path
-):
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """An unknown component fails with a message listing registered ones."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
     output_file = tmp_path / "should-not-exist.yaml"
@@ -412,8 +424,8 @@ def test_migrate_unsupported_component_lists_registered(
 
 
 def test_migrate_unsupported_provider_lists_registered(
-    cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path
-):
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """An unknown provider fails with a message listing registered ones."""
     mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
     output_file = tmp_path / "should-not-exist.yaml"
@@ -442,7 +454,7 @@ def test_migrate_unsupported_provider_lists_registered(
         assert not output_file.exists()
 
 
-def test_provider_migrate_kea_dhcp_shim_emits_deprecation_warning(tmp_path):
+def test_provider_migrate_kea_dhcp_shim_emits_deprecation_warning(tmp_path: Path) -> None:
     """The deprecated ``migrate_kea_dhcp`` shim must warn and still work."""
     from infrafoundry.providers.opnsense import OPNsenseProvider
 
@@ -469,7 +481,7 @@ def test_provider_migrate_kea_dhcp_shim_emits_deprecation_warning(tmp_path):
     assert "migrate_kea_dhcp" in str(deprecation_warnings[0].message)
 
 
-def test_provider_migrate_isc_to_kea_shim_passes_interfaces(tmp_path):
+def test_provider_migrate_isc_to_kea_shim_passes_interfaces(tmp_path: Path) -> None:
     """The deprecated ``migrate_isc_to_kea`` shim must forward ``interfaces``."""
     from infrafoundry.providers.opnsense import OPNsenseProvider
 
@@ -494,7 +506,7 @@ def test_provider_migrate_isc_to_kea_shim_passes_interfaces(tmp_path):
     assert len(deprecation_warnings) >= 1
 
 
-def test_provider_migrate_isc_to_kea_shim_no_interfaces(tmp_path):
+def test_provider_migrate_isc_to_kea_shim_no_interfaces(tmp_path: Path) -> None:
     """The shim must omit ``interfaces`` kwarg when no list is provided."""
     from infrafoundry.providers.opnsense import OPNsenseProvider
 
@@ -518,8 +530,8 @@ def test_provider_migrate_isc_to_kea_shim_no_interfaces(tmp_path):
 
 
 def test_migrate_kea_dhcp_no_underscore_alias_for_legacy_name(
-    cli_runner, mock_orchestrator, mock_opnsense_provider, tmp_path
-):
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
     """Legacy ``kea/dhcp`` (with slash) must fail — no transparent alias.
 
     The breaking CLI rename is intentional. ``kea/dhcp`` is no longer a

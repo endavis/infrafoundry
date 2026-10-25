@@ -12,13 +12,13 @@ from infrafoundry.core.state import StateManager
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator(tmp_path):
+def mock_orchestrator(tmp_path: Path) -> Mock:
     """Mock orchestrator with a mock state manager."""
     mock_state_manager = Mock(spec=StateManager)
     # Explicitly mock engine and engine.url
@@ -36,7 +36,7 @@ def mock_orchestrator(tmp_path):
     return mock_orchestrator
 
 
-def test_state_backup_basic(cli_runner, mock_orchestrator, tmp_path):
+def test_state_backup_basic(cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path) -> None:
     """Test basic state backup without generated directory."""
     # Patch the _get_orchestrator function to return our mock orchestrator
     with (
@@ -55,7 +55,9 @@ def test_state_backup_basic(cli_runner, mock_orchestrator, tmp_path):
         assert tmp_path.joinpath("infrafoundry_state_").stem in str(mock_copy2.call_args[0][1])
 
 
-def test_state_backup_with_generated(cli_runner, mock_orchestrator, tmp_path):
+def test_state_backup_with_generated(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
     """Test state backup including generated directory."""
     with cli_runner.isolated_filesystem() as td:
         cwd = Path(td)
@@ -82,7 +84,9 @@ def test_state_backup_with_generated(cli_runner, mock_orchestrator, tmp_path):
             assert mock_make_archive.call_args[1]["base_dir"] == "generated"
 
 
-def test_state_backup_state_db_not_found(cli_runner, mock_orchestrator, tmp_path):
+def test_state_backup_state_db_not_found(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
     """Test state backup when state.db file does not exist."""
     # Remove the mocked state.db file
     (tmp_path / ".infrafoundry" / "state.db").unlink()
@@ -94,7 +98,9 @@ def test_state_backup_state_db_not_found(cli_runner, mock_orchestrator, tmp_path
         assert "InfraFoundry state database file not found." in result.output
 
 
-def test_state_backup_output_dir_creation(cli_runner, mock_orchestrator, tmp_path):
+def test_state_backup_output_dir_creation(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
     """Test state backup creates output directory if it doesn't exist."""
     non_existent_dir = tmp_path / "non_existent_backup_dir"
     assert not non_existent_dir.exists()
@@ -109,7 +115,9 @@ def test_state_backup_output_dir_creation(cli_runner, mock_orchestrator, tmp_pat
         assert non_existent_dir.is_dir()  # Assert directory was created
 
 
-def test_state_backup_failure(cli_runner, mock_orchestrator, tmp_path):
+def test_state_backup_failure(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
     """Test state backup handles copy failure gracefully."""
     with (
         patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
@@ -121,7 +129,9 @@ def test_state_backup_failure(cli_runner, mock_orchestrator, tmp_path):
         assert "State backup failed: Permission denied" in result.output
 
 
-def test_state_backup_non_sqlite(cli_runner, mock_orchestrator, tmp_path):
+def test_state_backup_non_sqlite(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
     """Test state backup with non-SQLite database (e.g., PostgreSQL)."""
     mock_orchestrator.state_manager.engine.url.drivername = "postgresql"
 

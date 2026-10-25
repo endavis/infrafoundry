@@ -10,18 +10,18 @@ from infrafoundry.providers.opnsense.validators.unbound_validator import Unbound
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> UnboundValidator:
     """Create an UnboundValidator instance."""
     return UnboundValidator(report)
 
 
-def test_validate_valid_override(validator, report):
+def test_validate_valid_override(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation of a valid host override with all fields."""
     override = ResourceConfig(
         name="web-server",
@@ -42,7 +42,7 @@ def test_validate_valid_override(validator, report):
         assert call[1]["passed"] is True
 
 
-def test_validate_missing_hostname(validator, report):
+def test_validate_missing_hostname(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation fails when hostname is missing."""
     override = ResourceConfig(
         name="bad-override",
@@ -68,7 +68,7 @@ def test_validate_missing_hostname(validator, report):
     assert "missing" in hostname_call["message"]
 
 
-def test_validate_missing_domain(validator, report):
+def test_validate_missing_domain(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation fails when domain is missing."""
     override = ResourceConfig(
         name="bad-override",
@@ -94,7 +94,7 @@ def test_validate_missing_domain(validator, report):
     assert "missing" in domain_call["message"]
 
 
-def test_validate_empty_hostname(validator, report):
+def test_validate_empty_hostname(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation fails when hostname is empty string."""
     override = ResourceConfig(
         name="bad-override",
@@ -118,7 +118,7 @@ def test_validate_empty_hostname(validator, report):
     assert hostname_call["passed"] is False
 
 
-def test_validate_invalid_server_ip(validator, report):
+def test_validate_invalid_server_ip(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation fails when server is not a valid IP address."""
     override = ResourceConfig(
         name="bad-ip",
@@ -145,7 +145,7 @@ def test_validate_invalid_server_ip(validator, report):
     assert "invalid" in server_call["message"]
 
 
-def test_validate_valid_ipv6_server(validator, report):
+def test_validate_valid_ipv6_server(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation passes with valid IPv6 server address."""
     override = ResourceConfig(
         name="ipv6-override",
@@ -170,7 +170,7 @@ def test_validate_valid_ipv6_server(validator, report):
     assert server_call["passed"] is True
 
 
-def test_validate_no_server_field(validator, report):
+def test_validate_no_server_field(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation passes when server field is not provided (optional)."""
     override = ResourceConfig(
         name="no-server",
@@ -190,14 +190,14 @@ def test_validate_no_server_field(validator, report):
         assert call[1]["passed"] is True
 
 
-def test_validate_empty_resources(validator, report):
+def test_validate_empty_resources(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation with no resources produces no checks."""
     validator.validate([])
 
     report.add_check.assert_not_called()
 
 
-def test_validate_multiple_resources(validator, report):
+def test_validate_multiple_resources(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation of multiple resources."""
     overrides = [
         ResourceConfig(
@@ -228,7 +228,7 @@ def test_validate_multiple_resources(validator, report):
     assert report.add_check.call_count == 6
 
 
-def test_validate_mixed_valid_and_invalid(validator, report):
+def test_validate_mixed_valid_and_invalid(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation with mixed valid and invalid resources."""
     overrides = [
         ResourceConfig(

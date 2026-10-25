@@ -11,24 +11,26 @@ from infrafoundry.providers.proxmox.validators.storage_validator import StorageV
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def client():
+def client() -> MagicMock:
     """Create a mock Proxmox API client."""
     return MagicMock(spec=ProxmoxClient)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> StorageValidator:
     """Create a StorageValidator instance."""
     return StorageValidator(report)
 
 
-def test_validate_active_storage(validator, client, report):
+def test_validate_active_storage(
+    validator: StorageValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation of active storage."""
     client.get_json.return_value = {
         "data": [
@@ -45,7 +47,9 @@ def test_validate_active_storage(validator, client, report):
     assert "active" in call_args["message"]
 
 
-def test_validate_inactive_storage(validator, client, report):
+def test_validate_inactive_storage(
+    validator: StorageValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation of inactive storage."""
     client.get_json.return_value = {
         "data": [
@@ -61,7 +65,9 @@ def test_validate_inactive_storage(validator, client, report):
     assert "inactive" in call_args["message"]
 
 
-def test_validate_missing_storage(validator, client, report):
+def test_validate_missing_storage(
+    validator: StorageValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation of non-existent storage."""
     client.get_json.return_value = {
         "data": [
@@ -77,7 +83,9 @@ def test_validate_missing_storage(validator, client, report):
     assert "not found" in call_args["message"]
 
 
-def test_validate_api_fetch_failure(validator, client, report):
+def test_validate_api_fetch_failure(
+    validator: StorageValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation when API fetch fails."""
     client.get_json.side_effect = APIError("failed", provider="proxmox")
 
@@ -89,7 +97,9 @@ def test_validate_api_fetch_failure(validator, client, report):
     assert "not accessible" in call_args["message"]
 
 
-def test_validate_duplicate_storage_pools(validator, client, report):
+def test_validate_duplicate_storage_pools(
+    validator: StorageValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test that duplicate storage pools are only checked once."""
     client.get_json.return_value = {
         "data": [
@@ -104,7 +114,9 @@ def test_validate_duplicate_storage_pools(validator, client, report):
     report.add_check.assert_called_once()
 
 
-def test_validate_multiple_storage_pools(validator, client, report):
+def test_validate_multiple_storage_pools(
+    validator: StorageValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation of multiple storage pools."""
     client.get_json.side_effect = [
         {"data": [{"storage": "local", "active": 1, "type": "dir"}]},
@@ -117,7 +129,9 @@ def test_validate_multiple_storage_pools(validator, client, report):
     assert report.add_check.call_count == 2
 
 
-def test_validate_empty_storage_pools(validator, client, report):
+def test_validate_empty_storage_pools(
+    validator: StorageValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation with empty storage pool set."""
     validator.validate(client, set())
 

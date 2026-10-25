@@ -10,19 +10,19 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     return mock
 
 
-def test_status_basic(cli_runner, mock_orchestrator):
+def test_status_basic(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test basic status command."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "status", "--env", "test"])
@@ -31,7 +31,7 @@ def test_status_basic(cli_runner, mock_orchestrator):
         mock_orchestrator.status.assert_called_once_with("test")
 
 
-def test_status_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_status_orchestrator_failure(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test status command when orchestrator.status raises an error."""
     mock_orchestrator.status.side_effect = Exception("Status check failed")
 

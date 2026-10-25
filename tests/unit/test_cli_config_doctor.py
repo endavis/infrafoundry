@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, patch
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
 from click.testing import CliRunner
 
+from infrafoundry.cli.commands.doctor_utils import CheckResult
 from infrafoundry.cli.main import main
 
 # Patch targets (on the config/doctor module namespace)
@@ -20,13 +22,13 @@ _STATE_DB_ENVS = "infrafoundry.cli.commands.config.doctor._get_state_db_environm
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def temp_config_dir(tmp_path):
+def temp_config_dir(tmp_path: Path) -> Path:
     """Create a temporary config directory with two environments."""
     config_dir = tmp_path / "config"
     envs_dir = config_dir / "envs"
@@ -44,21 +46,21 @@ def temp_config_dir(tmp_path):
     return config_dir
 
 
-def _ok(name: str, message: str = "OK") -> MagicMock:
+def _ok(name: str, message: str = "OK") -> CheckResult:
     """Build a mock CheckResult with ok status."""
     from infrafoundry.cli.commands.doctor_utils import CheckResult
 
     return CheckResult(name=name, status="ok", message=message)
 
 
-def _error(name: str, message: str = "Failed") -> MagicMock:
+def _error(name: str, message: str = "Failed") -> CheckResult:
     """Build a mock CheckResult with error status."""
     from infrafoundry.cli.commands.doctor_utils import CheckResult
 
     return CheckResult(name=name, status="error", message=message, suggestion="Fix it")
 
 
-def _warning(name: str, message: str = "Warn") -> MagicMock:
+def _warning(name: str, message: str = "Warn") -> CheckResult:
     """Build a mock CheckResult with warning status."""
     from infrafoundry.cli.commands.doctor_utils import CheckResult
 
@@ -90,7 +92,7 @@ class TestConfigDoctorHelp:
 class TestConfigDoctorAllPass:
     """Tests when all checks pass."""
 
-    def test_all_pass_exit_zero(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_all_pass_exit_zero(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """All checks passing results in exit code 0."""
         with (
             patch(_STATE_BACKEND, return_value=_ok("State Backend")),
@@ -107,7 +109,9 @@ class TestConfigDoctorAllPass:
 class TestConfigDoctorConfigRepoMissing:
     """Tests when config repo is missing."""
 
-    def test_no_config_repo_warning(self, cli_runner: CliRunner, monkeypatch) -> None:
+    def test_no_config_repo_warning(
+        self, cli_runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Missing config repo shows warning in output."""
         monkeypatch.delenv("INFRAFOUNDRY_CONFIG_REPO", raising=False)
         with (
@@ -125,7 +129,7 @@ class TestConfigDoctorConfigRepoMissing:
 class TestConfigDoctorConsistencyError:
     """Tests when state/filesystem consistency fails."""
 
-    def test_consistency_error_exit_one(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_consistency_error_exit_one(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Consistency error results in exit code 1."""
         with (
             patch(_STATE_BACKEND, return_value=_ok("State Backend")),
@@ -145,7 +149,7 @@ class TestConfigDoctorConsistencyError:
 class TestConfigDoctorBlueprintError:
     """Tests when blueprint validation fails."""
 
-    def test_blueprint_error_exit_one(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_blueprint_error_exit_one(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Blueprint validation errors result in exit code 1."""
         with (
             patch(_STATE_BACKEND, return_value=_ok("State Backend")),
@@ -165,7 +169,7 @@ class TestConfigDoctorBlueprintError:
 class TestConfigDoctorSopsWarning:
     """Tests when SOPS keys are missing."""
 
-    def test_sops_warning(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_sops_warning(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """Missing SOPS keys show warning but exit 0."""
         with (
             patch(_STATE_BACKEND, return_value=_ok("State Backend")),
@@ -185,7 +189,7 @@ class TestConfigDoctorSopsWarning:
 class TestConfigDoctorDeep:
     """Tests for --deep flag."""
 
-    def test_deep_flag_accepted(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_deep_flag_accepted(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """--deep flag is accepted without error."""
         with (
             patch(_STATE_BACKEND, return_value=_ok("State Backend")),
@@ -210,7 +214,7 @@ class TestConfigDoctorDeep:
 class TestConfigDoctorJsonFormat:
     """Tests for --format json output."""
 
-    def test_json_output_structure(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_json_output_structure(self, cli_runner: CliRunner, temp_config_dir: Path) -> None:
         """JSON output has expected structure."""
         with (
             patch(_STATE_BACKEND, return_value=_ok("State Backend")),
@@ -243,7 +247,9 @@ class TestConfigDoctorJsonFormat:
 class TestConfigDoctorStateDbUnavailable:
     """Tests when state database is unavailable."""
 
-    def test_state_db_unavailable_graceful(self, cli_runner: CliRunner, temp_config_dir) -> None:
+    def test_state_db_unavailable_graceful(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
         """State DB unavailable produces warning, not crash."""
         with (
             patch(

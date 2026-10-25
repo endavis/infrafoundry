@@ -10,7 +10,7 @@ from infrafoundry.core.validation import (
 class TestValidationResult:
     """Tests for ValidationResult."""
 
-    def test_create_result(self):
+    def test_create_result(self) -> None:
         """Test creating a validation result."""
         result = ValidationResult(
             check_name="test_check",
@@ -25,7 +25,7 @@ class TestValidationResult:
         assert result.message == "Test failed"
         assert result.details is None
 
-    def test_result_with_details(self):
+    def test_result_with_details(self) -> None:
         """Test validation result with details."""
         result = ValidationResult(
             check_name="test_check",
@@ -37,7 +37,7 @@ class TestValidationResult:
 
         assert result.details == {"key": "value", "count": 42}
 
-    def test_result_repr(self):
+    def test_result_repr(self) -> None:
         """Test string representation of result."""
         result = ValidationResult(
             check_name="connectivity",
@@ -56,7 +56,7 @@ class TestValidationResult:
 class TestValidationReport:
     """Tests for ValidationReport."""
 
-    def test_empty_report(self):
+    def test_empty_report(self) -> None:
         """Test creating an empty report."""
         report = ValidationReport()
 
@@ -64,7 +64,7 @@ class TestValidationReport:
         assert not report.has_errors()
         assert not report.has_warnings()
 
-    def test_add_result(self):
+    def test_add_result(self) -> None:
         """Test adding results to report."""
         report = ValidationReport()
 
@@ -79,7 +79,7 @@ class TestValidationReport:
         assert len(report.results) == 1
         assert report.results[0] == result
 
-    def test_add_check(self):
+    def test_add_check(self) -> None:
         """Test adding check via convenience method."""
         report = ValidationReport()
 
@@ -95,7 +95,7 @@ class TestValidationReport:
         assert report.results[0].passed
         assert report.results[0].level == ValidationLevel.INFO
 
-    def test_has_errors(self):
+    def test_has_errors(self) -> None:
         """Test error detection."""
         report = ValidationReport()
 
@@ -117,7 +117,7 @@ class TestValidationReport:
         )
         assert report.has_errors()
 
-    def test_has_warnings(self):
+    def test_has_warnings(self) -> None:
         """Test warning detection."""
         report = ValidationReport()
 
@@ -134,7 +134,7 @@ class TestValidationReport:
         assert report.has_warnings()
         assert not report.has_errors()  # Warning, not error
 
-    def test_get_summary(self):
+    def test_get_summary(self) -> None:
         """Test getting summary counts."""
         report = ValidationReport()
 
@@ -151,7 +151,7 @@ class TestValidationReport:
         assert summary["warnings"] == 1
         assert summary["info"] == 0  # Info checks that failed
 
-    def test_report_repr(self):
+    def test_report_repr(self) -> None:
         """Test string representation of report."""
         report = ValidationReport()
 

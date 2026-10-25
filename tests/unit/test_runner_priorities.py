@@ -1,5 +1,6 @@
 """Tests for runner execution order priorities."""
 
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -13,28 +14,28 @@ class MockTerraformRunner(BaseRunner):
     tool_name = "terraform"
     priority = 0
 
-    def is_available(self):
+    def is_available(self) -> bool:
         return True
 
-    def initialize(self, *args, **kwargs):
+    def initialize(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def plan(self, *args, **kwargs):
+    def plan(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def apply(self, *args, **kwargs):
+    def apply(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def destroy(self, *args, **kwargs):
+    def destroy(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def run(self, *args, **kwargs):
+    def run(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {"success": True}
 
-    def get_resource_ids(self, *args, **kwargs):
+    def get_resource_ids(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def parse_plan_for_drift(self, *args, **kwargs):
+    def parse_plan_for_drift(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
 
@@ -42,28 +43,28 @@ class MockAnsibleRunner(BaseRunner):
     tool_name = "ansible"
     priority = 50
 
-    def is_available(self):
+    def is_available(self) -> bool:
         return True
 
-    def initialize(self, *args, **kwargs):
+    def initialize(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def plan(self, *args, **kwargs):
+    def plan(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def apply(self, *args, **kwargs):
+    def apply(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def destroy(self, *args, **kwargs):
+    def destroy(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def run(self, *args, **kwargs):
+    def run(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {"success": True}
 
-    def get_resource_ids(self, *args, **kwargs):
+    def get_resource_ids(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def parse_plan_for_drift(self, *args, **kwargs):
+    def parse_plan_for_drift(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
 
@@ -71,38 +72,38 @@ class MockPyInfraRunner(BaseRunner):
     tool_name = "pyinfra"
     priority = 50
 
-    def is_available(self):
+    def is_available(self) -> bool:
         return True
 
-    def initialize(self, *args, **kwargs):
+    def initialize(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def plan(self, *args, **kwargs):
+    def plan(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def apply(self, *args, **kwargs):
+    def apply(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def destroy(self, *args, **kwargs):
+    def destroy(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def run(self, *args, **kwargs):
+    def run(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {"success": True}
 
-    def get_resource_ids(self, *args, **kwargs):
+    def get_resource_ids(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
-    def parse_plan_for_drift(self, *args, **kwargs):
+    def parse_plan_for_drift(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return {}
 
 
 @pytest.fixture
-def executor():
+def executor() -> DeploymentExecutor:
     runner_registry = Mock()
     runner_registry.list_runners.return_value = ["terraform", "ansible", "pyinfra"]
 
     # Mock create_runner to return instances of our mock classes
-    def create_runner(name, **kwargs):
+    def create_runner(name: Any, **kwargs: Any) -> Any:
         if name == "terraform":
             return MockTerraformRunner()
         if name == "ansible":
@@ -122,7 +123,7 @@ def executor():
     )
 
 
-def test_default_priority_order(executor):
+def test_default_priority_order(executor: DeploymentExecutor) -> None:
     """Test default order: Terraform(0) -> Ansible(50) -> PyInfra(50)."""
     sorted_runners = executor._get_sorted_runners()
 
@@ -136,7 +137,7 @@ def test_default_priority_order(executor):
     assert names[2] == "pyinfra"
 
 
-def test_priority_override(executor):
+def test_priority_override(executor: DeploymentExecutor) -> None:
     """Test overriding priorities via config."""
     # Set priorities: PyInfra(40) -> Ansible(60) -> Terraform(0)
     # Order should be: Terraform(0) -> PyInfra(40) -> Ansible(60)
@@ -150,7 +151,7 @@ def test_priority_override(executor):
     assert names[2] == "ansible"  # 60
 
 
-def test_priority_override_terraform_last(executor):
+def test_priority_override_terraform_last(executor: DeploymentExecutor) -> None:
     """Test forcing Terraform last (unlikely but possible)."""
     executor.runner_priorities = {"terraform": 100}
 

@@ -17,6 +17,7 @@ import json
 import smtplib
 import sys
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
 
@@ -55,7 +56,7 @@ DEFAULT_ALERT_EVENT_TYPES = aiqum_setup.DEFAULT_ALERT_EVENT_TYPES
 BASE_URL = "https://192.168.1.50"
 
 
-def _make_client() -> AIQUMClient:
+def _make_client() -> Any:
     """Build a real AIQUMClient instance for unit tests that mock urlopen."""
     return AIQUMClient(BASE_URL, "umadmin", "secret", make_ssl_context())
 
@@ -71,7 +72,7 @@ def _mock_urlopen_response(status: int = 200, body: bytes = b"") -> MagicMock:
     return ctx
 
 
-def _make_config(alert_email: str = "") -> dict:
+def _make_config(alert_email: str = "") -> dict[str, Any]:
     """Build a minimal config dict for main()."""
     return {
         "ip_address": "192.168.1.50",
@@ -259,14 +260,14 @@ class TestCreateAlert:
         client.post.return_value = (200, {})
         assert create_alert(client, "My Alert", "user@example.com") is True
 
-    def test_returns_true_on_409_already_exists(self, capsys: pytest.CaptureFixture) -> None:
+    def test_returns_true_on_409_already_exists(self, capsys: pytest.CaptureFixture[str]) -> None:
         """409 means the alert already exists -- treated as success."""
         client = MagicMock()
         client.post.return_value = (409, {})
         assert create_alert(client, "My Alert", "user@example.com") is True
         assert "already exists" in capsys.readouterr().out
 
-    def test_returns_false_on_error(self, capsys: pytest.CaptureFixture) -> None:
+    def test_returns_false_on_error(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Non-success status codes return False and print a message."""
         client = MagicMock()
         client.post.return_value = (500, {})
@@ -323,7 +324,7 @@ class TestSendTestEmail:
         mock_srv.login.assert_called_once_with("aiqum", "smtppass")
         mock_srv.send_message.assert_called_once()
 
-    def test_returns_false_on_smtp_error(self, capsys: pytest.CaptureFixture) -> None:
+    def test_returns_false_on_smtp_error(self, capsys: pytest.CaptureFixture[str]) -> None:
         """SMTP failure returns False and prints error."""
         config = _make_config("alerts@test.com")
         with patch("aiqum_initial_setup.smtplib.SMTP") as mock_smtp:
@@ -352,9 +353,9 @@ class TestSendTestEmail:
 # Tests: main() integration for Step 7
 # ---------------------------------------------------------------------------
 def _make_mock_client(
-    get_return: tuple = (200, {}),
-    post_return: tuple = (201, {}),
-    put_return: tuple = (200, {}),
+    get_return: tuple[Any, ...] = (200, {}),
+    post_return: tuple[Any, ...] = (201, {}),
+    put_return: tuple[Any, ...] = (200, {}),
 ) -> MagicMock:
     """Build a MagicMock that satisfies the AIQUMClient surface used by main()."""
     client = MagicMock()
@@ -400,7 +401,7 @@ class TestMainAlertStep:
         mock_client_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_create_alert: MagicMock,
-        capsys: pytest.CaptureFixture,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Step 7 skips alert creation when aiqum_alert_email is empty."""
         mock_load_config.return_value = _make_config("")
@@ -420,7 +421,7 @@ class TestMainAlertStep:
         mock_client_cls: MagicMock,
         mock_load_config: MagicMock,
         mock_create_alert: MagicMock,
-        capsys: pytest.CaptureFixture,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Step 7 skips alert creation when aiqum_alert_email key is absent."""
         config = _make_config()
@@ -444,7 +445,7 @@ class TestMainAlertStep:
         mock_load_config: MagicMock,
         mock_create_alert: MagicMock,
         mock_send_test: MagicMock,
-        capsys: pytest.CaptureFixture,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """main() returns 0 even when alert creation fails (non-fatal)."""
         mock_load_config.return_value = _make_config("alerts@test.com")

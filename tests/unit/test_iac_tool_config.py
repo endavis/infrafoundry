@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -24,8 +25,8 @@ class TestIaCToolEnum:
 
     def test_is_string_enum(self) -> None:
         """IaCTool members are usable as strings."""
-        assert IaCTool.TERRAFORM == "terraform"
-        assert IaCTool.OPENTOFU == "opentofu"
+        assert IaCTool.TERRAFORM == "terraform"  # type: ignore[comparison-overlap]
+        assert IaCTool.OPENTOFU == "opentofu"  # type: ignore[comparison-overlap]
 
     def test_from_string(self) -> None:
         """IaCTool can be constructed from string values."""
@@ -48,12 +49,12 @@ class TestEnvironmentConfigIaCTool:
 
     def test_explicit_terraform(self) -> None:
         """Explicit terraform value works."""
-        config = EnvironmentConfig(name="dev", iac_tool="terraform")
+        config = EnvironmentConfig.model_validate({"name": "dev", "iac_tool": "terraform"})
         assert config.iac_tool == IaCTool.TERRAFORM
 
     def test_explicit_opentofu(self) -> None:
         """Setting opentofu works."""
-        config = EnvironmentConfig(name="dev", iac_tool="opentofu")
+        config = EnvironmentConfig.model_validate({"name": "dev", "iac_tool": "opentofu"})
         assert config.iac_tool == IaCTool.OPENTOFU
 
     def test_invalid_tool_raises(self) -> None:
@@ -63,13 +64,13 @@ class TestEnvironmentConfigIaCTool:
 
     def test_from_yaml_dict(self) -> None:
         """Config can be constructed from dict (simulating YAML load)."""
-        data = {"name": "staging", "iac_tool": "opentofu"}
+        data: dict[str, Any] = {"name": "staging", "iac_tool": "opentofu"}
         config = EnvironmentConfig(**data)
         assert config.iac_tool == IaCTool.OPENTOFU
 
     def test_from_yaml_dict_without_iac_tool(self) -> None:
         """Config without iac_tool field uses default."""
-        data = {"name": "prod"}
+        data: dict[str, Any] = {"name": "prod"}
         config = EnvironmentConfig(**data)
         assert config.iac_tool == IaCTool.TERRAFORM
 
@@ -77,7 +78,7 @@ class TestEnvironmentConfigIaCTool:
 class TestIaCToolEnvVarOverride:
     """Tests for INFRAFOUNDRY_IAC_TOOL environment variable override."""
 
-    def _write_settings(self, tmp_path: Path, env_name: str, data: dict) -> None:
+    def _write_settings(self, tmp_path: Path, env_name: str, data: dict[str, Any]) -> None:
         """Write a settings.yaml for the given environment."""
         env_dir = tmp_path / env_name
         env_dir.mkdir(parents=True, exist_ok=True)

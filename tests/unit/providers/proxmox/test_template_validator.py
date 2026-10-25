@@ -5,24 +5,25 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.providers.proxmox.validator import ClusterVM
 from infrafoundry.providers.proxmox.validators.template_validator import TemplateValidator
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> TemplateValidator:
     """Create a TemplateValidator instance."""
     return TemplateValidator(report)
 
 
-def test_validate_template_by_vmid_found(validator, report):
+def test_validate_template_by_vmid_found(validator: TemplateValidator, report: MagicMock) -> None:
     """Test validation of template found by VMID."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
         {"vmid": 101, "name": "debian-12", "template": 1},
     ]
@@ -36,9 +37,11 @@ def test_validate_template_by_vmid_found(validator, report):
     assert "ubuntu-22.04" in call_args["message"]
 
 
-def test_validate_template_by_vmid_not_found(validator, report):
+def test_validate_template_by_vmid_not_found(
+    validator: TemplateValidator, report: MagicMock
+) -> None:
     """Test validation of template not found by VMID."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
@@ -52,9 +55,9 @@ def test_validate_template_by_vmid_not_found(validator, report):
     assert "vm1" in call_args["message"]
 
 
-def test_validate_template_by_name_found(validator, report):
+def test_validate_template_by_name_found(validator: TemplateValidator, report: MagicMock) -> None:
     """Test validation of template found by name."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
@@ -67,9 +70,11 @@ def test_validate_template_by_name_found(validator, report):
     assert "100" in str(call_args["message"])  # Shows VMID
 
 
-def test_validate_template_by_name_not_found(validator, report):
+def test_validate_template_by_name_not_found(
+    validator: TemplateValidator, report: MagicMock
+) -> None:
     """Test validation of template not found by name."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
@@ -82,9 +87,9 @@ def test_validate_template_by_name_not_found(validator, report):
     assert "missing-template" in call_args["message"]
 
 
-def test_validate_ignores_non_templates(validator, report):
+def test_validate_ignores_non_templates(validator: TemplateValidator, report: MagicMock) -> None:
     """Test that non-template VMs are ignored."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
         {"vmid": 200, "name": "regular-vm", "template": 0},
     ]
@@ -96,9 +101,9 @@ def test_validate_ignores_non_templates(validator, report):
     assert call_args["passed"] is True
 
 
-def test_validate_empty_template_refs(validator, report):
+def test_validate_empty_template_refs(validator: TemplateValidator, report: MagicMock) -> None:
     """Test validation with no template references."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
@@ -107,16 +112,16 @@ def test_validate_empty_template_refs(validator, report):
     report.add_check.assert_not_called()
 
 
-def test_validate_cluster_vms_none(validator, report):
+def test_validate_cluster_vms_none(validator: TemplateValidator, report: MagicMock) -> None:
     """Test validation when cluster VMs fetch failed."""
     validator.validate(None, {"100": ["vm1"]})
 
     report.add_check.assert_not_called()
 
 
-def test_validate_multiple_templates(validator, report):
+def test_validate_multiple_templates(validator: TemplateValidator, report: MagicMock) -> None:
     """Test validation of multiple template references."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
         {"vmid": 101, "name": "debian-12", "template": 1},
     ]
@@ -132,9 +137,11 @@ def test_validate_multiple_templates(validator, report):
     assert report.add_check.call_count == 2
 
 
-def test_validate_template_used_by_multiple_resources(validator, report):
+def test_validate_template_used_by_multiple_resources(
+    validator: TemplateValidator, report: MagicMock
+) -> None:
     """Test template referenced by multiple resources."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 

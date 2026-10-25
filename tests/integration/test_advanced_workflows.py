@@ -10,6 +10,7 @@ Tests complex workflows including:
 
 from contextlib import suppress
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -21,7 +22,7 @@ from infrafoundry.core.state import DeploymentStatus, ResourceState
 
 
 @pytest.fixture
-def advanced_orchestrator(tmp_path):
+def advanced_orchestrator(tmp_path: Path) -> Any:
     """Create orchestrator with real components for advanced testing."""
     config_dir = tmp_path / "config"
     output_dir = tmp_path / "generated"
@@ -100,7 +101,7 @@ vms:
 class TestPolicyEnforcement:
     """Tests for policy enforcement during infrastructure operations."""
 
-    def test_plan_reports_policy_violations(self, advanced_orchestrator):
+    def test_plan_reports_policy_violations(self, advanced_orchestrator: Any) -> None:
         """Test that plan reports policy violations."""
         orchestrator, provider = advanced_orchestrator
 
@@ -118,7 +119,7 @@ class TestPolicyEnforcement:
         # Verify generation was called
         provider.generate_terraform.assert_called()
 
-    def test_plan_with_enforce_policies_flag(self, advanced_orchestrator):
+    def test_plan_with_enforce_policies_flag(self, advanced_orchestrator: Any) -> None:
         """Test plan with enforce_policies flag."""
         orchestrator, provider = advanced_orchestrator
 
@@ -142,7 +143,7 @@ class TestPolicyEnforcement:
 class TestDriftDetection:
     """Tests for drift detection functionality."""
 
-    def test_detect_drift_no_changes(self, advanced_orchestrator):
+    def test_detect_drift_no_changes(self, advanced_orchestrator: Any) -> None:
         """Test drift detection when infrastructure matches desired state."""
         orchestrator, provider = advanced_orchestrator
 
@@ -168,7 +169,7 @@ class TestDriftDetection:
             assert drift_results is not None
             mock_plan.assert_called()
 
-    def test_detect_drift_with_changes(self, advanced_orchestrator):
+    def test_detect_drift_with_changes(self, advanced_orchestrator: Any) -> None:
         """Test drift detection when infrastructure has drifted."""
         orchestrator, provider = advanced_orchestrator
 
@@ -195,7 +196,7 @@ class TestDriftDetection:
             assert drift_results is not None
             mock_plan.assert_called()
 
-    def test_detect_drift_multiple_providers(self, advanced_orchestrator):
+    def test_detect_drift_multiple_providers(self, advanced_orchestrator: Any) -> None:
         """Test drift detection across multiple providers."""
         orchestrator, provider = advanced_orchestrator
 
@@ -239,7 +240,9 @@ class TestDriftDetection:
 class TestRollbackScenarios:
     """Tests for rollback functionality with various failure scenarios."""
 
-    def test_rollback_to_previous_deployment(self, advanced_orchestrator, tmp_path):
+    def test_rollback_to_previous_deployment(
+        self, advanced_orchestrator: Any, tmp_path: Path
+    ) -> None:
         """Test rollback to a previous successful deployment."""
         orchestrator, provider = advanced_orchestrator
 
@@ -301,7 +304,7 @@ class TestRollbackScenarios:
             assert result is not None
             mock_apply.assert_called()
 
-    def test_rollback_with_terraform_failure(self, advanced_orchestrator):
+    def test_rollback_with_terraform_failure(self, advanced_orchestrator: Any) -> None:
         """Test rollback behavior when terraform fails."""
         orchestrator, provider = advanced_orchestrator
 
@@ -319,7 +322,7 @@ class TestRollbackScenarios:
             with patch.object(provider, "generate_terraform"), suppress(Exception):
                 orchestrator.rollback(deployment_id, auto_approve=True)
 
-    def test_rollback_nonexistent_deployment(self, advanced_orchestrator):
+    def test_rollback_nonexistent_deployment(self, advanced_orchestrator: Any) -> None:
         """Test rollback with invalid deployment ID."""
         orchestrator, _provider = advanced_orchestrator
 
@@ -332,7 +335,9 @@ class TestRollbackScenarios:
 class TestMultiProviderCoordination:
     """Tests for coordinating multiple providers with dependencies."""
 
-    def test_apply_with_cross_provider_dependencies(self, advanced_orchestrator, tmp_path):
+    def test_apply_with_cross_provider_dependencies(
+        self, advanced_orchestrator: Any, tmp_path: Path
+    ) -> None:
         """Test applying resources with dependencies across providers."""
         orchestrator, proxmox_provider = advanced_orchestrator
 
@@ -409,7 +414,7 @@ opnsense:
             proxmox_provider.generate_terraform.assert_called()
             opnsense_provider.generate_terraform.assert_called()
 
-    def test_parallel_provider_execution(self, advanced_orchestrator, tmp_path):
+    def test_parallel_provider_execution(self, advanced_orchestrator: Any, tmp_path: Path) -> None:
         """Test parallel execution of independent providers."""
         orchestrator, proxmox_provider = advanced_orchestrator
 
@@ -472,7 +477,7 @@ deployments:
             proxmox_provider.generate_terraform.assert_called()
             k8s_provider.generate_terraform.assert_called()
 
-    def test_provider_failure_handling(self, advanced_orchestrator):
+    def test_provider_failure_handling(self, advanced_orchestrator: Any) -> None:
         """Test handling when one provider fails during apply."""
         orchestrator, provider = advanced_orchestrator
 
@@ -495,7 +500,7 @@ deployments:
 class TestErrorRecoveryAndCleanup:
     """Tests for error recovery and cleanup operations."""
 
-    def test_cleanup_after_plan_failure(self, advanced_orchestrator):
+    def test_cleanup_after_plan_failure(self, advanced_orchestrator: Any) -> None:
         """Test that resources are cleaned up after plan failure."""
         orchestrator, provider = advanced_orchestrator
 
@@ -509,7 +514,7 @@ class TestErrorRecoveryAndCleanup:
             # Verify proper error handling occurred
             mock_gen.assert_called()
 
-    def test_cleanup_after_apply_failure(self, advanced_orchestrator):
+    def test_cleanup_after_apply_failure(self, advanced_orchestrator: Any) -> None:
         """Test cleanup after apply failure."""
         orchestrator, provider = advanced_orchestrator
 
@@ -524,7 +529,7 @@ class TestErrorRecoveryAndCleanup:
 
             orchestrator.apply("dev", auto_approve=True)
 
-    def test_state_consistency_after_errors(self, advanced_orchestrator):
+    def test_state_consistency_after_errors(self, advanced_orchestrator: Any) -> None:
         """Test that state remains consistent after errors."""
         orchestrator, provider = advanced_orchestrator
 
@@ -547,7 +552,7 @@ class TestErrorRecoveryAndCleanup:
         # Deployment may have been created and marked as failed
         assert len(final_deployments) >= initial_count
 
-    def test_concurrent_operation_prevention(self, advanced_orchestrator):
+    def test_concurrent_operation_prevention(self, advanced_orchestrator: Any) -> None:
         """Test that concurrent operations on same environment are prevented."""
         orchestrator, provider = advanced_orchestrator
 

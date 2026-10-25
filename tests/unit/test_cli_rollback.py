@@ -10,19 +10,19 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     return mock
 
 
-def test_rollback_with_auto_approve(cli_runner, mock_orchestrator):
+def test_rollback_with_auto_approve(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test rollback command with auto-approve."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "rollback", "to", "123", "--auto-approve"])
@@ -35,7 +35,7 @@ def test_rollback_with_auto_approve(cli_runner, mock_orchestrator):
         assert callable(call_args[1]["confirm_callback"])
 
 
-def test_rollback_basic(cli_runner, mock_orchestrator):
+def test_rollback_basic(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test basic rollback command (orchestrator handles confirmation)."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["infra", "rollback", "to", "123"])
@@ -47,7 +47,7 @@ def test_rollback_basic(cli_runner, mock_orchestrator):
         assert callable(call_args[1]["confirm_callback"])
 
 
-def test_rollback_orchestrator_failure(cli_runner, mock_orchestrator):
+def test_rollback_orchestrator_failure(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test rollback command when orchestrator.rollback raises an error."""
     mock_orchestrator.rollback.side_effect = Exception("Rollback failed")
 

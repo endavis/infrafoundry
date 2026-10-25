@@ -1,6 +1,7 @@
 """Unit tests for secrets rotation functionality."""
 
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -11,7 +12,7 @@ from infrafoundry.core.secrets.rotation import SecretsRotator
 
 
 @pytest.fixture
-def temp_secrets_dir(tmp_path):
+def temp_secrets_dir(tmp_path: Path) -> Path:
     """Create a temporary secrets directory with test files."""
     secrets_dir = tmp_path / "secrets"
     secrets_dir.mkdir()
@@ -37,7 +38,7 @@ def temp_secrets_dir(tmp_path):
 
 
 @pytest.fixture
-def mock_provider():
+def mock_provider() -> MagicMock:
     """Create a mock secret provider."""
     provider = MagicMock()
     provider.load_secret = MagicMock()
@@ -49,7 +50,7 @@ def mock_provider():
 class TestSecretsRotator:
     """Tests for SecretsRotator class."""
 
-    def test_initialization(self, temp_secrets_dir):
+    def test_initialization(self, temp_secrets_dir: Path) -> None:
         """Test rotator initialization."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
 
@@ -57,7 +58,7 @@ class TestSecretsRotator:
         assert rotator.backup_dir == temp_secrets_dir.parent / ".secrets_backups"
         assert rotator.current_backup is None
 
-    def test_initialization_custom_backup_dir(self, temp_secrets_dir, tmp_path):
+    def test_initialization_custom_backup_dir(self, temp_secrets_dir: Path, tmp_path: Path) -> None:
         """Test rotator with custom backup directory."""
         custom_backup = tmp_path / "custom_backups"
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir, backup_dir=custom_backup)
@@ -66,7 +67,9 @@ class TestSecretsRotator:
 
     @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
-    def test_generate_age_key_success(self, mock_run, mock_which, temp_secrets_dir):
+    def test_generate_age_key_success(
+        self, mock_run: MagicMock, mock_which: MagicMock, temp_secrets_dir: Path
+    ) -> None:
         """Test successful age key generation."""
         mock_run.return_value = Mock(
             stderr="# public key: age1newkey456789",
@@ -82,7 +85,7 @@ class TestSecretsRotator:
         # Check that the command uses the full path
         assert mock_run.call_args[0][0][0].endswith("age-keygen")
 
-    def test_generate_age_key_existing_file(self, temp_secrets_dir):
+    def test_generate_age_key_existing_file(self, temp_secrets_dir: Path) -> None:
         """Test that generation fails if key file already exists."""
         key_file = temp_secrets_dir / "existing.key"
         key_file.touch()
@@ -94,7 +97,9 @@ class TestSecretsRotator:
 
     @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
-    def test_generate_age_key_command_failure(self, mock_run, mock_which, temp_secrets_dir):
+    def test_generate_age_key_command_failure(
+        self, mock_run: MagicMock, mock_which: MagicMock, temp_secrets_dir: Path
+    ) -> None:
         """Test handling of age-keygen command failure."""
         mock_run.side_effect = subprocess.CalledProcessError(1, "age-keygen", stderr="error")
 
@@ -105,7 +110,9 @@ class TestSecretsRotator:
             rotator.generate_age_key(key_file)
 
     @patch("shutil.which", return_value=None)
-    def test_generate_age_key_age_not_found(self, mock_which, temp_secrets_dir):
+    def test_generate_age_key_age_not_found(
+        self, mock_which: MagicMock, temp_secrets_dir: Path
+    ) -> None:
         """Test handling when age-keygen is not installed."""
         key_file = temp_secrets_dir / "age.key.new"
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
@@ -113,7 +120,7 @@ class TestSecretsRotator:
         with pytest.raises(SecretError, match="age-keygen not found"):
             rotator.generate_age_key(key_file)
 
-    def test_create_backup(self, temp_secrets_dir):
+    def test_create_backup(self, temp_secrets_dir: Path) -> None:
         """Test creating backup of encrypted files."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
         backup_path = rotator.create_backup()
@@ -130,7 +137,7 @@ class TestSecretsRotator:
         # Verify .sops.yaml was backed up
         assert (backup_path / ".sops.yaml").exists()
 
-    def test_restore_backup(self, temp_secrets_dir):
+    def test_restore_backup(self, temp_secrets_dir: Path) -> None:
         """Test restoring files from backup."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
 
@@ -153,7 +160,7 @@ class TestSecretsRotator:
 
         assert "api_token" in data  # Original data restored
 
-    def test_restore_backup_not_found(self, temp_secrets_dir):
+    def test_restore_backup_not_found(self, temp_secrets_dir: Path) -> None:
         """Test that restore fails if backup doesn't exist."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
         fake_backup = temp_secrets_dir.parent / "nonexistent_backup"
@@ -161,7 +168,7 @@ class TestSecretsRotator:
         with pytest.raises(SecretError, match="Backup directory not found"):
             rotator.restore_backup(fake_backup)
 
-    def test_update_sops_config(self, temp_secrets_dir):
+    def test_update_sops_config(self, temp_secrets_dir: Path) -> None:
         """Test updating .sops.yaml with new public key."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
         new_public_key = "age1newkey456789"
@@ -174,7 +181,7 @@ class TestSecretsRotator:
 
         assert config["creation_rules"][0]["age"] == new_public_key
 
-    def test_get_encrypted_files_all(self, temp_secrets_dir):
+    def test_get_encrypted_files_all(self, temp_secrets_dir: Path) -> None:
         """Test getting all encrypted files."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
         files = rotator.get_encrypted_files()
@@ -185,7 +192,7 @@ class TestSecretsRotator:
         assert "settings.yaml" in file_names
         assert ".sops.yaml" not in file_names  # Should be excluded
 
-    def test_get_encrypted_files_with_patterns(self, temp_secrets_dir):
+    def test_get_encrypted_files_with_patterns(self, temp_secrets_dir: Path) -> None:
         """Test getting encrypted files with specific patterns."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
         files = rotator.get_encrypted_files(file_patterns=["proxmox.yaml", "opnsense.yaml"])
@@ -196,7 +203,7 @@ class TestSecretsRotator:
         assert "opnsense.yaml" in file_names
         assert "settings.yaml" not in file_names
 
-    def test_get_encrypted_files_wildcard_pattern(self, temp_secrets_dir):
+    def test_get_encrypted_files_wildcard_pattern(self, temp_secrets_dir: Path) -> None:
         """Test getting encrypted files with wildcard pattern."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
         files = rotator.get_encrypted_files(file_patterns=["*sense.yaml"])
@@ -205,14 +212,14 @@ class TestSecretsRotator:
         assert len(file_names) == 1
         assert "opnsense.yaml" in file_names
 
-    def test_rotate_missing_parameters(self, temp_secrets_dir):
+    def test_rotate_missing_parameters(self, temp_secrets_dir: Path) -> None:
         """Test that rotate fails without key parameters."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
 
         with pytest.raises(SecretError, match="Must specify either"):
             rotator.rotate()
 
-    def test_rotate_conflicting_parameters(self, temp_secrets_dir, tmp_path):
+    def test_rotate_conflicting_parameters(self, temp_secrets_dir: Path, tmp_path: Path) -> None:
         """Test that rotate fails with conflicting parameters."""
         rotator = SecretsRotator(secrets_dir=temp_secrets_dir)
         key_file = tmp_path / "key.txt"
@@ -222,7 +229,9 @@ class TestSecretsRotator:
             rotator.rotate(new_key_file=key_file, generate_new_key=True)
 
     @patch("subprocess.run")
-    def test_rotate_with_new_key_file(self, mock_run, temp_secrets_dir, mock_provider, tmp_path):
+    def test_rotate_with_new_key_file(
+        self, mock_run: MagicMock, temp_secrets_dir: Path, mock_provider: MagicMock, tmp_path: Path
+    ) -> None:
         """Test rotation with a provided new key file."""
         # Create new key file
         new_key_file = tmp_path / "new_age.key"
@@ -249,8 +258,13 @@ class TestSecretsRotator:
     @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
     def test_rotate_with_generate_new_key(
-        self, mock_run, mock_which, temp_secrets_dir, mock_provider, monkeypatch
-    ):
+        self,
+        mock_run: MagicMock,
+        mock_which: MagicMock,
+        temp_secrets_dir: Path,
+        mock_provider: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Test rotation with automatic key generation."""
         # Mock age-keygen for key generation
         mock_run.return_value = Mock(
@@ -275,7 +289,7 @@ class TestSecretsRotator:
         assert result["new_public_key"] == "age1generatedkey123"
 
     @patch("shutil.which", return_value="/usr/bin/age-keygen")
-    def test_rotate_no_encrypted_files(self, mock_which, temp_secrets_dir):
+    def test_rotate_no_encrypted_files(self, mock_which: MagicMock, temp_secrets_dir: Path) -> None:
         """Test rotation when no encrypted files exist."""
         # Remove all yaml files
         for yaml_file in temp_secrets_dir.glob("*.yaml"):
@@ -296,7 +310,9 @@ class TestSecretsRotator:
 
     @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
-    def test_extract_public_key(self, mock_run, mock_which, temp_secrets_dir, tmp_path):
+    def test_extract_public_key(
+        self, mock_run: MagicMock, mock_which: MagicMock, temp_secrets_dir: Path, tmp_path: Path
+    ) -> None:
         """Test extracting public key from private key file."""
         mock_run.return_value = Mock(stdout="age1extractedkey456\n", returncode=0)
 
@@ -312,7 +328,9 @@ class TestSecretsRotator:
 
     @patch("shutil.which", return_value="/usr/bin/age-keygen")
     @patch("subprocess.run")
-    def test_extract_public_key_failure(self, mock_run, mock_which, temp_secrets_dir, tmp_path):
+    def test_extract_public_key_failure(
+        self, mock_run: MagicMock, mock_which: MagicMock, temp_secrets_dir: Path, tmp_path: Path
+    ) -> None:
         """Test handling of public key extraction failure."""
         mock_run.side_effect = subprocess.CalledProcessError(1, "age-keygen", stderr="error")
 
@@ -324,7 +342,9 @@ class TestSecretsRotator:
         with pytest.raises(SecretError, match="Failed to extract public key"):
             rotator._extract_public_key(key_file)
 
-    def test_verify_rotation_success(self, temp_secrets_dir, mock_provider):
+    def test_verify_rotation_success(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test successful rotation verification."""
         test_data = {
             temp_secrets_dir / "test.yaml": {"key": "value"},
@@ -340,7 +360,9 @@ class TestSecretsRotator:
             original_data=test_data,
         )
 
-    def test_verify_rotation_data_mismatch(self, temp_secrets_dir, mock_provider):
+    def test_verify_rotation_data_mismatch(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock
+    ) -> None:
         """Test rotation verification with mismatched data."""
         original_data = {
             temp_secrets_dir / "test.yaml": {"key": "original_value"},
@@ -357,7 +379,9 @@ class TestSecretsRotator:
                 original_data=original_data,
             )
 
-    def test_rotate_rollback_on_failure(self, temp_secrets_dir, mock_provider, tmp_path):
+    def test_rotate_rollback_on_failure(
+        self, temp_secrets_dir: Path, mock_provider: MagicMock, tmp_path: Path
+    ) -> None:
         """Test that rotation rolls back on failure."""
         # Create new key
         new_key_file = tmp_path / "new.key"
@@ -386,7 +410,7 @@ class TestSecretsRotator:
 class TestSecretManagerRotation:
     """Tests for SecretManager.rotate_secrets() method."""
 
-    def test_rotate_secrets_calls_rotator(self, temp_secrets_dir):
+    def test_rotate_secrets_calls_rotator(self, temp_secrets_dir: Path) -> None:
         """Test that rotate_secrets properly delegates to SecretsRotator."""
         from infrafoundry.core.secrets import SecretManager
 

@@ -1,5 +1,8 @@
 """Unit tests for ConfigManager."""
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 import yaml
 
@@ -12,19 +15,19 @@ from infrafoundry.core.exceptions import InfraFoundryError
 class TestConfigManager:
     """Tests for ConfigManager."""
 
-    def test_init(self, mock_config_dir):
+    def test_init(self, mock_config_dir: Any) -> None:
         """Test ConfigManager initialization."""
         config = ConfigManager(mock_config_dir / "envs")
         assert config.base_dir.name == "envs"
 
-    def test_list_environments(self, mock_config_dir):
+    def test_list_environments(self, mock_config_dir: Any) -> None:
         """Test listing environments."""
         config = ConfigManager(mock_config_dir / "envs")
         envs = config.list_environments()
         assert "dev" in envs
         assert len(envs) == 1
 
-    def test_load_environment(self, mock_config_dir):
+    def test_load_environment(self, mock_config_dir: Any) -> None:
         """Test loading environment configuration."""
         config = ConfigManager(mock_config_dir / "envs")
         env = config.load_environment("dev")
@@ -32,13 +35,13 @@ class TestConfigManager:
         assert env.description == "Development environment"
         assert "datacenter" in env.variables
 
-    def test_load_environment_not_found(self, mock_config_dir):
+    def test_load_environment_not_found(self, mock_config_dir: Any) -> None:
         """Test loading non-existent environment."""
         config = ConfigManager(mock_config_dir / "envs")
         with pytest.raises(FileNotFoundError):
             config.load_environment("nonexistent")
 
-    def test_get_all_resources(self, mock_config_dir):
+    def test_get_all_resources(self, mock_config_dir: Any) -> None:
         """Test getting resources for a provider."""
         config = ConfigManager(mock_config_dir / "envs")
         resources = config.get_all_resources("dev", "proxmox")
@@ -48,7 +51,7 @@ class TestConfigManager:
         vm_resources = [r for r in resources if r.type == "vm"]
         assert len(vm_resources) >= 1
 
-    def test_get_all_resources_all_providers(self, mock_config_dir):
+    def test_get_all_resources_all_providers(self, mock_config_dir: Any) -> None:
         """Test getting all resources across all providers."""
         config = ConfigManager(mock_config_dir / "envs")
         all_resources = config.get_all_resources_all_providers("dev")
@@ -57,7 +60,7 @@ class TestConfigManager:
         proxmox_resources = [r for r in all_resources if r.provider == "proxmox"]
         assert len(proxmox_resources) > 0
 
-    def test_validate_environment_structure(self, temp_dir):
+    def test_validate_environment_structure(self, temp_dir: Path) -> None:
         """Test validation of environment directory structure."""
         # Create incomplete environment
         envs_dir = temp_dir / "envs"
@@ -85,7 +88,7 @@ class TestConfigManager:
         # Now validate should pass
         assert config.validate_environment("good")
 
-    def test_get_resources_empty_environment(self, temp_dir):
+    def test_get_resources_empty_environment(self, temp_dir: Path) -> None:
         """Test getting resources from environment with no resources."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -101,7 +104,7 @@ class TestConfigManager:
         resources = config.get_all_resources("empty", "proxmox")
         assert resources == []
 
-    def test_get_resources_invalid_yaml(self, temp_dir):
+    def test_get_resources_invalid_yaml(self, temp_dir: Path) -> None:
         """Test handling of invalid YAML files."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -123,7 +126,7 @@ class TestConfigManager:
             # If it raises, that's also acceptable
             pass
 
-    def test_get_resources_with_resource_filter(self, mock_config_dir):
+    def test_get_resources_with_resource_filter(self, mock_config_dir: Any) -> None:
         """Test filtering resources by name."""
         config = ConfigManager(mock_config_dir / "envs")
         all_resources = config.get_all_resources("dev", "proxmox")
@@ -135,7 +138,7 @@ class TestConfigManager:
             assert len(filtered) >= 1
             assert filtered[0].name == first_resource_name
 
-    def test_load_environment_with_invalid_yaml(self, temp_dir):
+    def test_load_environment_with_invalid_yaml(self, temp_dir: Path) -> None:
         """Test loading environment with invalid YAML."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -150,7 +153,7 @@ class TestConfigManager:
         with pytest.raises(InfraFoundryError):  # Should raise some exception
             config.load_environment("bad-yaml")
 
-    def test_list_environments_empty_directory(self, temp_dir):
+    def test_list_environments_empty_directory(self, temp_dir: Path) -> None:
         """Test listing environments from empty directory."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir()
@@ -159,14 +162,16 @@ class TestConfigManager:
         envs = config.list_environments()
         assert envs == []
 
-    def test_get_all_resources_nonexistent_provider(self, mock_config_dir):
+    def test_get_all_resources_nonexistent_provider(self, mock_config_dir: Any) -> None:
         """Test getting resources for non-existent provider."""
         config = ConfigManager(mock_config_dir / "envs")
         resources = config.get_all_resources("dev", "nonexistent-provider")
         # Should return empty list
         assert resources == []
 
-    def test_init_with_config_repo_env(self, temp_dir, monkeypatch):
+    def test_init_with_config_repo_env(
+        self, temp_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test initialization with INFRAFOUNDRY_CONFIG_REPO environment variable."""
         config_repo = temp_dir / "config-repo"
         config_repo.mkdir()
@@ -177,7 +182,9 @@ class TestConfigManager:
         config = ConfigManager()
         assert config.base_dir == envs_dir
 
-    def test_init_with_config_dir_env(self, temp_dir, monkeypatch):
+    def test_init_with_config_dir_env(
+        self, temp_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that CONFIG_DIR is no longer supported (must use CONFIG_REPO)."""
         custom_dir = temp_dir / "custom-envs"
         custom_dir.mkdir()
@@ -192,7 +199,7 @@ class TestConfigManager:
         ):
             ConfigManager()
 
-    def test_get_resources_with_plural_type(self, temp_dir):
+    def test_get_resources_with_plural_type(self, temp_dir: Path) -> None:
         """Test resource loading with plural type format (e.g., 'vms:' instead of 'vm:')."""
         import yaml
 
@@ -215,7 +222,7 @@ class TestConfigManager:
         assert len(resources) >= 1
         assert resources[0].name == "vm-01"
 
-    def test_get_resources_with_invalid_type(self, temp_dir):
+    def test_get_resources_with_invalid_type(self, temp_dir: Path) -> None:
         """Test resource loading with non-list resource type."""
         import yaml
 
@@ -236,7 +243,7 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="Expected list"):
             config.get_all_resources("dev", "proxmox")
 
-    def test_get_resources_direct_list_format(self, temp_dir):
+    def test_get_resources_direct_list_format(self, temp_dir: Path) -> None:
         """Test resource loading with direct list format (not dict)."""
         import yaml
 
@@ -258,7 +265,7 @@ class TestConfigManager:
         # Should return empty list for direct list format
         assert len(resources) == 0
 
-    def test_get_resources_from_empty_yaml_file(self, temp_dir):
+    def test_get_resources_from_empty_yaml_file(self, temp_dir: Path) -> None:
         """Test get_resources with empty YAML file."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -272,7 +279,7 @@ class TestConfigManager:
         # Should return empty list for empty file
         assert len(resources) == 0
 
-    def test_get_all_resources_missing_provider_field(self, temp_dir):
+    def test_get_all_resources_missing_provider_field(self, temp_dir: Path) -> None:
         """Test get_all_resources with missing provider field in resource-centric format."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -301,7 +308,7 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="Missing 'provider' field"):
             config.get_all_resources_all_providers("dev")
 
-    def test_get_all_resources_missing_type_field(self, temp_dir):
+    def test_get_all_resources_missing_type_field(self, temp_dir: Path) -> None:
         """Test get_all_resources with missing type field in resource-centric format."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -330,7 +337,7 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="Missing 'type' field"):
             config.get_all_resources_all_providers("dev")
 
-    def test_get_all_resources_missing_name_field(self, temp_dir):
+    def test_get_all_resources_missing_name_field(self, temp_dir: Path) -> None:
         """Test get_all_resources with missing name field in resource-centric format."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -359,7 +366,7 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="Missing 'name' field"):
             config.get_all_resources_all_providers("dev")
 
-    def test_get_all_resources_duplicate_names(self, temp_dir):
+    def test_get_all_resources_duplicate_names(self, temp_dir: Path) -> None:
         """Test get_all_resources_all_providers with duplicate resource names."""
         # Create two different files with same resource name
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
@@ -387,13 +394,13 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="Duplicate resource names found"):
             config.get_all_resources_all_providers("dev")
 
-    def test_list_environments_nonexistent_base_dir(self, temp_dir):
+    def test_list_environments_nonexistent_base_dir(self, temp_dir: Path) -> None:
         """Test list_environments when base_dir doesn't exist."""
         config = ConfigManager(temp_dir / "nonexistent")
         envs = config.list_environments()
         assert envs == []
 
-    def test_validate_environment_nonexistent(self, temp_dir):
+    def test_validate_environment_nonexistent(self, temp_dir: Path) -> None:
         """Test validate_environment with nonexistent environment."""
         envs_dir = temp_dir / "envs"
         envs_dir.mkdir(parents=True)
@@ -401,7 +408,7 @@ class TestConfigManager:
         config = ConfigManager(envs_dir)
         assert not config.validate_environment("nonexistent")
 
-    def test_get_resources_skips_settings_yaml_in_provider_dir(self, temp_dir):
+    def test_get_resources_skips_settings_yaml_in_provider_dir(self, temp_dir: Path) -> None:
         """Test that settings.yaml in provider directory is skipped."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -424,7 +431,7 @@ class TestConfigManager:
         assert len(resources) == 1
         assert resources[0].name == "test-vm"
 
-    def test_load_resources_with_yaml_returning_none(self, temp_dir):
+    def test_load_resources_with_yaml_returning_none(self, temp_dir: Path) -> None:
         """Test load_resources when YAML file contains only comments."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -438,7 +445,7 @@ class TestConfigManager:
         # Should return empty list when YAML returns None
         assert len(resources) == 0
 
-    def test_load_resource_centric_files_empty_file(self, temp_dir):
+    def test_load_resource_centric_files_empty_file(self, temp_dir: Path) -> None:
         """Test load_resource_centric_files with empty YAML file."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -452,7 +459,7 @@ class TestConfigManager:
         # Should return empty list for empty file
         assert len(resources) == 0
 
-    def test_load_resource_centric_files_missing_resources_key(self, temp_dir):
+    def test_load_resource_centric_files_missing_resources_key(self, temp_dir: Path) -> None:
         """Test load_resource_centric_files when 'resources' key is missing."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -468,7 +475,7 @@ class TestConfigManager:
         # Should skip files without 'resources' key
         assert len(resources) == 0
 
-    def test_load_resource_centric_files_non_list_resources(self, temp_dir):
+    def test_load_resource_centric_files_non_list_resources(self, temp_dir: Path) -> None:
         """Test load_resource_centric_files when resources is not a list."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -483,7 +490,7 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="Expected list for 'resources'"):
             config.load_resource_centric_files("dev")
 
-    def test_load_resource_centric_files_non_dict_item(self, temp_dir):
+    def test_load_resource_centric_files_non_dict_item(self, temp_dir: Path) -> None:
         """Test load_resource_centric_files when resource item is not a dict."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -510,7 +517,7 @@ class TestConfigManager:
         assert len(resources) == 1
         assert resources[0].name == "web-01"
 
-    def test_get_all_resources_all_providers_skips_settings_yaml(self, temp_dir):
+    def test_get_all_resources_all_providers_skips_settings_yaml(self, temp_dir: Path) -> None:
         """Test that get_all_resources_all_providers skips settings.yaml."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -539,7 +546,7 @@ class TestConfigManager:
         assert len(resources) == 1
         assert resources[0].name == "test-vm"
 
-    def test_load_resource_centric_files_missing_provider_direct_call(self, temp_dir):
+    def test_load_resource_centric_files_missing_provider_direct_call(self, temp_dir: Path) -> None:
         """Test load_resource_centric_files directly with missing provider."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -562,7 +569,7 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="Missing 'provider' field"):
             config.load_resource_centric_files("dev")
 
-    def test_load_resource_centric_files_missing_type_direct_call(self, temp_dir):
+    def test_load_resource_centric_files_missing_type_direct_call(self, temp_dir: Path) -> None:
         """Test load_resource_centric_files directly with missing type."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -585,7 +592,7 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="Missing 'type' field"):
             config.load_resource_centric_files("dev")
 
-    def test_load_resource_centric_files_missing_name_direct_call(self, temp_dir):
+    def test_load_resource_centric_files_missing_name_direct_call(self, temp_dir: Path) -> None:
         """Test load_resource_centric_files directly with missing name."""
         envs_dir = temp_dir / "envs" / "dev" / "resources"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -608,7 +615,7 @@ class TestConfigManager:
         with pytest.raises(ValueError, match="Missing 'name' field"):
             config.load_resource_centric_files("dev")
 
-    def test_load_resources_with_null_yaml(self, temp_dir):
+    def test_load_resources_with_null_yaml(self, temp_dir: Path) -> None:
         """Test load_resources when YAML file contains explicit null."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -622,7 +629,7 @@ class TestConfigManager:
         # Should return empty list when YAML is null
         assert len(resources) == 0
 
-    def test_load_resources_with_empty_dict(self, temp_dir):
+    def test_load_resources_with_empty_dict(self, temp_dir: Path) -> None:
         """Test load_resources when YAML file is empty dict."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True, exist_ok=True)
@@ -636,7 +643,9 @@ class TestConfigManager:
         # Should return empty list when YAML is empty dict
         assert len(resources) == 0
 
-    def test_get_all_resources_all_providers_with_resources_dir_empty_files(self, temp_dir):
+    def test_get_all_resources_all_providers_with_resources_dir_empty_files(
+        self, temp_dir: Path
+    ) -> None:
         """Test get_all_resources_all_providers with empty files in resources dir."""
         # Create environment
         envs_dir = temp_dir / "envs" / "dev"
@@ -664,7 +673,7 @@ class TestConfigManager:
         # Should handle empty files and files without resources key
         assert len(resources) == 0
 
-    def test_provider_settings_basic(self, temp_dir):
+    def test_provider_settings_basic(self, temp_dir: Path) -> None:
         """Test provider_settings configuration."""
         envs_dir = temp_dir / "envs" / "test"
         envs_dir.mkdir(parents=True)
@@ -706,7 +715,7 @@ provider_settings:
         k8s_settings = env.get_provider_settings("kubernetes")
         assert k8s_settings is None
 
-    def test_provider_settings_empty(self, temp_dir):
+    def test_provider_settings_empty(self, temp_dir: Path) -> None:
         """Test environment with no provider_settings."""
         envs_dir = temp_dir / "envs" / "test"
         envs_dir.mkdir(parents=True)
@@ -725,7 +734,7 @@ description: Test environment
         assert env.get_provider_settings("proxmox") is None
         assert env.get_provider_settings("opnsense") is None
 
-    def test_provider_settings_combined_with_ssh(self, temp_dir):
+    def test_provider_settings_combined_with_ssh(self, temp_dir: Path) -> None:
         """Test provider_settings and provider_ssh together."""
         envs_dir = temp_dir / "envs" / "test"
         envs_dir.mkdir(parents=True)
@@ -762,7 +771,7 @@ provider_settings:
         assert settings["api_url"] == "https://pve01.example.com:8006"
         assert settings["node"] == "pve01"
 
-    def test_get_all_resources_includes_packages(self, temp_dir):
+    def test_get_all_resources_includes_packages(self, temp_dir: Path) -> None:
         """Packages are loaded alongside regular resources."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True)
@@ -792,7 +801,7 @@ provider_settings:
         assert "regular-vm" in names
         assert "pkg-vm" in names
 
-    def test_get_all_resources_package_duplicate_name(self, temp_dir):
+    def test_get_all_resources_package_duplicate_name(self, temp_dir: Path) -> None:
         """Duplicate resource name from package raises error."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True)
@@ -819,7 +828,7 @@ provider_settings:
         with pytest.raises(ValueError, match="Duplicate resource names"):
             config.get_all_resources_all_providers("dev")
 
-    def test_get_package_events_returns_and_clears(self, temp_dir):
+    def test_get_package_events_returns_and_clears(self, temp_dir: Path) -> None:
         """Package events are returned and then cleared."""
         envs_dir = temp_dir / "envs" / "dev" / "proxmox"
         envs_dir.mkdir(parents=True)

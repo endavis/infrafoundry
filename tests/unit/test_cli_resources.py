@@ -1,6 +1,7 @@
 """Unit tests for the 'resources' CLI command."""
 
 from datetime import datetime
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -12,13 +13,13 @@ from infrafoundry.core.state import ResourceState
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     mock.state_manager = Mock()
@@ -26,7 +27,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def sample_resources():
+def sample_resources() -> list[Any]:
     """Sample resource data."""
     resource1 = Mock()
     resource1.environment = "test"
@@ -49,7 +50,9 @@ def sample_resources():
     return [resource1, resource2]
 
 
-def test_resources_list_all(cli_runner, mock_orchestrator, sample_resources):
+def test_resources_list_all(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_resources: list[Any]
+) -> None:
     """Test resources command lists all resources."""
     mock_orchestrator.state_manager.get_resources.return_value = sample_resources
 
@@ -70,7 +73,9 @@ def test_resources_list_all(cli_runner, mock_orchestrator, sample_resources):
         )
 
 
-def test_resources_filter_by_environment(cli_runner, mock_orchestrator, sample_resources):
+def test_resources_filter_by_environment(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_resources: list[Any]
+) -> None:
     """Test resources command with environment filter."""
     mock_orchestrator.state_manager.get_resources.return_value = [sample_resources[0]]
 
@@ -86,7 +91,9 @@ def test_resources_filter_by_environment(cli_runner, mock_orchestrator, sample_r
         )
 
 
-def test_resources_filter_by_provider(cli_runner, mock_orchestrator, sample_resources):
+def test_resources_filter_by_provider(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_resources: list[Any]
+) -> None:
     """Test resources command with provider filter."""
     mock_orchestrator.state_manager.get_resources.return_value = [sample_resources[0]]
 
@@ -102,7 +109,9 @@ def test_resources_filter_by_provider(cli_runner, mock_orchestrator, sample_reso
         )
 
 
-def test_resources_filter_by_type(cli_runner, mock_orchestrator, sample_resources):
+def test_resources_filter_by_type(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_resources: list[Any]
+) -> None:
     """Test resources command with type filter."""
     mock_orchestrator.state_manager.get_resources.return_value = [sample_resources[0]]
 
@@ -118,7 +127,9 @@ def test_resources_filter_by_type(cli_runner, mock_orchestrator, sample_resource
         )
 
 
-def test_resources_filter_by_state(cli_runner, mock_orchestrator, sample_resources):
+def test_resources_filter_by_state(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_resources: list[Any]
+) -> None:
     """Test resources command with state filter."""
     mock_orchestrator.state_manager.get_resources.return_value = sample_resources
 
@@ -132,7 +143,7 @@ def test_resources_filter_by_state(cli_runner, mock_orchestrator, sample_resourc
         assert call_args["state"] == ResourceState.ACTIVE
 
 
-def test_resources_no_resources_found(cli_runner, mock_orchestrator):
+def test_resources_no_resources_found(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test resources command when no resources are found."""
     mock_orchestrator.state_manager.get_resources.return_value = []
 
@@ -143,7 +154,7 @@ def test_resources_no_resources_found(cli_runner, mock_orchestrator):
         assert "No resources found matching filters" in result.output
 
 
-def test_resources_invalid_state(cli_runner, mock_orchestrator):
+def test_resources_invalid_state(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test resources command with invalid state."""
     with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
         result = cli_runner.invoke(main, ["state", "resources", "--state", "INVALID"])

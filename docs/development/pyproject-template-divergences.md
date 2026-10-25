@@ -140,9 +140,9 @@ customization a reviewer must verify survived the merge.
 | `README.md` | Preserves InfraFoundry description, quickstart, and feature list. |
 | `dodo.py` | Preserves InfraFoundry-specific task imports. |
 | `mkdocs.yml` | Preserves the InfraFoundry nav tree (Providers, Runners, Configuration, etc.). |
-| `pyproject.toml` | Preserves project name, dependencies, CLI entry points, and mypy/ruff overrides specific to InfraFoundry. |
+| `pyproject.toml` | Preserves project name, dependencies, CLI entry points, and mypy/ruff overrides specific to InfraFoundry: `disallow_any_generics = true` globally with an override that turns it off for template-owned tooling (as upstream has it), the `agent_roster` import override, and the InfraFoundry vulture `ignore_names` entries. |
 | `tests/conftest.py` | Preserves InfraFoundry-specific fixtures (`mock_config_manager`, `mock_config_dir`, sample resource fixtures, etc.) alongside upstream's `mock_subprocess` fixture. |
-| `tests/template/test_doit_quality.py` | Preserves assertions for local-only `lint_blueprints` task_dep and the local mypy target list. |
+| `tests/template/test_doit_quality.py` | Preserves the local-only `lint_blueprints` entry in the `task_check` dependency set and `TestTaskLintBlueprints`. The mypy scope assertions match upstream since #1056. |
 | `tests/template/test_doit_release.py` | Local-flow test file with no upstream equivalent (upstream's version targets a different `task_release` shape; local covers `task_release_pr`, `task_release_tag`, `task_release_dev`, `validate_*` helpers). Tracked in #853. |
 | `tools/doit/quality.py` | Preserves `task_lint_blueprints()` and any sibling blueprint-specific tasks. |
 | `tools/doit/install_tools.py` | Preserves age/sops/terraform/opentofu installer tasks. |

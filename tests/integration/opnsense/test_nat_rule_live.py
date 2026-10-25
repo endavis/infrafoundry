@@ -99,7 +99,7 @@ def service() -> Iterator[NATRuleService]:
         # Apply changes for all three kinds (#725); suppress errors if no changes.
         for kind in ("outbound", "one_to_one", "port_forward"):
             with contextlib.suppress(Exception):
-                svc.apply_changes(kind)  # type: ignore[arg-type]
+                svc.apply_changes(kind)
 
 
 def test_outbound_round_trip_apply_then_plan_zero(service: NATRuleService) -> None:

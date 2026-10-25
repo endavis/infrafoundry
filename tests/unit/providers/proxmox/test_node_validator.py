@@ -11,24 +11,26 @@ from infrafoundry.providers.proxmox.validators.node_validator import NodeValidat
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def client():
+def client() -> MagicMock:
     """Create a mock Proxmox API client."""
     return MagicMock(spec=ProxmoxClient)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> NodeValidator:
     """Create a NodeValidator instance."""
     return NodeValidator(report)
 
 
-def test_validate_node_online(validator, client, report):
+def test_validate_node_online(
+    validator: NodeValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation of online node."""
     client.get_json.return_value = {"data": {"uptime": 3600}}
 
@@ -42,7 +44,9 @@ def test_validate_node_online(validator, client, report):
     assert "online" in call_args["message"]
 
 
-def test_validate_node_not_accessible(validator, client, report):
+def test_validate_node_not_accessible(
+    validator: NodeValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation when node is not accessible."""
     client.get_json.side_effect = APIError("not accessible", provider="proxmox")
 
@@ -54,7 +58,9 @@ def test_validate_node_not_accessible(validator, client, report):
     assert "not accessible" in call_args["message"]
 
 
-def test_validate_multiple_nodes(validator, client, report):
+def test_validate_multiple_nodes(
+    validator: NodeValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation of multiple nodes."""
     client.get_json.side_effect = [
         {"data": {"uptime": 3600}},
@@ -67,29 +73,31 @@ def test_validate_multiple_nodes(validator, client, report):
     assert report.add_check.call_count == 2
 
 
-def test_format_uptime_seconds(validator):
+def test_format_uptime_seconds(validator: NodeValidator) -> None:
     """Test uptime formatting for seconds."""
     assert validator._format_uptime(30) == "30 seconds"
 
 
-def test_format_uptime_minutes(validator):
+def test_format_uptime_minutes(validator: NodeValidator) -> None:
     """Test uptime formatting for minutes."""
     assert validator._format_uptime(300) == "5 minutes"
 
 
-def test_format_uptime_hours(validator):
+def test_format_uptime_hours(validator: NodeValidator) -> None:
     """Test uptime formatting for hours."""
     assert validator._format_uptime(7200) == "2 hours"
     assert validator._format_uptime(7260) == "2 hours, 1 minutes"
 
 
-def test_format_uptime_days(validator):
+def test_format_uptime_days(validator: NodeValidator) -> None:
     """Test uptime formatting for days."""
     assert validator._format_uptime(86400) == "1 days"
     assert validator._format_uptime(90000) == "1 days, 1 hours"
 
 
-def test_validate_empty_nodes(validator, client, report):
+def test_validate_empty_nodes(
+    validator: NodeValidator, client: MagicMock, report: MagicMock
+) -> None:
     """Test validation with empty node set."""
     validator.validate(client, set())
 

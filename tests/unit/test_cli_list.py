@@ -1,5 +1,6 @@
 """Unit tests for the 'list' CLI command."""
 
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -10,20 +11,20 @@ from infrafoundry.core.config import ConfigManager
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_config_manager():
+def mock_config_manager() -> Mock:
     """Mock ConfigManager for testing."""
     mock = Mock(spec=ConfigManager)
     return mock
 
 
 @pytest.fixture
-def sample_resources():
+def sample_resources() -> list[Any]:
     """Sample resource data."""
     # Create mock resources
     vm1 = Mock()
@@ -44,7 +45,9 @@ def sample_resources():
     return [vm1, vm2, firewall]
 
 
-def test_list_all_resources(cli_runner, mock_config_manager, sample_resources):
+def test_list_all_resources(
+    cli_runner: CliRunner, mock_config_manager: Mock, sample_resources: list[Any]
+) -> None:
     """Test list command shows all resources."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
@@ -61,7 +64,9 @@ def test_list_all_resources(cli_runner, mock_config_manager, sample_resources):
         assert "Total: 3 resources" in result.output
 
 
-def test_list_filter_by_provider(cli_runner, mock_config_manager, sample_resources):
+def test_list_filter_by_provider(
+    cli_runner: CliRunner, mock_config_manager: Mock, sample_resources: list[Any]
+) -> None:
     """Test list command with provider filter."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
@@ -79,7 +84,9 @@ def test_list_filter_by_provider(cli_runner, mock_config_manager, sample_resourc
         assert "Total: 2 resources" in result.output
 
 
-def test_list_filter_by_type(cli_runner, mock_config_manager, sample_resources):
+def test_list_filter_by_type(
+    cli_runner: CliRunner, mock_config_manager: Mock, sample_resources: list[Any]
+) -> None:
     """Test list command with type filter."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
@@ -95,7 +102,9 @@ def test_list_filter_by_type(cli_runner, mock_config_manager, sample_resources):
         assert "Total: 2 resources" in result.output
 
 
-def test_list_filter_by_both(cli_runner, mock_config_manager, sample_resources):
+def test_list_filter_by_both(
+    cli_runner: CliRunner, mock_config_manager: Mock, sample_resources: list[Any]
+) -> None:
     """Test list command with both provider and type filters."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 
@@ -112,7 +121,7 @@ def test_list_filter_by_both(cli_runner, mock_config_manager, sample_resources):
         assert "Total: 2 resources" in result.output
 
 
-def test_list_no_resources_found(cli_runner, mock_config_manager):
+def test_list_no_resources_found(cli_runner: CliRunner, mock_config_manager: Mock) -> None:
     """Test list command when no resources are found."""
     mock_config_manager.get_all_resources_all_providers.return_value = []
 
@@ -125,7 +134,9 @@ def test_list_no_resources_found(cli_runner, mock_config_manager):
         assert "No resources found" in result.output
 
 
-def test_list_no_matching_provider(cli_runner, mock_config_manager, sample_resources):
+def test_list_no_matching_provider(
+    cli_runner: CliRunner, mock_config_manager: Mock, sample_resources: list[Any]
+) -> None:
     """Test list command when provider filter matches nothing."""
     mock_config_manager.get_all_resources_all_providers.return_value = sample_resources
 

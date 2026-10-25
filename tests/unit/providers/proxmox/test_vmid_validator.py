@@ -5,24 +5,25 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.providers.proxmox.validator import ClusterVM
 from infrafoundry.providers.proxmox.validators.vmid_validator import VMIDValidator
 
 
 @pytest.fixture
-def report():
+def report() -> MagicMock:
     """Create a mock validation report."""
     return MagicMock(spec=ValidationReport)
 
 
 @pytest.fixture
-def validator(report):
+def validator(report: MagicMock) -> VMIDValidator:
     """Create a VMIDValidator instance."""
     return VMIDValidator(report)
 
 
-def test_validate_vmid_available(validator, report):
+def test_validate_vmid_available(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation of available VMID."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -35,9 +36,9 @@ def test_validate_vmid_available(validator, report):
     assert "available" in call_args["message"]
 
 
-def test_validate_vmid_conflict_different_name(validator, report):
+def test_validate_vmid_conflict_different_name(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation of VMID conflict with different VM name."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -51,9 +52,9 @@ def test_validate_vmid_conflict_different_name(validator, report):
     assert "existing-vm" in call_args["message"]
 
 
-def test_validate_vmid_exists_same_name(validator, report):
+def test_validate_vmid_exists_same_name(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation of VMID that already exists with same name (update scenario)."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "my-vm"},
     ]
 
@@ -67,9 +68,9 @@ def test_validate_vmid_exists_same_name(validator, report):
     assert "update" in call_args["message"].lower() or "recreation" in call_args["message"].lower()
 
 
-def test_validate_empty_vmids(validator, report):
+def test_validate_empty_vmids(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation with no VMIDs."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -78,16 +79,16 @@ def test_validate_empty_vmids(validator, report):
     report.add_check.assert_not_called()
 
 
-def test_validate_cluster_vms_none(validator, report):
+def test_validate_cluster_vms_none(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation when cluster VMs fetch failed."""
     validator.validate(None, {200: "new-vm"})
 
     report.add_check.assert_not_called()
 
 
-def test_validate_multiple_vmids(validator, report):
+def test_validate_multiple_vmids(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation of multiple VMIDs."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -103,9 +104,9 @@ def test_validate_multiple_vmids(validator, report):
     assert report.add_check.call_count == 3
 
 
-def test_validate_vm_without_name(validator, report):
+def test_validate_vm_without_name(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation with VM that has no name field."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100},  # No name field
     ]
 
@@ -117,9 +118,9 @@ def test_validate_vm_without_name(validator, report):
     assert "N/A" in call_args["message"]  # Falls back to N/A
 
 
-def test_validate_all_vmids_available(validator, report):
+def test_validate_all_vmids_available(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation when all VMIDs are available."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "existing-vm"},
     ]
 
@@ -138,9 +139,9 @@ def test_validate_all_vmids_available(validator, report):
         assert call[1]["passed"] is True
 
 
-def test_validate_all_vmids_conflicts(validator, report):
+def test_validate_all_vmids_conflicts(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation when all VMIDs have conflicts."""
-    cluster_vms = [
+    cluster_vms: list[ClusterVM] = [
         {"vmid": 100, "name": "vm1"},
         {"vmid": 200, "name": "vm2"},
     ]

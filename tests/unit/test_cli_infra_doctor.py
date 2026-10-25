@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,12 +13,14 @@ from infrafoundry.cli.main import main
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
-def _mock_orchestrator(validate_results: dict | None = None, has_errors: bool = False):
+def _mock_orchestrator(
+    validate_results: dict[str, Any] | None = None, has_errors: bool = False
+) -> MagicMock:
     """Build a mock orchestrator with configurable validate results.
 
     Args:
@@ -57,7 +61,7 @@ class TestInfraDoctorSuccess:
     @patch("infrafoundry.cli.main._get_orchestrator")
     @patch("infrafoundry.cli.main._load_env_credentials")
     def test_clean_validation_exit_zero(
-        self, mock_creds, mock_get_orch, cli_runner: CliRunner, tmp_path
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
     ) -> None:
         """Clean validation exits with code 0."""
         orch = _mock_orchestrator(has_errors=False)
@@ -75,7 +79,7 @@ class TestInfraDoctorFailure:
     @patch("infrafoundry.cli.main._get_orchestrator")
     @patch("infrafoundry.cli.main._load_env_credentials")
     def test_validation_errors_exit_one(
-        self, mock_creds, mock_get_orch, cli_runner: CliRunner, tmp_path
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
     ) -> None:
         """Validation errors result in exit code 1."""
         orch = _mock_orchestrator(has_errors=True)
@@ -92,7 +96,7 @@ class TestInfraDoctorResourceFilter:
     @patch("infrafoundry.cli.main._get_orchestrator")
     @patch("infrafoundry.cli.main._load_env_credentials")
     def test_resource_filter_passed(
-        self, mock_creds, mock_get_orch, cli_runner: CliRunner, tmp_path
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
     ) -> None:
         """--resource values are passed to orchestrator.validate()."""
         orch = _mock_orchestrator(has_errors=False)
@@ -128,7 +132,7 @@ class TestInfraDoctorVerbose:
     @patch("infrafoundry.cli.main._get_orchestrator")
     @patch("infrafoundry.cli.main._load_env_credentials")
     def test_verbose_flag_passed(
-        self, mock_creds, mock_get_orch, cli_runner: CliRunner, tmp_path
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
     ) -> None:
         """--verbose flag is forwarded to orchestrator.validate()."""
         orch = _mock_orchestrator(has_errors=False)

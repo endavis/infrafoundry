@@ -1,6 +1,7 @@
 """Unit tests for the 'history' CLI command."""
 
 from datetime import datetime
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -12,13 +13,13 @@ from infrafoundry.core.state import DeploymentStatus
 
 
 @pytest.fixture
-def cli_runner():
+def cli_runner() -> CliRunner:
     """Fixture for invoking CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
-def mock_orchestrator():
+def mock_orchestrator() -> Mock:
     """Mock orchestrator for testing."""
     mock = Mock(spec=Orchestrator)
     mock.state_manager = Mock()
@@ -26,7 +27,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def sample_deployments():
+def sample_deployments() -> list[Any]:
     """Sample deployment history."""
     deployment1 = Mock()
     deployment1.id = 1
@@ -49,7 +50,9 @@ def sample_deployments():
     return [deployment1, deployment2]
 
 
-def test_history_basic(cli_runner, mock_orchestrator, sample_deployments):
+def test_history_basic(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployments: list[Any]
+) -> None:
     """Test basic history command."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = sample_deployments
 
@@ -73,7 +76,9 @@ def test_history_basic(cli_runner, mock_orchestrator, sample_deployments):
         )
 
 
-def test_history_filter_by_env(cli_runner, mock_orchestrator, sample_deployments):
+def test_history_filter_by_env(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployments: list[Any]
+) -> None:
     """Test history command with environment filter."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployments[0]]
 
@@ -92,7 +97,9 @@ def test_history_filter_by_env(cli_runner, mock_orchestrator, sample_deployments
         )
 
 
-def test_history_filter_by_command(cli_runner, mock_orchestrator, sample_deployments):
+def test_history_filter_by_command(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployments: list[Any]
+) -> None:
     """Test history command with command filter."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployments[0]]
 
@@ -111,7 +118,9 @@ def test_history_filter_by_command(cli_runner, mock_orchestrator, sample_deploym
         )
 
 
-def test_history_filter_by_status(cli_runner, mock_orchestrator, sample_deployments):
+def test_history_filter_by_status(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployments: list[Any]
+) -> None:
     """Test history command with status filter."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = sample_deployments
 
@@ -123,7 +132,9 @@ def test_history_filter_by_status(cli_runner, mock_orchestrator, sample_deployme
         assert call_args["status"] == DeploymentStatus.COMPLETED
 
 
-def test_history_with_limit(cli_runner, mock_orchestrator, sample_deployments):
+def test_history_with_limit(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployments: list[Any]
+) -> None:
     """Test history command with limit."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = sample_deployments
 
@@ -140,7 +151,9 @@ def test_history_with_limit(cli_runner, mock_orchestrator, sample_deployments):
         )
 
 
-def test_history_exclude_dry_runs(cli_runner, mock_orchestrator, sample_deployments):
+def test_history_exclude_dry_runs(
+    cli_runner: CliRunner, mock_orchestrator: Mock, sample_deployments: list[Any]
+) -> None:
     """Test history command excluding dry runs."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployments[0]]
 
@@ -157,7 +170,7 @@ def test_history_exclude_dry_runs(cli_runner, mock_orchestrator, sample_deployme
         )
 
 
-def test_history_no_deployments(cli_runner, mock_orchestrator):
+def test_history_no_deployments(cli_runner: CliRunner, mock_orchestrator: Mock) -> None:
     """Test history command when no deployments are found."""
     mock_orchestrator.state_manager.get_deployment_history.return_value = []
 
