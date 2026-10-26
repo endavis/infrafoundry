@@ -22,6 +22,8 @@ repos:
         stages: [pre-commit]
       - id: check-yaml
         stages: [pre-commit]
+        # Blueprint resource templates are Jinja2, not YAML; playbooks (.yml) stay checked.
+        exclude: ^blueprints/(?!(.*/)?blueprint\.yaml$).*\.yaml$
       - id: check-added-large-files
         stages: [pre-commit]
         # Add project-specific exclusions for large data/generated directories:
