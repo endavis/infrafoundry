@@ -369,6 +369,13 @@ ignore_decorators = [
 
 [tool.mutmut]
 source_paths = ["src/"]
+# Blueprint and example-config tests read these from the repository, and
+# mutants/ holds neither unless they are copied in (#1108).
+also_copy = ["blueprints/", "example-config/"]
+# Mutating a method of a runtime_checkable Protocol adds mutmut's trampoline
+# attributes to the protocol, so isinstance() then fails for every real
+# implementation and the stats run stops. The stub bodies hold nothing to kill.
+do_not_mutate = ["src/infrafoundry/core/protocols.py"]
 # The tests that exercise src/, not all of tests/. mutmut runs them inside
 # mutants/, a copy holding src/, tests/ and the project files but not tools/ or
 # the rest of the repository. One test there that imports tools or reads a repo
