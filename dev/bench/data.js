@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792973687421,
+  "lastUpdate": 1793004958568,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10230,6 +10230,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009574683907419392",
             "extra": "mean: 123.73157555051753 usec\nrounds: 8630"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8629df6003c93fc8ebb119682abc5d712dee8533",
+          "message": "feat: check blueprint-declared requirements before plan, apply and destroy (merges PR #1083, addresses #1046)\n\nBlueprints can declare the Python packages and Ansible collections their\nevent handlers and playbooks need in an optional requirements: block. The\norchestrator checks them for the packages in scope before any provider\nwork, so a missing dependency stops the run up front instead of after\ninfrastructure exists.\n\n- blueprint.yaml requirements: PEP 508 specs (string, or spec plus an\n  import name) and an ansible-galaxy requirements file, validated by the\n  blueprint resolver\n- core/requirements: models, checks (importlib.metadata with packaging\n  specifiers; ansible-galaxy collection list) and RequirementsManager, which\n  scopes by --package/--provider and de-duplicates across blueprints\n- Orchestrator.plan (and so apply) and destroy raise MissingRequirementsError\n  (IF-PACKAGE-002) naming each requirement, its blueprints and the install\n  command; destroy checks before taking the lock\n- config doctor reports requirement status per environment\n- ConfigManager.list_package_manifests and blueprint_resolver\n- ontap-cluster declares netapp-lib and its collections file\n- packaging>=24.0 becomes a declared runtime dependency\n- docs: blueprints guide, error reference, ADR-0017\n- tests: new requirements suite; orchestrator fixtures state that their\n  environment has no packages, and the doctor JSON test counts the new\n  per-environment check\n\nAddresses #1046\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T08:55:08Z",
+          "tree_id": "1083a8f018e602df0ea1796abd9488067ef1ce4a",
+          "url": "https://github.com/endavis/infrafoundry/commit/8629df6003c93fc8ebb119682abc5d712dee8533"
+        },
+        "date": 1793004957326,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7924.679929444783,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010231137063696528",
+            "extra": "mean: 126.18806171394 usec\nrounds: 8588"
           }
         ]
       }
