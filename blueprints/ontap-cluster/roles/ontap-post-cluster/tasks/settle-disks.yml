@@ -1,0 +1,77 @@
+---
+# Wait until RAID has taken up every disk a node owns.
+#
+# A freshly assigned disk reports container type "unknown" until RAID makes
+# it a spare. On the ONTAP simulator, disks assigned soon after a node joins
+# the cluster can stay "unknown" indefinitely, leaving the node no spares for
+# root-aggregate expansion or data aggregates (#1089). Removing and
+# re-assigning their ownership clears it.
+#
+# Expects: ontap_settle_node — the node whose disks to check.
+
+- name: "Wait for disks owned by {{ ontap_settle_node }} to become spares"
+  ansible.builtin.uri:
+    url: >-
+      https://{{ ontap_cluster_mgmt_ip }}/api/storage/disks?home_node.name={{ ontap_settle_node }}&container_type=unknown&fields=name
+    user: "{{ ontap_admin_user }}"
+    password: "{{ ontap_admin_password }}"
+    validate_certs: "{{ ontap_validate_certs }}"
+    force_basic_auth: true
+  register: ontap_unsettled
+  until: ontap_unsettled.json.num_records == 0
+  retries: "{{ ontap_disk_settle_retries }}"
+  delay: "{{ ontap_disk_settle_delay }}"
+  # Disks still "unknown" after the wait are re-assigned below.
+  failed_when: ontap_unsettled.json is not defined
+
+- name: "Re-assign disks stuck in container type unknown on {{ ontap_settle_node }}"
+  when: ontap_unsettled.json.num_records > 0
+  block:
+    - name: Remove ownership of stuck disks
+      netapp.ontap.na_ontap_command:
+        <<: &ontap_conn
+          hostname: "{{ ontap_cluster_mgmt_ip }}"
+          username: "{{ ontap_admin_user }}"
+          password: "{{ ontap_admin_password }}"
+          https: true
+          validate_certs: "{{ ontap_validate_certs }}"
+        command: "storage disk removeowner -disk {{ item }} -force true"
+        privilege: advanced
+        return_dict: true
+      loop: "{{ ontap_unsettled.json.records | map(attribute='name') | list }}"
+      register: ontap_removeowner
+      failed_when: ontap_removeowner.msg.result_value | default(0) | int != 1
+
+    - name: Assign stuck disks back to their node
+      netapp.ontap.na_ontap_command:
+        <<: *ontap_conn
+        command: "storage disk assign -disk {{ item }} -owner {{ ontap_settle_node }}"
+        privilege: admin
+        return_dict: true
+      loop: "{{ ontap_unsettled.json.records | map(attribute='name') | list }}"
+      register: ontap_reassign
+      failed_when: ontap_reassign.msg.result_value | default(0) | int != 1
+
+    - name: "Wait for re-assigned disks on {{ ontap_settle_node }} to become spares"
+      ansible.builtin.uri:
+        url: >-
+          https://{{ ontap_cluster_mgmt_ip }}/api/storage/disks?home_node.name={{ ontap_settle_node }}&container_type=unknown&fields=name
+        user: "{{ ontap_admin_user }}"
+        password: "{{ ontap_admin_password }}"
+        validate_certs: "{{ ontap_validate_certs }}"
+        force_basic_auth: true
+      register: ontap_still_unsettled
+      until: ontap_still_unsettled.json.num_records == 0
+      retries: "{{ ontap_disk_settle_retries }}"
+      delay: "{{ ontap_disk_settle_delay }}"
+      failed_when: false
+
+    - name: "Fail if disks on {{ ontap_settle_node }} are still not spares"
+      ansible.builtin.assert:
+        that: ontap_still_unsettled.json.num_records | default(1) == 0
+        fail_msg: >-
+          Disks on {{ ontap_settle_node }} are still in container type "unknown"
+          after re-assignment:
+          {{ ontap_still_unsettled.json.records | default([]) | map(attribute='name') | join(' ') }}.
+          Check them with "storage disk show -container-type unknown".
+        quiet: true
