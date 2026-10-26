@@ -68,7 +68,8 @@
 # ---------------------------------------------------------------
 # Disable root volume snapshots (saves space on simulator)
 # Node root volumes (vol0) can only be managed from the node-shell
-# via ZAPI. Requires netapp_lib Python package (pip install netapp-lib).
+# via ZAPI. Requires the netapp-lib Python package, declared in
+# blueprint.yaml; install it with foundry deps sync.
 # ---------------------------------------------------------------
 - name: Delete existing root volume snapshots
   netapp.ontap.na_ontap_command:

@@ -1,7 +1,8 @@
 ---
 # Ansible collection dependencies for ONTAP lab automation
 #
-# Install: ansible-galaxy collection install -r requirements.yml
+# Declared in blueprint.yaml under requirements.ansible_collections.
+# Install: foundry deps sync --env <env> --package <package>
 collections:
   - name: netapp.ontap
     version: ">=22.0.0"
