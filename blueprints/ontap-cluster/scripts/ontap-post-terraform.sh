@@ -93,6 +93,10 @@ inventory = {
                     'ontap-cluster': {
                         'ansible_host': v['cluster_mgmt_ip'],
                         'ansible_connection': 'local',
+                        # Run NetApp modules under the Python running ansible-playbook
+                        # (the InfraFoundry venv), where the blueprint's requirements
+                        # such as netapp-lib are installed, not the discovered system one.
+                        'ansible_python_interpreter': '{{ ansible_playbook_python }}',
                     },
                 },
             },
