@@ -111,6 +111,9 @@ not to ask "should we sync this?" — there is nothing to sync from.
 
 - `src/infrafoundry/` — the actual framework code.
 - `blueprints/` — infrastructure blueprints.
+- `.github/actions/install-age-sops/` — composite action that installs pinned,
+  checksum-verified age and sops for `ci.yml`, `mutation.yml` and
+  `daily-check.yml` (#1105).
 - `tools/lint_blueprint_portability.py` — custom linter enforcing the
   blueprint-script portability contract.
 - `docs/development/blueprint-script-portability.md` — the contract the linter
@@ -164,8 +167,9 @@ customization a reviewer must verify survived the merge.
 | `tools/doit/quality.py` | Preserves `task_lint_blueprints()` and any sibling blueprint-specific tasks. |
 | `tools/doit/install_tools.py` | Preserves age/sops/terraform/opentofu installer tasks. |
 | `tools/doit/testing.py` | Preserves `--cov=infrafoundry` coverage target. |
-| `.github/workflows/ci.yml` | Preserves the Linux-only `runs-on: ubuntu-latest` (ADR-0001), the Terraform/OpenTofu/age/sops install steps, the `INFRAFOUNDRY_SKIP_SOPS_CHECK` and `HYPOTHESIS_PROFILE` env vars, the `--cov=infrafoundry` flag, the Codecov upload step, and the sparse-checkout of `python-versions.json`. Verbatim adoption from upstream loses all of these — pulled forward from a sync miss in PR #836. |
-| `.github/workflows/daily-check.yml` | Preserves the Terraform/OpenTofu/age/sops install steps before `doit check`, matching `ci.yml`. Upstream installs only Python and uv, so without them the scheduled check fails on the tests that run `terraform` and `age-keygen` (#1095). |
+| `.github/workflows/ci.yml` | Preserves the Linux-only `runs-on: ubuntu-latest` (ADR-0001), the Terraform/OpenTofu install steps, the age/sops install through `.github/actions/install-age-sops` (#1105), the `INFRAFOUNDRY_SKIP_SOPS_CHECK` and `HYPOTHESIS_PROFILE` env vars, the `--cov=infrafoundry` flag, the Codecov upload step, and the sparse-checkout of `python-versions.json`. Verbatim adoption from upstream loses all of these — pulled forward from a sync miss in PR #836. |
+| `.github/workflows/daily-check.yml` | Preserves the Terraform/OpenTofu install steps and the age/sops install through `.github/actions/install-age-sops` before `doit check`, matching `ci.yml`. Upstream installs only Python and uv, so without them the scheduled check fails on the tests that run `terraform` and `age-keygen` (#1095). |
+| `.github/workflows/mutation.yml` | Preserves the age/sops install through `.github/actions/install-age-sops`, which pins both versions and checks each download's SHA-256 (#1105). |
 
 When reviewing a sync PR that touches any of the above, scroll through the diff
 with the spot-check note in mind. If the customization is missing from the
