@@ -28,6 +28,11 @@ ontap_assign_disks: true
 ontap_root_aggregate_disk_count: 2
 ontap_root_volume_size: "3GB"
 
+# How long to wait for newly assigned disks to become spares, per node:
+# retries x delay seconds. Disks still not spares are re-assigned once (#1089).
+ontap_disk_settle_retries: 12
+ontap_disk_settle_delay: 5
+
 # Aggregate configuration
 # Use node_index (0-based) instead of hardcoded node names.
 # Actual node names are discovered from the ONTAP REST API at runtime.
