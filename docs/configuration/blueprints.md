@@ -166,9 +166,15 @@ narrowed by `--package` or `--provider`. An unmet requirement stops the run with
 `IF-PACKAGE-002`, which names the package, the blueprints that need it, and the command that
 installs it. `foundry config doctor` reports the same check for every environment.
 
-**Install them yourself.** Nothing is installed during a run. Install Python packages into the
-environment that runs InfraFoundry (`uv pip install '<spec>'`) and collections with
-`ansible-galaxy collection install -r <file>`.
+**Installing them.** Nothing is installed during a run. Install every unmet requirement in scope
+with `foundry deps sync --env <env>`, or one at a time with the command the error prints.
+`foundry deps check --env <env>` shows the status without installing anything. Both take
+`--package` and `--provider`; see [CLI Reference — Deps Group](../usage/cli-reference.md#deps-group-foundry-deps).
+
+`deps sync` installs Python packages with `uv pip install` into the interpreter running
+InfraFoundry, and collections with `ansible-galaxy collection install --upgrade -r <file>`.
+`uv sync` removes packages that are not in `uv.lock`, including these, unless run with
+`--inexact`. Re-run `foundry deps sync` after it.
 
 !!! note "Which Python Ansible uses"
     The check looks at the interpreter running InfraFoundry. Ansible runs local-connection

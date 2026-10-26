@@ -362,9 +362,23 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
             "collections that are missing or at the wrong version."
         ),
         suggestions=[
-            "Run the install command printed for each unmet requirement",
-            "Run 'foundry config doctor' to see every environment's requirement status",
+            "Run 'foundry deps sync --env <env>' to install every unmet requirement",
+            "Or run the install command printed for each one",
             "Narrow the scope with --package or --provider if the package is not needed",
+        ],
+        see_also="docs/configuration/blueprints.md",
+    ),
+    "IF-PACKAGE-003": ErrorInfo(
+        code="IF-PACKAGE-003",
+        title="Requirement Install Failed",
+        description=(
+            "'foundry deps sync' could not install a blueprint requirement: uv or "
+            "ansible-galaxy is missing, or an install command failed."
+        ),
+        suggestions=[
+            "Install uv and Ansible, and make sure both are on PATH",
+            "Read the command output above for the install error",
+            "Run 'foundry deps sync --env <env> --dry-run' to see the commands it would run",
         ],
         see_also="docs/configuration/blueprints.md",
     ),
@@ -569,6 +583,7 @@ _EXCEPTION_TO_CODE: dict[str, str] = {
     # Package errors
     "PackageNotFoundError": "IF-PACKAGE-001",
     "MissingRequirementsError": "IF-PACKAGE-002",
+    "RequirementInstallError": "IF-PACKAGE-003",
     # Dependency errors
     "CircularDependencyError": "IF-DEPENDENCY-001",
     "MissingDependencyError": "IF-DEPENDENCY-002",

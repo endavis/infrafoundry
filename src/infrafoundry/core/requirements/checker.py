@@ -72,6 +72,7 @@ def check_python(
             blueprints=blueprints,
             problem=problem,
             fix="" if satisfied else fix,
+            install_args=(requirement.spec,),
         )
 
     if installed is None:
@@ -146,10 +147,11 @@ def check_collection(
         The status
     """
     wanted = requirement.version or ""
-    fix = (
-        " && ".join(f"ansible-galaxy collection install -r {path}" for path in collections_files)
-        or f"ansible-galaxy collection install '{requirement.name}{wanted}'"
-    )
+    install_args = collections_files or (f"{requirement.name}{wanted}",)
+    # --upgrade: without it, an installed collection outside the range is left alone.
+    fix = " && ".join(
+        f"ansible-galaxy collection install --upgrade -r {path}" for path in collections_files
+    ) or (f"ansible-galaxy collection install --upgrade '{requirement.name}{wanted}'")
     version = None if installed is None else installed.get(requirement.name)
 
     def status(satisfied: bool, problem: str = "") -> RequirementStatus:
@@ -162,6 +164,7 @@ def check_collection(
             blueprints=blueprints,
             problem=problem,
             fix="" if satisfied else fix,
+            install_args=install_args,
         )
 
     if installed is None:

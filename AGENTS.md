@@ -200,6 +200,10 @@ Key commands (`foundry` via `uv run foundry ...`):
 **Policy group (`policy`):**
 - `policy list` – list available infrastructure policies
 
+**Deps group (`deps`):**
+- `deps check --env <name>` – check the Python packages and Ansible collections blueprints in scope require
+- `deps sync --env <name> [--dry-run]` – install the unmet ones
+
 Generated artifacts should be reviewed (and optionally validated with native Terraform/Ansible tools) from the `generated/` directory hierarchy.
 
 ## Development & Testing
