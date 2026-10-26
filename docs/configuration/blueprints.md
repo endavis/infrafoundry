@@ -180,7 +180,8 @@ InfraFoundry, and collections with `ansible-galaxy collection install --upgrade 
     The check looks at the interpreter running InfraFoundry. Ansible runs local-connection
     modules under the interpreter it discovers, which may be the system Python, unless the
     inventory sets `ansible_python_interpreter: "{{ ansible_playbook_python }}"`. Pin it in
-    blueprints whose modules need these packages.
+    blueprints whose modules need these packages. `ontap-cluster` pins it on its
+    local-connection host in `blueprints/ontap-cluster/scripts/ontap-post-terraform.sh`.
 
 ## Shared Resource Templates
 

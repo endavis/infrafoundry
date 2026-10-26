@@ -37,7 +37,7 @@ Nothing is installed during a run. Installing is an explicit, separate step: the
 
 ### Known limit
 
-The check verifies the interpreter running InfraFoundry. Ansible runs local-connection modules under the interpreter it discovers unless the inventory pins `ansible_python_interpreter` to `{{ ansible_playbook_python }}`. A blueprint whose modules need these packages must pin it (#1049).
+The check verifies the interpreter running InfraFoundry. Ansible runs local-connection modules under the interpreter it discovers unless the inventory pins `ansible_python_interpreter` to `{{ ansible_playbook_python }}`. A blueprint whose modules need these packages must pin it; `ontap-cluster` does, in the inventory its post-terraform script generates (#1049).
 
 ## Related Issues
 
