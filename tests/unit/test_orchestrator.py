@@ -532,6 +532,8 @@ class TestOrchestratorLocking:
 
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
+        # No packages, so no blueprint requirements for the preflight to check (#1046).
+        config_manager.list_package_manifests.return_value = []
         state_manager = StateManager(connection_string=f"sqlite:///{tmp_path / 'state.db'}")
         state_manager.initialize()
         orchestrator = Orchestrator(

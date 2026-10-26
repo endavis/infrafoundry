@@ -56,6 +56,8 @@ def orchestrator(
     # Create mock ConfigManager
     config_manager = Mock(spec=ConfigManager)
     config_manager.base_dir = config_dir
+    # No packages, so no blueprint requirements for the preflight to check (#1046).
+    config_manager.list_package_manifests.return_value = []
 
     # Create a mock environment config object
     from infrafoundry.core.config.models import IaCTool
