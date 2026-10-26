@@ -1,20 +1,25 @@
 ---
-title: "Release Automation & Security"
-description: "Versioning, releases, governance validation and security tooling"
+title: Release Automation & Security
+description: Automated versioning, release management, and security tooling
 audience:
   - contributors
+  - maintainers
 tags:
-  - development
+  - release
+  - security
+  - automation
 ---
 
 # Release Automation & Security
 
-This guide covers the automated versioning, release management, governance validation, and security tooling available in InfraFoundry.
+This guide covers automated versioning, release management, governance validation, and security tooling available in this Python project template.
 
 ## Table of Contents
 - [Automated Versioning](#automated-versioning)
 - [Release Management](#release-management)
+- [GitHub Environments & Trusted Publishing](#github-environments-trusted-publishing)
 - [Release Notes](#release-notes)
+- [PR Merging](#pr-merging)
 - [Security & Quality Tasks](#security-quality-tasks)
 - [SBOM Generation](#sbom-generation)
 - [Governance Validation](#governance-validation)
@@ -22,7 +27,7 @@ This guide covers the automated versioning, release management, governance valid
 
 ## Automated Versioning
 
-InfraFoundry uses **hatch-vcs** for automated, git tag-based versioning. Version numbers are derived from git tags - no manual edits to `pyproject.toml` or `_version.py` are required.
+This template uses **hatch-vcs** for automated, git tag-based versioning. Version numbers are derived from git tags - no manual edits to `pyproject.toml` or `_version.py` are required.
 
 ### How It Works
 
@@ -38,17 +43,18 @@ v1.0.0         # Major release
 v1.1.0         # Minor release (new features)
 v1.1.1         # Patch release (bug fixes)
 
-# Pre-releases (for TestPyPI)
-v1.0.0-alpha.1   # Alpha release
-v1.0.0-beta.1    # Beta release
-v1.0.0-rc.1      # Release candidate
+# Pre-releases (for TestPyPI) — PEP440 format emitted by commitizen
+v1.0.0a0         # Alpha release
+v1.0.0b1         # Beta release
+v1.0.0rc0        # Release candidate
+v1.0.0.dev2      # Development release
 ```
 
 ### Checking Current Version
 
 ```bash
-# From installed package
-uv run python -c "from importlib.metadata import version; print(version('infrafoundry'))"
+# From installed package (replace 'your-package' with your package name)
+uv run python -c "from importlib.metadata import version; print(version('your-package'))"
 
 # Development version (shows git-based dev version)
 # Example output: 0.0.1.dev519+g295cc7b6b.d20251229
@@ -56,118 +62,329 @@ uv run python -c "from importlib.metadata import version; print(version('infrafo
 
 ## Release Management
 
-InfraFoundry provides two automated release workflows powered by **commitizen**:
+Releases follow a single PR-based flow powered by **commitizen**. The
+changelog and version bump are reviewed in a pull request; after the PR
+merges, a lightweight tagging step triggers the publish workflow. Direct-to-
+`main` release commands are not supported — they are incompatible with the
+template-default `no-commit-to-main` hook.
 
-### 1. Production Release (`doit release`)
-
-Creates a stable release for PyPI with full governance validation.
+### Release Flow
 
 ```bash
+# Step 1: open a release PR (production or pre-release)
+uv run doit release [--prerelease=alpha|beta|rc] [--increment=MAJOR|MINOR|PATCH]
+
+# --> reviewer merges the PR --
+
+# Step 2: tag main and trigger publish
+uv run doit release_tag
+```
+
+Both commands must be run from `main`. `doit release` also needs a clean
+working tree.
+`--prerelease` and `--increment` can be combined (e.g.
+`doit release --prerelease=alpha --increment=minor` forces a pre-release of
+the chosen bump type — see [issue #475](https://github.com/endavis/pyproject-template/issues/475)).
+
+### Before your first pre-release
+
+`doit release --prerelease=alpha|beta|rc` requires a baseline `v*` tag so
+commitizen has an anchor version to bump from. Without one the task refuses
+and prints guidance (see [issue #448](https://github.com/endavis/pyproject-template/issues/448)).
+
+**New projects (bootstrap flow).** `tools/pyproject_template/configure.py`
+auto-seeds a `v0.0.0` tag on the root commit, so nothing else is required —
+only push it when you're ready:
+
+```bash
+git push origin v0.0.0
+```
+
+**Existing projects (synced from the template before the auto-seed
+landed).** Seed the baseline tag manually, once per project:
+
+```bash
+# From the project root:
+git tag v0.0.0 "$(git rev-list --max-parents=0 HEAD | head -1)"
+git push origin v0.0.0
+```
+
+After that, `doit release --prerelease=alpha` produces the expected
+`v0.1.0a0` PR. Skip this step entirely if your first release is a
+production release (`doit release` without `--prerelease` works on a
+tagless repo — commitizen defaults to `v0.1.0`).
+
+### Step 1: Create the release PR (`doit release`)
+
+`doit release` determines the next version, creates a `release/vX.Y.Z`
+branch, updates `CHANGELOG.md`, and opens a PR for review.
+
+```bash
+# Auto-detect the next version from conventional commits
 uv run doit release
+
+# Force a specific increment
+uv run doit release --increment=major   # 1.0.0 → 2.0.0
+uv run doit release --increment=minor   # 1.0.0 → 1.1.0
+uv run doit release --increment=patch   # 1.0.0 → 1.0.1
+
+# Open a pre-release PR (TestPyPI)
+uv run doit release --prerelease=alpha  # 1.0.0 → 1.0.1a0
+uv run doit release --prerelease=beta
+uv run doit release --prerelease=rc
 ```
 
 **What it does:**
+
 1. ✅ Verifies you're on the `main` branch
-2. ✅ Checks for uncommitted changes
-3. ✅ Pulls latest changes from remote
-4. ✅ **Runs governance validations** (merge commit format, issue links)
-5. ✅ Runs all quality checks (`doit check`)
-6. ✅ Uses commitizen to:
-   - Analyze conventional commits since last tag
-   - Determine next version number (MAJOR, MINOR, PATCH)
-   - Update CHANGELOG.md (merges pre-release entries)
-   - Create git tag
-7. ✅ Pushes commits and tags to GitHub
-8. ✅ Triggers CI/CD to build and publish to PyPI
+2. ✅ Validates `--prerelease` (must be empty, `alpha`, `beta`, or `rc`), `--issue` (must be empty or a number) and `--increment` (must be empty, `MAJOR`, `MINOR` or `PATCH`, in any case)
+3. ✅ Checks for uncommitted changes
+4. ✅ Pulls latest changes from remote
+5. ✅ **Runs governance validations** (merge commit format, issue links)
+6. ✅ Runs all quality checks (`doit check`)
+7. ✅ Asks commitizen for the next version (`cz bump --get-next`)
+8. ✅ Creates a `release/vX.Y.Z` branch
+9. ✅ Updates `CHANGELOG.md` and commits it
+10. ✅ Pushes the branch and opens a PR titled `release: vX.Y.Z`
 
-**Example Output:**
-```
-======================================================================
-Starting automated release process...
-======================================================================
+The PR can be reviewed, discussed, and approved like any other change.
 
-Pulling latest changes...
-✓ Git pull successful.
+### Step 2: Tag the release (`doit release_tag`)
 
-Running governance validations...
-
-Validating merge commit format...
-✓ All merge commits follow required format.
-
-Validating issue links in commits...
-✓ All non-docs commits reference issues.
-
-✓ Governance validations complete.
-
-Running all pre-release checks...
-✓ All checks passed.
-
-Bumping version and generating CHANGELOG with commitizen...
-✓ Version bumped and CHANGELOG updated (merged pre-releases).
-
-Pushing commits and tags to GitHub...
-✓ Pushed new commits and tags to GitHub.
-
-======================================================================
-✓ Automated release 1.0.0 complete!
-======================================================================
-
-Next steps:
-1. Monitor GitHub Actions for build and publish.
-2. Check PyPI: https://pypi.org/project/infrafoundry/
-3. Verify the updated CHANGELOG.md in the repository.
-```
-
-### 2. Pre-release (`doit release_dev`)
-
-Creates alpha/beta/rc releases for TestPyPI testing.
+After the release PR is merged to `main`:
 
 ```bash
-# Create alpha pre-release (default)
-uv run doit release_dev
-
-# Create beta pre-release
-uv run doit release_dev --type=beta
-
-# Create release candidate
-uv run doit release_dev --type=rc
+git checkout main
+git pull
+uv run doit release_tag
 ```
 
 **What it does:**
-1. ✅ Verifies you're on the `main` branch (with warning option to continue)
-2. ✅ Checks for uncommitted changes
-3. ✅ Pulls latest changes
-4. ✅ Runs all quality checks
-5. ✅ Uses commitizen to create pre-release tag
-6. ✅ Pushes tag to trigger TestPyPI publish
 
-**No governance validation** - this is for testing only.
+1. ✅ Verifies you're on the `main` branch
+2. ✅ Pulls latest changes
+3. ✅ Finds the most recently merged `release: vX.Y.Z` PR
+4. ✅ Extracts the version from the PR title (falls back to the branch name)
+5. ✅ Creates the git tag `vX.Y.Z` on `main`
+6. ✅ Pushes the tag, which triggers the publish workflow
 
-### Release Workflow Best Practices
+### Pre-releases (TestPyPI)
 
-```bash
-# 1. Develop features with conventional commits
-git commit -m "feat: add new provider support"
-git commit -m "fix: resolve configuration parsing issue"
+Pass `--prerelease=<type>` to `doit release` to open a pre-release PR:
 
-# 2. Create alpha for testing
-uv run doit release_dev --type=alpha
-# --> Creates v0.2.0-alpha.1, publishes to TestPyPI
+| Type | Use when |
+| --- | --- |
+| `alpha` | Early, unstable snapshots for internal testing |
+| `beta` | Feature-complete but not yet stable |
+| `rc` | Release candidate; only fixes expected before the final release |
 
-# 3. Test the alpha release
-pip install --index-url https://test.pypi.org/simple/ infrafoundry==0.2.0a1
+Pre-release tags (e.g. `v1.2.0a0`, `v1.2.0b1`, `v1.2.0rc0`, `v1.2.0.dev2`)
+trigger the TestPyPI publish workflow; production tags (e.g. `v1.2.0`) trigger
+TestPyPI followed by PyPI.
+See the [Workflow Triggers](../../.github/CONTRIBUTING.md#workflow-triggers)
+table in `CONTRIBUTING.md` for the full mapping.
 
-# 4. Fix issues, create beta
-git commit -m "fix: address alpha feedback"
-uv run doit release_dev --type=beta
-# --> Creates v0.2.0-beta.1
+### Downstream opt-ins: static version and hand-written changelog
 
-# 5. Final testing, then production release
-uv run doit release
-# --> Creates v0.2.0, updates CHANGELOG, publishes to PyPI
+`doit release` reads two `[tool.commitizen]` keys to decide what a release PR changes (endavis/pyproject-template
+#971). The template sets `version_provider = "scm"` and `update_changelog_on_bump = true`, so its
+own release PR changes only a generated `CHANGELOG.md`. A downstream project that versions or
+writes its changelog differently gets a release PR that matches.
+
+| `[tool.commitizen]` | What `doit release` does |
+| :--- | :--- |
+| `version_provider = "scm"` | Leaves version files alone; the tag is the version. |
+| `version_provider` is anything else | Bumps every version file and `uv.lock` (below). |
+| `update_changelog_on_bump = true` | Generates `CHANGELOG.md` from commit subjects. |
+| `update_changelog_on_bump` is `false` **or missing** | Treats `CHANGELOG.md` as hand-written (below). |
+
+A missing `update_changelog_on_bump` counts as hand-written because that is commitizen's own
+default for it. A project that never set the key gets its `## [Unreleased]` section renamed, or a
+clear abort, instead of `cz changelog` overwriting entries it wrote by hand.
+
+**A static version.** With `version_provider` set to something other than `"scm"` (e.g.
+`"pep621"`) and the files that carry the version listed in `version_files`:
+
+```toml
+[tool.commitizen]
+version_provider = "pep621"
+version_files = [
+    "src/mypkg/__init__.py:__version__",
+    "Makefile:VERSION",
+]
 ```
 
-Both publish workflows' `build` job runs `doit wheel_check --dist=dist` against the exact wheel that gets uploaded, so a packaging regression (missing module, broken entry point, missing `py.typed`) fails the build step rather than reaching PyPI. See [`wheel_check`](doit-tasks-reference.md#wheel_check).
+`doit release` runs, on the release branch:
+
+```bash
+uv run cz bump --files-only --yes <next_version>
+uv lock
+```
+
+`pyproject.toml`, every path in `version_files`, and `uv.lock` are committed alongside
+`CHANGELOG.md` in a single commit, `chore: release v<next_version>`. `uv.lock` has to move with
+the version because it records the project's own version, and `uv lock --check` (run by the
+`uv-lock-check` pre-commit hook) fails once `pyproject.toml` alone has moved. With
+`update_changelog_on_bump = true`, the bump writes the changelog itself, so `doit release` does
+not run `cz changelog` again — it would exit 16, finding the new version's heading with no tag
+behind it.
+
+**A hand-written changelog.** `doit release` skips `cz changelog --incremental` and renames the
+project's own `## [Unreleased]` heading in `CHANGELOG.md` to `## [<next_version>] - <YYYY-MM-DD>`,
+under a new, empty `## [Unreleased]`. Every entry already under the old heading is kept as written:
+
+```markdown
+## [Unreleased]
+
+## [1.2.0] - 2026-10-21
+
+### Added
+- A hand-written entry
+```
+
+It checks the changelog before creating the release branch, and aborts if `CHANGELOG.md` has no
+`## [Unreleased]` heading or that section has no entries — there is nothing to release under the
+new version in either case. Any later abort discards what the release changed before returning to
+`main`, so a version-file bump is never carried back onto it.
+
+**Linking a release issue.** A release PR is exempt from the Validate Issue Link check by its
+`release/v*` branch, since a static-version release is no longer docs-only. A project that files
+an issue for each release can link it with `doit release --issue=<N>`, which writes
+`Addresses #<N>` into the PR body; `doit pr_merge` then records it in the merge commit.
+
+### Example Release Cycle
+
+```bash
+# 1. Develop features with conventional commits on feature branches
+git commit -m "feat: add new feature (#99)"
+git commit -m "fix: resolve bug (#100)"
+
+# 2. Cut an alpha for internal testing
+uv run doit release --prerelease=alpha
+# --> Opens PR "release: v0.2.0a0"
+# --> Reviewer merges the PR
+uv run doit release_tag
+# --> Tag v0.2.0a0 pushed; TestPyPI publish triggered
+
+# 3. Install from TestPyPI for testing
+pip install --index-url https://test.pypi.org/simple/ your-package==0.2.0a0
+
+# 4. Fix issues and cut a beta
+git commit -m "fix: address alpha feedback (#101)"
+uv run doit release --prerelease=beta
+# --> ... merge PR, tag, publish to TestPyPI ...
+
+# 5. Cut the final release
+uv run doit release
+# --> Opens PR "release: v0.2.0", reviewer merges
+uv run doit release_tag
+# --> Tag v0.2.0 pushed; publish workflow runs TestPyPI → PyPI
+```
+
+Both publish workflows' `build` job runs `doit wheel_check --dist=dist` against the exact wheel
+that gets uploaded — installing it into a throwaway venv, importing it, and running every
+`[project.scripts]` entry with `--help` — so a packaging regression (missing module, broken entry
+point, missing `py.typed`) fails the build step rather than reaching PyPI. See
+[`wheel_check`](doit-tasks-reference.md#wheel_check).
+
+## GitHub Environments & Trusted Publishing
+
+The release and TestPyPI publish workflows (`.github/workflows/release.yml`
+and `.github/workflows/testpypi.yml`) authenticate to PyPI and TestPyPI via
+**OpenID Connect trusted publishing**. That flow requires two GitHub
+Environments to exist on the repository before the first publish can
+succeed:
+
+| Environment | Used by | Purpose |
+| --- | --- | --- |
+| `testpypi` | `release.yml` (pre-publish canary), `testpypi.yml` | OIDC identity for TestPyPI |
+| `pypi` | `release.yml` (production step) | OIDC identity for PyPI |
+
+The environments are created empty — no protection rules, reviewers, or
+tag patterns are applied. The release workflows already restrict
+publishing on the Git-tag level (only `v*` tags trigger them), so layered
+tag-pattern protection on the environment itself is a reasonable future
+enhancement but not a blocker for publishing.
+
+### One-step bootstrap: `doit publish_setup`
+
+New projects adopting this template should run `doit publish_setup` once
+after first push:
+
+```bash
+doit publish_setup
+```
+
+The task:
+
+1. Uses `gh` to determine the current repository's `owner/repo` slug.
+2. For each of `testpypi` and `pypi`: checks whether the environment
+   exists. Missing environments are created via `gh api -X PUT
+   repos/<owner>/<repo>/environments/<name>`.
+3. Prints follow-up instructions for registering the project as a
+   trusted publisher on TestPyPI and PyPI — a manual step that can only
+   be completed from the user's own PyPI session.
+
+Running the task twice is a no-op: existing environments are reported
+as `already exists` and skipped.
+
+### Managing individual environments
+
+The same helpers are available as standalone tasks:
+
+```bash
+# Create a single environment by name (idempotent)
+doit env_create --name=pypi
+doit env_create --name=testpypi
+
+# List all environments on the current repository
+doit env_list
+```
+
+See [Doit Tasks Reference](doit-tasks-reference.md#env_create) for the
+full option matrix.
+
+### Trusted-publisher registration (manual)
+
+Creating the GitHub Environment is only half the setup. The other half
+is registering this project as a trusted publisher on PyPI and TestPyPI,
+which must be done by the project owner through the PyPI web UI.
+
+PyPI scopes trusted publishers per `(owner, repo, workflow, environment)`
+tuple, and the template fires three distinct `(workflow, env)` pairs —
+two against TestPyPI and one against PyPI. Each pair needs its own
+registration:
+
+| # | Host | Registration page | Workflow | Environment | Purpose |
+| --- | --- | --- | --- | --- | --- |
+| 1 | TestPyPI | <https://test.pypi.org/manage/account/publishing/> | `testpypi.yml` | `testpypi` | Pre-release uploads (`v*-*` tags) |
+| 2 | TestPyPI | <https://test.pypi.org/manage/account/publishing/> | `release.yml` | `testpypi` | Production-release canary — `release.yml` uploads to TestPyPI before PyPI as a sanity check |
+| 3 | PyPI | <https://pypi.org/manage/account/publishing/> | `release.yml` | `pypi` | Production-release publish |
+
+For every form, supply the same common fields:
+
+- **PyPI project name** — the distribution name from `pyproject.toml`.
+- **Owner** — the GitHub user or organization that owns the repository.
+- **Repository name** — the repository name on GitHub.
+
+And use the per-row **Workflow filename** and **Environment name** from
+the table above.
+
+Skipping registration #2 is the most common mistake. Pre-releases still
+work (they use registration #1), but the first production release fails
+at `release.yml`'s TestPyPI canary step with a `403 Invalid API Token:
+OIDC scoped token is not valid for project` error — because
+`release.yml` + `testpypi` is a different scope from `testpypi.yml` +
+`testpypi`.
+
+Once all three sides are registered, pushing a `v*` tag (via `doit
+release` followed by `doit release_tag`) triggers the publish workflow,
+which authenticates via OIDC and uploads the built distribution.
+
+**Further reading**
+
+- [PyPI docs: Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
+- [GitHub docs: Configuring OpenID Connect in PyPI](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-pypi)
 
 ## Release Notes
 
@@ -195,9 +412,142 @@ PR labels and conventional commit prefixes are mapped to release note sections i
 
 PRs with the `dependencies` or `needs-triage` labels are excluded from release notes.
 
+### Customizing Categories
+
+To add or modify categories, edit `.github/release.yml`:
+
+```yaml
+changelog:
+  exclude:
+    labels:
+      - dependencies
+      - needs-triage
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking
+    - title: New Features
+      labels:
+        - enhancement
+        - feat
+    # Add more categories here
+    - title: Other Changes
+      labels:
+        - "*"
+```
+
+Categories are evaluated in order. A PR is placed in the first matching category. The `"*"` wildcard matches any label and serves as a catch-all.
+
+### Further Reading
+
+- [GitHub Docs: Automatically generated release notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes)
+- [GitHub Docs: Configuring automatically generated release notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes#configuring-automatically-generated-release-notes)
+
+## PR Merging
+
+Use `doit pr_merge` to merge pull requests with properly formatted commit messages. This task enforces the merge commit format and provides a consistent workflow.
+
+### Basic Usage
+
+```bash
+# Merge PR for current branch
+doit pr_merge
+
+# Merge specific PR by number
+doit pr_merge --pr=123
+
+# Keep the branch after merge (default deletes it)
+doit pr_merge --delete-branch=false
+
+# Automatically close linked issues after merge
+doit pr_merge --auto-close
+```
+
+### What It Does
+
+1. **Checks the base branch** - Refuses a PR that does not target the default branch, so nothing merges into another branch
+2. **Validates PR title** - Ensures the title follows conventional commit format (`<type>: <subject>`)
+3. **Extracts linked issues** - Parses PR body for `addresses #XX`
+4. **Formats merge commit** - Creates a standardized commit message with PR and issue references
+5. **Squash merges** - Uses squash merge to maintain clean history
+6. **Deletes branch** - Removes the source branch after merge (default behavior)
+7. **Reminds to close issues** - Displays commands to manually close linked issues
+
+### Merge Commit Format
+
+The task automatically formats the merge commit subject:
+
+```
+<type>: <subject> (merges PR #XX, addresses #YY)
+<type>: <subject> (merges PR #XX)
+```
+
+**Examples:**
+```
+feat: add user authentication (merges PR #102, addresses #99)
+fix: resolve parsing error (merges PR #103, addresses #100, #101)
+docs: update installation guide (merges PR #104)
+refactor: extract helper functions (merges PR #105, addresses #50)
+```
+
+### Linking Issues in PRs
+
+In your PR body, use the `Addresses` keyword to link issues:
+
+| Keyword | Effect | Use When |
+|---------|--------|----------|
+| `Addresses #XX` | Included as `addresses #XX` in merge commit | PR relates to the issue |
+
+> [!NOTE]
+> The `Addresses #XX` keyword is case-sensitive and must be placed at the start of a line to be correctly parsed by `doit pr_merge`. Mid-sentence references or different capitalizations are ignored to prevent misattribution.
+
+**Example PR body:**
+```markdown
+## Summary
+- Add login form component
+- Implement session management
+
+Addresses #99
+
+## Test Plan
+- [ ] Test login flow
+```
+
+### Closing Issues After Merge
+
+By default, issues are **not automatically closed** when using `Addresses`. After merging, `doit pr_merge` prints the `gh issue close` commands so you can close linked issues manually:
+
+```bash
+# The task displays these commands after merge
+gh issue close 99 --comment "Addressed in PR #102"
+gh issue close 100 --comment "Addressed in PR #103"
+```
+
+This ensures issues are explicitly closed with a reference to the PR that addressed them.
+
+#### Auto-closing linked issues
+
+Pass `--auto-close` to have `doit pr_merge` run the `gh issue close` commands itself after a successful merge:
+
+```bash
+doit pr_merge --auto-close
+doit pr_merge --pr=123 --auto-close
+```
+
+Each linked issue is closed with the comment `Addressed in PR #XX`, matching the format used in the manual reminder.
+
+### Why Use `doit pr_merge`?
+
+| Direct `gh pr merge` | `doit pr_merge` |
+|---------------------|-----------------|
+| Default commit message | Enforced format with PR/issue links |
+| May not validate title | Validates conventional commit format |
+| Manual issue tracking | Extracts and displays linked issues |
+| No post-merge guidance | Reminds to close issues |
+
 ## Security & Quality Tasks
 
-InfraFoundry includes comprehensive security scanning and code quality tools.
+This template includes comprehensive security scanning and code quality tools.
 
 ### Security Tasks
 
@@ -265,7 +615,7 @@ uv run doit fmt_pyproject
 - **Example**:
   ```bash
   $ uv run doit spell_check
-  docs/README.md:42: receive ==> receive
+  # Checks all files for common typos and suggests corrections
   ```
 
 #### `doit fmt_pyproject`
@@ -303,7 +653,7 @@ uv run doit fmt_pyproject
 
 ### SBOM Generation
 
-A **Software Bill of Materials (SBOM)** is a machine-readable inventory of all software components and dependencies in a project. SBOMs are increasingly required for regulatory compliance and are essential for security auditing and supply chain transparency.
+A **Software Bill of Materials (SBOM)** is a machine-readable inventory of all software components and dependencies in a project. SBOMs are increasingly required for regulatory compliance (e.g., US Executive Order 14028) and are essential for security auditing and supply chain transparency.
 
 #### Why SBOM Matters
 
@@ -314,28 +664,34 @@ A **Software Bill of Materials (SBOM)** is a machine-readable inventory of all s
 
 #### Local Usage
 
+Generate SBOMs locally using the `doit sbom` task:
+
 ```bash
 # Install the security extra (if not already installed)
 uv run doit install_dev
 
 # Generate SBOM files
-doit sbom
+uv run doit sbom
 ```
 
 This produces two files in the `tmp/` directory:
 
-- `tmp/sbom.json` -- CycloneDX JSON format
-- `tmp/sbom.xml` -- CycloneDX XML format
+- `tmp/sbom.json` — CycloneDX JSON format
+- `tmp/sbom.xml` — CycloneDX XML format
 
 #### Release Integration
 
 SBOMs are automatically generated and attached to every GitHub release:
 
 1. During the **build** job, `cyclonedx-py` generates both JSON and XML SBOMs
-2. The SBOM files are included in the `dist/` artifact alongside wheel and sdist packages
-3. After publishing to PyPI, the **github-release** job creates a GitHub release with auto-generated notes and attaches the SBOMs as release assets
+2. The SBOM files are uploaded as a separate `sbom` artifact (the `dist` artifact is wheels + sdist only, so twine in the publish jobs does not reject the SBOM files as `InvalidDistribution`)
+3. After publishing to PyPI, the **github-release** job downloads the `sbom` artifact and attaches both SBOMs to the GitHub release as downloadable assets
+
+Users can download the SBOM from the GitHub release page for any version.
 
 #### Using SBOMs for Vulnerability Scanning
+
+You can feed the generated SBOM into vulnerability scanners for continuous monitoring:
 
 ```bash
 # Using grype (https://github.com/anchore/grype)
@@ -374,7 +730,7 @@ jobs:
 
 ## Governance Validation
 
-InfraFoundry enforces governance rules to ensure code quality and traceability.
+This template enforces governance rules to ensure code quality and traceability.
 
 ### Validation Functions
 
@@ -390,16 +746,23 @@ InfraFoundry enforces governance rules to ensure code quality and traceability.
 
 **Examples**:
 ```
-✅ feat: add CloudFlare provider (merges PR #102, addresses #99)
-✅ fix: resolve state parsing issue (merges PR #103, addresses #100)
-✅ docs: update installation guide (merges PR #104)
+✅ feat: add new feature (merges PR #102, addresses #99)
+✅ fix: resolve bug (merges PR #103, addresses #100)
+✅ docs: update guide (merges PR #104)
+✅ refactor: extract utils (merges PR #105, addresses #50)
 
 ❌ Add new feature                    # Missing type
 ❌ feat: add feature                  # Missing PR reference
 ❌ feat: add feature (PR #102)        # Wrong format
 ```
 
-**Valid Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `perf`
+See [PR Merging](#pr-merging) for details.
+
+**Valid Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `perf`, `release`
+
+`release` is included so that merge commits from the release PRs that
+`doit release` opens (e.g. `release: v0.1.0a0 (merges PR #652)`) pass
+governance validation on the next release cut.
 
 **When It Runs**: During `doit release` (blocks on failure)
 
@@ -411,7 +774,7 @@ InfraFoundry enforces governance rules to ensure code quality and traceability.
 
 **Examples**:
 ```
-✅ feat: add new provider (#99)
+✅ feat: add new feature (#99)
 ✅ fix: resolve bug addresses #100
 ✅ docs: update README                # Docs exempt
 
@@ -422,7 +785,7 @@ InfraFoundry enforces governance rules to ensure code quality and traceability.
 
 ### Pre-commit Hooks
 
-The repository includes pre-commit hooks that run on every commit:
+The template includes pre-commit hooks that run on every commit:
 
 ```yaml
 # .pre-commit-config.yaml
@@ -436,11 +799,11 @@ hooks:
 
 **Branch Naming Convention**:
 ```
-✅ issue/99-hatch-vcs-versioning
-✅ feat/102-add-provider
+✅ issue/99-feature-name
+✅ feat/102-add-feature
 ✅ fix/103-resolve-bug
 ✅ docs/installation-guide
-✅ hotfix/critical-security-fix
+✅ hotfix/critical-fix
 ✅ release/v1.0.0
 ✅ main
 ✅ develop
@@ -475,35 +838,35 @@ All commits should follow the [Conventional Commits](https://www.conventionalcom
 
 **Breaking Changes** (triggers MAJOR version bump):
 ```
-feat!: redesign provider API
+feat!: redesign API
 
-BREAKING CHANGE: Provider interface has changed. See migration guide.
+BREAKING CHANGE: API interface has changed. See migration guide.
 ```
 
 **Examples**:
 ```bash
 # Feature commit
-git commit -m "feat: add CloudFlare provider support (#99)"
+git commit -m "feat: add new capability (#99)"
 
 # Bug fix commit
-git commit -m "fix: resolve state file parsing issue (#100)"
+git commit -m "fix: resolve parsing issue (#100)"
 
 # Documentation commit
-git commit -m "docs: add release automation guide"
+git commit -m "docs: add release guide"
 
 # Breaking change
 git commit -m "feat!: redesign plugin system
 
 BREAKING CHANGE: Plugin registration API has changed.
 Plugins must now implement the new PluginProtocol interface.
-See docs/migration.md for upgrade instructions."
+See docs/template/migration.md for upgrade instructions."
 ```
 
 ## Environment Configuration
 
 ### Using direnv (Recommended)
 
-InfraFoundry supports `direnv` for automatic environment management:
+This template supports `direnv` for automatic environment management:
 
 ```bash
 # Install direnv
@@ -579,10 +942,12 @@ uv run doit audit           # Vulnerability scan
 uv run doit security        # Security analysis
 uv run doit spell_check     # Spell checking
 uv run doit licenses        # License compliance
+uv run doit sbom            # Generate SBOM (CycloneDX)
 
 # Releases
-uv run doit release_dev     # Create pre-release (TestPyPI)
-uv run doit release         # Create production release (PyPI)
+uv run doit release --prerelease=alpha   # Open a pre-release PR (TestPyPI)
+uv run doit release                      # Open a production release PR (PyPI)
+uv run doit release_tag                  # Tag main after the release PR is merged
 ```
 
 ### Installation Options
@@ -605,10 +970,10 @@ asked for. Keep the plain form for environments that only run the program.
 
 ```bash
 # Install hooks
-uv run pre-commit install
+doit pre_commit_install
 
 # Run manually on all files
-uv run pre-commit run --all-files
+doit pre_commit_run
 
 # Skip hooks (emergency only)
 git commit --no-verify
@@ -643,10 +1008,17 @@ uv run doit release
 
 **Problem**: Merge commit format doesn't match required pattern
 
-**Solution**: Update the merge commit message:
+**Solution**: Use `doit pr_merge` which automatically formats the commit message:
 ```bash
-# When merging PR #102 that addresses issue #99
-git merge --no-ff feat/99-feature -m "feat: add new feature (merges PR #102, addresses #99)"
+# Merge the PR with proper format
+doit pr_merge --pr=102
+```
+
+If you need to fix an existing merge commit, use interactive rebase (advanced):
+```bash
+git rebase -i HEAD~1
+# Change 'pick' to 'reword', then edit the message to:
+# feat: add new feature (merges PR #102, addresses #99)
 ```
 
 ### Security Task Fails: "pip-audit not installed"
@@ -673,4 +1045,7 @@ ignore-words-list = "crate,kubernetes,terraform"
 
 - [Coding Standards](coding-standards.md) - Code style guidelines
 - [CI/CD Testing](ci-cd-testing.md) - Continuous integration setup
-- [AGENTS.md](../../AGENTS.md) - Issue-driven development workflow
+
+---
+
+[Back to Documentation Index](../TABLE_OF_CONTENTS.md)
