@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792971075753,
+  "lastUpdate": 1792973001760,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10168,6 +10168,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002332624484753448",
             "extra": "mean: 74.88345017357975 usec\nrounds: 14410"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5032d09bd3733b7277c2f21d3ebd20af04a56539",
+          "message": "docs: merge the template's ci-cd-testing rewrite and adopt test_ci_jobs_doc (merges PR #1081, addresses #1057)\n\nci-cd-testing.md takes pyproject-template's rewrite, localized for this\nrepository, and tests/test_ci_jobs_doc.py is adopted to keep its Pipeline\nJobs table in step with ci.yml.\n\n- platforms are ubuntu-latest only (ADR-0001); coverage measures\n  infrafoundry and tools/ and is uploaded to Codecov; the test job installs\n  Terraform, OpenTofu, age and sops; the lint row includes lint_blueprints\n- the docs job note reflects the strict mkdocs build\n- hook tables keep the local hooks (check-commit-issue-ref, mypy scope) and\n  drop the tip to skip hooks, which AGENTS.md forbids\n- template issue references are qualified with the template repository\n- the stale tests.yml pipeline description is replaced\n- the divergences doc records the hand merge and clears the last deferral\n\nPart 3 of 3 for #1057.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T00:02:22Z",
+          "tree_id": "91fc986134d074ce4a773f2a1bb8ae5056ca1b94",
+          "url": "https://github.com/endavis/infrafoundry/commit/5032d09bd3733b7277c2f21d3ebd20af04a56539"
+        },
+        "date": 1792973000775,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8131.196395429183,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010501773766119887",
+            "extra": "mean: 122.9831320471036 usec\nrounds: 8656"
           }
         ]
       }
