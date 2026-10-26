@@ -452,6 +452,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_oci_k3s_cluster_blueprint.py",
     "tests/unit/test_ontap_cluster_console_restore.py",
     "tests/unit/test_opnsense_vm_blueprint.py",
+    "tests/unit/test_blueprint_templates_render.py",
     "tests/unit/test_orchestrator.py",
     "tests/unit/test_orchestrator_workflows_unit.py",
     "tests/unit/test_package_event_filtering.py",
