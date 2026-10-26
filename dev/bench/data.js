@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793036994936,
+  "lastUpdate": 1793037246664,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10633,6 +10633,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006293481419613734",
             "extra": "mean: 99.27322868691236 usec\nrounds: 10639"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "06dd30942bf60cfcc31507b379f5489c1685a2a8",
+          "message": "docs: note the mutmut also_copy and do_not_mutate keys as a divergence (merges PR #1112, addresses #1108)\n\nRecords the [tool.mutmut] also_copy and do_not_mutate keys in the\npyproject.toml spot-check, so a template sync keeps them.\n\nAddresses #1108\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T17:53:04Z",
+          "tree_id": "b7983341755fbbc6e21a9266e2f8b1bacdaf57a1",
+          "url": "https://github.com/endavis/infrafoundry/commit/06dd30942bf60cfcc31507b379f5489c1685a2a8"
+        },
+        "date": 1793037245455,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7968.677512607855,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000993475800042524",
+            "extra": "mean: 125.49133760499448 usec\nrounds: 8584"
           }
         ]
       }
