@@ -1,0 +1,40 @@
+# Reusable composite action that installs age (age, age-keygen) and sops into
+# ~/.local/bin. Versions are pinned and each download is checked against a
+# pinned SHA-256 before it is used, so a replaced release asset fails the step
+# instead of running in the job (#1105).
+#
+# To upgrade: change the version, then take the new SHA-256 from the release
+# asset (GitHub shows it as the asset digest; sops also publishes
+# sops-<version>.checksums.txt) and update the matching *_SHA256 value.
+name: Install age and sops
+description: Install pinned, checksum-verified age and sops binaries into ~/.local/bin
+runs:
+  using: composite
+  steps:
+    - name: Install age and sops
+      shell: bash
+      env:
+        AGE_VERSION: v1.3.2
+        AGE_SHA256: cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10
+        SOPS_VERSION: v3.13.3
+        SOPS_SHA256: e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.local/bin
+        work="${RUNNER_TEMP}/age-sops"
+        mkdir -p "$work"
+
+        # age + age-keygen
+        curl -fsSL -o "$work/age.tar.gz" \
+          "https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-amd64.tar.gz"
+        echo "${AGE_SHA256}  $work/age.tar.gz" | sha256sum -c -
+        tar xzf "$work/age.tar.gz" -C "$work"
+        install -m 0755 "$work/age/age" "$work/age/age-keygen" ~/.local/bin/
+
+        # sops
+        curl -fsSL -o "$work/sops" \
+          "https://github.com/getsops/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux.amd64"
+        echo "${SOPS_SHA256}  $work/sops" | sha256sum -c -
+        install -m 0755 "$work/sops" ~/.local/bin/sops
+
+        rm -rf "$work"
