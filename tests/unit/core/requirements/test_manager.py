@@ -1,8 +1,9 @@
-"""Scoping, de-duplication and enforcement of blueprint requirements (#1046)."""
+"""Scoping, de-duplication, enforcement and install of blueprint requirements (#1046, #1047)."""
 
 from __future__ import annotations
 
 import importlib.metadata
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -167,7 +168,8 @@ def test_ensure_raises_naming_the_package_blueprint_and_fix(config_manager: Conf
     assert "run: uv pip install 'alpha>=1'" in message
     assert "python beta: not installed (needed by blueprint bp-b)" in message
     assert "ansible_collection netapp.ontap>=22.0.0: not installed" in message
-    assert "run: ansible-galaxy collection install -r " in message
+    assert "run: ansible-galaxy collection install --upgrade -r " in message
+    assert "\nOr install them all with: foundry deps sync --env dev" in message
     assert excinfo.value.context["unmet"] == ["alpha", "beta", "netapp.ontap"]
 
 
@@ -190,3 +192,97 @@ def test_an_invalid_requirements_block_surfaces_as_configuration_error(
 
     with pytest.raises(InvalidConfigurationError, match="blueprint 'bp-b'"):
         _manager(config_manager, {})[0].check("dev")
+
+
+class _Installer:
+    """Stands in for uv and ansible-galaxy: running a step installs what it covers."""
+
+    def __init__(self, installed: dict[str, str], collections: dict[str, str]) -> None:
+        self.installed = installed
+        self.collections = collections
+        self.calls: list[list[str]] = []
+
+    def run(self, args: list[str]) -> subprocess.CompletedProcess[str]:
+        self.calls.append(args)
+        if args[0] == "uv":
+            self.installed.update({"alpha": "1.0", "beta": "2.0"})
+        else:
+            self.collections["netapp.ontap"] = "22.1.0"
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    def manager(self, config_manager: ConfigManager) -> RequirementsManager:
+        def get_version(name: str) -> str:
+            if name in self.installed:
+                return self.installed[name]
+            raise importlib.metadata.PackageNotFoundError(name)
+
+        return RequirementsManager(
+            config_manager,
+            get_version=get_version,
+            find_spec=lambda _: object(),
+            collections_lookup=lambda: self.collections,
+        )
+
+
+def _which(tool: str) -> str:
+    return f"/usr/bin/{tool}"
+
+
+def test_sync_with_nothing_unmet_runs_nothing(config_manager: ConfigManager) -> None:
+    fake = _Installer({"alpha": "1.0", "beta": "2.0"}, {"netapp.ontap": "22.1.0"})
+
+    result = fake.manager(config_manager).sync("dev", run=fake.run, which=_which)
+
+    assert result.steps == ()
+    assert len(result.report.statuses) == 3
+    assert fake.calls == []
+
+
+def test_sync_dry_run_plans_without_running(config_manager: ConfigManager) -> None:
+    fake = _Installer({}, {})
+
+    result = fake.manager(config_manager).sync("dev", dry_run=True, run=fake.run, which=_which)
+
+    assert result.dry_run
+    assert [step.command[0] for step in result.steps] == ["uv", "ansible-galaxy"]
+    assert len(result.report.unmet) == 3
+    assert fake.calls == []
+
+
+def test_sync_installs_then_rechecks(config_manager: ConfigManager) -> None:
+    fake = _Installer({"alpha": "0.5"}, {})
+
+    result = fake.manager(config_manager).sync("dev", run=fake.run, which=_which)
+
+    assert not result.dry_run
+    assert fake.calls == [list(step.command) for step in result.steps]
+    assert fake.calls[0][-2:] == ["alpha>=1", "beta"]
+    assert fake.calls[1][-1].endswith("bp-a/requirements.yml")
+    assert result.report.unmet == ()
+
+
+def test_sync_raises_when_the_install_did_not_satisfy_a_requirement(
+    config_manager: ConfigManager,
+) -> None:
+    fake = _Installer({}, {})
+    run_real = fake.run
+
+    def run_without_collections(args: list[str]) -> subprocess.CompletedProcess[str]:
+        result = run_real(args)
+        fake.collections.clear()
+        return result
+
+    with pytest.raises(MissingRequirementsError, match="Installed, but still unmet") as exc:
+        fake.manager(config_manager).sync("dev", run=run_without_collections, which=_which)
+
+    assert exc.value.context["unmet"] == ["netapp.ontap"]
+
+
+def test_sync_scope_follows_the_filters(config_manager: ConfigManager) -> None:
+    fake = _Installer({}, {})
+
+    result = fake.manager(config_manager).sync(
+        "dev", provider_filter=["kubernetes"], dry_run=True, run=fake.run, which=_which
+    )
+
+    assert [step.command[0] for step in result.steps] == ["uv"]

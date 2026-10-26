@@ -295,6 +295,7 @@ def foundry(
 # Import and register command groups
 from infrafoundry.cli.commands.completion import completion
 from infrafoundry.cli.commands.config import config
+from infrafoundry.cli.commands.deps import deps
 from infrafoundry.cli.commands.doctor import doctor
 from infrafoundry.cli.commands.infra import infra
 from infrafoundry.cli.commands.policy import policy
@@ -310,6 +311,7 @@ foundry.add_command(state)
 foundry.add_command(secrets)
 foundry.add_command(policy)
 foundry.add_command(provider)
+foundry.add_command(deps)
 
 # Alias for backwards compatibility during development
 main = foundry

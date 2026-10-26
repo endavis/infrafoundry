@@ -158,7 +158,8 @@ def test_collection_missing_points_at_its_requirements_file() -> None:
 
     assert not status.satisfied
     assert status.problem == "not installed"
-    assert status.fix == "ansible-galaxy collection install -r /bp/requirements.yml"
+    assert status.fix == "ansible-galaxy collection install --upgrade -r /bp/requirements.yml"
+    assert status.install_args == FILES
 
 
 def test_collection_out_of_range() -> None:
@@ -166,6 +167,8 @@ def test_collection_out_of_range() -> None:
 
     assert not status.satisfied
     assert status.problem == "installed 21.9.0, needs >=22.0.0"
+    # ansible-galaxy leaves an installed collection alone unless told to upgrade it.
+    assert "--upgrade" in status.fix
 
 
 def test_collection_without_a_version_accepts_any() -> None:
@@ -181,7 +184,8 @@ def test_collection_with_an_uncomparable_version_is_unmet() -> None:
 
     assert not status.satisfied
     assert "cannot be compared" in status.problem
-    assert status.fix == "ansible-galaxy collection install 'netapp.ontap>=22.0.0'"
+    assert status.fix == "ansible-galaxy collection install --upgrade 'netapp.ontap>=22.0.0'"
+    assert status.install_args == ("netapp.ontap>=22.0.0",)
 
 
 def test_collection_without_galaxy_is_unmet() -> None:

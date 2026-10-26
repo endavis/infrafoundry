@@ -393,11 +393,27 @@ that are missing or at the wrong version. `infra plan`, `infra apply` and `infra
 them before any provider work.
 
 **Solutions:**
-1. Run the install command printed for each unmet requirement
-2. Run `foundry config doctor` to see every environment's requirement status
-3. Narrow the scope with `--package` or `--provider` if the package is not needed
+1. Run `foundry deps sync --env <env>` to install every unmet requirement
+2. Or run the install command printed for each unmet requirement
+3. Run `foundry config doctor` to see every environment's requirement status
+4. Narrow the scope with `--package` or `--provider` if the package is not needed
 
 See [Configuration Blueprints — The `requirements:` Block](../configuration/blueprints.md#the-requirements-block).
+
+---
+
+### IF-PACKAGE-003: Requirement Install Failed
+
+**Cause:** `foundry deps sync` could not install a blueprint requirement: `uv` or `ansible-galaxy`
+is not on `PATH`, or an install command exited non-zero. The message includes the command and its
+output.
+
+**Solutions:**
+1. Install `uv` or Ansible if the message says it was not found
+2. Run the printed command by hand to see the full error (network, index or Galaxy access)
+3. Run `foundry deps sync --env <env> --dry-run` to see every command it would run
+
+See [CLI Reference — `deps sync`](../usage/cli-reference.md#deps-sync).
 
 ---
 

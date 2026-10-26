@@ -146,6 +146,9 @@ class RequirementStatus:
         blueprints: Blueprints that declare the requirement
         problem: Why it is not satisfied; empty when it is
         fix: Command that installs or upgrades it
+        install_args: What ``foundry deps sync`` installs for it: the PEP 508
+            spec of a Python requirement, or the requirements file(s) (else
+            ``name<spec>``) of a collection
     """
 
     kind: RequirementKind
@@ -156,6 +159,7 @@ class RequirementStatus:
     blueprints: tuple[str, ...]
     problem: str = ""
     fix: str = ""
+    install_args: tuple[str, ...] = ()
 
 
 def _as_list(value: Any, where: str) -> list[Any]:

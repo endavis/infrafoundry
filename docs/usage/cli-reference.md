@@ -15,7 +15,7 @@ The InfraFoundry CLI (`foundry`) organizes infrastructure management into a thre
 
 ## Command Domain Model
 
-InfraFoundry commands are organized into five domain groups plus two top-level utilities:
+InfraFoundry commands are organized into six domain groups plus two top-level utilities:
 
 | Domain | Command Group | Responsibility |
 |--------|--------------|----------------|
@@ -26,6 +26,7 @@ InfraFoundry commands are organized into five domain groups plus two top-level u
 | **State** | `foundry state` | State database management: init, backup, resources, backend migration, audit trail |
 | **Secrets** | `foundry secrets` | SOPS/age secret lifecycle: init, encrypt, decrypt, rotate |
 | **Policy** | `foundry policy` | Policy listing and enforcement |
+| **Dependencies** | `foundry deps` | Blueprint requirements: check and install the Python packages and Ansible collections blueprints declare |
 
 **The three-tier doctor pattern** illustrates the hierarchy:
 
@@ -90,6 +91,8 @@ InfraFoundry commands are organized into five domain groups plus two top-level u
 | Decrypt a file | `foundry secrets decrypt <file>` |
 | Rotate encryption keys | `foundry secrets rotate --env <env> --generate-new-key` |
 | List policies | `foundry policy list` |
+| Check blueprint requirements | `foundry deps check --env <env>` |
+| Install blueprint requirements | `foundry deps sync --env <env>` |
 | Install shell completion | `foundry completion bash` |
 
 ## Global Options
@@ -711,6 +714,47 @@ foundry policy list --env prod
 
 ---
 
+## Deps Group (`foundry deps`)
+
+Blueprints declare the Python packages and Ansible collections they need in a `requirements:`
+block; see [Configuration Blueprints — The `requirements:` Block](../configuration/blueprints.md#the-requirements-block).
+Both commands cover the blueprints used by the packages in scope: the whole environment, narrowed
+by `--package` or `--provider`, as in `infra plan`.
+
+### `deps check`
+
+Report each requirement, what is installed and which blueprints need it. Runs the same check as
+the preflight in `infra plan`, `apply` and `destroy`. Exits 1 when any requirement is unmet.
+
+```bash
+foundry deps check --env prod
+foundry deps check --env prod --package ontap-cluster
+```
+
+**Options:** `-e/--env TEXT` (required), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable;
+mutually exclusive with `--package`)
+
+### `deps sync`
+
+Install the unmet requirements, then check again. Python packages are installed with
+`uv pip install --python <interpreter>` into the interpreter running `foundry`; Ansible
+collections with `ansible-galaxy collection install --upgrade`, from the blueprint's
+requirements file. Every tool is located before anything runs, so a missing `uv` or
+`ansible-galaxy` changes nothing. A failed install is error `IF-PACKAGE-003`.
+
+```bash
+foundry deps sync --env prod --dry-run   # print the commands only
+foundry deps sync --env prod
+```
+
+**Options:** `-e/--env TEXT` (required), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable;
+mutually exclusive with `--package`), `--dry-run`
+
+`uv sync` removes packages that are not in `uv.lock`, including these, unless run with
+`--inexact`. Re-run `deps sync` after it.
+
+---
+
 ## Configuration Details
 
 - **State:** InfraFoundry DB at `~/.infrafoundry/state.db` (unless overridden); Terraform state under `generated/{env}/terraform/{provider}`.
@@ -788,7 +832,10 @@ foundry
 |   +-- decrypt <file>
 |   +-- rotate -e <env> [--new-key-file | --generate-new-key] [--files] [--no-verify] [--no-backup] [--dry-run]
 +-- policy
-    +-- list [-e env]
+|   +-- list [-e env]
++-- deps
+    +-- check -e <env> [-p package | -P provider]
+    +-- sync -e <env> [-p package | -P provider] [--dry-run]
 ```
 
 ## Related Documentation

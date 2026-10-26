@@ -221,6 +221,14 @@ class MissingRequirementsError(InfraFoundryError):
     """
 
 
+class RequirementInstallError(InfraFoundryError):
+    """Raised when ``foundry deps sync`` cannot install a requirement (#1047).
+
+    Either ``uv`` or ``ansible-galaxy`` is not on ``PATH``, or an install
+    command exited non-zero.
+    """
+
+
 class ProviderFilterError(InfraFoundryError):
     """Raised when ``--provider`` filter references unknown provider names.
 
