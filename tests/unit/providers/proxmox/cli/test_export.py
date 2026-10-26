@@ -69,7 +69,8 @@ def test_export_proxmox_success(
 
         assert result.exit_code == 0
         assert "Exported 3 files" in result.output
-        assert str(output_dir) in result.output
+        # Rich wraps long lines, splitting a long tmp path mid-word (#1111).
+        assert str(output_dir) in result.output.replace("\n", "")
 
         # Verify output directory was created and files were written
         assert output_dir.exists()
