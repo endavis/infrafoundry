@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793026037505,
+  "lastUpdate": 1793030261299,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10540,6 +10540,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002159129518913113",
             "extra": "mean: 65.94018988957137 usec\nrounds: 17210"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "902084021a7398172b945da7e9045a86df1b8e74",
+          "message": "chore: pin and checksum the age and sops installs in ci workflows (merges PR #1106, addresses #1105)\n\nci.yml, mutation.yml and daily-check.yml each installed age and sops by\nresolving the latest release through the GitHub API and downloading it with\ncurl -sL and no integrity check. Move the install into a local composite\naction that pins age v1.3.2 and sops v3.13.3, checks each download against\na pinned SHA-256 with sha256sum -c, uses curl -fsSL under set -euo\npipefail, and use it from all three workflows.\n\nAddresses #1105\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T15:56:35Z",
+          "tree_id": "354c1cdb8f1330c3917ce6fe57b13bfd48c4ac02",
+          "url": "https://github.com/endavis/infrafoundry/commit/902084021a7398172b945da7e9045a86df1b8e74"
+        },
+        "date": 1793030260249,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13428.950765841653,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000020477524131093684",
+            "extra": "mean: 74.4659815526046 usec\nrounds: 14582"
           }
         ]
       }
