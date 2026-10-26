@@ -1,0 +1,37 @@
+---
+# OPNsense VM — Bootstrap Playbook
+#
+# Runs on the Proxmox host that holds the VM: boots it, then configures it
+# over the serial console so the OPNsense provider can reach its API.
+#
+# All variables are read from INFRAFOUNDRY_VAR_* environment variables
+# set by the InfraFoundry framework.
+
+- name: Bootstrap OPNsense over the serial console
+  hosts: proxmox_host
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Install serial console dependencies
+      ansible.builtin.apt:
+        name:
+          - expect
+          - socat
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+  roles:
+    - role: opnsense-bootstrap
+      vars:
+        opnsense_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_vmid') }}"
+        opnsense_hostname: "{{ lookup('env', 'INFRAFOUNDRY_VAR_vm_name') }}"
+        opnsense_domain: "{{ lookup('env', 'INFRAFOUNDRY_VAR_domain') }}"
+        opnsense_wan_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_wan_ip') }}"
+        opnsense_wan_prefix: "{{ lookup('env', 'INFRAFOUNDRY_VAR_wan_prefix') }}"
+        opnsense_lan_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_lan_ip') }}"
+        opnsense_lan_prefix: "{{ lookup('env', 'INFRAFOUNDRY_VAR_lan_prefix') }}"
+        opnsense_api_allow_cidr: "{{ lookup('env', 'INFRAFOUNDRY_VAR_api_allow_cidr') }}"
+        opnsense_boot_timeout: "{{ lookup('env', 'INFRAFOUNDRY_VAR_boot_timeout') }}"
+        opnsense_root_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_opnsense_root_password') }}"
+        opnsense_api_key: "{{ lookup('env', 'INFRAFOUNDRY_VAR_opnsense_api_key') }}"
+        opnsense_api_secret: "{{ lookup('env', 'INFRAFOUNDRY_VAR_opnsense_api_secret') }}"

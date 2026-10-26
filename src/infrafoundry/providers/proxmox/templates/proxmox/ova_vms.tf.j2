@@ -1,11 +1,27 @@
 {% for vm in ova_vms %}
 {% set vm_tf_name = vm.config.name | replace('-', '_') %}
 {% set ssh_target = vm.config.target_node %}
+{% set image_source = vm.config.disk_image_source | default('') %}
+{% if image_source %}
+{#- Where the raw image ends up on the PVE host: a URL is downloaded into the
+    cache directory, and a .bz2 is decompressed there (#1094). -#}
+{% set image_cache = vm.config.disk_image_cache_dir | default('/var/lib/vz/template/cache/infrafoundry') %}
+{% set image_name = image_source.split('/') | last %}
+{% set image_local = image_source if image_source.startswith('/') else image_cache ~ '/' ~ image_name %}
+{% set image_raw = (image_cache ~ '/' ~ image_name[:-4]) if image_name.endswith('.bz2') else image_local %}
+# Disk image VM: {{ vm.config.name }}
+{% else %}
 # OVA VM: {{ vm.config.name }}
+{% endif %}
 resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
   triggers_replace = {
     vmid         = "{{ vm.config.vmid }}"
+{% if image_source %}
+    disk_image_source = "{{ image_source }}"
+    disk_image_sha256 = "{{ vm.config.disk_image_sha256 | default('') }}"
+{% else %}
     ova_source   = "{{ vm.config.ova_source }}"
+{% endif %}
     disk_bus     = "{{ vm.config.disk_bus | default('ide') }}"
     name         = "{{ vm.config.name }}"
     ssh_cmd      = local.ssh_cmd
@@ -22,6 +38,33 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
     tags         = "{{ vm.config.tags | default([]) | tojson | replace('"', '\\"') }}"
   }
 
+{% if image_source %}
+  # Phase 1: Fetch, verify and decompress the disk image on the Proxmox host.
+  # Each result is cached, so later runs reuse it.
+  provisioner "local-exec" {
+    command = <<-EOT
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} bash -s <<'IMAGE'
+      set -euo pipefail
+      mkdir -p {{ image_cache }}
+{% if not image_source.startswith('/') %}
+      if [ ! -f {{ image_local }} ]; then
+        curl -fsSL -o {{ image_local }}.part '{{ image_source }}'
+        mv {{ image_local }}.part {{ image_local }}
+      fi
+{% endif %}
+{% if vm.config.disk_image_sha256 is defined %}
+      echo '{{ vm.config.disk_image_sha256 }}  {{ image_local }}' | sha256sum -c -
+{% endif %}
+{% if image_raw != image_local %}
+      if [ ! -f {{ image_raw }} ]; then
+        bunzip2 -kc {{ image_local }} > {{ image_raw }}.part
+        mv {{ image_raw }}.part {{ image_raw }}
+      fi
+{% endif %}
+      IMAGE
+    EOT
+  }
+{% else %}
   # Phase 1: Extract OVA to temp directory on Proxmox host (skip if VMDKs exist)
   provisioner "local-exec" {
     command = <<-EOT
@@ -34,6 +77,7 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
          fi"
     EOT
   }
+{% endif %}
 
   # Phase 2: Create VM shell via qm create
   provisioner "local-exec" {
@@ -53,10 +97,28 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
           {% if vm.config.serial | default(false) %}
           --serial0 socket \
           {% endif %}
-          --description 'OVA VM managed by InfraFoundry'"
+          --description '{{ 'Disk image' if image_source else 'OVA' }} VM managed by InfraFoundry'"
     EOT
   }
 
+{% if image_source %}
+  # Phase 3: Import and attach the disk image
+  provisioner "local-exec" {
+    command = <<-EOT
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ ssh_target }} bash -s <<'IMPORT'
+      set -euo pipefail
+      IMPORT_OUT=$(qm disk import ${self.triggers_replace.vmid} {{ image_raw }} {{ vm.config.disk_storage | default('local-lvm') }} --format qcow2 2>&1)
+      echo "$IMPORT_OUT"
+      DISK_PATH=$(echo "$IMPORT_OUT" | grep 'successfully imported' | sed "s/.*'\(.*\)'.*/\1/")
+      if [ -z "$DISK_PATH" ]; then
+        echo "ERROR: Failed to import disk {{ image_raw }}" >&2
+        exit 1
+      fi
+      qm set ${self.triggers_replace.vmid} --${self.triggers_replace.disk_bus}0 "$DISK_PATH"
+      IMPORT
+    EOT
+  }
+{% else %}
   # Phase 3: Import and attach disks from extracted OVA
   provisioner "local-exec" {
     command = <<-EOT
@@ -78,6 +140,7 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
       "
     EOT
   }
+{% endif %}
 
   # Phase 4: Configure boot order (extracted files persist for future runs)
   provisioner "local-exec" {
