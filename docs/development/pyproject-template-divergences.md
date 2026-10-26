@@ -156,7 +156,6 @@ customization a reviewer must verify survived the merge.
 | `pyproject.toml` | Preserves project name, dependencies, CLI entry points, and mypy/ruff overrides specific to InfraFoundry: `disallow_any_generics = true` globally with an override that turns it off for template-owned tooling (as upstream has it), the `agent_roster` import override, and the InfraFoundry vulture `ignore_names` entries. |
 | `tests/conftest.py` | Preserves InfraFoundry-specific fixtures (`mock_config_manager`, `mock_config_dir`, sample resource fixtures, etc.) alongside upstream's `mock_subprocess` fixture. |
 | `tests/template/test_doit_quality.py` | Preserves the local-only `lint_blueprints` entry in the `task_check` dependency set and `TestTaskLintBlueprints`. The mypy scope assertions match upstream since #1056. |
-| `tests/template/test_doit_release.py` | Local-flow test file with no upstream equivalent (upstream's version targets a different `task_release` shape; local covers `task_release_pr`, `task_release_tag`, `task_release_dev`, `validate_*` helpers). Tracked in #853. |
 | `tests/test_markdown_links.py` | Preserves the `is_sync_excluded` skip, so links in template-owned files to excluded upstream files are not reported (#1057). |
 | `tests/test_documented_paths.py` | Preserves the `is_sync_excluded` skip, the committed-files-only scan, the `HISTORICAL` exemptions for dated records, the package/provider/example-config shorthand bases, and the InfraFoundry `ALLOWED` entries for config-repo walkthrough paths (#1057). |
 | `tests/test_instruction_pointers.py` | Preserves `_committed_markdown()`, so anchor checks skip git-ignored trees such as `generated/` (#1057). |
@@ -164,7 +163,6 @@ customization a reviewer must verify survived the merge.
 | `tests/test_docs_frontmatter.py` | Preserves the `dict[str, Any]` return type on `_frontmatter`, which local `disallow_any_generics` requires (#1057). |
 | `tools/doit/quality.py` | Preserves `task_lint_blueprints()` and any sibling blueprint-specific tasks. |
 | `tools/doit/install_tools.py` | Preserves age/sops/terraform/opentofu installer tasks. |
-| `tools/doit/release.py` | Preserves infrafoundry-specific release automation (release-PR flow). |
 | `tools/doit/testing.py` | Preserves `--cov=infrafoundry` coverage target. |
 | `.github/workflows/ci.yml` | Preserves the Linux-only `runs-on: ubuntu-latest` (ADR-0001), the Terraform/OpenTofu/age/sops install steps, the `INFRAFOUNDRY_SKIP_SOPS_CHECK` and `HYPOTHESIS_PROFILE` env vars, the `--cov=infrafoundry` flag, the Codecov upload step, and the sparse-checkout of `python-versions.json`. Verbatim adoption from upstream loses all of these — pulled forward from a sync miss in PR #836. |
 
@@ -175,9 +173,6 @@ proposed change, the merge lost it — push back and ask for a rework.
 ## 4. Temporarily deferred files
 
 Unlike the categories above, these files **will** be adopted — just not in the
-current sync phase. Sync-tracker #673 completed in Phase E (issue #678). Future
-deferrals should be logged here with a pointer to the follow-up issue.
-
-| File | Why deferred | Follow-up |
-| :--- | :--- | :--- |
-| `tests/test_release_steps_doc.py` and the release-steps docs | Waits on the `release.py` reconciliation. | #1059 |
+current sync phase. Sync-tracker #673 completed in Phase E (issue #678); no
+files are currently deferred. Future deferrals should be logged here with a
+pointer to the follow-up issue.

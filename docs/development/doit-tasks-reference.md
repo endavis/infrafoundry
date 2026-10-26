@@ -387,34 +387,85 @@ The ADR starts with the template's frontmatter, with the title and date filled i
 
 ## Release Tasks
 
+Releases follow a single PR-based flow: `doit release` opens a release PR,
+and `doit release_tag` tags `main` once the PR is merged.
+
 ### `release`
 
-Create a production release with full governance validation.
+Open a release PR with the version bump and changelog updates.
 
 ```bash
+# Auto-detect the next version from conventional commits
 doit release
+
+# Force a specific increment
+doit release --increment=major   # 1.0.0 → 2.0.0
+doit release --increment=minor
+doit release --increment=patch
+
+# Cut a pre-release PR (TestPyPI)
+doit release --prerelease=alpha  # 1.0.0 → 1.0.1a0
+doit release --prerelease=beta
+doit release --prerelease=rc
+
+# Force a pre-release of a specific bump type (see issue #475)
+doit release --prerelease=alpha --increment=minor  # 1.0.0 → 1.1.0a0
 ```
+
+**What it does:**
+1. Verifies you're on `main`
+2. Validates `--prerelease` (must be empty, `alpha`, `beta`, or `rc`), `--issue` (must be empty or a number) and `--increment` (must be empty, `MAJOR`, `MINOR` or `PATCH`, in any case)
+3. Checks for uncommitted changes
+4. Pulls latest changes
+5. Runs governance validations (merge commit format, issue links)
+6. Runs all quality checks (`doit check`)
+7. Asks commitizen for the next version (`cz bump --get-next`)
+8. Creates a `release/vX.Y.Z` branch and updates `CHANGELOG.md`
+9. Commits the changelog, pushes the branch, and opens PR `release: vX.Y.Z`
+
+A project with a static version or a hand-written changelog gets two more
+steps here — see [Release Automation — Downstream opt-ins](release-and-automation.md#downstream-opt-ins-static-version-and-hand-written-changelog).
+
+**Options:**
+- `--increment`: Force `MAJOR`, `MINOR`, or `PATCH` bump (auto-detects if empty).
+- `--prerelease`: `alpha`, `beta`, or `rc`. Empty means a production release.
+  Can be combined with `--increment` to force a pre-release of a specific
+  bump type (see [issue #475](https://github.com/endavis/pyproject-template/issues/475)).
+- `--issue`: Release issue number. Writes `Addresses #N` into the PR body, so `doit pr_merge`
+  records it in the merge commit.
+
+**Requirements:**
+- Must be on `main` branch
+- No uncommitted changes
+- All checks must pass
+- `--prerelease` additionally requires a baseline `v*` tag so commitizen
+  has an anchor to bump from. Existing projects that predate the bootstrap
+  auto-seed should seed one manually — see
+  [Before your first pre-release](release-and-automation.md#before-your-first-pre-release).
+
+See [Release Automation](release-and-automation.md) for the full flow.
 
 ### `release_tag`
 
-Tag `main` after a release PR is merged.
+Tag `main` after the release PR is merged, and — if `.github/workflows/release.yml`
+exists — trigger the publish workflow it defines.
 
 ```bash
+git checkout main
+git pull
 doit release_tag
 ```
 
 **What it does:**
-1. Verifies you are on `main` and pulls the latest changes.
-2. Finds the most recently merged `release: vX.Y.Z` PR.
-3. Extracts the version from the PR title (falls back to the branch name).
-4. Creates the git tag `vX.Y.Z` on `main` and pushes it.
-5. The tag push triggers `.github/workflows/release.yml` (production) or
-   `.github/workflows/testpypi.yml` (pre-release).
-
-**Pre-releases:** Open a pre-release PR with `doit release --prerelease=alpha`
-(or `beta` / `rc`). After merge, run `doit release_tag` — the PEP440 tag format
-(`v1.2.3a0`, `v1.2.3b0`, `v1.2.3rc0`, `v1.2.3.dev0`) is picked up by
-`testpypi.yml` and publishes to TestPyPI only.
+1. Verifies you're on `main`
+2. Pulls latest changes
+3. Finds the most recently merged `release: vX.Y.Z` PR
+4. Extracts the version from the PR title (falls back to the branch name)
+5. Creates the git tag `vX.Y.Z` on `main`
+6. Pushes the tag. If `.github/workflows/release.yml` exists, it triggers the
+   publish workflow and the printed next steps point at GitHub Actions and
+   PyPI/TestPyPI. Otherwise nothing builds or publishes from the tag, and the
+   task says so instead — the tag is the release (#993).
 
 ---
 
