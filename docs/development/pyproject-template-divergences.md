@@ -148,7 +148,7 @@ customization a reviewer must verify survived the merge.
 | `.github/CONTRIBUTING.md` | Preserves InfraFoundry branching/commit conventions and the issue-driven workflow description. |
 | `.gitignore` | Preserves entries for `generated/`, state DB paths, `endavis-infra/`, and other InfraFoundry-specific artifacts. |
 | `.envrc` | Preserves `INFRAFOUNDRY_*` environment variables and direnv layout specific to the framework. |
-| `.pre-commit-config.yaml` | Preserves InfraFoundry-specific hooks (blueprint linter, commit-msg format) alongside upstream quality hooks. |
+| `.pre-commit-config.yaml` | Preserves InfraFoundry-specific hooks (blueprint linter, commit-msg format) alongside upstream quality hooks, and the `check-yaml` `exclude` that skips Jinja2 blueprint resource templates (every `blueprints/**/*.yaml` except `blueprint.yaml`) (#1096). |
 | `CHANGELOG.md` | InfraFoundry owns this — never replaced, only appended. |
 | `README.md` | Preserves InfraFoundry description, quickstart, and feature list. |
 | `dodo.py` | Preserves InfraFoundry-specific task imports. |
