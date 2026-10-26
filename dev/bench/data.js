@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793025739536,
+  "lastUpdate": 1793026037505,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10509,6 +10509,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001179337515828356",
             "extra": "mean: 80.7475642209069 usec\nrounds: 13656"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6e0e52e60825895cda1c6164181879f003caa4b7",
+          "message": "docs: note the daily-check tool installs as a template divergence (merges PR #1104, addresses #1095)\n\nRecords the Terraform/OpenTofu/age/sops install steps in daily-check.yml in\nthe hand-merge spot-check list, so a template sync keeps them.\n\nAddresses #1095\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T14:46:08Z",
+          "tree_id": "fc6377ac58885971d9ba2e25f8f2f26841755fcb",
+          "url": "https://github.com/endavis/infrafoundry/commit/6e0e52e60825895cda1c6164181879f003caa4b7"
+        },
+        "date": 1793026036259,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15165.258117616566,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002159129518913113",
+            "extra": "mean: 65.94018988957137 usec\nrounds: 17210"
           }
         ]
       }
