@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793039102122,
+  "lastUpdate": 1793040611290,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10726,6 +10726,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009476150104494205",
             "extra": "mean: 125.11924815804723 usec\nrounds: 8551"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e9c55ab66a4b91b0cc5fb1f9221fdaa2412cfa7f",
+          "message": "fix: map prefixed terraform addresses to resource names on every apply (merges PR #1115, addresses #1099)\n\nTerraformRunner mapped an outcome address back to its resource name by\nsuffix matching against target_resources only, which is None unless -r or\n-p is given. On a plain or -P apply, terraform_data.ova_vm_<name> became\nova-vm-<name>, so an on_create handler with requires: [<name>] never fired\nfor an OVA or disk-image VM.\n\napply and destroy now take a resource_names keyword listing every resource\nin the run, and the executor and the destroy workflow pass it. Outcomes map\nagainst it, falling back to target_resources; -target selection is\nunchanged.\n\nAddresses #1099\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T18:49:13Z",
+          "tree_id": "d96b467fd420ae1039bf3bfd573e53df1a4bcadb",
+          "url": "https://github.com/endavis/infrafoundry/commit/e9c55ab66a4b91b0cc5fb1f9221fdaa2412cfa7f"
+        },
+        "date": 1793040610293,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12376.531367281243,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022400108806109083",
+            "extra": "mean: 80.7980822998286 usec\nrounds: 14192"
           }
         ]
       }
