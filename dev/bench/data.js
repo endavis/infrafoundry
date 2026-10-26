@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793022868491,
+  "lastUpdate": 1793025739536,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10478,6 +10478,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010081616545347083",
             "extra": "mean: 79.62953809803447 usec\nrounds: 13754"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7a36e19a8cc794f69bd813fb66f654b5f7505912",
+          "message": "ci: install terraform, opentofu, age and sops in the daily check (merges PR #1103, addresses #1095)\n\ndaily-check.yml came in with the template sync and installs only Python\nand uv, so the tests that run terraform and age-keygen fail there while\nthey pass in ci.yml. Install the same tools ci.yml does, before doit check.\n\nAddresses #1095\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T14:41:20Z",
+          "tree_id": "ba4687baf5d836cdb1acd8d94d6b22baf9cfc1fd",
+          "url": "https://github.com/endavis/infrafoundry/commit/7a36e19a8cc794f69bd813fb66f654b5f7505912"
+        },
+        "date": 1793025738253,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12384.274493583836,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001179337515828356",
+            "extra": "mean: 80.7475642209069 usec\nrounds: 13656"
           }
         ]
       }
