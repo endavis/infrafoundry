@@ -1,0 +1,38 @@
+# OPNsense VM — Jinja2 template rendered by infrafoundry.yml variables
+#
+# e1000 NICs appear in FreeBSD as em0/em1, the names the nano image's default
+# config already assigns (LAN em0, WAN em1), so first boot does not stop at
+# the interactive interface assignment.
+#
+# The Jinja control tags sit in YAML comments so they survive a YAML parse
+# of the unrendered file.
+vms:
+  - name: "{{ vm_name }}"
+    target_node: "{{ target_node }}"
+    vmid: {{ vmid }}
+    disk_image_source: "{{ image_source }}"
+# {% if image_sha256 %}
+    disk_image_sha256: "{{ image_sha256 }}"
+# {% endif %}
+    disk_image_cache_dir: "{{ image_cache_dir }}"
+    cores: {{ cores }}
+    memory: {{ memory }}
+    disk_bus: ide
+    disk_storage: "{{ disk_storage }}"
+    serial: true
+    boot_order: [ide0]
+    onboot: false
+    tags:
+      - opnsense
+      - opnsense-test
+# {% for tag in extra_tags %}
+      - "{{ tag }}"
+# {% endfor %}
+    network:
+      - bridge: "{{ lan_bridge }}"
+        model: e1000        # em0 — LAN
+      - bridge: "{{ wan_bridge }}"
+        model: e1000        # em1 — WAN
+# {% if wan_vlan %}
+        tag: {{ wan_vlan }}
+# {% endif %}

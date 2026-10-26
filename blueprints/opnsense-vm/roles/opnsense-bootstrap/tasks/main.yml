@@ -1,0 +1,104 @@
+---
+# OPNsense Bootstrap — Tasks
+#
+# Starts the VM with an expect script already listening on its serial
+# socket, so the script sees the first login prompt. The bootstrap PHP is
+# rendered on the controller and reaches the expect process only through
+# its environment; it is never written to the Proxmox host.
+
+- name: Check the bootstrap inputs
+  ansible.builtin.assert:
+    that:
+      - opnsense_vmid | string | length > 0
+      - opnsense_hostname | length > 0
+      - opnsense_wan_ip | length > 0
+      - opnsense_lan_ip | length > 0
+      - opnsense_root_password | length > 0
+      - opnsense_api_key | length > 0
+      - opnsense_api_secret | length > 0
+    fail_msg: >-
+      vmid, vm_name, wan_ip, lan_ip and the package secrets opnsense_root_password,
+      opnsense_api_key and opnsense_api_secret are all required.
+    quiet: true
+  no_log: true
+
+- name: Fail if the VM is already running
+  ansible.builtin.command:
+    cmd: "qm status {{ opnsense_vmid }}"
+  register: vm_status
+  changed_when: false
+  failed_when: "vm_status.rc != 0 or 'status: stopped' not in vm_status.stdout"
+
+- name: Deploy expect script
+  ansible.builtin.template:
+    src: bootstrap.exp.j2
+    dest: "/tmp/opnsense-bootstrap-{{ opnsense_vmid }}.exp"
+    mode: "0700"
+
+- name: Deploy wrapper script that waits for the serial socket, then runs expect
+  ansible.builtin.copy:
+    dest: "/tmp/opnsense-bootstrap-{{ opnsense_vmid }}-wrapper.sh"
+    mode: "0700"
+    content: |
+      #!/bin/bash
+      SOCKET="/var/run/qemu-server/{{ opnsense_vmid }}.serial0"
+      for _ in $(seq 1 60); do
+        [ -S "$SOCKET" ] && exec /tmp/opnsense-bootstrap-{{ opnsense_vmid }}.exp
+        sleep 0.5
+      done
+      echo "ERROR: Serial socket not found after 30s"
+      exit 1
+
+- name: Launch wrapper in background (listens before the VM boots)
+  ansible.builtin.shell: |
+    nohup /tmp/opnsense-bootstrap-{{ opnsense_vmid }}-wrapper.sh \
+      > /tmp/opnsense-bootstrap-wrapper-{{ opnsense_vmid }}.out 2>&1 &
+    echo $!
+  environment:
+    OPNSENSE_BOOTSTRAP_B64: "{{ lookup('ansible.builtin.template', 'bootstrap.php.j2') | b64encode }}"
+  vars:
+    opnsense_bootstrap_values:
+      hostname: "{{ opnsense_hostname }}"
+      domain: "{{ opnsense_domain }}"
+      root_password: "{{ opnsense_root_password }}"
+      api_key: "{{ opnsense_api_key }}"
+      api_secret: "{{ opnsense_api_secret }}"
+      wan_ip: "{{ opnsense_wan_ip }}"
+      wan_prefix: "{{ opnsense_wan_prefix | string }}"
+      lan_ip: "{{ opnsense_lan_ip }}"
+      lan_prefix: "{{ opnsense_lan_prefix | string }}"
+      api_allow_cidr: "{{ opnsense_api_allow_cidr }}"
+  register: wrapper_bg
+  changed_when: true
+  no_log: true
+
+- name: Start VM
+  ansible.builtin.command:
+    cmd: "qm start {{ opnsense_vmid }}"
+  changed_when: true
+
+- name: Wait for the expect script to finish
+  ansible.builtin.shell: |
+    TIMEOUT={{ opnsense_boot_timeout | int + 300 }}
+    ELAPSED=0
+    while kill -0 {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null; do
+      sleep 5
+      ELAPSED=$((ELAPSED + 5))
+      if [ $ELAPSED -ge $TIMEOUT ]; then
+        kill {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null || true
+        echo "ERROR: Expect script timed out after ${TIMEOUT}s"
+        break
+      fi
+    done
+    cat /tmp/opnsense-bootstrap-wrapper-{{ opnsense_vmid }}.out 2>/dev/null
+    ! grep -q "ERROR:" /tmp/opnsense-bootstrap-wrapper-{{ opnsense_vmid }}.out
+  register: bootstrap_run
+  changed_when: true
+
+- name: Remove the bootstrap scripts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/opnsense-bootstrap-{{ opnsense_vmid }}.exp"
+    - "/tmp/opnsense-bootstrap-{{ opnsense_vmid }}-wrapper.sh"

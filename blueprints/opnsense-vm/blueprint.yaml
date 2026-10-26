@@ -1,0 +1,91 @@
+name: opnsense-vm
+description: "Disposable OPNsense firewall on Proxmox from the nano image, bootstrapped for the API"
+version: "1.0.0"
+
+# Package secrets (secrets.yaml `variables:`), passed to the bootstrap only:
+#   opnsense_root_password  root password set on the box
+#   opnsense_api_key        API key created for root
+#   opnsense_api_secret     its secret
+# The same key and secret go in the environment's opnsense provider settings.
+
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: vm_name
+    description: "Proxmox VM name, also the firewall's hostname"
+  - name: vmid
+    description: "Proxmox VM ID"
+    type: integer
+
+  # --- Proxmox ---
+  - name: target_node
+    description: "Proxmox node to create the VM on"
+    default: pve3
+  - name: pve_host
+    description: "Address Ansible uses to reach target_node over SSH (root)"
+    default: "192.168.10.102"
+  - name: disk_storage
+    default: local-lvm
+  - name: memory
+    type: integer
+    default: 2048
+  - name: cores
+    type: integer
+    default: 2
+
+  # --- Image (OPNsense nano, serial console; bz2 is decompressed on the host) ---
+  - name: image_source
+    default: "https://pkg.opnsense.org/releases/26.1/OPNsense-26.1.6-nano-amd64.img.bz2"
+  - name: image_sha256
+    description: "sha256 of image_source, from the release's checksums file (empty skips the check)"
+    default: ""
+  - name: image_cache_dir
+    default: "/var/lib/vz/template/cache/infrafoundry"
+
+  # --- WAN (em1): static, on a tagged bridge ---
+  - name: wan_bridge
+    default: vmbr0
+  - name: wan_vlan
+    default: 10
+  - name: wan_ip
+    default: "192.168.10.250"
+  - name: wan_prefix
+    type: integer
+    default: 24
+
+  # --- LAN (em0): isolated bridge ---
+  - name: lan_bridge
+    default: vmbr1
+  - name: lan_ip
+    default: "192.168.99.1"
+  - name: lan_prefix
+    type: integer
+    default: 24
+
+  # --- Access ---
+  - name: domain
+    default: lab.local
+  - name: api_allow_cidr
+    description: "Source allowed to reach the web GUI/API (TCP 443) on the WAN address"
+    default: "192.168.10.0/24"
+  - name: boot_timeout
+    description: "Seconds to wait for the first login prompt on the serial console"
+    type: integer
+    default: 600
+
+  # Extra Proxmox tags appended to the blueprint's default tags
+  - name: extra_tags
+    default: []
+
+resources:
+  - vm.yaml
+
+events:
+  on_create:
+    - type: script
+      name: opnsense-bootstrap
+      script: scripts/opnsense-post-terraform.sh
+      description: "Boot the VM, set credentials, API key and addresses over the serial console"
+      timeout: 1800
+      continue_on_error: false
+      requires:
+        - "{{ vm_name }}"

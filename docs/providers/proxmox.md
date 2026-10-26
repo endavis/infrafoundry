@@ -17,7 +17,7 @@ the `bpg/proxmox` Terraform provider.
 
 | Type | Description |
 |------|-------------|
-| `vm` | QEMU VM (from template clone, cloud-init image download, or OVA import) |
+| `vm` | QEMU VM (from template clone, cloud-init image download, OVA import, or raw disk image import) |
 | `container` | LXC container with network and mount-point support |
 | `template` | VM template from a remote image or clone source |
 | `network` | Linux bridge or VLAN-aware bridge on a node |
@@ -86,6 +86,44 @@ envs/prod/proxmox/
 ├── vms.yaml
 └── containers.yaml
 ```
+
+### VMs from an appliance disk image
+
+A VM with `ova_source` or `disk_image_source` is built over SSH on its
+`target_node` with `qm` commands rather than by cloning. Use it for appliances
+that ship as a disk, not as a cloud image. Such VMs skip cloud-init.
+
+- **`ova_source`** is a path on the Proxmox host to an `.ova`. Its VMDKs are
+  extracted and imported in order.
+- **`disk_image_source`** is a raw disk image (`.img`, or `.img.bz2`). It is
+  either an absolute path on the Proxmox host or an `http(s)` URL.
+  - A URL is downloaded into `disk_image_cache_dir` (default
+    `/var/lib/vz/template/cache/infrafoundry`).
+  - A `.bz2` is decompressed there.
+  - Both results are cached, so later runs reuse them.
+  - If `disk_image_sha256` is set, the downloaded or given file is checked
+    against it before use.
+  - The image is imported as the only disk.
+
+The two are mutually exclusive.
+
+```yaml
+vms:
+  - name: opnsense-test
+    target_node: pve3
+    vmid: 950
+    disk_image_source: "https://pkg.opnsense.org/releases/26.1/OPNsense-26.1.6-nano-amd64.img.bz2"
+    disk_image_sha256: "<sha256 of the .img.bz2>"
+    disk_bus: ide
+    disk_storage: local-lvm
+    serial: true
+    network:
+      - { bridge: vmbr1, model: e1000 }
+      - { bridge: vmbr0, model: e1000, tag: 10 }
+```
+
+The `opnsense-vm` blueprint (`blueprints/opnsense-vm/`) uses this to build a
+disposable OPNsense test firewall.
 
 ## Provider CLI
 

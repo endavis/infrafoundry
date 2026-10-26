@@ -504,3 +504,103 @@ class TestOVATriggers:
         assert 'boot_order   = "[]"' in block
         assert 'onboot       = "false"' in block
         assert 'tags         = "[]"' in block
+
+
+NANO_URL = "https://pkg.opnsense.org/releases/26.1/OPNsense-26.1.6-nano-amd64.img.bz2"
+CACHE = "/var/lib/vz/template/cache/infrafoundry"
+
+
+def _make_image_vm(name: str = "test-image-vm", **config_overrides: Any) -> ResourceConfig:
+    """Helper to create a disk-image VM ResourceConfig (#1094)."""
+    config: dict[str, Any] = {
+        "name": name,
+        "target_node": "pve3",
+        "vmid": 950,
+        "disk_image_source": NANO_URL,
+        **config_overrides,
+    }
+    return ResourceConfig(name=name, type="vm", provider="proxmox", config=config)
+
+
+class TestDiskImageVM:
+    """A VM built from a raw disk image (``disk_image_source``, #1094)."""
+
+    def test_disk_image_vm_is_routed_to_the_import_template(
+        self, provider: ProxmoxProvider
+    ) -> None:
+        Path(provider.terraform_dir).mkdir(parents=True, exist_ok=True)
+        provider._generate_vms_terraform([_make_image_vm(), _make_regular_vm()])
+
+        imported_file = Path(provider.terraform_dir) / "ova_vms.tf"
+        regular_file = Path(provider.terraform_dir) / "vms.tf"
+        imported, regular = imported_file.read_text(), regular_file.read_text()
+        assert 'resource "terraform_data" "ova_vm_test_image_vm"' in imported
+        assert "test-image-vm" not in regular
+        assert "regular-vm" not in imported
+
+    def test_url_is_downloaded_into_the_cache_once(self, provider: ProxmoxProvider) -> None:
+        content = _render_ova_vms(provider, [_make_image_vm()])
+
+        local = f"{CACHE}/OPNsense-26.1.6-nano-amd64.img.bz2"
+        assert f"if [ ! -f {local} ]; then" in content
+        assert f"curl -fsSL -o {local}.part '{NANO_URL}'" in content
+
+    def test_bz2_is_decompressed_once_and_the_raw_image_imported(
+        self, provider: ProxmoxProvider
+    ) -> None:
+        content = _render_ova_vms(provider, [_make_image_vm(disk_storage="nas01")])
+
+        raw = f"{CACHE}/OPNsense-26.1.6-nano-amd64.img"
+        assert f"bunzip2 -kc {raw}.bz2 > {raw}.part" in content
+        assert f"qm disk import ${{self.triggers_replace.vmid}} {raw} nas01" in content
+        assert "tar -xf" not in content
+        assert "*.vmdk" not in content
+
+    def test_sha256_is_checked_against_the_downloaded_file(self, provider: ProxmoxProvider) -> None:
+        digest = "ab" * 32
+        content = _render_ova_vms(provider, [_make_image_vm(disk_image_sha256=digest)])
+
+        local = f"{CACHE}/OPNsense-26.1.6-nano-amd64.img.bz2"
+        assert f"echo '{digest}  {local}' | sha256sum -c -" in content
+        assert f'disk_image_sha256 = "{digest}"' in content
+
+    def test_no_sha256_means_no_check(self, provider: ProxmoxProvider) -> None:
+        assert "sha256sum" not in _render_ova_vms(provider, [_make_image_vm()])
+
+    def test_local_uncompressed_image_is_imported_in_place(self, provider: ProxmoxProvider) -> None:
+        content = _render_ova_vms(
+            provider, [_make_image_vm(disk_image_source="/mnt/pve/infra/fw.img")]
+        )
+
+        assert "curl" not in content
+        assert "bunzip2" not in content
+        assert "qm disk import ${self.triggers_replace.vmid} /mnt/pve/infra/fw.img" in content
+
+    def test_cache_dir_can_be_overridden(self, provider: ProxmoxProvider) -> None:
+        content = _render_ova_vms(provider, [_make_image_vm(disk_image_cache_dir="/srv/img")])
+
+        assert "mkdir -p /srv/img" in content
+        assert CACHE not in content
+
+    def test_vm_shell_keeps_nics_serial_and_destroy(self, provider: ProxmoxProvider) -> None:
+        vm = _make_image_vm(
+            serial=True,
+            network=[
+                {"bridge": "vmbr1", "model": "e1000"},
+                {"bridge": "vmbr0", "model": "e1000", "tag": 10},
+            ],
+        )
+        content = _render_ova_vms(provider, [vm])
+
+        assert "--net0 e1000,bridge=vmbr1 " in content
+        assert "--net1 e1000,bridge=vmbr0,tag=10 " in content
+        assert "--serial0 socket" in content
+        assert "Disk image VM managed by InfraFoundry" in content
+        assert "qm destroy ${self.triggers_replace.vmid} --purge" in content
+
+    def test_ova_vm_still_renders_its_extraction(self, provider: ProxmoxProvider) -> None:
+        content = _render_ova_vms(provider, [_make_ova_vm()])
+
+        assert "tar -xf" in content
+        assert "disk_image_source" not in content
+        assert "OVA VM managed by InfraFoundry" in content

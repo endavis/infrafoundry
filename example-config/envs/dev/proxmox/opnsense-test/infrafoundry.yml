@@ -1,0 +1,25 @@
+# Disposable OPNsense test firewall — example consumer of the opnsense-vm blueprint.
+#
+# All deployment logic (VM definition, image import, serial-console bootstrap)
+# lives in blueprints/opnsense-vm/. This file only supplies the per-instance
+# values. See blueprints/opnsense-vm/README.md for the full variable reference.
+#
+# Run: foundry infra apply --env dev --package opnsense-test
+
+name: opnsense-test
+description: "Disposable OPNsense test firewall (example)"
+blueprint: opnsense-vm
+
+variables:
+  vm_name: opnsense-test
+  vmid: 950
+  target_node: pve3
+  pve_host: "192.168.1.13"
+
+  # sha256 of the .img.bz2, from the release's checksums file
+  image_sha256: ""
+
+  # WAN on the management VLAN, LAN on an isolated bridge
+  wan_ip: "192.168.1.250"
+  lan_ip: "192.168.99.1"
+  api_allow_cidr: "192.168.1.0/24"

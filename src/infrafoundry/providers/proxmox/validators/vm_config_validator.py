@@ -32,6 +32,10 @@ VALID_NIC_MODELS = frozenset({"virtio", "e1000", "e1000e", "rtl8139", "vmxnet3"}
 # Pattern: storage_id:iso/filename.iso (e.g., "local:iso/ubuntu.iso")
 ISO_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+:iso/.+\.iso$")
 
+# A disk image is imported from a path on the PVE host or downloaded from a URL (#1094).
+DISK_IMAGE_SOURCE_PATTERN = re.compile(r"^(/|https?://).+\.img(\.bz2)?$")
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+
 
 class VMConfigValidator:
     """Validates VM configuration fields before Terraform generation.
@@ -68,6 +72,7 @@ class VMConfigValidator:
             self._validate_disk_type(name, config)
             self._validate_network_models(name, config)
             self._validate_ovmf_efi_disk(name, config)
+            self._validate_disk_image(name, config)
 
     def _validate_cpu_type(self, name: str, config: dict[str, Any]) -> None:
         """Warn if cpu_type is not in the known set."""
@@ -193,3 +198,37 @@ class VMConfigValidator:
                 ),
                 level=ValidationLevel.WARNING,
             )
+
+    def _validate_disk_image(self, name: str, config: dict[str, Any]) -> None:
+        """Validate the raw disk image import fields (#1094)."""
+        source = config.get("disk_image_source")
+        sha256 = config.get("disk_image_sha256")
+        if source is None:
+            if sha256 is not None:
+                self._error(name, "disk_image_sha256", "disk_image_sha256 needs disk_image_source.")
+            return
+        if "ova_source" in config:
+            self._error(
+                name,
+                "disk_image_source",
+                "ova_source and disk_image_source are mutually exclusive.",
+            )
+        if not isinstance(source, str) or not DISK_IMAGE_SOURCE_PATTERN.match(source):
+            self._error(
+                name,
+                "disk_image_source",
+                f"disk_image_source '{source}' must be an absolute path on the PVE host "
+                "or an http(s) URL ending in .img or .img.bz2.",
+            )
+        if sha256 is not None and not (isinstance(sha256, str) and SHA256_PATTERN.match(sha256)):
+            self._error(
+                name, "disk_image_sha256", "disk_image_sha256 must be 64 lowercase hex characters."
+            )
+
+    def _error(self, name: str, field: str, message: str) -> None:
+        self.report.add_check(
+            check_name=f"proxmox_vm_{name}_{field}",
+            passed=False,
+            message=f"VM '{name}': {message}",
+            level=ValidationLevel.ERROR,
+        )
