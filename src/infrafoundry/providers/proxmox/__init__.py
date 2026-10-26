@@ -27,6 +27,11 @@ if TYPE_CHECKING:
     from infrafoundry.providers.plugin_type import ProviderMetadata
 
 
+def _imports_disk(vm: ResourceConfig) -> bool:
+    """Whether a VM is built by importing a disk (an OVA or a raw image) over SSH."""
+    return "ova_source" in vm.config or "disk_image_source" in vm.config
+
+
 class ProxmoxProvider(
     ProviderBase,
     TemplateRendererMixin,
@@ -212,8 +217,8 @@ class ProxmoxProvider(
         """
         processed: list[ResourceConfig] = []
         for vm in vms:
-            if "ova_source" in vm.config:
-                # OVA VMs don't go through cloud-init / tailscale processing.
+            if _imports_disk(vm):
+                # OVA and disk-image VMs don't go through cloud-init / tailscale processing.
                 processed.append(vm)
             else:
                 processed.append(self._process_cloud_init_snippets(vm))
@@ -222,8 +227,8 @@ class ProxmoxProvider(
     def _generate_vms_terraform(self, vms: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox VMs.
 
-        Partitions VMs into regular VMs (using bpg/proxmox provider) and OVA VMs
-        (using terraform_data with SSH-based qm commands). Regular VMs get cloud-init
+        Partitions VMs into regular VMs (using bpg/proxmox provider) and OVA or
+        disk-image VMs (using terraform_data with SSH-based qm commands). Regular VMs get cloud-init
         processing; OVA VMs get network normalization only.
 
         Note: ``generate_terraform`` pre-processes VMs (via
@@ -236,7 +241,7 @@ class ProxmoxProvider(
         regular_vms = []
         ova_vms = []
         for vm in vms:
-            if "ova_source" in vm.config:
+            if _imports_disk(vm):
                 ova_vms.append(self._normalize_vm_config(vm))
             else:
                 processed = self._process_cloud_init_snippets(vm)
@@ -262,7 +267,7 @@ class ProxmoxProvider(
         run on the node where the VM will be created.
 
         Args:
-            ova_vms: List of OVA VM resource configs (must have ova_source).
+            ova_vms: VM resource configs with ``ova_source`` or ``disk_image_source``.
         """
         self.render_and_write_terraform(
             "proxmox/ova_vms.tf.j2",

@@ -298,3 +298,46 @@ class TestNonVMResourcesSkipped:
         )
         validator.validate([resource])
         report.add_check.assert_not_called()
+
+
+class TestDiskImageValidation:
+    """Tests for ``disk_image_source`` / ``disk_image_sha256`` (#1094)."""
+
+    URL = "https://pkg.opnsense.org/releases/26.1/OPNsense-26.1.6-nano-amd64.img.bz2"
+
+    @pytest.mark.parametrize("source", [URL, "/mnt/pve/infra/fw.img", "http://mirror/x.img"])
+    def test_valid_sources_pass(
+        self, validator: VMConfigValidator, report: MagicMock, source: str
+    ) -> None:
+        validator.validate([_vm(disk_image_source=source, disk_image_sha256="0" * 64)])
+        report.add_check.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("config", "check", "fragment"),
+        [
+            ({"disk_image_source": "fw.img"}, "disk_image_source", "absolute path"),
+            ({"disk_image_source": "/x/fw.iso"}, "disk_image_source", ".img or .img.bz2"),
+            (
+                {"disk_image_source": URL, "ova_source": "/x/a.ova"},
+                "disk_image_source",
+                "mutually exclusive",
+            ),
+            ({"disk_image_source": URL, "disk_image_sha256": "ABC"}, "disk_image_sha256", "64"),
+            ({"disk_image_sha256": "0" * 64}, "disk_image_sha256", "needs disk_image_source"),
+        ],
+    )
+    def test_invalid_config_is_an_error(
+        self,
+        validator: VMConfigValidator,
+        report: MagicMock,
+        config: dict[str, Any],
+        check: str,
+        fragment: str,
+    ) -> None:
+        validator.validate([_vm(**config)])
+
+        call = report.add_check.call_args.kwargs
+        assert call["check_name"] == f"proxmox_vm_test-vm_{check}"
+        assert call["passed"] is False
+        assert call["level"] is ValidationLevel.ERROR
+        assert fragment in call["message"]

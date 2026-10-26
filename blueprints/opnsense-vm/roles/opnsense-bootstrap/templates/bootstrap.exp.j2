@@ -1,0 +1,79 @@
+#!/usr/bin/expect -f
+# OPNsense Bootstrap — Expect Script
+#
+# Logs in on the serial console as root/opnsense, writes the bootstrap PHP
+# (base64 in $env(OPNSENSE_BOOTSTRAP_B64)) to the box in pieces, runs it and
+# reboots. Nothing secret is logged: logging is off while the payload is sent.
+
+set timestamp [clock format [clock seconds] -format "%Y%m%d-%H%M%S"]
+log_file -noappend /tmp/opnsense-bootstrap-{{ opnsense_vmid }}-${timestamp}.log
+set timeout {{ opnsense_boot_timeout }}
+# Root shell prompt ends in "# ". The bracket keeps Jinja from reading the
+# brace and hash together as the start of a comment.
+set prompt {[#] $}
+
+if {![info exists env(OPNSENSE_BOOTSTRAP_B64)]} {
+  puts "ERROR: OPNSENSE_BOOTSTRAP_B64 is not set"
+  exit 1
+}
+set payload $env(OPNSENSE_BOOTSTRAP_B64)
+
+spawn socat STDIO,rawer UNIX-CONNECT:/var/run/qemu-server/{{ opnsense_vmid }}.serial0
+
+# First boot: answer the interface assignment if it appears, then log in.
+expect {
+  "Do you want to configure LAGGs now?" { send "n\r"; exp_continue }
+  "Do you want to configure VLANs now?" { send "n\r"; exp_continue }
+  "Enter the WAN interface name" { send "{{ opnsense_wan_if }}\r"; exp_continue }
+  "Enter the LAN interface name" { send "{{ opnsense_lan_if }}\r"; exp_continue }
+  "Enter the Optional interface" { send "\r"; exp_continue }
+  "Do you want to proceed?" { send "y\r"; exp_continue }
+  "login:" { send "root\r" }
+  timeout { puts "ERROR: Timed out waiting for the login prompt"; exit 1 }
+}
+
+set timeout 60
+expect {
+  "Password:" { send "opnsense\r" }
+  timeout { puts "ERROR: Timed out waiting for the password prompt"; exit 1 }
+}
+expect {
+  "Enter an option:" { send "8\r" }
+  "Login incorrect" { puts "ERROR: Default credentials rejected (box already bootstrapped?)"; exit 1 }
+  timeout { puts "ERROR: Timed out waiting for the console menu"; exit 1 }
+}
+expect {
+  -re $prompt {}
+  timeout { puts "ERROR: Timed out waiting for the shell"; exit 1 }
+}
+
+# Payload: no logging from here until it has run.
+log_user 0
+log_file
+send "rm -f /tmp/ifb.b64\r"
+expect -re $prompt
+for {set i 0} {$i < [string length $payload]} {incr i {{ opnsense_send_chunk }}} {
+  set chunk [string range $payload $i [expr {$i + {{ opnsense_send_chunk }} - 1}]]
+  send "printf '%s' '$chunk' >> /tmp/ifb.b64\r"
+  expect {
+    -re $prompt {}
+    timeout { puts "ERROR: Timed out sending the bootstrap payload"; exit 1 }
+  }
+}
+send "openssl base64 -d -A -in /tmp/ifb.b64 -out /tmp/ifb.php ; php /tmp/ifb.php ; rm -f /tmp/ifb.b64 /tmp/ifb.php\r"
+expect {
+  "BOOTSTRAP OK" {}
+  "BOOTSTRAP FAILED" { puts "ERROR: Bootstrap script failed"; exit 1 }
+  timeout { puts "ERROR: Timed out running the bootstrap script"; exit 1 }
+}
+expect -re $prompt
+
+log_file /tmp/opnsense-bootstrap-{{ opnsense_vmid }}-${timestamp}.log
+log_user 1
+send "reboot\r"
+expect {
+  -re "(?i)reboot" {}
+  timeout {}
+}
+puts "\nBootstrap applied; rebooting"
+exit 0

@@ -1,0 +1,58 @@
+<?php
+/*
+ * OPNsense bootstrap — run once on the box from the serial console shell.
+ *
+ * Sets the hostname, the root password and an API key for root, static WAN
+ * and LAN addresses, and a WAN rule letting api_allow_cidr reach the web
+ * GUI/API. Values arrive as base64 JSON so no quoting can break the script.
+ * Prints "BOOTSTRAP OK" on success; the expect script waits for it.
+ */
+require_once('script/load_phalcon.php');
+
+use OPNsense\Core\Config;
+
+$v = json_decode(base64_decode('{{ opnsense_bootstrap_values | to_json | b64encode }}'), true);
+
+$cfg = Config::getInstance()->object();
+$cfg->system->hostname = $v['hostname'];
+$cfg->system->domain = $v['domain'];
+
+$root = null;
+foreach ($cfg->system->user as $user) {
+    if ((string)$user->name === 'root') {
+        $root = $user;
+    }
+}
+if ($root === null) {
+    echo "BOOTSTRAP FAILED: no root user\n";
+    exit(1);
+}
+$root->password = password_hash($v['root_password'], PASSWORD_BCRYPT, ['cost' => 11]);
+// 26.1 stores API keys as "<key>|<sha512-crypt of the secret>", one per line.
+$root->apikeys = $v['api_key'] . '|' . crypt($v['api_secret'], '$6$$');
+
+$wan = $cfg->interfaces->wan;
+$wan->ipaddr = $v['wan_ip'];
+$wan->subnet = $v['wan_prefix'];
+// The WAN sits on a private network, so its default RFC1918 and bogon
+// blocks would drop the controller's traffic.
+unset($wan->blockpriv);
+unset($wan->blockbogons);
+
+$lan = $cfg->interfaces->lan;
+$lan->ipaddr = $v['lan_ip'];
+$lan->subnet = $v['lan_prefix'];
+
+$rule = $cfg->filter->addChild('rule');
+$rule->addChild('type', 'pass');
+$rule->addChild('interface', 'wan');
+$rule->addChild('ipprotocol', 'inet');
+$rule->addChild('protocol', 'tcp');
+$rule->addChild('descr', 'infrafoundry bootstrap: web GUI/API from ' . $v['api_allow_cidr']);
+$rule->addChild('source')->addChild('address', $v['api_allow_cidr']);
+$destination = $rule->addChild('destination');
+$destination->addChild('network', 'wanip');
+$destination->addChild('port', '443');
+
+Config::getInstance()->save();
+echo "BOOTSTRAP OK\n";

@@ -1,0 +1,19 @@
+---
+# OPNsense Bootstrap — Default Variables
+
+opnsense_domain: lab.local
+opnsense_wan_prefix: 24
+opnsense_lan_prefix: 24
+opnsense_api_allow_cidr: "192.168.10.0/24"
+
+# Seconds to wait for the first login prompt on the serial console
+opnsense_boot_timeout: 600
+
+# Interface names the nano image's default config assigns. The expect
+# script answers the interactive assignment with these if it appears.
+opnsense_lan_if: em0
+opnsense_wan_if: em1
+
+# Base64 is sent to the console in pieces this long, keeping each shell
+# line well under the terminal's input limit.
+opnsense_send_chunk: 160
