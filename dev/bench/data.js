@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793030792387,
+  "lastUpdate": 1793036994936,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10602,6 +10602,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022167271076631753",
             "extra": "mean: 67.94546175009731 usec\nrounds: 17438"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1847015762581bf35398b70b17e744f0e4b71cf9",
+          "message": "fix: let mutmut collect its tests and check mutants (merges PR #1109, addresses #1108)\n\nThe mutation workflow tested no mutant: its stats run stopped on the first\nselected test that failed inside mutants/.\n\n- Blueprint and example-config tests read blueprints/ and example-config/,\n  which mutmut does not copy. List both in also_copy.\n- Mutating a method of a runtime_checkable Protocol adds mutmut's\n  trampoline attributes to the protocol, so isinstance(runner, Applyable)\n  fails for the real runners. Exclude core/protocols.py with do_not_mutate;\n  its stub bodies hold nothing to kill.\n\ntests/test_mutmut_project_paths.py checks both, so a new blueprint test or\nprotocol cannot bring the stall back.\n\nAddresses #1108\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T17:49:06Z",
+          "tree_id": "f9419de40686eee9aca30407a85455a6721a4024",
+          "url": "https://github.com/endavis/infrafoundry/commit/1847015762581bf35398b70b17e744f0e4b71cf9"
+        },
+        "date": 1793036991448,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10073.209194734636,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006293481419613734",
+            "extra": "mean: 99.27322868691236 usec\nrounds: 10639"
           }
         ]
       }
