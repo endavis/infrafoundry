@@ -20,7 +20,7 @@ A blueprint declares the Python packages and Ansible collections its event handl
 
 Before any provider work, `Orchestrator.plan` (and through it `apply`) and `Orchestrator.destroy` check the requirements of every blueprint used by the packages in scope. That is the environment, narrowed by `--package` or `--provider`. An unmet requirement raises `MissingRequirementsError` (`IF-PACKAGE-002`), naming the requirement, the blueprints that need it and the install command. `config doctor` reports the same check for every environment.
 
-Nothing is installed during a run. Installing is an explicit, separate step: the printed command now, and a `foundry deps sync` command in #1047.
+Nothing is installed during a run. Installing is an explicit, separate step: the printed command, or `foundry deps sync` (#1047), which installs every unmet requirement in scope and checks again.
 
 ## Rationale
 
@@ -50,3 +50,4 @@ The check verifies the interpreter running InfraFoundry. Ansible runs local-conn
 
 - [Configuration Blueprints — The `requirements:` Block](../configuration/blueprints.md#the-requirements-block)
 - [Error Reference — IF-PACKAGE-002](../reference/errors.md#if-package-002-blueprint-requirements-not-met)
+- [CLI Reference — Deps Group](../usage/cli-reference.md#deps-group-foundry-deps)

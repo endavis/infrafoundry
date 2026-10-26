@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import importlib
 import importlib.metadata
 import importlib.util
+import shutil
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, override
@@ -16,6 +18,13 @@ from infrafoundry.core.requirements.checker import (
     check_collection,
     check_python,
     installed_collections,
+)
+from infrafoundry.core.requirements.installer import (
+    InstallStep,
+    Runner,
+    Which,
+    plan_install,
+    run_install,
 )
 from infrafoundry.core.requirements.models import (
     BlueprintRequirements,
@@ -63,7 +72,23 @@ class RequirementsReport:
                 f"(needed by blueprint {', '.join(status.blueprints)})"
             )
             lines.append(f"    run: {status.fix}")
+        lines.append(f"Or install them all with: foundry deps sync --env {self.env_name}")
         return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class SyncResult:
+    """What ``deps sync`` did, or would do with ``--dry-run``.
+
+    Attributes:
+        steps: Install commands run (or planned); empty when nothing was unmet
+        report: Requirement status after the install (before it, on a dry run)
+        dry_run: Whether the steps were only planned
+    """
+
+    steps: tuple[InstallStep, ...]
+    report: RequirementsReport
+    dry_run: bool
 
 
 class RequirementsManager(BaseManager):
@@ -208,6 +233,53 @@ class RequirementsManager(BaseManager):
                 message, context={"unmet": [status.name for status in report.unmet]}
             )
         return report
+
+    def sync(
+        self,
+        env_name: str,
+        package_filter: str | None = None,
+        provider_filter: list[str] | None = None,
+        *,
+        dry_run: bool = False,
+        run: Runner | None = None,
+        which: Which | None = None,
+    ) -> SyncResult:
+        """Install the unmet requirements of the blueprints in scope (#1047).
+
+        Args:
+            env_name: Environment name
+            package_filter: Only the package with this name
+            provider_filter: Only packages targeting one of these providers
+            dry_run: Plan the install commands without running them
+            run: Runs one install command; defaults to :func:`subprocess.run`
+            which: Locates ``uv`` and ``ansible-galaxy``
+
+        Returns:
+            The steps and the resulting report
+
+        Raises:
+            RequirementInstallError: If a tool is missing or an install fails
+            MissingRequirementsError: If requirements are still unmet afterwards
+        """
+        report = self.check(env_name, package_filter, provider_filter)
+        steps = tuple(plan_install(report.unmet))
+        if not steps or dry_run:
+            return SyncResult(steps=steps, report=report, dry_run=dry_run)
+
+        for step in steps:
+            self._log_info(f"Installing {', '.join(step.covers)}: {step.display()}")
+        run_install(steps, run=run, which=which or shutil.which)
+
+        # New distributions are on disk; drop the import system's stale caches
+        # so the re-check finds them.
+        importlib.invalidate_caches()
+        after = self.check(env_name, package_filter, provider_filter)
+        if after.unmet:
+            raise MissingRequirementsError(
+                "Installed, but still unmet:\n" + after.format_unmet(),
+                context={"unmet": [status.name for status in after.unmet]},
+            )
+        return SyncResult(steps=steps, report=after, dry_run=False)
 
     @override
     def cleanup(self) -> None:
