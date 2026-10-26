@@ -156,7 +156,7 @@ customization a reviewer must verify survived the merge.
 | `README.md` | Preserves InfraFoundry description, quickstart, and feature list. |
 | `dodo.py` | Preserves InfraFoundry-specific task imports. |
 | `mkdocs.yml` | Preserves the InfraFoundry nav tree (Providers, Runners, Configuration, etc.). |
-| `pyproject.toml` | Preserves project name, dependencies, CLI entry points, and mypy/ruff overrides specific to InfraFoundry: `disallow_any_generics = true` globally with an override that turns it off for template-owned tooling (as upstream has it), the `agent_roster` import override, and the InfraFoundry vulture `ignore_names` entries. |
+| `pyproject.toml` | Preserves project name, dependencies, CLI entry points, and mypy/ruff overrides specific to InfraFoundry: `disallow_any_generics = true` globally with an override that turns it off for template-owned tooling (as upstream has it), the `agent_roster` import override, the InfraFoundry vulture `ignore_names` entries, and the `[tool.mutmut]` `also_copy` (`blueprints/`, `example-config/`) and `do_not_mutate` (`src/infrafoundry/core/protocols.py`) keys, checked by `tests/test_mutmut_project_paths.py` (#1108). |
 | `tests/conftest.py` | Preserves InfraFoundry-specific fixtures (`mock_config_manager`, `mock_config_dir`, sample resource fixtures, etc.) alongside upstream's `mock_subprocess` fixture. |
 | `tests/template/test_doit_quality.py` | Preserves the local-only `lint_blueprints` entry in the `task_check` dependency set and `TestTaskLintBlueprints`. The mypy scope assertions match upstream since #1056. |
 | `tests/test_markdown_links.py` | Preserves the `is_sync_excluded` skip, so links in template-owned files to excluded upstream files are not reported (#1057). |
