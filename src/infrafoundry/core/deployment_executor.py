@@ -486,6 +486,7 @@ class DeploymentExecutor:
                     target_resources=resource_filter if resource_filter else None,
                     parallelism=provider.terraform_parallelism,
                     add_only=add_only,
+                    resource_names=[r.name for r in resources],
                 )
                 runner_results[tool_name] = run_result
 

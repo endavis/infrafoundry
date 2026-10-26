@@ -177,7 +177,9 @@ class TerraformRunner(BaseRunner):
         Args:
             provider: Provider instance
             auto_approve: Pass ``-auto-approve`` to terraform (default: False)
-            **kwargs: Options including target_resources, parallelism
+            **kwargs: Options including target_resources, parallelism and
+                resource_names (every resource being applied, used to map
+                prefixed terraform addresses back to their names)
 
         Returns:
             Apply result, with ``resource_outcomes``
@@ -192,6 +194,7 @@ class TerraformRunner(BaseRunner):
                 auto_approve=auto_approve,
                 target_resources=target_resources,
                 parallelism=parallelism,
+                resource_names=kwargs.get("resource_names"),
             ),
         )
 
@@ -203,7 +206,9 @@ class TerraformRunner(BaseRunner):
         Args:
             provider: Provider instance
             auto_approve: Pass ``-auto-approve`` to terraform (default: False)
-            **kwargs: Options including target_resources, parallelism
+            **kwargs: Options including target_resources, parallelism and
+                resource_names (every resource being destroyed, used to map
+                prefixed terraform addresses back to their names)
 
         Returns:
             Destroy result, with ``resource_outcomes``
@@ -218,6 +223,7 @@ class TerraformRunner(BaseRunner):
                 auto_approve=auto_approve,
                 target_resources=target_resources,
                 parallelism=parallelism,
+                resource_names=kwargs.get("resource_names"),
             ),
         )
 
@@ -271,6 +277,7 @@ class TerraformRunner(BaseRunner):
         auto_approve: bool = False,
         target_resources: list[str] | None = None,
         parallelism: int | None = None,
+        resource_names: list[str] | None = None,
     ) -> BaseResult:
         """Run Terraform command for a provider.
 
@@ -291,6 +298,11 @@ class TerraformRunner(BaseRunner):
                 used.  Set to 1 to serialize all resource operations — useful
                 for providers like Proxmox where parallel clones cause CFS lock
                 timeouts on shared storage.
+            resource_names: Every InfraFoundry resource name in this run. Outcome
+                addresses are mapped back to these names, so a prefixed address
+                such as ``terraform_data.ova_vm_web_01`` resolves to ``web-01``
+                whether or not a target filter is set (#1099). Falls back to
+                ``target_resources`` when not given.
 
         Returns:
             Dict with command results.  For apply/destroy, includes a
@@ -395,7 +407,7 @@ class TerraformRunner(BaseRunner):
         }
 
         # Parse resource outcomes from JSON output
-        outcomes = self._parse_json_output(stdout_lines, tf_dir, target_resources)
+        outcomes = self._parse_json_output(stdout_lines, tf_dir, resource_names or target_resources)
         response["resource_outcomes"] = outcomes
         # Store JSON-safe version for audit logging
         response["resource_outcomes_summary"] = [o.to_dict() for o in outcomes]
