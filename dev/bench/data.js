@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793022286295,
+  "lastUpdate": 1793022568373,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10416,6 +10416,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004815946667465643",
             "extra": "mean: 93.43069320525598 usec\nrounds: 11141"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "536d33a947cf2e864630186a251a4aeb671317b9",
+          "message": "feat: add opnsense-vm blueprint for a disposable test firewall (merges PR #1101, addresses #1094)\n\nThe proxmox provider learns to build a VM from a raw appliance disk image\n(disk_image_source, optional disk_image_sha256 and disk_image_cache_dir):\nthe image is downloaded once into a cache on the node, checked, decompressed\nfrom .bz2 and imported with qm disk import, reusing the SSH path the OVA\nVMs take.\n\nThe opnsense-vm blueprint uses it to boot the OPNsense nano image on a\nLAN-only bridge and a VLAN-tagged WAN. Its on_create handler drives the\nserial console with expect: it answers the interface assignment, logs in\nwith the image defaults and runs a PHP script that sets the root password,\nan API key, static WAN and LAN addresses and a WAN rule for the API. The\nhandler then waits for the API with an unauthenticated probe, since the\nbox's certificate is self-signed.\n\nAddresses #1094\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T13:48:38Z",
+          "tree_id": "f952b8c9a5017648b7ba85a72cded7675be0dfa6",
+          "url": "https://github.com/endavis/infrafoundry/commit/536d33a947cf2e864630186a251a4aeb671317b9"
+        },
+        "date": 1793022567656,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7873.472865855267,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010025642616206356",
+            "extra": "mean: 127.00875675036364 usec\nrounds: 8481"
           }
         ]
       }
