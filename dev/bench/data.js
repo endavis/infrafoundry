@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792973001760,
+  "lastUpdate": 1792973687421,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10199,6 +10199,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010501773766119887",
             "extra": "mean: 122.9831320471036 usec\nrounds: 8656"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a4446560577a65f7faa2e04ef9cae2ba74019e77",
+          "message": "chore: adopt the template's single-entry release flow (merges PR #1082, addresses #1059)\n\ntools/doit/release.py now matches pyproject-template: `doit release` opens the\nrelease PR, with --prerelease, --increment and --issue, and `doit release_tag`\ntags main after it merges.\n\n- removed: the direct-push `doit release` (blocked by no-commit-to-main and\n  branch protection), `doit release_pr` (now `doit release`) and\n  `doit release_dev` (now `doit release --prerelease=alpha|beta|rc`)\n- gained: --increment validated in any case, a clean tree required only by\n  `doit release`, --issue, and the static-version / hand-written-changelog\n  opt-ins (inactive here: version_provider is scm and\n  update_changelog_on_bump is true)\n- tests/template/test_doit_release.py and tests/test_release_steps_doc.py\n  adopted from the template\n- release-and-automation.md adopted; the doit-tasks-reference release\n  section matches; CONTRIBUTING regains the downstream opt-ins pointer\n- the divergences doc drops release.py and test_doit_release.py from the\n  hand-merge list and clears the last deferral\n\nAddresses #1059\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T00:13:52Z",
+          "tree_id": "0b11c1c2f5472f1dcbcef26074861c219958ef93",
+          "url": "https://github.com/endavis/infrafoundry/commit/a4446560577a65f7faa2e04ef9cae2ba74019e77"
+        },
+        "date": 1792973686258,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8082.011366546584,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009574683907419392",
+            "extra": "mean: 123.73157555051753 usec\nrounds: 8630"
           }
         ]
       }
