@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793014148831,
+  "lastUpdate": 1793016851218,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10354,6 +10354,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009914001396302196",
             "extra": "mean: 125.24377776470914 usec\nrounds: 8509"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cc87bd91b70470f3c30eb901a5a8003a32ecf87f",
+          "message": "fix: wait for ontap-cluster disks to become spares before using them (merges PR #1090, addresses #1089)\n\nFreshly assigned disks report container type unknown until RAID makes them\nspares. The post-cluster role ran add-disks against node 02 seconds after\nassigning its disks, before they were spares, so the root aggregate could\nnot grow and aggr1_node02 had too few disks.\n\nAfter each disk assignment the role now waits, per node, until no owned\ndisk is unknown. Disks still unknown after the wait are removed and\nre-assigned, which clears the simulator's stuck state, and the run fails\nif that does not help.\n\nna_ontap_command reports a rejected CLI command as changed with\nresult_value 0. add-disks and the vol0 resize now fail on it instead of\nbeing ignored. Snapshot tuning stays best effort but warns, and fails\nonly on a module error such as a missing netapp-lib.\n\nAddresses #1089\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T12:13:15Z",
+          "tree_id": "c10516e616459231ab650080c26ebeb45d8715e3",
+          "url": "https://github.com/endavis/infrafoundry/commit/cc87bd91b70470f3c30eb901a5a8003a32ecf87f"
+        },
+        "date": 1793016850310,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15347.84601100829,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001766348761381833",
+            "extra": "mean: 65.15572278238568 usec\nrounds: 16662"
           }
         ]
       }
