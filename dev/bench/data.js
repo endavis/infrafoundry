@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793009459113,
+  "lastUpdate": 1793013654813,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10292,6 +10292,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007533385639174561",
             "extra": "mean: 95.69045216359234 usec\nrounds: 10954"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bfe9c74f170230a9e9f5da39e1f3338716260468",
+          "message": "fix: run ontap-cluster netapp modules under the playbook python (merges PR #1088, addresses #1049)\n\nThe generated inventory left the local-connection ontap-cluster host on\ninterpreter discovery, so netapp.ontap modules ran under the system Python\ninstead of the venv running ansible-playbook. ZAPI modules then failed with\n\"No module named 'netapp_lib'\" even with netapp-lib installed in the venv.\nPin ansible_python_interpreter to {{ ansible_playbook_python }} on that host.\n\nAddresses #1049\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T11:19:19Z",
+          "tree_id": "3480065b663d9dced8beedbb47ade9d8cc5aafe5",
+          "url": "https://github.com/endavis/infrafoundry/commit/bfe9c74f170230a9e9f5da39e1f3338716260468"
+        },
+        "date": 1793013654042,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8147.195584323303,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009884598990205428",
+            "extra": "mean: 122.7416219053564 usec\nrounds: 8765"
           }
         ]
       }
