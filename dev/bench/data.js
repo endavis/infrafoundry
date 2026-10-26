@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793038596838,
+  "lastUpdate": 1793039102122,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10695,6 +10695,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013276289933483871",
             "extra": "mean: 128.25329056341567 usec\nrounds: 8573"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9b0205b8a1d2c55c056813c027efd0dcbb1082d2",
+          "message": "fix: stop test_export_proxmox_success depending on the tmp path length (merges PR #1114, addresses #1111)\n\nThe CLI prints the output path through Rich, which wraps long lines, so a\nlong pytest tmp path was split mid-word and the substring check failed on\nmachines with a high pytest-of-<user> counter. Compare against the output\nwith Rich's line breaks removed; a path holds no newline.\n\nAddresses #1111\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T18:24:01Z",
+          "tree_id": "af3e1a47a1127bfc8b072ac7680da39cfe05dfe4",
+          "url": "https://github.com/endavis/infrafoundry/commit/9b0205b8a1d2c55c056813c027efd0dcbb1082d2"
+        },
+        "date": 1793039100624,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7992.375391648991,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009476150104494205",
+            "extra": "mean: 125.11924815804723 usec\nrounds: 8551"
           }
         ]
       }
