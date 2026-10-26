@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793013654813,
+  "lastUpdate": 1793014148831,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10323,6 +10323,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009884598990205428",
             "extra": "mean: 122.7416219053564 usec\nrounds: 8765"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7281c93c42d52eda52bea268ff0acaaa53b4e08c",
+          "message": "chore: point ontap-cluster install notes at foundry deps sync (merges PR #1087, addresses #1048)\n\nnetapp-lib and netapp.ontap are declared in the blueprint's requirements\nblock, so the install comments in requirements.yml and the post-cluster\nrole now name foundry deps sync instead of raw pip and ansible-galaxy\ncommands.\n\nAddresses #1048\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T11:28:17Z",
+          "tree_id": "ca4b328adb7e5577dfddce1169b17d3ebc433bcf",
+          "url": "https://github.com/endavis/infrafoundry/commit/7281c93c42d52eda52bea268ff0acaaa53b4e08c"
+        },
+        "date": 1793014147816,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7984.4285907653075,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009914001396302196",
+            "extra": "mean: 125.24377776470914 usec\nrounds: 8509"
           }
         ]
       }
