@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793037246664,
+  "lastUpdate": 1793038596838,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10664,6 +10664,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000993475800042524",
             "extra": "mean: 125.49133760499448 usec\nrounds: 8584"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bd68bf0163133be9dcbdcace3cffbcdd187940e0",
+          "message": "fix: give every test its own state database (merges PR #1113, addresses #1110)\n\nStateManager() without a connection string falls back to\n~/.infrafoundry/state.db, so tests that build a real Orchestrator wrote\ndeployments and locks into the developer's own database, and a stale lock\nfrom one run failed the next. An autouse fixture in tests/conftest.py now\npoints INFRAFOUNDRY_STATE_HOME at a fresh tmp_path_factory directory per\ntest and clears INFRAFOUNDRY_STATE_BACKEND and INFRAFOUNDRY_STATE_CONNECTION.\n\nAddresses #1110\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T18:15:45Z",
+          "tree_id": "1113830dd78ea90cdfff81bb9b58993e45beb101",
+          "url": "https://github.com/endavis/infrafoundry/commit/bd68bf0163133be9dcbdcace3cffbcdd187940e0"
+        },
+        "date": 1793038594737,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7797.070902485293,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013276289933483871",
+            "extra": "mean: 128.25329056341567 usec\nrounds: 8573"
           }
         ]
       }
