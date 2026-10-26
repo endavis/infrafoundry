@@ -1313,6 +1313,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                             auto_approve=auto_approve,
                             target_resources=resource_filter if resource_filter else None,
                             parallelism=provider.terraform_parallelism,
+                            resource_names=[r.name for r in generate_resources],
                         )
                         provider_results[tool_name] = runner_result
 

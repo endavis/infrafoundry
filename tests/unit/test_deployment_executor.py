@@ -501,6 +501,10 @@ def test_apply_single_provider_handles_multiple_resources() -> None:
     assert state_manager.track_resource.call_count == 3
     assert state_manager.update_resource_state.call_count == 3
     assert results["terraform"]["success"] is True
+    # Every resource name reaches the runner, even with no filter, so prefixed
+    # terraform addresses map back to their names (#1099).
+    assert tf_runner.apply.call_args.kwargs["resource_names"] == ["vm1", "vm2", "net1"]
+    assert tf_runner.apply.call_args.kwargs["target_resources"] is None
 
 
 def test_apply_single_provider_tracks_state_for_opentofu_runner() -> None:

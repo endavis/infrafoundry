@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -580,3 +581,58 @@ class TestVerifyDestroyed:
         ):
             result = runner.verify_destroyed(provider, ["ontap-node-01"])
         assert result == ["ontap-node-01"]
+
+
+class TestOutcomeNamesWithoutFilter:
+    """Prefixed addresses map to resource names on an unfiltered run (#1099)."""
+
+    ADDRESS = "terraform_data.ova_vm_opnsense_test"
+
+    def _popen_mock(self, action: str) -> MagicMock:
+        line = json.dumps(
+            {
+                "type": "apply_complete",
+                "hook": {"resource": {"addr": self.ADDRESS}, "action": action},
+            }
+        )
+        process = MagicMock()
+        process.stdout = iter([line + "\n"])
+        process.stderr = MagicMock()
+        process.stderr.__iter__ = MagicMock(return_value=iter([]))
+        process.returncode = 0
+        process.wait.return_value = 0
+        return process
+
+    def _run(
+        self, runner: TerraformRunner, provider: MagicMock, command: str, **kwargs: Any
+    ) -> Any:
+        (provider.terraform_dir / "ova_vms.tf").write_text(
+            'resource "terraform_data" "ova_vm_opnsense_test" {\n}\n'
+        )
+        (provider.terraform_dir / ".terraform").mkdir()
+        action = "create" if command == "apply" else "delete"
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
+            patch("subprocess.Popen", return_value=self._popen_mock(action)),
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+            return getattr(runner, command)(provider, auto_approve=True, **kwargs)
+
+    @pytest.mark.parametrize("command", ["apply", "destroy"])
+    def test_resource_names_map_prefixed_address_without_a_filter(
+        self, runner: TerraformRunner, provider: MagicMock, command: str
+    ) -> None:
+        result = self._run(runner, provider, command, resource_names=["opnsense-test"])
+
+        [outcome] = result["resource_outcomes"]
+        assert outcome.address == self.ADDRESS
+        assert outcome.resource_name == "opnsense-test"
+
+    def test_target_resources_still_map_when_no_names_are_given(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        result = self._run(runner, provider, "apply", target_resources=["opnsense-test"])
+
+        [outcome] = result["resource_outcomes"]
+        assert outcome.resource_name == "opnsense-test"
