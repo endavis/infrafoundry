@@ -305,6 +305,24 @@ def mock_provider_config() -> dict[str, Any]:
     }
 
 
+@pytest.fixture(autouse=True)
+def _isolated_state_db(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Give every test its own state database instead of ``~/.infrafoundry/state.db``.
+
+    ``StateManager()`` without a connection string falls back to
+    ``~/.infrafoundry``, so tests that build a real ``Orchestrator`` left rows and
+    deployment locks in the developer's database, and a stale lock from one run
+    failed the next (#1110). The directory comes from ``tmp_path_factory`` so a
+    test's own ``tmp_path`` stays empty. A test that sets these variables itself
+    still wins, since its ``monkeypatch`` runs after this one.
+    """
+    monkeypatch.setenv("INFRAFOUNDRY_STATE_HOME", str(tmp_path_factory.mktemp("state-home")))
+    monkeypatch.delenv("INFRAFOUNDRY_STATE_BACKEND", raising=False)
+    monkeypatch.delenv("INFRAFOUNDRY_STATE_CONNECTION", raising=False)
+
+
 @pytest.fixture
 def mock_environment_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     """Set up mock environment variables."""
