@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793030261299,
+  "lastUpdate": 1793030792387,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10571,6 +10571,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000020477524131093684",
             "extra": "mean: 74.4659815526046 usec\nrounds: 14582"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "45e3d7859499d014d2f23432f04fbc334bddf39e",
+          "message": "docs: record the age/sops install action as a template divergence (merges PR #1107, addresses #1105)\n\nLists .github/actions/install-age-sops as InfraFoundry-only and notes in\nthe ci.yml, daily-check.yml and mutation.yml rows that age and sops are\ninstalled through it, so a template sync keeps the pinned install.\n\nAddresses #1105\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T16:05:22Z",
+          "tree_id": "670a09acdb7c5eae7466a57041d6affa9d18d780",
+          "url": "https://github.com/endavis/infrafoundry/commit/45e3d7859499d014d2f23432f04fbc334bddf39e"
+        },
+        "date": 1793030791575,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14717.68642441477,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022167271076631753",
+            "extra": "mean: 67.94546175009731 usec\nrounds: 17438"
           }
         ]
       }
