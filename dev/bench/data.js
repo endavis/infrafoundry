@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793004958568,
+  "lastUpdate": 1793009459113,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10261,6 +10261,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010231137063696528",
             "extra": "mean: 126.18806171394 usec\nrounds: 8588"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5d80dba1c62223172c044fc6e2d72e98f0c3f6ff",
+          "message": "feat: add foundry deps check and deps sync for blueprint requirements (merges PR #1086, addresses #1047)\n\ndeps check reports each requirement of the blueprints in scope and exits 1\nwhen any is unmet. deps sync installs the unmet ones (uv pip install into the\nrunning interpreter, ansible-galaxy collection install --upgrade from the\nblueprint's requirements file), then checks again. --dry-run prints the\ncommands. Every tool is located before anything runs. A failed install is\nRequirementInstallError, IF-PACKAGE-003.\n\nThe printed collection fix gains --upgrade: without it ansible-galaxy leaves\nan installed collection outside the range in place.\n\nAddresses #1047\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T10:10:05Z",
+          "tree_id": "12205188ac021271683eb6362985fcf767e91a74",
+          "url": "https://github.com/endavis/infrafoundry/commit/5d80dba1c62223172c044fc6e2d72e98f0c3f6ff"
+        },
+        "date": 1793009457706,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10450.363410242859,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007533385639174561",
+            "extra": "mean: 95.69045216359234 usec\nrounds: 10954"
           }
         ]
       }
