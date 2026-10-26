@@ -237,7 +237,8 @@ class TestConfigDoctorJsonFormat:
             data = json.loads(result.output)
             assert "checks" in data
             assert "summary" in data
-            assert data["summary"]["total"] == 6
+            # Six repository-wide checks plus one requirements check per environment (#1046).
+            assert data["summary"]["total"] == 6 + 2
             check_names = {c["name"] for c in data["checks"]}
             assert "Config Repository" in check_names
             assert "Blueprints" in check_names

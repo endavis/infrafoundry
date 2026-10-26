@@ -13,6 +13,7 @@ import yaml
 
 from infrafoundry.core.config.manifest_utils import extract_inventory_block
 from infrafoundry.core.exceptions import InvalidConfigurationError
+from infrafoundry.core.requirements.models import BlueprintRequirements
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,8 @@ class BlueprintResolver:
     A blueprint directory must contain a ``blueprint.yaml`` manifest with
     at minimum a ``name`` field.  Optional fields: ``description``,
     ``version``, ``defaults`` (dict), ``resources`` (list), ``events``
-    (dict), ``inventory`` (dict).
+    (dict), ``inventory`` (dict), ``requirements`` (dict; see
+    :class:`~infrafoundry.core.requirements.models.BlueprintRequirements`).
     """
 
     def __init__(self, base_dir: Path) -> None:
@@ -67,7 +69,8 @@ class BlueprintResolver:
         Returns:
             Parsed blueprint manifest as a dictionary with keys:
             ``name``, ``description``, ``version``, ``defaults``,
-            ``resources``, ``events``, ``inventory``, ``blueprint_dir``.
+            ``resources``, ``events``, ``inventory``, ``blueprint_dir``,
+            ``providers`` and ``requirements`` (a ``BlueprintRequirements``).
 
         Raises:
             InvalidConfigurationError: If the blueprint directory or
@@ -134,6 +137,9 @@ class BlueprintResolver:
             "inventory_raw": inventory_raw,
             "blueprint_dir": blueprint_dir,
             "providers": normalised_providers,
+            "requirements": BlueprintRequirements.parse(
+                data.get("requirements"), blueprint_dir, blueprint_name
+            ),
         }
 
         logger.debug(

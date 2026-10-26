@@ -142,3 +142,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | ADR | Title | Status |
 |-----|-------|--------|
 | [0016](0016-direct-opnsense-nested-yaml-schema.md) | Direct-OPNsense nested YAML schema convention | Accepted |
+| [0017](0017-blueprint-declared-requirements-with-a-preflight-check.md) | Blueprint-declared requirements with a preflight check | Accepted |
