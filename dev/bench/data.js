@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793022568373,
+  "lastUpdate": 1793022868491,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10447,6 +10447,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010025642616206356",
             "extra": "mean: 127.00875675036364 usec\nrounds: 8481"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e5cc6ad5538943244e91fb5880a96e94f7e7cce",
+          "message": "docs: note the check-yaml blueprint exclusion as a template divergence (merges PR #1098, addresses #1096)\n\nRecords the .pre-commit-config.yaml check-yaml exclude for Jinja2\nblueprint resource templates in the hand-merge spot-check list, so a\ntemplate sync keeps it.\n\nAddresses #1096\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T13:53:32Z",
+          "tree_id": "fc67ce07d80a41dc6c314b5c9e03dc5c528f6401",
+          "url": "https://github.com/endavis/infrafoundry/commit/4e5cc6ad5538943244e91fb5880a96e94f7e7cce"
+        },
+        "date": 1793022867035,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12558.153970061563,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010081616545347083",
+            "extra": "mean: 79.62953809803447 usec\nrounds: 13754"
           }
         ]
       }
