@@ -160,6 +160,7 @@ customization a reviewer must verify survived the merge.
 | `tests/test_markdown_links.py` | Preserves the `is_sync_excluded` skip, so links in template-owned files to excluded upstream files are not reported (#1057). |
 | `tests/test_documented_paths.py` | Preserves the `is_sync_excluded` skip, the committed-files-only scan, the `HISTORICAL` exemptions for dated records, the package/provider/example-config shorthand bases, and the InfraFoundry `ALLOWED` entries for config-repo walkthrough paths (#1057). |
 | `tests/test_instruction_pointers.py` | Preserves `_committed_markdown()`, so anchor checks skip git-ignored trees such as `generated/` (#1057). |
+| `docs/development/ci-cd-testing.md` | Upstream's text, localized: Linux-only platforms (ADR-0001), coverage of `infrafoundry`, the Terraform/OpenTofu/age/sops installs and Codecov upload, `doit lint_blueprints` in the `lint` row (checked by `tests/test_ci_jobs_doc.py`), the strict docs build, the `check-commit-issue-ref` hook row, no hook-skipping tip, and upstream issue numbers written as `endavis/pyproject-template#NNN` (#1057). |
 | `tests/test_docs_frontmatter.py` | Preserves the `dict[str, Any]` return type on `_frontmatter`, which local `disallow_any_generics` requires (#1057). |
 | `tools/doit/quality.py` | Preserves `task_lint_blueprints()` and any sibling blueprint-specific tasks. |
 | `tools/doit/install_tools.py` | Preserves age/sops/terraform/opentofu installer tasks. |
@@ -179,5 +180,4 @@ deferrals should be logged here with a pointer to the follow-up issue.
 
 | File | Why deferred | Follow-up |
 | :--- | :--- | :--- |
-| `docs/development/ci-cd-testing.md` | Upstream's rewrite drops InfraFoundry's pre-commit hook tables; needs a hand merge. | #1057 |
 | `tests/test_release_steps_doc.py` and the release-steps docs | Waits on the `release.py` reconciliation. | #1059 |
