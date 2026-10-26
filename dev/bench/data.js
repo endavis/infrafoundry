@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793016851218,
+  "lastUpdate": 1793022286295,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10385,6 +10385,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001766348761381833",
             "extra": "mean: 65.15572278238568 usec\nrounds: 16662"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "34f81380311f76122e1770cb04efd11196576f0d",
+          "message": "chore: exclude jinja blueprint templates from check-yaml (merges PR #1097, addresses #1096)\n\nBlueprint resource templates are Jinja2, not YAML: an unquoted integer\nplaceholder such as `vmid: {{ vmid }}` parses as a mapping used as a key,\nand quoting it would load the rendered value as a string. check-yaml\nrejected ten committed templates and blocked any commit touching one.\n\nSkip every .yaml file under blueprints/ except blueprint.yaml. Playbooks,\nroles and requirements files use .yml and stay checked.\n\nAddresses #1096\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-26T13:43:49Z",
+          "tree_id": "fd2460d6255b4017eb1aa4964e110171b26993ac",
+          "url": "https://github.com/endavis/infrafoundry/commit/34f81380311f76122e1770cb04efd11196576f0d"
+        },
+        "date": 1793022285126,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10703.120844914642,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004815946667465643",
+            "extra": "mean: 93.43069320525598 usec\nrounds: 11141"
           }
         ]
       }
