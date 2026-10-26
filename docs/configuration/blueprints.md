@@ -136,6 +136,46 @@ inputs:
     default: 4096
 ```
 
+## The `requirements:` Block
+
+A blueprint declares the Python packages and Ansible collections its event handlers
+and playbooks need. InfraFoundry checks them before any provider work, so a missing
+dependency fails the run up front instead of after infrastructure has been created
+([ADR-0017](../decisions/0017-blueprint-declared-requirements-with-a-preflight-check.md)).
+
+```yaml
+requirements:
+  python:
+    - spec: "netapp-lib>=2021.6.25"   # PEP 508 requirement
+      import: netapp_lib              # optional: module to import-check
+    - "requests>=2.31"                # a plain string works when no import name is needed
+  ansible_collections: requirements.yml   # ansible-galaxy requirements file, relative to the blueprint
+```
+
+- **`python`**: each entry is a PEP 508 spec, as a string or as a mapping with `spec` and an
+  optional `import`. Use `import` when the module name differs from the distribution name.
+  An entry whose environment marker excludes this interpreter is skipped.
+- **`ansible_collections`**: a path, inside the blueprint directory, to the `requirements.yml`
+  you would pass to `ansible-galaxy collection install -r`. Collection versions use galaxy's
+  syntax (`*`, `1.2.3`, `>=22.0.0`, `>=1.0,<2.0`).
+- The block is optional. A blueprint without it has no requirements.
+
+**When it is checked.** `foundry infra plan`, `infra apply` and `infra destroy` check the
+requirements of every blueprint used by the packages in scope. That is the whole environment,
+narrowed by `--package` or `--provider`. An unmet requirement stops the run with error
+`IF-PACKAGE-002`, which names the package, the blueprints that need it, and the command that
+installs it. `foundry config doctor` reports the same check for every environment.
+
+**Install them yourself.** Nothing is installed during a run. Install Python packages into the
+environment that runs InfraFoundry (`uv pip install '<spec>'`) and collections with
+`ansible-galaxy collection install -r <file>`.
+
+!!! note "Which Python Ansible uses"
+    The check looks at the interpreter running InfraFoundry. Ansible runs local-connection
+    modules under the interpreter it discovers, which may be the system Python, unless the
+    inventory sets `ansible_python_interpreter: "{{ ansible_playbook_python }}"`. Pin it in
+    blueprints whose modules need these packages.
+
 ## Shared Resource Templates
 
 Multi-provider blueprints can use a single shared resource file with Jinja2

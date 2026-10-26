@@ -9,6 +9,7 @@ import click
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.requirements.manager import RequirementsManager
 
 from ...utils import console as cli_console
 from ...utils import raise_cli_error
@@ -105,6 +106,69 @@ def _check_environments(config_dir: Path | None) -> CheckResult:
             message=f"Error: {e}",
             suggestion="Check configuration directory structure",
         )
+
+
+def _check_requirements(config_dir: Path | None) -> list[CheckResult]:
+    """Check each environment's blueprint requirements (#1046).
+
+    Args:
+        config_dir: Path to the config repository, or ``None``.
+
+    Returns:
+        One ``CheckResult`` per environment, or a single warning when the
+        config repo is not set.
+    """
+    if config_dir:
+        config_manager = ConfigManager(base_dir=config_dir / "envs")
+    elif config_repo := os.getenv("INFRAFOUNDRY_CONFIG_REPO"):
+        config_manager = ConfigManager(base_dir=Path(config_repo) / "envs")
+    else:
+        return [
+            CheckResult(
+                name="Requirements",
+                status="warning",
+                message="Cannot check - config repo not set",
+                suggestion="Configure INFRAFOUNDRY_CONFIG_REPO first",
+            )
+        ]
+
+    manager = RequirementsManager(config_manager)
+    results: list[CheckResult] = []
+    for env_name in config_manager.list_environments():
+        name = f"Requirements ({env_name})"
+        try:
+            report = manager.check(env_name)
+        except Exception as e:
+            results.append(
+                CheckResult(
+                    name=name,
+                    status="error",
+                    message=f"Error: {e}",
+                    suggestion="Fix the blueprint's requirements: block",
+                )
+            )
+            continue
+        if not report.statuses:
+            results.append(CheckResult(name=name, status="ok", message="No blueprint requirements"))
+        elif report.unmet:
+            unmet = ", ".join(f"{s.name}{s.wanted} ({s.problem})" for s in report.unmet)
+            results.append(
+                CheckResult(
+                    name=name,
+                    status="error",
+                    message=f"{len(report.unmet)} of {len(report.statuses)} unmet: {unmet}",
+                    suggestion="; ".join(dict.fromkeys(s.fix for s in report.unmet)),
+                )
+            )
+        else:
+            results.append(
+                CheckResult(
+                    name=name,
+                    status="ok",
+                    message=f"{len(report.statuses)} met",
+                )
+            )
+    return results
 
 
 def _check_state_backend() -> CheckResult:
@@ -324,7 +388,7 @@ def _check_blueprints() -> CheckResult:
 def doctor(ctx: click.Context, output_format: str, deep: bool) -> None:
     """Check configuration repository health.
 
-    Runs six checks against the configuration repository:
+    Runs seven checks against the configuration repository:
 
     \b
     1. Config repo exists with envs/ directory
@@ -333,6 +397,7 @@ def doctor(ctx: click.Context, output_format: str, deep: bool) -> None:
     4. SOPS/age keys are configured
     5. State/filesystem consistency
     6. Blueprint template validation
+    7. Blueprint requirements installed, per environment
 
     Use --deep to include per-environment resource counts.
 
@@ -362,6 +427,7 @@ def doctor(ctx: click.Context, output_format: str, deep: bool) -> None:
         results.append(_check_sops_keys())
         results.append(_check_consistency(config_dir, deep))
         results.append(_check_blueprints())
+        results.extend(_check_requirements(config_dir))
 
         if output_format == "json":
             render_check_results_json(results)

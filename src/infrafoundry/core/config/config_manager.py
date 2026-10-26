@@ -9,7 +9,7 @@ import yaml
 
 from infrafoundry.core.base_manager import PathBasedManager
 from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
-from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
+from infrafoundry.core.config.models import EnvironmentConfig, IaCTool, PackageManifest
 from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
@@ -409,6 +409,40 @@ class ConfigManager(PathBasedManager):
             self._log_warning(f"Environment {env_name} missing settings.yaml")
 
         return is_valid
+
+    @property
+    def blueprint_resolver(self) -> BlueprintResolver:
+        """The resolver packages use for their ``blueprint:`` references."""
+        return self._blueprint_resolver
+
+    def list_package_manifests(self, env_name: str) -> list[tuple[str | None, PackageManifest]]:
+        """List every package in an environment with the provider it targets.
+
+        Covers provider-scoped packages (``envs/<env>/<provider>/<package>/``) and
+        env-root packages (``envs/<env>/<package>/``). Manifests are parsed but not
+        loaded, so blueprints are not resolved and no resource file is rendered.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            ``(provider, manifest)`` pairs. The provider is the manifest's
+            ``provider:`` when set, else the provider directory; it is ``None``
+            for an env-root package that names no provider.
+        """
+        manifests: list[tuple[str | None, PackageManifest]] = []
+        for provider_name in sorted(self.provider_centric.discover_providers(env_name)):
+            for package_dir in self._package_loader.discover_packages(env_name, provider_name):
+                manifest = self._package_loader._parse_manifest(
+                    package_dir / PackageLoader.MANIFEST_FILENAME
+                )
+                manifests.append((manifest.provider or provider_name, manifest))
+        for package_dir in self._package_loader.discover_env_root_packages(env_name):
+            manifest = self._package_loader._parse_manifest(
+                package_dir / PackageLoader.MANIFEST_FILENAME
+            )
+            manifests.append((manifest.provider, manifest))
+        return manifests
 
     def resolve_package_filter(self, env_name: str, package_name: str) -> list[str]:
         """Resolve a package name to a list of unique resource names.

@@ -354,6 +354,20 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
             "Verify the package directory contains an infrafoundry.yml manifest",
         ],
     ),
+    "IF-PACKAGE-002": ErrorInfo(
+        code="IF-PACKAGE-002",
+        title="Blueprint Requirements Not Met",
+        description=(
+            "A blueprint used by a package in scope declares Python packages or Ansible "
+            "collections that are missing or at the wrong version."
+        ),
+        suggestions=[
+            "Run the install command printed for each unmet requirement",
+            "Run 'foundry config doctor' to see every environment's requirement status",
+            "Narrow the scope with --package or --provider if the package is not needed",
+        ],
+        see_also="docs/configuration/blueprints.md",
+    ),
     # Dependency errors (IF-DEPENDENCY-XXX)
     "IF-DEPENDENCY-001": ErrorInfo(
         code="IF-DEPENDENCY-001",
@@ -554,6 +568,7 @@ _EXCEPTION_TO_CODE: dict[str, str] = {
     "ResourceFilterError": "IF-VALIDATION-005",
     # Package errors
     "PackageNotFoundError": "IF-PACKAGE-001",
+    "MissingRequirementsError": "IF-PACKAGE-002",
     # Dependency errors
     "CircularDependencyError": "IF-DEPENDENCY-001",
     "MissingDependencyError": "IF-DEPENDENCY-002",

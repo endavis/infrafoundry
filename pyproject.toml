@@ -26,6 +26,7 @@ dependencies = [
     "boto3>=1.43.67",
     "azure-identity>=1.15.0",
     "azure-keyvault-secrets>=4.11.0",
+    "packaging>=24.0",
 ]
 
 [project.optional-dependencies]

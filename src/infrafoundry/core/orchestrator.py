@@ -34,6 +34,7 @@ from infrafoundry.core.policy import PolicyEngine, PolicyViolation
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_registry_service import ProviderRegistryService
+from infrafoundry.core.requirements.manager import RequirementsManager
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
@@ -121,6 +122,7 @@ class Orchestrator:
             self.event_manager,
             self.providers,
         )
+        self.requirements_manager = RequirementsManager(self.config_manager)
         self.deployment_executor = DeploymentExecutor(
             self.runner_registry,
             self.state_manager,
@@ -538,7 +540,13 @@ class Orchestrator:
 
         Returns:
             Dict with plan results per provider
+
+        Raises:
+            MissingRequirementsError: If a blueprint in scope has unmet
+                requirements. Checked before any provider work; ``apply``
+                inherits the check through this call.
         """
+        self.requirements_manager.ensure(env_name, package_filter, provider_filter)
         return self.plan_orchestrator.plan(
             env_name,
             dry_run,
@@ -731,7 +739,13 @@ class Orchestrator:
 
         Returns:
             Dict with destroy results per provider
+
+        Raises:
+            MissingRequirementsError: If a blueprint in scope has unmet
+                requirements. Checked before the lock is taken, since
+                ``before_destroy`` handlers may need them.
         """
+        self.requirements_manager.ensure(env_name, package_filter, provider_filter)
         locked_by = _build_lock_holder_id()
         with environment_lock(
             self.state_manager,

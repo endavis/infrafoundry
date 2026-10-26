@@ -213,6 +213,14 @@ class PackageNotFoundError(InfraFoundryError):
     """Raised when a named package is not found in the environment."""
 
 
+class MissingRequirementsError(InfraFoundryError):
+    """Raised when blueprint-declared requirements are not met (#1046).
+
+    The preflight check raises it before any provider or runner work, so a
+    missing dependency cannot surface halfway through an apply.
+    """
+
+
 class ProviderFilterError(InfraFoundryError):
     """Raised when ``--provider`` filter references unknown provider names.
 

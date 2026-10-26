@@ -27,6 +27,7 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 | [SECRET](#secret-errors-if-secret) | Secret management errors |
 | [POLICY](#policy-errors-if-policy) | Policy violation errors |
 | [VALIDATION](#validation-errors-if-validation) | Configuration validation errors |
+| [PACKAGE](#package-errors-if-package) | Package and blueprint requirement errors |
 | [DEPENDENCY](#dependency-errors-if-dependency) | Resource dependency errors |
 | [API](#api-errors-if-api) | External API errors |
 | [TEMPLATE](#template-errors-if-template) | Template rendering errors |
@@ -369,6 +370,34 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 1. Review schema requirements in documentation
 2. Check for missing required fields
 3. Verify data types match expected schema
+
+---
+
+## Package Errors (IF-PACKAGE)
+
+### IF-PACKAGE-001: Package Not Found
+
+**Cause:** The specified infrastructure package was not found in the environment.
+
+**Solutions:**
+1. Check the package name spelling
+2. Run `foundry infra list --env <env>` to see available packages
+3. Verify the package directory contains an `infrafoundry.yml` manifest
+
+---
+
+### IF-PACKAGE-002: Blueprint Requirements Not Met
+
+**Cause:** A blueprint used by a package in scope declares Python packages or Ansible collections
+that are missing or at the wrong version. `infra plan`, `infra apply` and `infra destroy` check
+them before any provider work.
+
+**Solutions:**
+1. Run the install command printed for each unmet requirement
+2. Run `foundry config doctor` to see every environment's requirement status
+3. Narrow the scope with `--package` or `--provider` if the package is not needed
+
+See [Configuration Blueprints — The `requirements:` Block](../configuration/blueprints.md#the-requirements-block).
 
 ---
 

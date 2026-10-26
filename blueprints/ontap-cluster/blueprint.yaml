@@ -2,6 +2,15 @@ name: ontap-cluster
 description: "NetApp ONTAP Simulator 2-node cluster on Proxmox"
 version: "1.0.0"
 
+# Installed separately from InfraFoundry; `infra plan/apply/destroy` refuse to
+# start while these are missing, and `config doctor` reports them (#1046).
+requirements:
+  python:
+    # Needed by the netapp.ontap ZAPI modules (e.g. CIFS server creation)
+    - spec: "netapp-lib>=2021.6.25"
+      import: netapp_lib
+  ansible_collections: requirements.yml
+
 inputs:
   # --- Required per-instance inputs (no default) ---
   - name: cluster_name
