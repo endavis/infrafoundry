@@ -96,7 +96,6 @@ ALLOWED: dict[str, str] = {
     "proxmox/ontap-cluster/scripts/": "rewritten event script path in the ontap-cluster example",
     "envs/dev/proxmox/ontap-cluster/scripts/": "resolved event script path in the example",
     "endavis-infra/": "a separate configuration repository named in ADR-0016",
-    "tests/test_release_steps_doc.py": "upstream test listed as deferred in the divergences doc",
     "tests/unit/providers/opnsense/test_dhcp_validator.py": "named in ADR-0014 as deleted",
     "tests/integration/test_opnsense_nested_plan.py": "planned in ADR-0016's test plan",
     "src/infrafoundry/providers/opnsense/validators/firewall_validator.py": (
