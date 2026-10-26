@@ -44,6 +44,30 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
+      # The same tools ci.yml installs: the test suite runs terraform and
+      # age-keygen, so without them the daily check fails where CI passes (#1095).
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_wrapper: false
+
+      - name: Install system tools (age, sops)
+        run: |
+          mkdir -p ~/.local/bin
+          # age + age-keygen
+          AGE_VERSION=$(curl -s https://api.github.com/repos/FiloSottile/age/releases/latest -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" | jq -r .tag_name)
+          curl -sL "https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-amd64.tar.gz" | tar xz -C /tmp
+          mv /tmp/age/age /tmp/age/age-keygen ~/.local/bin/
+          # sops
+          SOPS_VERSION=$(curl -s https://api.github.com/repos/getsops/sops/releases/latest -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" | jq -r .tag_name)
+          curl -sL "https://github.com/getsops/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux.amd64" -o ~/.local/bin/sops
+          chmod +x ~/.local/bin/sops
+
       # --continue runs every task after a failure, so a second failure is not
       # hidden behind the first. The log feeds the failing-task list below (#952).
       - name: Run doit check
