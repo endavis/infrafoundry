@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793105080821,
+  "lastUpdate": 1793105863595,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10912,6 +10912,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011022179902381467",
             "extra": "mean: 125.96144010846544 usec\nrounds: 8482"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "aac89bdccf75f71e9ae6e8c963eb984eab342c68",
+          "message": "chore: clear pyright errors in src (merges PR #1123, addresses #1121)\n\npyright 1.1.414 reported 16 errors in src/; it now reports none, and\nmypy still passes with no new unreachable code.\n\n- The provider mixins declare, under TYPE_CHECKING, the attributes they\n  take from their host class, as TerraformGeneratorMixin and\n  CloudInitMixin already did.\n- Two runtime-checkable protocols, HasSnippetStrictness and\n  VerifiesDestroy, replace the orchestrator's hasattr guards. isinstance\n  against them checks the same attribute, and lets pyright narrow.\n- The python event handler binds the looked-up callable to a local\n  before caching it.\n- The proxmox template and VMID validators skip cluster entries that\n  lack the key they index, where they used to raise KeyError.\n\nAddresses #1121\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T12:56:51Z",
+          "tree_id": "ae7fb87c58c58dbfa795ea5a5ce358b1a8f5ffe7",
+          "url": "https://github.com/endavis/infrafoundry/commit/aac89bdccf75f71e9ae6e8c963eb984eab342c68"
+        },
+        "date": 1793105862783,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7967.470585565625,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009738053950527735",
+            "extra": "mean: 125.510347262739 usec\nrounds: 8567"
           }
         ]
       }
