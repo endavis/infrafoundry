@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793109626330,
+  "lastUpdate": 1793111352123,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11036,6 +11036,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000017282215322454804",
             "extra": "mean: 64.49412476938795 usec\nrounds: 16807"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b202a2f9e14a098621e0e4e24fa41f46edc50c38",
+          "message": "fix: plan opnsense resources from every package and keep filtered runs add-only (merges PR #1129, addresses #1128)\n\nOPNsenseDirectRunner built its desired state with\nget_all_resources(env, \"opnsense\"), which reads only envs/<env>/opnsense/\nand resource-centric files. OPNsense resources declared in another\nprovider's package, like the DHCP reservations in the k3s, aiqum and\nontap proxmox blueprints, never reached it: no apply created them, and a\nfull-reconcile plan could delete them. It now loads the whole environment,\nas the orchestrator does, and keeps provider == \"opnsense\".\n\nWith those resources visible, a filtered run (-r/-p) handed each manager\nonly its targets, and full reconcile planned to delete every other live\nobject of that type (17 reservations for -p k3s-cluster on prod). Filtered\nplans and applies are now add-only, so they never delete outside the\nfilter; deletes need an unfiltered run.\n\nADR-0014 and the --add-only help record both rules.\n\nAddresses #1128\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T14:28:21Z",
+          "tree_id": "9b03fc0f2c583cf2e69ec99c497beca0da2beec6",
+          "url": "https://github.com/endavis/infrafoundry/commit/b202a2f9e14a098621e0e4e24fa41f46edc50c38"
+        },
+        "date": 1793111351324,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9562.935480375278,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000017878732291641575",
+            "extra": "mean: 104.57040121750953 usec\nrounds: 10842"
           }
         ]
       }
