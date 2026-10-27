@@ -51,7 +51,9 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Run mutmut
-        timeout-minutes: 120
+        # The first run to test every mutant hit the old 120-minute limit with
+        # 273 of 48,611 left (#1116). mutmut already uses every CPU the runner has.
+        timeout-minutes: 180
         run: |
           mkdir -p tmp
           # Surviving mutants do not fail this step. mutmut exits non-zero only
