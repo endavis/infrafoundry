@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793130496221,
+  "lastUpdate": 1793131344482,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11408,6 +11408,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016990709600845082",
             "extra": "mean: 65.18686963781016 usec\nrounds: 17390"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9f84b2185a1efc50b45619c8477955f91e324223",
+          "message": "fix: accept proxmox sdn vnets as bridges in infra doctor (merges PR #1156, addresses #1154)\n\nThe bridge check listed only nodes/<node>/network bridges, which leaves\nout SDN vnets, so every VM on a vnet failed doctor. A bridge missing from\nthe node is now checked against the cluster's running SDN vnets\n(cluster/sdn/vnets?running=1), fetched once and only when needed. A vnet\ndeclared in the validated resources but not applied yet is a warning.\nBridges are checked in sorted order so the report order is stable.\n\nAddresses #1154\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T20:01:25Z",
+          "tree_id": "7c0372496f9908d4a2c6333eec734de892381800",
+          "url": "https://github.com/endavis/infrafoundry/commit/9f84b2185a1efc50b45619c8477955f91e324223"
+        },
+        "date": 1793131342987,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7813.855481698903,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011187563393207356",
+            "extra": "mean: 127.97779564033837 usec\nrounds: 8441"
           }
         ]
       }
