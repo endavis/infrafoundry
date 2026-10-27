@@ -59,7 +59,7 @@ from typing import Any, Literal
 from infrafoundry.core.provider import ResourceConfig
 
 from ._nested_emit import emit_nested_list_yaml
-from .base import BaseService
+from .base import BaseService, raise_on_failed_write
 
 # Allowed values for the ``ipprotocol`` discriminator.
 GatewayProtocol = Literal["inet", "inet6"]
@@ -291,6 +291,9 @@ def _needs_update(have: LiveGateway, want: GatewayConfig) -> bool:
     payload = want.to_payload()["gateway_item"]
     for key, want_value in payload.items():
         have_value = _normalize_field(have.raw.get(key))
+        if key == "monitor" and want_value == "" and have_value == want.gateway:
+            # Unset monitor: OPNsense monitors the gateway address (#1151).
+            continue
         if str(want_value) != have_value:
             return True
     return False
@@ -580,15 +583,15 @@ class GatewayService(BaseService):
         deleted = 0
 
         for gateway in diff.adds:
-            self.add(gateway)
+            raise_on_failed_write(self.add(gateway), f"add gateway {gateway.name}")
             created += 1
 
         for live, want in diff.updates:
-            self.update(live.uuid, want)
+            raise_on_failed_write(self.update(live.uuid, want), f"update gateway {want.name}")
             updated += 1
 
         for live in diff.deletes:
-            self.delete(live.uuid)
+            raise_on_failed_write(self.delete(live.uuid), f"delete gateway {live.name}")
             deleted += 1
 
         if created or updated or deleted:
