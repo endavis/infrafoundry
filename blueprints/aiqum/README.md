@@ -70,7 +70,7 @@ infra apply --env <env> --package aiqum
 | `memory` | `12288` | Memory in MiB (AIQUM minimum) |
 | `disk_size` | `150` | Disk size in GiB (AIQUM minimum) |
 | `bridge` | `vmbr0` | Network bridge |
-| `vlan_tag` | `10` | VLAN tag for the VM NIC |
+| `vlan_tag` | `10` | VLAN tag for the VM NIC. Empty: untagged, e.g. on an SDN vnet |
 | `mac_address` | `""` | VM MAC (empty = Proxmox auto-assigns) |
 | `aiqum_admin_user` | `umadmin` | AIQUM admin username |
 | `smtp_port` | `587` | SMTP port |

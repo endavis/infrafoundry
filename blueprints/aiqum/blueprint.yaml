@@ -38,6 +38,7 @@ inputs:
   - name: bridge
     default: vmbr0
   - name: vlan_tag
+    description: 'VLAN tag on the bridge. Empty: untagged (e.g. an SDN vnet)'
     default: 10
   - name: mac_address
     description: "Empty: Proxmox auto-assigns"

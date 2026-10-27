@@ -15,7 +15,9 @@ vms:
       size: {{ disk_size }}
     network:
       - bridge: "{{ bridge }}"
+{% if vlan_tag %}
         tag: {{ vlan_tag }}
+{% endif %}
 {% if mac_address %}
         macaddr: "{{ mac_address }}"
 {% endif %}
