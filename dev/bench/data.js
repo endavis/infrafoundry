@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793111352123,
+  "lastUpdate": 1793113868649,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11067,6 +11067,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000017878732291641575",
             "extra": "mean: 104.57040121750953 usec\nrounds: 10842"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c9c9c3852fb5570bb5c43bd2a6c4779411d8dfc5",
+          "message": "fix: report a filter-skipped terraform plan as skipped (merges PR #1130, addresses #1125)\n\nWhen a resource filter leaves a provider with no terraform resources, the\nrunner skips terraform on purpose and returns empty output. The plan\nsummary then printed \"Unable to parse plan output\", the same text as a\nreal parse failure, and drift parsing flagged the result as unparsed.\n\nThe runner now marks that result skipped: True. The plan workflow prints\n\"terraform: skipped (no resources matched the filter)\" and\nparse_plan_for_drift returns no changes with the same summary.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T15:08:17Z",
+          "tree_id": "3a15f7f5fbba44231a5e3182a1b272b2a00925b1",
+          "url": "https://github.com/endavis/infrafoundry/commit/c9c9c3852fb5570bb5c43bd2a6c4779411d8dfc5"
+        },
+        "date": 1793113867499,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7760.218224549774,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001192384115321344",
+            "extra": "mean: 128.86235555031922 usec\nrounds: 8342"
           }
         ]
       }
