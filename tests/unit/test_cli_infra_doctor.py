@@ -10,6 +10,8 @@ import pytest
 from click.testing import CliRunner
 
 from infrafoundry.cli.main import main
+from infrafoundry.core.jumphost_preflight import Check, JumphostReport, Status
+from infrafoundry.core.provider import ResourceConfig
 
 
 @pytest.fixture
@@ -156,3 +158,115 @@ class TestInfraDoctorVerbose:
             resource_filter=None,
             verbose=True,
         )
+
+
+def _vm(name: str, jumphost: str = "") -> ResourceConfig:
+    pkg_vars = {"jumphost": jumphost} if jumphost else {}
+    return ResourceConfig(
+        name=name, type="vm", provider="proxmox", config={}, package_variables=pkg_vars
+    )
+
+
+def _report(jumphost: str, status: Status) -> JumphostReport:
+    return JumphostReport(jumphost, [Check("SSH to jumphost", status, "detail")])
+
+
+@pytest.mark.unit
+class TestInfraDoctorPackage:
+    """Tests for --package and the jumphost preflight (#657)."""
+
+    def _invoke(self, cli_runner: CliRunner, tmp_path: Path, *args: str) -> Any:
+        return cli_runner.invoke(
+            main, ["-c", str(tmp_path), "infra", "doctor", "--env", "test", *args]
+        )
+
+    @patch("infrafoundry.cli.commands.infra.doctor.check_jumphost")
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_package_resolves_filter_and_checks_its_jumphost(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        mock_check: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """-p validates the package's resources and checks only their jumphost."""
+        orch = _mock_orchestrator(has_errors=False)
+        orch.config_manager.resolve_package_filter.return_value = ["k3s-server"]
+        orch.config_manager.get_all_resources_all_providers.return_value = [
+            _vm("k3s-server", jumphost="ansible@jump"),
+            _vm("other", jumphost="root@elsewhere"),
+        ]
+        mock_get_orch.return_value = orch
+        mock_check.return_value = _report("ansible@jump", Status.OK)
+
+        result = self._invoke(cli_runner, tmp_path, "-p", "k3s-cluster")
+
+        assert result.exit_code == 0, result.output
+        orch.config_manager.resolve_package_filter.assert_called_once_with("test", "k3s-cluster")
+        orch.validate.assert_called_once_with(
+            env_name="test", resource_filter=["k3s-server"], verbose=False
+        )
+        mock_check.assert_called_once_with("ansible@jump", [])
+        assert "Jumphost preflight (ansible@jump)" in result.output
+        assert "[OK] SSH to jumphost: detail" in result.output
+
+    @patch("infrafoundry.cli.commands.infra.doctor.check_jumphost")
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_jumphost_failure_exits_one(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        mock_check: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """A failed jumphost check fails doctor even when provider validation passes."""
+        orch = _mock_orchestrator(has_errors=False)
+        orch.config_manager.get_all_resources_all_providers.return_value = [
+            _vm("vm1", jumphost="ansible@jump")
+        ]
+        mock_get_orch.return_value = orch
+        mock_check.return_value = _report("ansible@jump", Status.FAIL)
+
+        result = self._invoke(cli_runner, tmp_path)
+
+        assert result.exit_code == 1
+        assert "[FAIL] SSH to jumphost" in result.output
+
+    @patch("infrafoundry.cli.commands.infra.doctor.check_jumphost")
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_no_jumphost_runs_no_preflight(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        mock_check: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """Packages without a jumphost get no jumphost section."""
+        orch = _mock_orchestrator(has_errors=False)
+        orch.config_manager.get_all_resources_all_providers.return_value = [_vm("vm1")]
+        mock_get_orch.return_value = orch
+
+        result = self._invoke(cli_runner, tmp_path)
+
+        assert result.exit_code == 0
+        mock_check.assert_not_called()
+        assert "Jumphost preflight" not in result.output
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_package_and_resource_are_exclusive(
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """-p together with -r is a usage error."""
+        mock_get_orch.return_value = _mock_orchestrator()
+
+        result = self._invoke(cli_runner, tmp_path, "-p", "pkg", "-r", "vm1")
+
+        assert result.exit_code == 2
+        assert "mutually exclusive" in result.output
