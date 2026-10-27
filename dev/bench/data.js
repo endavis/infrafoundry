@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793127158710,
+  "lastUpdate": 1793128117204,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11284,6 +11284,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011154497711121977",
             "extra": "mean: 125.73740044263194 usec\nrounds: 8588"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e2fa2db7d84e2248524c9241288d4cff76d2f4c4",
+          "message": "fix: turn off dnsmasq dhcp in the opnsense-vm bootstrap (merges PR #1147, addresses #1143)\n\nThe nano image ships dnsmasq serving DHCP on LAN, which the provider\ncannot manage and which would run alongside a Kea subnet on the same\ninterface. The bootstrap now sets dnsmasq enable to 0 and removes every\ndhcp_ranges entry in the same config.xml edit that sets the addresses.\n\nAddresses #1143\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T19:07:35Z",
+          "tree_id": "c651c9f5bc14bebadde8af4d5238d1412424b800",
+          "url": "https://github.com/endavis/infrafoundry/commit/e2fa2db7d84e2248524c9241288d4cff76d2f4c4"
+        },
+        "date": 1793128115949,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7763.517648380338,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009898578109060998",
+            "extra": "mean: 128.80759023052198 usec\nrounds: 8373"
           }
         ]
       }
