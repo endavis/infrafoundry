@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793121523104,
+  "lastUpdate": 1793124087752,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11160,6 +11160,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002308472955517741",
             "extra": "mean: 66.37677929408048 usec\nrounds: 16121"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "747f8ec00b2cff699917ec6ec845880b56fe5aff",
+          "message": "feat: check jumphost targets and outputs in infra doctor (merges PR #1135, addresses #657)\n\nThe jumphost preflight now also checks each VM the package's scripts\nwill reach, found through its DHCP reservation as the known_hosts\ncleanup does. A deployed VM must accept SSH from the jumphost, with the\nscripts' own options; the failure carries ssh's last error line. A VM\nnot deployed yet needs a route from the jumphost and an IP nothing\nanswers on. Deployment state comes from the newest state-DB row that\nis not \"planned\", since every plan adds a planned row.\n\nEach in-scope outputs: destination is rendered against the package\nvariables and checked on the workstation. These only WARN, as the\nscript handler only warns when a copy fails.\n\nThe stale known_hosts check in the plan was dropped: the scripts SSH to\ntargets with UserKnownHostsFile=/dev/null, so a leftover entry can't\nbreak an apply.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T18:00:33Z",
+          "tree_id": "b9239df3ff968ebaf876754e84a902237ca3835d",
+          "url": "https://github.com/endavis/infrafoundry/commit/747f8ec00b2cff699917ec6ec845880b56fe5aff"
+        },
+        "date": 1793124086102,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15249.601621895199,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000018791095188394514",
+            "extra": "mean: 65.57548353028527 usec\nrounds: 16667"
           }
         ]
       }
