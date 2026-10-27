@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793129285837,
+  "lastUpdate": 1793130496221,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11377,6 +11377,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011714203188862676",
             "extra": "mean: 128.95053330176754 usec\nrounds: 8438"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2251725177ff6f56c9ce4323b21e5b4f6ff1e9b6",
+          "message": "fix: fail opnsense route and gateway applies on rejected writes (merges PR #1152, addresses #1151)\n\nOPNsense answers a write that fails validation with HTTP 200 and\nresult: failed, which the route and gateway services ignored, so a\nrejected add was reported as applied. A new raise_on_failed_write helper\nraises APIError with the validations for every add, update and delete.\n\nRoutes now send enabled, the 26.1 model's field, instead of disabled,\nand compare and export against it (falling back to disabled on older\nrows). A gateway with no monitor set no longer plans an update when\nOPNsense defaults the monitor to the gateway address.\n\nAddresses #1151\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T19:47:17Z",
+          "tree_id": "9da799dc67b4addc35e64fa1128e0b90253a265c",
+          "url": "https://github.com/endavis/infrafoundry/commit/2251725177ff6f56c9ce4323b21e5b4f6ff1e9b6"
+        },
+        "date": 1793130494536,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15340.51267619043,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016990709600845082",
+            "extra": "mean: 65.18686963781016 usec\nrounds: 17390"
           }
         ]
       }
