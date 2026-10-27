@@ -198,3 +198,7 @@ echo "=== k3s Cluster Setup Complete ==="
 echo "  Control: ${CONTROL_NAME}"
 echo "  Workers: ${#WORKER_NAMES[@]} node(s)"
 echo "  Kubeconfig: ${KUBECONFIG_LOCAL}"
+if [ -n "${INFRAFOUNDRY_ON_JUMPHOST:-}" ]; then
+    echo "  (That path is on the jumphost; InfraFoundry copies the kubeconfig to the"
+    echo "   same ~ path on your workstation after this script succeeds.)"
+fi

@@ -20,9 +20,11 @@ It does NOT depend on the private endavis-infra/ config repo.
 import textwrap
 from pathlib import Path
 
+import jinja2
 import pytest
 
 from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
+from infrafoundry.core.config.filters import create_jinja2_env
 from infrafoundry.core.config.package_loader import PackageLoader
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -383,3 +385,20 @@ def test_proxmox_k3s_cluster_blueprint_with_zero_agents(tmp_path: Path) -> None:
     assert vms[0].name == "k3s-solo-server"
     assert dhcps[0].name == "k3s-solo-server-dhcp"
     assert events["on_create"][0]["requires"] == ["k3s-solo-server"]
+
+
+def test_k3s_install_declares_the_kubeconfig_as_an_output(loader: PackageLoader) -> None:
+    """With a jumphost, the framework copies the kubeconfig back to the operator (#672).
+
+    The paths are rendered a second time here, as ``ScriptHandler`` does at run time.
+    """
+    _resources, events, variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
+    )
+    (handler,) = events["on_create"]
+    env = create_jinja2_env(undefined=jinja2.StrictUndefined)
+
+    (output,) = handler["outputs"]
+    rendered = {key: env.from_string(output[key]).render(**variables) for key in output}
+
+    assert rendered == {"source": "~/.kube/k3s-dev.yaml", "dest": "~/.kube/k3s-dev.yaml"}
