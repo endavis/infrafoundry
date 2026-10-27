@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793124604391,
+  "lastUpdate": 1793126869521,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11222,6 +11222,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001124584821754828",
             "extra": "mean: 127.25754378825168 usec\nrounds: 8347"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f709cd429a37bb0fbd845a083766c52d2f5cb32c",
+          "message": "feat: manage Proxmox SDN VXLAN zones and vnets (merges PR #1141, addresses #1137)\n\nThe proxmox provider gains sdn_zone (kind vxlan) and sdn_vnet resource\ntypes, rendered to the current bpg proxmox_sdn_* resources in sdn.tf.\nZone and vnet IDs default to the resource name; a vnet names its zone by\nname or id. SDNConfigValidator checks IDs, peers, MTU, the vnet's zone\nand VXLAN tags before rendering.\n\nProxmox only stages SDN changes until they are applied cluster-wide, so\ntwo appliers are rendered: \"apply\" depends on and is replaced with every\nzone and vnet, and \"finalize\" (on_create = false) is what every zone and\nvnet depends on, so on destroy it goes last and applies the deletions.\nVMs, disk-image VMs and containers with a NIC on a managed vnet depend on\n\"apply\".\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T18:46:45Z",
+          "tree_id": "963abbf789a09020a89c38112852570a9699b79d",
+          "url": "https://github.com/endavis/infrafoundry/commit/f709cd429a37bb0fbd845a083766c52d2f5cb32c"
+        },
+        "date": 1793126868123,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9904.276735201893,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000999664417035186",
+            "extra": "mean: 100.96648414980052 usec\nrounds: 10757"
           }
         ]
       }
