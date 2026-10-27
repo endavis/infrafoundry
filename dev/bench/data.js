@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793102146744,
+  "lastUpdate": 1793105080821,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10881,6 +10881,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000999847885998971",
             "extra": "mean: 128.4341415362551 usec\nrounds: 8436"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "304fc5752062bf2d29db4f4e8d175c459e103df8",
+          "message": "chore: clear pyright errors in tests (merges PR #1122, addresses #784)\n\npyright 1.1.414 reported 50 errors in tests/ and none of the unused\nvariable warnings #784 listed, which earlier cleanups had removed.\nEvery fix changes typing only, not what a test checks:\n\n- optional TypedDict keys are read with .get() in equality asserts, or\n  narrowed with an `in` assert before a containment check;\n- shutil.which is patched by dotted path rather than through the\n  module's private shutil import;\n- the runner mocks override tool_name and priority as properties, as\n  BaseRunner declares them;\n- rc.events is asserted not None before it is indexed.\n\nThe 16 errors in src/ are tracked in #1121.\n\nAddresses #784\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T12:43:50Z",
+          "tree_id": "bc4c9e60b242b9ad01ab03d05c394c8bfaa8ee7e",
+          "url": "https://github.com/endavis/infrafoundry/commit/304fc5752062bf2d29db4f4e8d175c459e103df8"
+        },
+        "date": 1793105079593,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7938.937496577522,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011022179902381467",
+            "extra": "mean: 125.96144010846544 usec\nrounds: 8482"
           }
         ]
       }
