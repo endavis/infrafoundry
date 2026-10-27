@@ -318,10 +318,15 @@ Validate infrastructure against provider APIs (connectivity, nodes, storage, net
 ```bash
 foundry infra doctor --env dev
 foundry infra doctor --env dev --resource vm-01 --resource vm-02
+foundry infra doctor --env prod --package k3s-cluster
 foundry infra doctor --env dev --verbose
 ```
 
-**Options:** `-e/--env TEXT` (required), `-r/--resource TEXT` (repeatable), `-v/--verbose`
+**Options:** `-e/--env TEXT` (required), `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-v/--verbose`
+
+Note: `--resource` and `--package` are mutually exclusive.
+
+**Jumphost preflight:** for every in-scope package that sets `jumphost`, doctor also checks the jumphost in one SSH session: SSH access, an ssh-agent with keys loaded, the package's public key among them (where the package declares one, as `ssh_public_key` or a VM's `ssh_keys`), the tools the scripts need (`rsync`, `bash`, `python3`, `ssh`, `scp`) and a writable `/tmp`. Any `FAIL` makes doctor exit 1. See [Validation — Jumphost preflight](validation.md#jumphost-preflight).
 
 ### `infra plan`
 
