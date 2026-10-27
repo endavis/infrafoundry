@@ -503,6 +503,17 @@ class OPNsenseProvider(
         validator = OPNsenseValidator(env_config, report)
         validator.validate_references(resources)
 
+    def validate_references_in_context(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Validate *resources*, resolving names against *reference_resources* (#1133)."""
+        validator = OPNsenseValidator(env_config, report)
+        validator.validate_references(resources, reference_resources)
+
     def reset_kea_dhcpv4(self, env_name: str) -> None:
         """Reset (delete) all Kea DHCPv4 configuration.
 

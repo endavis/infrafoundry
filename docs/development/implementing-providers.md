@@ -173,6 +173,21 @@ def validate_references(self, resources, env_config, report):
 
 **Usage:** Called by `foundry infra doctor --env <env>`
 
+**Filtered runs:** with `-r` or `-p`, `resources` holds only the selected resources. If your checks resolve one config resource's reference to another by name (for example a reservation naming a subnet), those names may belong to resources outside the filter. Implement the optional `ValidatesReferencesInContext` protocol (`core/protocols.py`) as well:
+
+```python
+def validate_references_in_context(
+    self,
+    resources: list[ResourceConfig],            # resources to check
+    reference_resources: list[ResourceConfig],  # all of this provider's resources
+    env_config: EnvironmentConfig,
+    report: ValidationReport,
+) -> None:
+    ...
+```
+
+On a filtered run the validation workflow calls it instead of `validate_references`. Check only `resources`, and resolve names against `reference_resources`. Providers without it get `validate_references` with the filtered list, as before. The OPNsense provider implements it (#1133).
+
 ---
 
 ### generate_pyinfra()
