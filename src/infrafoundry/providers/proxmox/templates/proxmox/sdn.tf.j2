@@ -1,0 +1,64 @@
+{#- Proxmox SDN zones and vnets (#1137).
+
+    SDN objects are only staged until an apply (PUT /cluster/sdn). Two appliers
+    make that happen in the right order:
+    - "apply" depends on every zone and vnet and is replaced whenever one of
+      them changes, so creates and updates take effect;
+    - "finalize" is created first (on_create = false) and every zone and vnet
+      depends on it, so on destroy it goes last and its on_destroy applies the
+      deletions.
+    VMs and containers attached to a managed vnet depend on "apply". -#}
+{% set zone_refs = [] %}
+{% set vnet_refs = [] %}
+resource "proxmox_sdn_applier" "finalize" {
+  on_create  = false
+  on_destroy = true
+}
+
+{% for zone in sdn_zones %}
+{% set zone_tf = zone.config.id | replace('-', '_') %}
+{% do zone_refs.append('proxmox_sdn_zone_vxlan.' ~ zone_tf) %}
+resource "proxmox_sdn_zone_vxlan" "{{ zone_tf }}" {
+  id    = "{{ zone.config.id }}"
+  peers = {{ zone.config.peers | tojson }}
+  {% if zone.config.mtu is defined %}
+  mtu   = {{ zone.config.mtu }}
+  {% endif %}
+  {% if zone.config.nodes is defined %}
+  nodes = {{ zone.config.nodes | tojson }}
+  {% endif %}
+
+  depends_on = [proxmox_sdn_applier.finalize]
+}
+
+{% endfor %}
+{% for vnet in sdn_vnets %}
+{% set vnet_tf = vnet.config.id | replace('-', '_') %}
+{% do vnet_refs.append('proxmox_sdn_vnet.' ~ vnet_tf) %}
+resource "proxmox_sdn_vnet" "{{ vnet_tf }}" {
+  id   = "{{ vnet.config.id }}"
+  zone = proxmox_sdn_zone_vxlan.{{ vnet.config.zone | replace('-', '_') }}.id
+  {% if vnet.config.tag is defined %}
+  tag  = {{ vnet.config.tag }}
+  {% endif %}
+  {% if vnet.config.alias is defined %}
+  alias = "{{ vnet.config.alias }}"
+  {% endif %}
+  {% if vnet.config.isolate_ports is defined %}
+  isolate_ports = {{ vnet.config.isolate_ports | lower }}
+  {% endif %}
+  {% if vnet.config.vlan_aware is defined %}
+  vlan_aware = {{ vnet.config.vlan_aware | lower }}
+  {% endif %}
+
+  depends_on = [proxmox_sdn_applier.finalize]
+}
+
+{% endfor %}
+resource "proxmox_sdn_applier" "apply" {
+  depends_on = [{{ (zone_refs + vnet_refs) | join(', ') }}]
+
+  lifecycle {
+    replace_triggered_by = [{{ (zone_refs + vnet_refs) | join(', ') }}]
+  }
+}

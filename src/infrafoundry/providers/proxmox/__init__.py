@@ -19,9 +19,11 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from .validator import ProxmoxValidator
 from .validators import (
     ContainerConfigValidator,
+    SDNConfigValidator,
     StorageConfigValidator,
     VMConfigValidator,
 )
+from .validators.sdn_config_validator import sdn_id
 
 if TYPE_CHECKING:
     from infrafoundry.providers.plugin_type import ProviderMetadata
@@ -61,6 +63,9 @@ class ProxmoxProvider(
         # Used by get_terraform_env_vars to resolve resource-level
         # ``terraform_secrets`` references into TF_VAR_* env vars.
         self._last_terraform_resources: list[ResourceConfig] = []
+        # VMs and containers attached to a managed SDN vnet (#1137), set by
+        # generate_terraform and read by the VM and container templates.
+        self._sdn_dependents: set[str] = set()
         # Use TemplateRendererMixin to set up Jinja2 environment
         self._setup_template_environment()
 
@@ -145,6 +150,13 @@ class ProxmoxProvider(
             },
         )
 
+        # SDN first: VMs and containers on a managed vnet depend on its applier.
+        self._sdn_dependents = self._sdn_dependent_names(resources_by_type)
+        if "sdn_zone" in resources_by_type or "sdn_vnet" in resources_by_type:
+            self._generate_sdn_terraform(
+                resources_by_type.get("sdn_zone", []), resources_by_type.get("sdn_vnet", [])
+            )
+
         # Generate resources by type (storage before VMs/containers so they can reference it)
         if "storage" in resources_by_type:
             self._generate_storage_terraform(resources_by_type["storage"])
@@ -190,6 +202,9 @@ class ProxmoxProvider(
         StorageConfigValidator(report).validate(resources_by_type.get("storage", []))
         VMConfigValidator(report).validate(resources_by_type.get("vm", []))
         ContainerConfigValidator(report).validate(resources_by_type.get("container", []))
+        SDNConfigValidator(report).validate(
+            resources_by_type.get("sdn_zone", []), resources_by_type.get("sdn_vnet", [])
+        )
 
         if report.has_errors():
             error_lines = [
@@ -251,7 +266,7 @@ class ProxmoxProvider(
         if regular_vms:
             self.render_and_write_terraform(
                 "proxmox/vms.tf.j2",
-                context={"vms": regular_vms},
+                context={"vms": regular_vms, "sdn_dependents": self._sdn_dependents},
                 output_name="vms.tf",
             )
 
@@ -271,7 +286,7 @@ class ProxmoxProvider(
         """
         self.render_and_write_terraform(
             "proxmox/ova_vms.tf.j2",
-            context={"ova_vms": ova_vms},
+            context={"ova_vms": ova_vms, "sdn_dependents": self._sdn_dependents},
             output_name="ova_vms.tf",
         )
 
@@ -283,7 +298,7 @@ class ProxmoxProvider(
 
         self.render_and_write_terraform(
             "proxmox/containers.tf.j2",
-            context={"containers": processed_containers},
+            context={"containers": processed_containers, "sdn_dependents": self._sdn_dependents},
             output_name="containers.tf",
         )
 
@@ -407,6 +422,57 @@ class ProxmoxProvider(
             output_name="templates.tf",
         )
 
+    def _sdn_dependent_names(self, resources_by_type: dict[str, list[ResourceConfig]]) -> set[str]:
+        """Return the VMs and containers with a NIC on a managed SDN vnet.
+
+        Args:
+            resources_by_type: Resources grouped by type.
+
+        Returns:
+            Names of the ``vm`` and ``container`` resources whose ``network``
+            has a ``bridge`` equal to a declared ``sdn_vnet``'s ID.
+        """
+        vnet_ids = {sdn_id(v) for v in resources_by_type.get("sdn_vnet", [])}
+        if not vnet_ids:
+            return set()
+        dependents: set[str] = set()
+        for resource in resources_by_type.get("vm", []) + resources_by_type.get("container", []):
+            network = (resource.config or {}).get("network") or []
+            nics = network if isinstance(network, list) else [network]
+            if any(isinstance(n, dict) and n.get("bridge") in vnet_ids for n in nics):
+                dependents.add(resource.name)
+        return dependents
+
+    def _generate_sdn_terraform(
+        self, zones: list[ResourceConfig], vnets: list[ResourceConfig]
+    ) -> None:
+        """Generate Terraform for SDN zones and vnets (#1137).
+
+        Zone and vnet IDs default to the resource name, and a vnet's ``zone``
+        may name a zone by resource name or ID; both resolve to the zone ID.
+
+        Args:
+            zones: ``sdn_zone`` resources.
+            vnets: ``sdn_vnet`` resources.
+        """
+        zone_ids = {z.name: sdn_id(z) for z in zones}
+        zone_ids.update({sdn_id(z): sdn_id(z) for z in zones})
+        zone_ctx = []
+        for zone in zones:
+            config = {**(zone.config or {}), "id": sdn_id(zone)}
+            zone_ctx.append(ResourceConfig(**{**zone.model_dump(), "config": config}))
+        vnet_ctx = []
+        for vnet in vnets:
+            config = dict(vnet.config or {})
+            config["id"] = sdn_id(vnet)
+            config["zone"] = zone_ids.get(config.get("zone", ""), config.get("zone"))
+            vnet_ctx.append(ResourceConfig(**{**vnet.model_dump(), "config": config}))
+        self.render_and_write_terraform(
+            "proxmox/sdn.tf.j2",
+            context={"sdn_zones": zone_ctx, "sdn_vnets": vnet_ctx},
+            output_name="sdn.tf",
+        )
+
     def _generate_networks_terraform(self, networks: list[ResourceConfig]) -> None:
         """Generate Terraform for Proxmox networks."""
         self.render_and_write_terraform(
@@ -522,7 +588,16 @@ class ProxmoxProvider(
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["vm", "container", "template", "network", "storage", "trigger"]
+        return [
+            "vm",
+            "container",
+            "template",
+            "network",
+            "storage",
+            "trigger",
+            "sdn_zone",
+            "sdn_vnet",
+        ]
 
     @override
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
@@ -537,18 +612,22 @@ class ProxmoxProvider(
                 "proxmox_virtual_environment_storage_dir",
             ],
             "trigger": ["terraform_data"],
+            "sdn_zone": ["proxmox_sdn_zone_vxlan"],
+            "sdn_vnet": ["proxmox_sdn_vnet"],
         }
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
-            "vm": ["template", "network", "storage"],
-            "container": ["network", "storage"],
+            "vm": ["template", "network", "storage", "sdn_vnet"],
+            "container": ["network", "storage", "sdn_vnet"],
             "template": [],
             "network": [],
             "storage": [],
             "trigger": [],
+            "sdn_zone": [],
+            "sdn_vnet": ["sdn_zone"],
         }
 
 
