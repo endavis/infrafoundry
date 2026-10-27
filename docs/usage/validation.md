@@ -32,7 +32,7 @@ InfraFoundry validation is organized into three levels, each checking a differen
 |-------|---------|----------------|
 | **System** | `foundry doctor` | Binary dependencies (Terraform, OpenTofu, Ansible, SOPS, Age) |
 | **Config** | `foundry config doctor [--deep]` | Config repo structure, environments, state backend, SOPS keys, state/filesystem consistency, blueprint validation |
-| **Infrastructure** | `foundry infra doctor --env <env>` | Provider API connectivity, nodes/hosts, storage pools, network bridges, templates, resource IDs, MAC conflicts |
+| **Infrastructure** | `foundry infra doctor --env <env>` | Provider API connectivity, nodes/hosts, storage pools, network bridges, templates, resource IDs, MAC conflicts, and the jumphost of packages that set one |
 
 ## Quick Start
 
@@ -46,8 +46,33 @@ foundry config doctor --deep
 # Validate against provider APIs
 foundry infra doctor --env dev
 foundry infra doctor --env dev --resource vm-01 --resource vm-02
+foundry infra doctor --env prod --package k3s-cluster
 foundry infra doctor --env dev --verbose
 ```
+
+## Jumphost Preflight
+
+A package that sets `jumphost` runs its blueprint scripts on that host, and the scripts SSH to the package's VMs with the jumphost's own ssh-agent. If the agent holds no key, or not the one the VMs accept, the apply only fails minutes later, after terraform has created the VMs. `infra doctor` checks the jumphost first, once per jumphost, in a single SSH session opened the same way the script handler opens it:
+
+```
+Jumphost preflight (ansible@ansible.endavis.net):
+  [OK] SSH to jumphost
+  [OK] ssh-agent: 1 key(s) loaded
+  [SKIP] key match: package declares no public key to compare
+  [OK] tools: rsync, bash, python3, ssh, scp
+  [OK] writable /tmp
+Jumphost preflight: 4 OK, 1 SKIP
+```
+
+| Check | Fails when |
+|-------|-----------|
+| SSH to jumphost | The jumphost can't be reached non-interactively (BatchMode). The remaining checks are skipped. |
+| ssh-agent | `ssh-add -l` finds no keys (exit 1) or no agent (exit 2). |
+| key match | A public key the package declares (`ssh_public_key`, or a VM's `ssh_keys`) is not in the agent. Comments are ignored. `SKIP` when the package declares none, for example when the key comes from a cloud-init snippet. |
+| tools | `rsync`, `bash`, `python3`, `ssh` or `scp` is missing on the jumphost. |
+| writable /tmp | The script handler can't create its work directory in `/tmp`. |
+
+Any `FAIL` makes doctor exit 1, so `foundry infra doctor --env prod -p k3s-cluster && foundry infra apply --env prod -p k3s-cluster` stops before the apply.
 
 ## Additional Validation Commands
 
@@ -88,6 +113,7 @@ Beyond the doctor commands, InfraFoundry offers additional validation tools:
 
 - **Symptom:** Missing templates/networks in doctor output. **Fix:** Create the resource in the provider or update the configuration reference; rerun `foundry infra doctor --env <env>`.
 - **Symptom:** Doctor reports API failures. **Fix:** Verify endpoints, tokens, kubeconfig, and network reachability; test with provider CLIs.
+- **Symptom:** `[FAIL] ssh-agent: agent is running but has no keys loaded`. **Fix:** On the jumphost, load the key the VMs accept into the agent the jumphost user's non-interactive SSH sessions use (for example with `ssh-add` or keychain), then rerun doctor.
 - **Symptom:** Unknown resource/provider. **Fix:** Confirm resource type spelling and provider availability in the current framework version.
 
 ---
