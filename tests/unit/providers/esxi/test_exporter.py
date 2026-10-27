@@ -82,6 +82,7 @@ class TestExport:
         self, mock_ssh: MagicMock, env_config: EnvironmentData
     ) -> None:
         """Should filter to specific host."""
+        assert "provider_settings" in env_config
         env_config["provider_settings"]["esxi"]["hosts"]["esxi-02"] = {"hostname": "192.168.1.11"}
         exporter = EsxiConfigExporter(env_config)
         mock_ssh.return_value = ""

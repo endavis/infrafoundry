@@ -325,7 +325,7 @@ def test_parse_plan_for_drift_no_changes_is_parsed(runner: TerraformRunner) -> N
     """Terraform's "No changes" message is a parsed result with zero counts."""
     result = runner.parse_plan_for_drift({"success": True, "output": "No changes."})
     assert result["has_changes"] is False
-    assert result["to_add"] == result["to_change"] == result["to_destroy"] == 0
+    assert result.get("to_add") == result.get("to_change") == result.get("to_destroy") == 0
     assert "parsed" not in result
 
 
@@ -334,9 +334,9 @@ def test_parse_plan_for_drift_detects_changes(runner: TerraformRunner) -> None:
     output = "Plan: 1 to add, 2 to change, 0 to destroy"
     result = runner.parse_plan_for_drift({"success": True, "output": output})
     assert result["has_changes"] is True
-    assert result["to_add"] == 1
-    assert result["to_change"] == 2
-    assert result["to_destroy"] == 0
+    assert result.get("to_add") == 1
+    assert result.get("to_change") == 2
+    assert result.get("to_destroy") == 0
     assert "add" in result["summary"]
 
 
@@ -514,7 +514,8 @@ class TestDestroyFailureCapture:
             result = runner.destroy(provider, auto_approve=True)
 
         assert result["success"] is False
-        assert result["exit_code"] == 1
+        assert "stderr" in result and "error" in result
+        assert result.get("exit_code") == 1
         assert "Instance cannot be destroyed" in result["stderr"]
         assert "Instance cannot be destroyed" in result["error"]
 
@@ -549,6 +550,7 @@ class TestDestroyFailureCapture:
             result = runner.destroy(provider, auto_approve=True)
 
         assert result["success"] is False
+        assert "error" in result
         assert "Instance cannot be destroyed" in result["error"]
 
 
