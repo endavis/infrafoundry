@@ -10,7 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from infrafoundry.cli.main import main
-from infrafoundry.core.jumphost_preflight import Check, JumphostReport, Status
+from infrafoundry.core.jumphost_preflight import Check, JumphostReport, Status, Target
 from infrafoundry.core.provider import ResourceConfig
 
 
@@ -167,6 +167,15 @@ def _vm(name: str, jumphost: str = "") -> ResourceConfig:
     )
 
 
+def _dhcp(hostname: str, ip: str) -> ResourceConfig:
+    return ResourceConfig(
+        name=f"{hostname}-dhcp",
+        type="kea.dhcp4.reservations",
+        provider="opnsense",
+        config={"hostname": hostname, "ip_address": ip},
+    )
+
+
 def _report(jumphost: str, status: Status) -> JumphostReport:
     return JumphostReport(jumphost, [Check("SSH to jumphost", status, "detail")])
 
@@ -191,13 +200,20 @@ class TestInfraDoctorPackage:
         cli_runner: CliRunner,
         tmp_path: Path,
     ) -> None:
-        """-p validates the package's resources and checks only their jumphost."""
+        """-p checks only the package's jumphost, with its targets and outputs."""
         orch = _mock_orchestrator(has_errors=False)
         orch.config_manager.resolve_package_filter.return_value = ["k3s-server"]
         orch.config_manager.get_all_resources_all_providers.return_value = [
             _vm("k3s-server", jumphost="ansible@jump"),
             _vm("other", jumphost="root@elsewhere"),
+            _dhcp("k3s-server", "10.0.1.70"),
+            _dhcp("other", "10.0.1.99"),
         ]
+        dest = str(tmp_path / "kube" / "k3s.yaml")
+        orch.config_manager.get_package_events.return_value = {
+            "on_create": [{"requires": ["k3s-server"], "outputs": [{"source": dest, "dest": dest}]}]
+        }
+        orch.state_manager.get_resources.return_value = []
         mock_get_orch.return_value = orch
         mock_check.return_value = _report("ansible@jump", Status.OK)
 
@@ -208,9 +224,13 @@ class TestInfraDoctorPackage:
         orch.validate.assert_called_once_with(
             env_name="test", resource_filter=["k3s-server"], verbose=False
         )
-        mock_check.assert_called_once_with("ansible@jump", [])
+        mock_check.assert_called_once_with(
+            "ansible@jump", [], [Target("k3s-server", "10.0.1.70", "ansible", False)]
+        )
         assert "Jumphost preflight (ansible@jump)" in result.output
         assert "[OK] SSH to jumphost: detail" in result.output
+        # Rich wraps the long path at the test console's width.
+        assert f"[OK]output{dest}" in "".join(result.output.split())
 
     @patch("infrafoundry.cli.commands.infra.doctor.check_jumphost")
     @patch("infrafoundry.cli.main._get_orchestrator")

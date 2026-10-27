@@ -7,6 +7,12 @@ failure only shows minutes into an apply, as a wait-loop timeout after
 terraform has already created the VMs. ``infra doctor`` runs these checks
 first.
 
+Targets are the package's VMs that have a DHCP reservation (the same lookup
+``known_hosts`` uses). A deployed target must accept SSH from the jumphost; a
+target that is not deployed yet must have a route from the jumphost and an
+address nothing answers on. ``outputs:`` destinations are checked on the
+workstation, where the script handler copies them.
+
 All checks for one jumphost run in a single SSH session, opened the way the
 script handler opens it, so they see the same login environment (and
 ssh-agent) the scripts will.
@@ -14,13 +20,21 @@ ssh-agent) the scripts will.
 
 from __future__ import annotations
 
-import subprocess  # nosec B404 - runs ssh with list args and a fixed remote script
-from collections.abc import Callable, Iterable
+import os
+import shlex
+import subprocess  # nosec B404 - runs ssh with list args; remote values are shlex-quoted
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from pathlib import Path
+from typing import Any, Protocol
 
+import jinja2
+
+from infrafoundry.core.config.filters import create_jinja2_env
+from infrafoundry.core.known_hosts import RESERVATION_TYPE, reservation_ips
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.state.models import ResourceState
 
 # Same host-key handling as the script handler's jumphost transport, plus
 # BatchMode so a missing key fails instead of prompting.
@@ -33,6 +47,13 @@ _SSH_OPTS = [
     "StrictHostKeyChecking=no",
 ]
 _TIMEOUT_SECONDS = 60
+
+# Target SSH uses the blueprint scripts' options: host keys are not checked
+# and not recorded, so a reused IP can't block them.
+_TARGET_SSH = (
+    "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no "
+    "-o UserKnownHostsFile=/dev/null"
+)
 
 # The script handler rsyncs scripts into /tmp, runs them with bash and needs
 # python3 to export package variables; scripts reach targets with ssh/scp and
@@ -73,6 +94,21 @@ class Check:
     name: str
     status: Status
     detail: str = ""
+
+
+@dataclass(frozen=True)
+class Target:
+    """A package VM the jumphost's scripts will SSH to."""
+
+    name: str
+    ip: str
+    user: str | None
+    deployed: bool | None
+    """``True`` if deployed, ``False`` if not yet, ``None`` if the state is in between."""
+
+
+class _StateLookup(Protocol):
+    def get_resources(self, environment: str | None = None) -> list[Any]: ...
 
 
 @dataclass
@@ -129,8 +165,186 @@ def jumphosts_to_check(resources: Iterable[ResourceConfig]) -> dict[str, list[st
     return result
 
 
+def deployment_state(state: _StateLookup, env: str) -> Callable[[ResourceConfig], bool | None]:
+    """Return a lookup telling whether a resource is deployed, from the state DB.
+
+    The DB keeps a row per deployment, and every ``infra plan`` adds a
+    ``planned`` row, so the newest row is not the deployment state. The
+    lookup uses each resource's newest row that is not ``planned``.
+
+    Args:
+        state: The state manager.
+        env: Environment name.
+
+    Returns:
+        A function giving ``True`` for active or updating resources, ``False``
+        for untracked or deleted ones, and ``None`` otherwise (creating,
+        deleting or in error).
+    """
+    latest: dict[tuple[str, str], Any] = {}
+    for record in state.get_resources(environment=env):
+        if record.state == ResourceState.PLANNED:
+            continue
+        key = (record.provider, record.name)
+        if key not in latest or record.created_at > latest[key].created_at:
+            latest[key] = record
+
+    def lookup(resource: ResourceConfig) -> bool | None:
+        record = latest.get((resource.provider, resource.name))
+        if record is None or record.state == ResourceState.DELETED:
+            return False
+        if record.state in (ResourceState.ACTIVE, ResourceState.UPDATING):
+            return True
+        return None
+
+    return lookup
+
+
+def targets_by_jumphost(
+    resources: Iterable[ResourceConfig],
+    all_resources: Iterable[ResourceConfig],
+    deployed: Callable[[ResourceConfig], bool | None],
+) -> dict[str, list[Target]]:
+    """Find the VMs each jumphost's scripts will reach.
+
+    Args:
+        resources: The resources in scope for the doctor run.
+        all_resources: Every resource in the environment, used to find the
+            DHCP reservation that gives a VM its IP.
+        deployed: Deployment-state lookup, see :func:`deployment_state`.
+
+    Returns:
+        ``{jumphost: [Target, ...]}``. A resource is a target when its
+        package sets ``jumphost`` and a reservation's ``hostname`` equals its
+        name. The SSH user is the package's ``ssh_user``, else the user part
+        of ``jumphost``.
+    """
+    ips = reservation_ips(all_resources)
+    result: dict[str, list[Target]] = {}
+    for resource in resources:
+        pkg_vars = resource.package_variables or {}
+        jumphost = str(pkg_vars.get("jumphost", "")).strip()
+        if not jumphost or resource.type == RESERVATION_TYPE:
+            continue
+        user = str(pkg_vars.get("ssh_user", "")).strip() or (
+            jumphost.split("@", 1)[0] if "@" in jumphost else None
+        )
+        state = deployed(resource)
+        for ip in ips.get(resource.name, []):
+            result.setdefault(jumphost, []).append(Target(resource.name, ip, user, state))
+    return result
+
+
+def _target_lines(targets: Sequence[Target]) -> list[str]:
+    lines: list[str] = []
+    for i, target in enumerate(targets):
+        if target.deployed and target.user:
+            dest = shlex.quote(f"{target.user}@{target.ip}")
+            # Keep ssh's last error line: it says why ("Permission denied", ...).
+            lines.append(
+                f"o=$({_TARGET_SSH} {dest} true 2>&1 </dev/null); c=$?; "
+                f'echo "target {i} ssh $c"; '
+                f"[ \"$c\" -eq 0 ] || printf 'target-error {i} %s\\n' "
+                f'"$(printf \'%s\' "$o" | tail -n 1)"'
+            )
+        elif target.deployed is False:
+            ip = shlex.quote(target.ip)
+            lines.append(f'ip route get {ip} >/dev/null 2>&1; echo "target {i} route $?"')
+            lines.append(f'ping -c 1 -W 1 {ip} >/dev/null 2>&1; echo "target {i} ping $?"')
+    return lines
+
+
+def _target_check(target: Target, codes: dict[str, int], error: str = "") -> Check:
+    name = f"target {target.name} ({target.ip})"
+    if target.deployed is None:
+        return Check(name, Status.SKIP, "deployment in progress or failed; not checked")
+    if target.deployed:
+        if not target.user:
+            return Check(name, Status.SKIP, "no ssh_user, and jumphost has no user@ part")
+        code = codes.get("ssh")
+        if code == 0:
+            return Check(name, Status.OK, f"ssh as {target.user}")
+        reason = f": {error}" if error else ""
+        return Check(name, Status.FAIL, f"ssh as {target.user} failed (exit {code}){reason}")
+    if codes.get("route") == 127:
+        return Check(name, Status.WARN, "not deployed; 'ip' missing on the jumphost")
+    if codes.get("route") != 0:
+        return Check(name, Status.FAIL, "not deployed; no route from the jumphost")
+    if codes.get("ping") == 0:
+        return Check(name, Status.FAIL, "not deployed, but something answers at this IP")
+    return Check(name, Status.OK, "not deployed; routable and unused")
+
+
+def output_checks(
+    handlers: Iterable[dict[str, Any]],
+    resources: Iterable[ResourceConfig],
+) -> dict[str, list[Check]]:
+    """Check that each in-scope ``outputs:`` destination can be written.
+
+    A destination that can't be written only warns during an apply, as
+    the script handler does, so these checks WARN rather than FAIL.
+
+    Args:
+        handlers: Package event handler configs (``get_package_events``).
+        resources: The resources in scope; a handler is in scope when one of
+            its ``requires`` is, and that resource's package variables render
+            the destination.
+
+    Returns:
+        ``{jumphost: [Check, ...]}`` for handlers whose package sets a jumphost.
+    """
+    by_name = {r.name: r for r in resources}
+    template_env = create_jinja2_env(undefined=jinja2.StrictUndefined)
+    result: dict[str, list[Check]] = {}
+    seen: set[tuple[str, str]] = set()
+    for handler in handlers:
+        outputs = handler.get("outputs") or []
+        owner = next((by_name[n] for n in handler.get("requires") or [] if n in by_name), None)
+        if not outputs or owner is None:
+            continue
+        pkg_vars = owner.package_variables or {}
+        jumphost = str(pkg_vars.get("jumphost", "")).strip()
+        if not jumphost:
+            continue
+        for entry in outputs:
+            raw = str(entry.get("dest", ""))
+            if (jumphost, raw) in seen:
+                continue
+            seen.add((jumphost, raw))
+            result.setdefault(jumphost, []).append(_output_check(template_env, raw, pkg_vars))
+    return result
+
+
+def _output_check(template_env: jinja2.Environment, raw: str, pkg_vars: dict[str, Any]) -> Check:
+    try:
+        rendered = template_env.from_string(raw).render(**pkg_vars)
+    except jinja2.TemplateError as e:
+        return Check(f"output {raw}", Status.WARN, f"does not render: {e}")
+    name = f"output {rendered}"
+    dest = Path(rendered).expanduser()
+    if not dest.is_absolute():
+        return Check(name, Status.WARN, "not an absolute path")
+    if dest.exists():
+        if os.access(dest, os.W_OK):
+            return Check(name, Status.OK, "exists, writable")
+        return Check(name, Status.WARN, "exists but is not writable")
+    ancestor = dest.parent
+    while not ancestor.exists():
+        ancestor = ancestor.parent
+    if ancestor.is_dir() and os.access(ancestor, os.W_OK | os.X_OK):
+        return Check(name, Status.OK)
+    return Check(name, Status.WARN, f"{ancestor} is not a writable directory")
+
+
 def _parse(output: str) -> dict[str, Any]:
-    parsed: dict[str, Any] = {"connect": False, "agent": None, "keys": [], "tools": {}}
+    parsed: dict[str, Any] = {
+        "connect": False,
+        "agent": None,
+        "keys": [],
+        "tools": {},
+        "targets": {},
+        "target_errors": {},
+    }
     for line in output.splitlines():
         tag, _, value = line.strip().partition(" ")
         if tag == "connect":
@@ -144,6 +358,14 @@ def _parse(output: str) -> dict[str, Any]:
             parsed["tools"][name] = state == "ok"
         elif tag == "tmp":
             parsed["tmp"] = value == "ok"
+        elif tag == "target-error":
+            index, _, message = value.partition(" ")
+            if index.isdigit():
+                parsed["target_errors"][int(index)] = message.strip()
+        elif tag == "target":
+            index, kind, code = [*value.split(), "", "", ""][:3]
+            if index.isdigit() and code.isdigit():
+                parsed["targets"].setdefault(int(index), {})[kind] = int(code)
     return parsed
 
 
@@ -175,6 +397,7 @@ def _key_checks(expected: list[str], loaded: list[str]) -> list[Check]:
 def check_jumphost(
     jumphost: str,
     expected_keys: list[str],
+    targets: Sequence[Target] = (),
     run: Callable[..., subprocess.CompletedProcess[Any]] = subprocess.run,
 ) -> JumphostReport:
     """Run the preflight checks against *jumphost* in one SSH session.
@@ -183,6 +406,7 @@ def check_jumphost(
         jumphost: SSH destination, as in the package's ``jumphost`` variable.
         expected_keys: Public keys the package's VMs accept; at least one must
             match each declared key in the jumphost's agent.
+        targets: VMs the scripts will reach, see :func:`targets_by_jumphost`.
         run: ``subprocess.run`` or a stand-in for tests.
 
     Returns:
@@ -192,7 +416,7 @@ def check_jumphost(
     report = JumphostReport(jumphost)
     try:
         result = run(
-            ["ssh", *_SSH_OPTS, jumphost, _REMOTE_SCRIPT],
+            ["ssh", *_SSH_OPTS, jumphost, "; ".join([_REMOTE_SCRIPT, *_target_lines(targets)])],
             capture_output=True,
             text=True,
             timeout=_TIMEOUT_SECONDS,
@@ -232,4 +456,8 @@ def check_jumphost(
         report.checks.append(Check("writable /tmp", Status.OK))
     else:
         report.checks.append(Check("writable /tmp", Status.FAIL, "cannot create a dir in /tmp"))
+    for i, target in enumerate(targets):
+        report.checks.append(
+            _target_check(target, parsed["targets"].get(i, {}), parsed["target_errors"].get(i, ""))
+        )
     return report

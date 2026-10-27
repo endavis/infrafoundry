@@ -8,7 +8,10 @@ from infrafoundry.core.jumphost_preflight import (
     JumphostReport,
     Status,
     check_jumphost,
+    deployment_state,
     jumphosts_to_check,
+    output_checks,
+    targets_by_jumphost,
 )
 from infrafoundry.core.orchestrator import Orchestrator
 
@@ -69,7 +72,9 @@ def doctor(
 
     For packages that set ``jumphost``, it also checks the jumphost: SSH
     access, a loaded ssh-agent holding the package's public key, the tools
-    the scripts need, and a writable /tmp.
+    the scripts need, a writable /tmp, each VM the scripts will reach (SSH
+    if deployed; a route and a free IP if not), and that each ``outputs:``
+    destination can be written locally.
 
     This helps catch configuration errors before attempting deployment.
 
@@ -114,14 +119,22 @@ def _jumphost_preflight(
     orchestrator: Orchestrator, env: str, resource_filter: list[str] | None
 ) -> bool:
     """Check every jumphost the in-scope packages use; return whether any check failed."""
-    resources = orchestrator.config_manager.get_all_resources_all_providers(env)
+    config_manager = orchestrator.config_manager
+    all_resources = config_manager.get_all_resources_all_providers(env)
+    handlers = [h for hs in config_manager.get_package_events().values() for h in hs]
+    resources = all_resources
     if resource_filter is not None:
         wanted = set(resource_filter)
-        resources = [r for r in resources if r.name in wanted]
+        resources = [r for r in all_resources if r.name in wanted]
 
+    targets = targets_by_jumphost(
+        resources, all_resources, deployment_state(orchestrator.state_manager, env)
+    )
+    outputs = output_checks(handlers, resources)
     failed = False
     for jumphost, keys in jumphosts_to_check(resources).items():
-        report = check_jumphost(jumphost, keys)
+        report = check_jumphost(jumphost, keys, targets.get(jumphost, []))
+        report.checks.extend(outputs.get(jumphost, []))
         _print_report(report)
         failed = failed or report.failed
     return failed
