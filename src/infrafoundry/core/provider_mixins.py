@@ -108,6 +108,13 @@ class TemplateRendererMixin:
                 self._write_terraform_file("main.tf", content)
     """
 
+    if TYPE_CHECKING:
+        # Provided by ProviderBase.
+        name: str
+        terraform_dir: Path
+        ansible_dir: Path
+        pyinfra_dir: Path
+
     def _setup_template_environment(
         self,
         template_subdir: str | None = None,
@@ -309,6 +316,12 @@ class ResourceGrouperMixin:
                     self._generate_networks(grouped["network"])
     """
 
+    if TYPE_CHECKING:
+        # Provided by ProviderBase and TemplateRendererMixin.
+        _logger: logging.Logger
+
+        def get_resource_types(self) -> list[str]: ...
+
     def group_resources_by_type(
         self,
         resources: list[ResourceConfig],
@@ -429,8 +442,11 @@ class TerraformGeneratorMixin:
         # Declare expected attributes for type checking
         config_dir: Path
         terraform_dir: Path
+        _logger: logging.Logger
 
         def _write_terraform_file(self, filename: str, content: str) -> None: ...
+
+        def render_template(self, template_name: str, context: dict[str, Any]) -> str: ...
 
     def _load_environment_config(self) -> EnvironmentConfig | None:
         """Load current environment configuration if available."""

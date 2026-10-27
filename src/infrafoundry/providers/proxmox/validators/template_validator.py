@@ -42,8 +42,10 @@ class TemplateValidator:
         if cluster_vms is None:
             return
 
-        templates_by_vmid = {vm["vmid"]: vm for vm in cluster_vms if vm.get("template") == 1}
-        templates_by_name = {vm["name"]: vm for vm in cluster_vms if vm.get("template") == 1}
+        # ClusterVM keys are optional; an entry without the key cannot match it (#1121).
+        templates = [vm for vm in cluster_vms if vm.get("template") == 1]
+        templates_by_vmid = {vm["vmid"]: vm for vm in templates if "vmid" in vm}
+        templates_by_name = {vm["name"]: vm for vm in templates if "name" in vm}
 
         for template_ref, resource_names in template_refs.items():
             # Check if it's a VMID (integer) or name (string)

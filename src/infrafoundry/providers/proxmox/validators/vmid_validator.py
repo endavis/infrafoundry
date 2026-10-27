@@ -42,7 +42,8 @@ class VMIDValidator:
         if cluster_vms is None:
             return
 
-        existing_vmids = {vm["vmid"]: vm.get("name", "N/A") for vm in cluster_vms}
+        # ClusterVM keys are optional; an entry without a vmid cannot conflict (#1121).
+        existing_vmids = {vm["vmid"]: vm.get("name", "N/A") for vm in cluster_vms if "vmid" in vm}
 
         for vmid, resource_name in vmids.items():
             if vmid in existing_vmids:
