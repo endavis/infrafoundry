@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793040611290,
+  "lastUpdate": 1793094076208,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10757,6 +10757,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022400108806109083",
             "extra": "mean: 80.7980822998286 usec\nrounds: 14192"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "566b52d2a67d4cb8ece2e95c35c59056849c8e88",
+          "message": "ci: give the mutation run 180 minutes to check every mutant (merges PR #1117, addresses #1116)\n\nMutation run 40372371911 was stopped at the 120-minute step limit with\n273 of 48,611 mutants unchecked. mutmut already runs one worker per CPU,\nso the limit is raised instead. The job has no limit of its own, so\nGitHub's 360-minute default still covers the step. A test guards both.\n\nAddresses #1116\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T09:40:22Z",
+          "tree_id": "2b8a8070d155d13e0955968d3ff4591c49c48846",
+          "url": "https://github.com/endavis/infrafoundry/commit/566b52d2a67d4cb8ece2e95c35c59056849c8e88"
+        },
+        "date": 1793094075447,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13146.834963914962,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002042098210576308",
+            "extra": "mean: 76.06393498851777 usec\nrounds: 13936"
           }
         ]
       }
