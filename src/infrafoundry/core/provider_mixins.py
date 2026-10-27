@@ -16,6 +16,7 @@ from jinja2 import Environment, FileSystemLoader, Template, TemplateNotFound
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.credential_override import resolve_settings
 from infrafoundry.core.exceptions import TemplateError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.security.file_utils import secure_write
@@ -596,6 +597,8 @@ class TerraformGeneratorMixin:
         result: dict[str, str] = {}
         provider_settings = env_config.get_provider_settings(provider_name)
         if provider_settings:
+            # Gated <PROVIDER>_<KEY> env vars can redirect the apply (#783).
+            provider_settings = resolve_settings(provider_name, provider_settings, mapping)
             for source_key, tfvar_name in mapping.items():
                 value = provider_settings.get(source_key)
                 if value not in (None, ""):

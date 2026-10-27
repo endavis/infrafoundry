@@ -73,11 +73,12 @@ import os
 import threading
 from typing import Any
 
-logger = logging.getLogger(__name__)
+# The gate and its parsing are shared with the terraform write path (#783).
+# ``GATE_ENV_VAR`` is re-exported for callers that import it from here.
+from infrafoundry.core.credential_override import GATE_ENV_VAR as GATE_ENV_VAR
+from infrafoundry.core.credential_override import env_or_default, gate_active
 
-# Name of the gate env var. Override is honored only when this env var is set
-# to a value not in the falsy set below.
-GATE_ENV_VAR = "INFRAFOUNDRY_ALLOW_ENV_OVERRIDE"
+logger = logging.getLogger(__name__)
 
 # Per-field env var names. Empty string and unset are treated identically
 # (fall back to ``provider_settings``).
@@ -87,41 +88,10 @@ API_SECRET_ENV_VAR = "OPNSENSE_API_SECRET"  # nosec B105
 VERIFY_SSL_ENV_VAR = "OPNSENSE_VERIFY_SSL"
 PROXY_ENV_VAR = "OPNSENSE_PROXY"
 
-# The falsy set used for both the gate and ``OPNSENSE_VERIFY_SSL`` parsing.
-# Matches the project convention from
-# ``tests/integration/opnsense/test_vlan_live.py``.
-_FALSY = ("", "0", "false", "no", "off")
-
 # Module-level warning-tracking set, keyed by resolved ``api_url``. One entry
 # per overridden URL per process.
 _warned_urls_lock = threading.Lock()
 _warned_urls: set[str] = set()
-
-
-def _gate_active() -> bool:
-    """Return ``True`` if the override gate is set to a truthy value."""
-    raw = os.environ.get(GATE_ENV_VAR, "").strip().lower()
-    return raw not in _FALSY
-
-
-def _env_or_default(env_var: str, default: str) -> str:
-    """Return the env var value if non-empty, otherwise ``default``.
-
-    Empty strings are treated as unset — environment-variable convention
-    favors absence-or-empty being equivalent for "operator hasn't set
-    this".
-
-    Args:
-        env_var: Name of the env var to consult.
-        default: Fallback value used when the env var is unset or empty.
-
-    Returns:
-        The non-empty env var value, or ``default``.
-    """
-    value = os.environ.get(env_var, "")
-    if value:
-        return value
-    return default
 
 
 def _parse_verify_ssl(env_value: str, default: bool) -> bool:
@@ -180,7 +150,7 @@ def resolve_credentials(
     settings_verify = bool(provider_settings.get("verify_ssl", True))
     settings_proxy = str(provider_settings.get("proxy") or "")
 
-    if not _gate_active():
+    if not gate_active():
         return (
             settings_url,
             settings_key,
@@ -189,14 +159,14 @@ def resolve_credentials(
             settings_proxy or None,
         )
 
-    api_url = _env_or_default(API_URL_ENV_VAR, settings_url)
-    api_key = _env_or_default(API_KEY_ENV_VAR, settings_key)
-    api_secret = _env_or_default(API_SECRET_ENV_VAR, settings_secret)
+    api_url = env_or_default(API_URL_ENV_VAR, settings_url)
+    api_key = env_or_default(API_KEY_ENV_VAR, settings_key)
+    api_secret = env_or_default(API_SECRET_ENV_VAR, settings_secret)
     verify_ssl = _parse_verify_ssl(
         os.environ.get(VERIFY_SSL_ENV_VAR, ""),
         settings_verify,
     )
-    proxy = _env_or_default(PROXY_ENV_VAR, settings_proxy)
+    proxy = env_or_default(PROXY_ENV_VAR, settings_proxy)
 
     if api_url != settings_url:
         _warn_once_about_redirect(api_url)
