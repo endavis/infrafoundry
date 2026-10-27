@@ -426,6 +426,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_cli_rollback.py",
     "tests/unit/test_cli_rollback_points.py",
     "tests/unit/test_cli_secrets.py",
+    "tests/unit/test_cli_short_help.py",
     "tests/unit/test_cli_state.py",
     "tests/unit/test_cli_status.py",
     "tests/unit/test_cli_utils.py",
