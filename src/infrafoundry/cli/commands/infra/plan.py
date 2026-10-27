@@ -48,7 +48,8 @@ from ...utils import console
         "Suppress deletes for live resources not in YAML. Useful for partial "
         "migrations where the YAML doesn't yet describe everything on the box. "
         "Currently honored by OPNsense direct-API resources only; other "
-        "runners accept and ignore."
+        "runners accept and ignore. Implied for OPNsense direct-API resources "
+        "when --resource or --package filters the run."
     ),
 )
 @click.option(

@@ -279,9 +279,16 @@ class OPNsenseDirectRunner(BaseRunner):
         if not env_config:
             return []
 
-        # ConfigManager.get_all_resources merges provider-centric and
-        # resource-centric YAML for this provider.
-        return config_manager.get_all_resources(env_name, provider.name)
+        # Load the whole environment, as the orchestrator does, and keep this
+        # provider's resources. get_all_resources(env, provider) reads only
+        # envs/<env>/<provider>/ and resource-centric files, so it missed
+        # opnsense resources declared in other providers' packages, such as a
+        # proxmox blueprint's DHCP reservations (#1128).
+        return [
+            resource
+            for resource in config_manager.get_all_resources_all_providers(env_name)
+            if resource.provider == provider.name
+        ]
 
     # ------------------------------------------------------------------
     # Plannable / Applyable / Destroyable / StateAware
@@ -314,7 +321,10 @@ class OPNsenseDirectRunner(BaseRunner):
 
         env_name = self._resolve_env_name(provider)
         target_resources = kwargs.get("target_resources")
-        add_only = bool(kwargs.get("add_only", False))
+        # A filtered run hands each manager only the targeted resources, and the
+        # managers reconcile fully, so anything else live would be deleted.
+        # Scope the run to the targets by suppressing deletes (#1128).
+        add_only = bool(kwargs.get("add_only", False)) or bool(target_resources)
 
         resources = self._load_provider_resources(provider)
 
@@ -410,7 +420,10 @@ class OPNsenseDirectRunner(BaseRunner):
 
         env_name = self._resolve_env_name(provider)
         target_resources = kwargs.get("target_resources")
-        add_only = bool(kwargs.get("add_only", False))
+        # A filtered run hands each manager only the targeted resources, and the
+        # managers reconcile fully, so anything else live would be deleted.
+        # Scope the run to the targets by suppressing deletes (#1128).
+        add_only = bool(kwargs.get("add_only", False)) or bool(target_resources)
 
         resources = self._load_provider_resources(provider)
 
