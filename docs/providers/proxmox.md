@@ -162,6 +162,9 @@ A VM or container attaches by using the vnet as its bridge
 - **Ordering.** VMs and containers attached to a managed vnet depend on it, so the
   vnet is live before they are created and is removed only after they are
   destroyed.
+- **Doctor.** `infra doctor` accepts a vnet as a VM's bridge once it is in the
+  cluster's running SDN config. A vnet declared in the validated resources but
+  not applied yet is a warning, since the apply creates it first.
 
 ## Provider CLI
 

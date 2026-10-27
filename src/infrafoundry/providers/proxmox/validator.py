@@ -25,6 +25,7 @@ from infrafoundry.providers.proxmox.validators import (
     TemplateValidator,
     VMIDValidator,
 )
+from infrafoundry.providers.proxmox.validators.sdn_config_validator import sdn_id
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -177,7 +178,8 @@ class ProxmoxValidator:
             # Validate each type of reference using specialized validators
             self.node_validator.validate(client, resource_refs.nodes)
             self.storage_validator.validate(client, resource_refs.storage_pools)
-            self.network_validator.validate(client, resource_refs.bridges)
+            declared_vnets = frozenset(sdn_id(r) for r in resources if r.type == "sdn_vnet")
+            self.network_validator.validate(client, resource_refs.bridges, declared_vnets)
             self.template_validator.validate(cluster_vms, resource_refs.template_refs)
             self.vmid_validator.validate(cluster_vms, resource_refs.vmids)
 
