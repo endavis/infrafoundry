@@ -23,6 +23,7 @@ from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
+from infrafoundry.core.known_hosts import forget_on_jumphost, hosts_to_forget
 from infrafoundry.core.protocols import Destroyable, Plannable, VerifiesDestroy
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.result_types import PlanResult
@@ -1209,8 +1210,12 @@ class DestroyOrchestrator(HookExecutionMixin):
                     return {"success": False, "message": "User aborted"}
 
             _, resources_by_provider = self._load_resources(env_name)
+            # Unfiltered, so a filtered destroy still finds the DHCP reservation
+            # that gives a destroyed VM its IP (#656).
+            all_resources = [r for rs in resources_by_provider.values() for r in rs]
             resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
             providers = self._get_providers()
+            destroyed_resources: list[ResourceConfig] = []
 
             # Execute environment-level before_destroy hooks
             self._execute_env_hooks(env_name, "before_destroy", env_config)
@@ -1401,6 +1406,9 @@ class DestroyOrchestrator(HookExecutionMixin):
 
                 self._finalize_destroyed_resources(env_name, provider_name, resource_ids)
 
+                deleted = {o.resource_name for o in all_outcomes if o.action == "delete"}
+                destroyed_resources.extend(r for r in resources if r.name in deleted)
+
                 # Execute resource-level after_destroy hooks
                 for resource in resources:
                     self._execute_resource_hooks(env_name, "after_destroy", resource, provider_name)
@@ -1413,6 +1421,8 @@ class DestroyOrchestrator(HookExecutionMixin):
                             for o in result["resource_outcomes"]
                         ]
                 results[provider_name] = provider_results
+
+            self._forget_destroyed_hosts(destroyed_resources, all_resources)
 
             # Execute environment-level after_destroy hooks
             self._execute_env_hooks(env_name, "after_destroy", env_config)
@@ -1488,6 +1498,28 @@ class DestroyOrchestrator(HookExecutionMixin):
                 env_name,
                 {"resource_id": resource_id, "provider": provider_name, "name": resource_name},
             )
+
+    def _forget_destroyed_hosts(
+        self, destroyed: list[ResourceConfig], all_resources: list[ResourceConfig]
+    ) -> None:
+        """Remove destroyed hosts from each package jumphost's ``known_hosts`` (#656).
+
+        A failure is reported as a warning; the destroy has already succeeded.
+
+        Args:
+            destroyed: Resources the destroy removed.
+            all_resources: Every resource in the environment, unfiltered.
+        """
+        for jumphost, hosts in hosts_to_forget(destroyed, all_resources).items():
+            error = forget_on_jumphost(jumphost, hosts)
+            if error:
+                logger.warning("Could not clear known_hosts on %s: %s", jumphost, error)
+                self.console.print(
+                    f"[yellow]Warning: could not remove {', '.join(hosts)} from "
+                    f"known_hosts on {jumphost}: {error}[/yellow]"
+                )
+            else:
+                self.console.print(f"Removed {', '.join(hosts)} from known_hosts on {jumphost}")
 
     def _fire_destroy_lifecycle_events(
         self,
