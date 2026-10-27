@@ -226,7 +226,8 @@ def _show_welcome(ctx: click.Context) -> None:
     console.print()
 
 
-@click.group(invoke_without_command=True)
+# Subcommand contexts inherit help_option_names, so -h works on every command (#822).
+@click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option(version="0.1.0", prog_name="foundry")
 @click.option(
     "--debug",
