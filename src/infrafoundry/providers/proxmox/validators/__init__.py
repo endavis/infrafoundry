@@ -5,6 +5,7 @@ from infrafoundry.providers.proxmox.validators.container_config_validator import
 )
 from infrafoundry.providers.proxmox.validators.network_validator import NetworkValidator
 from infrafoundry.providers.proxmox.validators.node_validator import NodeValidator
+from infrafoundry.providers.proxmox.validators.sdn_config_validator import SDNConfigValidator
 from infrafoundry.providers.proxmox.validators.storage_config_validator import (
     StorageConfigValidator,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "ContainerConfigValidator",
     "NetworkValidator",
     "NodeValidator",
+    "SDNConfigValidator",
     "StorageConfigValidator",
     "StorageValidator",
     "TemplateValidator",

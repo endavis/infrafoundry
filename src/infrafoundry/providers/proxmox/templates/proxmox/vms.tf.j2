@@ -74,6 +74,9 @@ resource "proxmox_virtual_environment_file" "cloud_init_user_data_{{ vm.name | r
 {% endif %}
 
 resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_') }}" {
+{% if vm.name in (sdn_dependents | default([])) %}
+  depends_on = [proxmox_sdn_applier.apply]
+{% endif %}
   name        = "{{ vm.config.name }}"
   node_name   = "{{ vm.config.target_node }}"
   {% if vm.config.vmid is defined %}

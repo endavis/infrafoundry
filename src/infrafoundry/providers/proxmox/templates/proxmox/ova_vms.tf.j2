@@ -14,6 +14,9 @@
 # OVA VM: {{ vm.config.name }}
 {% endif %}
 resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
+{% if vm.name in (sdn_dependents | default([])) %}
+  depends_on = [proxmox_sdn_applier.apply]
+{% endif %}
   triggers_replace = {
     vmid         = "{{ vm.config.vmid }}"
 {% if image_source %}

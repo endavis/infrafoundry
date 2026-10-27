@@ -23,6 +23,8 @@ the `bpg/proxmox` Terraform provider.
 | `network` | Linux bridge or VLAN-aware bridge on a node |
 | `storage` | NFS, CIFS, or directory-backed storage pool |
 | `trigger` | Lightweight `terraform_data` marker for script-only packages |
+| `sdn_zone` | Cluster-wide SDN zone (VXLAN) |
+| `sdn_vnet` | SDN vnet in a zone; VMs and containers attach to it as a bridge |
 
 ## Prerequisites
 
@@ -124,6 +126,42 @@ vms:
 
 The `opnsense-vm` blueprint (`blueprints/opnsense-vm/`) uses this to build a
 disposable OPNsense test firewall.
+
+### SDN zones and vnets
+
+An SDN vnet is a network shared by every node in its zone, so VMs on different
+nodes can share an isolated layer-2 segment. A VXLAN zone tunnels it over the
+nodes' existing network; no switch configuration is needed. The SDN packages
+(`libpve-network-perl`, `ifupdown2`) must be installed on the nodes.
+
+```yaml
+sdn_zones:
+  - name: nettest
+    config:
+      kind: vxlan            # the only kind supported so far
+      peers: ["192.168.10.100", "192.168.10.101", "192.168.10.102"]
+      mtu: 8950              # optional; VXLAN adds ~50 bytes, keep it below the underlay MTU
+      # nodes: [pve1, pve3]  # optional; default is every node
+sdn_vnets:
+  - name: ntlan
+    config:
+      zone: nettest          # an sdn_zone, by name or id
+      tag: 9900              # the VXLAN network identifier (VNI), unique per vnet
+      alias: "NetApp test LAN"
+```
+
+A VM or container attaches by using the vnet as its bridge
+(`network: [{ bridge: ntlan }]`), with no VLAN tag.
+
+- **IDs.** The Proxmox ID is `config.id`, else the resource name. It must be 1–8
+  lowercase letters or digits, starting with a letter.
+- **Applying.** Proxmox stages SDN changes until they are applied cluster-wide.
+  InfraFoundry renders two `proxmox_sdn_applier` resources: one applies after any
+  zone or vnet is created or changed, the other applies the deletions after a
+  destroy.
+- **Ordering.** VMs and containers attached to a managed vnet depend on it, so the
+  vnet is live before they are created and is removed only after they are
+  destroyed.
 
 ## Provider CLI
 
