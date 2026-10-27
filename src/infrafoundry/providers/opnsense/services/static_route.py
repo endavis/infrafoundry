@@ -75,7 +75,7 @@ from typing import Any
 from infrafoundry.core.provider import ResourceConfig
 
 from ._nested_emit import emit_nested_list_yaml
-from .base import BaseService
+from .base import BaseService, raise_on_failed_write
 
 # Controller base for all static-route CRUD + reconfigure endpoints.
 _ROUTE_BASE = "routes/routes"
@@ -103,8 +103,8 @@ class StaticRouteConfig:
         name: Operator-facing YAML name; metadata only.
         network: Destination CIDR (IPv4 or IPv6).
         gateway: Next-hop gateway name (managed or live system gateway).
-        enabled: Whether the route is active. Inverted to ``disabled``
-            on the wire.
+        enabled: Whether the route is active. Sent as ``enabled``, the
+            26.1 model's field (#1151).
         description: Operator-facing free-form description (mapped to
             ``descr`` on the wire).
         lock: Per-resource safety annotation (ADR-0014 §6).
@@ -127,15 +127,14 @@ class StaticRouteConfig:
 
         Returns:
             ``{"route": {<fields>}}``. Booleans are stringified to
-            ``"0"``/``"1"``; ``enabled`` is inverted to ``disabled``;
-            ``description`` maps to ``descr``. The operator-facing
+            ``"0"``/``"1"``; ``description`` maps to ``descr``. The operator-facing
             ``name`` is intentionally NOT sent — it is metadata only.
         """
         return {
             "route": {
                 "network": self.network,
                 "gateway": self.gateway,
-                "disabled": _bool_str(not self.enabled),
+                "enabled": _bool_str(self.enabled),
                 "descr": self.description,
             }
         }
@@ -258,10 +257,24 @@ def _needs_update(have: LiveStaticRoute, want: StaticRouteConfig) -> bool:
     """
     payload = want.to_payload()["route"]
     for key, want_value in payload.items():
-        have_value = _normalize_field(have.raw.get(key))
+        if key == "enabled":
+            have_value = _bool_str(_live_enabled(have.raw))
+        else:
+            have_value = _normalize_field(have.raw.get(key))
         if str(want_value) != have_value:
             return True
     return False
+
+
+def _live_enabled(item: dict[str, Any]) -> bool:
+    """Whether a live route is enabled.
+
+    26.1 reports ``enabled``; older releases reported the inverse,
+    ``disabled`` (#1151).
+    """
+    if "enabled" in item:
+        return _normalize_field(item.get("enabled")) == "1"
+    return _normalize_field(item.get("disabled")) != "1"
 
 
 def _normalize_field(value: Any) -> str:
@@ -493,15 +506,17 @@ class StaticRouteService(BaseService):
         deleted = 0
 
         for route in diff.adds:
-            self.add(route)
+            raise_on_failed_write(self.add(route), f"add static route {route.network}")
             created += 1
 
         for live, want in diff.updates:
-            self.update(live.uuid, want)
+            raise_on_failed_write(
+                self.update(live.uuid, want), f"update static route {want.network}"
+            )
             updated += 1
 
         for live in diff.deletes:
-            self.delete(live.uuid)
+            raise_on_failed_write(self.delete(live.uuid), f"delete static route {live.network}")
             deleted += 1
 
         if created or updated or deleted:
@@ -574,11 +589,12 @@ def _live_to_export_config(get_response: dict[str, Any]) -> dict[str, Any]:
     Reads the option-dict ``gateway`` via ``_normalize_field`` to recover
     the selected gateway name. Booleans are decoded from the
     ``"0"``/``"1"`` strings that OPNsense returns. The operator-facing
-    ``enabled`` is the inverse of the live ``disabled``.
+    ``enabled`` comes from the live ``enabled`` (or the inverse of
+    ``disabled`` on releases before 26.1).
     """
     item = get_response.get("route", {}) if isinstance(get_response, dict) else {}
     return {
-        "enabled": _normalize_field(item.get("disabled")) != "1",
+        "enabled": _live_enabled(item),
         "network": _normalize_field(item.get("network")),
         "gateway": _normalize_field(item.get("gateway")),
         "description": _normalize_field(item.get("descr")),
