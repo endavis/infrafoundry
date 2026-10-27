@@ -25,6 +25,7 @@ from infrafoundry.core.orchestrator_workflows import (
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.state import DeploymentStatus
+from infrafoundry.core.types import ResourceOutcome
 
 
 @pytest.fixture
@@ -1726,3 +1727,92 @@ def test_plan_provider_filter_unknown_name_raises(console: Console) -> None:
             enforce_policies=False,
             provider_filter=["nope"],
         )
+
+
+def _jumphost_destroy(
+    console: Console, outcomes: list[ResourceOutcome]
+) -> tuple[DestroyOrchestrator, list[ResourceConfig]]:
+    """A destroy of one proxmox VM in a jumphost package, plus its opnsense reservation."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 30
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.destroy = MagicMock(return_value={"success": True, "resource_outcomes": outcomes})
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+
+    pkg_vars = {"jumphost": "ansible@jump.example"}
+    vm = ResourceConfig(
+        name="k3s-server", provider="proxmox", type="vm", config={}, package_variables=pkg_vars
+    )
+    reservation = ResourceConfig(
+        name="k3s-server-dhcp",
+        provider="opnsense",
+        type="kea.dhcp4.reservations",
+        config={"hostname": "k3s-server", "ip_address": "10.0.1.10"},
+        package_variables=pkg_vars,
+    )
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        MagicMock(),
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: (
+            [vm, reservation],
+            {"proxmox": [vm], "opnsense": [reservation]},
+        ),
+        # Only proxmox is destroyed, as with `-P proxmox`.
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
+            ProviderResourceBatch("proxmox", resources_by_provider["proxmox"], 1)
+        ],
+        get_current_user=lambda: "tester",
+    )
+    orchestrator.runners = {"terraform": tf_runner}
+    return orchestrator, [vm, reservation]
+
+
+def _destroy(orchestrator: DestroyOrchestrator) -> dict[str, Any]:
+    return orchestrator.destroy(
+        env_name="dev", resource_filter=None, auto_approve=True, confirm_callback=lambda: True
+    )
+
+
+def test_destroy_forgets_destroyed_vm_on_the_jumphost(console: Console) -> None:
+    """The VM's name and its reservation's IP are removed from the jumphost (#656)."""
+    deleted = ResourceOutcome(address="vm.k3s_server", action="delete", resource_name="k3s-server")
+    orchestrator, _ = _jumphost_destroy(console, [deleted])
+
+    with patch(
+        "infrafoundry.core.orchestrator_workflows.forget_on_jumphost", return_value=None
+    ) as forget:
+        _destroy(orchestrator)
+
+    forget.assert_called_once_with("ansible@jump.example", ["k3s-server", "10.0.1.10"])
+
+
+def test_destroy_without_deletions_leaves_known_hosts_alone(console: Console) -> None:
+    orchestrator, _ = _jumphost_destroy(console, [])
+
+    with patch("infrafoundry.core.orchestrator_workflows.forget_on_jumphost") as forget:
+        _destroy(orchestrator)
+
+    forget.assert_not_called()
+
+
+def test_known_hosts_failure_does_not_fail_the_destroy(console: Console) -> None:
+    deleted = ResourceOutcome(address="vm.k3s_server", action="delete", resource_name="k3s-server")
+    orchestrator, _ = _jumphost_destroy(console, [deleted])
+
+    with patch(
+        "infrafoundry.core.orchestrator_workflows.forget_on_jumphost",
+        return_value="ssh to ansible@jump.example exited 255",
+    ):
+        _destroy(orchestrator)
+
+    status = cast(MagicMock, orchestrator.state_manager).update_deployment_status
+    status.assert_called_with(30, DeploymentStatus.COMPLETED)

@@ -144,6 +144,20 @@ tools the blueprint script itself needs. SSH must be reachable from the
 operator's host using the value of `jumphost` as a destination (e.g.
 `ansible@jump.example.com` or an alias defined in `~/.ssh/config`).
 
+**Host keys after destroy:** after `foundry infra destroy`, the framework
+removes each destroyed resource from the jumphost's `~/.ssh/known_hosts`, so a
+VM recreated on the same IP doesn't fail with "REMOTE HOST IDENTIFICATION HAS
+CHANGED" (#656). For each destroyed resource whose package sets `jumphost`, it
+runs `ssh-keygen -R` on the jumphost, in one SSH call per jumphost, for:
+
+- the resource's name;
+- the `ip_address` of every `kea.dhcp4.reservations` resource whose `hostname`
+  matches that name.
+
+FQDN entries are not removed, and a resource with no matching reservation
+(for example k3s on OCI) loses only its name entry. If the SSH call fails,
+destroy prints a warning and still succeeds.
+
 ### Declaring script outputs
 
 Blueprint event-handler scripts often produce artifact files the operator
