@@ -141,7 +141,9 @@ class TestIacToolAlternatives:
         return _which
 
     def test_both_installed_ok(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"terraform", "tofu"}))
+        monkeypatch.setattr(
+            f"{doctor_module.__name__}.shutil.which", self._which_stub({"terraform", "tofu"})
+        )
         result = doctor_module._check_iac_tool()
         assert result.name == "IaC Tool"
         assert result.status == "ok"
@@ -149,19 +151,21 @@ class TestIacToolAlternatives:
         assert "OpenTofu" in result.message
 
     def test_only_terraform_ok(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"terraform"}))
+        monkeypatch.setattr(
+            f"{doctor_module.__name__}.shutil.which", self._which_stub({"terraform"})
+        )
         result = doctor_module._check_iac_tool()
         assert result.status == "ok"
         assert "Terraform" in result.message
 
     def test_only_opentofu_ok(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub({"tofu"}))
+        monkeypatch.setattr(f"{doctor_module.__name__}.shutil.which", self._which_stub({"tofu"}))
         result = doctor_module._check_iac_tool()
         assert result.status == "ok"
         assert "OpenTofu" in result.message
 
     def test_neither_installed_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(doctor_module.shutil, "which", self._which_stub(set()))
+        monkeypatch.setattr(f"{doctor_module.__name__}.shutil.which", self._which_stub(set()))
         result = doctor_module._check_iac_tool()
         assert result.status == "error"
         assert "Neither" in result.message
@@ -174,16 +178,14 @@ class TestIacToolAlternatives:
         """Doctor should exit 0 and show no warnings when only Terraform is installed."""
         installed = {"terraform", "ansible", "sops", "age"}
         monkeypatch.setattr(
-            doctor_module.shutil,
-            "which",
+            f"{doctor_module.__name__}.shutil.which",
             lambda cmd: f"/usr/bin/{cmd}" if cmd in installed else None,
         )
         # doctor_utils.check_dependency also calls shutil.which directly
         from infrafoundry.cli.commands import doctor_utils
 
         monkeypatch.setattr(
-            doctor_utils.shutil,
-            "which",
+            f"{doctor_utils.__name__}.shutil.which",
             lambda cmd: f"/usr/bin/{cmd}" if cmd in installed else None,
         )
 

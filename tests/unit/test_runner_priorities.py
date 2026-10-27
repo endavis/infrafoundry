@@ -11,8 +11,13 @@ from infrafoundry.core.runners import BaseRunner
 
 
 class MockTerraformRunner(BaseRunner):
-    tool_name = "terraform"
-    priority = 0
+    @property
+    def tool_name(self) -> str:
+        return "terraform"
+
+    @property
+    def priority(self) -> int:
+        return 0
 
     def is_available(self) -> bool:
         return True
@@ -40,8 +45,13 @@ class MockTerraformRunner(BaseRunner):
 
 
 class MockAnsibleRunner(BaseRunner):
-    tool_name = "ansible"
-    priority = 50
+    @property
+    def tool_name(self) -> str:
+        return "ansible"
+
+    @property
+    def priority(self) -> int:
+        return 50
 
     def is_available(self) -> bool:
         return True
@@ -69,8 +79,13 @@ class MockAnsibleRunner(BaseRunner):
 
 
 class MockPyInfraRunner(BaseRunner):
-    tool_name = "pyinfra"
-    priority = 50
+    @property
+    def tool_name(self) -> str:
+        return "pyinfra"
+
+    @property
+    def priority(self) -> int:
+        return 50
 
     def is_available(self) -> bool:
         return True

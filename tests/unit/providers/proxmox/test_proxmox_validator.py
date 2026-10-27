@@ -444,7 +444,7 @@ class TestGetClusterVMs:
 
         assert result is not None
         assert len(result) == 2
-        assert result[0]["vmid"] == 100
+        assert result[0].get("vmid") == 100
 
     def test_api_error_returns_none(self, validator: ProxmoxValidator, report: MagicMock) -> None:
         """Returns None and reports warning on API error."""
