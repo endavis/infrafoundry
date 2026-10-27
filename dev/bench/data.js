@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793124087752,
+  "lastUpdate": 1793124604391,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11191,6 +11191,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000018791095188394514",
             "extra": "mean: 65.57548353028527 usec\nrounds: 16667"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "30fc2dd5055cedda6d1e7bb96d705a49529a5740",
+          "message": "fix: resolve references against the whole environment on filtered validation (merges PR #1136, addresses #1133)\n\nA filtered infra doctor run (-r or -p) gave each provider only the\nfiltered resources, and the OPNsense validators resolved names against\nthat list. A reservation naming a subnet managed by another package\nfailed with \"references unknown subnet_ref\", although the unfiltered\nrun and the apply both accept it.\n\nProviders can now implement the optional ValidatesReferencesInContext\nprotocol. On a filtered run the validation workflow passes it the\nfiltered resources to check and all of the provider's resources to\nresolve against. OPNsense implements it: every name lookup and the\ncross-reference index use the whole environment, while only the\nfiltered resources are checked. Providers without it are called as\nbefore, so the provider contract is unchanged.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T18:09:10Z",
+          "tree_id": "a226fcd9db6592d3b9c503edfa85d82f030583b5",
+          "url": "https://github.com/endavis/infrafoundry/commit/30fc2dd5055cedda6d1e7bb96d705a49529a5740"
+        },
+        "date": 1793124602476,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7858.080316746763,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001124584821754828",
+            "extra": "mean: 127.25754378825168 usec\nrounds: 8347"
           }
         ]
       }
