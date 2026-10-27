@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793128117204,
+  "lastUpdate": 1793128571393,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11315,6 +11315,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009898578109060998",
             "extra": "mean: 128.80759023052198 usec\nrounds: 8373"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ede45b99297424591710e4207ad3e92ad3c671ce",
+          "message": "fix: plan kea reservations in a subnet the same run creates (merges PR #1148, addresses #1145)\n\nThe DHCPv4 reservation manager resolved every reservation's subnet against\nthe subnets live on the box, so a plan that adds a subnet and reservations\nin it aborted with ReferenceValidationError. Plan now treats a reservation\nwhose CIDR belongs to a managed kea.dhcp4.subnets resource that is not live\nyet as an add. Apply stays strict: the runner applies subnets first, and\napply resolves the UUID from the live subnets then.\n\nAddresses #1145\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T19:15:09Z",
+          "tree_id": "70bdd92aff0109aeaf499a52afa5f4b68b4978b1",
+          "url": "https://github.com/endavis/infrafoundry/commit/ede45b99297424591710e4207ad3e92ad3c671ce"
+        },
+        "date": 1793128569769,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12950.944487304761,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002095164262363309",
+            "extra": "mean: 77.2144457093655 usec\nrounds: 13879"
           }
         ]
       }
