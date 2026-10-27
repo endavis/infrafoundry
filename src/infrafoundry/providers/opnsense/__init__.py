@@ -83,6 +83,23 @@ class OPNsenseProvider(
         "api_secret": "opnsense_api_secret",  # nosec B105
     }
 
+    #: Types with a registered manager that ``get_resource_types`` still
+    #: rejects: their services call endpoints that return 404 on OPNsense
+    #: 26.1 (``system/general``, ``system/settings``, ``firmware/info``,
+    #: ``gdrivebackup/settings``, ``diagnostics/system/sysctl``). Remove a
+    #: type once its service is verified against a live box (#1144, #1149).
+    UNVERIFIED_RESOURCE_TYPES: ClassVar[frozenset[str]] = frozenset(
+        {
+            "system.hostname",
+            "system.dns",
+            "system.ssh",
+            "system.webgui",
+            "system.firmware",
+            "system.remotebackup",
+            "system.tuning",
+        }
+    )
+
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize OPNsense provider."""
         super().__init__("opnsense", config_dir, output_dir)
@@ -426,23 +443,17 @@ class OPNsenseProvider(
 
     @override
     def get_resource_types(self) -> list[str]:
-        """Get supported resource types."""
+        """Get supported resource types.
+
+        Derived from the direct-API manager table, less
+        ``UNVERIFIED_RESOURCE_TYPES``, so a new manager is accepted by
+        ``Orchestrator.validate_resources`` without a second list to keep
+        in step (#1144).
+        """
         return [
-            "firewall.rules",
-            "interfaces.vlans",
-            "interfaces.assignments",
-            "firewall.aliases",
-            "kea.dhcp4.subnets",
-            "kea.dhcp4.reservations",
-            "kea.dhcp6.subnets",
-            "kea.dhcp6.reservations",
-            "unbound.host_overrides",
-            "firewall.nat",
-            "routing.gateways",
-            "routing.static",
-            "interfaces.virtual_ips",
-            "unbound.host_aliases",
-            "unbound.forwards",
+            resource_type
+            for resource_type in self.get_direct_api_resource_types()
+            if resource_type not in self.UNVERIFIED_RESOURCE_TYPES
         ]
 
     @override
@@ -482,6 +493,8 @@ class OPNsenseProvider(
             "interfaces.virtual_ips": ["interfaces.assignments"],
             "unbound.host_aliases": ["unbound.host_overrides"],
             "unbound.forwards": [],
+            "radvd": ["interfaces.assignments"],
+            "cron.jobs": [],
         }
 
     @override
