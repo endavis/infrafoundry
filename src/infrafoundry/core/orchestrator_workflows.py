@@ -24,7 +24,12 @@ from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.known_hosts import forget_on_jumphost, hosts_to_forget
-from infrafoundry.core.protocols import Destroyable, Plannable, VerifiesDestroy
+from infrafoundry.core.protocols import (
+    Destroyable,
+    Plannable,
+    ValidatesReferencesInContext,
+    VerifiesDestroy,
+)
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.result_types import PlanResult
 from infrafoundry.core.runner_results import raise_on_runner_failure
@@ -264,7 +269,13 @@ class ValidationOrchestrator:
             report = ValidationReport()
             self.console.print(f"[bold]Validating {provider_name}...[/bold]")
 
-            self._run_validation_checks(provider, env_config, resources, report)
+            # A filter limits what is checked, not what references resolve to.
+            reference_resources = (
+                resources_by_provider.get(provider_name, resources) if filter_set else None
+            )
+            self._run_validation_checks(
+                provider, env_config, resources, report, reference_resources
+            )
 
             summary = report.get_summary()
             passed = not report.has_errors()
@@ -290,8 +301,18 @@ class ValidationOrchestrator:
         env_config: EnvironmentConfig,
         resources: list[ResourceConfig],
         report: ValidationReport,
+        reference_resources: list[ResourceConfig] | None = None,
     ) -> None:
-        """Invoke provider validation hooks with error protection."""
+        """Invoke provider validation hooks with error protection.
+
+        Args:
+            provider: Provider to validate.
+            env_config: Environment configuration including credentials.
+            resources: Resources to validate.
+            report: Report to add results to.
+            reference_resources: On a filtered run, all of the provider's
+                resources, for providers that resolve references against them.
+        """
         try:
             provider.validate_connectivity(env_config, report)
         except Exception as exc:
@@ -299,7 +320,14 @@ class ValidationOrchestrator:
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
 
         try:
-            provider.validate_references(resources, env_config, report)
+            if reference_resources is not None and isinstance(
+                provider, ValidatesReferencesInContext
+            ):
+                provider.validate_references_in_context(
+                    resources, reference_resources, env_config, report
+                )
+            else:
+                provider.validate_references(resources, env_config, report)
         except Exception as exc:
             self.console.print(f"[red]✗ Reference validation failed: {exc}[/red]")
             self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback

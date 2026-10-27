@@ -23,7 +23,9 @@ from jinja2 import Template
 from infrafoundry.core.result_types import ApplyResult, DestroyResult, DriftInfo, PlanResult
 
 if TYPE_CHECKING:
+    from infrafoundry.core.config.models import EnvironmentConfig
     from infrafoundry.core.provider import ProviderBase, ResourceConfig
+    from infrafoundry.core.validation import ValidationReport
 
 
 @runtime_checkable
@@ -222,6 +224,36 @@ class HasSnippetStrictness(Protocol):
     """
 
     fail_on_missing_snippets: bool
+
+
+@runtime_checkable
+class ValidatesReferencesInContext(Protocol):
+    """Protocol for providers that resolve references beyond the resources checked.
+
+    A filtered ``infra doctor`` run validates only the resources in the
+    filter, but their references may name resources outside it, such as a
+    DHCP reservation naming a subnet from another package (#1133). A provider
+    implementing this checks *resources* and resolves names against
+    *reference_resources*. Providers without it get ``validate_references``
+    with the filtered list, as before.
+    """
+
+    def validate_references_in_context(
+        self,
+        resources: list["ResourceConfig"],
+        reference_resources: list["ResourceConfig"],
+        env_config: "EnvironmentConfig",
+        report: "ValidationReport",
+    ) -> None:
+        """Validate *resources*, resolving references against *reference_resources*.
+
+        Args:
+            resources: Resources to validate
+            reference_resources: All of the provider's resources in the environment
+            env_config: Environment configuration including credentials
+            report: ValidationReport to add results to
+        """
+        ...
 
 
 @runtime_checkable

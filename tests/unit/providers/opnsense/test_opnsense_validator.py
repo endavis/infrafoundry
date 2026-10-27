@@ -227,6 +227,82 @@ class TestValidateReferences:
         validator.api_validator.handle_validation_exception.assert_called_once()
 
 
+def _reservation(name: str, subnet_ref: str) -> ResourceConfig:
+    return ResourceConfig(
+        name=name,
+        type="kea.dhcp4.reservations",
+        provider="opnsense",
+        config={
+            "hw_address": "aa:bb:cc:dd:ee:01",
+            "ip_address": "10.0.10.50",
+            "hostname": name,
+            "subnet_ref": subnet_ref,
+        },
+    )
+
+
+def _subnet(name: str) -> ResourceConfig:
+    return ResourceConfig(
+        name=name, type="kea.dhcp4.subnets", provider="opnsense", config={"subnet": "10.0.10.0/24"}
+    )
+
+
+class TestReferenceResources:
+    """A filtered run checks its resources but resolves names against all of them (#1133)."""
+
+    @pytest.fixture
+    def real_validator(self, env_config: Any) -> tuple[OPNsenseValidator, ValidationReport]:
+        report = ValidationReport()
+        validator = OPNsenseValidator(env_config, report)
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        return validator, report
+
+    @staticmethod
+    def _errors(report: ValidationReport) -> list[str]:
+        return [r.message for r in report.results if not r.passed and r.level.value == "error"]
+
+    def test_reference_outside_the_filter_resolves(
+        self, real_validator: tuple[OPNsenseValidator, ValidationReport]
+    ) -> None:
+        validator, report = real_validator
+        reservation = _reservation("k3s-server-dhcp", "opt1-infrastructure")
+
+        validator.validate_references([reservation], [reservation, _subnet("opt1-infrastructure")])
+
+        assert self._errors(report) == []
+
+    def test_without_reference_resources_the_filtered_list_is_used(
+        self, real_validator: tuple[OPNsenseValidator, ValidationReport]
+    ) -> None:
+        validator, report = real_validator
+
+        validator.validate_references([_reservation("k3s-server-dhcp", "opt1-infrastructure")])
+
+        assert any("unknown subnet_ref" in m for m in self._errors(report))
+
+    def test_unknown_reference_still_errors(
+        self, real_validator: tuple[OPNsenseValidator, ValidationReport]
+    ) -> None:
+        validator, report = real_validator
+        reservation = _reservation("k3s-server-dhcp", "no-such-subnet")
+
+        validator.validate_references([reservation], [reservation, _subnet("other")])
+
+        assert any("'no-such-subnet'" in m for m in self._errors(report))
+
+    def test_reference_resources_are_not_themselves_checked(
+        self, real_validator: tuple[OPNsenseValidator, ValidationReport]
+    ) -> None:
+        """A broken resource outside the filter is not reported."""
+        validator, report = real_validator
+        in_scope = _reservation("in-scope", "lan")
+        broken = _reservation("out-of-scope", "no-such-subnet")
+
+        validator.validate_references([in_scope], [in_scope, broken, _subnet("lan")])
+
+        assert self._errors(report) == []
+
+
 class TestCollectResourceReferences:
     """Tests for _collect_resource_references."""
 
