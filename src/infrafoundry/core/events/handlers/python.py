@@ -63,8 +63,9 @@ class PythonHandler(BaseHandler):
         function_name = self.config.get("function", "handle")
 
         module = importlib.import_module(module_path)
-        self._callable = getattr(module, function_name)
-        return self._callable
+        handler: Callable[[EventContext], Any] = getattr(module, function_name)
+        self._callable = handler
+        return handler
 
     @override
     def execute(self, context: EventContext) -> EventResult:
