@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793113868649,
+  "lastUpdate": 1793121230506,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11098,6 +11098,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001192384115321344",
             "extra": "mean: 128.86235555031922 usec\nrounds: 8342"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8badd2073500c7207b13b1e7e14fd2af5164d771",
+          "message": "chore: bump msgpack to 1.2.4 to fix CVE-2026-114613 (merges PR #1132, addresses #1131)\n\nmsgpack is a dev-only dependency (cachecontrol <- pip-audit[filecache] <-\nthe security extra). pip-audit flagged 1.2.1, which failed doit check and\nCI on every branch.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T17:12:58Z",
+          "tree_id": "ce980731c48a3ebc37dd1057d592e6244430d464",
+          "url": "https://github.com/endavis/infrafoundry/commit/8badd2073500c7207b13b1e7e14fd2af5164d771"
+        },
+        "date": 1793121228580,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10582.80800392709,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001714855629971186",
+            "extra": "mean: 94.49287935951574 usec\nrounds: 12301"
           }
         ]
       }
