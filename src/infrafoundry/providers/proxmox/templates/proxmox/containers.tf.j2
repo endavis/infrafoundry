@@ -1,5 +1,8 @@
 {% for container in containers %}
 resource "proxmox_virtual_environment_container" "{{ container.config.name | replace('-', '_') }}" {
+{% if container.name in (sdn_dependents | default([])) %}
+  depends_on = [proxmox_sdn_applier.apply]
+{% endif %}
   node_name   = "{{ container.config.target_node }}"
   {% if container.config.ctid is defined %}
   vm_id       = {{ container.config.ctid }}
