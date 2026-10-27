@@ -332,6 +332,9 @@ remote_kubectl "${SERVER_IP}" "kubectl get nodes -o wide"
 
 # ===========================================================================
 # Phase 6: Save kubeconfig locally
+#
+# "Locally" is the host running this script. With a jumphost, the blueprint's
+# outputs: entry has the framework copy the file back to the operator (#672).
 # ===========================================================================
 echo ""
 echo "--- Phase 6: Saving kubeconfig locally ---"
@@ -352,3 +355,7 @@ for i in "${!AGENT_NAMES[@]}"; do
 done
 echo "  Kubeconfig: export KUBECONFIG=${KUBECONFIG_LOCAL}"
 echo "  kubectl: KUBECONFIG=${KUBECONFIG_LOCAL} kubectl get nodes"
+if [ -n "${INFRAFOUNDRY_ON_JUMPHOST:-}" ]; then
+    echo "  (That path is on the jumphost; InfraFoundry copies the kubeconfig to the"
+    echo "   same ~ path on your workstation after this script succeeds.)"
+fi

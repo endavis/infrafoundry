@@ -94,6 +94,11 @@ providers:
           continue_on_error: false
           requires:
             - "{{ server_name }}"
+          # The script writes the kubeconfig on the host it runs on; with a
+          # jumphost the framework copies it back to the operator (#672).
+          outputs:
+            - source: "{{ kubeconfig_dir }}/{{ cluster_name }}.yaml"
+              dest: "{{ kubeconfig_dir }}/{{ cluster_name }}.yaml"
 
   # =====================================================================
   # OCI — ARM Always-Free-Tier (1 control + N workers) with Tailscale
@@ -180,6 +185,11 @@ providers:
           continue_on_error: false
           requires:
             - "{{ control_name }}"
+          # Ansible's fetch writes the kubeconfig on the controller, which is
+          # the jumphost when one is set; the framework copies it back (#672).
+          outputs:
+            - source: "{{ kubeconfig_local_path }}"
+              dest: "{{ kubeconfig_local_path }}"
 
       before_destroy:
         - type: script
