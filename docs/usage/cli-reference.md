@@ -109,7 +109,9 @@ Options:
   --fail-on-missing-snippets / --allow-missing-snippets
 ```
 
-**Environment variables:** `INFRAFOUNDRY_CONFIG_REPO`, `INFRAFOUNDRY_STRICT_MODE`, `INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS`, `INFRAFOUNDRY_FAIL_ON_MISSING_SNIPPETS`.
+**Environment variables:** `INFRAFOUNDRY_CONFIG_REPO`, `INFRAFOUNDRY_STRICT_MODE`, `INFRAFOUNDRY_FAIL_ON_MISSING_SECRETS`, `INFRAFOUNDRY_FAIL_ON_MISSING_SNIPPETS`, `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE`.
+
+`INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1` lets `<PROVIDER>_<KEY>` env vars override the matching `provider_settings` key for one invocation, without editing `settings.yaml`. For example, `PROXMOX_API_URL` redirects a proxmox `infra plan`/`apply` to another endpoint, and a warning names the new endpoint. Without the gate, these env vars are ignored. Details and the OPNsense variables: [ADR-0014 §"Runtime credential resolution"](../decisions/0014-opnsense-direct-api-apply-mechanism.md#runtime-credential-resolution-741-2026-05-05).
 
 ## Top-Level Commands
 
