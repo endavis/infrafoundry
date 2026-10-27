@@ -156,3 +156,45 @@ def test_opnsense_in_context_passes_reference_resources(tmp_path: Path) -> None:
         provider.validate_references_in_context(checked, references, MagicMock(), MagicMock())
 
     validator_cls.return_value.validate_references.assert_called_once_with(checked, references)
+
+
+class TestOPNsenseResourceTypes:
+    """Supported types track the manager table, less the unverified set (#1144)."""
+
+    @pytest.fixture
+    def provider(self, tmp_path: Path) -> OPNsenseProvider:
+        return OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
+
+    def test_every_manager_is_supported_or_explicitly_unverified(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        managed = set(provider.get_direct_api_resource_types())
+        supported = set(provider.get_resource_types())
+        unverified = OPNsenseProvider.UNVERIFIED_RESOURCE_TYPES
+
+        assert supported | unverified == managed
+        assert not supported & unverified
+
+    @pytest.mark.parametrize("resource_type", ["radvd", "cron.jobs"])
+    def test_previously_rejected_types_are_supported(
+        self, provider: OPNsenseProvider, resource_type: str
+    ) -> None:
+        assert resource_type in provider.get_resource_types()
+
+    def test_system_types_stay_rejected_until_verified(self, provider: OPNsenseProvider) -> None:
+        supported = provider.get_resource_types()
+
+        assert not [t for t in supported if t.startswith("system.")]
+
+    def test_every_supported_type_has_a_loader_shape(self, provider: OPNsenseProvider) -> None:
+        from infrafoundry.core.config.package_loader import DOTTED_RESOURCE_SHAPES
+
+        assert set(provider.get_resource_types()) <= set(DOTTED_RESOURCE_SHAPES)
+
+    def test_every_supported_type_has_a_dependency_entry(self, provider: OPNsenseProvider) -> None:
+        deps = provider.get_dependencies()
+        supported = set(provider.get_resource_types())
+
+        assert set(deps) == supported
+        for required in deps.values():
+            assert set(required) <= supported
