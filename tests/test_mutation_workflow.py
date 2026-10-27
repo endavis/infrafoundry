@@ -1,4 +1,4 @@
-"""Tests for the mutation-testing workflow (#873, #878).
+"""Tests for the mutation-testing workflow (#873, #878, #1116).
 
 The workflow ran ``uv run mutmut run > ... || true``. mutmut 3 exits non-zero
 only when it cannot test the mutants at all, never for surviving mutants, so
@@ -225,3 +225,12 @@ def test_no_mutants_gives_no_score(tmp_path: Path) -> None:
     summary = _summary(_run_results_step(tmp_path, []))
 
     assert "%" not in summary
+
+
+def test_the_run_has_time_to_check_every_mutant() -> None:
+    """Run 40372371911 was stopped at 120 minutes with 273 of 48,611 mutants unchecked (#1116)."""
+    step_limit = _steps()[_mutmut_run_index()]["timeout-minutes"]
+
+    assert step_limit >= 180
+    # A job limit below the step's would stop the run first; unset means 360.
+    assert _job().get("timeout-minutes", 360) > step_limit
