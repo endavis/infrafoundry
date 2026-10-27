@@ -20,6 +20,13 @@ Creates the VMs, configures OPNsense Kea DHCP reservations for every node, and
 runs a multi-phase post-deploy script that installs k3s, joins each agent,
 verifies the cluster, and writes a local kubeconfig.
 
+When the package sets `jumphost`, the install script runs there, so the kubeconfig is
+first written on the jumphost. The blueprint declares it under the handler's `outputs:`, and
+InfraFoundry copies it to the same `~` path on your workstation (`~/.kube/<cluster>.yaml`
+by default) once the script succeeds, so no manual `scp` is needed. The OCI variant
+works the same way: Ansible's `fetch` writes `kubeconfig_local_path` on the jumphost, and the
+framework copies it back.
+
 ### OCI
 
 One control plane plus N worker nodes on OCI ARM instances. Creates a VCN with
