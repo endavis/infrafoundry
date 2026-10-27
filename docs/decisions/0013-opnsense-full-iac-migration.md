@@ -18,6 +18,7 @@ tags:
 **Amended:** 2026-05-04 — added virtual_ips with EnvSecretsBackend for CARP password resolution (#723)
 **Amended:** 2026-05-04 (#725) — port_forward shipped as a third `kind` on `nat_rules` via direct-API at `firewall/d_nat`; implementation-order item #2 closed. The 2026-05-04 re-probe of `26.1.6_2` confirmed the stock `DNatController` ships with the standard CRUD verbs; the original 2026-05-03 probe used the wrong URL (`firewall/dnat` concatenated instead of `firewall/d_nat` snake-case)
 **Amended:** 2026-05-12 (#788) — `radvd` per-component decision recorded (modern MVC controller `radvd/settings/*Entry`; **hybrid YAML-singleton/wire-list** pattern; full-reconcile semantics; new shared finalization hook `radvd_reconfigure`). The legacy `<dhcpdv6>/<optN>/<ra*>` source-XML fields are explicitly **out of scope** — Kea owns DHCPv6 leases (`kea.dhcp6.*`, #758) and the modern `radvd` controller takes over RA emission. Cutover hard blocker for hands-free IPv6: without per-interface RA emission on `opt1`/`opt2`/`opt3`/`opt6`, every IPv6 host on those VLANs loses its default route the moment cutover finishes. See [ADR-0014 §"Per-component decisions" → `radvd`](0014-opnsense-direct-api-apply-mechanism.md#radvd-788-2026-05-12) for the apply mechanism and wire schema.
+**Amended:** 2026-10-27 (#1093) — OpenVPN (`<openvpn>`, `<OPNsense>/OpenVPN`), CAs and certificates (`<ca>`, `<cert>`) and the ACME client (`<OPNsense>/AcmeClient`) move from out of scope to in scope, tracked by [#808](https://github.com/endavis/infrafoundry/issues/808), [#807](https://github.com/endavis/infrafoundry/issues/807) and [#790](https://github.com/endavis/infrafoundry/issues/790). A box rebuilt from YAML otherwise loses its VPN client, its GUI certificate and its renewals, which defeats the drop-in replacement goal.
 **Status:** Accepted
 **Issue:** [#701](https://github.com/endavis/infrafoundry/issues/701)
 
@@ -41,6 +42,9 @@ We will close the IaC gap so OPNsense box-to-box migration is achievable through
 | `static_routes` | Needed when downstream networks aren't reachable via the default route. |
 | `virtual_ips` | Required for CARP, NAT outbound source addresses, and IP aliases. |
 | Unbound `domain_override`, `host_alias`, `forward` | Existing `unbound_host_override` is incomplete — host aliases and conditional forwarders are common in real deployments. |
+| `openvpn_legacy.clients` ([#808](https://github.com/endavis/infrafoundry/issues/808)) | Added 2026-10-27 (#1093). The VPN client must work on the replacement box without a hand import. |
+| `trust.cas`, `trust.certs` ([#807](https://github.com/endavis/infrafoundry/issues/807)) | Added 2026-10-27 (#1093). `system.webgui` and the OpenVPN client refer to certificates by reference, so the references must resolve after a rebuild. |
+| `acmeclient_*` ([#790](https://github.com/endavis/infrafoundry/issues/790)) | Added 2026-10-27 (#1093). Certificates issued by the ACME client stop renewing if its accounts, validations and actions are not carried over. |
 
 **Tooling work:**
 
@@ -51,8 +55,6 @@ We will close the IaC gap so OPNsense box-to-box migration is achievable through
 | Section | Reason |
 | --- | --- |
 | `<hasync>` | Set-once HA pairing config. |
-| `<openvpn>`, `<OPNsense>/OpenVPN` | Typically one or two clients/servers per box; pinning structure into IaC is high cost, low value. |
-| `<ca>`, `<cert>`, `<OPNsense>/AcmeClient` | Certificate material; importing is faster and safer than re-issuing through IaC. |
 | `<gres>`, `<gifs>`, `<laggs>`, `<bridges>`, `<ppps>`, `<wireless>` | Each typically a single record per box; not worth a component. |
 
 ISC DHCP (`<dhcpd>`/`<dhcpdv6>`) is also out of scope going forward — Kea is the supported path and the existing ISC→Kea helper covers the migration when needed.
@@ -61,7 +63,7 @@ ISC DHCP (`<dhcpd>`/`<dhcpdv6>`) is also out of scope going forward — Kea is t
 
 - **Drop-in replacement is the operator's stated goal.** The current Kea-only coverage doesn't get there.
 - **Interface assignment is the lever that makes hardware swaps repeatable.** Without it, every cutover requires hand-editing `config.xml` interface mappings on the target. With it, hardware-identical successor boxes are a "change endpoint, re-apply" operation.
-- **The deferred items are deliberately small and stable.** HA sync, OpenVPN, ACME, certs, and physical layer constructs (LAGG/bridge/GRE/etc.) change infrequently and are well-served by OPNsense's selective `config.xml` import. Putting them under IaC is a future option, not a prerequisite.
+- **The deferred items are deliberately small and stable.** HA sync and physical layer constructs (LAGG/bridge/GRE/etc.) change infrequently and are well-served by OPNsense's selective `config.xml` import. Putting them under IaC is a future option, not a prerequisite. OpenVPN, certificates and ACME were in this list until 2026-10-27 (#1093); they moved in scope because other managed settings depend on them.
 - **The scope is bounded and incremental.** Each gap is its own component with a clear contract (template + validator + manager + tests + `config migrate` extractor). Issues can ship independently and the migration runbook absorbs each one as it lands.
 
 ## Data model and apply mechanism
@@ -114,6 +116,10 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 - Issue [#724](https://github.com/endavis/infrafoundry/issues/724): feat: add OPNsense Unbound extensions — `unbound_host_alias` (direct-API, name-to-UUID resolution at apply time) and `unbound_forward` (direct-API, natural-key tuple identity; merges domain_override).
 - Issue [#725](https://github.com/endavis/infrafoundry/issues/725): feat: add OPNsense `port_forward` kind on `nat_rules` (direct-API at `firewall/d_nat`; closes implementation-order item #2; the 2026-05-04 re-probe corrected the original deferral premise).
 - Issue [#788](https://github.com/endavis/infrafoundry/issues/788): feat: add OPNsense `radvd` direct-API resource (IPv6 Router Advertisements; hybrid YAML-singleton/wire-list pattern; cutover hard blocker for hands-free IPv6).
+- Issue [#1093](https://github.com/endavis/infrafoundry/issues/1093): docs: reconcile the out-of-scope list with open issues (amended 2026-10-27).
+- Issue [#808](https://github.com/endavis/infrafoundry/issues/808): feat: add `openvpn_legacy.clients` direct-API resource (moved in scope by #1093).
+- Issue [#807](https://github.com/endavis/infrafoundry/issues/807): feat: add `trust.cas` and `trust.certs` direct-API resources (moved in scope by #1093).
+- Issue [#790](https://github.com/endavis/infrafoundry/issues/790): feat: add the `acmeclient_*` resource types (moved in scope by #1093).
 
 ## Related Documentation
 
