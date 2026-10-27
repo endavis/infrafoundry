@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793094326342,
+  "lastUpdate": 1793098339033,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10819,6 +10819,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011796950344589504",
             "extra": "mean: 127.26315648440922 usec\nrounds: 8397"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4aaa3185468364c5f1a1a24d08ee95694a548d3e",
+          "message": "docs: move openvpn, certificates and acme into opnsense iac scope (merges PR #1119, addresses #1093)\n\nADR-0013 listed OpenVPN, CAs/certificates and the ACME client as out of\nscope while #808, #807 and #790 proposed managing them. The owner chose\nto move them in scope: the ADR gains a dated amendment, in-scope rows and\nrelated-issue links, and the coverage runbook drops them from its\nout-of-scope sentence. The coverage matrix gains a gap row, linked to its\nissue, for each in-use section that has one open (#787, #790, #791, #792,\n#804, #805, #807, #808, #1091, #1092).\n\nAddresses #1093\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T10:51:21Z",
+          "tree_id": "f670b134a4c601a5c7cb02021c323bf784c6cce4",
+          "url": "https://github.com/endavis/infrafoundry/commit/4aaa3185468364c5f1a1a24d08ee95694a548d3e"
+        },
+        "date": 1793098337703,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16075.361678434252,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000018683625876914752",
+            "extra": "mean: 62.20699851136416 usec\nrounds: 17466"
           }
         ]
       }
