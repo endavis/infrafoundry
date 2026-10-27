@@ -33,6 +33,27 @@ def _jumphost(resource: ResourceConfig) -> str:
     return str((resource.package_variables or {}).get("jumphost", "")).strip()
 
 
+def reservation_ips(all_resources: Iterable[ResourceConfig]) -> dict[str, list[str]]:
+    """Map each reserved hostname to its DHCP reservation IPs.
+
+    Args:
+        all_resources: Every resource in the environment.
+
+    Returns:
+        ``{hostname: [ip, ...]}`` from the ``kea.dhcp4.reservations``
+        resources that set both ``hostname`` and ``ip_address``.
+    """
+    ips_by_hostname: dict[str, list[str]] = {}
+    for resource in all_resources:
+        if resource.type != RESERVATION_TYPE:
+            continue
+        hostname = str(resource.config.get("hostname", "")).strip()
+        ip = str(resource.config.get("ip_address", "")).strip()
+        if hostname and ip:
+            ips_by_hostname.setdefault(hostname, []).append(ip)
+    return ips_by_hostname
+
+
 def hosts_to_forget(
     destroyed: Iterable[ResourceConfig],
     all_resources: Iterable[ResourceConfig],
@@ -48,14 +69,7 @@ def hosts_to_forget(
         ``{jumphost: [host, ...]}`` with each list de-duplicated in first-seen
         order. Destroyed resources whose package sets no jumphost are left out.
     """
-    ips_by_hostname: dict[str, list[str]] = {}
-    for resource in all_resources:
-        if resource.type != RESERVATION_TYPE:
-            continue
-        hostname = str(resource.config.get("hostname", "")).strip()
-        ip = str(resource.config.get("ip_address", "")).strip()
-        if hostname and ip:
-            ips_by_hostname.setdefault(hostname, []).append(ip)
+    ips_by_hostname = reservation_ips(all_resources)
 
     result: dict[str, list[str]] = {}
     for resource in destroyed:

@@ -326,7 +326,7 @@ foundry infra doctor --env dev --verbose
 
 Note: `--resource` and `--package` are mutually exclusive.
 
-**Jumphost preflight:** for every in-scope package that sets `jumphost`, doctor also checks the jumphost in one SSH session: SSH access, an ssh-agent with keys loaded, the package's public key among them (where the package declares one, as `ssh_public_key` or a VM's `ssh_keys`), the tools the scripts need (`rsync`, `bash`, `python3`, `ssh`, `scp`) and a writable `/tmp`. Any `FAIL` makes doctor exit 1. See [Validation — Jumphost preflight](validation.md#jumphost-preflight).
+**Jumphost preflight:** for every in-scope package that sets `jumphost`, doctor also checks the jumphost in one SSH session: SSH access, an ssh-agent with keys loaded, the package's public key among them (where the package declares one, as `ssh_public_key` or a VM's `ssh_keys`), the tools the scripts need (`rsync`, `bash`, `python3`, `ssh`, `scp`), a writable `/tmp`, each VM the scripts will reach (SSH if deployed; a route and an unused IP if not) and the `outputs:` destinations on the workstation. Any `FAIL` makes doctor exit 1. See [Validation — Jumphost preflight](validation.md#jumphost-preflight).
 
 ### `infra plan`
 

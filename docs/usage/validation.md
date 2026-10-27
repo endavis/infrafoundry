@@ -61,7 +61,12 @@ Jumphost preflight (ansible@ansible.endavis.net):
   [SKIP] key match: package declares no public key to compare
   [OK] tools: rsync, bash, python3, ssh, scp
   [OK] writable /tmp
-Jumphost preflight: 4 OK, 1 SKIP
+  [OK] target k3s-server (192.168.10.70): not deployed; routable and unused
+  [OK] target k3s-agent-1 (192.168.10.71): not deployed; routable and unused
+  [OK] target k3s-agent-2 (192.168.10.72): not deployed; routable and unused
+  [OK] target k3s-agent-3 (192.168.10.73): not deployed; routable and unused
+  [OK] output ~/.kube/k3s-homelab.yaml: exists, writable
+Jumphost preflight: 9 OK, 1 SKIP
 ```
 
 | Check | Fails when |
@@ -71,6 +76,11 @@ Jumphost preflight: 4 OK, 1 SKIP
 | key match | A public key the package declares (`ssh_public_key`, or a VM's `ssh_keys`) is not in the agent. Comments are ignored. `SKIP` when the package declares none, for example when the key comes from a cloud-init snippet. |
 | tools | `rsync`, `bash`, `python3`, `ssh` or `scp` is missing on the jumphost. |
 | writable /tmp | The script handler can't create its work directory in `/tmp`. |
+| target (deployed) | SSH from the jumphost to the VM fails. The detail carries ssh's last error line, such as `Permission denied (publickey)`. |
+| target (not deployed) | The jumphost has no route to the IP, or something already answers a ping there, which means another host holds the address. `WARN` when `ip` is missing on the jumphost. |
+| output | Only `WARN`: an `outputs:` destination doesn't render, isn't absolute, or can't be written on the workstation. An apply only warns about these too. |
+
+**Targets** are the package's VMs that have a DHCP reservation whose `hostname` is the VM name; the reservation gives the IP. A VM counts as deployed when its newest state-DB row, ignoring the `planned` rows every `infra plan` adds, is `active` or `updating`; `deleted` or no row means not deployed, and anything in between is `SKIP`. Target SSH runs as the package's `ssh_user`, else the user in `jumphost`, with the blueprint scripts' options (`StrictHostKeyChecking=no`, `UserKnownHostsFile=/dev/null`). Leftover `known_hosts` entries on the jumphost therefore can't break an apply and aren't checked.
 
 Any `FAIL` makes doctor exit 1, so `foundry infra doctor --env prod -p k3s-cluster && foundry infra apply --env prod -p k3s-cluster` stops before the apply.
 
