@@ -255,3 +255,43 @@ def test_aiqum_blueprint_supports_multiple_instances(tmp_path: Path) -> None:
     # Events are per-instance: requires field references the correct vm_name
     assert events_a["on_create"][0]["requires"] == ["aiqum-a"]
     assert events_b["on_create"][0]["requires"] == ["aiqum-b"]
+
+
+def test_aiqum_empty_vlan_tag_attaches_untagged(tmp_path: Path) -> None:
+    """An empty vlan_tag leaves the NIC untagged, so AIQUM can sit on an SDN vnet (#1138)."""
+    envs = tmp_path / "envs"
+    pkg = envs / "test" / "proxmox" / "aiqum-sdn"
+    pkg.mkdir(parents=True)
+    (pkg / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: aiqum-sdn
+            description: "AIQUM on an SDN vnet"
+            blueprint: aiqum
+            variables:
+              vm_name: aiqum-sdn
+              vmid: 232
+              target_node: pve1
+              disk_storage: local-lvm
+              ip_address: "192.168.99.70"
+              dhcp_subnet: nettest
+              bridge: ntlan
+              vlan_tag: ""
+              aiqum_admin_password: "pw"
+              aiqum_admin_email: "a@example.com"
+              aiqum_url_base: "http://web/aiqum"
+              smtp_server: "smtp.example.com"
+              smtp_user: "aiqum"
+              smtp_password: "pw"
+              ontap_cluster_ip: "192.168.99.80"
+              ontap_admin_password: "pw"
+            """
+        )
+    )
+    loader = PackageLoader(envs, blueprint_resolver=BlueprintResolver(envs))
+
+    resources, _events, _variables = loader.load_package(pkg, provider="proxmox", env_name="test")
+
+    vm = next(r for r in resources if r.type == "vm")
+    assert vm.config["network"][0]["bridge"] == "ntlan"
+    assert "tag" not in vm.config["network"][0]

@@ -94,7 +94,7 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
           --scsihw virtio-scsi-pci \
           {% if vm.config.network is defined %}
           {% for nic in vm.config.network %}
-          --net{{ loop.index0 }} {{ nic.model | default('virtio') }},bridge={{ nic.bridge | default('vmbr0') }}{% if nic.tag is defined %},tag={{ nic.tag }}{% endif %}{% if nic.macaddr is defined %},macaddr={{ nic.macaddr }}{% endif %} \
+          --net{{ loop.index0 }} {{ nic.model | default('virtio') }},bridge={{ nic.bridge | default('vmbr0') }}{% if nic.tag is defined and nic.tag is not none and nic.tag != '' %},tag={{ nic.tag }}{% endif %}{% if nic.macaddr is defined %},macaddr={{ nic.macaddr }}{% endif %} \
           {% endfor %}
           {% endif %}
           {% if vm.config.serial | default(false) %}
