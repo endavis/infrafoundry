@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.services.gateway import (
     DEFAULT_PRIORITY,
@@ -688,3 +689,41 @@ class TestLiveToExportConfig:
         assert cfg["protocol"] == "inet"
         assert cfg["priority"] == DEFAULT_PRIORITY
         assert cfg["weight"] == DEFAULT_WEIGHT
+
+
+class TestMonitorDefault:
+    """An unset monitor matches OPNsense's default of the gateway address (#1151)."""
+
+    def _live_from(self, want: GatewayConfig, **overrides: str) -> LiveGateway:
+        raw = {**want.to_payload()["gateway_item"], **overrides}
+        return _live("u1", want.name, raw_overrides=raw)
+
+    def test_unset_monitor_matches_gateway_address(self) -> None:
+        want = _gw("OTEST_GW", gateway="192.168.10.250")
+        live = self._live_from(want, monitor="192.168.10.250")
+        assert compute_diff([want], [live]).updates == []
+
+    def test_unset_monitor_still_flags_a_different_address(self) -> None:
+        want = _gw("OTEST_GW", gateway="192.168.10.250")
+        live = self._live_from(want, monitor="192.168.10.9")
+        assert len(compute_diff([want], [live]).updates) == 1
+
+    def test_explicit_monitor_is_compared(self) -> None:
+        want = _gw("OTEST_GW", gateway="192.168.10.250", monitor="192.168.10.9")
+        live = self._live_from(want, monitor="192.168.10.250")
+        assert len(compute_diff([want], [live]).updates) == 1
+
+
+class TestApplyDiffRejectedWrite:
+    """A ``result: failed`` answer fails the apply instead of counting (#1151)."""
+
+    def test_failed_add_raises_and_skips_reconfigure(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"result": "failed", "validations": {"x": "bad"}}
+        svc = GatewayService(client)
+
+        with pytest.raises(APIError, match="add gateway OTEST_GW"):
+            svc.apply_diff(Diff(adds=[_gw("OTEST_GW")]))
+
+        endpoints = [c.args[1] for c in client.request.call_args_list]
+        assert not [e for e in endpoints if e.endswith("reconfigure")]

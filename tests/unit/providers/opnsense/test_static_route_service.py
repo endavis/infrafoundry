@@ -20,6 +20,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.services.static_route import (
     Diff,
@@ -103,21 +104,21 @@ class TestPayload:
         assert inner["gateway"] == "WAN_DHCP"
         assert inner["descr"] == "reach the LAN"
 
-    def test_enabled_true_serializes_disabled_zero(self) -> None:
-        # operator-facing ``enabled=True`` → wire ``disabled=0``.
+    def test_enabled_true_serializes_enabled_one(self) -> None:
+        # The 26.1 route model has ``enabled``, not ``disabled`` (#1151).
         inner = _route("foo", enabled=True).to_payload()["route"]
-        assert inner["disabled"] == "0"
+        assert inner["enabled"] == "1"
 
-    def test_enabled_false_serializes_disabled_one(self) -> None:
+    def test_enabled_false_serializes_enabled_zero(self) -> None:
         inner = _route("foo", enabled=False).to_payload()["route"]
-        assert inner["disabled"] == "1"
+        assert inner["enabled"] == "0"
 
     def test_name_not_sent_on_wire(self) -> None:
         # ``name`` is operator-facing only; the wire only carries
-        # ``network``, ``gateway``, ``descr``, ``disabled``.
+        # ``network``, ``gateway``, ``descr``, ``enabled``.
         inner = _route("operator-friendly-name").to_payload()["route"]
         assert "name" not in inner
-        assert set(inner.keys()) == {"network", "gateway", "descr", "disabled"}
+        assert set(inner.keys()) == {"network", "gateway", "descr", "enabled"}
 
     def test_default_description_empty(self) -> None:
         inner = _route("foo").to_payload()["route"]
@@ -787,3 +788,52 @@ class TestLiveToExportConfig:
         cfg = _live_to_export_config(None)  # type: ignore[arg-type]
         assert cfg["enabled"] is True
         assert cfg["network"] == ""
+
+
+class TestEnabledField261:
+    """26.1 rows carry ``enabled`` and no ``disabled`` (#1151)."""
+
+    def _row(self, enabled: str) -> LiveStaticRoute:
+        live = _live("u1", raw_overrides={"enabled": enabled})
+        del live.raw["disabled"]
+        return live
+
+    def test_enabled_route_matching_live_row_needs_no_update(self) -> None:
+        diff = compute_diff([_route("foo")], [self._row("1")])
+        assert diff.updates == []
+
+    def test_disabled_live_row_plans_an_update(self) -> None:
+        diff = compute_diff([_route("foo")], [self._row("0")])
+        assert len(diff.updates) == 1
+
+    def test_export_reads_enabled(self) -> None:
+        cfg = _live_to_export_config(
+            {"route": {"network": "10.0.0.0/24", "gateway": "WAN_DHCP", "enabled": "0"}}
+        )
+        assert cfg["enabled"] is False
+
+
+class TestApplyDiffRejectedWrite:
+    """A ``result: failed`` answer fails the apply instead of counting (#1151)."""
+
+    def test_failed_add_raises_with_validations_and_skips_reconfigure(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {
+            "result": "failed",
+            "validations": {"route.gateway": "Option not in list."},
+        }
+        svc = StaticRouteService(client)
+
+        with pytest.raises(APIError, match=r"add static route 10\.0\.0\.0/24.*Option not in list"):
+            svc.apply_diff(Diff(adds=[_route("foo")]))
+
+        endpoints = [c.args[1] for c in client.request.call_args_list]
+        assert "routes/routes/reconfigure" not in endpoints
+
+    def test_failed_update_raises(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"result": "failed"}
+        svc = StaticRouteService(client)
+
+        with pytest.raises(APIError, match="update static route"):
+            svc.apply_diff(Diff(updates=[(_live("u1"), _route("foo"))]))

@@ -2,7 +2,9 @@
 
 from abc import ABC
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
+
+from infrafoundry.core.exceptions import APIError
 
 from ..api_client import OPNsenseClient
 from ._credentials import resolve_credentials
@@ -72,3 +74,31 @@ class BaseService(ABC):  # noqa: B024
         )
 
         return cls(client)
+
+
+def raise_on_failed_write(response: Any, action: str) -> Any:
+    """Raise when an MVC write answered ``{"result": "failed"}`` (#1151).
+
+    OPNsense rejects a write that fails model validation with HTTP 200 and
+    ``{"result": "failed", "validations": {...}}``, so the HTTP layer never
+    sees an error.
+
+    Args:
+        response: Decoded response from an add/set/del call.
+        action: What was attempted, for the error message (e.g.
+            ``"add static route 192.168.99.0/24"``).
+
+    Returns:
+        ``response`` unchanged when the write did not fail.
+
+    Raises:
+        APIError: If the response's ``result`` is ``"failed"``.
+    """
+    if isinstance(response, dict) and response.get("result") == "failed":
+        validations = response.get("validations")
+        raise APIError(
+            f"OPNsense rejected {action}: {validations or 'no validation details'}",
+            response=str(response),
+            provider="opnsense",
+        )
+    return response
