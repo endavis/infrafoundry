@@ -14,9 +14,9 @@ vms:
     onboot: false
     tags: {{ ["ontap", "ontap-lab"] + extra_tags }}
     network:
-      - bridge: {{ bridge }}
+      - bridge: {{ cluster_bridge or bridge }}
         model: e1000        # e0a — cluster interconnect
-      - bridge: {{ bridge }}
+      - bridge: {{ cluster_bridge or bridge }}
         model: e1000        # e0b — cluster interconnect
       - bridge: {{ bridge }}
         model: e1000        # e0c — management
@@ -49,9 +49,9 @@ vms:
     onboot: false
     tags: {{ ["ontap", "ontap-lab"] + extra_tags }}
     network:
-      - bridge: {{ bridge }}
+      - bridge: {{ cluster_bridge or bridge }}
         model: e1000        # e0a — cluster interconnect
-      - bridge: {{ bridge }}
+      - bridge: {{ cluster_bridge or bridge }}
         model: e1000        # e0b — cluster interconnect
       - bridge: {{ bridge }}
         model: e1000        # e0c — management
