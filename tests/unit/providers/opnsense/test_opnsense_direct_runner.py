@@ -13,6 +13,7 @@ Coverage:
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -218,6 +219,29 @@ class TestResolveDispatchTable:
         assert table == {}
 
 
+EXAMPLE_ENVS = Path(__file__).resolve().parents[4] / "example-config" / "envs"
+
+
+class TestLoadProviderResources:
+    """The runner sees every opnsense resource in the env, wherever it is declared (#1128)."""
+
+    def _load(self) -> list[ResourceConfig]:
+        provider = SimpleNamespace(
+            name="opnsense", config_dir=EXAMPLE_ENVS, _current_environment="dev"
+        )
+        return OPNsenseDirectRunner._load_provider_resources(provider)  # type: ignore[arg-type]
+
+    def test_includes_reservations_from_proxmox_packages(self) -> None:
+        """example-config dev has no opnsense/ directory; its reservations live in
+        proxmox blueprint packages, which the old per-directory load missed."""
+        names = {r.name for r in self._load() if r.type == "kea.dhcp4.reservations"}
+
+        assert {"k3s-dev-server-dhcp", "k3s-dev-agent-1-dhcp", "aiqum"} <= names
+
+    def test_keeps_only_opnsense_resources(self) -> None:
+        assert {r.provider for r in self._load()} == {"opnsense"}
+
+
 class TestResolveEnvName:
     """``_resolve_env_name`` reads ``provider._current_environment``."""
 
@@ -324,6 +348,53 @@ class TestPlanDelegation:
         assert result["success"] is False
         assert "error" in result
         assert "boom" in result["error"]
+
+
+class TestFilteredRunsNeverDelete:
+    """A filtered run reaches the managers with only its targets, so it must not
+    delete live resources outside the filter (#1128)."""
+
+    def _setup(self, provider: MagicMock) -> tuple[MagicMock, list[ResourceConfig]]:
+        resources = [_vlan_resource("v1", "igb0", 10), _vlan_resource("v2", "igb0", 20)]
+        manager_mock = MagicMock()
+        manager_mock.plan.return_value = Diff()
+        manager_mock.apply.return_value = {
+            "success": True,
+            "resources_created": 0,
+            "resources_updated": 0,
+            "resources_deleted": 0,
+            "resource_outcomes": [],
+        }
+        provider.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": MagicMock(return_value=manager_mock)
+        }
+        return manager_mock, resources
+
+    def test_filtered_plan_is_add_only(self, provider_with_env: MagicMock) -> None:
+        manager_mock, resources = self._setup(provider_with_env)
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().plan(provider_with_env, target_resources=["v1"])
+
+        manager_mock.plan.assert_called_once_with("test-env", [resources[0]], add_only=True)
+
+    def test_filtered_apply_is_add_only(self, provider_with_env: MagicMock) -> None:
+        manager_mock, resources = self._setup(provider_with_env)
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().apply(provider_with_env, target_resources=["v1"])
+
+        manager_mock.apply.assert_called_once_with(
+            "test-env", [resources[0]], auto_approve=True, add_only=True
+        )
+
+    def test_unfiltered_plan_still_reconciles(self, provider_with_env: MagicMock) -> None:
+        manager_mock, resources = self._setup(provider_with_env)
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().plan(provider_with_env)
+
+        manager_mock.plan.assert_called_once_with("test-env", resources, add_only=False)
 
 
 class TestApplyDelegation:
