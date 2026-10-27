@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793098339033,
+  "lastUpdate": 1793102146744,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10850,6 +10850,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000018683625876914752",
             "extra": "mean: 62.20699851136416 usec\nrounds: 17466"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "275125dc9f21365824659a8439da9fc1cf72c039",
+          "message": "feat: accept -h as a short alias for --help in the foundry cli (merges PR #1120, addresses #822)\n\nThe root group sets help_option_names to [\"-h\", \"--help\"], and every\nsubcommand context inherits it. A test checks that -h prints the same help\nas --help on the root, the command groups and two leaf commands, and a\nsecond fails if any command takes -h for an option of its own. The new test\nfile joins mutmut's test selection.\n\nAddresses #822\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T11:55:01Z",
+          "tree_id": "db577e8089d2519436c212f3a5959b17a7f68830",
+          "url": "https://github.com/endavis/infrafoundry/commit/275125dc9f21365824659a8439da9fc1cf72c039"
+        },
+        "date": 1793102145477,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7786.091673433378,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000999847885998971",
+            "extra": "mean: 128.4341415362551 usec\nrounds: 8436"
           }
         ]
       }
