@@ -69,7 +69,7 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
 
   network_device {
     bridge = "{{ template.config.network.bridge | default('vmbr0') }}"
-{% if template.config.network.tag is defined %}
+{% if template.config.network.tag is defined and template.config.network.tag is not none and template.config.network.tag != '' %}
     vlan_id = {{ template.config.network.tag }}
 {% endif %}
   }
@@ -169,7 +169,7 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
   # Network Configuration
   network_device {
     bridge = "{{ template.config.network.bridge | default('vmbr0') }}"
-    {% if template.config.network.tag is defined %}
+    {% if template.config.network.tag is defined and template.config.network.tag is not none and template.config.network.tag != '' %}
     vlan_id = {{ template.config.network.tag }}
     {% endif %}
   }

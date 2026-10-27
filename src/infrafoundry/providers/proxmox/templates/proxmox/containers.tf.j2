@@ -102,7 +102,7 @@ resource "proxmox_virtual_environment_container" "{{ container.config.name | rep
     {% if nic.rate_limit is defined %}
     rate_limit = {{ nic.rate_limit }}
     {% endif %}
-    {% if nic.tag is defined %}
+    {% if nic.tag is defined and nic.tag is not none and nic.tag != '' %}
     vlan_id  = {{ nic.tag }}
     {% endif %}
   }

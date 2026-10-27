@@ -161,7 +161,7 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
     {% if nic.macaddr is defined %}
     mac_address = "{{ nic.macaddr }}"
     {% endif %}
-    {% if nic.tag is defined %}
+    {% if nic.tag is defined and nic.tag is not none and nic.tag != '' %}
     vlan_id     = {{ nic.tag }}
     {% endif %}
   }
