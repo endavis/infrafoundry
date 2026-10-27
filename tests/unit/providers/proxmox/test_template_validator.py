@@ -150,3 +150,21 @@ def test_validate_template_used_by_multiple_resources(
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is True
+
+
+def test_validate_skips_templates_missing_a_key(
+    validator: TemplateValidator, report: MagicMock
+) -> None:
+    """A template entry without ``vmid`` or ``name`` is skipped, not a ``KeyError`` (#1121)."""
+    cluster_vms: list[ClusterVM] = [
+        {"name": "no-vmid", "template": 1},
+        {"vmid": 101, "template": 1},
+        {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
+    ]
+
+    validator.validate(cluster_vms, {"100": ["vm1"], "101": ["vm2"], "ubuntu-22.04": ["vm3"]})
+
+    passed = {c.kwargs["check_name"]: c.kwargs["passed"] for c in report.add_check.call_args_list}
+    assert passed["proxmox_template_vmid_100"] is True
+    assert passed["proxmox_template_vmid_101"] is True
+    assert all(passed.values())

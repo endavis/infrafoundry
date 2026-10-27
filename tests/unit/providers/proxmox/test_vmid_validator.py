@@ -158,3 +158,18 @@ def test_validate_all_vmids_conflicts(validator: VMIDValidator, report: MagicMoc
     # All should fail
     for call in report.add_check.call_args_list:
         assert call[1]["passed"] is False
+
+
+def test_validate_skips_cluster_entries_without_vmid(
+    validator: VMIDValidator, report: MagicMock
+) -> None:
+    """A cluster entry without ``vmid`` is skipped, not a ``KeyError`` (#1121)."""
+    cluster_vms: list[ClusterVM] = [
+        {"name": "no-vmid"},
+        {"vmid": 100, "name": "existing-vm"},
+    ]
+
+    validator.validate(cluster_vms, {200: "new-vm"})
+
+    report.add_check.assert_called_once()
+    assert report.add_check.call_args.kwargs["passed"] is True

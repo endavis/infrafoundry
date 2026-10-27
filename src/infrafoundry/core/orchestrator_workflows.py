@@ -23,7 +23,7 @@ from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventManager, EventType
 from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
-from infrafoundry.core.protocols import Destroyable, Plannable
+from infrafoundry.core.protocols import Destroyable, Plannable, VerifiesDestroy
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.result_types import PlanResult
 from infrafoundry.core.runner_results import raise_on_runner_failure
@@ -1336,7 +1336,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                         # Verify state: defense-in-depth check for the case
                         # where terraform exits 0 but a resource is still
                         # present in state.
-                        if hasattr(runner, "verify_destroyed"):
+                        if isinstance(runner, VerifiesDestroy):
                             expected_names = [r.name for r in resources]
                             still_present = runner.verify_destroyed(provider, expected_names)
                             if still_present:

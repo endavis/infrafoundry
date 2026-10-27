@@ -32,6 +32,7 @@ from infrafoundry.core.orchestrator_workflows import (
 )
 from infrafoundry.core.policy import PolicyEngine, PolicyViolation
 from infrafoundry.core.policy_checker import PolicyChecker
+from infrafoundry.core.protocols import HasSnippetStrictness
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_registry_service import ProviderRegistryService
 from infrafoundry.core.requirements.manager import RequirementsManager
@@ -240,7 +241,7 @@ class Orchestrator:
             provider: Provider instance to register
         """
         self._providers[provider.name] = provider
-        if hasattr(provider, "fail_on_missing_snippets"):
+        if isinstance(provider, HasSnippetStrictness):
             provider.fail_on_missing_snippets = self.strict_config.fail_on_missing_snippets
         # Sync providers to helper classes that need them
         self.deployment_executor.providers = self._providers

@@ -191,6 +191,40 @@ class Destroyable(Protocol):
 
 
 @runtime_checkable
+class VerifiesDestroy(Protocol):
+    """Protocol for runners that can confirm resources left state after a destroy.
+
+    ``isinstance`` against it checks that ``verify_destroyed`` exists, as the
+    ``hasattr`` guard it replaced did (#1121).
+    """
+
+    def verify_destroyed(
+        self, provider: "ProviderBase", expected_destroyed_names: list[str]
+    ) -> list[str]:
+        """Return the names of expected-destroyed resources still present in state.
+
+        Args:
+            provider: Provider whose state to inspect
+            expected_destroyed_names: Names of resources that should be gone
+
+        Returns:
+            Names still present in state
+        """
+        ...
+
+
+@runtime_checkable
+class HasSnippetStrictness(Protocol):
+    """Protocol for providers that can fail on missing cloud-init snippets.
+
+    ``isinstance`` against it checks that ``fail_on_missing_snippets`` exists,
+    as the ``hasattr`` guard it replaced did (#1121).
+    """
+
+    fail_on_missing_snippets: bool
+
+
+@runtime_checkable
 class DriftDetectable(Protocol):
     """Protocol for runners that can detect configuration drift.
 

@@ -22,8 +22,13 @@ from infrafoundry.core.protocols import (
     Destroyable,       # Destroy infrastructure
     StateAware,        # Track resource IDs/state
     DriftDetectable,   # Detect configuration drift
+    VerifiesDestroy,   # Confirm resources left state after destroy
 )
 ```
+
+`VerifiesDestroy` is optional. Only `TerraformRunner` and its subclass `OpenTofuRunner`
+implement it today. After a successful destroy, the destroy workflow uses it to check
+that every resource has left state.
 
 ### Runner Protocol Matrix
 
