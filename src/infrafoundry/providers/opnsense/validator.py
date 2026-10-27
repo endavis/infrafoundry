@@ -158,7 +158,11 @@ class OPNsenseValidator:
                 level=ValidationLevel.WARNING,
             )
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
+    def validate_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Validate that referenced OPNsense resources exist.
 
         Checks:
@@ -170,6 +174,10 @@ class OPNsenseValidator:
 
         Args:
             resources: List of resources to validate
+            reference_resources: Resources that references may resolve to.
+                Defaults to ``resources``. A filtered run passes every
+                OPNsense resource in the environment, so a reservation in
+                one package can name a subnet managed by another (#1133).
         """
         env_map = {
             "api_url": "OPNSENSE_API_URL",
@@ -189,13 +197,21 @@ class OPNsenseValidator:
 
         # Collect resources by type
         resource_refs = self._collect_resource_references(resources)
+        # Name lookups resolve against the whole environment; only the
+        # resources in scope are checked.
+        reference_list = reference_resources if reference_resources is not None else resources
+        reference_refs = (
+            resource_refs
+            if reference_resources is None
+            else self._collect_resource_references(reference_list)
+        )
 
         # Build the dotted-type cross-reference index once (#793). The
         # nested-dict shape gives O(1) lookup per resolver call inside
         # each per-resource validator. Validators that haven't adopted
         # the resolver yet ignore this argument; that's fine — the
         # parameter is optional and additive.
-        xref_index = build_xref_index(resources)
+        xref_index = build_xref_index(reference_list)
 
         # Validate against live API
         try:
@@ -216,13 +232,13 @@ class OPNsenseValidator:
             # Validate using specialized validators
             self.firewall_rule_validator.validate(
                 resource_refs["firewall_rules"],
-                resource_refs["alias_names"],
-                resource_refs["interface_assignment_names"],
-                resource_refs["gateway_names"],
+                reference_refs["alias_names"],
+                reference_refs["interface_assignment_names"],
+                reference_refs["gateway_names"],
                 existing_interfaces,
                 existing_aliases,
                 existing_gateways,
-                managed_gateways=resource_refs["gateways"],
+                managed_gateways=reference_refs["gateways"],
                 index=xref_index,
             )
             self.vlan_validator.validate(
@@ -231,39 +247,39 @@ class OPNsenseValidator:
             )
             self.interface_assignment_validator.validate(
                 resource_refs["interface_assignments"],
-                resource_refs["vlan_names"],
+                reference_refs["vlan_names"],
                 existing_interfaces,
             )
             self.nat_rule_validator.validate(
                 resource_refs["nat_rules"],
-                resource_refs["alias_names"],
-                resource_refs["interface_assignment_names"],
+                reference_refs["alias_names"],
+                reference_refs["interface_assignment_names"],
                 existing_interfaces,
                 existing_aliases,
                 index=xref_index,
             )
             self.gateway_validator.validate(
                 resource_refs["gateways"],
-                resource_refs["interface_assignment_names"],
+                reference_refs["interface_assignment_names"],
                 existing_interfaces,
             )
             self.static_route_validator.validate(
                 resource_refs["static_routes"],
-                resource_refs["gateways"],
-                resource_refs["gateway_names"],
+                reference_refs["gateways"],
+                reference_refs["gateway_names"],
                 existing_gateways,
                 index=xref_index,
             )
             self.virtual_ip_validator.validate(
                 resource_refs["virtual_ips"],
-                resource_refs["interface_assignment_names"],
+                reference_refs["interface_assignment_names"],
                 existing_interfaces,
                 index=xref_index,
             )
             self.unbound_validator.validate(resource_refs["unbound_host_overrides"])
             self.unbound_host_alias_validator.validate(
                 resource_refs["unbound_host_aliases"],
-                resource_refs["unbound_host_override_names"],
+                reference_refs["unbound_host_override_names"],
                 existing_unbound_host_overrides,
                 index=xref_index,
             )
@@ -271,13 +287,13 @@ class OPNsenseValidator:
             self.kea_reservation_validator.validate(
                 resource_refs["kea_dhcp4_reservations"],
                 resource_refs["kea_dhcp6_reservations"],
-                resource_refs["kea_dhcp4_subnet_names"],
-                resource_refs["kea_dhcp6_subnet_names"],
+                reference_refs["kea_dhcp4_subnet_names"],
+                reference_refs["kea_dhcp6_subnet_names"],
                 index=xref_index,
             )
             self.radvd_validator.validate(
                 resource_refs["radvd"],
-                resource_refs["interface_assignment_names"],
+                reference_refs["interface_assignment_names"],
                 existing_interfaces,
             )
             self.cron_jobs_validator.validate(resource_refs["cron_jobs"])

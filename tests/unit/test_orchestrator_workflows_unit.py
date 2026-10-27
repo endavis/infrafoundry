@@ -249,6 +249,78 @@ def test_validation_orchestrator_warns_on_missing_provider(console: Console) -> 
     assert results == {}
 
 
+def _validate_with(
+    provider: Any, console: Console, resource_filter: list[str] | None
+) -> list[ResourceConfig]:
+    """Run ValidationOrchestrator.validate for one opnsense provider; return its resources."""
+    config_manager = MagicMock()
+    config_manager.load_environment.return_value = SimpleNamespace(
+        model_dump=lambda: {"name": "dev"}
+    )
+    env_resources = [
+        _resource("res-dhcp", provider="opnsense"),
+        _resource("lan", provider="opnsense"),
+    ]
+    by_provider = {"opnsense": env_resources}
+
+    def batches(rbp: Any, filt: list[str] | None, reverse: bool, env: Any) -> Any:
+        selected = [r for r in rbp["opnsense"] if not filt or r.name in filt]
+        return [ProviderResourceBatch("opnsense", selected, 1)]
+
+    validation = ValidationOrchestrator(
+        config_manager,
+        console,
+        get_providers=lambda: {"opnsense": provider},
+        load_resources=lambda env: (env_resources, by_provider),
+        iter_provider_batches=batches,
+    )
+    validation.validate("dev", resource_filter=resource_filter, verbose=False)
+    return env_resources
+
+
+class _InContextProvider:
+    """Defines the protocol method on the class, as ``isinstance`` requires."""
+
+    def __init__(self) -> None:
+        self.validate_connectivity = MagicMock()
+        self.validate_references = MagicMock()
+        self.in_context = MagicMock()
+
+    def validate_references_in_context(self, *args: Any) -> None:
+        self.in_context(*args)
+
+
+def test_filtered_validation_resolves_references_against_all_resources(console: Console) -> None:
+    """A provider that supports it checks the filter but resolves against everything (#1133)."""
+    provider = _InContextProvider()
+
+    env_resources = _validate_with(provider, console, ["res-dhcp"])
+
+    provider.validate_references.assert_not_called()
+    args = provider.in_context.call_args.args
+    assert [r.name for r in args[0]] == ["res-dhcp"]
+    assert args[1] == env_resources
+
+
+def test_filtered_validation_falls_back_for_other_providers(console: Console) -> None:
+    """Providers without validate_references_in_context get the filtered list, as before."""
+    provider = MagicMock(spec=["validate_connectivity", "validate_references"])
+
+    _validate_with(provider, console, ["res-dhcp"])
+
+    assert [r.name for r in provider.validate_references.call_args.args[0]] == ["res-dhcp"]
+
+
+def test_unfiltered_validation_uses_validate_references(console: Console) -> None:
+    """Without a filter every resource is in scope, so the plain hook is enough."""
+    provider = _InContextProvider()
+
+    env_resources = _validate_with(provider, console, None)
+
+    provider.in_context.assert_not_called()
+    assert provider.validate_references.call_args.args[0] == env_resources
+
+
 def test_status_orchestrator_marks_unregistered_provider(console: Console) -> None:
     """Status shows not registered when provider missing."""
     rows: list[tuple[str, str, str]] = []

@@ -8,7 +8,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from infrafoundry.core.protocols import ValidatesReferencesInContext
+from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense import OPNsenseProvider
+from infrafoundry.providers.proxmox import ProxmoxProvider
 
 
 class TestOPNsenseProviderReset:
@@ -128,3 +131,28 @@ class TestOPNsenseProviderBasic:
         """Test provider name is correct."""
         provider = OPNsenseProvider(config_dir=Path("."), output_dir=Path("."))
         assert provider.name == "opnsense"
+
+
+def test_opnsense_resolves_references_in_context(tmp_path: Path) -> None:
+    """OPNsense opts into context-aware validation; Proxmox keeps the plain hook (#1133)."""
+    opnsense: ValidatesReferencesInContext = OPNsenseProvider(tmp_path, tmp_path)
+
+    assert isinstance(opnsense, ValidatesReferencesInContext)
+    assert not isinstance(ProxmoxProvider(tmp_path, tmp_path), ValidatesReferencesInContext)
+
+
+def test_opnsense_in_context_passes_reference_resources(tmp_path: Path) -> None:
+    """The provider hands both lists to its validator."""
+    provider = OPNsenseProvider(tmp_path, tmp_path)
+    checked = [
+        ResourceConfig(name="r", type="kea.dhcp4.reservations", provider="opnsense", config={})
+    ]
+    references = [
+        *checked,
+        ResourceConfig(name="s", type="kea.dhcp4.subnets", provider="opnsense", config={}),
+    ]
+
+    with patch("infrafoundry.providers.opnsense.OPNsenseValidator") as validator_cls:
+        provider.validate_references_in_context(checked, references, MagicMock(), MagicMock())
+
+    validator_cls.return_value.validate_references.assert_called_once_with(checked, references)
