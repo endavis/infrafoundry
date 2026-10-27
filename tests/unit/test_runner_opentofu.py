@@ -145,8 +145,8 @@ class TestOpenTofuRunnerOperations:
         output = "Plan: 2 to add, 1 to change, 0 to destroy"
         result = runner.parse_plan_for_drift({"success": True, "output": output})
         assert result["has_changes"] is True
-        assert result["to_add"] == 2
-        assert result["to_change"] == 1
+        assert result.get("to_add") == 2
+        assert result.get("to_change") == 1
 
 
 class TestOpenTofuRunnerRegistry:

@@ -267,7 +267,7 @@ class TestPlanDelegation:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             result = runner.plan(provider_with_env)
         assert result["success"] is True
-        assert result["has_changes"] is False
+        assert result.get("has_changes") is False
         manager_cls.assert_not_called()
 
     def test_returns_no_changes_when_dispatch_empty(self, provider_with_env: MagicMock) -> None:
@@ -280,7 +280,7 @@ class TestPlanDelegation:
         ):
             result = runner.plan(provider_with_env)
         assert result["success"] is True
-        assert result["has_changes"] is False
+        assert result.get("has_changes") is False
 
     def test_calls_manager_plan_with_add_only(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
@@ -301,7 +301,8 @@ class TestPlanDelegation:
         manager_cls.assert_called_once_with(provider_with_env.config_dir)
         manager_mock.plan.assert_called_once_with("test-env", resources, add_only=True)
         assert result["success"] is True
-        assert result["has_changes"] is True
+        assert result.get("has_changes") is True
+        assert "changes_summary" in result
         assert "1 to add" in result["changes_summary"]
         assert "add-only mode" in result["changes_summary"]
 
@@ -321,6 +322,7 @@ class TestPlanDelegation:
             result = runner.plan(provider_with_env)
 
         assert result["success"] is False
+        assert "error" in result
         assert "boom" in result["error"]
 
 
@@ -336,10 +338,10 @@ class TestApplyDelegation:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             result = runner.apply(provider_with_env)
         assert result["success"] is True
-        assert result["resources_created"] == 0
-        assert result["resources_updated"] == 0
-        assert result["resources_deleted"] == 0
-        assert result["resource_outcomes"] == []
+        assert result.get("resources_created") == 0
+        assert result.get("resources_updated") == 0
+        assert result.get("resources_deleted") == 0
+        assert result.get("resource_outcomes") == []
         manager_cls.assert_not_called()
 
     def test_outcomes_returned(self, provider_with_env: MagicMock) -> None:
@@ -365,8 +367,8 @@ class TestApplyDelegation:
         manager_mock.apply.assert_called_once_with(
             "test-env", resources, auto_approve=True, add_only=False
         )
-        assert result["resources_created"] == 1
-        assert result["resource_outcomes"] == [outcome]
+        assert result.get("resources_created") == 1
+        assert result.get("resource_outcomes") == [outcome]
 
     def test_apply_threads_add_only(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
@@ -400,6 +402,7 @@ class TestApplyDelegation:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.apply(provider_with_env)
         assert result["success"] is False
+        assert "error" in result
         assert "api down" in result["error"]
 
 
@@ -415,7 +418,7 @@ class TestDestroyDelegation:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
             result = runner.destroy(provider_with_env)
         assert result["success"] is True
-        assert result["resources_destroyed"] == 0
+        assert result.get("resources_destroyed") == 0
 
     def test_calls_manager_destroy(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()
@@ -432,7 +435,7 @@ class TestDestroyDelegation:
         }
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.destroy(provider_with_env, auto_approve=True)
-        assert result["resources_destroyed"] == 1
+        assert result.get("resources_destroyed") == 1
         manager_mock.destroy.assert_called_once_with("test-env", resources, auto_approve=True)
 
 
@@ -522,7 +525,8 @@ class TestMultiComponentDispatch:
 
         assert result["success"] is True
         # vlans diff has an add → has_changes is True overall.
-        assert result["has_changes"] is True
+        assert result.get("has_changes") is True
+        assert "changes_summary" in result
         summary = result["changes_summary"]
         assert "interfaces.vlans:" in summary
         assert "interfaces.assignments:" in summary
@@ -560,8 +564,8 @@ class TestMultiComponentDispatch:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.apply(provider_with_env)
 
-        assert result["resources_created"] == 1
-        assert result["resource_outcomes"] == [outcome]
+        assert result.get("resources_created") == 1
+        assert result.get("resource_outcomes") == [outcome]
         # Each manager dispatched exactly once.
         vlan_manager.apply.assert_called_once()
         ifa_manager.apply.assert_called_once()
@@ -591,7 +595,7 @@ class TestMultiComponentDispatch:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             result = runner.destroy(provider_with_env)
 
-        assert result["resources_destroyed"] == 1
+        assert result.get("resources_destroyed") == 1
 
     def test_get_resource_ids_merges_across_components(self, provider_with_env: MagicMock) -> None:
         runner = OPNsenseDirectRunner()

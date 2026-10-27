@@ -48,6 +48,7 @@ class TestResourceConfigEvents:
             events=events,
         )
         assert rc.events == events
+        assert rc.events is not None
         assert len(rc.events["on_create"]) == 1
         assert rc.events["on_create"][0]["type"] == "script"
 

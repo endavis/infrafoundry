@@ -404,13 +404,13 @@ class TestEnsureInstalled:
 class TestEnsureSshToolsPresent:
     def test_raises_when_missing(self) -> None:
         with (
-            patch.object(installer.shutil, "which", return_value=None),
+            patch(f"{installer.__name__}.shutil.which", return_value=None),
             pytest.raises(RuntimeError, match="not on PATH"),
         ):
             installer._ensure_ssh_tools_present()
 
     def test_passes_when_present(self) -> None:
-        with patch.object(installer.shutil, "which", return_value="/usr/bin/ssh"):
+        with patch(f"{installer.__name__}.shutil.which", return_value="/usr/bin/ssh"):
             # Must not raise.
             installer._ensure_ssh_tools_present()
 
