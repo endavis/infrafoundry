@@ -27,6 +27,8 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
    - the WAN as `wan_ip`/`wan_prefix`, with the RFC1918 and bogon blocks off
      (the WAN is on a private network);
    - the LAN as `lan_ip`/`lan_prefix`;
+   - dnsmasq off, with its DHCP ranges removed, so the image's default LAN
+     DHCP does not run and Kea can serve the LAN instead;
    - a WAN pass rule for TCP 443 from `api_allow_cidr`.
 
    The box then reboots. The handler waits until
@@ -36,8 +38,9 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
 3. **Manage it.** Point the environment's `opnsense` provider settings at
    `https://<wan_ip>` with the same key and secret.
 
-The bootstrap does not set a default gateway or DNS. Manage those with the
-provider (`gateways`, `system.dns`) after the box is up.
+The bootstrap does not set a default gateway, DNS or LAN DHCP. Manage those
+with the provider (`gateways`, `system.dns`, `kea.dhcp4.subnets`) after the
+box is up.
 
 ## Usage
 

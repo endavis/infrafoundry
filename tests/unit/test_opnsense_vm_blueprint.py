@@ -127,6 +127,8 @@ def test_bootstrap_php_carries_the_values_as_base64_json() -> None:
         "unset($wan->blockbogons);",
         "$destination->addChild('network', 'wanip');",
         "$destination->addChild('port', '443');",
+        "$cfg->dnsmasq->enable = '0';",
+        "unset($cfg->dnsmasq->dhcp_ranges[0]);",
         "Config::getInstance()->save();",
         'echo "BOOTSTRAP OK\\n";',
     ],
@@ -139,6 +141,18 @@ def test_bootstrap_php_makes_the_expected_edits(line: str) -> None:
     )
 
     assert line in php
+
+
+def test_bootstrap_php_removes_every_dhcp_range_before_saving() -> None:
+    php = (
+        _ansible_like_env()
+        .get_template("bootstrap.php.j2")
+        .render(opnsense_bootstrap_values=VALUES)
+    )
+
+    # A single unset would leave all but the first range; the loop runs until none remain.
+    assert "while (isset($cfg->dnsmasq->dhcp_ranges[0])) {" in php
+    assert php.index("dhcp_ranges") < php.index("Config::getInstance()->save();")
 
 
 @pytest.mark.skipif(shutil.which("php") is None, reason="php is not installed")

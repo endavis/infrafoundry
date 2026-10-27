@@ -4,7 +4,7 @@
  *
  * Sets the hostname, the root password and an API key for root, static WAN
  * and LAN addresses, and a WAN rule letting api_allow_cidr reach the web
- * GUI/API. Values arrive as base64 JSON so no quoting can break the script.
+ * GUI/API. Turns off the image's dnsmasq DHCP on LAN. Values arrive as base64 JSON so no quoting can break the script.
  * Prints "BOOTSTRAP OK" on success; the expect script waits for it.
  */
 require_once('script/load_phalcon.php');
@@ -42,6 +42,15 @@ unset($wan->blockbogons);
 $lan = $cfg->interfaces->lan;
 $lan->ipaddr = $v['lan_ip'];
 $lan->subnet = $v['lan_prefix'];
+
+// The image ships dnsmasq serving DHCP on LAN. Turn it off and drop its
+// ranges so Kea, which the OPNsense provider manages, can serve the LAN.
+if (isset($cfg->dnsmasq)) {
+    $cfg->dnsmasq->enable = '0';
+    while (isset($cfg->dnsmasq->dhcp_ranges[0])) {
+        unset($cfg->dnsmasq->dhcp_ranges[0]);
+    }
+}
 
 $rule = $cfg->filter->addChild('rule');
 $rule->addChild('type', 'pass');
