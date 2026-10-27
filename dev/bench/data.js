@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793094076208,
+  "lastUpdate": 1793094326342,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10788,6 +10788,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002042098210576308",
             "extra": "mean: 76.06393498851777 usec\nrounds: 13936"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cca46cda084835afccc9b0440a4d5df7900bef3e",
+          "message": "docs: note the 180-minute mutmut step limit as a divergence (merges PR #1118, addresses #1116)\n\nAddresses #1116\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T09:44:29Z",
+          "tree_id": "61ac2e81612ced4ec21d8335ee34cfcf5e621e47",
+          "url": "https://github.com/endavis/infrafoundry/commit/cca46cda084835afccc9b0440a4d5df7900bef3e"
+        },
+        "date": 1793094325493,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7857.733751264515,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011796950344589504",
+            "extra": "mean: 127.26315648440922 usec\nrounds: 8397"
           }
         ]
       }
