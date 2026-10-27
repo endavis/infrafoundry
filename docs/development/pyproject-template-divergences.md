@@ -169,7 +169,7 @@ customization a reviewer must verify survived the merge.
 | `tools/doit/testing.py` | Preserves `--cov=infrafoundry` coverage target. |
 | `.github/workflows/ci.yml` | Preserves the Linux-only `runs-on: ubuntu-latest` (ADR-0001), the Terraform/OpenTofu install steps, the age/sops install through `.github/actions/install-age-sops` (#1105), the `INFRAFOUNDRY_SKIP_SOPS_CHECK` and `HYPOTHESIS_PROFILE` env vars, the `--cov=infrafoundry` flag, the Codecov upload step, and the sparse-checkout of `python-versions.json`. Verbatim adoption from upstream loses all of these — pulled forward from a sync miss in PR #836. |
 | `.github/workflows/daily-check.yml` | Preserves the Terraform/OpenTofu install steps and the age/sops install through `.github/actions/install-age-sops` before `doit check`, matching `ci.yml`. Upstream installs only Python and uv, so without them the scheduled check fails on the tests that run `terraform` and `age-keygen` (#1095). |
-| `.github/workflows/mutation.yml` | Preserves the age/sops install through `.github/actions/install-age-sops`, which pins both versions and checks each download's SHA-256 (#1105). |
+| `.github/workflows/mutation.yml` | Preserves the age/sops install through `.github/actions/install-age-sops`, which pins both versions and checks each download's SHA-256 (#1105). Gives the `Run mutmut` step 180 minutes instead of 120, since a full run outgrew the old limit (#1116). |
 
 When reviewing a sync PR that touches any of the above, scroll through the diff
 with the spot-check note in mind. If the customization is missing from the
