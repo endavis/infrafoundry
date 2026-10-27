@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793107690914,
+  "lastUpdate": 1793109626330,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11005,6 +11005,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000018802328050188943",
             "extra": "mean: 65.79233823708499 usec\nrounds: 16450"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9e2294186af908f962bde592eb9b9f5e0bab9b4f",
+          "message": "refactor: declare the k3s kubeconfig as a script output (merges PR #1127, addresses #672)\n\nWith a jumphost, both k3s-cluster variants wrote the kubeconfig on the\njumphost: the proxmox script to kubeconfig_dir, and the OCI playbook's\nAnsible fetch to kubeconfig_local_path on its controller. The operator\nhad to copy it back by hand.\n\nEach variant's k3s-install handler now declares the file under outputs:\nwith the same ~ path as source and dest, so ScriptHandler scp's it back\nafter a jumphost run and skips the copy on a local run. The scripts keep\nwriting where they did, and say on a jumphost run that the framework\ncopies the file back; the README describes it.\n\nAddresses #672\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T13:59:34Z",
+          "tree_id": "1be6acad479bf525d179c5b35159e13372e30d6e",
+          "url": "https://github.com/endavis/infrafoundry/commit/9e2294186af908f962bde592eb9b9f5e0bab9b4f"
+        },
+        "date": 1793109624932,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15505.288327823757,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000017282215322454804",
+            "extra": "mean: 64.49412476938795 usec\nrounds: 16807"
           }
         ]
       }
