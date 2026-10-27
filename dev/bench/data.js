@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793126869521,
+  "lastUpdate": 1793127158710,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11253,6 +11253,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000999664417035186",
             "extra": "mean: 100.96648414980052 usec\nrounds: 10757"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2df2e59f9ae4ebe49ab87c30cc795457150e125a",
+          "message": "fix: skip empty VLAN tags so VMs can attach untagged (merges PR #1142, addresses #1138)\n\nThe aiqum blueprint always wrote \"tag: {{ vlan_tag }}\", so an empty\nvlan_tag became \"tag: None\", and the Proxmox templates' \"is defined\"\nguard rendered \"vlan_id = None\". AIQUM could not sit on an untagged\nbridge or an SDN vnet.\n\nThe aiqum NIC now carries a tag only when vlan_tag is set, and the VM,\ncontainer, disk-image VM and VM template templates skip a null or empty\ntag, so no blueprint can render it.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T18:51:41Z",
+          "tree_id": "7f0e1ad895a419b35a05c6096399d29a9b165d9b",
+          "url": "https://github.com/endavis/infrafoundry/commit/2df2e59f9ae4ebe49ab87c30cc795457150e125a"
+        },
+        "date": 1793127157638,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7953.0831437560455,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011154497711121977",
+            "extra": "mean: 125.73740044263194 usec\nrounds: 8588"
           }
         ]
       }
