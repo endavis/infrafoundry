@@ -23,7 +23,7 @@ from infrafoundry.core.orchestrator_workflows import (
     ValidationOrchestrator,
 )
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.runners.base_runner import BaseRunner
+from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
 from infrafoundry.core.state import DeploymentStatus
 from infrafoundry.core.types import ResourceOutcome
 
@@ -513,6 +513,22 @@ def test_plan_summary_handles_no_changes_output(console: Console) -> None:
 
     prints = _print_strings(console_mock)
     assert any("terraform: No changes" in p for p in prints)
+
+
+def test_plan_summary_reports_skipped_plan(console: Console) -> None:
+    """A plan the filter skipped prints a skip line, not "Unable to parse" (#1125)."""
+    runner = MagicMock()
+    orchestrator, console_mock, _ = _build_plan_orchestrator_with_runner(
+        runner=runner, runner_output="", extractor_return="Unable to parse plan output"
+    )
+    runner.plan.return_value = {"success": True, "skipped": True, "output": ""}
+
+    orchestrator.plan(env_name="dev", dry_run=False, resource_filter=None, enforce_policies=False)
+
+    prints = _print_strings(console_mock)
+    assert any(f"terraform: {SKIPPED_PLAN_SUMMARY}" in p for p in prints)
+    assert not any("Unable to parse" in p for p in prints)
+    runner.extract_plan_summary.assert_not_called()
 
 
 def test_plan_skips_summary_for_runner_without_extract_plan_summary(console: Console) -> None:

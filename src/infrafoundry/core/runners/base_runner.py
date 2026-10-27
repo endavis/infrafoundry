@@ -9,6 +9,9 @@ from rich.console import Console
 
 from infrafoundry.core.provider import ProviderBase
 
+SKIPPED_PLAN_SUMMARY = "skipped (no resources matched the filter)"
+"""Plan summary for a run whose resource filter left the runner nothing to plan."""
+
 
 class BaseRunner(ABC):
     """Abstract base class for infrastructure tool runners.

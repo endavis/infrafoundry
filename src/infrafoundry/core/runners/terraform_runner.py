@@ -19,7 +19,7 @@ from infrafoundry.core.result_types import (
     DriftInfo,
     PlanResult,
 )
-from infrafoundry.core.runners.base_runner import BaseRunner
+from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
 from infrafoundry.core.types import ResourceOutcome
 
 logger = logging.getLogger(__name__)
@@ -339,6 +339,7 @@ class TerraformRunner(BaseRunner):
                 return {
                     "exit_code": 0,
                     "success": True,
+                    "skipped": True,
                     "output": "",
                     "error": "",
                     "resource_outcomes": [],
@@ -866,9 +867,22 @@ class TerraformRunner(BaseRunner):
 
         Returns:
             Drift information. When the output can't be parsed, ``has_changes``
-            is ``False``, the counts are zero and ``parsed`` is ``False``.
+            is ``False``, the counts are zero and ``parsed`` is ``False``. A
+            skipped plan has no changes and the ``SKIPPED_PLAN_SUMMARY`` summary.
         """
         output = plan_result.get("output", "")
+
+        # A filter that matched no terraform resource skips the plan on purpose
+        # (#1125): nothing was planned, so there is nothing to drift.
+        if plan_result.get("skipped"):
+            return {
+                "has_changes": False,
+                "to_add": 0,
+                "to_change": 0,
+                "to_destroy": 0,
+                "summary": SKIPPED_PLAN_SUMMARY,
+                "raw_output": output,
+            }
 
         # Look for Terraform's plan summary line
         plan_pattern = r"Plan: (\d+) to add, (\d+) to change, (\d+) to destroy"

@@ -29,7 +29,7 @@ from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.result_types import PlanResult
 from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
-from infrafoundry.core.runners.base_runner import BaseRunner
+from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
 from infrafoundry.core.types import (
@@ -760,7 +760,8 @@ class PlanOrchestrator(HookExecutionMixin):
             return
 
         output = runner_result.get("output", "") or ""
-        summary = extractor(output)
+        # A skipped plan has no output by design; don't report it as unparsable (#1125).
+        summary = SKIPPED_PLAN_SUMMARY if runner_result.get("skipped") else extractor(output)
         self.console.print(f"  [dim]{tool_name}: {summary}[/dim]")
 
         if verbose and output:

@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY
 from infrafoundry.core.runners.terraform_runner import TerraformRunner
 
 
@@ -329,6 +330,14 @@ def test_parse_plan_for_drift_no_changes_is_parsed(runner: TerraformRunner) -> N
     assert "parsed" not in result
 
 
+def test_parse_plan_for_drift_skipped_plan_is_not_unparsable(runner: TerraformRunner) -> None:
+    """A plan skipped by the filter has no drift and is not flagged as unparsed (#1125)."""
+    result = runner.parse_plan_for_drift({"success": True, "skipped": True, "output": ""})
+    assert result["has_changes"] is False
+    assert result["summary"] == SKIPPED_PLAN_SUMMARY
+    assert "parsed" not in result
+
+
 def test_parse_plan_for_drift_detects_changes(runner: TerraformRunner) -> None:
     """Plan parser returns counts and summary."""
     output = "Plan: 1 to add, 2 to change, 0 to destroy"
@@ -476,6 +485,23 @@ class TestResolveTargets:
         # Init runs (via subprocess.run) regardless, but the apply itself
         # (via subprocess.Popen) must be skipped when the filter matches nothing.
         mock_popen.assert_not_called()
+
+    def test_unmatched_filter_marks_plan_skipped(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        """A plan the filter leaves empty is reported as skipped, not run (#1125)."""
+        (provider.terraform_dir / "main.tf").write_text('resource "esxi_guest" "other_vm" {\n}\n')
+        (provider.terraform_dir / ".terraform").mkdir()
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+            result = runner.plan(provider, target_resources=["no-match"])
+
+        assert result["success"]
+        assert result.get("skipped") is True
+        assert not any("plan" in call.args[0] for call in mock_run.call_args_list)
 
 
 class TestDestroyFailureCapture:
