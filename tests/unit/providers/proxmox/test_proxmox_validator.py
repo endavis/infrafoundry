@@ -190,6 +190,29 @@ class TestValidateReferences:
         validator.template_validator.validate.assert_called_once()
         validator.vmid_validator.validate.assert_called_once()
 
+    def test_passes_declared_sdn_vnet_ids(self, validator: ProxmoxValidator) -> None:
+        """sdn_vnet resources reach the bridge check by Proxmox ID (#1154)."""
+        mock_client = MagicMock(spec=ProxmoxClient)
+        mock_client.get_json.return_value = {"data": []}
+        validator.node_validator = MagicMock()
+        validator.storage_validator = MagicMock()
+        validator.network_validator = MagicMock()
+        validator.template_validator = MagicMock()
+        validator.vmid_validator = MagicMock()
+
+        resources = [
+            ResourceConfig(name="ntlan", type="sdn_vnet", provider="proxmox", config={}),
+            ResourceConfig(
+                name="test-lan", type="sdn_vnet", provider="proxmox", config={"id": "tlan"}
+            ),
+        ]
+
+        with patch.object(ProxmoxClient, "from_provider_settings", return_value=mock_client):
+            validator.validate_references(resources)
+
+        declared = validator.network_validator.validate.call_args.args[2]
+        assert declared == frozenset({"ntlan", "tlan"})
+
     def test_exception_caught_gracefully(self, validator: ProxmoxValidator) -> None:
         """Exceptions during validation are caught and reported."""
         mock_client = MagicMock(spec=ProxmoxClient)

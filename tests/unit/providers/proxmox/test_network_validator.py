@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrafoundry.core.exceptions import APIError
-from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.proxmox.api_client import ProxmoxClient
 from infrafoundry.providers.proxmox.validators.network_validator import NetworkValidator
 
@@ -138,3 +138,95 @@ def test_validate_empty_bridges(
 
     client.get_json.assert_not_called()
     report.add_check.assert_not_called()
+
+
+def _routes(responses: dict[str, object]) -> object:
+    """Answer ``get_json`` by endpoint; an ``Exception`` value is raised."""
+
+    def get_json(endpoint: str, **kwargs: object) -> object:
+        value = responses[endpoint]
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    return get_json
+
+
+NODE = {"data": [{"type": "bridge", "iface": "vmbr0"}, {"type": "bridge", "iface": "vmbr1"}]}
+
+
+def test_applied_sdn_vnet_passes(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
+    """A bridge that is an applied SDN vnet passes (#1154)."""
+    client.get_json.side_effect = _routes(
+        {"nodes/pve3/network": NODE, "cluster/sdn/vnets": {"data": [{"vnet": "ntlan"}]}}
+    )
+
+    validator.validate(client, {("pve3", "ntlan")})
+
+    call_args = report.add_check.call_args[1]
+    assert call_args["passed"] is True
+    assert "applied SDN vnet" in call_args["message"]
+    client.get_json.assert_any_call("cluster/sdn/vnets", params={"running": 1})
+
+
+def test_declared_but_unapplied_vnet_warns(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
+    client.get_json.side_effect = _routes(
+        {"nodes/pve3/network": NODE, "cluster/sdn/vnets": {"data": []}}
+    )
+
+    validator.validate(client, {("pve3", "ntlan")}, declared_vnets=frozenset({"ntlan"}))
+
+    call_args = report.add_check.call_args[1]
+    assert call_args["passed"] is False
+    assert call_args["level"] == ValidationLevel.WARNING
+    assert "not yet applied" in call_args["message"]
+
+
+def test_unknown_bridge_is_still_an_error(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
+    client.get_json.side_effect = _routes(
+        {"nodes/pve3/network": NODE, "cluster/sdn/vnets": {"data": [{"vnet": "other"}]}}
+    )
+
+    validator.validate(client, {("pve3", "ntlan")}, declared_vnets=frozenset({"other"}))
+
+    call_args = report.add_check.call_args[1]
+    assert call_args["passed"] is False
+    assert call_args["level"] == ValidationLevel.ERROR
+    assert "not found" in call_args["message"]
+
+
+def test_unreadable_sdn_endpoint_falls_back_to_the_error(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
+    client.get_json.side_effect = _routes(
+        {"nodes/pve3/network": NODE, "cluster/sdn/vnets": APIError("no sdn")}
+    )
+
+    validator.validate(client, {("pve3", "ntlan")})
+
+    assert report.add_check.call_args[1]["level"] == ValidationLevel.ERROR
+
+
+def test_vnets_are_fetched_once_and_only_when_needed(
+    validator: NetworkValidator, client: MagicMock, report: MagicMock
+) -> None:
+    client.get_json.side_effect = _routes(
+        {
+            "nodes/pve1/network": NODE,
+            "nodes/pve2/network": NODE,
+            "nodes/pve3/network": NODE,
+            "cluster/sdn/vnets": {"data": [{"vnet": "ntlan"}]},
+        }
+    )
+
+    validator.validate(client, {("pve1", "vmbr0"), ("pve2", "ntlan"), ("pve3", "ntlan")})
+
+    endpoints = [c.args[0] for c in client.get_json.call_args_list]
+    assert endpoints.count("cluster/sdn/vnets") == 1
+    assert report.add_check.call_count == 3
