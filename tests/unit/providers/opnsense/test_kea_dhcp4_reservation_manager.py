@@ -660,3 +660,89 @@ class TestSubnetRefResolution:
             svc_cls.from_environment.return_value = service
             result = manager.get_resource_ids("test-env", [reservation], sibling_resources=siblings)
         assert result == {"server1": "u-res-1"}
+
+
+class TestPendingSubnet:
+    """Plan treats a reservation in a managed, not-yet-live subnet as an add (#1145)."""
+
+    def test_plan_adds_reservation_in_pending_subnet_ref(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[{"subnet": "10.0.10.0/24", "uuid": "u-sub-1"}],
+        )
+        siblings = [_v4_subnet("nettest-lan", subnet="192.168.99.0/24")]
+        reservation = _v4_reservation_with_ref("aiqum-test", subnet_ref="nettest-lan")
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan("test-env", [reservation], sibling_resources=siblings)
+        assert [a["__name__"] for a in diff.adds] == ["aiqum-test"]
+        assert diff.adds[0]["subnet"] == "192.168.99.0/24"
+        assert diff.updates == []
+        assert diff.deletes == []
+        service.get_dhcpv4_reservation.assert_not_called()
+
+    def test_plan_adds_legacy_cidr_matching_pending_subnet(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(existing_subnets=[])
+        siblings = [_v4_subnet("nettest-lan", subnet="192.168.99.0/24")]
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan(
+                "test-env",
+                [_reservation("server1", subnet="192.168.99.0/24")],
+                sibling_resources=siblings,
+            )
+        assert len(diff.adds) == 1
+
+    def test_plan_still_raises_for_unmanaged_missing_cidr(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(existing_subnets=[])
+        siblings = [_v4_subnet("nettest-lan", subnet="192.168.99.0/24")]
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            with pytest.raises(ReferenceValidationError, match=r"10\.0\.77\.0/24"):
+                manager.plan(
+                    "test-env",
+                    [_reservation("server1", subnet="10.0.77.0/24")],
+                    sibling_resources=siblings,
+                )
+
+    def test_plan_keeps_deleting_live_reservations_not_in_yaml(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[{"subnet": "10.0.10.0/24", "uuid": "u-sub-1"}],
+            existing_reservations=[
+                {"hw_address": "aa:bb:cc:dd:ee:09", "subnet": "u-sub-1", "uuid": "u-res-9"}
+            ],
+        )
+        siblings = [_v4_subnet("nettest-lan", subnet="192.168.99.0/24")]
+        reservation = _v4_reservation_with_ref("aiqum-test", subnet_ref="nettest-lan")
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan("test-env", [reservation], sibling_resources=siblings)
+        assert diff.deletes == [("u-res-9", "aa:bb:cc:dd:ee:09")]
+
+    def test_apply_resolves_the_subnet_created_earlier_in_the_run(self, tmp_path: Path) -> None:
+        # The runner applies kea.dhcp4.subnets first, so apply sees the new subnet live.
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(
+            existing_subnets=[{"subnet": "192.168.99.0/24", "uuid": "u-new"}],
+        )
+        siblings = [_v4_subnet("nettest-lan", subnet="192.168.99.0/24")]
+        reservation = _v4_reservation_with_ref("aiqum-test", subnet_ref="nettest-lan")
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            result = manager.apply("test-env", [reservation], sibling_resources=siblings)
+        assert result["resources_created"] == 1
+        assert service.add_dhcpv4_reservation.call_args.args[0]["subnet"] == "u-new"
+
+    def test_apply_still_raises_when_the_subnet_is_not_live(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4ReservationManager(tmp_path)
+        service = _make_service_mock(existing_subnets=[])
+        siblings = [_v4_subnet("nettest-lan", subnet="192.168.99.0/24")]
+        reservation = _v4_reservation_with_ref("aiqum-test", subnet_ref="nettest-lan")
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            with pytest.raises(ReferenceValidationError, match="no live kea_subnet"):
+                manager.apply("test-env", [reservation], sibling_resources=siblings)
+        service.add_dhcpv4_reservation.assert_not_called()

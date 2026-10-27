@@ -16,7 +16,10 @@ flagged inline:
   operator-facing subnet CIDR to the live subnet UUID. If no live subnet
   matches, the manager raises :class:`ReferenceValidationError` so the
   failure surfaces at plan time rather than as a silent skip-with-warning
-  at apply time.
+  at apply time. The exception is ``plan`` for a reservation whose CIDR
+  belongs to a managed ``kea.dhcp4.subnets`` resource not yet on the box:
+  that reservation is planned as an add, since apply creates the subnet
+  first (#1145).
 - Wire schema: ``subnet`` (UUID on the wire; see operator-facing schema
   below), ``hw_address`` (MAC), ``ip_address``, ``hostname``,
   ``description``.
@@ -137,12 +140,19 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
 
         Raises:
             ReferenceValidationError: If any reservation's ``subnet_ref``
-                or ``subnet`` CIDR does not match any live DHCPv4 subnet,
-                or if both fields disagree, or if neither is present.
+                or ``subnet`` CIDR matches neither a live DHCPv4 subnet nor
+                a managed subnet that apply will create, or if both fields
+                disagree, or if neither is present.
         """
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
         name_to_cidr = _build_subnet_name_to_cidr(sibling_resources)
-        return self._compute_diff(service, resources, add_only=add_only, name_to_cidr=name_to_cidr)
+        return self._compute_diff(
+            service,
+            resources,
+            add_only=add_only,
+            name_to_cidr=name_to_cidr,
+            allow_pending_subnets=True,
+        )
 
     def apply(
         self,
@@ -363,6 +373,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         *,
         add_only: bool,
         name_to_cidr: dict[str, str],
+        allow_pending_subnets: bool = False,
     ) -> _Diff:
         """Compute the add/update/delete diff against live state.
 
@@ -371,8 +382,17 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         UUID via ``search_dhcpv4_subnets``; raises
         ``ReferenceValidationError`` on any miss (mirrors the DHCPv6
         manager's behavior).
+
+        With ``allow_pending_subnets`` (plan only), a reservation whose
+        CIDR belongs to a managed sibling subnet that is not live yet is
+        an add: no live reservation can sit in a subnet that does not
+        exist, and apply creates the subnet before the reservations and
+        resolves the UUID then (#1145).
         """
         cidr_to_uuid = _build_subnet_cidr_lookup(service)
+        pending_cidrs = (
+            set(name_to_cidr.values()) - cidr_to_uuid.keys() if allow_pending_subnets else set()
+        )
 
         live_reservations = service.search_dhcpv4_reservations()
         live_by_key: dict[tuple[str, str], dict[str, Any]] = {
@@ -385,6 +405,11 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
 
         for resource in resources:
             subnet_cidr = _resolve_subnet_cidr(resource, name_to_cidr)
+            if subnet_cidr in pending_cidrs:
+                # The UUID does not exist yet; carry the CIDR for display.
+                pending = _build_reservation_payload(resource, subnet_cidr)
+                adds.append({**pending, "__name__": resource.name})
+                continue
             subnet_uuid = _resolve_subnet_uuid(cidr_to_uuid, subnet_cidr, resource.name)
             reservation_data = _build_reservation_payload(resource, subnet_uuid)
             hw_address = str(reservation_data["hw_address"])
