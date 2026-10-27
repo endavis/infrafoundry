@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793128571393,
+  "lastUpdate": 1793129285837,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11346,6 +11346,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002095164262363309",
             "extra": "mean: 77.2144457093655 usec\nrounds: 13879"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ea1615aecb14e54846c5fe0559b297ebc3ace5b8",
+          "message": "fix: accept radvd and cron.jobs opnsense resource types (merges PR #1150, addresses #1144)\n\nget_resource_types() was a hand-kept list that had drifted from the\ndirect-API manager table, so radvd and cron.jobs were rejected before\ntheir managers ran. It is now derived from the table, less\nUNVERIFIED_RESOURCE_TYPES: the seven system.* singletons, whose services\ncall endpoints that 404 on OPNsense 26.1 (#1149). A test requires every\nmanager to be supported or listed as unverified.\n\nAddresses #1144\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T19:27:11Z",
+          "tree_id": "e157f2a60c0afb7785bf66cfa0d51888befdd2db",
+          "url": "https://github.com/endavis/infrafoundry/commit/ea1615aecb14e54846c5fe0559b297ebc3ace5b8"
+        },
+        "date": 1793129284596,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7754.911704473679,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011714203188862676",
+            "extra": "mean: 128.95053330176754 usec\nrounds: 8438"
           }
         ]
       }
