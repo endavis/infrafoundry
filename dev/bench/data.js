@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793121230506,
+  "lastUpdate": 1793121523104,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11129,6 +11129,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001714855629971186",
             "extra": "mean: 94.49287935951574 usec\nrounds: 12301"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5cce34f0b5b9bd346233feaca62e78b625d9e9a3",
+          "message": "feat: check package jumphosts in infra doctor (merges PR #1134, addresses #657)\n\nA package that sets jumphost runs its scripts there, and they reach the\nVMs with the jumphost's own ssh-agent. When that agent had no key, the\napply only failed minutes in, after terraform had created the VMs.\n\ninfra doctor now checks every jumphost the in-scope packages use, in one\nSSH session per jumphost opened the way the script handler opens it: SSH\naccess, an ssh-agent with keys loaded, the package's declared public key\namong them, the tools the scripts need and a writable /tmp. Any FAIL\nmakes doctor exit 1. doctor also gains -p/--package, exclusive with -r.\n\nThis is the first of two PRs for #657; target checks follow.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T17:17:50Z",
+          "tree_id": "d98f1836cc67ea219487139f9ce9b63fd5cd524f",
+          "url": "https://github.com/endavis/infrafoundry/commit/5cce34f0b5b9bd346233feaca62e78b625d9e9a3"
+        },
+        "date": 1793121521539,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15065.509514547666,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002308472955517741",
+            "extra": "mean: 66.37677929408048 usec\nrounds: 16121"
           }
         ]
       }
