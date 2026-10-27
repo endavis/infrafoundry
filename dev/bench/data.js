@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793106363786,
+  "lastUpdate": 1793107690914,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10974,6 +10974,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000434289984301947",
             "extra": "mean: 148.91780880957702 usec\nrounds: 8400"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f64ad35f97dd359808f13c29f5e3f0c225607ccb",
+          "message": "fix: forget destroyed hosts in the jumphost known_hosts (merges PR #1126, addresses #656)\n\nAfter a destroy, a VM recreated on the same IP failed SSH from the package\njumphost with \"REMOTE HOST IDENTIFICATION HAS CHANGED\" until the operator\nran ssh-keygen -R by hand.\n\nThe destroy workflow now collects the resources each provider deleted,\nand core/known_hosts.py removes them from the jumphost of each package\nthat sets one: the resource's name, and the ip_address of every\nkea.dhcp4.reservations resource whose hostname matches it. The reservation\nlookup uses the unfiltered resource set, so -P/-r/-p destroys still find\nthe IP. All entries for a jumphost go in one ssh call with BatchMode and\na timeout; a failure prints a warning and the destroy still succeeds.\n\nAddresses #656\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T13:27:20Z",
+          "tree_id": "63293176d82363a2cfc0ac9dbdacad219546b61c",
+          "url": "https://github.com/endavis/infrafoundry/commit/f64ad35f97dd359808f13c29f5e3f0c225607ccb"
+        },
+        "date": 1793107689926,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15199.338202519342,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000018802328050188943",
+            "extra": "mean: 65.79233823708499 usec\nrounds: 16450"
           }
         ]
       }
