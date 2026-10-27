@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793105863595,
+  "lastUpdate": 1793106363786,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -10943,6 +10943,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009738053950527735",
             "extra": "mean: 125.510347262739 usec\nrounds: 8567"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "189294d7457658af7b6df65613d95ad53ae60eb8",
+          "message": "refactor: extend the env override gate to terraform write paths (merges PR #1124, addresses #783)\n\nbuild_terraform_env_vars read provider_settings only, so with\nINFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1 a proxmox or oci terraform apply could\nnot be redirected the way the OPNsense direct-API path can (#741).\n\nThe gate parsing and env-first lookup move from the OPNsense\n_credentials.py into core/credential_override.py. Its resolve_settings\napplies each non-empty <PROVIDER>_<KEY> env var (PROXMOX_API_URL,\nOCI_REGION, ...) to the keys in a provider's TF-var mapping, and warns\nonce per provider and URL when api_url changes. build_terraform_env_vars\ncalls it, so every terraform-managed provider gets the override; with the\ngate off nothing changes. The OPNsense path still resolves through\nresolve_credentials, which keeps its own verify_ssl, proxy and warning.\n\nADR-0014 and the CLI reference document the terraform path.\n\nAddresses #783\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-27T13:05:08Z",
+          "tree_id": "fc417e0bcb2d9ecf02b930294b92bdc75316eba3",
+          "url": "https://github.com/endavis/infrafoundry/commit/189294d7457658af7b6df65613d95ad53ae60eb8"
+        },
+        "date": 1793106362365,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6715.113578381427,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000434289984301947",
+            "extra": "mean: 148.91780880957702 usec\nrounds: 8400"
           }
         ]
       }
