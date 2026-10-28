@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 BLUEPRINT_MANIFEST = "blueprint.yaml"
 
 # Allowed keys in an ``inputs:`` entry.
-_ALLOWED_INPUT_KEYS = frozenset({"name", "description", "type", "default"})
+_ALLOWED_INPUT_KEYS = frozenset({"name", "description", "type", "default", "required"})
 
 
 class BlueprintResolver:
@@ -70,7 +70,9 @@ class BlueprintResolver:
             Parsed blueprint manifest as a dictionary with keys:
             ``name``, ``description``, ``version``, ``defaults``,
             ``resources``, ``events``, ``inventory``, ``blueprint_dir``,
-            ``providers`` and ``requirements`` (a ``BlueprintRequirements``).
+            ``providers`` and ``requirements`` (a ``BlueprintRequirements``),
+            plus ``required_inputs`` (a ``frozenset`` of input names marked
+            ``required: true``; per-provider blocks carry their own).
 
         Raises:
             InvalidConfigurationError: If the blueprint directory or
@@ -122,6 +124,9 @@ class BlueprintResolver:
                 new_block = dict(provider_block)
                 new_block["defaults"] = provider_defaults
                 new_block["input_names"] = provider_input_names
+                new_block["required_inputs"] = self._required_input_names(
+                    provider_block.get("inputs")
+                )
                 normalised_providers[provider_name] = new_block
 
         # Normalise optional fields
@@ -131,6 +136,7 @@ class BlueprintResolver:
             "version": data.get("version"),
             "defaults": top_defaults,
             "input_names": top_input_names,
+            "required_inputs": self._required_input_names(top_inputs_raw),
             "resources": data.get("resources", []),
             "events": data.get("events", {}),
             "inventory": data.get("inventory"),
@@ -285,6 +291,8 @@ class BlueprintResolver:
             (preserving declaration order) so downstream callers that read
             ``blueprint["defaults"]`` keep working unchanged. ``input_names``
             is the frozenset of declared input names (required + optional).
+            Inputs marked ``required: true`` are collected separately by
+            :meth:`_required_input_names`.
 
         Raises:
             InvalidConfigurationError: If both ``inputs:`` and ``defaults:``
@@ -342,11 +350,43 @@ class BlueprintResolver:
                 raise InvalidConfigurationError(
                     f"{scope} declares input '{name}' more than once in {manifest_path}."
                 )
+            if "required" in entry:
+                if not isinstance(entry["required"], bool):
+                    raise InvalidConfigurationError(
+                        f"{scope} input '{name}' has a non-boolean 'required' "
+                        f"value in {manifest_path}; use true or false."
+                    )
+                if entry["required"] and "default" in entry:
+                    raise InvalidConfigurationError(
+                        f"{scope} input '{name}' is 'required: true' but also "
+                        f"has a 'default' in {manifest_path}; a required input "
+                        "cannot have a default."
+                    )
             names.append(name)
             if "default" in entry:
                 defaults[name] = entry["default"]
 
         return defaults, frozenset(names)
+
+    @staticmethod
+    def _required_input_names(inputs_raw: Any) -> frozenset[str]:
+        """Collect the names of inputs marked ``required: true``.
+
+        Expects *inputs_raw* to have passed :meth:`_parse_inputs_section`.
+
+        Args:
+            inputs_raw: Value of an ``inputs:`` key (may be ``None``).
+
+        Returns:
+            Frozenset of required input names.
+        """
+        if not isinstance(inputs_raw, list):
+            return frozenset()
+        return frozenset(
+            entry["name"]
+            for entry in inputs_raw
+            if isinstance(entry, dict) and entry.get("required") is True
+        )
 
     @staticmethod
     def _validate_manifest(data: dict[str, Any], manifest_path: Path) -> None:

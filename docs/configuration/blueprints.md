@@ -76,6 +76,13 @@ inputs:
 | `description` | Human-readable help text shown in tooling and `config doctor`.     |
 | `type`        | Declared type hint. Informational; not enforced by the validator.  |
 | `default`     | Default value. Presence marks the input as optional.               |
+| `required`    | Boolean. `true` makes the package fail at load (`infra doctor`, `plan`, `apply`) when the value is missing or empty, after `secrets.yaml` is merged. Cannot be combined with `default`. |
+
+Use `required: true` for inputs that are only read at run time and never
+rendered into a template (so a missing value would otherwise go unnoticed),
+such as secrets. The error names the package and the input, never its value.
+The `ontap-cluster` blueprint marks `ontap_password` this way: set it under
+`variables:` in the package's `secrets.yaml`.
 
 Unknown keys are rejected at resolve time to catch typos early. Declaring
 both `inputs:` and the legacy `defaults:` section in the same scope is a
