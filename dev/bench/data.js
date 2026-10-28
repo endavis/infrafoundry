@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793131344482,
+  "lastUpdate": 1793173192406,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11439,6 +11439,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011187563393207356",
             "extra": "mean: 127.97779564033837 usec\nrounds: 8441"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e98c5585994ec875d09a721d26024fe305054e0e",
+          "message": "feat: separate cluster interconnect bridge in the ontap-cluster blueprint (merges PR #1159, addresses #1158)\n\nAdd an optional cluster_bridge input. When set, the cluster interconnect\nports e0a/e0b use it instead of bridge. Without it, an SDN vnet or any\nbridge with no VLAN between interconnect and management/data puts e0c/e0d\nin the Cluster IPspace and data LIF creation fails. Empty keeps today's\nrendering.\n\nAddresses #1158\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-28T07:38:03Z",
+          "tree_id": "31edcb1d634ce60fe2dc6f7637dd82ac6156b8cc",
+          "url": "https://github.com/endavis/infrafoundry/commit/e98c5585994ec875d09a721d26024fe305054e0e"
+        },
+        "date": 1793173191389,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8139.24383684793,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008703558902772539",
+            "extra": "mean: 122.8615360400934 usec\nrounds: 8546"
           }
         ]
       }
