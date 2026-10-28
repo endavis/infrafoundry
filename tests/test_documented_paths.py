@@ -17,28 +17,23 @@ The allowlist below is the interesting half. A doc legitimately names paths that
 do not exist -- placeholders substituted during setup, files created at runtime,
 worked examples. Each entry states which, so the list stays a set of decisions
 rather than a pile of suppressions.
+
+Discovery is `doc_scan.committed_markdown_files()` -- git-tracked plus untracked-
+but-not-ignored markdown -- rather than `rglob()` minus a hardcoded skip set. A
+downstream project can also silence a path it deliberately did not adopt via
+`.config/pyproject_template/sync-exclude.toml` (ADR-9026); upstream has no such
+file, so that skip is a no-op here.
 """
 
 from __future__ import annotations
 
 import re
-import subprocess
-from functools import cache
+import subprocess  # nosec B404 - subprocess is required to build a test git repo
 from pathlib import Path
 
-from tests.sync_excluded import is_sync_excluded
+from tests.doc_scan import committed_markdown_files, is_excluded, load_sync_excludes
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SKIP_DIRS = {
-    ".git",
-    ".venv",
-    "site",
-    "node_modules",
-    "__pycache__",
-    "tmp",
-    ".mypy_cache",
-    "worktrees",
-}
 
 # A backticked path with a directory component and a known extension. Bare
 # filenames ("run `configure.py`") are shorthand, not location claims, and are
@@ -127,47 +122,29 @@ _SHORTHAND_BASES = (
 )
 
 
-@cache
-def _tracked_markdown() -> frozenset[str]:
-    """Repo-relative paths of the committed markdown files.
-
-    InfraFoundry divergence (#1057): git-ignored trees such as `generated/` and a
-    checked-out config repo carry third-party markdown that no one here maintains.
-    """
-    out = subprocess.run(
-        ["git", "ls-files", "*.md"], cwd=REPO_ROOT, capture_output=True, text=True, check=True
-    )
-    return frozenset(out.stdout.split())
+def _is_historical(doc: Path, root: Path = REPO_ROOT) -> bool:
+    """Whether *doc* is a dated record or proposal listed in HISTORICAL."""
+    return doc.relative_to(root).as_posix().startswith(tuple(HISTORICAL))
 
 
-def _is_local_doc(doc: Path) -> bool:
-    """Whether *doc* is a committed, non-historical document of this repository."""
-    rel = doc.relative_to(REPO_ROOT).as_posix()
-    return rel in _tracked_markdown() and not rel.startswith(tuple(HISTORICAL))
-
-
-def _resolves(doc: Path, raw: str) -> bool:
+def _resolves(doc: Path, raw: str, root: Path = REPO_ROOT) -> bool:
     """Whether *raw* names an existing path from any base it may be written against."""
-    bases = (REPO_ROOT, doc.parent, *_SHORTHAND_BASES)
+    bases = (root, doc.parent, *_SHORTHAND_BASES)
     return any((base / raw).exists() for base in bases)
 
 
 def _markdown_files(root: Path = REPO_ROOT) -> list[Path]:
-    return [
-        path
-        for path in sorted(root.rglob("*.md"))
-        if not any(part in SKIP_DIRS for part in path.relative_to(root).parts)
-    ]
+    return committed_markdown_files(root)
 
 
 def _is_allowed(raw: str) -> bool:
     return any(raw.startswith(prefix) or raw == prefix for prefix in ALLOWED)
 
 
-def _documented_paths() -> list[tuple[Path, str]]:
+def _documented_paths(root: Path = REPO_ROOT) -> list[tuple[Path, str]]:
     """Return (doc, path) for every backticked path that claims a location."""
     found: list[tuple[Path, str]] = []
-    for doc in _markdown_files():
+    for doc in _markdown_files(root):
         for match in DOCUMENTED_PATH.finditer(doc.read_text(encoding="utf-8", errors="replace")):
             raw = match.group(1)
             if "/" not in raw:
@@ -178,19 +155,31 @@ def _documented_paths() -> list[tuple[Path, str]]:
     return found
 
 
+def _unallowed_missing(
+    pairs: list[tuple[Path, str]], excludes: list[str], root: Path = REPO_ROOT
+) -> set[str]:
+    """Return "<doc>: <raw>" for every pair that is missing, unallowed and unexcluded."""
+    return {
+        f"{doc.relative_to(root)}: {raw}"
+        for doc, raw in pairs
+        if not _is_historical(doc, root)
+        and not _is_allowed(raw)
+        and not is_excluded(raw, excludes)
+        and not _resolves(doc, raw, root)
+    }
+
+
 def test_documented_paths_exist() -> None:
-    """A path in backticks should resolve, or be a declared placeholder."""
-    missing = sorted(
-        {
-            f"{doc.relative_to(REPO_ROOT)}: {raw}"
-            for doc, raw in _documented_paths()
-            if _is_local_doc(doc)
-            and not _is_allowed(raw)
-            # InfraFoundry divergence (#1057): upstream files we deliberately exclude.
-            and not is_sync_excluded(raw)
-            and not _resolves(doc, raw)
-        }
-    )
+    """A path in backticks should resolve, be a declared placeholder, or be excluded.
+
+    A downstream project lists in `.config/pyproject_template/sync-exclude.toml`
+    (ADR-9026) the upstream-only paths it did not adopt -- such a path is never
+    committed there, so it would otherwise be reported as missing documentation
+    forever. Upstream has no such file, so `load_sync_excludes` returns `[]` and
+    this check is exactly as strict as before.
+    """
+    excludes = load_sync_excludes(REPO_ROOT)
+    missing = sorted(_unallowed_missing(_documented_paths(), excludes))
     assert not missing, (
         "documentation names paths that do not exist:\n  "
         + "\n  ".join(missing)
@@ -198,12 +187,48 @@ def test_documented_paths_exist() -> None:
     )
 
 
+def test_excluded_missing_target_is_skipped(tmp_path: Path) -> None:
+    """A missing target matching sync-exclude.toml must not be reported."""
+    doc = tmp_path / "readme.md"
+    pairs = [(doc, "docs/template/manage.md")]
+
+    assert _unallowed_missing(pairs, ["docs/template/**"], root=tmp_path) == set()
+
+
+def test_non_excluded_missing_target_still_fails(tmp_path: Path) -> None:
+    """The same missing target, without a matching exclude, is still reported.
+
+    Pins that the skip above fires *because* of the exclude pattern, not because
+    the check stopped looking for missing targets altogether.
+    """
+    doc = tmp_path / "readme.md"
+    pairs = [(doc, "docs/template/manage.md")]
+
+    assert _unallowed_missing(pairs, [], root=tmp_path) == {"readme.md: docs/template/manage.md"}
+
+
+def _git(args: list[str], cwd: Path) -> None:
+    subprocess.run(  # nosec B603 B607 - fixed argv, no shell, test fixture only
+        ["git", *args], cwd=cwd, check=True, capture_output=True
+    )
+
+
+def _init_repo(root: Path) -> None:
+    _git(["init", "--quiet"], root)
+    _git(["config", "user.email", "test@example.com"], root)
+    _git(["config", "user.name", "Test"], root)
+
+
 def test_the_scanner_skips_worktrees(tmp_path: Path) -> None:
     """Each worktree under `worktrees/` is a full copy of the repository (#854).
 
     Its docs name paths relative to itself, and a check run from the main
-    checkout must not also judge every copy.
+    checkout must not also judge every copy. `worktrees/` is gitignored
+    (mirroring the real `.gitignore`), so the git-based scan drops it without
+    a hardcoded skip list.
     """
+    _init_repo(tmp_path)
+    (tmp_path / ".gitignore").write_text("/worktrees/\n", encoding="utf-8")
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "kept.md").write_text("# Kept\n", encoding="utf-8")
     copy = tmp_path / "worktrees" / "feat" / "42-add-export" / "docs"

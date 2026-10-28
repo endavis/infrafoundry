@@ -29,6 +29,7 @@ import re
 import shutil
 import subprocess  # nosec B404
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -51,6 +52,7 @@ from utils import (  # noqa: E402
     Colors,
     Logger,
     download_and_extract_archive,
+    github_api_request,
 )
 
 # Frozen set for O(1) membership tests in the hot path of compare_files.
@@ -113,6 +115,10 @@ def load_sync_excludes(project_root: Path) -> list[str]:
     return [str(item) for item in excludes if isinstance(item, str)]
 
 
+class TemplateRefError(RuntimeError):
+    """The template ref could not be pinned to a commit."""
+
+
 def resolve_template_ref(ref: str) -> str:
     """Resolve *ref* -- a tag, branch or commit SHA -- to a commit SHA.
 
@@ -120,31 +126,48 @@ def resolve_template_ref(ref: str) -> str:
     (ADR-9020). A tag, a branch and a SHA all resolve here, so a comparison can
     be reproduced later and both halves of a sync can name the same commit.
 
-    On failure -- offline, rate-limited, an unknown ref -- returns *ref*
-    unchanged and warns. Refusing to run a drift check because api.github.com is
-    unreachable would trade a small gain for a hard outage, which is the same
-    call `bootstrap.resolve_ref` makes.
+    Raises:
+        TemplateRefError: offline, rate-limited, an unknown ref or a non-SHA
+            response. Unlike `bootstrap.resolve_ref`, the drift check does not
+            continue against the moving ref: an extract of a moving ref cannot
+            be recorded as a sync point, and continuing used to replace the
+            reviewed extract `sync` needs (#1026).
     """
     if SHA_RE.match(ref):
         return ref
 
     api_url = f"https://api.github.com/repos/{TEMPLATE_REPO}/commits/{ref}"
-    request = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github.sha"})
-    token = os.environ.get("GITHUB_TOKEN")
-    if token:
-        request.add_header("Authorization", f"token {token}")
+    request = github_api_request(api_url, accept="application/vnd.github.sha")
+    authenticated = request.has_header("Authorization")
     try:
         with urllib.request.urlopen(request, timeout=15) as response:  # nosec B310
             sha: str = response.read().decode("utf-8").strip()
+    except urllib.error.HTTPError as e:
+        cause = "rate limited" if e.code in (403, 429) else str(e)
+        raise TemplateRefError(_ref_error_message(ref, cause, authenticated)) from e
     except Exception as e:
-        Logger.warning(f"Could not resolve '{ref}' to a commit ({e}).")
-        Logger.info(f"Continuing against the moving ref '{ref}'.")
-        return ref
+        raise TemplateRefError(_ref_error_message(ref, str(e), authenticated)) from e
 
     if not SHA_RE.match(sha):
-        Logger.warning(f"Unexpected response resolving '{ref}'; using it as-is.")
-        return ref
+        raise TemplateRefError(
+            _ref_error_message(ref, "unexpected response from the API", authenticated)
+        )
     return sha
+
+
+def _ref_error_message(ref: str, cause: str, authenticated: bool) -> str:
+    """Name the cause of a failed ref lookup and the remedy for it."""
+    if authenticated:
+        remedy = (
+            "check network access and that the ref exists, or wait for the API rate "
+            "limit to reset, then re-run the check"
+        )
+    else:
+        remedy = (
+            "set GITHUB_TOKEN (e.g. GITHUB_TOKEN=$(gh auth token)) or log in with "
+            "`gh auth login`, then re-run the check"
+        )
+    return f"Could not resolve '{ref}' to a commit ({cause}): {remedy}."
 
 
 def download_template(target_dir: Path, ref: str | None = None) -> Path:
@@ -152,6 +175,9 @@ def download_template(target_dir: Path, ref: str | None = None) -> Path:
 
     `ref` is resolved to a commit first, so one URL shape serves all three and
     the archive is a fixed commit rather than a moving branch.
+
+    Raises:
+        TemplateRefError: *ref* could not be pinned; nothing was downloaded.
     """
     commit = resolve_template_ref(ref or DEFAULT_TEMPLATE_REF)
     archive_url = f"{TEMPLATE_URL}/archive/{commit}.zip"
@@ -468,8 +494,13 @@ def run_check_updates(
         Logger.info("Dry run mode - would download and compare template files")
         return 0
 
-    # Download template
-    template_dir = download_template(tmp_dir, ref)
+    # Download template. A ref that cannot be pinned stops the check before
+    # anything on disk changes, so a reviewed extract survives it (#1026).
+    try:
+        template_dir = download_template(tmp_dir, ref)
+    except TemplateRefError as e:
+        Logger.error(str(e))
+        return 1
 
     # Warn -- before anything else -- if the local template-sync skill copies
     # are older than the template just downloaded. An agent following a stale

@@ -190,6 +190,7 @@ nav:
     - ADR-9023 Shared skills: decisions/9023-shared-workflow-skills-live-in-agents-skills-generated-for-claude.md
     - ADR-9024 Implement-issue skill: decisions/9024-one-implement-issue-skill-takes-an-issue-to-a-green-pr.md
     - ADR-9025 Delegation context: decisions/9025-delegated-agents-receive-github-data-from-the-host-and-run-without-network.md
+    - ADR-9026 Doc-scan sync-exclude: decisions/9026-doc-scanning-tests-honor-sync-excludetoml-and-discover-markdown-via-git.md
 
   - Providers:
     - ESXi: providers/esxi.md
@@ -234,7 +235,6 @@ nav:
         - LSP Tool and Diagnostics: development/ai/lsp-tool.md
         - Token-Efficiency Add-Ons: development/ai/token-efficiency-add-ons.md
         - Cross-Agent Delegation: development/ai/cross-agent-delegation.md
-        - Auto-Checkpoint Hook: development/ai/auto-checkpoint-hook.md
         - Ruff-fix Hook: development/ai/ruff-fix-hook.md
         - Statusline: development/ai/statusline.md
         - Per-Stack Rule Files: development/ai/rule-files.md

@@ -69,6 +69,9 @@ include them in actionable drift.
   package.
 - `tests/template/test_properties.py` — property tests for the skeleton
   package's `greet`.
+- `tests/template/test_check_template_updates.py` — template-owned (ADR-9017)
+  and never adopted; excluded so the documented-path test accepts ADR-9026
+  naming it (#1169).
 
 > **Note on `tests/template/`:** this directory is **not** blanket-skipped.
 > Upstream uses it for tests that exercise the `tools/pyproject_template/*`
@@ -101,8 +104,15 @@ include them in actionable drift.
 - `docs/TABLE_OF_CONTENTS.md` — skeleton table of contents. Superseded by the
   mkdocs-generated nav.
 
+### Opt-in AI hooks
+- `tools/hooks/ai/cbm-*`, `tools/hooks/ai/context-mode-*` and their
+  `tests/test_hook_cbm_*.py` / `tests/test_hook_context_mode_*.py` tests —
+  opt-in token-efficiency hooks InfraFoundry does not use (#1169).
+
 ### Other
 - `LICENSE` — InfraFoundry ships its own license; never overwrite.
+- `README.template.md` — the README template for newly generated projects
+  (#1169).
 
 ## 2. Infrafoundry-specific files (upstream changes never apply)
 
@@ -130,8 +140,6 @@ not to ask "should we sync this?" — there is nothing to sync from.
   `0001–0012`). Upstream ships its own ADRs in the `9000-` series under the
   same directory; those are adopted verbatim. See ADR-9016 for the two-series
   convention.
-- `tests/sync_excluded.py` — lets the link and documented-path tests skip
-  targets that `sync-exclude.toml` keeps out of this repository (#1057).
 
 Note: `tools/doit/quality.py` is an upstream file but contains an
 infrafoundry-specific task (`task_lint_blueprints()`). See category 3.
@@ -147,7 +155,7 @@ customization a reviewer must verify survived the merge.
 | :--- | :--- |
 | `AGENTS.md` | Preserves InfraFoundry-specific CLI command tables, architecture sections, and the `foundry` CLI reference. |
 | `.claude/CLAUDE.md` | Preserves InfraFoundry TodoWrite rules, workflow mandates, and the `@../AGENTS.md` import. |
-| `.claude/settings.json` | Preserves project-specific permissions, hooks, and environment variables. |
+| `.claude/settings.json` | Preserves project-specific permissions, hooks, and environment variables. Matches upstream since #1169, which dropped the committed `bash-ban-raw-tools` wiring along with the hook (endavis/pyproject-template#1038). |
 | `.github/CONTRIBUTING.md` | Preserves InfraFoundry branching/commit conventions and the issue-driven workflow description. |
 | `.gitignore` | Preserves entries for `generated/`, state DB paths, `endavis-infra/`, and other InfraFoundry-specific artifacts. |
 | `.envrc` | Preserves `INFRAFOUNDRY_*` environment variables and direnv layout specific to the framework. |
@@ -159,9 +167,9 @@ customization a reviewer must verify survived the merge.
 | `pyproject.toml` | Preserves project name, dependencies, CLI entry points, and mypy/ruff overrides specific to InfraFoundry: `disallow_any_generics = true` globally with an override that turns it off for template-owned tooling (as upstream has it), the `agent_roster` import override, the InfraFoundry vulture `ignore_names` entries, and the `[tool.mutmut]` `also_copy` (`blueprints/`, `example-config/`) and `do_not_mutate` (`src/infrafoundry/core/protocols.py`) keys, checked by `tests/test_mutmut_project_paths.py` (#1108). |
 | `tests/conftest.py` | Preserves InfraFoundry-specific fixtures (`mock_config_manager`, `mock_config_dir`, sample resource fixtures, etc.) alongside upstream's `mock_subprocess` fixture. |
 | `tests/template/test_doit_quality.py` | Preserves the local-only `lint_blueprints` entry in the `task_check` dependency set and `TestTaskLintBlueprints`. The mypy scope assertions match upstream since #1056. |
-| `tests/test_markdown_links.py` | Preserves the `is_sync_excluded` skip, so links in template-owned files to excluded upstream files are not reported (#1057). |
-| `tests/test_documented_paths.py` | Preserves the `is_sync_excluded` skip, the committed-files-only scan, the `HISTORICAL` exemptions for dated records, the package/provider/example-config shorthand bases, and the InfraFoundry `ALLOWED` entries for config-repo walkthrough paths (#1057). |
-| `tests/test_instruction_pointers.py` | Preserves `_committed_markdown()`, so anchor checks skip git-ignored trees such as `generated/` (#1057). |
+| `tests/test_documented_paths.py` | Preserves the `HISTORICAL` exemptions for dated records (`_is_historical`), the package/provider/example-config shorthand bases (`_resolves`), and the InfraFoundry `ALLOWED` entries for config-repo walkthrough paths (#1057). The sync-exclude skip and committed-files-only scan come from upstream's `tests/doc_scan.py` since #1169 (ADR-9026). |
+| `tests/test_markdown_links.py`, `tests/test_instruction_pointers.py`, `tests/test_doc_scan.py` (and `tests/test_documented_paths.py`) | Import `from tests.doc_scan import ...` instead of upstream's bare `from doc_scan import ...`: `tests/` is a package here, so mypy cannot resolve the bare name, and an `ignore_missing_imports` override would leave the `doc_scan` calls untyped (#1169). |
+| `tests/test_hook_dangerous_command_matrix.py` | Preserves `dict[str, Any]` in the case-table annotations, which local `disallow_any_generics` requires. |
 | `docs/development/ci-cd-testing.md` | Upstream's text, localized: Linux-only platforms (ADR-0001), coverage of `infrafoundry`, the Terraform/OpenTofu/age/sops installs and Codecov upload, `doit lint_blueprints` in the `lint` row (checked by `tests/test_ci_jobs_doc.py`), the strict docs build, the `check-commit-issue-ref` hook row, no hook-skipping tip, and upstream issue numbers written as `endavis/pyproject-template#NNN` (#1057). |
 | `tests/test_docs_frontmatter.py` | Preserves the `dict[str, Any]` return type on `_frontmatter`, which local `disallow_any_generics` requires (#1057). |
 | `tools/doit/quality.py` | Preserves `task_lint_blueprints()` and any sibling blueprint-specific tasks. |

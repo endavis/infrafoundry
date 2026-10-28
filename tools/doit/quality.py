@@ -90,10 +90,17 @@ def task_lint_blueprints() -> dict[str, Any]:
 
 
 def task_check() -> dict[str, Any]:
-    """Run all checks (format, lint, type, dead code, security, audit, spell, wheel, docs, test)."""
+    """Run all checks (format, lint, type, dead code, security, audit, spell, wheel, docs, test).
+
+    ``env_check`` runs first (#1033): it warns, without failing, when the
+    environment has drifted from ``uv.lock``, replacing the
+    ``post-merge``/``post-checkout`` pre-commit hooks that used to auto-sync
+    on checkout.
+    """
     return {
         "actions": [success_message],
         "task_dep": [
+            "env_check",
             "format_check",
             "lint",
             "lint_blueprints",
