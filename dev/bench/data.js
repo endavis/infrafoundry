@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793182953875,
+  "lastUpdate": 1793184992841,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11501,6 +11501,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006228319240787978",
             "extra": "mean: 97.67413491251259 usec\nrounds: 10807"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c669d3a6d124950f7070618d966f0f0827b35efe",
+          "message": "fix: halt ontap nodes by their ontap name in console restore (merges PR #1163, addresses #1162)\n\nThe console-restore play halted each node with its Proxmox VM name. ONTAP\nnames nodes <cluster>-01/-02, so the halt was rejected wherever the two\ndiffer, and na_ontap_command reported the rejection as changed. The\nwrapper then timed out waiting for VLOADER.\n\nThe playbook now passes each node's management IP, and the role resolves\nthe ONTAP node name from it through /api/cluster/nodes before staging or\nhalting anything, failing early if no node matches. The halt task fails\nwhen ONTAP rejects the command (result_value != 1, as in #1089).\n\nAddresses #1162\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-28T10:55:31Z",
+          "tree_id": "4cdca79fd68353c39df1a0335351671e03c2265f",
+          "url": "https://github.com/endavis/infrafoundry/commit/c669d3a6d124950f7070618d966f0f0827b35efe"
+        },
+        "date": 1793184991505,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13029.8855519145,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000228078878812508",
+            "extra": "mean: 76.74664493527101 usec\nrounds: 13989"
           }
         ]
       }
