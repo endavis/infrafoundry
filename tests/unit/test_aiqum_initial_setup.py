@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -214,6 +214,24 @@ class TestAIQUMClient:
         auth = req.get_header("Authorization")
         assert auth is not None
         assert auth.startswith("Basic ")
+
+    def test_uses_client_timeout_by_default(self) -> None:
+        """A request without its own timeout uses the client's timeout."""
+        client = AIQUMClient(BASE_URL, "umadmin", "secret", make_ssl_context(), timeout=7)
+        mock_urlopen = MagicMock(return_value=_mock_urlopen_response(200, b"{}"))
+        with patch("aiqum_initial_setup.urlopen", mock_urlopen):
+            client.post("/api/foo", body={})
+
+        assert mock_urlopen.call_args.kwargs["timeout"] == 7
+
+    def test_post_timeout_overrides_client_timeout(self) -> None:
+        """A per-call timeout on POST replaces the client's timeout (#1167)."""
+        client = AIQUMClient(BASE_URL, "umadmin", "secret", make_ssl_context(), timeout=7)
+        mock_urlopen = MagicMock(return_value=_mock_urlopen_response(201, b"{}"))
+        with patch("aiqum_initial_setup.urlopen", mock_urlopen):
+            client.post("/api/foo", body={}, timeout=99)
+
+        assert mock_urlopen.call_args.kwargs["timeout"] == 99
 
 
 # ---------------------------------------------------------------------------
@@ -457,6 +475,69 @@ class TestMainAlertStep:
         mock_create_alert.assert_called_once()
         mock_send_test.assert_not_called()
         assert "FAILED (non-fatal)" in capsys.readouterr().out
+
+
+def _cluster_post_raising(exc: Exception) -> Any:
+    """Build a ``client.post`` side effect that raises ``exc`` on the cluster add only."""
+
+    def post(path: str, **kwargs: Any) -> tuple[int, dict[str, Any]]:
+        if path == "/api/admin/datasources/clusters":
+            raise exc
+        return (201, {})
+
+    return post
+
+
+class TestMainClusterStep:
+    """Tests for Step 5 (add ONTAP cluster) within ``main()`` (#1167)."""
+
+    @patch("aiqum_initial_setup.load_config")
+    @patch("aiqum_initial_setup.AIQUMClient")
+    def test_cluster_add_uses_long_timeout(
+        self,
+        mock_client_cls: MagicMock,
+        mock_load_config: MagicMock,
+    ) -> None:
+        """Step 5 posts with CLUSTER_ADD_TIMEOUT, not the client's default."""
+        mock_load_config.return_value = _make_config("")
+        client = _make_mock_client()
+        mock_client_cls.return_value = client
+
+        aiqum_setup.main()
+
+        cluster_calls = [
+            c for c in client.post.call_args_list if c.args[0] == "/api/admin/datasources/clusters"
+        ]
+        assert len(cluster_calls) == 1
+        assert cluster_calls[0].kwargs["timeout"] == aiqum_setup.CLUSTER_ADD_TIMEOUT
+        assert aiqum_setup.CLUSTER_ADD_TIMEOUT > 86  # the slowest add observed
+
+    @pytest.mark.parametrize(
+        "exc",
+        [TimeoutError("The read operation timed out"), URLError("connection refused")],
+    )
+    @patch("aiqum_initial_setup.load_config")
+    @patch("aiqum_initial_setup.AIQUMClient")
+    def test_cluster_add_transport_error_is_non_fatal(
+        self,
+        mock_client_cls: MagicMock,
+        mock_load_config: MagicMock,
+        exc: Exception,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A timeout or connection error on Step 5 is reported and Steps 6+ still run."""
+        mock_load_config.return_value = _make_config("")
+        client = _make_mock_client()
+        client.post.side_effect = _cluster_post_raising(exc)
+        mock_client_cls.return_value = client
+
+        result = aiqum_setup.main()
+
+        out = capsys.readouterr().out
+        assert result == 0
+        assert "Cluster: no response" in out
+        assert "(non-fatal)" in out
+        assert "Setup complete: OK" in out
 
 
 # ---------------------------------------------------------------------------

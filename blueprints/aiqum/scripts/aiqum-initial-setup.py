@@ -35,6 +35,9 @@ from urllib.request import Request, urlopen
 
 HAL_JSON = "application/vnd.netapp.v1.hal+json"
 DEFAULT_PASSWORD = "admin"  # nosec B105 - initial FEW password published in NetApp docs
+# Adding a cluster returns only after AIQUM has set up its agent link to the
+# cluster: 12 s when it works, 86 s when the cluster cannot reach AIQUM (#1167).
+CLUSTER_ADD_TIMEOUT = 180
 
 DEFAULT_ALERT_SEVERITIES = ["critical", "error", "warning"]
 
@@ -178,6 +181,7 @@ class AIQUMClient:
         body: Any = None,
         params: dict[str, Any] | None = None,
         content_type: str = "application/json",
+        timeout: int | None = None,
     ) -> tuple[int, dict[str, Any]]:
         """Dispatch a single HTTP request and parse the response.
 
@@ -187,6 +191,8 @@ class AIQUMClient:
             body: Optional body object, serialized to JSON.
             params: Optional query-string parameters.
             content_type: ``Content-Type`` header for the request body.
+            timeout: Timeout in seconds for this request; defaults to the
+                client's per-request timeout.
 
         Returns:
             A tuple ``(status_code, parsed_body)``. ``parsed_body`` is a dict
@@ -210,7 +216,7 @@ class AIQUMClient:
 
         try:
             with urlopen(  # nosec B310 - AIQUM URL constructed from package variables
-                req, context=self._ssl_ctx, timeout=self._timeout
+                req, context=self._ssl_ctx, timeout=timeout or self._timeout
             ) as resp:
                 raw = resp.read()
                 return resp.status, self._parse_body(raw)
@@ -240,9 +246,10 @@ class AIQUMClient:
         path: str,
         body: Any,
         content_type: str = "application/json",
+        timeout: int | None = None,
     ) -> tuple[int, dict[str, Any]]:
         """Issue a POST request with a JSON body."""
-        return self._request("POST", path, body=body, content_type=content_type)
+        return self._request("POST", path, body=body, content_type=content_type, timeout=timeout)
 
     def put(
         self,
@@ -368,12 +375,12 @@ def send_test_email(config: dict[str, Any], recipient: str) -> bool:
             srv.login(config["smtp_user"], config["smtp_password"])
             srv.send_message(msg)
         return True
-    except Exception as exc:  # noqa: BLE001 - report any SMTP failure as non-fatal
+    except Exception as exc:
         print(f"    SMTP error: {exc}")
         return False
 
 
-def main() -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915 - wizard is inherently linear
+def main() -> int:
     """Run the First Experience Wizard against a freshly deployed AIQUM VM.
 
     Returns:
@@ -466,31 +473,38 @@ def main() -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915 - wizard is inherent
 
     # Step 5: Add ONTAP cluster
     print(f"\nStep 5: Adding ONTAP cluster ({config['ontap_cluster_ip']})...")
-    code, body = client.post(
-        "/api/admin/datasources/clusters",
-        body={
-            "address": config["ontap_cluster_ip"],
-            "username": config["ontap_admin_user"],
-            "password": config["ontap_admin_password"],
-            "port": 443,
-            "protocol": "https",
-        },
-    )
-    if code in (200, 201):
-        print("  Cluster: OK")
-    elif code == 409:
-        print("  Cluster: Already exists (OK)")
+    try:
+        code, body = client.post(
+            "/api/admin/datasources/clusters",
+            body={
+                "address": config["ontap_cluster_ip"],
+                "username": config["ontap_admin_user"],
+                "password": config["ontap_admin_password"],
+                "port": 443,
+                "protocol": "https",
+            },
+            timeout=CLUSTER_ADD_TIMEOUT,
+        )
+    except OSError as exc:
+        # TimeoutError and URLError are both OSError. AIQUM may still finish
+        # the add on its side, so report it and carry on like any other failure.
+        print(f"  Cluster: no response ({exc}) (non-fatal)")
     else:
-        print(f"  Cluster: {code} (non-fatal)")
-        # Best-effort detail extraction; mirrors the old behavior of the .text fallback
-        message = ""
-        if isinstance(body, dict):
-            error = body.get("error")
-            if isinstance(error, dict):
-                message = str(error.get("message", ""))
-            if not message:
-                message = str(body.get("_raw", ""))[:200]
-        print(f"    {message}")
+        if code in (200, 201):
+            print("  Cluster: OK")
+        elif code == 409:
+            print("  Cluster: Already exists (OK)")
+        else:
+            print(f"  Cluster: {code} (non-fatal)")
+            # Best-effort detail extraction; mirrors the old behavior of the .text fallback
+            message = ""
+            if isinstance(body, dict):
+                error = body.get("error")
+                if isinstance(error, dict):
+                    message = str(error.get("message", ""))
+                if not message:
+                    message = str(body.get("_raw", ""))[:200]
+            print(f"    {message}")
 
     # Step 6: Mark setup complete
     print("\nStep 6: Marking initial setup complete...")
