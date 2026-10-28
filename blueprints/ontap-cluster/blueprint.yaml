@@ -51,6 +51,12 @@ inputs:
     default: vmbr0
   - name: mgmt_vlan
     default: 10
+  # Bridge for the cluster interconnect ports (e0a/e0b); empty uses `bridge`.
+  # Set it when management/data and the interconnect share a bridge with no
+  # VLAN between them, e.g. an SDN vnet, or ONTAP puts e0c/e0d in the Cluster
+  # IPspace (#1158).
+  - name: cluster_bridge
+    default: ""
 
   # --- MAC Addresses (optional — set for DHCP reservations) ---
   - name: node01_mgmt_mac
