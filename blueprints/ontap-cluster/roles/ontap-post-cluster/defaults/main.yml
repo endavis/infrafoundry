@@ -77,6 +77,15 @@ ontap_lifs:
     address: "192.168.1.231"
     netmask: "255.255.255.0"
 
+# SVM routes, created after the data LIFs and before DNS so an off-subnet
+# DNS server is reachable. Each: {vserver, destination, gateway}.
+ontap_svm_routes: []
+# Example:
+# ontap_svm_routes:
+#   - vserver: svm_data
+#     destination: "0.0.0.0/0"
+#     gateway: "192.168.1.1"
+
 # DNS configuration for the SVM
 ontap_dns:
   - vserver: svm_data
