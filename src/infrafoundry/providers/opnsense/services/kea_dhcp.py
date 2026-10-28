@@ -13,11 +13,10 @@ reuse them without provider coupling.
 DHCPv4 parallels (``_extract_subnet4_fields``, ``_build_desired_subnet4_fields``,
 ``_extract_reservation4_fields``, ``_build_desired_reservation4_fields``,
 ``_drop_non_round_trip_subnet4_fields``) follow the same pattern but
-target the DHCPv4 wire schema (#777, #778). DHCPv4's wire format uses
-flat ``option_data_*`` fields (not nested under ``option_data`` like
-DHCPv6); the helpers below normalize the live shape so change-detection
-matches what ``KeaClient.add_dhcp4_subnet`` / ``update_dhcp4_subnet``
-accept.
+target the DHCPv4 wire schema (#777, #778). On OPNsense 26.1 the DHCPv4
+DHCP options live in a nested ``option_data`` dict, as in DHCPv6 (#1165);
+the helpers below normalize the live shape so change-detection matches what
+``KeaClient.add_dhcp4_subnet`` / ``update_dhcp4_subnet`` accept.
 """
 
 import logging
@@ -289,12 +288,12 @@ def _log_field_diff(
 # DHCPv4 change-detection helpers (#777, #778). Parallel structure to the
 # DHCPv6 helpers above; differences captured inline:
 #
-# - DHCPv4 uses FLAT ``option_data_*`` keys (not nested under ``option_data``
-#   like DHCPv6). The ``export_to_yaml`` read-side at ``services/kea_dhcp.py``
-#   already reads ``option_data_dns_servers`` / ``option_data_routers`` /
-#   ``option_data_domain_name`` / ``option_data_ntp_servers`` /
-#   ``option_data_domain_search`` / ``option_data_autocollect`` directly,
-#   confirming the wire shape.
+# - DHCPv4 options are nested under ``option_data`` on 26.1 (``routers``,
+#   ``domain_name_servers``, ``ntp_servers``, ``domain_search``,
+#   ``domain_name``); search rows flatten them to dotted keys such as
+#   ``option_data.routers``. Only ``option_data_autocollect`` is a flat
+#   top-level field. An earlier reading of flat ``option_data_*`` keys was
+#   wrong: OPNsense ignored them on write (#1165).
 # - Subnet GET is wrapped under the ``"subnet4"`` envelope key (parallel to
 #   DHCPv6's ``"subnet6"``); reservation GET is wrapped under
 #   ``"reservation"`` (same as DHCPv6).
@@ -302,13 +301,30 @@ def _log_field_diff(
 # ---------------------------------------------------------------------------
 
 
+#: DHCPv4 ``option_data`` entries InfraFoundry manages (#1165).
+_SUBNET4_OPTION_DATA_FIELDS: Final[tuple[str, ...]] = (
+    "domain_name_servers",
+    "routers",
+    "ntp_servers",
+    "domain_search",
+    "domain_name",
+)
+
+
+def _sorted_csv(value: str) -> str:
+    """Sort a comma-joined value the way ``_select_option_dict_value`` sorts keys."""
+    if "," not in value:
+        return _normalize_field_value(value)
+    return ",".join(sorted(part.strip() for part in value.split(",") if part.strip()))
+
+
 def _extract_subnet4_fields(api_response: dict[str, Any]) -> dict[str, str]:
     """Extract and normalize subnet fields from a DHCPv4 GET response.
 
     The OPNsense API returns DHCPv4 GET responses wrapped under
-    ``{"subnet4": {...}}`` with flat ``option_data_*`` keys (not nested
-    under ``option_data`` like DHCPv6). Select fields like ``interface``
-    and ``option_data_*`` may be returned as option-dicts (e.g.,
+    ``{"subnet4": {...}}``, with the DHCP options nested under
+    ``option_data`` (#1165). Select fields like ``interface`` and the
+    ``option_data`` entries may be returned as option-dicts (e.g.,
     ``{"": {"value": "", "selected": 1}}`` for "no value selected"); this
     helper normalizes either shape so they can be compared with the flat
     strings we send in update requests.
@@ -323,7 +339,7 @@ def _extract_subnet4_fields(api_response: dict[str, Any]) -> dict[str, str]:
     result: dict[str, str] = {}
 
     # Simple string fields — normalize whitespace and sort multi-line values
-    for field in ("subnet", "pools", "valid_lifetime", "description", "domain_name"):
+    for field in ("subnet", "pools", "valid_lifetime", "description"):
         result[field] = _normalize_field_value(str(data.get(field, "") or ""))
 
     # Interface may be a dict with selected keys or a plain string
@@ -334,16 +350,13 @@ def _extract_subnet4_fields(api_response: dict[str, Any]) -> dict[str, str]:
     for field in ("match_client_id", "option_data_autocollect"):
         result[field] = _normalize_field_value(str(data.get(field, "") or ""))
 
-    # Flat option_data_* fields — comma-joined lists or scalars. May be
-    # returned as option-dicts (DNS servers selected from interface dropdowns)
-    # or plain strings depending on field type.
-    for field in (
-        "option_data_dns_servers",
-        "option_data_routers",
-        "option_data_ntp_servers",
-        "option_data_domain_search",
-    ):
-        result[field] = _select_option_dict_value(data.get(field, ""))
+    # Nested option_data entries — option-dicts (the list options) or plain
+    # strings (domain_name). Keyed "option_data.<name>" in the result.
+    option_data = data.get("option_data") or {}
+    if not isinstance(option_data, dict):
+        option_data = {}
+    for field in _SUBNET4_OPTION_DATA_FIELDS:
+        result[f"option_data.{field}"] = _select_option_dict_value(option_data.get(field, ""))
 
     return result
 
@@ -361,20 +374,16 @@ def _build_desired_subnet4_fields(subnet_data: dict[str, Any]) -> dict[str, str]
         returned by :func:`_extract_subnet4_fields`.
     """
     result: dict[str, str] = {}
-    for field in ("subnet", "pools", "valid_lifetime", "description", "domain_name"):
+    for field in ("subnet", "pools", "valid_lifetime", "description"):
         result[field] = _normalize_field_value(str(subnet_data.get(field, "") or ""))
     result["interface"] = _normalize_field_value(str(subnet_data.get("interface", "") or ""))
 
     for field in ("match_client_id", "option_data_autocollect"):
         result[field] = _normalize_field_value(str(subnet_data.get(field, "") or ""))
 
-    for field in (
-        "option_data_dns_servers",
-        "option_data_routers",
-        "option_data_ntp_servers",
-        "option_data_domain_search",
-    ):
-        result[field] = _normalize_field_value(str(subnet_data.get(field, "") or ""))
+    option_data = subnet_data.get("option_data") or {}
+    for field in _SUBNET4_OPTION_DATA_FIELDS:
+        result[f"option_data.{field}"] = _sorted_csv(str(option_data.get(field, "") or ""))
 
     return result
 
@@ -455,6 +464,13 @@ def _drop_non_round_trip_subnet4_fields(
         if not current_fields.get(field):
             current_fields.pop(field, None)
             desired_fields.pop(field, None)
+    # An option the YAML does not set is left to OPNsense (auto_collect, or the
+    # GUI), so a live value for it is not drift (#1165).
+    for field in _SUBNET4_OPTION_DATA_FIELDS:
+        key = f"option_data.{field}"
+        if not desired_fields.get(key):
+            current_fields.pop(key, None)
+            desired_fields.pop(key, None)
 
 
 class KeaDHCPService(BaseService):
@@ -801,13 +817,14 @@ class KeaDHCPService(BaseService):
             }
             if subnet.get("option_data_autocollect") == "1":
                 entry_config["auto_collect"] = True
-            if dns_servers := subnet.get("option_data_dns_servers"):
+            # 26.1 search rows carry the options as dotted keys (#1165).
+            if dns_servers := subnet.get("option_data.domain_name_servers"):
                 entry_config["dns_servers"] = [s.strip() for s in dns_servers.split(",")]
-            if routers := subnet.get("option_data_routers"):
+            if routers := subnet.get("option_data.routers"):
                 entry_config["routers"] = [r.strip() for r in routers.split(",")]
-            if domain_name := subnet.get("option_data_domain_name"):
+            if domain_name := subnet.get("option_data.domain_name"):
                 entry_config["domain_name"] = domain_name
-            if ntp_servers := subnet.get("option_data_ntp_servers"):
+            if ntp_servers := subnet.get("option_data.ntp_servers"):
                 entry_config["ntp_servers"] = [n.strip() for n in ntp_servers.split(",")]
             dhcp4_subnet_entries.append(
                 {

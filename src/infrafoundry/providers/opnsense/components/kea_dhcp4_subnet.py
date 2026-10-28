@@ -10,12 +10,11 @@ Mirrors :mod:`.kea_dhcp6_subnet` line-for-line; differences are flagged inline:
 
 - Identity is the natural key ``subnet`` (the IPv4 CIDR string, e.g.,
   ``10.0.10.0/24``).
-- Wire schema uses **flat** ``option_data_*`` fields (not nested under
-  ``option_data`` like DHCPv6), e.g., ``option_data_dns_servers`` /
-  ``option_data_routers`` / ``option_data_domain_name`` /
-  ``option_data_ntp_servers`` / ``option_data_domain_search`` /
-  ``option_data_autocollect``. Confirmed by reading
-  ``services/kea_dhcp.py:export_to_yaml`` which already reads these fields.
+- DHCP options are nested under ``option_data`` on the wire (``routers``,
+  ``domain_name_servers``, ``ntp_servers``, ``domain_search``,
+  ``domain_name``), as in DHCPv6; only ``option_data_autocollect`` is flat.
+  Flat ``option_data_*`` option keys are ignored by OPNsense 26.1 (#1165).
+  An option the YAML does not set is left to OPNsense and not diffed.
 - The ``add`` API response does not include the new UUID; the manager
   re-runs ``search_dhcpv4_subnets`` after each create to recover it.
 
@@ -349,13 +348,23 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
         return _Diff(adds=adds, updates=updates, deletes=deletes)
 
 
+# (YAML key, option_data wire key) for the comma-joined list options.
+_OPTION_DATA_LIST_FIELDS: tuple[tuple[str, str], ...] = (
+    ("dns_servers", "domain_name_servers"),
+    ("routers", "routers"),
+    ("ntp_servers", "ntp_servers"),
+    ("domain_search", "domain_search"),
+)
+
+
 def _build_subnet_payload(resource: ResourceConfig) -> dict[str, Any]:
     """Build the wire-format payload sent to OPNsense for a DHCPv4 subnet.
 
     Mirrors the legacy terraform template (``kea_subnet.tf.j2``) field
-    coverage so wire-level behavior is unchanged. DHCPv4 uses **flat**
-    ``option_data_*`` fields on the wire, distinct from DHCPv6's nested
-    ``option_data`` dict.
+    coverage. DHCP options (routers, DNS servers, NTP servers, domain
+    search, domain name) go in a nested ``option_data`` dict, which is
+    where the 26.1 subnet model keeps them; flat ``option_data_*`` keys
+    are silently ignored (#1165).
 
     Args:
         resource: DHCPv4 subnet resource (validated upstream).
@@ -388,22 +397,20 @@ def _build_subnet_payload(resource: ResourceConfig) -> dict[str, Any]:
         subnet_data["valid_lifetime"] = str(config["valid_lifetime"])
     if "description" in config:
         subnet_data["description"] = config["description"]
-    if "domain_name" in config:
-        subnet_data["domain_name"] = config["domain_name"]
 
     if "match_client_id" in config:
         subnet_data["match_client_id"] = "1" if config["match_client_id"] else "0"
     if "auto_collect" in config:
         subnet_data["option_data_autocollect"] = "1" if config["auto_collect"] else "0"
 
-    # Flat option_data_* fields — comma-joined strings (DHCPv4 wire shape).
-    if "dns_servers" in config:
-        subnet_data["option_data_dns_servers"] = ",".join(config["dns_servers"])
-    if "routers" in config:
-        subnet_data["option_data_routers"] = ",".join(config["routers"])
-    if "ntp_servers" in config:
-        subnet_data["option_data_ntp_servers"] = ",".join(config["ntp_servers"])
-    if "domain_search" in config:
-        subnet_data["option_data_domain_search"] = ",".join(config["domain_search"])
+    # Nested option_data — comma-joined strings for the list-valued options.
+    option_data: dict[str, str] = {}
+    for yaml_key, wire_key in _OPTION_DATA_LIST_FIELDS:
+        if yaml_key in config:
+            option_data[wire_key] = ",".join(config[yaml_key])
+    if "domain_name" in config:
+        option_data["domain_name"] = str(config["domain_name"])
+    if option_data:
+        subnet_data["option_data"] = option_data
 
     return subnet_data

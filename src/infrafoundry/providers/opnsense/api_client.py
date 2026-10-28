@@ -248,18 +248,15 @@ class KeaClient:
         """Add a new DHCPv4 subnet.
 
         Args:
-            subnet_data: Subnet configuration dictionary with flat
-                ``option_data_*`` fields (DHCPv4 wire schema; differs from
-                DHCPv6 which nests under ``option_data``):
+            subnet_data: Subnet configuration dictionary (DHCPv4 wire schema,
+                OPNsense 26.1; #1165):
                 - subnet: IPv4 subnet (e.g., "192.168.1.0/24")
                 - interface: Interface name (e.g., "opt1")
                 - pools: Newline-joined pool ranges
                 - description: Operator description
-                - option_data_dns_servers: Comma-separated DNS server IPv4 addresses
-                - option_data_routers: Comma-separated default-gateway addresses
-                - option_data_domain_name: Domain name (string)
-                - option_data_ntp_servers: Comma-separated NTP server addresses
-                - option_data_domain_search: Comma-separated DNS search domains
+                - option_data: Nested dict of DHCP options:
+                  routers / domain_name_servers / ntp_servers /
+                  domain_search (comma-separated) and domain_name (string)
                 - option_data_autocollect: Auto-collect options ("0" / "1")
 
         Returns:
