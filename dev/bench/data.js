@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793184992841,
+  "lastUpdate": 1793203437338,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11532,6 +11532,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000228078878812508",
             "extra": "mean: 76.74664493527101 usec\nrounds: 13989"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ade6ffbabea88e899df1c6b16656b26f3c496e70",
+          "message": "fix: send kea dhcp4 subnet options nested under option_data (merges PR #1166, addresses #1165)\n\nOPNsense 26.1 keeps DHCPv4 subnet options (routers, domain_name_servers,\nntp_servers, domain_search, domain_name) in a nested option_data dict. The\nprovider sent and compared flat option_data_* keys, which OPNsense ignored,\nso YAML options never reached the box and a subnet created through the API\nhanded out no gateway. Export read the same wrong keys and dropped them.\n\nThe payload now nests the options, the diff reads the nested live values,\nand export reads the dotted search-row keys. An option the YAML does not\nset is left to OPNsense (auto_collect or the GUI) and is not diffed.\n\nAddresses #1165\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-28T16:02:56Z",
+          "tree_id": "1f4c3a06d5ece9d78b68cdbfaa5571046d6b6def",
+          "url": "https://github.com/endavis/infrafoundry/commit/ade6ffbabea88e899df1c6b16656b26f3c496e70"
+        },
+        "date": 1793203436083,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15784.204561703176,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015606238110367004",
+            "extra": "mean: 63.35447542451871 usec\nrounds: 16785"
           }
         ]
       }
