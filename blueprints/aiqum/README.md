@@ -116,7 +116,8 @@ infra apply --package aiqum
                  +-- Step 2: Enable AutoSupport
                  +-- Step 3: Change admin password
                  +-- Step 4: Enable API Gateway
-                 +-- Step 5: Add ONTAP cluster
+                 +-- Step 5: Add ONTAP cluster (waits up to 180 s; a failure or
+                 |           timeout is reported and setup continues)
                  +-- Step 6: Mark setup complete
                  +-- Step 7: Create default alert policy (if aiqum_alert_email set)
                  +-- Step 8: Send test alert email (if alert created)
