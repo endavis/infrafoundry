@@ -25,6 +25,7 @@ from unittest.mock import MagicMock, patch
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.components.kea_dhcp4_subnet import (
     KeaDHCPv4SubnetManager,
+    _build_subnet_payload,
 )
 
 # ---------------------------------------------------------------------------
@@ -135,7 +136,7 @@ class TestPlan:
                         "subnet": "10.0.10.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
-                        "option_data_dns_servers": "192.168.1.1",
+                        "option_data": {"domain_name_servers": "192.168.1.1"},
                     }
                 }
             },
@@ -151,8 +152,8 @@ class TestPlan:
         assert len(diff.updates) == 1
         uuid, payload = diff.updates[0]
         assert uuid == "u1"
-        # DHCPv4 wire shape: flat option_data_dns_servers, not nested.
-        assert payload["option_data_dns_servers"] == "192.168.1.10,192.168.1.11"
+        # 26.1 wire shape: DHCP options nested under option_data (#1165).
+        assert payload["option_data"]["domain_name_servers"] == "192.168.1.10,192.168.1.11"
 
     def test_plan_update_when_ntp_servers_differ_cutover_regression(self, tmp_path: Path) -> None:
         """Cutover-regression case: NTP server drift detected as an update."""
@@ -165,7 +166,7 @@ class TestPlan:
                         "subnet": "10.0.10.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
-                        "option_data_ntp_servers": "192.168.1.1",
+                        "option_data": {"ntp_servers": "192.168.1.1"},
                     }
                 }
             },
@@ -179,7 +180,7 @@ class TestPlan:
         assert diff.adds == []
         assert len(diff.updates) == 1
         _, payload = diff.updates[0]
-        assert payload["option_data_ntp_servers"] == "10.0.0.123"
+        assert payload["option_data"]["ntp_servers"] == "10.0.0.123"
 
     def test_plan_no_change_when_fields_match(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
@@ -460,3 +461,156 @@ class TestGetResourceIds:
                 ],
             )
         assert result == {"vlan10": "u1"}
+
+
+def _selected(*values: str) -> dict[str, dict[str, Any]]:
+    """Live option-dict shape for a multi-select option (as getSubnet returns it)."""
+    return {v: {"value": v, "selected": 1} for v in values}
+
+
+class TestOptionDataWireShape:
+    """DHCP options go nested under option_data on 26.1 (#1165)."""
+
+    def test_payload_nests_every_option_and_sends_no_flat_keys(self) -> None:
+        payload = _build_subnet_payload(
+            _subnet(
+                "nettest-lan",
+                routers=["192.168.99.1"],
+                dns_servers=["192.168.10.1", "192.168.10.2"],
+                ntp_servers=["192.168.99.1"],
+                domain_search=["endavis.net"],
+                domain_name="endavis.net",
+            )
+        )
+
+        assert payload["option_data"] == {
+            "routers": "192.168.99.1",
+            "domain_name_servers": "192.168.10.1,192.168.10.2",
+            "ntp_servers": "192.168.99.1",
+            "domain_search": "endavis.net",
+            "domain_name": "endavis.net",
+        }
+        assert not [
+            k for k in payload if k.startswith("option_data_") and k != "option_data_autocollect"
+        ]
+        assert "domain_name" not in payload
+
+    def test_payload_has_no_option_data_when_none_set(self) -> None:
+        assert "option_data" not in _build_subnet_payload(_subnet("plain"))
+
+    def test_missing_live_router_plans_an_update(self, tmp_path: Path) -> None:
+        # The opnsense-test case: created through the API, routers left empty.
+        manager = KeaDHCPv4SubnetManager(tmp_path)
+        service = _make_service_mock(
+            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            get_responses={
+                "u1": {
+                    "subnet4": {
+                        "subnet": "10.0.10.0/24",
+                        "description": "vlan10 desc",
+                        "option_data": {"routers": {"": {"value": "", "selected": 1}}},
+                    }
+                }
+            },
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan("test-env", [_subnet("vlan10", routers=["10.0.10.1"])])
+
+        assert len(diff.updates) == 1
+        assert diff.updates[0][1]["option_data"] == {"routers": "10.0.10.1"}
+
+    def test_matching_live_options_need_no_update_in_any_order(self, tmp_path: Path) -> None:
+        manager = KeaDHCPv4SubnetManager(tmp_path)
+        service = _make_service_mock(
+            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            get_responses={
+                "u1": {
+                    "subnet4": {
+                        "subnet": "10.0.10.0/24",
+                        "interface": "opt1",
+                        "description": "vlan10 desc",
+                        "option_data": {
+                            "routers": _selected("10.0.10.1"),
+                            "domain_name_servers": _selected("10.0.10.2", "10.0.10.1"),
+                            "domain_name": "lab.local",
+                        },
+                    }
+                }
+            },
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan(
+                "test-env",
+                [
+                    _subnet(
+                        "vlan10",
+                        routers=["10.0.10.1"],
+                        dns_servers=["10.0.10.2", "10.0.10.1"],
+                        domain_name="lab.local",
+                    )
+                ],
+            )
+
+        assert diff.updates == []
+
+    def test_option_not_set_in_yaml_is_not_drift(self, tmp_path: Path) -> None:
+        # Prod subnets: options filled in the GUI, YAML relies on auto_collect.
+        manager = KeaDHCPv4SubnetManager(tmp_path)
+        service = _make_service_mock(
+            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            get_responses={
+                "u1": {
+                    "subnet4": {
+                        "subnet": "10.0.10.0/24",
+                        "interface": "opt1",
+                        "description": "vlan10 desc",
+                        "option_data": {
+                            "routers": _selected("10.0.10.1"),
+                            "domain_name_servers": _selected("10.0.10.1"),
+                        },
+                    }
+                }
+            },
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan("test-env", [_subnet("vlan10")])
+
+        assert diff.updates == []
+
+
+class TestExportReadsDottedOptionKeys:
+    """export_to_yaml reads the dotted option keys 26.1 search rows carry (#1165)."""
+
+    def test_dhcpv4_options_survive_export(self) -> None:
+        import yaml
+
+        from infrafoundry.providers.opnsense.services.kea_dhcp import KeaDHCPService
+
+        service = KeaDHCPService(MagicMock())
+        # Shape of a live searchSubnet row on opnsense-a (192.168.20.0/24).
+        row = {
+            "subnet": "192.168.20.0/24",
+            "description": "opt2 network",
+            "pools": "192.168.20.100-192.168.20.199",
+            "option_data_autocollect": "1",
+            "option_data.routers": "192.168.20.1",
+            "option_data.domain_name_servers": "192.168.20.1,192.168.10.1",
+            "option_data.domain_name": "endavis.net",
+            "option_data.ntp_servers": "192.168.20.1",
+        }
+        with (
+            patch.object(service, "search_dhcpv4_subnets", return_value=[row]),
+            patch.object(service, "search_dhcpv4_reservations", return_value=[]),
+            patch.object(service, "search_dhcpv6_subnets", return_value=[]),
+            patch.object(service, "search_dhcpv6_reservations", return_value=[]),
+        ):
+            doc = yaml.safe_load(service.export_to_yaml())
+
+        [subnet] = doc["opnsense"]["kea"]["dhcp4"]["subnets"]
+        assert subnet["config"]["routers"] == ["192.168.20.1"]
+        assert subnet["config"]["dns_servers"] == ["192.168.20.1", "192.168.10.1"]
+        assert subnet["config"]["domain_name"] == "endavis.net"
+        assert subnet["config"]["ntp_servers"] == ["192.168.20.1"]
