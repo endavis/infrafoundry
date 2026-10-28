@@ -174,7 +174,8 @@ class TestConsoleRestoreNodeName:
     def test_playbook_passes_management_ips_not_vm_names(self) -> None:
         plays = yaml.safe_load((BLUEPRINT_DIR / "ontap-lab-console-restore.yml").read_text())
 
-        for play, node in zip(plays, ("node01", "node02"), strict=True):
+        # plays[0] is the localhost password assert (#1157).
+        for play, node in zip(plays[1:], ("node01", "node02"), strict=True):
             role_vars = play["roles"][0]["vars"]
             assert "ontap_node_name" not in role_vars
             assert role_vars["ontap_node_mgmt_ip"] == (

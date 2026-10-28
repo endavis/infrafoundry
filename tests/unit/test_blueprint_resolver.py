@@ -455,3 +455,67 @@ class TestBlueprintResolverResolveFile:
 
         with pytest.raises(InvalidConfigurationError, match="not found"):
             resolver.resolve_file("missing.yaml", package_dir, blueprint_dir)
+
+
+@pytest.mark.unit
+class TestBlueprintResolverRequiredInputs:
+    """Tests for the ``required: true`` input flag."""
+
+    def _resolve(self, temp_dir: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+        envs_dir = temp_dir / "envs"
+        envs_dir.mkdir()
+        resolver = _make_resolver(envs_dir)
+        _create_blueprint(envs_dir, "bp", manifest)
+        return resolver.resolve("bp")
+
+    def test_required_input_is_listed(self, temp_dir: Path) -> None:
+        """``required: true`` inputs are exposed in ``required_inputs``."""
+        result = self._resolve(
+            temp_dir,
+            {
+                "name": "bp",
+                "inputs": [
+                    {"name": "secret", "required": True},
+                    {"name": "opt", "required": False},
+                    {"name": "cores", "default": 2},
+                ],
+            },
+        )
+        assert result["required_inputs"] == frozenset({"secret"})
+        assert result["input_names"] == frozenset({"secret", "opt", "cores"})
+
+    def test_absent_required_keeps_old_behaviour(self, temp_dir: Path) -> None:
+        """Without ``required`` nothing is enforced."""
+        result = self._resolve(temp_dir, {"name": "bp", "inputs": [{"name": "a"}]})
+        assert result["required_inputs"] == frozenset()
+
+    def test_non_bool_required_raises(self, temp_dir: Path) -> None:
+        """A non-boolean ``required`` is a config error."""
+        with pytest.raises(InvalidConfigurationError, match="non-boolean 'required'"):
+            self._resolve(temp_dir, {"name": "bp", "inputs": [{"name": "a", "required": "yes"}]})
+
+    def test_required_with_default_raises(self, temp_dir: Path) -> None:
+        """``required: true`` together with ``default`` is a config error."""
+        with pytest.raises(InvalidConfigurationError, match="cannot have a default"):
+            self._resolve(
+                temp_dir,
+                {"name": "bp", "inputs": [{"name": "a", "required": True, "default": "x"}]},
+            )
+
+    def test_per_provider_required_input(self, temp_dir: Path) -> None:
+        """A provider block carries its own ``required_inputs``."""
+        result = self._resolve(
+            temp_dir,
+            {
+                "name": "bp",
+                "inputs": [{"name": "shared", "default": 1}],
+                "providers": {
+                    "proxmox": {
+                        "inputs": [{"name": "token", "required": True}],
+                        "resources": ["vm.yaml"],
+                    }
+                },
+            },
+        )
+        assert result["required_inputs"] == frozenset()
+        assert result["providers"]["proxmox"]["required_inputs"] == frozenset({"token"})

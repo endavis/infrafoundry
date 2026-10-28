@@ -93,9 +93,16 @@ expect {
 expect "Retype the password"
 send "{{ ontap_password }}\r"
 
-# Cluster name
-expect "Enter the cluster name*"
-send "{{ ontap_cluster_name }}\r"
+# A mismatch (e.g. an empty password) re-prompts forever; fail fast instead.
+expect {
+  "Passwords do not match*" {
+    puts "\nERROR: ONTAP rejected the admin password (Passwords do not match)"
+    exit 1
+  }
+  "Enter the cluster name*" {
+    send "{{ ontap_cluster_name }}\r"
+  }
+}
 
 # Cluster base license
 expect "*license key*"

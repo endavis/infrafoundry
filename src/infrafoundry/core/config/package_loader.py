@@ -333,6 +333,9 @@ class PackageLoader:
                     secrets_path.name,
                 )
 
+        if blueprint is not None:
+            self._check_required_inputs(manifest, blueprint, provider)
+
         # Use manifest provider with fallback to directory-inferred provider
         effective_provider = manifest.provider or provider
 
@@ -792,6 +795,41 @@ class PackageLoader:
                 )
             )
         return result
+
+    @staticmethod
+    def _check_required_inputs(
+        manifest: PackageManifest,
+        blueprint: dict[str, Any],
+        provider: str | None,
+    ) -> None:
+        """Fail when a ``required: true`` blueprint input has no usable value.
+
+        Runs after ``secrets.yaml`` is merged into ``manifest.variables``. A value
+        that is missing, ``None`` or an empty/whitespace-only string counts as
+        unset. Error messages name the input, never its value.
+
+        Args:
+            manifest: Package manifest with merged variables.
+            blueprint: Resolved blueprint manifest.
+            provider: Directory-inferred provider, used when the manifest has none.
+
+        Raises:
+            InvalidConfigurationError: If a required input is unset.
+        """
+        required: set[str] = set(blueprint.get("required_inputs") or ())
+        bp_providers = blueprint.get("providers") or {}
+        effective_provider = manifest.provider or provider
+        if effective_provider and effective_provider in bp_providers:
+            required |= set(bp_providers[effective_provider].get("required_inputs") or ())
+
+        for name in sorted(required):
+            value = manifest.variables.get(name)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                raise InvalidConfigurationError(
+                    f"Package '{manifest.name}' (blueprint '{manifest.blueprint}') is missing "
+                    f"required input '{name}'. Set it under 'variables:' in the package "
+                    f"manifest or, for secrets, under 'variables:' in its secrets.yaml."
+                )
 
     def _resolve_package_file(
         self,
