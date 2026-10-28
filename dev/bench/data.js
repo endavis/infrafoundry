@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793173192406,
+  "lastUpdate": 1793182953875,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11470,6 +11470,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008703558902772539",
             "extra": "mean: 122.8615360400934 usec\nrounds: 8546"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fd17ed78b4d6248084323f42034ba6d87ef6fdc9",
+          "message": "feat: default route for the data svm in the ontap-cluster blueprint (merges PR #1161, addresses #1160)\n\nWith data LIFs off the DNS server's subnet, the post-cluster role failed\ncreating DNS (192.168.10.1: Network is unreachable) and stopped. New\noptional input data_gateway adds a 0.0.0.0/0 route for the data SVM,\ncreated after the data LIFs and before DNS through a new ontap_svm_routes\nrole list. Empty adds no route, so existing packages are unchanged.\n\nAddresses #1160\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-28T10:21:45Z",
+          "tree_id": "0d1172c6cd9bca66e1dde52707a4cb302982b7cd",
+          "url": "https://github.com/endavis/infrafoundry/commit/fd17ed78b4d6248084323f42034ba6d87ef6fdc9"
+        },
+        "date": 1793182952464,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10238.124974392731,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006228319240787978",
+            "extra": "mean: 97.67413491251259 usec\nrounds: 10807"
           }
         ]
       }
