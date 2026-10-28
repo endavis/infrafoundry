@@ -130,7 +130,7 @@ versions, raw `pytest` instead of `doit`, and mutable action tags this project's
 | :--- | :--- |
 | `setup` | Builds the test matrix from `.github/python-versions.json` |
 | `test` | `pytest`, called directly, on each Python version in the matrix, after installing Terraform, OpenTofu, age and sops. The newest Python also measures coverage and uploads it to Codecov. |
-| `lint` | `doit format_check`, `doit lint`, `doit lint_blueprints`, `doit type_check`, `doit deadcode`, `doit security`, `doit spell_check`, `doit audit` and `doit wheel_check`, on `ubuntu-latest`. Each runs even when one before it failed, so CI reports every failing check at once. A failure in any of them fails CI. |
+| `lint` | `doit env_check`, `doit format_check`, `doit lint`, `doit lint_blueprints`, `doit type_check`, `doit deadcode`, `doit security`, `doit spell_check`, `doit audit` and `doit wheel_check`, on `ubuntu-latest`. Each runs even when one before it failed, so CI reports every failing check at once. A failure in any of them fails CI. |
 | `docs` | `doit docs_build`, described below |
 | `ci-complete` | Fails if any other job failed; a skipped job passes. It gives the run one result to require ([ADR-9013](../decisions/9013-python-version-support-policy.md)). |
 
@@ -413,12 +413,14 @@ uv run pre-commit autoupdate
 | `conventional-pre-commit` | Enforce conventional commit format |
 | `check-commit-issue-ref` | Reject a commit message that cites a different issue than the branch name |
 
-**Post-merge / Post-checkout stage** (automatic dependency sync):
-
-| Hook | Purpose |
-|------|---------|
-| `uv-sync-on-pull` | Runs `uv sync --all-extras --dev` when `uv.lock` changes after `git pull` |
-| `uv-sync-on-checkout` | Runs `uv sync --all-extras --dev` when `uv.lock` changes after branch switch |
+**No post-merge / post-checkout stage.** Earlier versions ran `uv-sync-on-pull` and
+`uv-sync-on-checkout` here, auto-running `uv sync --all-extras --dev` whenever `uv.lock` changed
+after a `git pull` or branch switch. Removed in endavis/pyproject-template#1033: `pre-commit` reads `.pre-commit-config.yaml`
+from whatever is checked out, so a `post-merge`/`post-checkout` hook — ours or one an untrusted
+branch supplies in its own copy of the file — ran before anyone had reviewed that branch. `doit
+pre_commit_install` now uninstalls both hook types from repos that installed them before this
+change. `doit check` and `doit test` warn instead, without failing, when `uv.lock` has drifted from
+the installed environment — see `tools/doit/base.py::warn_if_env_drifted`.
 
 ### Continuous Integration Checklist
 
@@ -813,7 +815,7 @@ The `benchmark.yml` workflow runs on three triggers:
 
 Only pushes to `main` store results. The `store` job holds the workflow's only write permission (`contents: write`) and never runs for a pull request, so code from a PR never gets a write-capable token (endavis/pyproject-template#695).
 
-If `tests/benchmarks/` does not exist or contains no `test_*.py` files, the workflow skips all benchmark steps and finishes successfully. This allows downstream projects generated from this template to enable the workflow incrementally without CI failures before any benchmark tests are written.
+If `tests/benchmarks/` does not exist or contains no `test_*.py` files, the workflow skips all benchmark steps and finishes successfully. This allows downstream projects generated from pyproject-template to enable the workflow incrementally without CI failures before any benchmark tests are written.
 
 ### The `gh-benchmarks` Branch
 

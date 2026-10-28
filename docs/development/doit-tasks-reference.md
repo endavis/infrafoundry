@@ -52,7 +52,7 @@ Run pytest with parallel execution.
 doit test
 ```
 
-Runs `pytest -n auto -v` using all available CPU cores.
+Runs `pytest -n auto -v` using all available CPU cores. Depends on `env_check` first, which warns (without failing) if `uv.lock` has drifted (endavis/pyproject-template#1033).
 
 ### `coverage`
 
@@ -158,7 +158,17 @@ Run all quality checks in sequence.
 doit check
 ```
 
-Runs format check, lint, blueprint lint, type check, dead code (`deadcode`), security, audit, spelling, a wheel smoke test (`wheel_check`), a strict docs build (`docs_build`), and tests. Stops on first failure.
+Warns, without failing, if the environment has drifted from `uv.lock` (`env_check`), then runs format check, lint, blueprint lint, type check, dead code (`deadcode`), security, audit, spelling, a wheel smoke test (`wheel_check`), a strict docs build (`docs_build`), and tests. Stops on first failure.
+
+### `env_check`
+
+Warn, without failing, when the installed environment has drifted from `uv.lock`.
+
+```bash
+doit env_check
+```
+
+Runs `uv sync --all-extras --dev --check`. If it exits non-zero, prints `uv.lock changed — run: doit install_dev` and returns — it never fails the task and never runs `uv sync` itself. It replaces the `uv-sync-on-pull`/`uv-sync-on-checkout` pre-commit hooks, which auto-ran `uv sync` on `git pull`/`git checkout` before anyone had reviewed the branch (endavis/pyproject-template#1033). `check` and `test` both depend on it, so the reminder runs only when a developer runs `doit` on a branch they have already decided to trust.
 
 ### `wheel_check`
 
@@ -524,7 +534,9 @@ doit publish_setup
 ### `pre_commit_install`
 
 Install every hook type declared by `default_install_hook_types` in `.pre-commit-config.yaml`:
-`pre-commit`, `commit-msg`, `post-merge` and `post-checkout`.
+`pre-commit` and `commit-msg`. Also uninstalls `post-checkout` and `post-merge` if a previous run
+installed them (`pre-commit uninstall -t post-checkout -t post-merge`; a no-op if they were never
+installed).
 
 ```bash
 doit pre_commit_install
@@ -534,6 +546,12 @@ doit pre_commit_install
 commit's issue reference matches its branch. A clone that installed hooks *before* that type was
 declared does not have it, and neither check runs — silently, because a hook that was never
 installed cannot fail. Run this task again to pick it up, then confirm with `ls .git/hooks/`.
+
+**Why `post-checkout`/`post-merge` are uninstalled, not fixed (endavis/pyproject-template#1033):**
+`pre-commit` reads `.pre-commit-config.yaml` from whatever is checked out, so a hook of either type
+— ours, or one an untrusted branch supplies in its own copy of the file — runs before anyone has
+reviewed that branch. Only not installing the type closes that. `doit check` and `doit test` warn
+instead, via `env_check`, when `uv.lock` has drifted from the installed environment.
 
 ### `completions`
 

@@ -51,4 +51,16 @@ exclude = [
 
     # InfraFoundry ships its own license; never overwrite.
     "LICENSE",
+
+    # Opt-in AI token-efficiency hooks InfraFoundry does not use (#1169).
+    "tools/hooks/ai/cbm-*",
+    "tools/hooks/ai/context-mode-*",
+    "tests/test_hook_cbm_*.py",
+    "tests/test_hook_context_mode_*.py",
+
+    # Template-owned test (ADR-9017) that adopted ADR-9026 names (#1169).
+    "tests/template/test_check_template_updates.py",
+
+    # Template-skeleton README for newly generated projects (#1169).
+    "README.template.md",
 ]
