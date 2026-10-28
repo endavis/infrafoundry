@@ -258,11 +258,17 @@ def run_sync(project_root: Path) -> None:
 
     print()
 
-    # Detect and create settings
-    print("  Detecting project settings from pyproject.toml...")
-    settings = detect_project_settings(project_root)
-    settings_path = create_settings_file(project_root, settings)
-    print(f"  Created {settings_path.relative_to(project_root)}")
+    # Detect and create settings, first run only. An existing file holds the
+    # project's sync point under [template], which rewriting it would erase (#1008).
+    settings_path = project_root / ".config" / "pyproject_template" / "settings.toml"
+    settings: dict[str, str] = {}
+    if settings_path.exists():
+        print(f"  Kept existing {settings_path.relative_to(project_root)}")
+    else:
+        print("  Detecting project settings from pyproject.toml...")
+        settings = detect_project_settings(project_root)
+        settings_path = create_settings_file(project_root, settings)
+        print(f"  Created {settings_path.relative_to(project_root)}")
 
     if settings:
         print()

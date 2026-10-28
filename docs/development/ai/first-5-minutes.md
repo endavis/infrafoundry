@@ -14,7 +14,7 @@ tags:
 
 ## Purpose
 
-This page is a narrative walkthrough of the AI agent workflow this template ships with. It is aimed at a new adopter who has Claude Code installed, has opened the repository for the first time, and wants to see what a full issue-to-merge cycle looks like before diving into the reference material. It is intentionally not a reference — the command-by-command reference lives in [Slash Commands and Workflows](slash-commands.md). Read this page once, then use the reference when you need the details.
+This page is a narrative walkthrough of the AI agent workflow this project ships with. It is aimed at a new adopter who has Claude Code installed, has opened the repository for the first time, and wants to see what a full issue-to-merge cycle looks like before diving into the reference material. It is intentionally not a reference — the command-by-command reference lives in [Slash Commands and Workflows](slash-commands.md). Read this page once, then use the reference when you need the details.
 
 ## Prerequisites
 

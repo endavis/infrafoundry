@@ -97,7 +97,7 @@ SHIP_GATE_SENTENCE = (
 PYTHON_FENCE = re.compile(r"```python\s*$")
 
 # Decorators this skill must never tell an agent to actually write, only to avoid:
-# `warnings.deprecated` does not exist on every version this template supports, and
+# `warnings.deprecated` does not exist on every version this project supports, and
 # `typing_extensions.deprecated` would need a new runtime dependency (Ask First).
 FORBIDDEN_DECORATORS = ("@warnings.deprecated", "@typing_extensions.deprecated")
 
@@ -248,7 +248,7 @@ def test_the_policy_pointer_is_one_the_pointer_checks_can_see() -> None:
 def test_no_body_tells_the_agent_to_write_the_forbidden_decorators() -> None:
     """`@warnings.deprecated` and `@typing_extensions.deprecated` are named only as what to avoid.
 
-    `warnings.deprecated` does not exist on every version this template supports (measured: 3.12
+    `warnings.deprecated` does not exist on every version this project supports (measured: 3.12
     lacks it, 3.13 has it), and `typing_extensions` is not a runtime dependency here -- adding one
     is Ask First. A code example that actually uses either decorator would teach an agent to write
     code that fails on the floor version or reaches for an unapproved dependency.
