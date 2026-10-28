@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793207955827,
+  "lastUpdate": 1793210880413,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11594,6 +11594,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009954280592384832",
             "extra": "mean: 125.76281697489702 usec\nrounds: 8436"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2558d5e4e2aacf55cd47386087924f685b55d032",
+          "message": "fix: keep aiqum setup going when adding the cluster times out (merges PR #1171, addresses #1167)\n\nAdding the ONTAP cluster can outlast the 30 s request timeout, and the\nuncaught TimeoutError aborted the apply before steps 6-7. Give that\nrequest 180 s and report transport errors as non-fatal, like error codes.\n\nAddresses #1167\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-28T18:07:07Z",
+          "tree_id": "924225e844ddda712aabb705229db9b253665a67",
+          "url": "https://github.com/endavis/infrafoundry/commit/2558d5e4e2aacf55cd47386087924f685b55d032"
+        },
+        "date": 1793210878814,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15443.407819783883,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022337381901543697",
+            "extra": "mean: 64.75254760279938 usec\nrounds: 17478"
           }
         ]
       }
