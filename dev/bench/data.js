@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793210880413,
+  "lastUpdate": 1793211799082,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11625,6 +11625,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022337381901543697",
             "extra": "mean: 64.75254760279938 usec\nrounds: 17478"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3300487ab2ec4b975d64f3ee1aa17c5e31bab1fd",
+          "message": "fix: fail early when the ontap-cluster password secret is missing (merges PR #1172, addresses #1157)\n\nA package without ontap_password passed doctor and plan, then sent an\nempty admin password over the serial console and waited an hour for the\nhandler timeout. Blueprint inputs can now be marked required: true, which\nthe package loader enforces after secrets.yaml is merged, so doctor, plan\nand apply all stop before any VM is created. The ontap-cluster blueprint\nmarks ontap_password required, both console playbooks assert it first,\nand cluster-create exits on \"Passwords do not match\" instead of looping.\n\nAddresses #1157\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-28T18:22:31Z",
+          "tree_id": "136889f5c55193e0b4987b9689726cb9906300cb",
+          "url": "https://github.com/endavis/infrafoundry/commit/3300487ab2ec4b975d64f3ee1aa17c5e31bab1fd"
+        },
+        "date": 1793211797512,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7717.288289687338,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001748531023576532",
+            "extra": "mean: 129.57919446087124 usec\nrounds: 8449"
           }
         ]
       }
