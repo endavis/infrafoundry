@@ -26,7 +26,12 @@ ontap_validate_certs: false
 
 # Per-node ONTAP node name (e.g. "ontap-cluster-01"). Used for the
 # `system node halt -node <name>` command and the cluster health poll.
+# Empty resolves it from `ontap_node_mgmt_ip` through the cluster API, so
+# it never has to match the Proxmox VM name (#1162).
 ontap_node_name: ""
+
+# Node management IP used to look up `ontap_node_name` when it is empty.
+ontap_node_mgmt_ip: ""
 
 # Overall ceiling (seconds) for the wrapper expect script: covers the
 # halt -> reach VLOADER -> set console -> boot_ontap sequence. The

@@ -5,6 +5,8 @@
 # so the Proxmox noVNC console is usable again after the cluster is
 # healthy. Sequence per node:
 #
+#   0. Resolve the ONTAP node name from its management IP when it is not
+#      given, before anything is staged or halted (#1162).
 #   1. Stage an expect-wrapper script on the Proxmox host that listens
 #      on the VM's serial socket and waits for the boot intercept.
 #   2. Halt the node cleanly via ONTAP CLI (HA-aware) — delegated to
@@ -19,6 +21,40 @@
 - name: Restore Proxmox noVNC console on ONTAP node
   when: ontap_restore_console | bool
   block:
+    - name: Look up cluster nodes to resolve the ONTAP node name
+      ansible.builtin.uri:
+        url: "https://{{ ontap_cluster_mgmt_ip }}/api/cluster/nodes?fields=name,management_interfaces"
+        user: "{{ ontap_admin_user }}"
+        password: "{{ ontap_admin_password }}"
+        validate_certs: "{{ ontap_validate_certs }}"
+        force_basic_auth: true
+        return_content: true
+      register: ontap_cluster_nodes
+      when: ontap_node_name | length == 0
+      delegate_to: localhost
+      connection: local
+      become: false
+
+    - name: Pick the node whose management interface has ontap_node_mgmt_ip
+      ansible.builtin.set_fact:
+        ontap_node_name: "{{ item.name }}"
+      loop: "{{ ontap_cluster_nodes.json.records | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when:
+        - ontap_cluster_nodes is not skipped
+        - >-
+          ontap_node_mgmt_ip in (item.management_interfaces | default([])
+          | map(attribute='ip.address') | list)
+
+    - name: Fail when no ONTAP node name is known
+      ansible.builtin.assert:
+        that: ontap_node_name | length > 0
+        fail_msg: >-
+          No ONTAP node has management IP '{{ ontap_node_mgmt_ip }}' on cluster
+          {{ ontap_cluster_mgmt_ip }}; set ontap_node_name or fix the IP.
+        quiet: true
+
     - name: Deploy console-restore expect script
       ansible.builtin.template:
         src: console-restore.exp.j2
@@ -72,6 +108,11 @@
           - "-ignore-quorum-warnings"
           - "true"
         privilege: admin
+        return_dict: true
+      register: ontap_halt
+      # A rejected CLI command comes back as changed with result_value 0 (#1089);
+      # without this, a bad halt leaves the wrapper waiting for VLOADER (#1162).
+      failed_when: ontap_halt.msg.result_value | default(0) | int != 1
       delegate_to: localhost
       connection: local
       become: false
