@@ -22,7 +22,8 @@
     - role: ontap-console-restore
       vars:
         ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_vmid') }}"
-        ontap_node_name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_name') }}"
+        # Resolved to the ONTAP node name by this IP; the VM name can differ (#1162).
+        ontap_node_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_mgmt_ip') }}"
         ontap_cluster_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}"
         ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
         ontap_restore_console: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_restore_console') | default('true', true) | bool }}"
@@ -35,7 +36,8 @@
     - role: ontap-console-restore
       vars:
         ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_vmid') }}"
-        ontap_node_name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_name') }}"
+        # Resolved to the ONTAP node name by this IP; the VM name can differ (#1162).
+        ontap_node_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_mgmt_ip') }}"
         ontap_cluster_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}"
         ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
         ontap_restore_console: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_restore_console') | default('true', true) | bool }}"

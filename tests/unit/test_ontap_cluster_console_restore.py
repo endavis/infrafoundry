@@ -137,3 +137,94 @@ class TestConsoleRestoreBlueprintInput:
         assert entry["type"] == "boolean"
         assert entry["default"] is True
         assert entry.get("description"), "input must carry a description"
+
+
+# Records as GET /api/cluster/nodes?fields=name,management_interfaces returned
+# them on the ontapcl-test cluster (2026-10-28), less _links and uuids. The VM
+# names there are ontapcl-01-test / ontapcl-02-test, so they cannot be used.
+LIVE_NODE_RECORDS = [
+    {
+        "name": "ontapcl-test-01",
+        "management_interfaces": [
+            {"name": "ontapcl-test-01_mgmt1", "ip": {"address": "192.168.99.81"}}
+        ],
+    },
+    {
+        "name": "ontapcl-test-02",
+        "management_interfaces": [
+            {"name": "ontapcl-test-02_mgmt1", "ip": {"address": "192.168.99.82"}}
+        ],
+    },
+]
+
+
+class TestConsoleRestoreNodeName:
+    """The halted node is the ONTAP node, found by management IP (#1162)."""
+
+    @pytest.fixture
+    def tasks(self) -> list[dict[str, Any]]:
+        main: list[dict[str, Any]] = yaml.safe_load((ROLE_DIR / "tasks" / "main.yml").read_text())
+        block: list[dict[str, Any]] = main[0]["block"]
+        return block
+
+    @staticmethod
+    def _task(tasks: list[dict[str, Any]], prefix: str) -> dict[str, Any]:
+        return next(t for t in tasks if str(t.get("name", "")).startswith(prefix))
+
+    def test_playbook_passes_management_ips_not_vm_names(self) -> None:
+        plays = yaml.safe_load((BLUEPRINT_DIR / "ontap-lab-console-restore.yml").read_text())
+
+        for play, node in zip(plays, ("node01", "node02"), strict=True):
+            role_vars = play["roles"][0]["vars"]
+            assert "ontap_node_name" not in role_vars
+            assert role_vars["ontap_node_mgmt_ip"] == (
+                f"{{{{ lookup('env', 'INFRAFOUNDRY_VAR_{node}_mgmt_ip') }}}}"
+            )
+
+    def test_name_is_resolved_before_anything_is_staged_or_halted(
+        self, tasks: list[dict[str, Any]]
+    ) -> None:
+        names = [str(t.get("name")) for t in tasks]
+        assert_index = names.index("Fail when no ONTAP node name is known")
+
+        assert names.index("Look up cluster nodes to resolve the ONTAP node name") < assert_index
+        assert names.index("Pick the node whose management interface has ontap_node_mgmt_ip") < (
+            assert_index
+        )
+        assert assert_index < names.index("Deploy console-restore expect script")
+        assert assert_index < names.index("Halt ONTAP node cleanly via cluster API (HA-aware)")
+
+    def test_lookup_is_skipped_when_a_name_is_given(self, tasks: list[dict[str, Any]]) -> None:
+        lookup = self._task(tasks, "Look up cluster nodes")
+
+        assert lookup["when"] == "ontap_node_name | length == 0"
+        assert "management_interfaces" in lookup["ansible.builtin.uri"]["url"]
+
+    @pytest.mark.parametrize(
+        ("mgmt_ip", "expected"),
+        [
+            ("192.168.99.81", ["ontapcl-test-01"]),
+            ("192.168.99.82", ["ontapcl-test-02"]),
+            ("10.0.0.9", []),
+        ],
+    )
+    def test_pick_condition_matches_only_the_node_with_that_ip(
+        self, tasks: list[dict[str, Any]], mgmt_ip: str, expected: list[str]
+    ) -> None:
+        condition = self._task(tasks, "Pick the node")["when"][1]
+        env = Environment(autoescape=False)
+
+        picked = [
+            record["name"]
+            for record in LIVE_NODE_RECORDS
+            if env.compile_expression(condition)(ontap_node_mgmt_ip=mgmt_ip, item=record)
+        ]
+
+        assert picked == expected
+
+    def test_halt_fails_on_a_rejected_command(self, tasks: list[dict[str, Any]]) -> None:
+        halt = self._task(tasks, "Halt ONTAP node")
+
+        assert halt["netapp.ontap.na_ontap_command"]["return_dict"] is True
+        assert halt["register"] == "ontap_halt"
+        assert halt["failed_when"] == "ontap_halt.msg.result_value | default(0) | int != 1"
