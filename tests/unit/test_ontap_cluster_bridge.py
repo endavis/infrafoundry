@@ -27,6 +27,7 @@ BASE_VARIABLES = """\
   node02_vmid: 1131
   node02_target: pve3
   node02_mgmt_ip: "192.168.99.82"
+  ontap_password: test-password
 """
 
 

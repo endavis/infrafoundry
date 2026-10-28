@@ -40,6 +40,11 @@ inputs:
   - name: node02_mgmt_ip
     description: "Management IP for node 2 (DHCP reservation)"
 
+  # Admin password for the cluster; put it in the package's secrets.yaml.
+  - name: ontap_password
+    description: "ONTAP cluster admin password (secret; set in secrets.yaml)"
+    required: true
+
   # --- VM Configuration ---
   - name: disk_storage
     default: nas01

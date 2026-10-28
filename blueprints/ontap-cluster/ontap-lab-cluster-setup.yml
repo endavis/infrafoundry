@@ -7,6 +7,20 @@
 # All variables are read from INFRAFOUNDRY_VAR_* environment variables
 # set by the InfraFoundry framework (includes merged secrets from secrets.yaml).
 
+- name: Check the ONTAP admin password is set
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Assert INFRAFOUNDRY_VAR_ontap_password is non-empty
+      ansible.builtin.assert:
+        that:
+          - (lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') | trim) | length > 0
+        fail_msg: >-
+          ontap_password is not set. Add it under 'variables:' in the package's
+          secrets.yaml before running the ONTAP playbooks.
+      no_log: true
+
 - name: Create ONTAP cluster on node 01
   hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_target') }}"
   gather_facts: false
