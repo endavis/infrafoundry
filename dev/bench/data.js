@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793203437338,
+  "lastUpdate": 1793207955827,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11563,6 +11563,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015606238110367004",
             "extra": "mean: 63.35447542451871 usec\nrounds: 16785"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e4bde002a9707fe0aced4b26764374bb442eda79",
+          "message": "chore: synchronize with pyproject-template 4cadf97 (merges PR #1170, addresses #1169)\n\nSyncs the following template improvements (72dd3cd...4cadf97):\n- endavis/pyproject-template#1010, #1013, #1024, #1030, #1064 (dangerous-command hook parser gaps)\n- endavis/pyproject-template#1015, #1039, #1047, #1050 (Antigravity/Copilot edit tools through the hook)\n- endavis/pyproject-template#1049, #1054, #1057 (credential-store reads and .envrc.local write guard)\n- endavis/pyproject-template#1014 (doc tests honor sync-exclude.toml via tests/doc_scan.py, ADR-9026)\n- endavis/pyproject-template#1033 (drop post-checkout/post-merge hooks; doit env_check)\n- endavis/pyproject-template#1038 (remove bash-ban-raw-tools, precompact-checkpoint, session-resume-restore hooks)\n- endavis/pyproject-template#1046 (Claude model pins to the 5.5 family)\n- endavis/pyproject-template#1063 (merge-pr skill)\n- endavis/pyproject-template#1032, #1053, #1058, #1060, #1068 (docs and AI instructions)\n- dependabot dev-dependency floor bumps (ruff, pre-commit, pymdown-extensions, hypothesis)\n\nLocal divergences:\n- tests/sync_excluded.py retired in favour of upstream tests/doc_scan.py\n- doc-scan tests import `tests.doc_scan` so mypy can resolve it\n- sync-exclude.toml: cbm/context-mode hooks, README.template.md and\n  tests/template/test_check_template_updates.py\n\nPlan: https://github.com/endavis/infrafoundry/issues/1169#issuecomment-6474498257\n\nAddresses #1169\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1sbjvsCCW7NmJcLdQmW\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-28T17:18:19Z",
+          "tree_id": "942301257327fe0e65ea40764c2c0a7c9c64febf",
+          "url": "https://github.com/endavis/infrafoundry/commit/e4bde002a9707fe0aced4b26764374bb442eda79"
+        },
+        "date": 1793207954007,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7951.475834066327,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009954280592384832",
+            "extra": "mean: 125.76281697489702 usec\nrounds: 8436"
           }
         ]
       }
