@@ -76,6 +76,14 @@
         ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
         ontap_validate_certs: false
         ontap_licenses: "{{ (lookup('env', 'INFRAFOUNDRY_PACKAGE_VARS') | from_json).get('ontap_licenses', []) if lookup('env', 'INFRAFOUNDRY_PACKAGE_VARS') else [] }}"
+        ontap_svm_routes: >-
+          {{
+            [{"vserver": lookup('env', 'INFRAFOUNDRY_VAR_svm_name'),
+              "destination": "0.0.0.0/0",
+              "gateway": lookup('env', 'INFRAFOUNDRY_VAR_data_gateway')}]
+            if lookup('env', 'INFRAFOUNDRY_VAR_data_gateway')
+            else []
+          }}
         ontap_dns:
           - vserver: "{{ lookup('env', 'INFRAFOUNDRY_VAR_svm_name') }}"
             domains:

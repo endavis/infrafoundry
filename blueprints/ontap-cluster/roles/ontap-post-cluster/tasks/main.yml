@@ -248,6 +248,20 @@
     label: "{{ item.name }}"
 
 # ---------------------------------------------------------------
+# SVM routes (before DNS: an off-subnet DNS server needs one)
+# ---------------------------------------------------------------
+- name: Create SVM routes
+  netapp.ontap.na_ontap_net_routes:
+    <<: *ontap_conn
+    state: present
+    vserver: "{{ item.vserver }}"
+    destination: "{{ item.destination }}"
+    gateway: "{{ item.gateway }}"
+  loop: "{{ ontap_svm_routes }}"
+  loop_control:
+    label: "{{ item.vserver }} {{ item.destination }} via {{ item.gateway }}"
+
+# ---------------------------------------------------------------
 # DNS configuration
 # ---------------------------------------------------------------
 - name: Configure DNS for SVMs

@@ -79,6 +79,10 @@ inputs:
     default: "255.255.255.0"
   - name: node_mgmt_mask
     default: "255.255.255.0"
+  # Default gateway for the data SVM. Set it when the DNS server or clients
+  # are off the data LIF subnet; empty adds no route (#1160).
+  - name: data_gateway
+    default: ""
 
   # --- Licenses (standard ONTAP simulator keys) ---
   - name: ontap_cluster_base_license
