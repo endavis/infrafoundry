@@ -1,0 +1,93 @@
+name: console-connector
+description: "NetApp Console agent (formerly BlueXP Connector) on Ubuntu 24.04 (Proxmox VM)"
+version: "1.0.0"
+
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: vm_name
+    description: "Hostname and Proxmox VM name for the Console agent VM"
+  - name: vmid
+    description: "Proxmox VM ID"
+    type: integer
+  - name: target_node
+    description: "Proxmox node to deploy the Console agent VM onto"
+  - name: disk_storage
+    description: "Proxmox storage pool for the Console agent VM disk"
+  - name: ip_address
+    description: "Static IPv4 address for the Console agent VM (DHCP reservation)"
+  - name: dhcp_subnet
+    description: "OPNsense DHCP subnet identifier used for the reservation"
+
+  # --- Installer source (read by the post-terraform script only) ---
+  - name: console_agent_url_base
+    description: "URL base of an internal mirror of the NetApp Console agent installer"
+    required: true
+  - name: console_agent_installer
+    description: "Installer file name on the mirror, e.g. NetApp_Console_Agent_Cloud_<version>"
+    required: true
+  - name: console_agent_sha256
+    description: "SHA-256 of the installer; checked on the VM before it runs as root"
+    required: true
+
+  # --- VM hardware ---
+  - name: template_vmid
+    description: "Standard ubuntu-template vmid"
+    default: 900
+  - name: template_node
+    description: "Proxmox node hosting the template"
+    default: pve1
+  - name: cores
+    description: "UNVERIFIED sizing (not stated on the install page); override as needed"
+    default: 8
+  - name: memory
+    description: "UNVERIFIED sizing (not stated on the install page); override as needed"
+    default: 32768
+  - name: disk_size
+    description: "GiB; /opt needs 120 GiB and /var needs 40 GiB, both on this disk"
+    default: 180
+
+  # --- Network ---
+  - name: bridge
+    default: vmbr0
+  - name: vlan_tag
+    description: 'VLAN tag on the bridge. Empty: untagged (e.g. an SDN vnet)'
+    default: 10
+  - name: mac_address
+    description: "Empty: Proxmox auto-assigns"
+    default: ""
+
+  # --- SSH access ---
+  - name: jumphost
+    description: 'Empty: direct SSH. Set to e.g. "ansible@jump.example.com"'
+    default: ""
+  - name: ssh_user
+    default: ansible
+
+  # --- Console agent install ---
+  - name: docker_version
+    description: >-
+      Docker Engine version to install (supported range 23.0.6 to 28.0.0). Matched
+      against the docker-ce apt versions, i.e. the part after "5:" and before "-".
+    default: "27.5.1"
+  - name: console_agent_install_args
+    description: 'Extra installer flags, e.g. "--proxy http://proxy:3128 --cacert /path/ca.pem"'
+    default: ""
+
+  # Extra Proxmox tags appended to the blueprint's default tags
+  - name: extra_tags
+    default: []
+
+resources:
+  - vm.yaml
+  - dhcp.yaml
+
+events:
+  on_create:
+    - type: script
+      name: console-connector-setup
+      script: scripts/console-connector-post-terraform.sh
+      description: "Install Docker and the NetApp Console agent (registration is manual)"
+      timeout: 3600
+      continue_on_error: false
+      requires:
+        - "{{ vm_name }}"
