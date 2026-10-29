@@ -16,6 +16,8 @@ from infrafoundry.providers.opnsense.validators import (
     UnboundValidator,
     VLANValidator,
 )
+from infrafoundry.providers.opnsense.validators.gateway_validator import GatewayValidator
+from infrafoundry.providers.opnsense.validators.nat_rule_validator import NATRuleValidator
 from tests.helpers.env import make_env_config
 
 
@@ -448,6 +450,65 @@ class TestGetExistingInterfaces:
 
         assert "lan" in result
         assert "wan" in result
+
+    def test_26_1_rows_resolve_identifier_and_device(self, validator: OPNsenseValidator) -> None:
+        """26.1 rows (identifier/device, no name) resolve by both; empty identifier skipped."""
+        validator.api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
+            return_value=[
+                {"identifier": "wan", "device": "em1", "description": "WAN"},
+                {"identifier": "", "device": "enc0", "description": "Unassigned Interface"},
+            ]
+        )
+
+        result = validator._get_existing_interfaces("https://opn.example.com", "key", "secret")
+
+        assert set(result) == {"wan", "em1", "enc0"}
+        assert "" not in result
+
+    def test_legacy_name_row_still_resolves(self, validator: OPNsenseValidator) -> None:
+        """Older name-shaped rows keep working and register device too."""
+        validator.api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
+            return_value=[{"name": "lan", "device": "igc0"}]
+        )
+
+        result = validator._get_existing_interfaces("https://opn.example.com", "key", "secret")
+
+        assert set(result) == {"lan", "igc0"}
+
+    def test_26_1_wan_reference_passes_rule_validators(self, validator: OPNsenseValidator) -> None:
+        """Firewall rule, NAT rule and gateway referencing wan raise no unknown-interface error."""
+        validator.api_validator.fetch_json = MagicMock(  # type: ignore[method-assign]
+            return_value=[{"identifier": "wan", "device": "em1", "description": "WAN"}]
+        )
+        existing = validator._get_existing_interfaces("https://opn.example.com", "key", "secret")
+        report = ValidationReport()
+
+        fw = ResourceConfig(
+            name="fw1",
+            type="firewall.rules",
+            provider="opnsense",
+            config={"interface": "wan", "action": "pass", "direction": "in"},
+        )
+        FirewallRuleValidator(report).validate([fw], set(), set(), set(), existing, {}, set())
+        nat = ResourceConfig(
+            name="nat1",
+            type="firewall.nat_rules",
+            provider="opnsense",
+            config={"interface": "wan"},
+        )
+        NATRuleValidator(report).validate([nat], set(), set(), existing, {})
+        gw = ResourceConfig(
+            name="WAN_GW",
+            type="routing.gateways",
+            provider="opnsense",
+            config={"interface": "wan", "protocol": "inet", "gateway": "192.0.2.1"},
+        )
+        GatewayValidator(report).validate([gw], set(), existing)
+
+        bad = [r for r in report.results if "unknown interface" in r.message]
+        assert not bad
+        resolved = [r for r in report.results if "wan" in r.message and r.passed]
+        assert len(resolved) >= 3
 
     def test_api_failure_returns_empty(self, validator: OPNsenseValidator) -> None:
         """Returns empty dict on API failure."""
