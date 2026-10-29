@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793211799082,
+  "lastUpdate": 1793280341779,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11656,6 +11656,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001748531023576532",
             "extra": "mean: 129.57919446087124 usec\nrounds: 8449"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e3fcfd321af42887133bc6142c2bb78a27ef2a01",
+          "message": "feat: add --provider/-P to infra doctor (merges PR #1177, addresses #1176)\n\ninfra doctor can now be limited to one or more providers, like plan,\napply and destroy. The validation workflow applies the same provider\nfilter before any connectivity check, and the jumphost preflight only\ncovers the selected providers' resources.\n\nAn unknown provider name now prints \"Unknown provider(s): ... Available:\n...\" for every command that takes -P, instead of a traceback and\n[IF-GENERAL-001] Unknown Error.\n\nAddresses #1176\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T13:24:45Z",
+          "tree_id": "ecd9e3fcb972d0b24e409091e5d1d88b5444ba10",
+          "url": "https://github.com/endavis/infrafoundry/commit/e3fcfd321af42887133bc6142c2bb78a27ef2a01"
+        },
+        "date": 1793280340816,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7766.385062095687,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011422393424166328",
+            "extra": "mean: 128.7600334009397 usec\nrounds: 8383"
           }
         ]
       }
