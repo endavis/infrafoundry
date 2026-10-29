@@ -127,6 +127,31 @@ vms:
 The `opnsense-vm` blueprint (`blueprints/opnsense-vm/`) uses this to build a
 disposable OPNsense test firewall.
 
+### Templates from a downloaded image
+
+A `template` with a `download_image` block downloads a cloud image into the
+Proxmox `import` content type. Proxmox only accepts `.ova`, `.ovf`, `.qcow2`,
+`.raw` and `.vmdk` there, so `download_image.filename` is required and must end
+in one of them (case-insensitive). Anything else, such as the `.img` name in
+the URL, fails at plan time. Most cloud `.img` images are qcow2, so name the
+file `*.qcow2`.
+
+```yaml
+templates:
+  - name: ubuntu-2404
+    vmid: 9000
+    target_node: pve1
+    cloud_init: true
+    disk:
+      storage: local-lvm
+    download_image:
+      url: https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img
+      filename: ubuntu-24.04-server-cloudimg-amd64.qcow2
+```
+
+The cloud-init drive goes on `cloud_init_datastore` when set, otherwise on the
+disk storage (`disk.storage`, then `local-lvm`).
+
 ### Memory ballooning
 
 VMs and templates take an optional `balloon` key, the minimum memory in MiB
