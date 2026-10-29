@@ -47,6 +47,7 @@ foundry config doctor --deep
 foundry infra doctor --env dev
 foundry infra doctor --env dev --resource vm-01 --resource vm-02
 foundry infra doctor --env prod --package k3s-cluster
+foundry infra doctor --env dev --provider opnsense   # only OPNsense; repeat -P for more
 foundry infra doctor --env dev --verbose
 ```
 

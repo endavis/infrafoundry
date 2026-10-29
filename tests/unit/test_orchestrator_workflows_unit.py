@@ -13,6 +13,7 @@ from rich.console import Console
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.events import EventType
+from infrafoundry.core.exceptions import ProviderFilterError
 from infrafoundry.core.orchestrator_workflows import (
     ApplyOrchestrator,
     DestroyOrchestrator,
@@ -319,6 +320,65 @@ def test_unfiltered_validation_uses_validate_references(console: Console) -> Non
 
     provider.in_context.assert_not_called()
     assert provider.validate_references.call_args.args[0] == env_resources
+
+
+def _validate_two_providers(
+    console: Console, provider_filter: list[str] | None
+) -> tuple[MagicMock, MagicMock, dict[str, Any]]:
+    """Run validate over opnsense + proxmox; return both providers and the results."""
+    config_manager = MagicMock()
+    config_manager.load_environment.return_value = SimpleNamespace(
+        model_dump=lambda: {"name": "dev"}
+    )
+    opn = [_resource("lan", provider="opnsense")]
+    pve = [_resource("vm1", provider="proxmox")]
+    by_provider = {"opnsense": opn, "proxmox": pve}
+    providers = {
+        "opnsense": MagicMock(spec=["validate_connectivity", "validate_references"]),
+        "proxmox": MagicMock(spec=["validate_connectivity", "validate_references"]),
+    }
+
+    def batches(rbp: Any, filt: list[str] | None, reverse: bool, env: Any) -> Any:
+        return [ProviderResourceBatch(name, res, len(res)) for name, res in rbp.items()]
+
+    validation = ValidationOrchestrator(
+        config_manager,
+        console,
+        get_providers=lambda: cast(Any, providers),
+        load_resources=lambda env: (opn + pve, by_provider),
+        iter_provider_batches=batches,
+    )
+    results = validation.validate(
+        "dev", resource_filter=None, verbose=False, provider_filter=provider_filter
+    )
+    return providers["opnsense"], providers["proxmox"], results
+
+
+def test_provider_filter_validates_only_selected_providers(console: Console) -> None:
+    """Only the selected provider is connectivity-checked (#1176)."""
+    opn, pve, results = _validate_two_providers(console, ["opnsense"])
+
+    opn.validate_connectivity.assert_called_once()
+    pve.validate_connectivity.assert_not_called()
+    assert list(results) == ["opnsense"]
+
+
+def test_provider_filter_unknown_raises_before_any_check(console: Console) -> None:
+    """An unknown provider name fails before any connectivity call (#1176)."""
+    with pytest.raises(ProviderFilterError) as excinfo:
+        _validate_two_providers(console, ["nosuch"])
+
+    assert excinfo.value.requested == ["nosuch"]
+    assert excinfo.value.available == ["opnsense", "proxmox"]
+
+
+def test_no_provider_filter_validates_every_provider(console: Console) -> None:
+    """Without a provider filter every provider is checked, as before."""
+    opn, pve, results = _validate_two_providers(console, None)
+
+    opn.validate_connectivity.assert_called_once()
+    pve.validate_connectivity.assert_called_once()
+    assert set(results) == {"opnsense", "proxmox"}
 
 
 def test_status_orchestrator_marks_unregistered_provider(console: Console) -> None:
