@@ -4,10 +4,10 @@ Reusable blueprint that deploys the NetApp Console agent (formerly the BlueXP
 Connector) on an Ubuntu 24.04 Proxmox VM, with an OPNsense DHCP reservation and
 an `on_create` handler that installs Docker Engine and the agent.
 
-**Scope is install only.** Registering the agent with the NetApp Console,
-adding the ONTAP cluster and deregistering the agent are manual steps
-documented below. NetApp documents no non-interactive registration, so this
-blueprint calls no Console API.
+**Scope is install plus optional registration.** Registering the agent can be
+scripted (see [Scripted registration](#scripted-registration)); without the
+service account inputs it is a manual browser step. Adding the ONTAP cluster and
+deregistering the agent are manual steps documented below.
 
 Requirements come from
 <https://docs.netapp.com/us-en/console-setup-admin/task-install-agent-on-prem.html>.
@@ -30,7 +30,7 @@ variables:
   ip_address: "192.168.1.51"
   dhcp_subnet: my-subnet
   console_agent_url_base: "http://web/applications/console-connector"
-  console_agent_installer: "NetApp_Console_Agent_Cloud_<version>"
+  console_agent_installer: "netapp-console-agent-<version>"
   console_agent_sha256: "<sha256sum of the installer>"
 ```
 
@@ -51,7 +51,7 @@ infra apply --env <env> --package console-connector
 | `ip_address` | VM IP (assigned via DHCP reservation) |
 | `dhcp_subnet` | OPNsense Kea subnet reference |
 | `console_agent_url_base` | Base URL of your internal mirror of the installer |
-| `console_agent_installer` | Installer file name, `NetApp_Console_Agent_Cloud_<version>` |
+| `console_agent_installer` | Installer file name, `netapp-console-agent-<version>` |
 | `console_agent_sha256` | SHA-256 of the installer (`sha256sum <file>`). The VM refuses to run a download that does not match. |
 
 ### Optional (blueprint defaults)
@@ -70,6 +70,12 @@ infra apply --env <env> --package console-connector
 | `ssh_user` | `ansible` | SSH user on the VM |
 | `docker_version` | `27.5.1` | Docker Engine version, supported range 23.0.6 to 28.0.0 |
 | `console_agent_install_args` | `""` | Extra installer flags, e.g. `--proxy <url> --cacert <file>` |
+| `console_client_id` | `""` | Service account client ID; enables scripted registration |
+| `console_client_secret` | `""` | Service account secret; put it in `secrets.yaml` (SOPS) |
+| `console_admin_email` | `""` | Email of the Console user that administers the agent |
+| `console_account_id` | `""` | Console organization ID; empty: the only account the service account sees |
+| `console_company` | `""` | Company name sent at registration; empty: `vm_name` |
+| `console_site` | `default` | Site name sent at registration |
 | `extra_tags` | `[]` | Additional Proxmox tags |
 
 `docker_version` is the upstream version only (`27.5.1`). The install script
@@ -85,7 +91,7 @@ Verified against the NetApp page above:
 - `/opt` needs 120 GiB (`/opt/application/netapp`); `/var` needs 40 GiB
   (`/var/lib/docker`).
 - The installer comes from the NetApp Console UI or the NetApp Support Site. Use
-  the "online" installer, `NetApp_Console_Agent_Cloud_<version>`, run as root
+  the "online" installer, `netapp-console-agent-<version>`, run as root
   after `chmod +x`, with optional `--proxy <url> --cacert <file>`.
 - The install fails when `http_proxy`/`https_proxy` are set. The install script
   unsets them.
@@ -126,15 +132,42 @@ infra apply --package console-connector
        |    +-- unset proxy variables, check free space on /opt and /var
        |    +-- install Docker Engine at docker_version (Docker apt repo, noble)
        |    +-- download and run the installer
-       +-- Phase 4: wait for https://<ip>, print the registration steps
+       +-- Phase 4: wait for https://<ip>
+       +-- Phase 5: register the agent (console-connector-register.py), or
+                    print the manual registration steps
 ```
 
 The remote script runs on the VM (Ubuntu 24.04, `apt`), not on the jumphost; see
 [blueprint script portability](../../docs/development/blueprint-script-portability.md).
 
+## Scripted registration
+
+Set `console_client_id`, `console_client_secret` and `console_admin_email` to
+register the agent during `infra apply`. Set none of them to keep the manual
+flow; setting only some fails with the missing names.
+
+1. In the NetApp Console, create a service account with an admin role (for
+   example Organization admin) and copy its client ID and secret.
+2. Put `console_client_secret` (and `console_client_id`) under `variables:` in
+   the package `secrets.yaml`, encrypted with SOPS.
+3. Set `console_admin_email` in `infrafoundry.yml`. Set `console_account_id` when
+   the service account sees more than one organization; otherwise registration
+   fails and lists the choices.
+
+The helper `scripts/console-connector-register.py` (stdlib only) runs on the
+InfraFoundry host, as the Phase 4 check does, even when a jumphost is set. That
+host must reach `netapp-cloud-account.auth0.com`,
+`api.bluexp.netapp.com` and the agent over HTTPS. It is idempotent: an agent
+that already reports `isSetup` is left alone and no token is requested. Every
+request to the agent, including the status checks, is certificate-pinned: Phase 5
+reads the agent's certificate over SSH (`openssl` on the VM) and the helper trusts
+exactly that certificate. The NetApp endpoints use normal verification. The
+secret is read from the environment, never passed on a command line or printed. A `User is not associated as admin` error
+means the service account lacks an admin role.
+
 ## Manual steps
 
-### Register the agent
+### Register the agent (without a service account)
 
 1. Open `https://<ip_address>` in a browser.
 2. Log in and choose your NetApp Console organization.
