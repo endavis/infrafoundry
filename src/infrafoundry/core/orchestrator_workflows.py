@@ -230,8 +230,13 @@ class ValidationOrchestrator:
         env_name: str,
         resource_filter: list[str] | None,
         verbose: bool,
+        provider_filter: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Perform validation for all providers in the environment."""
+        """Perform validation for all providers in the environment.
+
+        Raises:
+            ProviderFilterError: If ``provider_filter`` names an unknown provider.
+        """
         self.console.print(f"\n[bold cyan]Validating configuration for: {env_name}[/bold cyan]\n")
 
         env_config = self.config_manager.load_environment(env_name)
@@ -240,6 +245,7 @@ class ValidationOrchestrator:
             return {}
 
         all_resources, resources_by_provider = self._load_resources(env_name)
+        resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
 
         # Convert to set for O(1) lookups
         filter_set = set(resource_filter) if resource_filter else None
@@ -717,7 +723,8 @@ class PlanOrchestrator(HookExecutionMixin):
                 target_resources=resource_filter,
                 package_filter=package_filter,
             )
-            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
+            if not isinstance(exc, ProviderFilterError):  # the CLI renders that one cleanly
+                self.console.print(traceback.format_exc(), style="dim red")
             raise
 
         return results
@@ -1084,7 +1091,8 @@ class ApplyOrchestrator(HookExecutionMixin):
                 target_resources=resource_filter,
                 package_filter=package_filter,
             )
-            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
+            if not isinstance(exc, ProviderFilterError):  # the CLI renders that one cleanly
+                self.console.print(traceback.format_exc(), style="dim red")
             raise
         finally:
             # Render the warnings summary (even on the failure path), then
@@ -1475,7 +1483,8 @@ class DestroyOrchestrator(HookExecutionMixin):
                 target_resources=resource_filter,
                 package_filter=package_filter,
             )
-            self.console.print(traceback.format_exc(), style="dim red")  # Log full traceback
+            if not isinstance(exc, ProviderFilterError):  # the CLI renders that one cleanly
+                self.console.print(traceback.format_exc(), style="dim red")
             raise
 
         return results

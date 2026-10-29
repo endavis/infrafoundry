@@ -483,6 +483,8 @@ class Orchestrator:
         env_name: str,
         resource_filter: list[str] | None = None,
         verbose: bool = False,
+        *,
+        provider_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Validate infrastructure configuration against provider APIs.
 
@@ -495,6 +497,7 @@ class Orchestrator:
             env_name: Environment name
             resource_filter: Optional list of resource names to validate
             verbose: If True, show detailed validation output
+            provider_filter: Optional provider names to limit validation to
 
         Returns:
             Dict with validation results per provider:
@@ -507,7 +510,9 @@ class Orchestrator:
                 }
             }
         """
-        return self.validation_orchestrator.validate(env_name, resource_filter, verbose)
+        return self.validation_orchestrator.validate(
+            env_name, resource_filter, verbose, provider_filter=provider_filter
+        )
 
     def plan(
         self,

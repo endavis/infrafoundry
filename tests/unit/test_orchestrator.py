@@ -287,6 +287,37 @@ class TestOrchestratorValidateResources:
         orchestrator.validate_resources([])
 
 
+class TestOrchestratorValidateProviderFilter:
+    """Orchestrator.validate forwards the provider filter (#1176)."""
+
+    def test_validate_forwards_provider_filter(self, tmp_path: Path) -> None:
+        """provider_filter reaches the validation orchestrator."""
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        orchestrator = Orchestrator(config_manager)
+        validation = MagicMock()
+        validation.validate.return_value = {}
+        orchestrator.validation_orchestrator = validation
+
+        orchestrator.validate("dev", ["r1"], True, provider_filter=["opnsense"])
+
+        validation.validate.assert_called_once_with(
+            "dev", ["r1"], True, provider_filter=["opnsense"]
+        )
+
+    def test_validate_provider_filter_defaults_to_none(self, tmp_path: Path) -> None:
+        """Without a provider filter, None is forwarded."""
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        orchestrator = Orchestrator(config_manager)
+        validation = MagicMock()
+        orchestrator.validation_orchestrator = validation
+
+        orchestrator.validate("dev")
+
+        validation.validate.assert_called_once_with("dev", None, False, provider_filter=None)
+
+
 class TestOrchestratorBuildDependencyGraph:
     """Tests for dependency graph building."""
 

@@ -14,6 +14,7 @@ from infrafoundry.core.exceptions import (
     EnvironmentNotFoundError,
     InfraFoundryError,
     LockAcquisitionError,
+    ProviderFilterError,
 )
 
 from .utils import raise_cli_error
@@ -82,6 +83,13 @@ def with_orchestrator(
                     f"{exc.locked_by} since {exc.acquired_at} "
                     f"(expires {exc.expires_at}). Use 'foundry infra unlock "
                     f"--env {exc.environment}' to release."
+                )
+                raise click.ClickException(msg) from exc
+            except ProviderFilterError as exc:
+                # Unknown --provider name - a usage mistake, not an unknown error.
+                msg = (
+                    f"Unknown provider(s): {', '.join(sorted(exc.requested))}. "
+                    f"Available: {', '.join(sorted(exc.available))}"
                 )
                 raise click.ClickException(msg) from exc
             except InfraFoundryError as exc:

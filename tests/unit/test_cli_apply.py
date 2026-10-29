@@ -318,3 +318,6 @@ def test_apply_unknown_provider_filter_surfaces_error(
         assert "nope" in result.output
         assert "opnsense" in result.output
         assert "proxmox" in result.output
+        assert "Unknown provider(s): nope. Available: opnsense, proxmox" in result.output
+        assert "IF-GENERAL-001" not in result.output
+        assert "Traceback" not in result.output

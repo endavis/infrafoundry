@@ -38,7 +38,17 @@ _STATUS_STYLE = {
     "--package",
     "-p",
     "package_name",
-    help="Validate a specific package by name (mutually exclusive with -r)",
+    help="Validate a specific package by name (mutually exclusive with -r and -P)",
+)
+@click.option(
+    "--provider",
+    "-P",
+    "provider",
+    multiple=True,
+    help=(
+        "Limit validation to specific provider(s) (can be used multiple times). "
+        "Mutually exclusive with --package and --resource."
+    ),
 )
 @click.option(
     "--verbose",
@@ -54,6 +64,7 @@ def doctor(
     env: str,
     resource: tuple[str, ...],
     package_name: str | None,
+    provider: tuple[str, ...],
     verbose: bool,
 ) -> None:
     """Validate infrastructure configuration against provider APIs.
@@ -89,9 +100,14 @@ def doctor(
         # Validate one package, including its jumphost
         infra doctor --env prod --package k3s-cluster
 
+        # Validate only one provider (repeat -P for more)
+        infra doctor --env test --provider opnsense
+
         # Show detailed output with all passing checks
         infra doctor --env test --verbose
     """
+    if provider and (package_name or resource):
+        raise click.UsageError("--package, --resource, and --provider are mutually exclusive")
     if package_name and resource:
         raise click.UsageError("--package and --resource are mutually exclusive")
     if package_name:
@@ -101,14 +117,19 @@ def doctor(
     else:
         resource_filter = list(resource) if resource else None
 
+    provider_filter: list[str] | None = list(provider) if provider else None
+    # Only pass the filter when set, so unfiltered calls keep their original signature.
+    extra: dict[str, list[str]] = {"provider_filter": provider_filter} if provider_filter else {}
+
     results = orchestrator.validate(
         env_name=env,
         resource_filter=resource_filter,
         verbose=verbose,
+        **extra,
     )
 
     has_errors = any(r["errors"] > 0 for r in results.values())
-    if _jumphost_preflight(orchestrator, env, resource_filter):
+    if _jumphost_preflight(orchestrator, env, resource_filter, provider_filter):
         has_errors = True
     if has_errors:
         sys.exit(1)
@@ -116,7 +137,10 @@ def doctor(
 
 
 def _jumphost_preflight(
-    orchestrator: Orchestrator, env: str, resource_filter: list[str] | None
+    orchestrator: Orchestrator,
+    env: str,
+    resource_filter: list[str] | None,
+    provider_filter: list[str] | None = None,
 ) -> bool:
     """Check every jumphost the in-scope packages use; return whether any check failed."""
     config_manager = orchestrator.config_manager
@@ -126,6 +150,9 @@ def _jumphost_preflight(
     if resource_filter is not None:
         wanted = set(resource_filter)
         resources = [r for r in all_resources if r.name in wanted]
+    if provider_filter is not None:
+        selected = set(provider_filter)
+        resources = [r for r in resources if r.provider in selected]
 
     targets = targets_by_jumphost(
         resources, all_resources, deployment_state(orchestrator.state_manager, env)

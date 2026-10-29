@@ -10,6 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from infrafoundry.cli.main import main
+from infrafoundry.core.exceptions import ProviderFilterError
 from infrafoundry.core.jumphost_preflight import Check, JumphostReport, Status, Target
 from infrafoundry.core.provider import ResourceConfig
 
@@ -290,3 +291,143 @@ class TestInfraDoctorPackage:
 
         assert result.exit_code == 2
         assert "mutually exclusive" in result.output
+
+
+@pytest.mark.unit
+class TestInfraDoctorProviderFilter:
+    """Tests for --provider/-P (#1176)."""
+
+    def _invoke(self, cli_runner: CliRunner, tmp_path: Path, *args: str) -> Any:
+        return cli_runner.invoke(
+            main, ["-c", str(tmp_path), "infra", "doctor", "--env", "test", *args]
+        )
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_provider_forwarded(
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """-P forwards provider_filter to validate()."""
+        orch = _mock_orchestrator()
+        mock_get_orch.return_value = orch
+
+        result = self._invoke(cli_runner, tmp_path, "-P", "opnsense")
+
+        assert result.exit_code == 0, result.output
+        orch.validate.assert_called_once_with(
+            env_name="test", resource_filter=None, verbose=False, provider_filter=["opnsense"]
+        )
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_repeated_provider_forwarded(
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Repeated -P forwards the full list."""
+        orch = _mock_orchestrator()
+        mock_get_orch.return_value = orch
+
+        result = self._invoke(cli_runner, tmp_path, "-P", "opnsense", "--provider", "proxmox")
+
+        assert result.exit_code == 0, result.output
+        assert orch.validate.call_args.kwargs["provider_filter"] == ["opnsense", "proxmox"]
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_no_provider_passes_no_filter(
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Without -P the validate call is unchanged (no filter)."""
+        orch = _mock_orchestrator()
+        mock_get_orch.return_value = orch
+
+        result = self._invoke(cli_runner, tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert "provider_filter" not in orch.validate.call_args.kwargs
+
+    @pytest.mark.parametrize("other", [["-p", "pkg"], ["-r", "vm1"]])
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_provider_exclusive_with_package_and_resource(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        other: list[str],
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """-P with -p or -r is a usage error and validate is not called."""
+        orch = _mock_orchestrator()
+        mock_get_orch.return_value = orch
+
+        result = self._invoke(cli_runner, tmp_path, "-P", "opnsense", *other)
+
+        assert result.exit_code == 2
+        assert "mutually exclusive" in result.output
+        orch.validate.assert_not_called()
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_package_and_resource_still_exclusive(
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """-p with -r still errors."""
+        mock_get_orch.return_value = _mock_orchestrator()
+
+        result = self._invoke(cli_runner, tmp_path, "-p", "pkg", "-r", "vm1")
+
+        assert result.exit_code == 2
+        assert "mutually exclusive" in result.output
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_unknown_provider_is_a_clean_error(
+        self, mock_creds: MagicMock, mock_get_orch: MagicMock, cli_runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """An unknown provider shows the available names, no error code or traceback."""
+        orch = _mock_orchestrator()
+        orch.validate.side_effect = ProviderFilterError(
+            requested=["nope"], available=["opnsense", "proxmox"]
+        )
+        mock_get_orch.return_value = orch
+
+        result = self._invoke(cli_runner, tmp_path, "-P", "nope")
+
+        assert result.exit_code != 0
+        assert "Unknown provider(s): nope. Available: opnsense, proxmox" in result.output
+        assert "IF-GENERAL-001" not in result.output
+        assert "Traceback" not in result.output
+
+    @patch("infrafoundry.cli.commands.infra.doctor.check_jumphost")
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_jumphost_preflight_only_for_selected_providers(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        mock_check: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """The jumphost preflight skips resources of providers outside -P."""
+        orch = _mock_orchestrator()
+        orch.config_manager.get_all_resources_all_providers.return_value = [
+            _vm("vm1", jumphost="ansible@jump"),
+            _dhcp("vm1", "10.0.1.70"),
+        ]
+        orch.config_manager.get_package_events.return_value = {}
+        orch.state_manager.get_resources.return_value = []
+        mock_get_orch.return_value = orch
+
+        result = self._invoke(cli_runner, tmp_path, "-P", "opnsense")
+
+        assert result.exit_code == 0, result.output
+        mock_check.assert_not_called()
+        assert "Jumphost preflight" not in result.output
+
+        mock_check.return_value = _report("ansible@jump", Status.OK)
+        result = self._invoke(cli_runner, tmp_path, "-P", "proxmox")
+
+        assert result.exit_code == 0, result.output
+        mock_check.assert_called_once()

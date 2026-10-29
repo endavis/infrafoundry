@@ -166,7 +166,7 @@ Key commands (`foundry` via `uv run foundry ...`):
 - `config schema <export|list|show>` – JSON schemas for IDE autocomplete
 
 **Infra group (`infra`):**
-- `infra doctor --env <name>` – validate infrastructure against provider APIs
+- `infra doctor --env <name>` – validate infrastructure against provider APIs. Supports `--provider/-P <name>` (repeatable) to scope to specific provider(s).
 - `infra plan --env <name>` – generate files only (use `--dry-run` when applicable). Supports `--provider/-P <name>` (repeatable) to scope to specific provider(s).
 - `infra apply --env <name>` – generate and execute Terraform/Ansible. Supports `--provider/-P <name>` (repeatable) to scope to specific provider(s).
 - `infra destroy --env <name>` – tear down infrastructure. Supports `--provider/-P <name>` (repeatable) to scope to specific provider(s).
