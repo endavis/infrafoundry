@@ -81,6 +81,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | List resources in state | `foundry state list --env <env>` |
 | List tracked resources | `foundry state resources` |
 | Backup state database | `foundry state backup` |
+| Remove a stale environment from state | `foundry state prune --env <env>` |
 | Validate backend config | `foundry state backend validate --env <env>` |
 | Migrate backend | `foundry state backend migrate --env <env>` |
 | View audit trail | `foundry state audit list` |
@@ -614,6 +615,27 @@ foundry state backup --output-dir ./backups --include-generated
 ```
 
 **Options:** `-o/--output-dir DIRECTORY`, `-g/--include-generated`
+
+### `state prune`
+
+Delete one environment's rows from the state database: resources, resource dependencies, deployments, deployment events and deployment locks. Use it for state-db-only environments reported by `config doctor`. The audit trail (`audit_entries`) is kept, and the prune is recorded in it as a `state_pruned` entry.
+
+```bash
+foundry state prune --env old-env --dry-run   # row counts per table, deletes nothing
+foundry state prune --env old-env             # backs up, asks to confirm, deletes
+foundry state prune --env old-env --yes --backup-dir ./backups
+```
+
+**Options:** `-e/--env TEXT` (required), `--dry-run`, `--force`, `--yes`, `--no-backup`, `--backup-dir DIRECTORY`
+
+- Refuses an environment that still exists in the config repo unless `--force` is given (for a renamed environment).
+- Refuses an environment with an unexpired deployment lock; release it with `foundry infra unlock`.
+- On SQLite it first copies the database (like `state backup`) and prints the path. If the backup fails nothing is deleted.
+- On other backends no file backup is possible: back up with `pg_dump` and pass `--no-backup`.
+- Everything is deleted in one transaction, so a failure leaves the database unchanged.
+
+!!! note
+    `state list --env <env>` reads the YAML config, not the state database. `config envs` and `config doctor` read the state database.
 
 ### `state backend`
 

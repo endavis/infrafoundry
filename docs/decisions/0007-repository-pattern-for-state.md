@@ -31,6 +31,9 @@ We will use the **Repository Pattern** to abstract data access logic.
 **Negative:**
 - **Boilerplate:** Requires writing wrapper methods for every query instead of using the ORM directly in business logic.
 
+## Related Issues
+- [#1175](https://github.com/endavis/infrafoundry/issues/1175): `state prune` deletes an environment's rows through `StateManager` in one transaction.
+
 ## Alternatives Considered
 - **Active Record Pattern:** Rejected because it couples business logic tightly to the database schema.
 - **Direct SQLAlchemy Usage:** Rejected because it makes unit testing difficult and leaks database concerns into the Orchestrator layer.

@@ -12,6 +12,31 @@ from ...decorators import with_orchestrator
 from ...utils import console, raise_cli_error
 
 
+def sqlite_db_path(orchestrator: Orchestrator) -> Path | None:
+    """Return the state database file for a SQLite backend, or None for other backends."""
+    engine_url = orchestrator.state_manager.engine.url
+    if engine_url.drivername != "sqlite":
+        return None
+    # Ensure database path is treated as string, as Path() expects str or PathLike
+    return Path(str(engine_url.database))
+
+
+def copy_state_db(state_db_path: Path, output_path: Path, timestamp: str) -> Path:
+    """Copy the SQLite state database to ``output_path`` as a timestamped file.
+
+    Args:
+        state_db_path: Existing state database file.
+        output_path: Existing directory to place the copy in.
+        timestamp: ``%Y%m%d_%H%M%S`` stamp used in the file name.
+
+    Returns:
+        Path of the backup file.
+    """
+    db_backup_path = output_path / f"infrafoundry_state_{timestamp}.db"
+    shutil.copy2(state_db_path, db_backup_path)
+    return db_backup_path
+
+
 @click.group()
 def state() -> None:
     """Manage InfraFoundry state database (backup, restore, migrate)."""
@@ -47,20 +72,9 @@ def state_backup(
         output_path = Path(output_dir).resolve()
         output_path.mkdir(parents=True, exist_ok=True)
 
-        # Determine state.db location
-        # This is a bit tricky, StateManager._determine_state_dir is private.
-        # For now, let's assume it's in orchestrator.state_manager._state_dir
-        # Or, we can use the default ~/.infrafoundry/state.db or .infrafoundry/state.db
-        # Let's use the explicit connection string if it's sqlite, or fallback to default path logic
-
-        state_db_path = None
-        # Try to infer from StateManager's connection_string
-        if orchestrator.state_manager.engine.url.drivername == "sqlite":
-            # Ensure database path is treated as string, as Path() expects str or PathLike
-            db_path_str = str(orchestrator.state_manager.engine.url.database)
-            state_db_path = Path(db_path_str)
-        else:
-            # If not SQLite, it's likely a remote DB, so backup is not a file copy.
+        state_db_path = sqlite_db_path(orchestrator)
+        if state_db_path is None:
+            # Not SQLite, so likely a remote DB: backup is not a file copy.
             console.warning(
                 "InfraFoundry state is not a local SQLite database. Skipping file backup."
             )
@@ -71,10 +85,7 @@ def state_backup(
             return
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        db_backup_name = f"infrafoundry_state_{timestamp}.db"
-        db_backup_path = output_path / db_backup_name
-
-        shutil.copy2(state_db_path, db_backup_path)
+        db_backup_path = copy_state_db(state_db_path, output_path, timestamp)
         console.success(f"State database backed up to: {db_backup_path}")
 
         if include_generated:

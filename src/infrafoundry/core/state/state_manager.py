@@ -22,6 +22,7 @@ from infrafoundry.core.state.models import (
     Resource,
     ResourceState,
 )
+from infrafoundry.core.state.prune import prune_environment as _prune_environment
 from infrafoundry.core.state.resource_repository import ResourceRepository
 from infrafoundry.core.types import DeploymentMetadata, ResourceTrackingMetadata, RollbackData
 
@@ -200,6 +201,23 @@ class StateManager(BaseManager):
         deployment_envs = set(self.deployments.list_environments())
         resource_envs = set(self.resources.list_environments())
         return sorted(deployment_envs | resource_envs)
+
+    def prune_environment(self, environment: str, dry_run: bool = False) -> dict[str, int]:
+        """Delete every state row of an environment in one transaction.
+
+        The audit trail (``audit_entries``) is kept.
+
+        Args:
+            environment: Environment name
+            dry_run: Count the rows without deleting
+
+        Returns:
+            Row count per table
+
+        Raises:
+            StateError: If another environment's resources reference its deployments
+        """
+        return _prune_environment(self.SessionLocal, environment, dry_run=dry_run)
 
     def count_resources(self, environment: str) -> int:
         """Count tracked resources for an environment.
