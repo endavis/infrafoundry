@@ -302,6 +302,13 @@ def _check_consistency(config_dir: Path | None, deep: bool) -> CheckResult:
     )
 
 
+def _first_with_more(items: list[str]) -> str:
+    """Return the first item, noting how many more follow."""
+    if len(items) > 1:
+        return f"{items[0]} (+{len(items) - 1} more)"
+    return items[0]
+
+
 def _check_blueprints() -> CheckResult:
     """Validate blueprint templates using static analysis.
 
@@ -322,9 +329,8 @@ def _check_blueprints() -> CheckResult:
                 message="No blueprints found (nothing to validate)",
             )
 
-        total_errors = 0
-        total_warnings = 0
         error_details: list[str] = []
+        warning_details: list[str] = []
 
         for name in names:
             try:
@@ -332,35 +338,41 @@ def _check_blueprints() -> CheckResult:
                 validator = BlueprintValidator(resolved)
                 result = validator.validate()
                 for prov in result.providers:
-                    total_errors += len(prov.errors)
-                    total_warnings += len(prov.warnings)
                     for err in prov.errors:
                         error_details.append(f"{name}/{prov.provider}: {err}")
+                    for warn in prov.warnings:
+                        warning_details.append(f"{name}/{prov.provider}: {warn}")
             except Exception as e:
-                total_errors += 1
                 error_details.append(f"{name}: {e}")
 
-        if total_errors > 0:
+        if error_details:
             message = (
                 f"{len(names)} blueprint(s) checked, "
-                f"{total_errors} error(s), {total_warnings} warning(s)"
+                f"{len(error_details)} error(s), {len(warning_details)} warning(s): "
+                f"{_first_with_more(error_details)}"
             )
-            if error_details:
-                message += f": {error_details[0]}"
-                if len(error_details) > 1:
-                    message += f" (+{len(error_details) - 1} more)"
             return CheckResult(
                 name="Blueprints",
                 status="error",
                 message=message,
                 suggestion="Run 'config doctor --format json' for full details",
+                details=error_details + warning_details,
             )
 
-        if total_warnings > 0:
+        if warning_details:
             return CheckResult(
                 name="Blueprints",
                 status="warning",
-                message=(f"{len(names)} blueprint(s) checked, {total_warnings} warning(s)"),
+                message=(
+                    f"{len(names)} blueprint(s) checked, {len(warning_details)} warning(s): "
+                    f"{_first_with_more(warning_details)}"
+                ),
+                suggestion=(
+                    "Run 'config doctor --format json' for full details"
+                    if len(warning_details) > 1
+                    else ""
+                ),
+                details=warning_details,
             )
 
         return CheckResult(
