@@ -433,6 +433,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_cloud_init_mixin.py",
     "tests/unit/test_config.py",
     "tests/unit/test_config_diff.py",
+    "tests/unit/test_console_connector_blueprint.py",
     "tests/unit/test_credential_loader.py",
     "tests/unit/test_dependencies.py",
     "tests/unit/test_dependencies_graph.py",
