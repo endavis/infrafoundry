@@ -102,7 +102,7 @@ sudo chmod a+r /etc/apt/keyrings/docker.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" \
     | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
 sudo apt-get update -y
-docker_apt_version=$(apt-cache madison docker-ce | awk -F'|' -v v="5:${DOCKER_VERSION}-" 'index($2, v) > 0 { gsub(/ /, "", $2); print $2; exit }')
+docker_apt_version=$(apt-cache madison docker-ce | awk -F'|' -v v="5:${DOCKER_VERSION}-" '!f && index($2, v) > 0 { gsub(/ /, "", $2); print $2; f = 1 }')
 if [ -z "$docker_apt_version" ]; then
     echo "ERROR: docker-ce ${DOCKER_VERSION} not found in the apt repository; see 'apt-cache madison docker-ce'" >&2
     exit 1
