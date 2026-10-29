@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793298998279,
+  "lastUpdate": 1793299732066,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12059,6 +12059,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022686533291071882",
             "extra": "mean: 77.83962902763784 usec\nrounds: 13966"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cdf326f50f381113b661c5c6953c090292d50d0a",
+          "message": "fix: keep state backups next to the state db and never overwrite them (merges PR #1199, addresses #1198)\n\nstate prune wrote its pre-prune backup to the current directory, which\nput untracked database copies in the repo root. It now defaults to a\nbackups directory next to the SQLite state DB.\n\nThe backup copy helper, shared with state backup, named files by the\nsecond and overwrote an existing file, so two backups in the same\nsecond kept only the second. It now reserves the name exclusively and\nfalls through to -1, -2, ... when the name is taken.\n\nAddresses #1198\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T18:47:52Z",
+          "tree_id": "7efe1efc37e909ae570fc8dcb2ddc2e42003afc6",
+          "url": "https://github.com/endavis/infrafoundry/commit/cdf326f50f381113b661c5c6953c090292d50d0a"
+        },
+        "date": 1793299729572,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7805.089983403906,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010854357888222707",
+            "extra": "mean: 128.1215209723804 usec\nrounds: 8392"
           }
         ]
       }
