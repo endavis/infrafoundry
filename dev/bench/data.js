@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793288878567,
+  "lastUpdate": 1793291397512,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11811,6 +11811,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013240326599855578",
             "extra": "mean: 130.15494439137123 usec\nrounds: 8380"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cba2a473b5d6de2992e977bcec1c91ea5ba5f62b",
+          "message": "feat: expose memory ballooning in the console-connector blueprint (merges PR #1184, addresses #1183)\n\nThe agent VM had fixed memory with ballooning off, so the guest filled it\nwith page cache the host could not reclaim, and a full Proxmox node's\nout-of-memory killer took the VM down. A new optional balloon input sets\nthe minimum memory with ballooning on; the default 0 keeps it off. The\nREADME notes the installer's 13,312 MiB minimum and when to use it.\n\nAddresses #1183\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T16:29:01Z",
+          "tree_id": "38d86926b0f3dabd8d60111ca8a2625309efa31b",
+          "url": "https://github.com/endavis/infrafoundry/commit/cba2a473b5d6de2992e977bcec1c91ea5ba5f62b"
+        },
+        "date": 1793291396323,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15389.172108087856,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000017220305739624733",
+            "extra": "mean: 64.9807535438794 usec\nrounds: 16437"
           }
         ]
       }
