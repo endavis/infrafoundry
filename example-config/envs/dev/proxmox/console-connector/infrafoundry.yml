@@ -1,0 +1,32 @@
+# NetApp Console agent — example consumer of the console-connector blueprint.
+#
+# All deployment logic (VM definition, DHCP reservation, install scripts,
+# event handlers) lives in blueprints/console-connector/. This file only
+# supplies the per-instance values.
+#
+# See blueprints/console-connector/README.md for the full variable reference
+# and the manual registration steps.
+#
+# Run: foundry infra apply --env dev --package console-connector
+
+name: console-connector
+description: "NetApp Console agent (example)"
+blueprint: console-connector
+
+variables:
+  # --- VM placement ---
+  vm_name: console-connector
+  vmid: 223
+  target_node: pve1
+  disk_storage: local-lvm
+
+  # --- Network ---
+  ip_address: "192.168.1.51"
+  dhcp_subnet: my-subnet
+
+  # --- Console agent installer (mirrored from the NetApp Support Site) ---
+  console_agent_url_base: "http://your-web-server/applications/console-connector"
+  console_agent_installer: "NetApp_Console_Agent_Cloud_CHANGE_ME"
+
+  # --- SSH jumphost (for remote VM access during install) ---
+  jumphost: "ansible@ansible.example.com"

@@ -18,6 +18,7 @@ BLUEPRINTS_DIR = Path(__file__).resolve().parents[2] / "blueprints"
 # Each entry: (blueprint, resource_file, base_tags_list)
 BLUEPRINT_TAG_CASES = [
     ("aiqum", "vm.yaml", ["ontap", "aiqum"]),
+    ("console-connector", "vm.yaml", ["ontap", "console-connector"]),
     ("k3s-cluster", "providers/proxmox/vm.yaml", ["k3s", "k3s-server"]),
     ("k3s-cluster", "providers/proxmox/vm.yaml", ["k3s", "k3s-agent"]),
     ("ontap-cluster", "vm.yaml", ["ontap", "ontap-lab"]),
