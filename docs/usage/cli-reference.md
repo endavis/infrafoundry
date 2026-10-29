@@ -32,7 +32,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 
 - `foundry doctor` -- checks system-level binary dependencies
 - `foundry config doctor` -- checks config repo structure and health
-- `foundry infra doctor --env <env>` -- validates against live provider APIs
+- `foundry infra doctor --env <env>` -- validates against live provider APIs. Options: `-r/--resource`, `-p/--package`, `-P/--provider` (repeatable; limits validation, connectivity checks and the jumphost preflight to the named providers), `-v/--verbose`. `--package`, `--resource` and `--provider` are mutually exclusive; an unknown provider name fails with the list of available providers. Example: `foundry infra doctor --env <env> -P opnsense`
 
 ## Audience and Prerequisites
 
