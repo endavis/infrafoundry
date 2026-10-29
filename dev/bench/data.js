@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793294828900,
+  "lastUpdate": 1793295677288,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11904,6 +11904,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009980444922915672",
             "extra": "mean: 124.85480772838712 usec\nrounds: 8514"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3f9d8bd48136946790ede0784eb868511cf68491",
+          "message": "fix: keep terraform's error detail in foundry output (merges PR #1193, addresses #1189)\n\nfoundry runs terraform with -json, and terraform puts the explanation of\nan error in each diagnostic's detail field. Both the live progress\noutput and the error summary used only the one-line summary, so a\nfailed apply showed \"Error downloading file from url\" with nothing\nexplaining why, even with --debug.\n\nA new _format_diagnostic helper renders summary, resource address and\ndetail, and both places use it. The live output escapes the text so\nbrackets in terraform's message are not read as Rich markup.\n\nAddresses #1189\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T17:40:26Z",
+          "tree_id": "efddb9dd56ea3c0a9f2d70c1ae7771a2b489b74e",
+          "url": "https://github.com/endavis/infrafoundry/commit/3f9d8bd48136946790ede0784eb868511cf68491"
+        },
+        "date": 1793295676468,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10626.728972884337,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005365583877726436",
+            "extra": "mean: 94.10233408150778 usec\nrounds: 11138"
           }
         ]
       }
