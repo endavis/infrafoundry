@@ -2,8 +2,10 @@
 # NetApp Console agent Post-Terraform Setup
 #
 # Installs Docker Engine and the NetApp Console agent on the Ubuntu 24.04 VM,
-# then waits for the agent web page. Registration with the NetApp Console is a
-# manual browser step (see the blueprint README); no Console API is called.
+# then waits for the agent web page. Registration with the NetApp Console is
+# scripted (Phase 5) when console_client_id, console_client_secret and
+# console_admin_email are set; otherwise it is a manual browser step (see the
+# blueprint README).
 #
 # All remote commands run through the jumphost when `jumphost` is set, since the
 # SSH key for the VM may only exist there.
@@ -150,11 +152,32 @@ while ! curl -skS -o /dev/null -w "%{http_code}" "https://${ip_address}/" 2>"$CU
 done
 echo "  Console agent web page is available"
 
+# --- Phase 5: Register the agent with the NetApp Console (optional) ---
+echo ""
+log "--- Phase 5: Registering the Console agent ---"
+command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 is required for registration" >&2; exit 1; }
+# The helper reads INFRAFOUNDRY_PACKAGE_VARS itself; no secret goes on a command line.
+REGISTRATION_REQUESTED=0
+if [ -n "${console_client_id:-}${console_client_secret:-}${console_admin_email:-}" ]; then
+    REGISTRATION_REQUESTED=1
+fi
+AGENT_CERT=""
+if [ "${REGISTRATION_REQUESTED}" -eq 1 ]; then
+    # Pin the agent's own certificate (fetched over the SSH channel to the VM) so the
+    # bearer token is only ever sent to this agent. A path, not a secret, goes on argv.
+    AGENT_CERT=$(mktemp)
+    trap 'rm -f "$WAIT_ERR" "$CURL_ERR" "$AGENT_CERT"' EXIT
+    remote_cmd "${ip_address}" "openssl s_client -connect 127.0.0.1:443 -servername localhost </dev/null 2>/dev/null | openssl x509" >"$AGENT_CERT"
+fi
+python3 "${SCRIPT_DIR}/console-connector-register.py" ${AGENT_CERT:+--agent-cert "$AGENT_CERT"}
+
 echo ""
 log "=== Console agent install complete ==="
-echo "  Registration is a manual step. In a browser:"
-echo "    1. Open https://${ip_address}"
-echo "    2. Log in and choose your NetApp Console organization"
-echo "    3. Name the system; keep restricted mode disabled"
-echo "    4. Select 'Let's start'"
+if [ "${REGISTRATION_REQUESTED}" -eq 0 ]; then
+    echo "  Registration is a manual step. In a browser:"
+    echo "    1. Open https://${ip_address}"
+    echo "    2. Log in and choose your NetApp Console organization"
+    echo "    3. Name the system; keep restricted mode disabled"
+    echo "    4. Select 'Let's start'"
+fi
 echo "  Then add the ONTAP cluster in the NetApp Console (see the blueprint README)."

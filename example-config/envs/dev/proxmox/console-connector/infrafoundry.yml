@@ -26,9 +26,15 @@ variables:
 
   # --- Console agent installer (mirrored from the NetApp Support Site) ---
   console_agent_url_base: "http://your-web-server/applications/console-connector"
-  console_agent_installer: "NetApp_Console_Agent_Cloud_CHANGE_ME"
+  console_agent_installer: "netapp-console-agent-CHANGE_ME"
   # sha256sum of the installer, checked on the VM before it runs as root.
   console_agent_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+
+  # --- Optional scripted registration (set all three, or none) ---
+  # console_client_secret (and console_client_id) belong in secrets.yaml (SOPS).
+  # console_client_id: "<service account client id>"
+  # console_admin_email: "admin@example.com"
+  # console_account_id: ""   # needed when the service account sees several orgs
 
   # --- SSH jumphost (for remote VM access during install) ---
   jumphost: "ansible@ansible.example.com"

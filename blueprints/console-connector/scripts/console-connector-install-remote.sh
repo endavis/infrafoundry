@@ -20,7 +20,7 @@
 #                               the docker-ce apt versions ("5:<version>-...").
 #   CONSOLE_AGENT_URL_BASE      Required. Base URL hosting the installer.
 #   CONSOLE_AGENT_INSTALLER     Required. Installer file name
-#                               (NetApp_Console_Agent_Cloud_<version>).
+#                               (netapp-console-agent-<version>).
 #   CONSOLE_AGENT_SHA256        Required. SHA-256 of the installer; the download
 #                               is checked against it before it runs as root.
 #   CONSOLE_AGENT_INSTALL_ARGS  Optional. Extra installer flags (--proxy, --cacert).

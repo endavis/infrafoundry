@@ -23,7 +23,7 @@ inputs:
     description: "URL base of an internal mirror of the NetApp Console agent installer"
     required: true
   - name: console_agent_installer
-    description: "Installer file name on the mirror, e.g. NetApp_Console_Agent_Cloud_<version>"
+    description: "Installer file name on the mirror, e.g. netapp-console-agent-<version>"
     required: true
   - name: console_agent_sha256
     description: "SHA-256 of the installer; checked on the VM before it runs as root"
@@ -73,6 +73,26 @@ inputs:
     description: 'Extra installer flags, e.g. "--proxy http://proxy:3128 --cacert /path/ca.pem"'
     default: ""
 
+  # --- Optional scripted registration (all three of id/secret/email, or none) ---
+  - name: console_client_id
+    description: "Service account client ID (NetApp Console). Enables scripted registration"
+    default: ""
+  - name: console_client_secret
+    description: "Service account client secret; keep it in secrets.yaml (SOPS)"
+    default: ""
+  - name: console_admin_email
+    description: "Email of the Console user that administers the agent"
+    default: ""
+  - name: console_account_id
+    description: "Console organization (account) ID; empty: use the only account the service account sees"
+    default: ""
+  - name: console_company
+    description: "Company name sent at registration; empty: vm_name"
+    default: ""
+  - name: console_site
+    description: "Site name sent at registration"
+    default: "default"
+
   # Extra Proxmox tags appended to the blueprint's default tags
   - name: extra_tags
     default: []
@@ -86,7 +106,7 @@ events:
     - type: script
       name: console-connector-setup
       script: scripts/console-connector-post-terraform.sh
-      description: "Install Docker and the NetApp Console agent (registration is manual)"
+      description: "Install Docker and the NetApp Console agent (registers it when service account inputs are set)"
       timeout: 3600
       continue_on_error: false
       requires:

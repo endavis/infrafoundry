@@ -239,3 +239,35 @@ def test_post_script_upload_and_jumphost_hardening() -> None:
     jump_lines = [ln for ln in text.splitlines() if "${JUMP_SSH}" in ln]
     assert jump_lines
     assert all("StrictHostKeyChecking" not in ln.split("${JUMPHOST}")[0] for ln in jump_lines)
+
+
+REGISTER_SCRIPT = SCRIPTS_DIR / "console-connector-register.py"
+BLUEPRINT_README = REPO_ROOT / "blueprints" / "console-connector" / "README.md"
+
+
+def test_register_helper_compiles_and_is_executable() -> None:
+    """The registration helper is valid Python and has the exec bit."""
+    compile(REGISTER_SCRIPT.read_text(), str(REGISTER_SCRIPT), "exec")
+    assert os.access(REGISTER_SCRIPT, os.X_OK)
+
+
+def test_post_script_calls_helper_without_secret_argv() -> None:
+    """Phase 5 calls the helper and never puts a secret on a command line."""
+    text = POST_SCRIPT.read_text()
+    assert "console-connector-register.py" in text
+    code = [ln for ln in text.splitlines() if not ln.lstrip().startswith("#")]
+    assert not any("console_client_secret" in ln and "register" in ln for ln in code)
+
+
+def test_registration_inputs_are_optional(loader: PackageLoader) -> None:
+    """The example package loads without the registration inputs."""
+    _r, _e, variables = loader.load_package(PACKAGE_DIR, provider="proxmox", env_name="dev")
+    assert variables["console_client_secret"] == ""
+    assert variables["console_site"] == "default"
+
+
+def test_readme_uses_real_installer_name() -> None:
+    """The README names the installer netapp-console-agent-<version>."""
+    text = BLUEPRINT_README.read_text()
+    assert "netapp-console-agent-<version>" in text
+    assert "NetApp_Console_Agent_Cloud" not in text
