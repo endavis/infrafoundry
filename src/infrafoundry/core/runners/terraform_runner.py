@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import IO, Any, cast, override
 
 from rich.console import Console
+from rich.markup import escape
 
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.result_types import (
@@ -440,10 +441,9 @@ class TerraformRunner(BaseRunner):
                 continue
             if data.get("@level") != "error":
                 continue
-            diagnostic = data.get("diagnostic", {})
-            summary = diagnostic.get("summary") or data.get("@message", "")
-            if summary:
-                summaries.append(summary)
+            message = TerraformRunner._format_diagnostic(data)
+            if message:
+                summaries.append(message)
 
         if summaries:
             return "; ".join(summaries)
@@ -455,6 +455,28 @@ class TerraformRunner(BaseRunner):
                 truncated = truncated[:500] + "..."
             return truncated
         return ""
+
+    @staticmethod
+    def _format_diagnostic(data: dict[str, Any]) -> str:
+        """Render a terraform JSON diagnostic as summary, resource address and detail.
+
+        Terraform puts the explanation of an error in ``diagnostic.detail``; the
+        ``summary`` alone (e.g. "Error downloading file from url") rarely says why.
+
+        Args:
+            data: One decoded ``diagnostic`` event from terraform JSON output.
+
+        Returns:
+            ``"<summary> (<address>): <detail>"``, omitting the parts terraform did not send.
+        """
+        diagnostic = data.get("diagnostic") or {}
+        summary = str(diagnostic.get("summary") or data.get("@message") or "").strip()
+        address = str(diagnostic.get("address") or "").strip()
+        detail = str(diagnostic.get("detail") or "").strip()
+        message = f"{summary} ({address})" if summary and address else summary or address
+        if detail:
+            message = f"{message}: {detail}" if message else detail
+        return message
 
     @staticmethod
     def _collect_stream(stream: IO[str] | None, collected: list[str]) -> None:
@@ -490,9 +512,9 @@ class TerraformRunner(BaseRunner):
             if message:
                 self.console.print(f"  {message}")
         elif msg_type == "diagnostic" and data.get("@level") == "error":
-            detail = data.get("diagnostic", {}).get("summary", message)
+            detail = self._format_diagnostic(data)
             if detail:
-                self.console.print(f"  [red]{detail}[/red]")
+                self.console.print(f"  [red]{escape(detail)}[/red]")
 
     def _parse_json_output(
         self,
