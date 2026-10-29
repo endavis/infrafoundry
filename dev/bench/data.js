@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793296660827,
+  "lastUpdate": 1793296976567,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11997,6 +11997,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015770771179005972",
             "extra": "mean: 61.92487834732616 usec\nrounds: 17402"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "077becc2745120bf01e4a7c0f48c7f9fce9322dd",
+          "message": "docs: point the config export references at provider proxmox export (merges PR #1196, addresses #1146)\n\nconfig export moved to provider proxmox export (ADR-0005), but\nAGENTS.md still listed it under the Config group and the Proxmox\nexporter doc still used it in its example. AGENTS.md now has a Provider\ngroup with export and dump, and the example uses the new command.\n\nAddresses #1146\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T18:02:07Z",
+          "tree_id": "ab08245b8b8386eefa73ec677ee5791bb8086beb",
+          "url": "https://github.com/endavis/infrafoundry/commit/077becc2745120bf01e4a7c0f48c7f9fce9322dd"
+        },
+        "date": 1793296975312,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13088.90839034467,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002346850703143341",
+            "extra": "mean: 76.40056528607631 usec\nrounds: 13931"
           }
         ]
       }
