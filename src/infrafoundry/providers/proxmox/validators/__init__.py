@@ -10,6 +10,9 @@ from infrafoundry.providers.proxmox.validators.storage_config_validator import (
     StorageConfigValidator,
 )
 from infrafoundry.providers.proxmox.validators.storage_validator import StorageValidator
+from infrafoundry.providers.proxmox.validators.template_config_validator import (
+    TemplateConfigValidator,
+)
 from infrafoundry.providers.proxmox.validators.template_validator import TemplateValidator
 from infrafoundry.providers.proxmox.validators.vm_config_validator import VMConfigValidator
 from infrafoundry.providers.proxmox.validators.vmid_validator import VMIDValidator
@@ -21,6 +24,7 @@ __all__ = [
     "SDNConfigValidator",
     "StorageConfigValidator",
     "StorageValidator",
+    "TemplateConfigValidator",
     "TemplateValidator",
     "VMConfigValidator",
     "VMIDValidator",

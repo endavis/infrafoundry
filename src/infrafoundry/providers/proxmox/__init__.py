@@ -21,6 +21,7 @@ from .validators import (
     ContainerConfigValidator,
     SDNConfigValidator,
     StorageConfigValidator,
+    TemplateConfigValidator,
     VMConfigValidator,
 )
 from .validators.sdn_config_validator import sdn_id
@@ -182,9 +183,10 @@ class ProxmoxProvider(
     def _validate_resource_configs(
         self, resources_by_type: dict[str, list[ResourceConfig]]
     ) -> None:
-        """Run field-level config validation on storage, VM, and container resources.
+        """Run field-level config validation on storage, VM, container, SDN and template resources.
 
-        Collects ERROR-level findings from the three ``*ConfigValidator`` classes and
+        Collects ERROR-level findings from the ``*ConfigValidator`` classes (templates
+        are checked for a ``download_image.filename`` Proxmox accepts, #1188) and
         raises ``SchemaValidationError`` with a multi-line summary if any are present.
         WARNING-level findings (e.g., CIFS without ``username``) are collected but do
         not block generation.
@@ -202,6 +204,7 @@ class ProxmoxProvider(
         StorageConfigValidator(report).validate(resources_by_type.get("storage", []))
         VMConfigValidator(report).validate(resources_by_type.get("vm", []))
         ContainerConfigValidator(report).validate(resources_by_type.get("container", []))
+        TemplateConfigValidator(report).validate(resources_by_type.get("template", []))
         SDNConfigValidator(report).validate(
             resources_by_type.get("sdn_zone", []), resources_by_type.get("sdn_vnet", [])
         )
