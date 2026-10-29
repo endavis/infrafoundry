@@ -162,7 +162,6 @@ Key commands (`foundry` via `uv run foundry ...`):
 - `config create <name>` – create a new environment
 - `config new create <blueprint> <dir>` – create infrastructure from blueprints
 - `config migrate --env <name> --provider <p> --component <c>` – migrate existing infra to config
-- `config export --env <name> --output <dir>` – export provider config to YAML
 - `config schema <export|list|show>` – JSON schemas for IDE autocomplete
 
 **Infra group (`infra`):**
@@ -203,6 +202,10 @@ Key commands (`foundry` via `uv run foundry ...`):
 **Deps group (`deps`):**
 - `deps check --env <name>` – check the Python packages and Ansible collections blueprints in scope require
 - `deps sync --env <name> [--dry-run]` – install the unmet ones
+
+**Provider group (`provider`):**
+- `provider proxmox export --env <name> --output <dir>` – export Proxmox config to InfraFoundry YAML
+- `provider proxmox dump --env <name> --output <file>` – dump raw Proxmox API state as a JSON snapshot
 
 Generated artifacts should be reviewed (and optionally validated with native Terraform/Ansible tools) from the `generated/` directory hierarchy.
 

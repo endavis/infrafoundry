@@ -15,7 +15,7 @@ The Proxmox Config Exporter allows you to extract existing Proxmox cluster confi
 ## Usage
 
 ```bash
-foundry config export --env prod --output ./envs/imported --provider proxmox
+foundry provider proxmox export --env prod --output ./envs/imported
 ```
 
 ## Features
