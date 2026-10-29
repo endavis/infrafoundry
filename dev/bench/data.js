@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793296268444,
+  "lastUpdate": 1793296660827,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11966,6 +11966,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002645121544069676",
             "extra": "mean: 137.05039770582525 usec\nrounds: 8456"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b0d91f6f50931b096297e02d037068d33fe4695f",
+          "message": "docs: correct what balloon 0 means in the console-connector blueprint (merges PR #1195, addresses #1192)\n\nSince the provider keeps the balloon device on by default, a balloon of\n0 no longer turns ballooning off: the blueprint leaves 0 out, so the VM\nkeeps its balloon device and is never shrunk. The input description,\nthe README table and the ballooning note now say so.\n\nAddresses #1192\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T17:56:49Z",
+          "tree_id": "97834d5eff9348ab86a9b873961692084db61ccc",
+          "url": "https://github.com/endavis/infrafoundry/commit/b0d91f6f50931b096297e02d037068d33fe4695f"
+        },
+        "date": 1793296659406,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16148.59853888076,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015770771179005972",
+            "extra": "mean: 61.92487834732616 usec\nrounds: 17402"
           }
         ]
       }
