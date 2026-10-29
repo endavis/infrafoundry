@@ -21,11 +21,13 @@
 #   CONSOLE_AGENT_URL_BASE      Required. Base URL hosting the installer.
 #   CONSOLE_AGENT_INSTALLER     Required. Installer file name
 #                               (NetApp_Console_Agent_Cloud_<version>).
+#   CONSOLE_AGENT_SHA256        Required. SHA-256 of the installer; the download
+#                               is checked against it before it runs as root.
 #   CONSOLE_AGENT_INSTALL_ARGS  Optional. Extra installer flags (--proxy, --cacert).
 #
 # Target OS tool assumptions (Ubuntu 24.04 cloud image):
 #   bash, sudo, apt-get, apt-cache, curl, gpg (gnupg), df, awk, tail, dpkg,
-#   systemctl, docker (installed by this script)
+#   sha256sum, systemctl, docker (installed by this script)
 #
 # Side effects (on the target VM):
 #   - Adds Docker's apt repository and installs docker-ce at DOCKER_VERSION
@@ -40,6 +42,11 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 : "${DOCKER_VERSION:?required}"
 : "${CONSOLE_AGENT_URL_BASE:?required}"
 : "${CONSOLE_AGENT_INSTALLER:?required}"
+: "${CONSOLE_AGENT_SHA256:?required}"
+if ! [[ "${CONSOLE_AGENT_SHA256}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    echo "ERROR: CONSOLE_AGENT_SHA256 must be a 64-character hex SHA-256" >&2
+    exit 1
+fi
 CONSOLE_AGENT_INSTALL_ARGS="${CONSOLE_AGENT_INSTALL_ARGS:-}"
 
 # Free space required, in GiB (verified from the NetApp install page).
@@ -107,7 +114,18 @@ sudo systemctl enable --now docker
 
 log "=== Step 3: Downloading the Console agent installer ==="
 cd /tmp/console-connector-install
+case "${CONSOLE_AGENT_URL_BASE}" in
+    https://*) ;;
+    *) echo "WARNING: ${CONSOLE_AGENT_URL_BASE} is not https; relying on the SHA-256 check" >&2 ;;
+esac
 curl -4 -fsSO "${CONSOLE_AGENT_URL_BASE}/${CONSOLE_AGENT_INSTALLER}"
+# The installer runs as root: refuse anything that is not the expected file.
+if ! echo "${CONSOLE_AGENT_SHA256}  ${CONSOLE_AGENT_INSTALLER}" | sha256sum -c --status -; then
+    echo "ERROR: ${CONSOLE_AGENT_INSTALLER} does not match console_agent_sha256; not running it" >&2
+    rm -f "${CONSOLE_AGENT_INSTALLER}"
+    exit 1
+fi
+echo "  SHA-256 verified"
 chmod +x "${CONSOLE_AGENT_INSTALLER}"
 
 log "=== Step 4: Running the Console agent installer ==="

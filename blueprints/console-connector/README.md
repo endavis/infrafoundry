@@ -31,6 +31,7 @@ variables:
   dhcp_subnet: my-subnet
   console_agent_url_base: "http://web/applications/console-connector"
   console_agent_installer: "NetApp_Console_Agent_Cloud_<version>"
+  console_agent_sha256: "<sha256sum of the installer>"
 ```
 
 ```bash
@@ -51,6 +52,7 @@ infra apply --env <env> --package console-connector
 | `dhcp_subnet` | OPNsense Kea subnet reference |
 | `console_agent_url_base` | Base URL of your internal mirror of the installer |
 | `console_agent_installer` | Installer file name, `NetApp_Console_Agent_Cloud_<version>` |
+| `console_agent_sha256` | SHA-256 of the installer (`sha256sum <file>`). The VM refuses to run a download that does not match. |
 
 ### Optional (blueprint defaults)
 

@@ -25,6 +25,9 @@ inputs:
   - name: console_agent_installer
     description: "Installer file name on the mirror, e.g. NetApp_Console_Agent_Cloud_<version>"
     required: true
+  - name: console_agent_sha256
+    description: "SHA-256 of the installer; checked on the VM before it runs as root"
+    required: true
 
   # --- VM hardware ---
   - name: template_vmid

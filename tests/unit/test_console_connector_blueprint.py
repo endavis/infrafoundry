@@ -9,6 +9,7 @@ Depends only on files checked into this repository:
   - example-config/envs/dev/proxmox/console-connector/
 """
 
+import os
 import subprocess
 import textwrap
 from pathlib import Path
@@ -144,3 +145,70 @@ def test_remote_script_guarantees() -> None:
     assert guard < text.index("curl -4 -fsSO")
     assert guard < text.index("apt-get install -y ca-certificates")
     assert text.count("console_agent_installed()") == 1
+
+
+def test_remote_script_verifies_installer_before_running_it() -> None:
+    """The download is checked against CONSOLE_AGENT_SHA256 before chmod and exec."""
+    text = REMOTE_SCRIPT.read_text()
+    assert ': "${CONSOLE_AGENT_SHA256:?required}"' in text
+    check = text.index("sha256sum -c --status -")
+    assert text.index("curl -4 -fsSO") < check
+    assert check < text.index('chmod +x "${CONSOLE_AGENT_INSTALLER}"')
+    assert check < text.index('"./${CONSOLE_AGENT_INSTALLER}"')
+
+
+@pytest.mark.parametrize(
+    ("sha", "ok"),
+    [("a" * 64, True), ("A1" * 32, True), ("a" * 63, False), ("g" * 64, False), ("", False)],
+)
+def test_remote_script_rejects_malformed_sha256(sha: str, ok: bool) -> None:
+    """Only a 64-character hex digest gets past the input check."""
+    text = REMOTE_SCRIPT.read_text()
+    start = text.index('if ! [[ "${CONSOLE_AGENT_SHA256}"')
+    block = text[start : text.index("fi\n", start) + 3]
+    result = subprocess.run(
+        ["bash", "-c", block],
+        env={**os.environ, "CONSOLE_AGENT_SHA256": sha},
+        capture_output=True,
+        text=True,
+    )
+    assert (result.returncode == 0) is ok
+
+
+def test_sha256_is_a_required_input(tmp_path: Path) -> None:
+    """A package with the installer location but no digest fails to load."""
+    envs = tmp_path / "envs"
+    pkg = envs / "test" / "proxmox" / "cc"
+    pkg.mkdir(parents=True)
+    (pkg / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: cc
+            blueprint: console-connector
+            variables:
+              vm_name: cc
+              vmid: 230
+              target_node: pve1
+              disk_storage: local-lvm
+              ip_address: "192.168.1.60"
+              dhcp_subnet: s
+              console_agent_url_base: "https://web/cc"
+              console_agent_installer: NetApp_Console_Agent_Cloud_v4.0.0
+            """
+        )
+    )
+    loader = PackageLoader(envs, blueprint_resolver=BlueprintResolver(envs))
+    with pytest.raises(InvalidConfigurationError, match="console_agent_sha256"):
+        loader.load_package(pkg, provider="proxmox", env_name="test")
+
+
+def test_post_script_upload_and_jumphost_hardening() -> None:
+    """No fixed /tmp staging path, and the jumphost hop keeps host-key checks."""
+    text = POST_SCRIPT.read_text()
+    assert "/tmp/_console_connector_upload" not in text
+    assert "/tmp/console-connector-install-remote.sh" not in text
+    assert "mktemp" in text
+    assert 'JUMP_SSH="ssh -o ConnectTimeout=10"' in text
+    jump_lines = [ln for ln in text.splitlines() if "${JUMP_SSH}" in ln]
+    assert jump_lines
+    assert all("StrictHostKeyChecking" not in ln.split("${JUMPHOST}")[0] for ln in jump_lines)

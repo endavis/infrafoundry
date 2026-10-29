@@ -39,21 +39,32 @@ for k, val in v.items():
 ")"
 
 JUMPHOST="${jumphost:-}"
-SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
+# Host keys are not checked for the VM: it gets new keys on every rebuild. The
+# jumphost is a long-lived host, so its connection keeps normal verification.
+VM_SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+SSH="ssh ${VM_SSH_OPTS} -o ConnectTimeout=10"
+JUMP_SSH="ssh -o ConnectTimeout=10"
 SSH_USER="${ssh_user:-ansible}"
 DOCKER_VERSION="${docker_version:-27.5.1}"
 INSTALL_ARGS="${console_agent_install_args:-}"
 : "${console_agent_url_base:?required: set console_agent_url_base in the package}"
 : "${console_agent_installer:?required: set console_agent_installer in the package}"
+: "${console_agent_sha256:?required: set console_agent_sha256 in the package}"
 
 if [ -n "${JUMPHOST}" ]; then
-    remote_cmd() { ${SSH} ${JUMPHOST} "${SSH} ${SSH_USER}@${1} '${2}'"; }
-    remote_cmd_long() { ${SSH} -o ServerAliveInterval=30 ${JUMPHOST} "${SSH} -o ServerAliveInterval=30 ${SSH_USER}@${1} '${2}'"; }
-    remote_upload() { scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$1" "${JUMPHOST}:/tmp/_console_connector_upload" && ${SSH} ${JUMPHOST} "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/_console_connector_upload ${SSH_USER}@${2}:${3}"; }
+    remote_cmd() { ${JUMP_SSH} ${JUMPHOST} "${SSH} ${SSH_USER}@${1} '${2}'"; }
+    remote_cmd_long() { ${JUMP_SSH} -o ServerAliveInterval=30 ${JUMPHOST} "${SSH} -o ServerAliveInterval=30 ${SSH_USER}@${1} '${2}'"; }
+    # Stage through a private mktemp file on the jumphost, removed afterwards.
+    remote_upload() {
+        local staged
+        staged=$(${JUMP_SSH} ${JUMPHOST} mktemp) || return 1
+        scp "$1" "${JUMPHOST}:${staged}" \
+            && ${JUMP_SSH} ${JUMPHOST} "scp ${VM_SSH_OPTS} ${staged} ${SSH_USER}@${2}:${3}; rc=\$?; rm -f ${staged}; exit \$rc"
+    }
 else
     remote_cmd() { ${SSH} ${SSH_USER}@${1} "${2}"; }
     remote_cmd_long() { ${SSH} -o ServerAliveInterval=30 ${SSH_USER}@${1} "${2}"; }
-    remote_upload() { scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$1" "${SSH_USER}@${2}:${3}"; }
+    remote_upload() { scp ${VM_SSH_OPTS} "$1" "${SSH_USER}@${2}:${3}"; }
 fi
 
 log "=== NetApp Console agent Post-Terraform Setup ==="
@@ -112,12 +123,13 @@ if [ ! -f "${REMOTE_SCRIPT}" ]; then
     echo "ERROR: Install script not found: ${REMOTE_SCRIPT}" >&2
     exit 1
 fi
-remote_upload "${REMOTE_SCRIPT}" "${ip_address}" "/tmp/console-connector-install-remote.sh"
+# Into the VM user's home, not a shared /tmp path.
+remote_upload "${REMOTE_SCRIPT}" "${ip_address}" "console-connector-install-remote.sh"
 
 # --- Phase 3: Install Docker and the Console agent ---
 echo ""
 log "--- Phase 3: Installing Docker ${DOCKER_VERSION} and the Console agent ---"
-remote_cmd_long "${ip_address}" "chmod +x /tmp/console-connector-install-remote.sh && DOCKER_VERSION='${DOCKER_VERSION}' CONSOLE_AGENT_URL_BASE='${console_agent_url_base}' CONSOLE_AGENT_INSTALLER='${console_agent_installer}' CONSOLE_AGENT_INSTALL_ARGS='${INSTALL_ARGS}' bash /tmp/console-connector-install-remote.sh"
+remote_cmd_long "${ip_address}" "DOCKER_VERSION='${DOCKER_VERSION}' CONSOLE_AGENT_URL_BASE='${console_agent_url_base}' CONSOLE_AGENT_INSTALLER='${console_agent_installer}' CONSOLE_AGENT_SHA256='${console_agent_sha256}' CONSOLE_AGENT_INSTALL_ARGS='${INSTALL_ARGS}' bash ~/console-connector-install-remote.sh"
 
 # --- Phase 4: Wait for the agent web page, print manual steps ---
 echo ""

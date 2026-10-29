@@ -27,6 +27,8 @@ variables:
   # --- Console agent installer (mirrored from the NetApp Support Site) ---
   console_agent_url_base: "http://your-web-server/applications/console-connector"
   console_agent_installer: "NetApp_Console_Agent_Cloud_CHANGE_ME"
+  # sha256sum of the installer, checked on the VM before it runs as root.
+  console_agent_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 
   # --- SSH jumphost (for remote VM access during install) ---
   jumphost: "ansible@ansible.example.com"
