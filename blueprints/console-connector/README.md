@@ -62,6 +62,7 @@ infra apply --env <env> --package console-connector
 | `template_node` | `pve1` | Node hosting the template |
 | `cores` | `8` | vCPU count (unverified sizing, see below) |
 | `memory` | `32768` | Memory in MiB (unverified sizing, see below) |
+| `balloon` | `0` | Minimum memory in MiB with ballooning on; `0` turns it off (see below) |
 | `disk_size` | `180` | Disk GiB: 120 for `/opt` plus 40 for `/var`, plus the OS and headroom (the install script checks the free space) |
 | `bridge` | `vmbr0` | Network bridge |
 | `vlan_tag` | `10` | VLAN tag. Empty: untagged, e.g. on an SDN vnet |
@@ -99,7 +100,13 @@ Verified against the NetApp page above:
 **Not confirmed, verify on a live install:**
 
 - CPU and RAM. 8 cores and 32 GB are the defaults but are not verified; override
-  `cores` and `memory` as needed.
+  `cores` and `memory` as needed. The installer refuses to run below 13,312 MiB
+  of guest MemTotal, so `memory` must be at least 14336.
+- Ballooning. Without it the guest fills its memory with page cache that the
+  host cannot reclaim; a 14 GiB agent using about 2.5 GB was killed by the
+  host's out-of-memory killer on a full node. Set `balloon` (for example 8192)
+  to let the host take memory back under pressure. The guest still sees the full
+  `memory` at install, so the installer's check is unaffected.
 - The idempotency markers (`/opt/application/netapp` present plus a running
   container). They live in one function, `console_agent_installed`, in
   `scripts/console-connector-install-remote.sh`.

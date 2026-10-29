@@ -61,6 +61,7 @@ def test_example_renders_vm_and_dhcp(loader: PackageLoader) -> None:
     assert vm.config["clone"] == {"vm_id": 900, "node_name": "pve1"}
     assert vm.config["cores"] == 8
     assert vm.config["memory"] == 32768
+    assert "balloon" not in vm.config
     assert vm.config["disk"]["size"] == 180
     assert vm.config["tags"] == ["ontap", "console-connector"]
     assert vm.config["cloud_init_snippets"] == [
@@ -89,6 +90,39 @@ def test_on_create_event_points_at_executable_script(loader: PackageLoader) -> N
     assert script.name == "console-connector-post-terraform.sh"
     assert script.is_file()
     assert script.stat().st_mode & 0o111
+
+
+def test_balloon_is_rendered_when_set(tmp_path: Path) -> None:
+    """A non-zero balloon input becomes the VM's balloon minimum (#1183)."""
+    envs = tmp_path / "envs"
+    pkg = envs / "test" / "proxmox" / "cc"
+    pkg.mkdir(parents=True)
+    (pkg / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: cc
+            blueprint: console-connector
+            variables:
+              vm_name: cc
+              vmid: 230
+              target_node: pve1
+              disk_storage: local-lvm
+              ip_address: "192.168.1.60"
+              dhcp_subnet: s
+              memory: 14336
+              balloon: 8192
+              console_agent_url_base: "http://example.invalid/connector"
+              console_agent_installer: netapp-console-agent-4.12.0
+              console_agent_sha256: "%s"
+            """
+            % ("a" * 64)
+        )
+    )
+    loader = PackageLoader(envs, blueprint_resolver=BlueprintResolver(envs))
+    resources, _events, _variables = loader.load_package(pkg, provider="proxmox", env_name="test")
+    vm = next(r for r in resources if r.type == "vm")
+    assert vm.config["memory"] == 14336
+    assert vm.config["balloon"] == 8192
 
 
 def test_missing_required_input_fails(tmp_path: Path) -> None:
