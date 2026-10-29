@@ -30,6 +30,9 @@ inputs:
   - name: memory
     description: "AIQUM minimum recommendation (12 GiB)"
     default: 12288
+  - name: balloon
+    description: "Minimum memory in MiB the host may shrink the VM to; 0 keeps the provider default (balloon device on, never shrunk)"
+    default: 0
   - name: disk_size
     description: "AIQUM minimum (~100 GB+)"
     default: 150

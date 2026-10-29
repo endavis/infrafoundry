@@ -295,3 +295,45 @@ def test_aiqum_empty_vlan_tag_attaches_untagged(tmp_path: Path) -> None:
     vm = next(r for r in resources if r.type == "vm")
     assert vm.config["network"][0]["bridge"] == "ntlan"
     assert "tag" not in vm.config["network"][0]
+
+
+@pytest.mark.parametrize(("balloon", "expected"), [(None, None), (0, None), (8192, 8192)])
+def test_aiqum_balloon_is_rendered_only_when_set(
+    tmp_path: Path, balloon: int | None, expected: int | None
+) -> None:
+    """A non-zero balloon input becomes the VM's balloon minimum (#1185)."""
+    envs = tmp_path / "envs"
+    pkg = envs / "test" / "proxmox" / "aiqum-balloon"
+    pkg.mkdir(parents=True)
+    extra = "" if balloon is None else f"\n              balloon: {balloon}"
+    (pkg / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            f"""\
+            name: aiqum-balloon
+            description: "AIQUM with ballooning"
+            blueprint: aiqum
+            variables:
+              vm_name: aiqum-balloon
+              vmid: 233
+              target_node: pve1
+              disk_storage: local-lvm
+              ip_address: "192.168.99.72"
+              dhcp_subnet: nettest
+              aiqum_admin_password: "pw"
+              aiqum_admin_email: "a@example.com"
+              aiqum_url_base: "http://web/aiqum"
+              smtp_server: "smtp.example.com"
+              smtp_user: "aiqum"
+              smtp_password: "pw"
+              ontap_cluster_ip: "192.168.99.80"
+              ontap_admin_password: "pw"{extra}
+            """
+        )
+    )
+    loader = PackageLoader(envs, blueprint_resolver=BlueprintResolver(envs))
+
+    resources, _events, _variables = loader.load_package(pkg, provider="proxmox", env_name="test")
+
+    vm = next(r for r in resources if r.type == "vm")
+    assert vm.config["memory"] == 12288
+    assert vm.config.get("balloon") == expected
