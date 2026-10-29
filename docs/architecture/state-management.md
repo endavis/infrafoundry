@@ -112,6 +112,17 @@ foundry state resources --env prod --state ACTIVE
 foundry state resources --env prod --state ERROR
 ```
 
+### Pruning Stale Environments
+
+`config doctor` reports state-db-only environments (rows in the state database with no environment in the config repo). Remove one with `foundry state prune`:
+
+```bash
+foundry state prune --env old-env --dry-run   # row counts per table
+foundry state prune --env old-env             # backup, confirm, delete
+```
+
+It deletes the environment's resources, dependencies, deployments, events and locks in one transaction (`StateManager.prune_environment`, [ADR-0007](../decisions/0007-repository-pattern-for-state.md)), keeps the audit trail, and records a `state_pruned` audit entry. See the [CLI reference](../usage/cli-reference.md#state-prune) for the guards and options.
+
 ## Backend Configuration
 
 InfraFoundry supports multiple Terraform backend types for state storage and locking. Configure backends per-environment in `settings.yaml` to enable team collaboration and state locking.
