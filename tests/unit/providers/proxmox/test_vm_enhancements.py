@@ -73,10 +73,82 @@ class TestBalloon:
         assert "floating  = 2048" in content
 
     def test_vm_without_balloon(self, provider: ProxmoxProvider) -> None:
-        """No balloon config should omit the floating attribute."""
+        """No balloon config keeps the balloon device on, minimum = memory (#1186)."""
         vms = [_make_vm()]
         content = _render_vms(provider, vms)
-        assert "floating" not in content
+        assert "dedicated = 2048" in content
+        assert "floating  = 2048" in content
+
+
+class TestBalloonDefaultFloating:
+    """Floating defaults to dedicated for VMs and templates (#1186)."""
+
+    @staticmethod
+    def _render_template(provider: ProxmoxProvider, **cfg: Any) -> str:
+        config: dict[str, Any] = {
+            "name": "tpl",
+            "target_node": "pve01",
+            "vmid": 9000,
+            "download_image": {"url": "https://x/y.img", "filename": "y.img"},
+            "disk": {"storage": "local-lvm"},
+            "network": {"bridge": "vmbr0"},
+            **cfg,
+        }
+        res = ResourceConfig(name="tpl", type="template", provider="proxmox", config=config)
+        return provider.render_template("proxmox/templates.tf.j2", {"templates": [res]})
+
+    @staticmethod
+    def _render_clone_template(provider: ProxmoxProvider, **cfg: Any) -> str:
+        config: dict[str, Any] = {"name": "tpl", "target_node": "pve01", "vmid": 9000, **cfg}
+        res = ResourceConfig(name="tpl", type="template", provider="proxmox", config=config)
+        return provider.render_template("proxmox/templates.tf.j2", {"templates": [res]})
+
+    def test_vm_unset_default_memory(self, provider: ProxmoxProvider) -> None:
+        """Unset balloon and memory render 2048 for both values."""
+        content = _render_vms(provider, [_make_vm()])
+        assert "dedicated = 2048" in content
+        assert "floating  = 2048" in content
+
+    def test_vm_unset_explicit_memory(self, provider: ProxmoxProvider) -> None:
+        """Unset balloon floats at the configured memory."""
+        content = _render_vms(provider, [_make_vm(memory=14336)])
+        assert "floating  = 14336" in content
+
+    def test_vm_balloon_zero(self, provider: ProxmoxProvider) -> None:
+        """Balloon 0 renders floating 0."""
+        content = _render_vms(provider, [_make_vm(memory=14336, balloon=0)])
+        assert "floating  = 0" in content
+
+    def test_vm_balloon_below_memory(self, provider: ProxmoxProvider) -> None:
+        """Balloon below memory renders as given."""
+        content = _render_vms(provider, [_make_vm(memory=14336, balloon=8192)])
+        assert "dedicated = 14336" in content
+        assert "floating  = 8192" in content
+
+    @pytest.mark.parametrize("render", ["_render_template", "_render_clone_template"])
+    def test_template_unset_default_memory(self, provider: ProxmoxProvider, render: str) -> None:
+        """Template without balloon or memory floats at 2048."""
+        content = getattr(self, render)(provider)
+        assert "floating  = 2048" in content
+        assert content.count("floating") == content.count("memory {")
+
+    @pytest.mark.parametrize("render", ["_render_template", "_render_clone_template"])
+    def test_template_unset_explicit_memory(self, provider: ProxmoxProvider, render: str) -> None:
+        """Template without balloon floats at its memory."""
+        content = getattr(self, render)(provider, memory=14336)
+        assert "floating  = 14336" in content
+
+    @pytest.mark.parametrize("render", ["_render_template", "_render_clone_template"])
+    def test_template_balloon_zero(self, provider: ProxmoxProvider, render: str) -> None:
+        """Template balloon 0 renders floating 0."""
+        content = getattr(self, render)(provider, memory=14336, balloon=0)
+        assert "floating  = 0" in content
+
+    @pytest.mark.parametrize("render", ["_render_template", "_render_clone_template"])
+    def test_template_balloon_below_memory(self, provider: ProxmoxProvider, render: str) -> None:
+        """Template balloon below memory renders as given."""
+        content = getattr(self, render)(provider, memory=14336, balloon=8192)
+        assert "floating  = 8192" in content
 
 
 class TestMultiNIC:
@@ -289,7 +361,8 @@ class TestDefaultsUnchanged:
         vms = [_make_vm(clone="100")]
         content = _render_vms(provider, vms)
         assert 'type    = "host"' in content
-        assert "floating" not in content
+        assert "dedicated = 2048" in content
+        assert "floating  = 2048" in content  # balloon on, minimum = memory (#1186)
         assert "cdrom" not in content
         assert "network_device" not in content  # No network defined
 

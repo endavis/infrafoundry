@@ -119,9 +119,7 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   # Memory Configuration
   memory {
     dedicated = {{ vm.config.memory | default(2048) }}
-    {% if vm.config.balloon is defined %}
-    floating  = {{ vm.config.balloon }}
-    {% endif %}
+    floating  = {{ vm.config.balloon if vm.config.balloon is defined else vm.config.memory | default(2048) }}
   }
 
   {% if vm.config.agent is defined %}
