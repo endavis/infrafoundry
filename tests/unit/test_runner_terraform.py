@@ -578,6 +578,71 @@ class TestDestroyFailureCapture:
         assert result["success"] is False
         assert "error" in result
         assert "Instance cannot be destroyed" in result["error"]
+        assert "Resource has lifecycle.prevent_destroy set" in result["error"]
+
+
+class TestFormatDiagnostic:
+    """Terraform diagnostics keep their detail and resource address (#1189)."""
+
+    def test_summary_address_and_detail(self) -> None:
+        data = {
+            "@level": "error",
+            "@message": "Error: Error downloading file from url",
+            "type": "diagnostic",
+            "diagnostic": {
+                "summary": "Error downloading file from url",
+                "detail": "received an HTTP 400 response - Reason: Parameter verification failed.",
+                "address": "proxmox_virtual_environment_download_file.cloud_image",
+            },
+        }
+        assert TerraformRunner._format_diagnostic(data) == (
+            "Error downloading file from url "
+            "(proxmox_virtual_environment_download_file.cloud_image): "
+            "received an HTTP 400 response - Reason: Parameter verification failed."
+        )
+
+    def test_summary_only(self) -> None:
+        data = {"type": "diagnostic", "diagnostic": {"summary": "Invalid reference"}}
+        assert TerraformRunner._format_diagnostic(data) == "Invalid reference"
+
+    def test_detail_without_summary_falls_back_to_message(self) -> None:
+        data = {
+            "type": "diagnostic",
+            "@message": "Error: boom",
+            "diagnostic": {"detail": "the reason"},
+        }
+        assert TerraformRunner._format_diagnostic(data) == "Error: boom: the reason"
+
+    def test_empty_diagnostic(self) -> None:
+        assert TerraformRunner._format_diagnostic({"type": "diagnostic"}) == ""
+
+    def test_error_summary_joins_multiple_diagnostics_with_detail(self) -> None:
+        lines = [
+            json.dumps(
+                {
+                    "@level": "error",
+                    "type": "diagnostic",
+                    "diagnostic": {"summary": f"err{i}", "detail": f"why{i}"},
+                }
+            )
+            for i in (1, 2)
+        ]
+        lines.append(json.dumps({"@level": "warning", "type": "diagnostic", "diagnostic": {}}))
+        assert TerraformRunner._extract_error_summary(lines, "") == "err1: why1; err2: why2"
+
+    def test_live_progress_prints_detail_escaped(self, runner: TerraformRunner) -> None:
+        runner.console = MagicMock()
+        runner._print_json_progress(
+            json.dumps(
+                {
+                    "@level": "error",
+                    "type": "diagnostic",
+                    "diagnostic": {"summary": "Bad value", "detail": "expected [a-z]+"},
+                }
+            )
+        )
+        printed = runner.console.print.call_args.args[0]
+        assert "Bad value: expected \\[a-z]+" in printed
 
 
 class TestVerifyDestroyed:
