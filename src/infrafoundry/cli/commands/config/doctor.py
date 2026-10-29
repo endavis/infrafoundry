@@ -280,7 +280,14 @@ def _check_consistency(config_dir: Path | None, deep: bool) -> CheckResult:
             name="State Consistency",
             status="error",
             message=message,
-            suggestion="Deploy missing environments or clean up stale state records",
+            suggestion=(
+                "Deploy missing environments, or remove stale state records with "
+                + (
+                    f"'foundry state prune --env {sorted(db_only)[0]}'"
+                    if db_only
+                    else "'foundry state prune --env <name>'"
+                )
+            ),
         )
 
     message = "All environments consistent"

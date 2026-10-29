@@ -79,6 +79,9 @@ class EventType(StrEnum):
     LOCK_TIMEOUT = "lock_timeout"
     LOCK_HEARTBEAT_FAILED = "lock_heartbeat_failed"
 
+    # State maintenance
+    STATE_PRUNED = "state_pruned"
+
 
 class HandlerType(StrEnum):
     """Types of event handlers."""

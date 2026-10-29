@@ -187,6 +187,7 @@ Key commands (`foundry` via `uv run foundry ...`):
 - `state list --env <name>` – list resources in an environment
 - `state resources` – list tracked infrastructure resources
 - `state backup` – backup state database
+- `state prune --env <name>` – delete a stale environment's rows from the state database
 - `state backend <validate|migrate>` – manage Terraform backend configuration
 - `state audit <list|export|verify>` – view and export audit trail
 
