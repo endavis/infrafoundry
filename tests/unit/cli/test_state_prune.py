@@ -218,3 +218,47 @@ def test_doctor_suggestion_names_prune(config_dir: Path) -> None:
 
     assert result.suggestion is not None
     assert "foundry state prune --env stale" in result.suggestion
+
+
+def test_copy_state_db_never_overwrites(tmp_path: Path) -> None:
+    from infrafoundry.cli.commands.state.state import copy_state_db
+
+    src = tmp_path / "src.db"
+    src.write_bytes(b"one")
+    out = tmp_path / "out"
+    out.mkdir()
+    first = copy_state_db(src, out, "20260101_000000")
+    src.write_bytes(b"two")
+    second = copy_state_db(src, out, "20260101_000000")
+
+    assert first != second
+    assert second.name == "infrafoundry_state_20260101_000000-1.db"
+    assert first.read_bytes() == b"one"
+    assert second.read_bytes() == b"two"
+
+
+def test_default_backup_dir_is_next_to_state_db(
+    manager: StateManager, config_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed(manager, "stale")
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+
+    result = _run(config_dir, "--env", "stale", "--yes")
+
+    assert result.exit_code == 0, result.output
+    assert len(list((_db_file(manager).parent / "backups").glob("infrafoundry_state_*.db"))) == 1
+    assert list(cwd.rglob("infrafoundry_state_*")) == []
+
+
+def test_explicit_backup_dir_honored(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    _seed(manager, "stale")
+
+    result = _run(config_dir, "--env", "stale", "--yes", "--backup-dir", str(backup_dir))
+
+    assert result.exit_code == 0, result.output
+    assert len(list(backup_dir.glob("infrafoundry_state_*.db"))) == 1
+    assert not (_db_file(manager).parent / "backups").exists()

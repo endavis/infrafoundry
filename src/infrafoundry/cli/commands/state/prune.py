@@ -47,8 +47,11 @@ def _active_lock_holder(orchestrator: Orchestrator, env: str) -> tuple[str, obje
 @click.option(
     "--backup-dir",
     type=click.Path(file_okay=False, dir_okay=True, writable=True),
-    default=".",
-    help="Directory for the pre-prune backup. Defaults to the current directory.",
+    default=None,
+    help=(
+        "Directory for the pre-prune backup. Defaults to a 'backups' directory "
+        "next to the state database. Existing backups are never overwritten."
+    ),
 )
 @with_orchestrator("State prune failed", require_env=True, load_credentials=False)
 def prune(
@@ -59,7 +62,7 @@ def prune(
     force: bool,
     yes: bool,
     no_backup: bool,
-    backup_dir: str,
+    backup_dir: str | None,
 ) -> None:
     """Delete one environment's rows from the state database.
 
@@ -119,7 +122,7 @@ def prune(
         if not db_path.exists():
             raise click.ClickException("InfraFoundry state database file not found.")
         try:
-            out = Path(backup_dir).resolve()
+            out = (Path(backup_dir) if backup_dir else db_path.parent / "backups").resolve()
             out.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = copy_state_db(db_path, out, timestamp)

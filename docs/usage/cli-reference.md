@@ -606,7 +606,7 @@ foundry state resources --provider proxmox --type vm
 
 ### `state backup`
 
-Create a timestamped backup of the state database. Optionally includes the `generated/` directory.
+Create a timestamped backup of the state database. Optionally includes the `generated/` directory. An existing backup is never overwritten: if the name is taken, `-1`, `-2`, ... is appended.
 
 ```bash
 foundry state backup
@@ -630,7 +630,7 @@ foundry state prune --env old-env --yes --backup-dir ./backups
 
 - Refuses an environment that still exists in the config repo unless `--force` is given (for a renamed environment).
 - Refuses an environment with an unexpired deployment lock; release it with `foundry infra unlock`.
-- On SQLite it first copies the database (like `state backup`) and prints the path. If the backup fails nothing is deleted.
+- On SQLite it first copies the database (like `state backup`) and prints the path. The backup goes to `--backup-dir`, which defaults to a `backups` directory next to the state database (created if missing). An existing backup is never overwritten. If the backup fails nothing is deleted.
 - On other backends no file backup is possible: back up with `pg_dump` and pass `--no-backup`.
 - Everything is deleted in one transaction, so a failure leaves the database unchanged.
 
