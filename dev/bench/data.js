@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793281029813,
+  "lastUpdate": 1793283124149,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11718,6 +11718,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001619267832296447",
             "extra": "mean: 64.98930199724546 usec\nrounds: 16573"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f5cf9bc7301fde233f417438b7a4cac553e76823",
+          "message": "feat: add a console-connector blueprint for the NetApp Console agent (merges PR #1174, addresses #1140)\n\n* feat: add a console-connector blueprint for the NetApp Console agent\n\nProvision an Ubuntu 24.04 VM with a DHCP reservation, install Docker\nEngine pinned to a NetApp-supported version, and run the Console agent\ninstaller from an operator-hosted mirror. The post-terraform script waits\nfor the agent web page and prints the registration steps.\n\nNetApp documents registration of a manually installed agent only as a\nbrowser step, so registering, adding the ONTAP cluster and deregistering\nare documented manual steps rather than API calls.\n\nAddresses #1140\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* fix: verify the console agent installer before running it as root\n\nAdd a required console_agent_sha256 input. The VM checks the download\nwith sha256sum before chmod and exec, and warns when the mirror is not\nhttps. Uploads no longer use a fixed /tmp path: the jumphost staging file\ncomes from mktemp and is removed afterwards, the script lands in the VM\nuser's home, and the jumphost connection keeps host-key verification\n(only the rebuilt VM skips it).\n\nAddresses #1140\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T14:11:20Z",
+          "tree_id": "13a8e8b3c5d4166e9fdd3ad6b3ff9249d7b57f63",
+          "url": "https://github.com/endavis/infrafoundry/commit/f5cf9bc7301fde233f417438b7a4cac553e76823"
+        },
+        "date": 1793283123149,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16250.610498248801,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015598669797730204",
+            "extra": "mean: 61.536149679285096 usec\nrounds: 17611"
           }
         ]
       }
