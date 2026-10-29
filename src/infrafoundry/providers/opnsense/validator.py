@@ -459,6 +459,25 @@ class OPNsenseValidator:
             or iface_data.get("interface")
         )
 
+    def _interface_keys(self, iface_data: dict[str, Any]) -> list[str]:
+        """Return every non-empty key an interface can be referenced by.
+
+        OPNsense 26.1 export rows carry ``identifier`` (wan, lan, opt1) and ``device``
+        (em1) but no ``name``; older shapes use ``name``, ``if`` or ``interface``.
+
+        Args:
+            iface_data: Interface data dict
+
+        Returns:
+            Unique non-empty keys, identifier first.
+        """
+        keys: list[str] = []
+        for field in ("identifier", "name", "device", "if", "interface"):
+            value = iface_data.get(field)
+            if isinstance(value, str) and value and value not in keys:
+                keys.append(value)
+        return keys
+
     def _get_existing_interfaces(
         self, api_url: str, api_key: str, api_secret: str
     ) -> dict[str, InterfaceData]:
@@ -490,12 +509,13 @@ class OPNsenseValidator:
         # Normalize to list of interface dicts
         interface_list = self._normalize_interface_data(data)
 
-        # Convert to dict keyed by name
-        return {
-            name: cast(InterfaceData, iface)
-            for iface in interface_list
-            if (name := self._extract_interface_name(iface))
-        }
+        # Register each interface under every identifying key, so references by
+        # identifier (wan), device (em1) or legacy name all resolve.
+        existing: dict[str, InterfaceData] = {}
+        for iface in interface_list:
+            for name in self._interface_keys(iface):
+                existing.setdefault(name, cast(InterfaceData, iface))
+        return existing
 
     def _get_existing_gateways(self, api_url: str, api_key: str, api_secret: str) -> set[str]:
         """Get the set of live gateway names from OPNsense API.
