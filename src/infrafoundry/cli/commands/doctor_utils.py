@@ -8,7 +8,7 @@ rendering functions (Rich table and JSON) used by ``foundry doctor``,
 from __future__ import annotations
 
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from rich.console import Console
@@ -27,6 +27,7 @@ class CheckResult:
     status: str  # "ok", "warning", "error"
     message: str
     suggestion: str = ""
+    details: list[str] = field(default_factory=list)
 
 
 def check_dependency(name: str, command: str, suggestion: str) -> CheckResult:
@@ -122,6 +123,8 @@ def render_check_results_json(results: list[CheckResult]) -> None:
         }
         if result.suggestion:
             check_dict["suggestion"] = result.suggestion
+        if result.details:
+            check_dict["details"] = result.details
         check_data.append(check_dict)
 
     output_data(
