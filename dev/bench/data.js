@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793299732066,
+  "lastUpdate": 1793300353794,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12090,6 +12090,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010854357888222707",
             "extra": "mean: 128.1215209723804 usec\nrounds: 8392"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bd67bc48e4d9d13606c082f67e1b28e76b46e263",
+          "message": "fix: show blueprint warning text in config doctor (merges PR #1202, addresses #1200)\n\nThe Blueprints check counted validator warnings but dropped their text,\nand --format json carried only the count. The message now names the\nfirst warning (or error) with a \"+N more\" note, and CheckResult gains a\ndetails list that the JSON output includes, listing every error and\nwarning as <blueprint>/<provider>: <message>.\n\nAddresses #1200\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T18:58:23Z",
+          "tree_id": "16f5d4de9e7dfaf1bda7ad2c96f0392f5736d137",
+          "url": "https://github.com/endavis/infrafoundry/commit/bd67bc48e4d9d13606c082f67e1b28e76b46e263"
+        },
+        "date": 1793300352155,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7595.787348703671,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015604443862628423",
+            "extra": "mean: 131.65192153130303 usec\nrounds: 8411"
           }
         ]
       }
