@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793291397512,
+  "lastUpdate": 1793292669910,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11842,6 +11842,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000017220305739624733",
             "extra": "mean: 64.9807535438794 usec\nrounds: 16437"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d30c5542d8893b7044d5dd5496a9db2f1ce4aa74",
+          "message": "feat: keep the proxmox balloon device on by default (merges PR #1187, addresses #1186)\n\nVMs and templates created without a balloon value rendered no\nmemory.floating, and came up with balloon: 0, so the guest had no\nballoon device. Freed memory never went back to the host, and on an\novercommitted node the host's out-of-memory killer took a VM down.\n\nvms.tf.j2 and templates.tf.j2 now render floating = memory when balloon\nis unset. That keeps the balloon device and free page reporting, as\nProxmox does by default, without letting Proxmox shrink the VM.\nballoon: 0 still means no balloon device, and a value below memory\nstill sets the minimum. The Proxmox provider docs describe all three.\n\nBREAKING CHANGE: an existing VM created without balloon shows an\nin-place update of memory.floating from 0 to its memory at its next\napply, and the bpg provider reboots the VM to apply it. Set balloon: 0\non the VM to keep the old behavior and avoid the reboot.\n\nAddresses #1186\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T16:50:15Z",
+          "tree_id": "6e01470f31851fc979c62fe9067d2e1500e472bf",
+          "url": "https://github.com/endavis/infrafoundry/commit/d30c5542d8893b7044d5dd5496a9db2f1ce4aa74"
+        },
+        "date": 1793292668450,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7896.763970391417,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000012197009841170825",
+            "extra": "mean: 126.63415086856561 usec\nrounds: 8577"
           }
         ]
       }
