@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793280341779,
+  "lastUpdate": 1793281029813,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11687,6 +11687,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011422393424166328",
             "extra": "mean: 128.7600334009397 usec\nrounds: 8383"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "03aea79343a6dd154032d246e379101f066ad176",
+          "message": "fix: resolve live opnsense interfaces by identifier in infra doctor (merges PR #1179, addresses #1178)\n\nOPNsense 26.1 interface export rows carry identifier (wan, lan, opt1)\nand device (em1) but no name, so live interfaces were keyed by device\nand every reference to wan was reported as unknown. Register each live\ninterface under all of its non-empty keys, identifier first, keeping\ndevice and the older name/if/interface fields accepted.\n\nAddresses #1178\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T13:36:19Z",
+          "tree_id": "b7018464efeaad4c1c3b3e255c126aaa1862da04",
+          "url": "https://github.com/endavis/infrafoundry/commit/03aea79343a6dd154032d246e379101f066ad176"
+        },
+        "date": 1793281028698,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15387.147873082013,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001619267832296447",
+            "extra": "mean: 64.98930199724546 usec\nrounds: 16573"
           }
         ]
       }
