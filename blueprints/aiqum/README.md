@@ -68,6 +68,7 @@ infra apply --env <env> --package aiqum
 | `template_vmid` | `901` | Rocky 9 cloud-init template VM ID |
 | `cores` | `4` | vCPU count |
 | `memory` | `12288` | Memory in MiB (AIQUM minimum) |
+| `balloon` | `0` | Minimum memory in MiB the host may shrink the VM to; `0` never shrinks it (see Notes) |
 | `disk_size` | `150` | Disk size in GiB (AIQUM minimum) |
 | `bridge` | `vmbr0` | Network bridge |
 | `vlan_tag` | `10` | VLAN tag for the VM NIC. Empty: untagged, e.g. on an SDN vnet |
@@ -146,6 +147,12 @@ After a successful deploy:
 
 - VM hardware (`cores`, `memory`, `disk_size`) is set to AIQUM minimum
   recommendations and is rarely overridden.
+- `balloon` lets an overcommitted Proxmox node reclaim the guest's page cache by
+  shrinking the VM toward that minimum under memory pressure. AIQUM's
+  recommended minimum is 12 GiB, so a lower `balloon` trades AIQUM performance
+  for host stability; the install scripts do not check memory. With `0` the VM
+  keeps its balloon device (it returns freed pages to the host) but is never
+  shrunk. See [Memory ballooning](../../docs/providers/proxmox.md#memory-ballooning).
 - The default tags (`ontap`, `aiqum`) and `cloud_init_snippets` are recipe-level
   metadata baked into the blueprint. Additional tags can be appended via `extra_tags`.
 - Events live at the top of `blueprint.yaml` (not embedded in `vm.yaml`)
