@@ -155,15 +155,14 @@ flow; setting only some fails with the missing names.
    fails and lists the choices.
 
 The helper `scripts/console-connector-register.py` (stdlib only) runs on the
-host that runs the script (the InfraFoundry host, or the jumphost when one is
-set). That host must reach `netapp-cloud-account.auth0.com`,
+InfraFoundry host, as the Phase 4 check does, even when a jumphost is set. That
+host must reach `netapp-cloud-account.auth0.com`,
 `api.bluexp.netapp.com` and the agent over HTTPS. It is idempotent: an agent
-that already reports `isSetup` is left alone and no token is requested. The
-bearer token is only sent to a certificate-pinned agent: Phase 5 reads the agent's
-certificate over SSH (`openssl` on the VM) and the helper trusts exactly that
-certificate. The unauthenticated status check does not verify the agent's
-certificate (as with the Phase 4 check); the NetApp endpoints are verified. The secret is read from the environment, never
-passed on a command line or printed. A `User is not associated as admin` error
+that already reports `isSetup` is left alone and no token is requested. Every
+request to the agent, including the status checks, is certificate-pinned: Phase 5
+reads the agent's certificate over SSH (`openssl` on the VM) and the helper trusts
+exactly that certificate. The NetApp endpoints use normal verification. The
+secret is read from the environment, never passed on a command line or printed. A `User is not associated as admin` error
 means the service account lacks an admin role.
 
 ## Manual steps

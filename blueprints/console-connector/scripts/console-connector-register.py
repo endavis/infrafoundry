@@ -8,9 +8,9 @@ Registration runs only when ``console_client_id``, ``console_client_secret`` and
 ``console_admin_email`` are all set. With none of them set it logs a skip and
 exits 0; with only some set it fails and names the missing ones.
 
-The authenticated call to the agent (it carries the bearer token) is TLS-pinned to
-the agent's own certificate, passed as a PEM file path with ``--agent-cert``. The
-unauthenticated status GET does not verify the agent's certificate.
+Every request to the agent is TLS-pinned to the agent's own certificate, passed as
+a PEM file path with ``--agent-cert``, so neither the bearer token nor the setup
+status is exchanged with any other server.
 
 Stdlib only (see docs/development/blueprint-script-portability.md).
 """
@@ -175,21 +175,12 @@ def load_pin(path: str) -> str:
     return pem
 
 
-def _unverified_context() -> ssl.SSLContext:
-    """TLS context for the agent's self-signed certificate."""
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
-
-
 def _request(
     url: str,
     *,
     method: str = "GET",
     body: dict[str, Any] | None = None,
     token: str = "",
-    verify: bool = True,
     pin: str = "",
 ) -> Any:
     """Send a JSON request and return the decoded JSON body.
@@ -205,13 +196,7 @@ def _request(
     if token:
         headers["Authorization"] = f"Bearer {token}"
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
-    ctx: ssl.SSLContext | None
-    if pin:
-        ctx = pinned_context(pin)
-    elif verify:
-        ctx = None
-    else:
-        ctx = _unverified_context()
+    ctx = pinned_context(pin) if pin else None
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as resp:  # nosec B310
             raw = resp.read().decode() or "{}"
@@ -228,10 +213,10 @@ def _request(
         raise RegistrationError(f"non-JSON response from {method} {url}") from None
 
 
-def get_status(cfg: Config) -> tuple[bool, str]:
-    """Read the agent's setup status (no auth)."""
+def get_status(cfg: Config, pin: str) -> tuple[bool, str]:
+    """Read the agent's setup status, trusting only the pinned agent certificate."""
     base = AGENT_URL_TEMPLATE.format(ip=cfg.ip)
-    payload = _request(f"{base}/system/support-services", verify=False)
+    payload = _request(f"{base}/system/support-services", pin=pin)
     return parse_setup_status(payload if isinstance(payload, dict) else {})
 
 
@@ -266,10 +251,10 @@ def register(cfg: Config, pin: str) -> str:
     Raises:
         RegistrationError: On any failure.
     """
-    is_setup, _ = get_status(cfg)
+    pinned_context(pin)  # fail closed before any request
+    is_setup, _ = get_status(cfg, pin)
     if is_setup:
         return "already-registered"
-    pinned_context(pin)  # fail closed before any token is requested
     token = fetch_token(cfg)
     accounts: list[dict[str, Any]] = []
     if not cfg.account_id:
@@ -287,7 +272,7 @@ def register(cfg: Config, pin: str) -> str:
         )
     except RegistrationError as exc:
         raise RegistrationError(explain_error(str(exc))) from None
-    is_setup, account = get_status(cfg)
+    is_setup, account = get_status(cfg, pin)
     if not is_setup or account != account_id:
         raise RegistrationError(
             f"agent did not report registration to account {account_id} after init"

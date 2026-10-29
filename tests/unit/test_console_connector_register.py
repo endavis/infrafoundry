@@ -288,6 +288,7 @@ def tls_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[dict[
 
     server = HTTPServer(("127.0.0.1", 0), Handler)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.load_cert_chain(str(served), str(served_key))
     server.socket = ctx.wrap_socket(server.socket, server_side=True)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -297,15 +298,21 @@ def tls_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[dict[
     server.server_close()
 
 
-def test_pinned_call_matches_and_mismatch_is_refused(tls_agent: dict[str, Path]) -> None:
+def test_pinned_call_matches_and_mismatch_is_refused(
+    tls_agent: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
     url = f"https://127.0.0.1:{tls_agent['port']}/x"
     good = tls_agent["served"].read_text()
     bad = tls_agent["other"].read_text()
     assert reg._request(url, method="POST", body={}, token="t", pin=good) == {}
     with pytest.raises(reg.RegistrationError, match="cannot reach"):
         reg._request(url, method="POST", body={}, token="t", pin=bad)
-    # The unauthenticated status GET still works without verification.
-    assert reg._request(url, verify=False) == {}
+    # The status GET is pinned too: a different certificate is refused.
+    cfg = reg.load_config(FULL_VARS)
+    assert cfg is not None
+    monkeypatch.setattr(reg, "AGENT_URL_TEMPLATE", f"https://127.0.0.1:{tls_agent['port']}")
+    with pytest.raises(reg.RegistrationError, match="cannot reach"):
+        reg.get_status(cfg, bad)
 
 
 def test_pin_must_be_a_certificate(tmp_path: Path) -> None:
