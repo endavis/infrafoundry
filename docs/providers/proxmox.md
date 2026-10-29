@@ -127,6 +127,32 @@ vms:
 The `opnsense-vm` blueprint (`blueprints/opnsense-vm/`) uses this to build a
 disposable OPNsense test firewall.
 
+### Memory ballooning
+
+VMs and templates take an optional `balloon` key, the minimum memory in MiB
+that Proxmox may shrink the guest to (the bpg `memory.floating` attribute).
+
+- **Unset**: the balloon device stays on with a minimum equal to `memory`
+  (default 2048). The guest reports free pages to the host but is never shrunk.
+- **`0`**: no balloon device.
+- **A value below `memory`**: Proxmox may shrink the VM to that minimum under
+  host memory pressure.
+
+```yaml
+vms:
+  - name: app-01
+    target_node: pve1
+    memory: 14336
+    balloon: 8192   # may shrink to 8 GiB; omit for no shrinking, 0 for no device
+```
+
+!!! warning "Behavior change for existing VMs"
+    Before, a VM without `balloon` rendered no `floating` value. Now it renders
+    `floating = <memory>`. An existing VM created without `balloon` shows an
+    in-place update `floating 0 -> <memory>` at its next apply, and the bpg
+    provider reboots the VM to apply it (`reboot_after_update`). Set
+    `balloon: 0` on such a VM to keep the old behavior and avoid the reboot.
+
 ### SDN zones and vnets
 
 An SDN vnet is a network shared by every node in its zone, so VMs on different

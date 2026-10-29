@@ -33,6 +33,7 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
 
   memory {
     dedicated = {{ template.config.memory | default(2048) }}
+    floating  = {{ template.config.balloon if template.config.balloon is defined else template.config.memory | default(2048) }}
   }
 
 {% if template.config.agent is defined %}
@@ -144,6 +145,7 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
   # Memory Configuration
   memory {
     dedicated = {{ template.config.memory | default(2048) }}
+    floating  = {{ template.config.balloon if template.config.balloon is defined else template.config.memory | default(2048) }}
   }
 
   {% if template.config.agent is defined %}
