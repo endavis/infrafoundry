@@ -43,7 +43,7 @@ inputs:
     description: "UNVERIFIED sizing (not stated on the install page); override as needed"
     default: 32768
   - name: balloon
-    description: "Minimum memory in MiB with ballooning on, so the host can reclaim guest cache; 0 turns ballooning off"
+    description: "Minimum memory in MiB the host may shrink the VM to, so it can reclaim guest cache; 0 keeps the provider default (balloon device on, never shrunk)"
     default: 0
   - name: disk_size
     description: "GiB; /opt needs 120 GiB and /var needs 40 GiB, both on this disk"
