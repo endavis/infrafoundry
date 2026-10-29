@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793295677288,
+  "lastUpdate": 1793296268444,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11935,6 +11935,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005365583877726436",
             "extra": "mean: 94.10233408150778 usec\nrounds: 11138"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "67397af34fe7d8bff79252255f9a360f9d10a2a1",
+          "message": "fix: make download-image templates buildable without workarounds (merges PR #1194, addresses #1190, #1188)\n\nThe download-image form of a Proxmox template rendered the cloud-init\ndrive's datastore only when cloud_init_datastore was set, so the bpg\nprovider fell back to local-lvm and VM creation failed on nodes without\nit. It now defaults to the disk storage, as the clone form already did.\n\nA download_image filename that Proxmox will not accept for import\ncontent (anything but .ova, .ovf, .qcow2, .raw or .vmdk) failed only at\napply, with no reason given. A new TemplateConfigValidator rejects it\nduring plan, names the accepted extensions, and suggests .qcow2 for\n.img cloud images. It also rejects a missing filename.\n\nAddresses #1190\nAddresses #1188\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T17:50:15Z",
+          "tree_id": "ffa0fdbbeba8693329539e39381a075f3048e19b",
+          "url": "https://github.com/endavis/infrafoundry/commit/67397af34fe7d8bff79252255f9a360f9d10a2a1"
+        },
+        "date": 1793296267045,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7296.585903723325,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002645121544069676",
+            "extra": "mean: 137.05039770582525 usec\nrounds: 8456"
           }
         ]
       }
