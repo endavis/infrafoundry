@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793284091820,
+  "lastUpdate": 1793288878567,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11780,6 +11780,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010598282062107516",
             "extra": "mean: 128.96979039827457 usec\nrounds: 8311"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "972f27025af3c4415f5c8991d6ecedd80a285c33",
+          "message": "feat: register the console agent with the netapp console by api (merges PR #1182, addresses #1140)\n\n* feat: register the console agent with the netapp console by api\n\nThe console-connector blueprint can now register the agent itself, in a\nnew Phase 5 of the post-terraform script. When console_client_id,\nconsole_client_secret and console_admin_email are set, a stdlib helper\ngets a client-credentials token from NetApp's Auth0, picks the account\n(console_account_id, or the only one the token can see) and calls the\nagent's setup-portal/init endpoint. It skips agents that already report\nisSetup, and verifies the registration afterwards.\n\nThe bearer token is sent to the agent only through a context pinned to\nthe agent's own certificate, fetched over the SSH channel to the VM.\nSecrets never go on a command line and are redacted from errors. Without\nthe inputs, the browser flow is unchanged.\n\nThe README also fixes the installer name (netapp-console-agent-<version>).\n\nAddresses #1140\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* fix: pin the agent certificate for the setup status reads too\n\nThe registration helper read the agent's setup status without verifying\nits certificate, and decided from that whether to register and whether\nregistration succeeded. Every request to the agent now uses the pinned\ncertificate, and the unverified path is gone. The pinned-certificate\ntest server also requires TLS 1.2 (CodeQL py/insecure-protocol).\n\nThe README no longer claims the helper runs on the jumphost; like the\nPhase 4 check it runs on the InfraFoundry host.\n\nAddresses #1140\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T15:47:07Z",
+          "tree_id": "3892f7374ea25d9b145422aee6c317ff5da03526",
+          "url": "https://github.com/endavis/infrafoundry/commit/972f27025af3c4415f5c8991d6ecedd80a285c33"
+        },
+        "date": 1793288876683,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7683.150299638529,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013240326599855578",
+            "extra": "mean: 130.15494439137123 usec\nrounds: 8380"
           }
         ]
       }
