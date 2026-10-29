@@ -175,6 +175,33 @@ def test_remote_script_rejects_malformed_sha256(sha: str, ok: bool) -> None:
     assert (result.returncode == 0) is ok
 
 
+def test_docker_version_lookup_survives_pipefail(tmp_path: Path) -> None:
+    """Resolving the docker-ce version does not die of SIGPIPE under ``pipefail`` (#1180)."""
+    rows = "".join(
+        f" docker-ce | 5:27.{i}.1-1~ubuntu.24.04~noble | https://download.docker.com noble/stable\n"
+        for i in range(5, 0, -1)
+    )
+    stub = tmp_path / "apt-cache"
+    # Enough output to overflow the pipe buffer after awk has matched.
+    stub.write_text(f"#!/bin/bash\nfor _ in $(seq 2000); do printf '%s' '{rows}'; done\n")
+    stub.chmod(0o755)
+    line = next(
+        ln for ln in REMOTE_SCRIPT.read_text().splitlines() if ln.startswith("docker_apt_version=")
+    )
+    result = subprocess.run(
+        ["bash", "-c", f'set -euo pipefail\n{line}\necho "$docker_apt_version"'],
+        env={
+            **os.environ,
+            "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
+            "DOCKER_VERSION": "27.5.1",
+        },
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "5:27.5.1-1~ubuntu.24.04~noble"
+
+
 def test_sha256_is_a_required_input(tmp_path: Path) -> None:
     """A package with the installer location but no digest fails to load."""
     envs = tmp_path / "envs"
