@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793296976567,
+  "lastUpdate": 1793298998279,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12028,6 +12028,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002346850703143341",
             "extra": "mean: 76.40056528607631 usec\nrounds: 13931"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ca47eac76df3e1644d90952bb5b9957e12246d7d",
+          "message": "feat: add a state prune command for stale environments (merges PR #1197, addresses #1175)\n\nconfig doctor flags environments that exist only in the state DB, but\nnothing could remove their rows. foundry state prune --env <name>\ndeletes one environment's resources, resource dependencies,\ndeployments, deployment events and locks in a single transaction, in\nan order that holds under enforced foreign keys. It keeps the audit\ntrail and records the prune as a new STATE_PRUNED audit event.\n\nIt refuses an environment that still exists in the config repo unless\n--force is given, refuses while the environment's lock is held, and\nrefuses when another environment's resources reference its\ndeployments, naming those environments. On SQLite it copies the\ndatabase first and prints the path; on other backends it requires\n--no-backup. --dry-run prints the row counts per table, and a real run\nasks for confirmation unless --yes is given. config doctor's\nsuggestion now names the command.\n\nAddresses #1175\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T18:35:45Z",
+          "tree_id": "612fc0db58d0316449a474981543924b55894f40",
+          "url": "https://github.com/endavis/infrafoundry/commit/ca47eac76df3e1644d90952bb5b9957e12246d7d"
+        },
+        "date": 1793298997420,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12846.926591144707,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022686533291071882",
+            "extra": "mean: 77.83962902763784 usec\nrounds: 13966"
           }
         ]
       }
