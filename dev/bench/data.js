@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793292669910,
+  "lastUpdate": 1793294828900,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11873,6 +11873,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000012197009841170825",
             "extra": "mean: 126.63415086856561 usec\nrounds: 8577"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6b774a6610281d2d099f5e11f5eb9a86fbd4c7f8",
+          "message": "feat: expose memory ballooning in the aiqum blueprint (merges PR #1191, addresses #1185)\n\nThe aiqum blueprint had no way to set a balloon minimum, so an AIQUM VM\non an overcommitted Proxmox node kept its full memory even when the\nhost ran short. A new optional balloon input sets the minimum memory\nthe host may shrink the VM to. The default 0 leaves it out, so the\nprovider default applies: balloon device on, never shrunk. The README\nnotes AIQUM's 12 GiB recommended minimum and that the install scripts\ndo not check memory.\n\nAddresses #1185\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T17:26:18Z",
+          "tree_id": "c6c80086ec8bef6b5c32d77ad410262c151f05ae",
+          "url": "https://github.com/endavis/infrafoundry/commit/6b774a6610281d2d099f5e11f5eb9a86fbd4c7f8"
+        },
+        "date": 1793294828049,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8009.30311130213,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009980444922915672",
+            "extra": "mean: 124.85480772838712 usec\nrounds: 8514"
           }
         ]
       }
