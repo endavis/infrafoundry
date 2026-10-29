@@ -9,6 +9,9 @@ vms:
       node_name: "{{ template_node }}"
     cores: {{ cores }}
     memory: {{ memory }}
+{% if balloon %}
+    balloon: {{ balloon }}
+{% endif %}
     agent: true
     disk:
       storage: "{{ disk_storage }}"
