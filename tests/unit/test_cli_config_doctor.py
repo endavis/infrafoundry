@@ -270,3 +270,97 @@ class TestConfigDoctorStateDbUnavailable:
             result = cli_runner.invoke(main, ["-c", str(temp_config_dir), "config", "doctor"])
             assert result.exit_code == 0
             assert "WARN" in result.output
+
+
+def _validation(*provs: tuple[str, list[str], list[str]]) -> object:
+    """Build a BlueprintValidationResult from (provider, errors, warnings) tuples."""
+    from infrafoundry.core.config.blueprint_validator import (
+        BlueprintValidationResult,
+        ProviderValidationResult,
+    )
+
+    return BlueprintValidationResult(
+        blueprint_name="bp",
+        is_multi_provider=len(provs) > 1,
+        providers=[
+            ProviderValidationResult(provider=p, errors=errs, warnings=warns)
+            for p, errs, warns in provs
+        ],
+    )
+
+
+@pytest.mark.unit
+class TestCheckBlueprintsDetails:
+    """``_check_blueprints`` reports the text of every warning and error (#1200)."""
+
+    def _run(self, results: dict[str, object]) -> CheckResult:
+        from infrafoundry.cli.commands.config.doctor import _check_blueprints
+
+        with (
+            patch("infrafoundry.core.config.blueprint_resolver.BlueprintResolver") as resolver_cls,
+            patch(
+                "infrafoundry.core.config.blueprint_validator.BlueprintValidator"
+            ) as validator_cls,
+        ):
+            resolver_cls.return_value.list_blueprints.return_value = list(results)
+            resolver_cls.return_value.resolve.side_effect = lambda n: n
+            validator_cls.side_effect = lambda n: type(
+                "V", (), {"validate": lambda self: results[n]}
+            )()
+            return _check_blueprints()
+
+    def test_single_warning_shown_in_message(self) -> None:
+        res = self._run({"k3s": _validation(("proxmox", [], ["Asymmetric variable: 'x'"]))})
+
+        assert res.status == "warning"
+        assert res.message == (
+            "1 blueprint(s) checked, 1 warning(s): k3s/proxmox: Asymmetric variable: 'x'"
+        )
+        assert res.details == ["k3s/proxmox: Asymmetric variable: 'x'"]
+        assert res.suggestion == ""
+
+    def test_multiple_warnings_list_all_in_details(self) -> None:
+        res = self._run(
+            {
+                "a": _validation(("oci", [], ["w1"])),
+                "b": _validation(("proxmox", [], ["w2", "w3"])),
+            }
+        )
+
+        assert res.status == "warning"
+        assert res.message.endswith("3 warning(s): a/oci: w1 (+2 more)")
+        assert res.details == ["a/oci: w1", "b/proxmox: w2", "b/proxmox: w3"]
+        assert "--format json" in res.suggestion
+
+    def test_errors_lead_and_warnings_follow_in_details(self) -> None:
+        res = self._run({"a": _validation(("oci", ["e1"], ["w1"]))})
+
+        assert res.status == "error"
+        assert res.message == "1 blueprint(s) checked, 1 error(s), 1 warning(s): a/oci: e1"
+        assert res.details == ["a/oci: e1", "a/oci: w1"]
+
+    def test_clean_has_no_details(self) -> None:
+        res = self._run({"a": _validation(("oci", [], []))})
+
+        assert res.status == "ok"
+        assert res.details == []
+
+    def test_json_output_includes_details(
+        self, cli_runner: CliRunner, temp_config_dir: Path
+    ) -> None:
+        warn = CheckResult(
+            name="Blueprints", status="warning", message="1 warning(s)", details=["a/oci: w1"]
+        )
+        with (
+            patch(_STATE_BACKEND, return_value=_ok("State Backend")),
+            patch(_SOPS_KEYS, return_value=_ok("SOPS/Age Keys")),
+            patch(_CONSISTENCY, return_value=_ok("State Consistency")),
+            patch(_BLUEPRINTS, return_value=warn),
+        ):
+            result = cli_runner.invoke(
+                main, ["-c", str(temp_config_dir), "config", "doctor", "--format", "json"]
+            )
+
+        checks = {c["name"]: c for c in json.loads(result.output)["checks"]}
+        assert checks["Blueprints"]["details"] == ["a/oci: w1"]
+        assert "details" not in checks["State Backend"]
