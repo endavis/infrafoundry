@@ -29,12 +29,29 @@ def copy_state_db(state_db_path: Path, output_path: Path, timestamp: str) -> Pat
         output_path: Existing directory to place the copy in.
         timestamp: ``%Y%m%d_%H%M%S`` stamp used in the file name.
 
+    An existing backup is never overwritten: if the name is taken, ``-1``, ``-2``, ...
+    is appended to the stem and the first free name is used.
+
     Returns:
-        Path of the backup file.
+        Path of the backup file actually written.
     """
-    db_backup_path = output_path / f"infrafoundry_state_{timestamp}.db"
-    shutil.copy2(state_db_path, db_backup_path)
-    return db_backup_path
+    attempt = 0
+    while True:
+        suffix = f"-{attempt}" if attempt else ""
+        db_backup_path = output_path / f"infrafoundry_state_{timestamp}{suffix}.db"
+        try:
+            # "xb" reserves the name exclusively, so concurrent runs never share it.
+            with db_backup_path.open("xb"):
+                pass
+        except FileExistsError:
+            attempt += 1
+            continue
+        try:
+            shutil.copy2(state_db_path, db_backup_path)
+        except BaseException:
+            db_backup_path.unlink(missing_ok=True)
+            raise
+        return db_backup_path
 
 
 @click.group()
