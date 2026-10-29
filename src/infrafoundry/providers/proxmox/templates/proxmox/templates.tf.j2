@@ -77,9 +77,7 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
 
 {% if template.config.cloud_init is defined and template.config.cloud_init %}
   initialization {
-{% if template.config.cloud_init_datastore is defined %}
-    datastore_id = "{{ template.config.cloud_init_datastore }}"
-{% endif %}
+    datastore_id = "{{ template.config.cloud_init_datastore | default(template.config.disk.storage) | default('local-lvm') }}"
     ip_config {
       ipv4 {
         address = "dhcp"
