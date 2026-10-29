@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793283124149,
+  "lastUpdate": 1793284091820,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -11749,6 +11749,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015598669797730204",
             "extra": "mean: 61.536149679285096 usec\nrounds: 17611"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ae1fdc0cdc459fb2affc38d8cceb22ba3b0a2c1d",
+          "message": "fix: stop the docker-ce version lookup dying of sigpipe (merges PR #1181, addresses #1180)\n\nThe console-connector remote script resolved the docker-ce apt version\nwith an awk that exited on the first match. Under set -o pipefail the\nSIGPIPE apt-cache took made the pipeline return 141, and set -e aborted\nthe install before Docker and the agent were installed. awk now keeps\nreading after the match.\n\nAddresses #1180\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-29T14:27:11Z",
+          "tree_id": "91ce0c40def1e51bd86bde338d1ae6c011ac38f2",
+          "url": "https://github.com/endavis/infrafoundry/commit/ae1fdc0cdc459fb2affc38d8cceb22ba3b0a2c1d"
+        },
+        "date": 1793284090151,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7753.7537815009,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010598282062107516",
+            "extra": "mean: 128.96979039827457 usec\nrounds: 8311"
           }
         ]
       }
