@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793376636648,
+  "lastUpdate": 1793378349931,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12369,6 +12369,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011769064181703274",
             "extra": "mean: 128.46573842219456 usec\nrounds: 8227"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e29b64f6a45fed539014cc4abd29b48217c9d7f",
+          "message": "fix: re-run the sdn applier when a zone or vnet is added (merges PR #1215, addresses #1153)\n\nTerraform does not replace proxmox_sdn_applier.apply when a resource in\nits replace_triggered_by list is created, so a zone or vnet added to an\nSDN setup that was already deployed stayed pending on the nodes,\nfiltered or not. A filtered run of a VM even created the new vnet\nthrough the applier's dependencies without re-running it.\n\n_sdn_removal_args becomes _sdn_change_args. It now also detects SDN\nzones and vnets that are declared but not in state. When any exist and\nthe applier is already in state, plan and apply pass\n-replace=proxmox_sdn_applier.apply. A filtered run also targets the\nappliers, because -replace on an address outside the targets is\nsilently ignored. On the first SDN deploy nothing changes: creating the\napplier applies the change.\n\nAn addition that reached state before this fix cannot be detected from\nstate. The docs give the one-off terraform -replace for it.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T16:38:18Z",
+          "tree_id": "7e171ce94f2847997fc4da791bfef6c821a41a1d",
+          "url": "https://github.com/endavis/infrafoundry/commit/1e29b64f6a45fed539014cc4abd29b48217c9d7f"
+        },
+        "date": 1793378349040,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7627.576895303341,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002040856568799261",
+            "extra": "mean: 131.10323418905776 usec\nrounds: 8570"
           }
         ]
       }
