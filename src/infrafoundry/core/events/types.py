@@ -81,6 +81,7 @@ class EventType(StrEnum):
 
     # State maintenance
     STATE_PRUNED = "state_pruned"
+    STATE_ENV_RENAMED = "state_env_renamed"
 
 
 class HandlerType(StrEnum):

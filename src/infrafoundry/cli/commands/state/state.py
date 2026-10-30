@@ -2,6 +2,7 @@
 
 import datetime
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 import click
@@ -52,6 +53,52 @@ def copy_state_db(state_db_path: Path, output_path: Path, timestamp: str) -> Pat
             db_backup_path.unlink(missing_ok=True)
             raise
         return db_backup_path
+
+
+def active_lock_holder(orchestrator: Orchestrator, env: str) -> tuple[str, object] | None:
+    """Return (holder, expires_at) when ``env`` has an unexpired deployment lock."""
+    lock = orchestrator.state_manager.get_lock(env)
+    if lock is None:
+        return None
+    expires = lock.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=datetime.UTC)
+    if expires <= datetime.datetime.now(datetime.UTC):
+        return None
+    return lock.locked_by, lock.expires_at
+
+
+def backup_state_db(
+    db_path: Path,
+    backup_dir: str | None,
+    copier: Callable[[Path, Path, str], Path] = copy_state_db,
+    unchanged: str = "changed",
+) -> Path:
+    """Back up the SQLite state database before a destructive command.
+
+    Args:
+        db_path: State database file.
+        backup_dir: Target directory; defaults to ``backups`` next to ``db_path``.
+        copier: Function doing the copy; callers pass their own module's reference.
+        unchanged: Verb for the failure message ("nothing was <unchanged>").
+
+    Returns:
+        Path of the backup file.
+
+    Raises:
+        click.ClickException: If the database file is missing or the copy fails.
+    """
+    if not db_path.exists():
+        raise click.ClickException("InfraFoundry state database file not found.")
+    try:
+        out = (Path(backup_dir) if backup_dir else db_path.parent / "backups").resolve()
+        out.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = copier(db_path, out, timestamp)
+    except OSError as exc:
+        raise click.ClickException(f"Backup failed, nothing was {unchanged}: {exc}") from exc
+    console.success(f"State database backed up to: {backup_path}")
+    return backup_path
 
 
 @click.group()
