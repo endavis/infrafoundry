@@ -18,7 +18,7 @@ class ErrorCategory(StrEnum):
     RUNNER = "RUNNER"
     STATE = "STATE"
     CREDENTIAL = "CREDENTIAL"
-    SECRET = "SECRET"  # nosec B105 - enum value, not a password
+    SECRET = "SECRET"  # nosec B105  # enum value, not a password
     POLICY = "POLICY"
     VALIDATION = "VALIDATION"
     DEPENDENCY = "DEPENDENCY"

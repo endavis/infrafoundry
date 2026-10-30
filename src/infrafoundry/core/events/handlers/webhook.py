@@ -90,7 +90,7 @@ class WebhookHandler(BaseHandler):
                 req.add_header(key, value)
 
             # Send request
-            with urlopen(req, timeout=timeout) as response:  # nosec B310 - user-configured URL
+            with urlopen(req, timeout=timeout) as response:  # nosec B310  # user-configured URL
                 response_body = response.read().decode("utf-8")
                 duration = time.monotonic() - start_time
 

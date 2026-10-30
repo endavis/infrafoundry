@@ -13,7 +13,7 @@ Pass ALLOW_AI_READY_TO_MERGE=1 to exercise the bypass path:
 
 import json
 import os
-import subprocess  # nosec B404 - needed to run hook for testing
+import subprocess  # nosec B404  # needed to run hook for testing
 import sys
 from pathlib import Path
 from typing import Any
@@ -22,6 +22,8 @@ from typing import Any
 RED = "\033[91m"
 GREEN = "\033[92m"
 RESET = "\033[0m"
+
+SCRATCH_PATH = "/tmp/scratch.txt"  # nosec B108  # test data, not a real tmp file
 
 # Find the hook to test (same directory as this test file)
 # Use resolve() to get absolute path so it works from any directory
@@ -300,7 +302,7 @@ EDIT_TESTS: list[tuple[str, dict[str, Any], str, str]] = [
     (
         "Edit",
         {
-            "file_path": "/tmp/scratch.txt",  # nosec B108 - test data, not a real tmp file
+            "file_path": SCRATCH_PATH,
             "old_string": "",
             "new_string": "export ALLOW_AI_READY_TO_MERGE=1",
         },
@@ -348,7 +350,7 @@ EDIT_TESTS: list[tuple[str, dict[str, Any], str, str]] = [
     (
         "write_file",
         {
-            "file_path": "/tmp/scratch.txt",  # nosec B108 - test data, not a real tmp file
+            "file_path": SCRATCH_PATH,
             "content": "export ALLOW_AI_READY_TO_MERGE=1\n",
         },
         "ALLOW",

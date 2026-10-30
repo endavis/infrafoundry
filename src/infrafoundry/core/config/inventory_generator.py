@@ -89,7 +89,7 @@ class InventoryGenerator:
         try:
             env = jinja2.Environment(
                 undefined=jinja2.StrictUndefined,
-            )  # nosec B701 - rendering YAML, not HTML
+            )  # nosec B701  # rendering YAML, not HTML
             template = env.from_string(inventory_raw)
             rendered_yaml = template.render(**variables)
         except jinja2.UndefinedError as e:

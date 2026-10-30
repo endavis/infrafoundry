@@ -14,7 +14,7 @@ import importlib.metadata
 import importlib.util
 import json
 import shutil
-import subprocess  # nosec B404 - runs ansible-galaxy with a fixed argument list
+import subprocess  # nosec B404  # runs ansible-galaxy with a fixed argument list
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -124,7 +124,7 @@ def installed_collections(
 
 
 def _run_galaxy(args: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # nosec B603 - fixed argument list, no shell
+    return subprocess.run(  # nosec B603  # fixed argument list, no shell
         args, capture_output=True, text=True, check=False, timeout=120
     )
 

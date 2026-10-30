@@ -1,7 +1,7 @@
 """Git-related doit tasks."""
 
 import os
-import subprocess  # nosec B404 - subprocess is required for doit tasks
+import subprocess  # nosec B404  # subprocess is required for doit tasks
 import sys
 from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath

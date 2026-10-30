@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess  # nosec B404 - required for running user scripts
+import subprocess  # nosec B404  # required for running user scripts
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -275,7 +275,7 @@ class HookManager(PathBasedManager):
         start_time = time.monotonic()
         hook_result: HookResult
         try:
-            result = subprocess.run(  # nosec B603 - user-controlled scripts
+            result = subprocess.run(  # nosec B603  # user-controlled scripts
                 [str(script_path)],
                 cwd=working_dir,
                 env=env,
