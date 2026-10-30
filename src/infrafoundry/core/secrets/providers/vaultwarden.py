@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import shutil
-import subprocess  # nosec B404 - required for running bitwarden CLI
+import subprocess  # nosec B404  # required for running bitwarden CLI
 from pathlib import Path
 from typing import Any
 

@@ -37,6 +37,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
+_API_SECRET_ENV = "OPNSENSE_API_SECRET"  # nosec B105  # env var name, not a password literal
+
 
 class AliasRow(TypedDict, total=False):
     """Partial representation of an alias row."""
@@ -108,7 +110,7 @@ class OPNsenseValidator:
         env_map = {
             "api_url": "OPNSENSE_API_URL",
             "api_key": "OPNSENSE_API_KEY",
-            "api_secret": "OPNSENSE_API_SECRET",  # nosec B105
+            "api_secret": _API_SECRET_ENV,
         }
         credentials = self.api_validator.get_credentials(
             ["api_url", "api_key", "api_secret"],
@@ -182,7 +184,7 @@ class OPNsenseValidator:
         env_map = {
             "api_url": "OPNSENSE_API_URL",
             "api_key": "OPNSENSE_API_KEY",
-            "api_secret": "OPNSENSE_API_SECRET",  # nosec B105
+            "api_secret": _API_SECRET_ENV,
         }
         credentials = self.api_validator.get_credentials(
             ["api_url", "api_key", "api_secret"],

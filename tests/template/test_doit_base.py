@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import os
 import shlex
-import subprocess  # nosec B404 - test invokes bash deliberately to verify shell-snippet behaviour
+import subprocess  # nosec B404  # test invokes bash deliberately to verify shell-snippet behaviour
 import sys
 from io import StringIO
 from pathlib import Path

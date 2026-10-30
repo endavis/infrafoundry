@@ -1,7 +1,7 @@
 """Pytest fixtures and Hypothesis profiles for InfraFoundry tests."""
 
 import os
-import subprocess  # nosec B404 - guarding subprocess use, not invoking it
+import subprocess  # nosec B404  # guarding subprocess use, not invoking it
 import sys
 import tempfile
 from collections.abc import Callable, Iterator

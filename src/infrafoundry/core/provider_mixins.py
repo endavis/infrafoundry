@@ -154,7 +154,7 @@ class TemplateRendererMixin:
             lstrip_blocks=env_kwargs.pop("lstrip_blocks", True),
             keep_trailing_newline=env_kwargs.pop("keep_trailing_newline", True),
             extensions=extensions,
-            autoescape=False,  # nosec B701 - infrastructure code, not HTML
+            autoescape=False,  # nosec B701  # infrastructure code, not HTML
             **env_kwargs,  # Pass through any additional parameters
         )
 
@@ -939,7 +939,7 @@ class TerraformGeneratorMixin:
                 trim_blocks=True,
                 lstrip_blocks=True,
                 keep_trailing_newline=True,
-                autoescape=False,  # nosec B701 - infrastructure code, not HTML
+                autoescape=False,  # nosec B701  # infrastructure code, not HTML
             )
 
             template = env.get_template("backend.tf.j2")

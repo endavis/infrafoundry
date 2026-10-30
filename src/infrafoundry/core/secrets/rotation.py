@@ -1,7 +1,7 @@
 """Secrets rotation utilities for re-encrypting secrets with new keys."""
 
 import shutil
-import subprocess  # nosec B404 - required for running age-keygen
+import subprocess  # nosec B404  # required for running age-keygen
 from datetime import datetime
 from pathlib import Path
 from typing import Any

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 import shlex
-import subprocess  # nosec B404 - runs ssh with list args; remote values are shlex-quoted
+import subprocess  # nosec B404  # runs ssh with list args; remote values are shlex-quoted
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum

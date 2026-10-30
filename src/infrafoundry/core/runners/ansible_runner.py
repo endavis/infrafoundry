@@ -1,6 +1,6 @@
 """Ansible runner implementation."""
 
-import subprocess  # nosec B404 - required for running ansible-playbook
+import subprocess  # nosec B404  # required for running ansible-playbook
 from pathlib import Path
 from typing import Any, cast, override
 
@@ -77,7 +77,7 @@ class AnsibleRunner(BaseRunner):
             return None
 
         try:
-            result = subprocess.run(  # nosec B603 - trusted command
+            result = subprocess.run(  # nosec B603  # trusted command
                 [self.tool_path, "--version"],
                 capture_output=True,
                 text=True,
@@ -110,7 +110,7 @@ class AnsibleRunner(BaseRunner):
             return {"valid": True, "message": "No playbook found (optional)"}
 
         try:
-            result = subprocess.run(  # nosec B603 - trusted command
+            result = subprocess.run(  # nosec B603  # trusted command
                 [self.tool_path, "--syntax-check", playbook.name],
                 cwd=ansible_dir,
                 capture_output=True,

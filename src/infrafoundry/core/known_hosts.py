@@ -16,7 +16,7 @@ FQDN entries are not removed, since the framework does not know the domain.
 from __future__ import annotations
 
 import shlex
-import subprocess  # nosec B404 - runs ssh with list args; remote hosts are shlex-quoted
+import subprocess  # nosec B404  # runs ssh with list args; remote hosts are shlex-quoted
 from collections.abc import Callable, Iterable
 from typing import Any
 

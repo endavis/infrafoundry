@@ -2,7 +2,7 @@
 
 import os
 import shlex
-import subprocess  # nosec B404 - subprocess is required to run doit sub-tasks
+import subprocess  # nosec B404  # subprocess is required to run doit sub-tasks
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -283,7 +283,7 @@ def run_teed(
 
     buffer: list[str] = []
     # process.stdout is non-None because we asked for subprocess.PIPE.
-    assert process.stdout is not None  # nosec B101 - invariant from Popen args
+    assert process.stdout is not None  # nosec B101  # invariant from Popen args
     try:
         for line in process.stdout:
             buffer.append(line)

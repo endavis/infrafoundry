@@ -49,7 +49,7 @@ from .base import BaseService
 # fields — OPNsense returns the live values on read but we never want
 # to round-trip those into committed YAML.
 _PASSWORD_REDACTED = "secret://env_secrets/opnsense/gdrive/password/REPLACE_ME"  # nosec B105
-_P12KEY_REDACTED = "secret://env_secrets/opnsense/gdrive/p12_key/REPLACE_ME"  # nosec B105
+_P12KEY_REDACTED = "secret://env_secrets/opnsense/gdrive/p12_key/REPLACE_ME"
 
 
 class SystemRemoteBackupService(BaseService):

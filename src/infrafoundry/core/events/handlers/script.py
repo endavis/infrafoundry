@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import shutil
-import subprocess  # nosec B404 - required for running user scripts
+import subprocess  # nosec B404  # required for running user scripts
 import tempfile
 import threading
 import time
@@ -303,7 +303,7 @@ class ScriptHandler(BaseHandler):
         timeout = self.config.get("timeout", 300)
         start_time = time.monotonic()
         try:
-            process = subprocess.Popen(  # nosec B603 - user-controlled scripts
+            process = subprocess.Popen(  # nosec B603  # user-controlled scripts
                 [str(script_path)],
                 cwd=working_dir,
                 env=env,
@@ -653,7 +653,7 @@ class ScriptHandler(BaseHandler):
             local_warnings_path: The orchestrator's local warnings file to
                 append the remote content to.
         """
-        with tempfile.NamedTemporaryFile(  # nosec B108 - managed lifecycle
+        with tempfile.NamedTemporaryFile(  # nosec B108  # managed lifecycle
             mode="wb",
             suffix=".jsonl",
             prefix="infrafoundry-remote-warnings-",
