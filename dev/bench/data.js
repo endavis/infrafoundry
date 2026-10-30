@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793360956942,
+  "lastUpdate": 1793373201187,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12276,6 +12276,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001104926641816701",
             "extra": "mean: 125.88251513029246 usec\nrounds: 8559"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "965dcf6468797494b09bf0e917f7da550ed1dce8",
+          "message": "fix: target the sdn appliers when a filtered run targets a zone or vnet (merges PR #1212, addresses #1153)\n\n* fix: target the sdn appliers when a filtered run targets a zone or vnet\n\nTerraform adds a target's dependencies but not its dependents, so a\nfiltered run staged SDN zones and vnets without creating\nproxmox_sdn_applier.apply. Add the apply and finalize appliers to the\ntargets whenever a proxmox_sdn_zone or proxmox_sdn_vnet matches.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n* fix: never add the sdn appliers to destroy targets\n\n-target on an applier also destroys its dependents (VMs and containers),\nso a filtered destroy of one vnet could destroy VMs. Add the appliers for\nplan and apply only.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\n---------\n\nCo-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T15:12:29Z",
+          "tree_id": "1b637571cddaf3c281fd8c9e70a1db149a4b522d",
+          "url": "https://github.com/endavis/infrafoundry/commit/965dcf6468797494b09bf0e917f7da550ed1dce8"
+        },
+        "date": 1793373200239,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7871.443822592218,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001114407029478144",
+            "extra": "mean: 127.04149613948216 usec\nrounds: 8548"
           }
         ]
       }
