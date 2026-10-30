@@ -143,6 +143,7 @@ SELF_REMOVAL_SENTENCE = (
 HEADLESS_CODEX_HOST_FILES: dict[str, Path] = {
     **MULTI_AGENT_FILES,
     "implement-issue": IMPLEMENT_ISSUE_FILE,
+    "implement-issues": REPO_ROOT / ".agents" / "skills" / "implement-issues" / "SKILL.md",
 }
 
 # The non-interactive invocation each CLI needs, copied verbatim from
@@ -352,10 +353,13 @@ def test_implement_issue_briefs_hand_no_gh_command() -> None:
     planner_start = text.index("## Planner brief")
     coder_start = text.index("## Coder brief")
     per_host_start = text.index("## Per-host subagent notes")
-    planner_brief = text[planner_start:coder_start]
+    review_start = text.index("## Plan-review brief")
+    planner_brief = text[planner_start:review_start]
+    review_brief = text[review_start:coder_start]
     coder_brief = text[coder_start:per_host_start]
 
     assert not GH_COMMAND_PATTERN.search(planner_brief), "Planner brief still invokes gh"
+    assert not GH_COMMAND_PATTERN.search(review_brief), "Plan-review brief still invokes gh"
     assert not GH_COMMAND_PATTERN.search(coder_brief), "Coder brief still invokes gh"
 
 

@@ -107,7 +107,10 @@ tmp/
 .infrafoundry/
 coverage.xml
 .nfs*
-.doit.db.db
+# doit's dependency database; the filename depends on the dbm backend
+# (dbm.sqlite3/dbm.gnu: .doit.db, dbm.ndbm: .doit.db.db, dbm.dumb: .doit.db.dat/.dir/.bak)
+.doit.db
+.doit.db.*
 
 # AI agent settings originals
 

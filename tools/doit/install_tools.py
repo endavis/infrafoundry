@@ -226,7 +226,7 @@ def download_github_release_binary(
     # Verify before the executable bit goes on: a file that never becomes
     # executable cannot be run by a caller that ignores the exception.
     verify_download(dest_path, url, sha256)
-    dest_path.chmod(0o755)
+    dest_path.chmod(0o755)  # rwxr-xr-x is required for executable binary
 
     return dest_path
 
@@ -291,7 +291,7 @@ def download_and_extract_archive(
         verify_download(temp_path, url, sha256)
 
         if archive_kind == "tar":
-            with tarfile.open(temp_path, "r:gz") as tar:
+            with tarfile.open(temp_path, "r:gz") as tar:  # data_filter set below when available
                 if hasattr(tarfile, "data_filter"):
                     tar.extraction_filter = tarfile.data_filter
                 for member in tar.getmembers():
@@ -306,7 +306,7 @@ def download_and_extract_archive(
                     out_path = dest_dir / basename
                     with open(out_path, "wb") as out:
                         shutil.copyfileobj(src, out)
-                    out_path.chmod(0o755)
+                    out_path.chmod(0o755)  # executable bit required
                     extracted[basename] = out_path
         else:  # zip
             with zipfile.ZipFile(temp_path) as zf:
@@ -324,7 +324,7 @@ def download_and_extract_archive(
                         raise RuntimeError(f"Refusing to extract outside dest_dir: {entry}")
                     data = zf.read(entry)
                     out_path.write_bytes(data)
-                    out_path.chmod(0o755)
+                    out_path.chmod(0o755)  # executable bit required
                     extracted[basename] = out_path
 
         missing = [b for b in extract_binaries if b not in extracted]
@@ -466,7 +466,7 @@ def install_tool(
                 print(f"Downloading {url}...")
                 urllib.request.urlretrieve(url, dest_path)  # nosec B310  # integrity via verify_download below, before chmod
                 verify_download(dest_path, url, expected_sha)
-                dest_path.chmod(0o755)
+                dest_path.chmod(0o755)  # executable bit required
             else:
                 download_github_release_binary(
                     repo=repo,
