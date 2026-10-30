@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, ClassVar
@@ -786,14 +787,8 @@ def _resource(name: str, rtype: str) -> ResourceConfig:
     return ResourceConfig(name=name, type=rtype, provider="proxmox", config={})
 
 
-class TestSdnRemoval:
-    """SDN removal through apply and the filtered-destroy guard (#1153)."""
-
-    TF_TYPES: ClassVar[dict[str, list[str]]] = {
-        "vm": ["proxmox_virtual_environment_vm"],
-        "sdn_zone": ["proxmox_sdn_zone_vxlan"],
-        "sdn_vnet": ["proxmox_sdn_vnet"],
-    }
+class _SdnRunHelpers:
+    """Shared helpers that run terraform with SDN state mocked."""
 
     def _cmd(
         self,
@@ -831,6 +826,16 @@ class TestSdnRemoval:
     @staticmethod
     def _flag_values(cmd: list[str], flag: str) -> list[str]:
         return [cmd[i + 1] for i, a in enumerate(cmd) if a == flag]
+
+
+class TestSdnRemoval(_SdnRunHelpers):
+    """SDN removal through apply and the filtered-destroy guard (#1153)."""
+
+    TF_TYPES: ClassVar[dict[str, list[str]]] = {
+        "vm": ["proxmox_virtual_environment_vm"],
+        "sdn_zone": ["proxmox_sdn_zone_vxlan"],
+        "sdn_vnet": ["proxmox_sdn_vnet"],
+    }
 
     # check_filtered_destroy
 
@@ -876,7 +881,7 @@ class TestSdnRemoval:
     def test_destroy_never_computes_sdn_removal(
         self, runner: TerraformRunner, provider: MagicMock
     ) -> None:
-        with patch.object(runner, "_sdn_removal_args") as removal:
+        with patch.object(runner, "_sdn_change_args") as removal:
             cmd = self._cmd(
                 runner, provider, "destroy", STATE_WITH_ORPHAN, target_resources=["web-01"]
             )
@@ -971,3 +976,185 @@ class TestSdnRemoval:
         with patch("subprocess.run") as mock_run:
             assert runner.state_list(tmp_path) == []
         mock_run.assert_not_called()
+
+
+SDN_TF_NEW_VNET = SDN_TF + 'resource "proxmox_sdn_vnet" "nttmp" {\n}\n'
+SDN_TF_NEW_ZONE = SDN_TF_NEW_VNET + 'resource "proxmox_sdn_zone_vxlan" "zone2" {\n}\n'
+STATE_DEPLOYED = [
+    "proxmox_sdn_applier.finalize",
+    "proxmox_sdn_applier.apply",
+    "proxmox_sdn_zone_vxlan.nettest",
+    "proxmox_sdn_vnet.ntlan",
+    "proxmox_virtual_environment_vm.web_01",
+]
+APPLIERS = ["proxmox_sdn_applier.apply", "proxmox_sdn_applier.finalize"]
+
+
+class TestSdnAddition(_SdnRunHelpers):
+    """An SDN zone or vnet added to a deployed setup re-runs the applier (#1153)."""
+
+    def test_filtered_apply_of_new_vnet_replaces_and_targets_appliers(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(
+            runner,
+            provider,
+            "apply",
+            STATE_DEPLOYED,
+            tf=SDN_TF_NEW_VNET,
+            target_resources=["nttmp"],
+        )
+        assert cmd is not None
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+        targets = self._flag_values(cmd, "-target")
+        assert "proxmox_sdn_vnet.nttmp" in targets
+        assert set(APPLIERS) <= set(targets)
+
+    def test_filtered_apply_of_vm_with_new_vnet_replaces(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(
+            runner,
+            provider,
+            "apply",
+            STATE_DEPLOYED,
+            tf=SDN_TF_NEW_VNET,
+            target_resources=["web-01"],
+        )
+        assert cmd is not None
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+        targets = self._flag_values(cmd, "-target")
+        assert "proxmox_virtual_environment_vm.web_01" in targets
+        assert set(APPLIERS) <= set(targets)
+
+    def test_filtered_apply_of_unchanged_vnet_with_new_vnet_elsewhere(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(
+            runner,
+            provider,
+            "apply",
+            STATE_DEPLOYED,
+            tf=SDN_TF_NEW_VNET,
+            target_resources=["ntlan"],
+        )
+        assert cmd is not None
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+        assert set(APPLIERS) <= set(self._flag_values(cmd, "-target"))
+
+    def test_new_zone_and_new_vnet_replace_once(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(runner, provider, "apply", STATE_DEPLOYED, tf=SDN_TF_NEW_ZONE)
+        assert cmd is not None
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+
+    def test_filter_selecting_new_zone_but_not_its_vnet(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(
+            runner,
+            provider,
+            "apply",
+            STATE_DEPLOYED,
+            tf=SDN_TF_NEW_ZONE,
+            target_resources=["zone2"],
+        )
+        assert cmd is not None
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+        targets = self._flag_values(cmd, "-target")
+        assert "proxmox_sdn_zone_vxlan.zone2" in targets
+        assert "proxmox_sdn_vnet.nttmp" not in targets
+        assert set(APPLIERS) <= set(targets)
+
+    def test_unfiltered_apply_with_new_vnet_replaces_without_targets(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(runner, provider, "apply", STATE_DEPLOYED, tf=SDN_TF_NEW_VNET)
+        assert cmd is not None
+        assert "-target" not in cmd
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+
+    def test_first_sdn_deploy_adds_nothing(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        state = [a for a in STATE_DEPLOYED if a != "proxmox_sdn_applier.apply"]
+        cmd = self._cmd(
+            runner, provider, "apply", state, tf=SDN_TF_NEW_VNET, target_resources=["web-01"]
+        )
+        assert cmd is not None
+        assert "-replace" not in cmd
+        assert self._flag_values(cmd, "-target") == ["proxmox_virtual_environment_vm.web_01"]
+
+    def test_empty_state_adds_no_replace(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(runner, provider, "apply", [], tf=SDN_TF_NEW_VNET)
+        assert cmd is not None
+        assert "-replace" not in cmd
+
+    def test_state_list_failure_adds_no_replace(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        (provider.terraform_dir / "sdn.tf").write_text(SDN_TF_NEW_VNET)
+        (provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
+        process = MagicMock()
+        process.stdout = iter([])
+        process.stderr = MagicMock()
+        process.stderr.__iter__ = MagicMock(return_value=iter([]))
+        process.returncode = 0
+        process.wait.return_value = 0
+
+        def fake_run(cmd: list[str], **kwargs: Any) -> SimpleNamespace:
+            if "state" in cmd:
+                raise subprocess.CalledProcessError(1, cmd)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run", side_effect=fake_run),
+            patch("subprocess.Popen", return_value=process) as mock_popen,
+        ):
+            runner.apply(provider, auto_approve=True)
+        assert mock_popen.called
+        assert "-replace" not in mock_popen.call_args[0][0]
+
+    def test_plan_with_new_vnet_has_replace(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(runner, provider, "plan", STATE_DEPLOYED, tf=SDN_TF_NEW_VNET)
+        assert cmd is not None
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+
+    def test_addition_and_orphan_replace_once(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(
+            runner,
+            provider,
+            "apply",
+            [*STATE_DEPLOYED, ORPHAN],
+            tf=SDN_TF_NEW_VNET,
+            target_resources=["web-01"],
+        )
+        assert cmd is not None
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+        targets = self._flag_values(cmd, "-target")
+        assert ORPHAN in targets
+        assert len(targets) == len(set(targets))
+
+    def test_no_additions_and_no_orphans_adds_nothing(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(runner, provider, "apply", STATE_DEPLOYED, target_resources=["web-01"])
+        assert cmd is not None
+        assert "-replace" not in cmd
+
+    def test_destroy_never_computes_sdn_changes(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        with patch.object(runner, "_sdn_change_args") as change:
+            cmd = self._cmd(runner, provider, "destroy", STATE_DEPLOYED, tf=SDN_TF_NEW_VNET)
+        change.assert_not_called()
+        assert cmd is not None
+        assert "-replace" not in cmd
