@@ -111,3 +111,7 @@ with open(sys.argv[1], 'w') as f:
 echo "Running ONTAP lab cluster setup playbook..."
 cd "$BLUEPRINT_DIR"
 ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -v
+
+# Add the cluster to the NetApp Console when the console_* inputs are set (#1140).
+# Skips with a message when they are not; secrets stay in INFRAFOUNDRY_PACKAGE_VARS.
+python3 "${BLUEPRINT_DIR}/scripts/ontap-console-discover.py"

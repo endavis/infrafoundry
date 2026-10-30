@@ -161,6 +161,32 @@ inputs:
     type: boolean
     default: true
 
+  # --- NetApp Console discovery (optional) ---
+  # Set console_client_id, console_client_secret and console_agent_id to add the
+  # cluster to the NetApp Console through that agent after setup. Leave all three
+  # empty to skip. Put the client ID and secret in secrets.yaml.
+  - name: console_client_id
+    description: "NetApp Console service account client ID; enables discovery"
+    default: ""
+  - name: console_client_secret
+    description: "NetApp Console service account secret (secret; set in secrets.yaml)"
+    default: ""
+  - name: console_agent_id
+    description: "Console agent ID, e.g. from https://<agent>/occm/api/occm/system/about"
+    default: ""
+  - name: console_account_id
+    description: "Console organization ID; empty: the only one the service account sees"
+    default: ""
+  - name: console_workspace_id
+    description: "Console workspace ID; empty: the account's only workspace"
+    default: ""
+  - name: console_system_name
+    description: "System name in the Console; empty: cluster_name"
+    default: ""
+  - name: console_cluster_user
+    description: "ONTAP user the agent logs in as; ontap_password is its password"
+    default: admin
+
 resources:
   - vm.yaml
   - dhcp.yaml
