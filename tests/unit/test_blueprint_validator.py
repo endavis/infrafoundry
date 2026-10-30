@@ -212,6 +212,43 @@ class TestMultiProviderValidation:
         b_result = next(p for p in result.providers if p.provider == "b")
         assert any("shared_var" in w for w in b_result.warnings)
 
+    def _asym_resolved(self, tmp_path: Path, **b_extra: Any) -> dict[str, Any]:
+        _write_template(tmp_path, "providers/a/vm.yaml", "name: {{ cluster_name }}")
+        _write_template(tmp_path, "providers/b/vm.yaml", "cpu: 1")
+        return _make_resolved(
+            tmp_path,
+            defaults={"cluster_name": "test"},
+            providers={
+                "a": {"defaults": {}, "resources": ["providers/a/vm.yaml"]},
+                "b": {"defaults": {}, "resources": ["providers/b/vm.yaml"], **b_extra},
+            },
+        )
+
+    def _b_warnings(self, resolved: dict[str, Any]) -> list[str]:
+        result = BlueprintValidator(resolved).validate()
+        return next(p for p in result.providers if p.provider == "b").warnings
+
+    def test_asymmetric_still_warns_without_script_or_event_use(self, tmp_path: Path) -> None:
+        assert self._b_warnings(self._asym_resolved(tmp_path))
+
+    def test_script_env_var_counts_as_use(self, tmp_path: Path) -> None:
+        _write_template(tmp_path, "scripts/b/run.sh", 'echo "$INFRAFOUNDRY_VAR_cluster_name"')
+        assert self._b_warnings(self._asym_resolved(tmp_path)) == []
+
+    def test_event_referenced_script_jinja_counts_as_use(self, tmp_path: Path) -> None:
+        _write_template(tmp_path, "other/run.sh", "echo {{ cluster_name }}")
+        events = {"on_create": [{"type": "script", "script": "other/run.sh"}]}
+        assert self._b_warnings(self._asym_resolved(tmp_path, events=events)) == []
+
+    def test_provider_event_string_counts_as_use(self, tmp_path: Path) -> None:
+        events = {"on_create": [{"outputs": [{"source": "/k/{{ cluster_name }}.yaml"}]}]}
+        assert self._b_warnings(self._asym_resolved(tmp_path, events=events)) == []
+
+    def test_shared_blueprint_event_counts_as_use(self, tmp_path: Path) -> None:
+        resolved = self._asym_resolved(tmp_path)
+        resolved["events"] = {"after_apply": [{"requires": ["{{ cluster_name }}"]}]}
+        assert self._b_warnings(resolved) == []
+
     def test_undefined_error_multi_provider(self, tmp_path: Path) -> None:
         """Variable not in any defaults layer produces error in multi-provider."""
         _write_template(tmp_path, "providers/a/vm.yaml", "ip: {{ ip_address }}")
