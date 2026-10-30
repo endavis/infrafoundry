@@ -26,6 +26,10 @@ from infrafoundry.core.types import ResourceOutcome
 logger = logging.getLogger(__name__)
 
 
+_SDN_OBJECT_TYPE = re.compile(r"^proxmox_sdn_(zone|vnet)")
+_SDN_APPLIER_ADDRESSES = ("proxmox_sdn_applier.apply", "proxmox_sdn_applier.finalize")
+
+
 class TerraformRunner(BaseRunner):
     """Handles Terraform command execution and state management."""
 
@@ -679,6 +683,7 @@ class TerraformRunner(BaseRunner):
             ["proxmox_virtual_environment_vm.infra_web"])
         """
         targets: list[str] = []
+        declared: set[str] = set()
         # Pattern matches: resource "type" "name" {
         resource_pattern = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
 
@@ -689,6 +694,7 @@ class TerraformRunner(BaseRunner):
                     if match:
                         resource_type = match.group(1)
                         resource_name = match.group(2)
+                        declared.add(f"{resource_type}.{resource_name}")
                         # Exact match or suffix match for prefixed resources
                         # (e.g., "ovf_ontap_node_01" matches "ontap_node_01")
                         if any(
@@ -696,6 +702,14 @@ class TerraformRunner(BaseRunner):
                             for infra_name in resource_names
                         ):
                             targets.append(f"{resource_type}.{resource_name}")
+
+        # Terraform adds a target's dependencies but not its dependents, so the SDN
+        # appliers (which depend on / are depended on by zones and vnets) are
+        # added by hand or the change is staged but never applied (#1153).
+        if any(_SDN_OBJECT_TYPE.match(t.split(".", 1)[0]) for t in targets):
+            for applier in _SDN_APPLIER_ADDRESSES:
+                if applier in declared and applier not in targets:
+                    targets.append(applier)
 
         return targets
 
