@@ -14,13 +14,8 @@ from rich.text import Text
 # Configuration
 DOIT_CONFIG = {
     "verbosity": 2,
-    "default_tasks": ["list"],
+    "default_tasks": ["default"],
 }
-
-# Use direnv-managed UV_CACHE_DIR if available, otherwise use tmp/
-# Set in os.environ so subprocesses inherit it (cross-platform compatible)
-UV_CACHE_DIR = os.environ.get("UV_CACHE_DIR", "tmp/.uv_cache")
-os.environ["UV_CACHE_DIR"] = UV_CACHE_DIR
 
 
 def success_message() -> None:

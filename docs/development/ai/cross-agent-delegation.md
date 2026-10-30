@@ -157,15 +157,18 @@ inaccessible issue/PR aborts the task with a clear error — never a silent empt
 for the full reference.
 
 By convention the output directory is `tmp/agents/<host>/<task>-<n>/` (for example
-`tmp/agents/claude/multi-review-123/`), per `AGENTS.md`'s temp-file convention. The delegated
+`tmp/agents/claude/multi-review-123/`), per `AGENTS.md`'s temp-file convention. `implement-issue`
+runs in a per-issue worktree, so it passes an absolute `--out` inside that worktree
+(`$WORKTREE/tmp/agents/<host>/implement-issue-<n>/`) and the directory never lands in the main
+checkout. The delegated
 prompt is told to read the files in that directory instead of calling `gh`, and to print
 `DELEGATION-ERROR:` and stop if the directory or a file in it is missing or unreadable — the
 `DELEGATION_ERROR_CHECK` half of the contract (below) is unchanged, only what triggers the marker
 is: a missing context file, not a failed `gh` call. The orchestrating skill that created the
 directory deletes it once every delegated agent (or subagent) using it has returned.
 
-This removes `gh` from every delegated prompt this project ships: `implement-issue`'s Planner and
-Coder briefs, `multi-plan`'s and `multi-review`'s per-agent delegated prompt, and the six Codex
+This removes `gh` from every delegated prompt this project ships: `implement-issue`'s Planner,
+Plan-review and Coder briefs, `multi-plan`'s and `multi-review`'s per-agent delegated prompt, and the six Codex
 bridge files, which now give Codex only git-based inline steps (`.agents/skills/delegate-codex-
 {review,adversarial-review}/SKILL.md`, `.github/skills/codex-{review,adversarial-review}/SKILL.md`,
 `.claude/commands/codex/{review,adversarial-review}.md`) — Hybrid C's old "activate
@@ -294,6 +297,19 @@ Copilot also reads `.claude/skills/`, but this repo deliberately places the 8 Co
 ### What's clean by construction
 
 Codex does not read `.claude/commands/`, `.copilot/commands/`, or `.github/skills/`. Claude does not read `.agents/skills/` or `.github/skills/`. The conflicts above are the only ones the layout creates.
+
+## Parallel issues (`implement-issues`)
+
+`implement-issues` runs `implement-issue` for several issues at once, one worktree and one background `general-purpose` agent each, which in turn start the Planner and Coder subagents. Host support:
+
+| Host | Mode | Basis |
+| :--- | :--- | :--- |
+| Claude Code | Parallel | Verified on 2.1.314: a background subagent has the Agent tool and starts `implement-planner` nested. |
+| Codex CLI | Sequential | Nested agents not verified. |
+| GitHub Copilot CLI | Sequential | `--fleet`/`task` nesting not verified. |
+| Antigravity CLI | Sequential | No subagent flag found. |
+
+See [slash-commands.md](slash-commands.md#implement-issues-a-b) and [ADR-9028](../../decisions/9028-implement-issues-runs-issues-in-parallel-background-agents.md).
 
 ## Multi-agent orchestration (`/multi-*`)
 

@@ -18,7 +18,10 @@ Usage:
 
     # Install management suite for existing project
     curl -sSL https://raw.githubusercontent.com/endavis/pyproject-template/main/bootstrap.py \
-        | python3 - --sync
+        | python3 - --sync --yes
+
+    # --yes answers the overwrite prompt: when the script is piped to python3,
+    # stdin is the script itself, so there is no terminal to answer from (#1070).
 """
 
 import argparse
@@ -227,7 +230,7 @@ def create_settings_file(project_root: Path, settings: dict[str, str]) -> Path:
     return settings_path
 
 
-def run_sync(project_root: Path) -> None:
+def run_sync(project_root: Path, *, assume_yes: bool = False) -> None:
     """Install the template management suite for an existing project."""
     print(f"Installing {REPO_NAME} management suite...")
     print()
@@ -237,10 +240,24 @@ def run_sync(project_root: Path) -> None:
     # Check if already installed
     if pkg_dir.exists() and (pkg_dir / "manage.py").exists():
         print("  tools/pyproject_template/ already exists.")
-        response = input("  Overwrite with latest versions? [y/N] ").strip().lower()
-        if response not in ("y", "yes"):
-            print("  Cancelled.")
-            sys.exit(0)
+        if assume_yes:
+            print("  Overwriting with latest versions (--yes).")
+        else:
+            # Piped to python3, stdin is the script, so input() hits EOF (#1070).
+            try:
+                response = input("  Overwrite with latest versions? [y/N] ").strip().lower()
+            except EOFError:
+                print(
+                    "\n  No terminal to answer from (stdin is the piped script). "
+                    "Rerun with --yes to overwrite, e.g.:\n"
+                    "    curl -sSL https://raw.githubusercontent.com/endavis/"
+                    "pyproject-template/main/bootstrap.py | python3 - --sync --yes",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            if response not in ("y", "yes"):
+                print("  Cancelled.")
+                sys.exit(0)
         print()
 
     # Create directory structure
@@ -359,6 +376,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Install template management suite for an existing project "
         "(downloads to tools/pyproject_template/)",
     )
+    parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="With --sync, overwrite an existing tools/pyproject_template/ without "
+        "asking (needed when the script is piped to python3)",
+    )
     return parser.parse_args(argv)
 
 
@@ -368,7 +392,7 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.sync:
         project_root = Path.cwd()
-        run_sync(project_root)
+        run_sync(project_root, assume_yes=args.yes)
     else:
         run_setup()
 

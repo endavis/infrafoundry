@@ -96,6 +96,9 @@ ALLOWED: dict[str, str] = {
     "src/infrafoundry/providers/opnsense/validators/firewall_validator.py": (
         "ADR-0015's file list; the validator is now firewall_rule_validator.py"
     ),
+    # Template-owned test (ADR-9017, TEMPLATE_OWNED_TEST_FILES): it lives in
+    # pyproject-template and is never copied into a project made from it (#1208).
+    "tests/template/test_utils.py": "template-owned test named in ADR-9017, absent here",
 }
 
 
