@@ -341,6 +341,20 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
             "Check spelling of the resource names passed to -r",
             "Run 'foundry infra list --env <env>' to see available resources",
             "Verify the resources exist in your configuration",
+            "A -p package that declares no resources is also refused",
+        ],
+    ),
+    "IF-VALIDATION-006": ErrorInfo(
+        code="IF-VALIDATION-006",
+        title="Filtered Destroy Refused",
+        description=(
+            "A filtered destroy selected Proxmox SDN zones or vnets, which would also "
+            "destroy the VMs and containers that depend on them."
+        ),
+        suggestions=[
+            "Remove the zone or vnet from the config and run 'foundry infra apply'",
+            "If the package has no Proxmox resources left, run "
+            "'foundry infra apply --env <env> -P proxmox'",
         ],
     ),
     # Package errors (IF-PACKAGE-XXX)
@@ -580,6 +594,7 @@ _EXCEPTION_TO_CODE: dict[str, str] = {
     "ReferenceValidationError": "IF-VALIDATION-003",
     "SchemaValidationError": "IF-VALIDATION-004",
     "ResourceFilterError": "IF-VALIDATION-005",
+    "FilteredDestroyRefusedError": "IF-VALIDATION-006",
     # Package errors
     "PackageNotFoundError": "IF-PACKAGE-001",
     "MissingRequirementsError": "IF-PACKAGE-002",

@@ -12,7 +12,8 @@ from typing import IO, Any, cast, override
 from rich.console import Console
 from rich.markup import escape
 
-from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.exceptions import FilteredDestroyRefusedError
+from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.result_types import (
     ApplyResult,
     BaseResult,
@@ -27,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 _SDN_OBJECT_TYPE = re.compile(r"^proxmox_sdn_(zone|vnet)")
-_SDN_APPLIER_ADDRESSES = ("proxmox_sdn_applier.apply", "proxmox_sdn_applier.finalize")
+_SDN_APPLY_ADDRESS = "proxmox_sdn_applier.apply"
+_SDN_APPLIER_ADDRESSES = (_SDN_APPLY_ADDRESS, "proxmox_sdn_applier.finalize")
 
 
 class TerraformRunner(BaseRunner):
@@ -293,6 +295,12 @@ class TerraformRunner(BaseRunner):
         progress information is printed to the console from the JSON
         ``message`` fields.
 
+        For plan and apply, orphaned SDN zones and vnets (in state, no longer
+        declared) are added to the targets of a filtered run together with the
+        SDN appliers, and ``-replace=proxmox_sdn_applier.apply`` is passed so the
+        removal reaches the nodes (#1153). A filtered destroy that resolves to an
+        SDN zone or vnet raises :class:`FilteredDestroyRefusedError`.
+
         Args:
             provider: Provider instance
             command: Terraform command (plan, apply, destroy)
@@ -333,9 +341,23 @@ class TerraformRunner(BaseRunner):
         if parallelism is not None and command in {"apply", "destroy", "plan"}:
             cmd.append(f"-parallelism={parallelism}")
 
+        # Orphaned SDN zones/vnets (in state, no longer declared) are removed by
+        # replacing the applier, which terraform does not do on its own (#1153).
+        extra_targets: list[str] = []
+        replacements: list[str] = []
+        if command in {"plan", "apply"}:
+            extra_targets, replacements = self._sdn_removal_args(tf_dir)
+
         # Add -target flags for resource filtering
         if target_resources:
             targets = self._resolve_terraform_targets(tf_dir, target_resources, command=command)
+            if command == "destroy":
+                # Backstop: -target on an SDN object cascades through the applier to
+                # every VM and container that depends on it (#1153).
+                sdn_targets = [t for t in targets if _SDN_OBJECT_TYPE.match(t.split(".", 1)[0])]
+                if sdn_targets:
+                    raise FilteredDestroyRefusedError(self._refusal_message(sdn_targets))
+            targets = list(dict.fromkeys([*targets, *extra_targets]))
             if not targets:
                 self.console.print(
                     f"[yellow]Warning: No terraform resources matched filter: "
@@ -351,6 +373,9 @@ class TerraformRunner(BaseRunner):
                 }
             for target in targets:
                 cmd.extend(["-target", target])
+
+        for replacement in replacements:
+            cmd.extend(["-replace", replacement])
 
         use_json = command in {"apply", "destroy"}
         if use_json:
@@ -668,6 +693,95 @@ class TerraformRunner(BaseRunner):
         target = infra_name.replace("-", "_")
         return tf_name == target or tf_name.endswith(f"_{target}")
 
+    @staticmethod
+    def _declared_addresses(tf_dir: Path) -> list[str]:
+        """Return the resource addresses declared in the ``.tf`` files, in file order.
+
+        Args:
+            tf_dir: Terraform working directory
+
+        Returns:
+            ``type.name`` addresses, without duplicates
+        """
+        addresses: list[str] = []
+        # Pattern matches: resource "type" "name" {
+        resource_pattern = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
+        for tf_file in tf_dir.glob("*.tf"):
+            with open(tf_file) as f:
+                for line in f:
+                    match = resource_pattern.match(line)
+                    if match:
+                        address = f"{match.group(1)}.{match.group(2)}"
+                        if address not in addresses:
+                            addresses.append(address)
+        return addresses
+
+    def _sdn_removal_args(self, tf_dir: Path) -> tuple[list[str], list[str]]:
+        """Work out what a plan or apply needs to remove SDN zones and vnets.
+
+        Terraform does not re-run ``proxmox_sdn_applier.apply`` when a zone or
+        vnet it references is removed from config, so the removal would stay
+        staged on the nodes. Replacing the applier makes it run after the
+        orphan is destroyed (#1153).
+
+        Args:
+            tf_dir: Terraform working directory
+
+        Returns:
+            ``(extra_targets, replacements)``. Both are empty when no SDN zone
+            or vnet is in state without being declared. Otherwise the targets
+            are the orphans plus each applier that is declared or in state, and
+            the replacements are ``proxmox_sdn_applier.apply`` if it is declared.
+        """
+        in_state = self.state_list(tf_dir)
+        declared = set(self._declared_addresses(tf_dir))
+        orphans = [
+            a for a in in_state if _SDN_OBJECT_TYPE.match(a.split(".", 1)[0]) and a not in declared
+        ]
+        if not orphans:
+            return [], []
+        appliers = [a for a in _SDN_APPLIER_ADDRESSES if a in declared or a in in_state]
+        replacements = [_SDN_APPLY_ADDRESS] if _SDN_APPLY_ADDRESS in declared else []
+        return [*orphans, *appliers], replacements
+
+    @staticmethod
+    def _refusal_message(sdn_names: list[str]) -> str:
+        """Build the message for a filtered destroy that selects SDN objects."""
+        listed = ", ".join(sdn_names)
+        return (
+            f"Refusing a filtered destroy of SDN zone/vnet: {listed}. Terraform would "
+            "destroy proxmox_sdn_applier.apply with them, and so every VM and container "
+            "that depends on it. To remove a zone or vnet, delete it from the config and "
+            "run `foundry infra apply --env <env>` (with the same -p/-r). If the package "
+            "has no Proxmox resources left, run `foundry infra apply --env <env> -P proxmox`."
+        )
+
+    def check_filtered_destroy(
+        self, provider: ProviderBase, resources: list[ResourceConfig]
+    ) -> None:
+        """Refuse a filtered destroy that selects Proxmox SDN zones or vnets.
+
+        Args:
+            provider: Provider whose resources the filter selected
+            resources: The selected resources for that provider
+
+        Raises:
+            FilteredDestroyRefusedError: If any selected resource is an SDN zone
+                or vnet
+        """
+        tf_types: object = provider.get_terraform_resource_types()
+        if not isinstance(tf_types, dict):
+            # A provider that cannot map its types has nothing to refuse on; the
+            # destroy backstop in _run_terraform still checks the resolved targets.
+            return
+        sdn_names = [
+            r.name
+            for r in resources
+            if any(_SDN_OBJECT_TYPE.match(t) for t in tf_types.get(r.type, []))
+        ]
+        if sdn_names:
+            raise FilteredDestroyRefusedError(self._refusal_message(sdn_names))
+
     def _resolve_terraform_targets(
         self, tf_dir: Path, resource_names: list[str], command: str = "apply"
     ) -> list[str]:
@@ -688,25 +802,17 @@ class TerraformRunner(BaseRunner):
             ["proxmox_virtual_environment_vm.infra_web"])
         """
         targets: list[str] = []
-        declared: set[str] = set()
-        # Pattern matches: resource "type" "name" {
-        resource_pattern = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
-
-        for tf_file in tf_dir.glob("*.tf"):
-            with open(tf_file) as f:
-                for line in f:
-                    match = resource_pattern.match(line)
-                    if match:
-                        resource_type = match.group(1)
-                        resource_name = match.group(2)
-                        declared.add(f"{resource_type}.{resource_name}")
-                        # Exact match or suffix match for prefixed resources
-                        # (e.g., "ovf_ontap_node_01" matches "ontap_node_01")
-                        if any(
-                            self._name_matches_tf_name(infra_name, resource_name)
-                            for infra_name in resource_names
-                        ):
-                            targets.append(f"{resource_type}.{resource_name}")
+        declared_list = self._declared_addresses(tf_dir)
+        declared = set(declared_list)
+        for address in declared_list:
+            resource_name = address.split(".", 1)[1]
+            # Exact match or suffix match for prefixed resources
+            # (e.g., "ovf_ontap_node_01" matches "ontap_node_01")
+            if any(
+                self._name_matches_tf_name(infra_name, resource_name)
+                for infra_name in resource_names
+            ):
+                targets.append(address)
 
         # Terraform adds a target's dependencies but not its dependents, so the SDN
         # appliers (which depend on / are depended on by zones and vnets) are
@@ -752,8 +858,9 @@ class TerraformRunner(BaseRunner):
         """List all resource addresses in terraform state.
 
         Runs ``terraform state list`` in the given directory and returns
-        the resource addresses. Returns an empty list if no state file
-        exists or the command fails.
+        the resource addresses. Returns an empty list if there is neither a
+        local state file nor a ``backend.tf`` (remote state), or the command
+        fails.
 
         Args:
             working_dir: Terraform working directory containing state
@@ -762,7 +869,7 @@ class TerraformRunner(BaseRunner):
             List of terraform resource addresses
         """
         state_file = working_dir / "terraform.tfstate"
-        if not state_file.exists():
+        if not state_file.exists() and not (working_dir / "backend.tf").exists():
             return []
 
         try:

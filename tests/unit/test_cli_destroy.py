@@ -6,7 +6,12 @@ import pytest
 from click.testing import CliRunner
 
 from infrafoundry.cli.main import main
-from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
+from infrafoundry.core.exceptions import (
+    FilteredDestroyRefusedError,
+    ProviderFilterError,
+    ResourceFilterError,
+    TerraformError,
+)
 from infrafoundry.core.orchestrator import Orchestrator
 
 
@@ -271,3 +276,41 @@ def test_destroy_unknown_provider_filter_surfaces_error(
         assert "Unknown provider(s): nope. Available: opnsense, proxmox" in result.output
         assert "IF-GENERAL-001" not in result.output
         assert "Traceback" not in result.output
+
+
+def test_destroy_refusal_exits_nonzero_and_shows_message(
+    cli_runner: CliRunner, mock_orchestrator: Mock
+) -> None:
+    """A refused filtered destroy of an SDN vnet fails with the explanation (#1153)."""
+    mock_orchestrator.destroy.side_effect = FilteredDestroyRefusedError(
+        "Refusing a filtered destroy of SDN zone/vnet: ntlan. Run foundry infra apply."
+    )
+
+    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+        result = cli_runner.invoke(
+            main, ["infra", "destroy", "--env", "test", "-r", "ntlan", "--auto-approve"]
+        )
+
+    assert result.exit_code != 0
+    assert "Refusing a filtered destroy" in result.output
+    assert "ntlan" in result.output
+
+
+@pytest.mark.parametrize("command", ["destroy", "apply"])
+def test_empty_package_exits_nonzero_without_running(
+    cli_runner: CliRunner, mock_orchestrator: Mock, command: str
+) -> None:
+    """An emptied package is an error, never a match-all filter (#1153)."""
+    mock_orchestrator.config_manager = Mock()
+    mock_orchestrator.config_manager.resolve_package_filter.side_effect = ResourceFilterError(
+        "Package 'empty' declares no resources"
+    )
+
+    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+        result = cli_runner.invoke(
+            main, ["infra", command, "--env", "test", "-p", "empty", "--auto-approve"]
+        )
+
+    assert result.exit_code != 0
+    assert "declares no resources" in result.output
+    getattr(mock_orchestrator, command).assert_not_called()

@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrafoundry.core.provider import ProviderBase
+from infrafoundry.core.exceptions import FilteredDestroyRefusedError
+from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY
 from infrafoundry.core.runners.terraform_runner import TerraformRunner
 
@@ -762,3 +763,211 @@ class TestOutcomeNamesWithoutFilter:
 
         [outcome] = result["resource_outcomes"]
         assert outcome.resource_name == "opnsense-test"
+
+
+SDN_TF = (
+    'resource "proxmox_sdn_applier" "finalize" {\n}\n'
+    'resource "proxmox_sdn_zone_vxlan" "nettest" {\n}\n'
+    'resource "proxmox_sdn_vnet" "ntlan" {\n}\n'
+    'resource "proxmox_sdn_applier" "apply" {\n}\n'
+    'resource "proxmox_virtual_environment_vm" "web_01" {\n}\n'
+)
+ORPHAN = "proxmox_sdn_vnet.vnet2"
+STATE_WITH_ORPHAN = [
+    "proxmox_sdn_applier.finalize",
+    "proxmox_sdn_applier.apply",
+    "proxmox_sdn_zone_vxlan.nettest",
+    "proxmox_sdn_vnet.ntlan",
+    ORPHAN,
+]
+
+
+def _resource(name: str, rtype: str) -> ResourceConfig:
+    return ResourceConfig(name=name, type=rtype, provider="proxmox", config={})
+
+
+class TestSdnRemoval:
+    """SDN removal through apply and the filtered-destroy guard (#1153)."""
+
+    TF_TYPES: ClassVar[dict[str, list[str]]] = {
+        "vm": ["proxmox_virtual_environment_vm"],
+        "sdn_zone": ["proxmox_sdn_zone_vxlan"],
+        "sdn_vnet": ["proxmox_sdn_vnet"],
+    }
+
+    def _cmd(
+        self,
+        runner: TerraformRunner,
+        provider: MagicMock,
+        command: str,
+        state: list[str],
+        tf: str = SDN_TF,
+        **kwargs: Any,
+    ) -> list[str] | None:
+        """Run a command with terraform mocked and return the command line it ran."""
+        (provider.terraform_dir / "sdn.tf").write_text(tf)
+        (provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
+        process = MagicMock()
+        process.stdout = iter([])
+        process.stderr = MagicMock()
+        process.stderr.__iter__ = MagicMock(return_value=iter([]))
+        process.returncode = 0
+        process.wait.return_value = 0
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch.object(runner, "state_list", return_value=state),
+            patch("subprocess.run") as mock_run,
+            patch("subprocess.Popen", return_value=process) as mock_popen,
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+            getattr(runner, command)(provider, auto_approve=True, **kwargs)
+            if command == "plan":
+                calls = [c.args[0] for c in mock_run.call_args_list if "plan" in c.args[0]]
+                return calls[0] if calls else None
+            if not mock_popen.called:
+                return None
+            return list(mock_popen.call_args[0][0])
+
+    @staticmethod
+    def _flag_values(cmd: list[str], flag: str) -> list[str]:
+        return [cmd[i + 1] for i, a in enumerate(cmd) if a == flag]
+
+    # check_filtered_destroy
+
+    @pytest.mark.parametrize(("rtype", "name"), [("sdn_vnet", "ntlan"), ("sdn_zone", "nettest")])
+    def test_check_refuses_sdn(
+        self, runner: TerraformRunner, provider: MagicMock, rtype: str, name: str
+    ) -> None:
+        provider.get_terraform_resource_types.return_value = self.TF_TYPES
+        with pytest.raises(FilteredDestroyRefusedError) as exc:
+            runner.check_filtered_destroy(provider, [_resource(name, rtype)])
+        assert name in str(exc.value)
+        assert "apply" in str(exc.value)
+
+    def test_check_allows_vm(self, runner: TerraformRunner, provider: MagicMock) -> None:
+        provider.get_terraform_resource_types.return_value = self.TF_TYPES
+        runner.check_filtered_destroy(provider, [_resource("web-01", "vm")])
+
+    # backstop and destroy
+
+    def test_backstop_refuses_filtered_destroy_of_declared_vnet(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        (provider.terraform_dir / "sdn.tf").write_text(SDN_TF)
+        (provider.terraform_dir / ".terraform").mkdir()
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
+            patch("subprocess.Popen") as mock_popen,
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+            with pytest.raises(FilteredDestroyRefusedError):
+                runner.destroy(provider, auto_approve=True, target_resources=["ntlan"])
+        mock_popen.assert_not_called()
+
+    def test_unfiltered_destroy_with_sdn_runs_without_targets(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(runner, provider, "destroy", STATE_WITH_ORPHAN)
+        assert cmd is not None
+        assert "-target" not in cmd
+        assert "-replace" not in cmd
+
+    def test_destroy_never_computes_sdn_removal(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        with patch.object(runner, "_sdn_removal_args") as removal:
+            cmd = self._cmd(
+                runner, provider, "destroy", STATE_WITH_ORPHAN, target_resources=["web-01"]
+            )
+        removal.assert_not_called()
+        assert cmd is not None
+        assert "-replace" not in cmd
+
+    # filtered plan and apply
+
+    @pytest.mark.parametrize("command", ["apply", "plan"])
+    def test_filtered_run_with_orphan_targets_orphan_and_appliers(
+        self, runner: TerraformRunner, provider: MagicMock, command: str
+    ) -> None:
+        cmd = self._cmd(runner, provider, command, STATE_WITH_ORPHAN, target_resources=["ntlan"])
+        assert cmd is not None
+        targets = self._flag_values(cmd, "-target")
+        assert ORPHAN in targets
+        assert "proxmox_sdn_applier.apply" in targets
+        assert "proxmox_sdn_applier.finalize" in targets
+        assert "proxmox_virtual_environment_vm.web_01" not in targets
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+
+    def test_filter_matching_nothing_declared_still_runs_for_orphans(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(runner, provider, "apply", STATE_WITH_ORPHAN, target_resources=["vnet2"])
+        assert cmd is not None
+        targets = self._flag_values(cmd, "-target")
+        assert targets == [
+            ORPHAN,
+            "proxmox_sdn_applier.apply",
+            "proxmox_sdn_applier.finalize",
+        ]
+
+    def test_all_sdn_removed_targets_all_orphans_without_replace(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        state = [
+            "proxmox_sdn_applier.finalize",
+            "proxmox_sdn_applier.apply",
+            "proxmox_sdn_zone_vxlan.nettest",
+            "proxmox_sdn_vnet.ntlan",
+        ]
+        cmd = self._cmd(
+            runner,
+            provider,
+            "apply",
+            state,
+            tf='resource "proxmox_virtual_environment_vm" "web_01" {\n}\n',
+            target_resources=["nettest"],
+        )
+        assert cmd is not None
+        assert sorted(self._flag_values(cmd, "-target")) == sorted(state)
+        assert "-replace" not in cmd
+
+    def test_unfiltered_apply_with_orphan_replaces_without_targets(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        cmd = self._cmd(runner, provider, "apply", STATE_WITH_ORPHAN)
+        assert cmd is not None
+        assert "-target" not in cmd
+        assert self._flag_values(cmd, "-replace") == ["proxmox_sdn_applier.apply"]
+
+    def test_no_orphans_changes_nothing(self, runner: TerraformRunner, provider: MagicMock) -> None:
+        state = [a for a in STATE_WITH_ORPHAN if a != ORPHAN]
+        cmd = self._cmd(runner, provider, "apply", state, target_resources=["ntlan"])
+        assert cmd is not None
+        assert "-replace" not in cmd
+        assert self._flag_values(cmd, "-target") == [
+            "proxmox_sdn_vnet.ntlan",
+            "proxmox_sdn_applier.apply",
+            "proxmox_sdn_applier.finalize",
+        ]
+
+    # state_list
+
+    def test_state_list_runs_with_only_backend_tf(
+        self, runner: TerraformRunner, tmp_path: Path
+    ) -> None:
+        (tmp_path / "backend.tf").write_text("terraform {}\n")
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="a.b\n", stderr="")
+            assert runner.state_list(tmp_path) == ["a.b"]
+        mock_run.assert_called_once()
+
+    def test_state_list_empty_without_state_or_backend(
+        self, runner: TerraformRunner, tmp_path: Path
+    ) -> None:
+        with patch("subprocess.run") as mock_run:
+            assert runner.state_list(tmp_path) == []
+        mock_run.assert_not_called()

@@ -206,6 +206,10 @@ class ResourceFilterError(InfraFoundryError):
     """Raised when resource filter matches no resources."""
 
 
+class FilteredDestroyRefusedError(InfraFoundryError):
+    """Raised when a filtered destroy would cascade beyond the selected resources (#1153)."""
+
+
 # Package Errors
 
 
@@ -426,6 +430,7 @@ __all__ = [
     "DeploymentError",
     "DeploymentNotFoundError",
     "EnvironmentNotFoundError",
+    "FilteredDestroyRefusedError",
     "InfraFoundryError",
     "InvalidConfigurationError",
     "InvalidCredentialError",

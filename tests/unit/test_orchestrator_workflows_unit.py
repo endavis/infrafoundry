@@ -13,7 +13,7 @@ from rich.console import Console
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.events import EventType
-from infrafoundry.core.exceptions import ProviderFilterError
+from infrafoundry.core.exceptions import FilteredDestroyRefusedError, ProviderFilterError
 from infrafoundry.core.orchestrator_workflows import (
     ApplyOrchestrator,
     DestroyOrchestrator,
@@ -25,6 +25,7 @@ from infrafoundry.core.orchestrator_workflows import (
 )
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
+from infrafoundry.core.runners.terraform_runner import TerraformRunner
 from infrafoundry.core.state import DeploymentStatus
 from infrafoundry.core.types import ResourceOutcome
 
@@ -1964,3 +1965,98 @@ def test_known_hosts_failure_does_not_fail_the_destroy(console: Console) -> None
 
     status = cast(MagicMock, orchestrator.state_manager).update_deployment_status
     status.assert_called_with(30, DeploymentStatus.COMPLETED)
+
+
+def _sdn_destroy_setup(
+    console: Console, provider_names: list[str] | None = None
+) -> tuple[DestroyOrchestrator, MagicMock, MagicMock, MagicMock]:
+    """Build a DestroyOrchestrator over a real TerraformRunner and a proxmox provider."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 9
+    event_manager = MagicMock()
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    runner_registry.create_runner.return_value = TerraformRunner(console)
+    provider = MagicMock()
+    provider.terraform_parallelism = None
+    provider.get_terraform_resource_types.return_value = {
+        "vm": ["proxmox_virtual_environment_vm"],
+        "sdn_vnet": ["proxmox_sdn_vnet"],
+    }
+    resources = [
+        _resource("web-01", type_="vm"),
+        _resource("ntlan", type_="sdn_vnet"),
+    ]
+    by_provider = {"proxmox": resources}
+
+    def iter_batches(
+        rbp: dict[str, list[ResourceConfig]],
+        filt: list[str] | None,
+        reverse: bool,
+        env_name: str | None,
+    ) -> list[ProviderResourceBatch]:
+        return [
+            ProviderResourceBatch(name, [r for r in rs if not filt or r.name in filt], len(rs))
+            for name, rs in rbp.items()
+        ]
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: {"proxmox": provider},
+        load_resources=lambda env: (resources, by_provider),
+        iter_provider_batches=iter_batches,
+        get_current_user=lambda: "tester",
+    )
+    return orchestrator, state_manager, event_manager, provider
+
+
+def test_filtered_destroy_of_sdn_vnet_is_refused_before_any_side_effect(
+    console: Console,
+) -> None:
+    """The refusal precedes the deployment record, events, generation and destroy."""
+    orchestrator, state_manager, event_manager, provider = _sdn_destroy_setup(console)
+    with (
+        patch.object(TerraformRunner, "destroy") as runner_destroy,
+        pytest.raises(FilteredDestroyRefusedError, match="ntlan"),
+    ):
+        orchestrator.destroy("dev", resource_filter=["ntlan"], auto_approve=True)
+
+    state_manager.create_deployment.assert_not_called()
+    event_manager.emit_event.assert_not_called()
+    provider.generate_terraform.assert_not_called()
+    runner_destroy.assert_not_called()
+
+
+@pytest.mark.parametrize("resource_filter", [["web-01"], None])
+def test_destroy_of_vm_or_unfiltered_goes_ahead(
+    console: Console, resource_filter: list[str] | None
+) -> None:
+    orchestrator, state_manager, _events, _provider = _sdn_destroy_setup(console)
+    with (
+        patch.object(TerraformRunner, "destroy", return_value={"success": True}) as runner_destroy,
+        patch.object(TerraformRunner, "verify_destroyed", return_value=[]),
+    ):
+        orchestrator.destroy("dev", resource_filter=resource_filter, auto_approve=True)
+
+    state_manager.create_deployment.assert_called_once()
+    runner_destroy.assert_called_once()
+
+
+def test_provider_filter_excluding_proxmox_is_not_refused(console: Console) -> None:
+    orchestrator, state_manager, _events, _provider = _sdn_destroy_setup(console)
+    sdn = [_resource("ntlan", type_="sdn_vnet")]
+    other = [_resource("fw", provider="opnsense", type_="rule")]
+    orchestrator._load_resources = lambda env: (
+        sdn + other,
+        {"proxmox": sdn, "opnsense": other},
+    )
+    with patch.object(TerraformRunner, "destroy", return_value={"success": True}) as runner_destroy:
+        orchestrator.destroy(
+            "dev", resource_filter=["ntlan"], auto_approve=True, provider_filter=["opnsense"]
+        )
+
+    runner_destroy.assert_not_called()
+    state_manager.create_deployment.assert_called_once()

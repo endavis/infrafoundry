@@ -14,7 +14,11 @@ from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoader
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
 from infrafoundry.core.config.sops import load_yaml_with_sops
-from infrafoundry.core.exceptions import InvalidConfigurationError, PackageNotFoundError
+from infrafoundry.core.exceptions import (
+    InvalidConfigurationError,
+    PackageNotFoundError,
+    ResourceFilterError,
+)
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.secrets.provider import SecretProvider
 from infrafoundry.core.secrets.secret_manager import (
@@ -444,6 +448,18 @@ class ConfigManager(PathBasedManager):
             manifests.append((manifest.provider, manifest))
         return manifests
 
+    @staticmethod
+    def _non_empty_package_names(package_name: str, resources: list[ResourceConfig]) -> list[str]:
+        """Return the unique resource names of a package, refusing an empty one."""
+        names = list(dict.fromkeys(r.name for r in resources))
+        if not names:
+            raise ResourceFilterError(
+                f"Package '{package_name}' declares no resources, so there is nothing to "
+                f"select. An empty selection would act on the whole environment; restore "
+                f"the package's resources or drop -p/--package."
+            )
+        return names
+
     def resolve_package_filter(self, env_name: str, package_name: str) -> list[str]:
         """Resolve a package name to a list of unique resource names.
 
@@ -460,6 +476,9 @@ class ConfigManager(PathBasedManager):
 
         Raises:
             PackageNotFoundError: If no package with the given name is found
+            ResourceFilterError: If the package declares no resources. An empty
+                filter means "no filter" to every layer, so it would otherwise
+                widen a destroy to the whole environment (#1153).
         """
         # Check provider-scoped packages
         discovered_providers = self.provider_centric.discover_providers(env_name)
@@ -473,7 +492,7 @@ class ConfigManager(PathBasedManager):
                     pkg_resources, _, _pkg_vars = self._package_loader.load_package(
                         package_dir, effective_provider, env_name
                     )
-                    return list(dict.fromkeys(r.name for r in pkg_resources))
+                    return self._non_empty_package_names(package_name, pkg_resources)
 
         # Check env-root packages
         for package_dir in self._package_loader.discover_env_root_packages(env_name):
@@ -486,7 +505,7 @@ class ConfigManager(PathBasedManager):
                 pkg_resources, _, _pkg_vars = self._package_loader.load_package(
                     package_dir, manifest.provider, env_name
                 )
-                return list(dict.fromkeys(r.name for r in pkg_resources))
+                return self._non_empty_package_names(package_name, pkg_resources)
 
         raise PackageNotFoundError(
             f"Package '{package_name}' not found in environment '{env_name}'"
