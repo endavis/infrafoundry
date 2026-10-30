@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793376104566,
+  "lastUpdate": 1793376636648,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12338,6 +12338,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014578477280168263",
             "extra": "mean: 93.58545129997198 usec\nrounds: 12577"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c9fe9018eb388a40ceadcae7b4117f98e0a0c428",
+          "message": "fix: refuse filtered sdn destroys and remove sdn objects through apply (merges PR #1214, addresses #1153)\n\nA filtered destroy of a Proxmox SDN zone or vnet cascades through\nproxmox_sdn_applier.apply to every VM and container that depends on it.\nDestroyOrchestrator now refuses it before any deployment record, event\nor hook (FilteredDestroyRefusedError), and the runner keeps a backstop\non the resolved destroy targets.\n\nRemoval goes through apply instead. Plan and apply target SDN zones and\nvnets that are in state but no longer declared, together with the\nappliers, and pass -replace=proxmox_sdn_applier.apply so the removal is\napplied on the nodes. Terraform does not re-run the applier on its own\nwhen a referenced object is removed. The -replace is also passed on\nunfiltered and -P runs.\n\nstate_list now also lists state when backend.tf exists, so remote\nbackends are covered. A -p package that declares no resources is now a\nResourceFilterError: its empty filter meant \"no filter\", which widened\na destroy to the whole environment.\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T16:09:39Z",
+          "tree_id": "4d3bf62038d3a34b7ce531a14800c9684660db94",
+          "url": "https://github.com/endavis/infrafoundry/commit/c9fe9018eb388a40ceadcae7b4117f98e0a0c428"
+        },
+        "date": 1793376635524,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7784.176639483152,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011769064181703274",
+            "extra": "mean: 128.46573842219456 usec\nrounds: 8227"
           }
         ]
       }
