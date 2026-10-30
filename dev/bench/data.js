@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793354185140,
+  "lastUpdate": 1793354691168,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12152,6 +12152,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00004048185672409713",
             "extra": "mean: 147.41036257993738 usec\nrounds: 8434"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b089a973d42b8e881fe178d2c4baca9420975733",
+          "message": "feat: let an ontap-cluster add itself to the NetApp Console (merges PR #1205, addresses #1140)\n\nAfter the setup playbook, ontap-post-terraform.sh runs a new stdlib\nhelper, scripts/ontap-console-discover.py. When console_client_id,\nconsole_client_secret and console_agent_id are set it gets a token with\nthe service account and posts the cluster to\n/occm/api/onprem/working-environments on api.bluexp.netapp.com with the\nx-agent-id header, so the agent connects to cluster_mgmt_ip. The\nworkspace is console_workspace_id or the account's only one. A system\nalready in the Console, matched by name or by\nontapClusterProperties.clusterAddress, is left alone. With no console_*\ninput set the step logs a skip; a partial set fails naming the rest.\nSecrets are read from INFRAFOUNDRY_PACKAGE_VARS and redacted from errors.\n\nVerified live: ontapcl-test was added through console-connector-test as\nOnPremWorkingEnvironment-qcJnlyUQ, and a second run reported it already\npresent.\n\nAddresses #1140\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T10:04:04Z",
+          "tree_id": "0da0d187bdfcf8964208d592a8fa27a9e630604e",
+          "url": "https://github.com/endavis/infrafoundry/commit/b089a973d42b8e881fe178d2c4baca9420975733"
+        },
+        "date": 1793354689703,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10980.864721406382,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015020520799530246",
+            "extra": "mean: 91.06750928736733 usec\nrounds: 12490"
           }
         ]
       }
