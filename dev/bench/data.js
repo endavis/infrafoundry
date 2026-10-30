@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793354691168,
+  "lastUpdate": 1793358555901,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12183,6 +12183,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015020520799530246",
             "extra": "mean: 91.06750928736733 usec\nrounds: 12490"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1b8919abeaef836617f1e6c75968b38a10ede2cf",
+          "message": "fix: set the ontap-cluster interconnect MTU from cluster_mtu (merges PR #1207, addresses #1206)\n\nThe simulator leaves the Cluster broadcast domain at MTU 9000. On a\ncluster-port network below that, such as the 1500 VXLAN vnet in the\ntest lab, large cluster packets are dropped and ONTAP logs\nvifmgr.cluscheck.ctdpktloss and \"CLUSTER NETWORK DEGRADED: Large MTU\nPacket Loss\".\n\nA new cluster_mtu input (default 1500) is passed to the post-cluster\nrole, which sets the Cluster broadcast domain in the Cluster IPspace to\nit with na_ontap_broadcast_domain before any data configuration. No\nports are given, so the domain's ports are left alone.\n\nAddresses #1206\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T11:08:27Z",
+          "tree_id": "ec3a517f6eac39456a87d1d84cedf427c49c2a1c",
+          "url": "https://github.com/endavis/infrafoundry/commit/1b8919abeaef836617f1e6c75968b38a10ede2cf"
+        },
+        "date": 1793358555064,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7888.062701640703,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013073364396090339",
+            "extra": "mean: 126.7738401460731 usec\nrounds: 8489"
           }
         ]
       }
