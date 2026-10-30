@@ -443,6 +443,39 @@ class TestResolveTargets:
         targets = runner._resolve_terraform_targets(tmp_path, ["ontap-node-01"])
         assert targets == ["terraform_data.ovf_ontap_node_01"]
 
+    def test_sdn_targets_add_appliers(self, runner: TerraformRunner, tmp_path: Path) -> None:
+        """Targeting an SDN zone or vnet also targets both appliers (#1153)."""
+        (tmp_path / "sdn.tf").write_text(
+            'resource "proxmox_sdn_applier" "finalize" {\n}\n'
+            'resource "proxmox_sdn_zone_vxlan" "nettest" {\n}\n'
+            'resource "proxmox_sdn_vnet" "ntlan" {\n}\n'
+            'resource "proxmox_sdn_applier" "apply" {\n}\n'
+        )
+        targets = runner._resolve_terraform_targets(tmp_path, ["ntlan"])
+        assert sorted(targets) == [
+            "proxmox_sdn_applier.apply",
+            "proxmox_sdn_applier.finalize",
+            "proxmox_sdn_vnet.ntlan",
+        ]
+
+    def test_sdn_destroy_does_not_target_appliers(
+        self, runner: TerraformRunner, tmp_path: Path
+    ) -> None:
+        """A filtered destroy of a vnet must not target the appliers (#1153)."""
+        (tmp_path / "sdn.tf").write_text(
+            'resource "proxmox_sdn_applier" "finalize" {\n}\n'
+            'resource "proxmox_sdn_vnet" "ntlan" {\n}\n'
+            'resource "proxmox_sdn_applier" "apply" {\n}\n'
+        )
+        targets = runner._resolve_terraform_targets(tmp_path, ["ntlan"], command="destroy")
+        assert targets == ["proxmox_sdn_vnet.ntlan"]
+
+    def test_non_sdn_targets_skip_appliers(self, runner: TerraformRunner, tmp_path: Path) -> None:
+        """A VM target does not pull in the SDN appliers."""
+        (tmp_path / "sdn.tf").write_text('resource "proxmox_sdn_applier" "apply" {\n}\n')
+        (tmp_path / "vm.tf").write_text('resource "esxi_guest" "my_vm" {\n}\n')
+        assert runner._resolve_terraform_targets(tmp_path, ["my-vm"]) == ["esxi_guest.my_vm"]
+
     def test_no_match_returns_empty(self, runner: TerraformRunner, tmp_path: Path) -> None:
         """Unmatched filter returns empty list."""
         tf_file = tmp_path / "main.tf"
