@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793300353794,
+  "lastUpdate": 1793354185140,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12121,6 +12121,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015604443862628423",
             "extra": "mean: 131.65192153130303 usec\nrounds: 8411"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1537231fa9c975276d7533ea790fb44bc3e8c923",
+          "message": "feat: add a state rename-env command (merges PR #1204, addresses #1203)\n\nfoundry state rename-env --env OLD --to-env NEW renames an environment's\nstate rows (resources, deployments, deployment_locks and the environment\nin rollback snapshots) in one transaction and moves generated/OLD to\ngenerated/NEW. It refuses, changing nothing, when NEW already has rows,\nOLD has none, OLD is locked, the config repo was not renamed first\n(--force skips that), or the generated directories are not as expected.\nSQLite is backed up first and a STATE_ENV_RENAMED audit entry is\nwritten; audit_entries keep the old name.\n\nThe lock check and the backup block move from prune into state.py and\nare shared by both commands.\n\nAddresses #1203\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T09:55:28Z",
+          "tree_id": "857835d8c7c932fa2764a67b9524f1d53fd5abae",
+          "url": "https://github.com/endavis/infrafoundry/commit/1537231fa9c975276d7533ea790fb44bc3e8c923"
+        },
+        "date": 1793354184277,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 6783.783599051405,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00004048185672409713",
+            "extra": "mean: 147.41036257993738 usec\nrounds: 8434"
           }
         ]
       }
