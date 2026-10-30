@@ -224,6 +224,19 @@ A VM or container attaches by using the vnet as its bridge
   removal is applied on the nodes. Terraform does not re-run the applier on its own
   when a referenced object disappears. This works for unfiltered and `-P` applies too,
   and also when the state is in a remote backend.
+- **Adding a zone or vnet.** Terraform does not re-run the applier when a zone or vnet it
+  references is created, so an addition to an SDN setup that is already deployed would stay
+  staged. When a zone or vnet is declared but not in state, and `proxmox_sdn_applier.apply`
+  is in state, `plan` and `apply` replace `proxmox_sdn_applier.apply` and, in a filtered run,
+  also target both appliers, so the addition is applied on the nodes. A filtered apply of an
+  unrelated VM creates pending additions through the applier's dependencies and re-runs the
+  applier the same way. On the first SDN deploy nothing extra is needed: creating the applier
+  applies the change.
+- **Additions deployed before this change.** An addition that is already in state but was
+  never applied is not detected, because Terraform state cannot tell it from an applied one.
+  `foundry` cannot pass `-replace`, so run
+  `terraform apply -replace=proxmox_sdn_applier.apply` in
+  `generated/<env>/terraform/proxmox/`.
 - **Filtered destroy is refused.** `foundry infra destroy -p`/`-r` that selects a zone or
   vnet fails before anything runs. Terraform would destroy `proxmox_sdn_applier.apply`
   along with it, and so every VM and container that depends on it. Use the

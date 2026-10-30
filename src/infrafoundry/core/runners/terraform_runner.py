@@ -298,7 +298,9 @@ class TerraformRunner(BaseRunner):
         For plan and apply, orphaned SDN zones and vnets (in state, no longer
         declared) are added to the targets of a filtered run together with the
         SDN appliers, and ``-replace=proxmox_sdn_applier.apply`` is passed so the
-        removal reaches the nodes (#1153). A filtered destroy that resolves to an
+        removal reaches the nodes. The same replacement, with the appliers
+        targeted, is used when an SDN zone or vnet is declared but not yet in
+        state and the applier already is (#1153). A filtered destroy that resolves to an
         SDN zone or vnet raises :class:`FilteredDestroyRefusedError`.
 
         Args:
@@ -341,12 +343,12 @@ class TerraformRunner(BaseRunner):
         if parallelism is not None and command in {"apply", "destroy", "plan"}:
             cmd.append(f"-parallelism={parallelism}")
 
-        # Orphaned SDN zones/vnets (in state, no longer declared) are removed by
-        # replacing the applier, which terraform does not do on its own (#1153).
+        # Orphaned and newly added SDN zones/vnets reach the nodes by replacing the
+        # applier, which terraform does not do on its own (#1153).
         extra_targets: list[str] = []
         replacements: list[str] = []
         if command in {"plan", "apply"}:
-            extra_targets, replacements = self._sdn_removal_args(tf_dir)
+            extra_targets, replacements = self._sdn_change_args(tf_dir)
 
         # Add -target flags for resource filtering
         if target_resources:
@@ -716,33 +718,57 @@ class TerraformRunner(BaseRunner):
                             addresses.append(address)
         return addresses
 
-    def _sdn_removal_args(self, tf_dir: Path) -> tuple[list[str], list[str]]:
-        """Work out what a plan or apply needs to remove SDN zones and vnets.
+    def _sdn_change_args(self, tf_dir: Path) -> tuple[list[str], list[str]]:
+        """Work out what a plan or apply needs to apply SDN zone and vnet changes.
 
-        Terraform does not re-run ``proxmox_sdn_applier.apply`` when a zone or
-        vnet it references is removed from config, so the removal would stay
-        staged on the nodes. Replacing the applier makes it run after the
-        orphan is destroyed (#1153).
+        Terraform re-runs ``proxmox_sdn_applier.apply`` (through
+        ``replace_triggered_by``) when a zone or vnet is updated, but not when one
+        it references is removed from config or newly created, so those changes
+        would stay staged on the nodes. Replacing the applier makes it run after
+        them (#1153).
+
+        - **Orphans:** SDN zones and vnets in state but not declared. The extra
+          targets are the orphans plus each applier that is declared or in state,
+          and the applier ``apply`` is replaced if it is declared.
+        - **Additions:** SDN zones and vnets declared but not in state. When
+          ``apply`` is both declared and in state, it is replaced and the declared
+          appliers are targeted, since ``-replace`` outside the targets is silently
+          ignored. When ``apply`` is not in state, creating it applies the change,
+          so nothing is added.
 
         Args:
             tf_dir: Terraform working directory
 
         Returns:
-            ``(extra_targets, replacements)``. Both are empty when no SDN zone
-            or vnet is in state without being declared. Otherwise the targets
-            are the orphans plus each applier that is declared or in state, and
-            the replacements are ``proxmox_sdn_applier.apply`` if it is declared.
+            ``(extra_targets, replacements)``. Both are empty when there are
+            neither orphans nor additions that need a replacement.
         """
         in_state = self.state_list(tf_dir)
-        declared = set(self._declared_addresses(tf_dir))
+        declared_list = self._declared_addresses(tf_dir)
+        declared = set(declared_list)
         orphans = [
             a for a in in_state if _SDN_OBJECT_TYPE.match(a.split(".", 1)[0]) and a not in declared
         ]
-        if not orphans:
+        additions = [
+            a
+            for a in declared_list
+            if _SDN_OBJECT_TYPE.match(a.split(".", 1)[0]) and a not in in_state
+        ]
+        apply_declared = _SDN_APPLY_ADDRESS in declared
+        replace_for_additions = (
+            bool(additions) and apply_declared and _SDN_APPLY_ADDRESS in in_state
+        )
+        if not orphans and not replace_for_additions:
             return [], []
-        appliers = [a for a in _SDN_APPLIER_ADDRESSES if a in declared or a in in_state]
-        replacements = [_SDN_APPLY_ADDRESS] if _SDN_APPLY_ADDRESS in declared else []
-        return [*orphans, *appliers], replacements
+        extra_targets: list[str] = list(orphans)
+        if orphans:
+            extra_targets.extend(
+                a for a in _SDN_APPLIER_ADDRESSES if a in declared or a in in_state
+            )
+        if replace_for_additions:
+            extra_targets.extend(a for a in _SDN_APPLIER_ADDRESSES if a in declared)
+        replacements = [_SDN_APPLY_ADDRESS] if apply_declared else []
+        return list(dict.fromkeys(extra_targets)), replacements
 
     @staticmethod
     def _refusal_message(sdn_names: list[str]) -> str:
