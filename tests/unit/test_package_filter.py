@@ -8,7 +8,7 @@ from click.testing import CliRunner
 
 from infrafoundry.cli.main import main
 from infrafoundry.core.config.config_manager import ConfigManager
-from infrafoundry.core.exceptions import PackageNotFoundError
+from infrafoundry.core.exceptions import PackageNotFoundError, ResourceFilterError
 from infrafoundry.core.orchestrator import Orchestrator
 
 
@@ -104,6 +104,20 @@ class TestResolvePackageFilter:
         result = cm.resolve_package_filter("test-env", "standalone-pkg")
 
         assert result == ["standalone-vm"]
+
+    def test_empty_package_raises(self, tmp_path: Path) -> None:
+        """A package with no resources is an error, not an empty (match-all) filter."""
+        env_dir = tmp_path / "test-env"
+        pkg_dir = env_dir / "proxmox" / "empty-pkg"
+        pkg_dir.mkdir(parents=True)
+        (env_dir / "settings.yaml").write_text("iac_tool: terraform\n")
+        (pkg_dir / "infrafoundry.yml").write_text("name: empty-pkg\nresources:\n  - vm.yaml\n")
+        (pkg_dir / "vm.yaml").write_text("vm: []\n")
+
+        cm = ConfigManager(base_dir=tmp_path)
+
+        with pytest.raises(ResourceFilterError, match="empty-pkg"):
+            cm.resolve_package_filter("test-env", "empty-pkg")
 
 
 # --- CLI mutual exclusivity tests ---

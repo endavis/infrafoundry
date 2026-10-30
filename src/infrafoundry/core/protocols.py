@@ -216,6 +216,28 @@ class VerifiesDestroy(Protocol):
 
 
 @runtime_checkable
+class ChecksFilteredDestroy(Protocol):
+    """Protocol for runners that can refuse an unsafe filtered destroy (#1153).
+
+    ``isinstance`` against it checks that ``check_filtered_destroy`` exists.
+    """
+
+    def check_filtered_destroy(
+        self, provider: "ProviderBase", resources: "list[ResourceConfig]"
+    ) -> None:
+        """Raise if destroying ``resources`` with a filter would cascade.
+
+        Args:
+            provider: Provider whose resources are being destroyed
+            resources: The resources the filter selected for this provider
+
+        Raises:
+            FilteredDestroyRefusedError: If the destroy is unsafe
+        """
+        ...
+
+
+@runtime_checkable
 class HasSnippetStrictness(Protocol):
     """Protocol for providers that can fail on missing cloud-init snippets.
 

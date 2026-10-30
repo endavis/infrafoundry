@@ -25,6 +25,7 @@ from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.known_hosts import forget_on_jumphost, hosts_to_forget
 from infrafoundry.core.protocols import (
+    ChecksFilteredDestroy,
     Destroyable,
     Plannable,
     ValidatesReferencesInContext,
@@ -1194,6 +1195,15 @@ class DestroyOrchestrator(HookExecutionMixin):
         provider_filter: list[str] | None = None,
     ) -> dict[str, Any]:
         """Destroy all requested resources."""
+        # Load environment config for hooks and event handlers
+        env_config = self._load_environment(env_name) if self._load_environment else None
+
+        # Refuse before any deployment record, event or generated file (#1153).
+        if resource_filter:
+            self._refuse_unsafe_filtered_destroy(
+                env_name, resource_filter, provider_filter, env_config
+            )
+
         destroy_metadata: DestroyDeploymentMetadata = {
             "resource_filter": resource_filter,
             "auto_approve": auto_approve,
@@ -1216,8 +1226,6 @@ class DestroyOrchestrator(HookExecutionMixin):
 
         results: dict[str, Any] = {}
 
-        # Load environment config for hooks and event handlers
-        env_config = self._load_environment(env_name) if self._load_environment else None
         self._load_event_config(env_config)
 
         try:
@@ -1488,6 +1496,40 @@ class DestroyOrchestrator(HookExecutionMixin):
             raise
 
         return results
+
+    def _refuse_unsafe_filtered_destroy(
+        self,
+        env_name: str,
+        resource_filter: list[str],
+        provider_filter: list[str] | None,
+        env_config: EnvironmentConfig | None,
+    ) -> None:
+        """Ask each active IaC runner whether the filtered destroy is safe.
+
+        Args:
+            env_name: Environment being destroyed
+            resource_filter: Resource names the destroy is limited to
+            provider_filter: Optional provider names the destroy is limited to
+            env_config: Environment config, which selects the active IaC tool
+
+        Raises:
+            FilteredDestroyRefusedError: If a runner refuses the destroy
+        """
+        _, resources_by_provider = self._load_resources(env_name)
+        resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
+        providers = self._get_providers()
+        active_iac = env_config.iac_tool.value if env_config else IaCTool.TERRAFORM.value
+        for batch in self._iter_provider_batches(
+            resources_by_provider, resource_filter, True, env_name
+        ):
+            provider = providers.get(batch.name)
+            if not provider:
+                continue
+            for tool_name, runner in self.runners.items():
+                if tool_name in _IAC_TOOL_KEYS and tool_name != active_iac:
+                    continue
+                if runner.is_iac_runner and isinstance(runner, ChecksFilteredDestroy):
+                    runner.check_filtered_destroy(provider, batch.resources)
 
     def _track_destroying_resources(
         self,

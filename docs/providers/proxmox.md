@@ -216,6 +216,24 @@ A VM or container attaches by using the vnet as its bridge
 - **Doctor.** `infra doctor` accepts a vnet as a VM's bridge once it is in the
   cluster's running SDN config. A vnet declared in the validated resources but
   not applied yet is a warning, since the apply creates it first.
+- **Filtered runs.** `infra plan`/`apply` with `-p` or `-r` that select a zone or
+  vnet also target both appliers, so the change reaches the nodes.
+- **Removing a zone or vnet.** Delete it from the config and run `foundry infra apply`
+  (with the same `-p`/`-r` if you use one). When an SDN zone or vnet is in state but no
+  longer declared, the apply destroys it and replaces `proxmox_sdn_applier.apply`, so the
+  removal is applied on the nodes. Terraform does not re-run the applier on its own
+  when a referenced object disappears. This works for unfiltered and `-P` applies too,
+  and also when the state is in a remote backend.
+- **Filtered destroy is refused.** `foundry infra destroy -p`/`-r` that selects a zone or
+  vnet fails before anything runs. Terraform would destroy `proxmox_sdn_applier.apply`
+  along with it, and so every VM and container that depends on it. Use the
+  config edit plus apply above instead. An unfiltered or `-P` destroy is unchanged.
+- **No Proxmox resources left.** If a package keeps resources but none are Proxmox, a
+  filtered apply never calls the Proxmox runner. Clean up with
+  `foundry infra apply --env <env> -P proxmox`.
+- **Empty packages.** `-p <package>` is an error when the package declares no resources
+  (for plan, apply, destroy and doctor). An empty selection would otherwise mean "no
+  filter" and act on the whole environment.
 
 ## Provider CLI
 
