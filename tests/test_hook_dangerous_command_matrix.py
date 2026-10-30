@@ -637,6 +637,28 @@ BASH_CASES = [
     ("dd if=evil of=.envrc.local", "BLOCK", "dd of= literal"),
     ("echo x > .envrc.@(local)", "BLOCK", "extglob redirect target"),
     ("cp src/* build/", "ALLOW", "star source glob into a directory"),
+    # Patch writers (#1105): forms that need no file on disk
+    ("patch -o .bashrc a b", "BLOCK", "patch -o names a protected file"),
+    ("patch --dry-run -o .envrc.local a b", "BLOCK", "patch --dry-run still writes -o"),
+    ("patch .envrc.local fix.patch", "BLOCK", "patch ORIGFILE is protected"),
+    ("patch -p1", "BLOCK", "patch from stdin is unresolvable"),
+    ("sudo patch -p1 < missing.patch", "BLOCK", "unreadable patch file is unresolvable"),
+    ("xargs patch -p1", "BLOCK", "xargs patch has no patch source"),
+    ("patch -b -z .local -p1 < missing.patch", "BLOCK", "backup suffix is unresolvable"),
+    ("git apply", "BLOCK", "git apply from stdin"),
+    ("git apply --unsafe-paths fix.patch", "BLOCK", "git apply --unsafe-paths"),
+    ("git am --continue", "BLOCK", "git am --continue applies queued patches"),
+    ("git apply --check fix.patch", "ALLOW", "git apply --check writes nothing"),
+    ("git apply --stat fix.patch", "ALLOW", "git apply --stat writes nothing"),
+    ("git am --abort", "ALLOW", "git am --abort applies no patch"),
+    ("patch --dry-run -p1 < x.patch", "ALLOW", "patch --dry-run without -o writes nothing"),
+    ("patch src/a.py fix.patch", "ALLOW", "patch an unprotected ORIGFILE"),
+    ("echo the patch is ready", "ALLOW", "patch word followed by other words"),
+    (
+        "uv version --bump patch",
+        "BLOCK",
+        "accepted over-match: a bare trailing `patch` word reads as patch from stdin",
+    ),
     ("git checkout -- .", "ALLOW", "checkout the index over the root"),
     (
         # The allowlist applies only to the top-level command: a wrapper can
@@ -1767,3 +1789,73 @@ def test_heredoc_body(
     """A heredoc an interpreter will execute is scanned; one consumed as text is not."""
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
     assert _outcome_exit_code(hook, monkeypatch, payload) == expected, description
+
+
+# Every character other than ``\n`` that ``str.splitlines()`` breaks a line at.
+# Bash ends a line only at ``\n``, so each stays inside its line (#1102).
+SPLITLINES_ONLY_BREAKS = ["\r", "\v", "\f", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"]
+
+
+@pytest.mark.parametrize("char", SPLITLINES_ONLY_BREAKS, ids=lambda c: f"U+{ord(c):04X}")
+def test_heredoc_body_lines_split_only_at_newline(hook: types.ModuleType, char: str) -> None:
+    """A body line holding *char* stays one line, so ``EOF`` after it is not the terminator."""
+    command = f"cat > notes.md <<EOF\nalpha{char}EOF\nEOF\necho done"
+    assert hook._without_heredoc_bodies(command) == "cat > notes.md <<EOF\necho done"
+
+
+@pytest.mark.parametrize("char", SPLITLINES_ONLY_BREAKS, ids=lambda c: f"U+{ord(c):04X}")
+def test_heredoc_payload_lines_split_only_at_newline(hook: types.ModuleType, char: str) -> None:
+    """An executed body line holding *char* is yielded as the one line bash runs."""
+    command = f"bash <<EOF\necho a{char}echo b\nEOF"
+    assert hook._heredoc_payloads(command) == [f"echo a{char}echo b"]
+
+
+@pytest.mark.parametrize("char", SPLITLINES_ONLY_BREAKS, ids=lambda c: f"U+{ord(c):04X}")
+def test_heredocs_body_range_split_only_at_newline(hook: types.ModuleType, char: str) -> None:
+    """Given the command split at ``\\n``, the body is the single line bash reads."""
+    lines = f"cat <<EOF\nalpha{char}EOF\nEOF".split("\n")
+    assert hook._heredocs(lines) == [(0, ["cat"], 1, 2)]
+
+
+@pytest.mark.parametrize("char", SPLITLINES_ONLY_BREAKS, ids=lambda c: f"U+{ord(c):04X}")
+def test_heredoc_delimiter_running_past_the_marker_is_not_stripped(
+    hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch, char: str
+) -> None:
+    """A delimiter word bash reads past the marker regex leaves the rest in the scans."""
+    command = f"cat <<EOF{char}\nbody\nEOF{char}\ncat ~/.netrc"
+    assert hook._heredocs(command.split("\n")) == []
+    assert hook._without_heredoc_bodies(command) == command
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    assert _outcome_exit_code(hook, monkeypatch, payload) == "BLOCK"
+
+
+@pytest.mark.parametrize("delimiter_end", [" ", "\t", "|", "&", ";", "(", ")", "<", ">"])
+def test_heredoc_delimiter_ended_by_a_metacharacter_is_stripped(
+    hook: types.ModuleType, delimiter_end: str
+) -> None:
+    """A blank or metacharacter ends the delimiter word, so the heredoc is still found."""
+    lines = f"cat <<EOF{delimiter_end}x\nbody\nEOF".split("\n")
+    assert hook._heredocs(lines) == [(0, ["cat"], 1, 2)]
+
+
+def test_unterminated_heredoc_is_not_stripped(hook: types.ModuleType) -> None:
+    """With no terminator line, nothing after the marker is dropped from the scans."""
+    command = "cat > notes.md <<EOF\nbody\ncat ~/.netrc"
+    assert hook._heredocs(command.split("\n")) == []
+    assert hook._without_heredoc_bodies(command) == command
+
+
+@pytest.mark.parametrize("char", SPLITLINES_ONLY_BREAKS, ids=lambda c: f"U+{ord(c):04X}")
+def test_heredoc_payload_with_unclear_delimiter_runs_to_the_end(
+    hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch, char: str
+) -> None:
+    """A body run as code is re-scanned to the last line when its delimiter is unclear."""
+    command = f"bash <<EOF{char}\ngit push --force\nEOF{char}"
+    assert hook._heredoc_payloads(command) == ["git push --force", f"EOF{char}"]
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    assert _outcome_exit_code(hook, monkeypatch, payload) == "BLOCK"
+
+
+def test_unterminated_heredoc_payload_runs_to_the_end(hook: types.ModuleType) -> None:
+    """A body run as code with no terminator is re-scanned to the last line."""
+    assert hook._heredoc_payloads("bash <<EOF\ngit push --force") == ["git push --force"]
