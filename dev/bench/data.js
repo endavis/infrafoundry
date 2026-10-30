@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793373201187,
+  "lastUpdate": 1793376104566,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12307,6 +12307,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001114407029478144",
             "extra": "mean: 127.04149613948216 usec\nrounds: 8548"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5050ae5e0395632fac28ce560d2925053a54eb1a",
+          "message": "fix: count script and event use in the blueprint asymmetric-variable check (merges PR #1213, addresses #1201)\n\nThe check decided a provider \"used\" a global input from its resource\ntemplates only. It now also counts variables referenced in the provider's\nand blueprint's event strings, event-referenced scripts, and files under\nscripts/<provider>/ (INFRAFOUNDRY_VAR_<name> or {{ <name> }}).\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T16:00:51Z",
+          "tree_id": "71f4004a0820f97c9e9ff51d084adeae54bbf344",
+          "url": "https://github.com/endavis/infrafoundry/commit/5050ae5e0395632fac28ce560d2925053a54eb1a"
+        },
+        "date": 1793376103106,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10685.421570439115,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014578477280168263",
+            "extra": "mean: 93.58545129997198 usec\nrounds: 12577"
           }
         ]
       }
