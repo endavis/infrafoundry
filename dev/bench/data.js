@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793360391496,
+  "lastUpdate": 1793360956942,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12245,6 +12245,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010591356608999036",
             "extra": "mean: 127.85828677941026 usec\nrounds: 8449"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "403a26bbd94a5fbd0ddada4b9c6917e34dfe56b9",
+          "message": "chore: synchronize with pyproject-template cd91ae2 (merges PR #1211, addresses #1208)\n\nSyncs pyproject-template from 4cadf97 to cd91ae2 (31 commits), per the\nplan approved on #1208:\n- endavis/pyproject-template#1072 (default doit task)\n- endavis/pyproject-template#1073 (ignore every doit dbm database name)\n- endavis/pyproject-template#1074 (bootstrap.py --sync --yes)\n- endavis/pyproject-template#1077 (implement-planner on Opus, Coder on Sonnet)\n- endavis/pyproject-template#1080 (terse doit failure output)\n- endavis/pyproject-template#1082 (Copilot implement-worker without model key)\n- endavis/pyproject-template#1083, #1085 (nosec ID list and stale nosec rules)\n- endavis/pyproject-template#1087 (session-start template-update-check hook)\n- endavis/pyproject-template#1089, #1100, #1108-#1125 (dangerous-command hook\n  tokenizer and checkout/restore, heredoc, extglob and patch/apply fixes)\n- endavis/pyproject-template#1092 (dev-tooling advisories handled in the open)\n- endavis/pyproject-template#1096 (uv's shared default cache)\n- endavis/pyproject-template#1098, #1126, #1129 (implement-issue per-issue\n  worktree, no bare git stash, host plan and one doit check per run)\n- endavis/pyproject-template#1101 (doit issue --upstream, report-template-bug)\n- endavis/pyproject-template#1114 (worktree removal judges ignored dirs by files)\n- endavis/pyproject-template#1127 (implement-issues, parallel worktrees)\n\nLocal adjustments: .envrc no longer sets UV_CACHE_DIR; doit-tasks-reference\ntakes upstream's text plus an InfraFoundry Tasks section; ADR-9017's\ntemplate-owned tests/template/test_utils.py is in test_documented_paths'\nALLOWED; tests/template/test_doit_discovery.py and test_doit_docs.py are\nadopted. The nosec cleanup the new tests need landed first in #1210.\n\nAddresses #1208\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T11:48:22Z",
+          "tree_id": "d78c774d7a41ad44dccbb4161bfe95a6f7067a72",
+          "url": "https://github.com/endavis/infrafoundry/commit/403a26bbd94a5fbd0ddada4b9c6917e34dfe56b9"
+        },
+        "date": 1793360956035,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7943.914998560108,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001104926641816701",
+            "extra": "mean: 125.88251513029246 usec\nrounds: 8559"
           }
         ]
       }
