@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 from pathlib import Path
 
 import click
@@ -14,20 +13,7 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
 from ...utils import console
-from .state import copy_state_db, sqlite_db_path
-
-
-def _active_lock_holder(orchestrator: Orchestrator, env: str) -> tuple[str, object] | None:
-    """Return (holder, expires_at) when ``env`` has an unexpired deployment lock."""
-    lock = orchestrator.state_manager.get_lock(env)
-    if lock is None:
-        return None
-    expires = lock.expires_at
-    if expires.tzinfo is None:
-        expires = expires.replace(tzinfo=datetime.UTC)
-    if expires <= datetime.datetime.now(datetime.UTC):
-        return None
-    return lock.locked_by, lock.expires_at
+from .state import active_lock_holder, backup_state_db, copy_state_db, sqlite_db_path
 
 
 @click.command("prune")
@@ -85,7 +71,7 @@ def prune(
             "Back it up with pg_dump, then re-run with --no-backup."
         )
 
-    holder = _active_lock_holder(orchestrator, env)
+    holder = active_lock_holder(orchestrator, env)
     if holder is not None:
         raise click.ClickException(
             f"Environment '{env}' is locked by {holder[0]} (expires {holder[1]}). "
@@ -119,16 +105,9 @@ def prune(
 
     backup_path: Path | None = None
     if not no_backup and db_path is not None:
-        if not db_path.exists():
-            raise click.ClickException("InfraFoundry state database file not found.")
-        try:
-            out = (Path(backup_dir) if backup_dir else db_path.parent / "backups").resolve()
-            out.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = copy_state_db(db_path, out, timestamp)
-        except OSError as exc:
-            raise click.ClickException(f"Backup failed, nothing was deleted: {exc}") from exc
-        console.success(f"State database backed up to: {backup_path}")
+        backup_path = backup_state_db(
+            db_path, backup_dir, copier=copy_state_db, unchanged="deleted"
+        )
 
     deleted = state_manager.prune_environment(env)
     console.success(f"Pruned {sum(deleted.values())} state row(s) for environment '{env}'.")

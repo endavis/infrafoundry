@@ -82,6 +82,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | List tracked resources | `foundry state resources` |
 | Backup state database | `foundry state backup` |
 | Remove a stale environment from state | `foundry state prune --env <env>` |
+| Rename an environment in state | `foundry state rename-env --env <old> --to-env <new>` |
 | Validate backend config | `foundry state backend validate --env <env>` |
 | Migrate backend | `foundry state backend migrate --env <env>` |
 | View audit trail | `foundry state audit list` |
@@ -636,6 +637,27 @@ foundry state prune --env old-env --yes --backup-dir ./backups
 
 !!! note
     `state list --env <env>` reads the YAML config, not the state database. `config envs` and `config doctor` read the state database.
+
+### `state rename-env`
+
+Rename an environment in the state database and move its `generated/<env>` directory, so a renamed config environment keeps its deployment history, tracked resources and rollback snapshots. It renames `resources`, `deployments` and `deployment_locks`, and rewrites the `environment` key inside each deployment's `rollback_data`, in one transaction. A `state_env_renamed` entry is written to the audit trail.
+
+```bash
+foundry state rename-env --env old-env --to-env new-env --dry-run   # counts and planned move
+foundry state rename-env --env old-env --to-env new-env             # backs up, asks to confirm, renames
+```
+
+**Options:** `-e/--env TEXT` (required), `--to-env TEXT` (required), `--dry-run`, `--force`, `--yes`, `--no-backup`, `--backup-dir DIRECTORY`, `--no-move-generated`
+
+- Refuses when the two names are equal, when the new name already has state rows, or when the old name has none. Nothing is changed.
+- Refuses unless the config repo already uses the new name (and no longer the old one); rename the config directory and the `name:` in its `settings.yaml` first, or pass `--force`.
+- Refuses an environment with an unexpired deployment lock; release it with `foundry infra unlock`.
+- Refuses when `generated/<new>` already exists or `generated/<old>` is missing (the root is `INFRAFOUNDRY_OUTPUT_DIR`, default `generated`), unless `--no-move-generated` is given.
+- Backups behave as in [`state prune`](#state-prune), including `pg_dump` and `--no-backup` for non-SQLite backends.
+- If the database is renamed but moving the directory fails, the command reports it, names the backup and prints the `mv` command to finish. The audit entry records the failure.
+- Not renamed: `audit_entries` keeps the old name as history, and the free-form `extra_data` JSON on deployments and resources is left unchanged. Dependencies and deployment events link by id and need nothing.
+
+Procedure: rename the config repo directory and `settings.yaml` name first, run with `--dry-run`, run for real, then check that `foundry infra plan --env <new>` shows no changes and `foundry config doctor` is clean.
 
 ### `state backend`
 

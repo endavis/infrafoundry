@@ -23,6 +23,8 @@ from infrafoundry.core.state.models import (
     ResourceState,
 )
 from infrafoundry.core.state.prune import prune_environment as _prune_environment
+from infrafoundry.core.state.rename import count_environment_rows as _count_environment_rows
+from infrafoundry.core.state.rename import rename_environment as _rename_environment
 from infrafoundry.core.state.resource_repository import ResourceRepository
 from infrafoundry.core.types import DeploymentMetadata, ResourceTrackingMetadata, RollbackData
 
@@ -218,6 +220,35 @@ class StateManager(BaseManager):
             StateError: If another environment's resources reference its deployments
         """
         return _prune_environment(self.SessionLocal, environment, dry_run=dry_run)
+
+    def count_environment_rows(self, environment: str) -> dict[str, int]:
+        """Count the rows a rename of an environment would touch.
+
+        Args:
+            environment: Environment name
+
+        Returns:
+            Row count per renamed table, plus ``rollback_data`` snapshots
+        """
+        return _count_environment_rows(self.SessionLocal, environment)
+
+    def rename_environment(self, old: str, new: str, dry_run: bool = False) -> dict[str, int]:
+        """Rename every state row of an environment in one transaction.
+
+        The audit trail (``audit_entries``) is kept.
+
+        Args:
+            old: Current environment name
+            new: New environment name
+            dry_run: Count the rows without changing them
+
+        Returns:
+            Row count per renamed table, plus ``rollback_data`` snapshots
+
+        Raises:
+            StateError: If the names are equal, ``old`` has no rows or ``new`` has rows
+        """
+        return _rename_environment(self.SessionLocal, old, new, dry_run=dry_run)
 
     def count_resources(self, environment: str) -> int:
         """Count tracked resources for an environment.
