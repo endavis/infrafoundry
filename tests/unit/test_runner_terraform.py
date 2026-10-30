@@ -458,6 +458,18 @@ class TestResolveTargets:
             "proxmox_sdn_vnet.ntlan",
         ]
 
+    def test_sdn_destroy_does_not_target_appliers(
+        self, runner: TerraformRunner, tmp_path: Path
+    ) -> None:
+        """A filtered destroy of a vnet must not target the appliers (#1153)."""
+        (tmp_path / "sdn.tf").write_text(
+            'resource "proxmox_sdn_applier" "finalize" {\n}\n'
+            'resource "proxmox_sdn_vnet" "ntlan" {\n}\n'
+            'resource "proxmox_sdn_applier" "apply" {\n}\n'
+        )
+        targets = runner._resolve_terraform_targets(tmp_path, ["ntlan"], command="destroy")
+        assert targets == ["proxmox_sdn_vnet.ntlan"]
+
     def test_non_sdn_targets_skip_appliers(self, runner: TerraformRunner, tmp_path: Path) -> None:
         """A VM target does not pull in the SDN appliers."""
         (tmp_path / "sdn.tf").write_text('resource "proxmox_sdn_applier" "apply" {\n}\n')

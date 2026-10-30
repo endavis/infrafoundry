@@ -335,7 +335,7 @@ class TerraformRunner(BaseRunner):
 
         # Add -target flags for resource filtering
         if target_resources:
-            targets = self._resolve_terraform_targets(tf_dir, target_resources)
+            targets = self._resolve_terraform_targets(tf_dir, target_resources, command=command)
             if not targets:
                 self.console.print(
                     f"[yellow]Warning: No terraform resources matched filter: "
@@ -668,7 +668,9 @@ class TerraformRunner(BaseRunner):
         target = infra_name.replace("-", "_")
         return tf_name == target or tf_name.endswith(f"_{target}")
 
-    def _resolve_terraform_targets(self, tf_dir: Path, resource_names: list[str]) -> list[str]:
+    def _resolve_terraform_targets(
+        self, tf_dir: Path, resource_names: list[str], command: str = "apply"
+    ) -> list[str]:
         """Resolve resource names to terraform resource addresses.
 
         Scans generated .tf files for resource blocks matching the given names
@@ -677,6 +679,9 @@ class TerraformRunner(BaseRunner):
         Args:
             tf_dir: Terraform working directory
             resource_names: List of resource names (e.g., ["infra-web", "esx-01"])
+            command: Terraform command. SDN appliers are added to the targets for
+                every command except ``destroy``, where targeting them would also
+                destroy their dependents (VMs and containers).
 
         Returns:
             List of terraform resource addresses (e.g.,
@@ -705,8 +710,11 @@ class TerraformRunner(BaseRunner):
 
         # Terraform adds a target's dependencies but not its dependents, so the SDN
         # appliers (which depend on / are depended on by zones and vnets) are
-        # added by hand or the change is staged but never applied (#1153).
-        if any(_SDN_OBJECT_TYPE.match(t.split(".", 1)[0]) for t in targets):
+        # added by hand or the change is staged but never applied (#1153). Never for
+        # destroy: -target on an applier also destroys everything that depends on it.
+        if command != "destroy" and any(
+            _SDN_OBJECT_TYPE.match(t.split(".", 1)[0]) for t in targets
+        ):
             for applier in _SDN_APPLIER_ADDRESSES:
                 if applier in declared and applier not in targets:
                     targets.append(applier)
