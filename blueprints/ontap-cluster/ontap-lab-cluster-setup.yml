@@ -89,6 +89,7 @@
         ontap_admin_user: "admin"
         ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
         ontap_validate_certs: false
+        ontap_cluster_mtu: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mtu') | default('1500', true) | int }}"
         ontap_licenses: "{{ (lookup('env', 'INFRAFOUNDRY_PACKAGE_VARS') | from_json).get('ontap_licenses', []) if lookup('env', 'INFRAFOUNDRY_PACKAGE_VARS') else [] }}"
         ontap_svm_routes: >-
           {{
