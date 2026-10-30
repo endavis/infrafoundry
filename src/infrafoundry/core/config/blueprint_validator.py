@@ -8,6 +8,7 @@ blueprints, also warns about asymmetric variable usage across providers.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,9 @@ import jinja2.meta
 from infrafoundry.core.config.filters import create_jinja2_env
 
 logger = logging.getLogger(__name__)
+
+_SCRIPT_ENV_VAR_RE = re.compile(r"INFRAFOUNDRY_VAR_([A-Za-z_][A-Za-z0-9_]*)")
+_SCRIPT_JINJA_RE = re.compile(r"\{\{-?\s*([A-Za-z_][A-Za-z0-9_]*)")
 
 
 @dataclass
@@ -134,6 +138,7 @@ class BlueprintValidator:
 
         # Collect vars per provider first for asymmetry detection
         provider_var_map: dict[str, frozenset[str]] = {}
+        shared_event_vars = self._collect_event_vars(self._blueprint.get("events"))
 
         for provider_name, provider_block in providers_block.items():
             resources: list[str] = provider_block.get("resources", [])
@@ -143,7 +148,14 @@ class BlueprintValidator:
             all_defaults = global_input_names | provider_input_names
 
             errors = self._find_undefined_vars(template_vars, all_defaults)
-            provider_var_map[provider_name] = template_vars
+            # Asymmetry counts a variable as used when templates, event
+            # strings or event scripts reference it (#1201).
+            provider_var_map[provider_name] = (
+                template_vars
+                | shared_event_vars
+                | self._collect_event_vars(provider_block.get("events"))
+                | self._collect_script_dir_vars(provider_name)
+            )
 
             provider_results.append(
                 ProviderValidationResult(
@@ -206,6 +218,62 @@ class BlueprintValidator:
             else:
                 logger.warning("Resource template not found: %s", template_path)
         return frozenset(all_vars)
+
+    def _collect_event_vars(self, events: Any) -> frozenset[str]:
+        """Collect variables referenced by an events block and its scripts.
+
+        Walks every string in ``events``, extracting Jinja variables, and
+        scans each referenced ``script`` file for variable references.
+
+        Args:
+            events: An ``events`` mapping (or ``None``) from a blueprint or provider.
+
+        Returns:
+            Frozenset of variable names referenced.
+        """
+        found: set[str] = set()
+        self._walk_event_value(events, found)
+        return frozenset(found)
+
+    def _walk_event_value(self, value: Any, found: set[str]) -> None:
+        """Recursively gather variables from strings and script files in ``value``."""
+        if isinstance(value, str):
+            try:
+                found |= jinja2.meta.find_undeclared_variables(self._env.parse(value))
+            except jinja2.TemplateSyntaxError:
+                found.update(_SCRIPT_JINJA_RE.findall(value))
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                if key == "script" and isinstance(item, str):
+                    found |= self._scan_script(self._blueprint_dir / item)
+                self._walk_event_value(item, found)
+        elif isinstance(value, list):
+            for item in value:
+                self._walk_event_value(item, found)
+
+    def _collect_script_dir_vars(self, provider_name: str) -> frozenset[str]:
+        """Collect variables referenced by files under ``scripts/<provider>/``."""
+        scripts_dir = self._blueprint_dir / "scripts" / provider_name
+        found: set[str] = set()
+        if scripts_dir.is_dir():
+            for path in sorted(scripts_dir.rglob("*")):
+                found |= self._scan_script(path)
+        return frozenset(found)
+
+    @staticmethod
+    def _scan_script(path: Path) -> frozenset[str]:
+        """Return variable names a script references.
+
+        Matches ``INFRAFOUNDRY_VAR_<name>`` and ``{{ <name> }}`` occurrences.
+
+        Args:
+            path: Script file path; unreadable or missing files yield no names.
+        """
+        try:
+            content = path.read_text()
+        except (OSError, UnicodeDecodeError):
+            return frozenset()
+        return frozenset(_SCRIPT_ENV_VAR_RE.findall(content) + _SCRIPT_JINJA_RE.findall(content))
 
     @staticmethod
     def _find_undefined_vars(
