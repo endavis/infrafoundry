@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793358555901,
+  "lastUpdate": 1793360391496,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -12214,6 +12214,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013073364396090339",
             "extra": "mean: 126.7738401460731 usec\nrounds: 8489"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7adf4464841bf00afb4c9c29cb95bb95ab0cf340",
+          "message": "chore: clean up nosec comments to the template's bandit rules (merges PR #1210, addresses #1209)\n\npyproject-template's security-triage tests (#1208 sync) require a\nnosec reason after a second '#' and no nosec that suppresses nothing.\n\n- 98 comments in src/, tools/ and tests/ that put their reason inside\n  the ID list now read '# nosec <IDs>  # <reason>'.\n- 16 nosec comments that suppressed nothing are removed.\n- 10 needed suppressions sat in multi-line dict/tuple literals, where\n  bandit applies the nosec to the whole literal and reports every other\n  line as a stale nosec. The Proxmox and OPNsense tfvars maps are now\n  built from their keys (each value is the prefix plus the key), and the\n  other flagged literals are single-line constants with one nosec each.\n  Values are unchanged; new tests pin the maps, the OPNsense secret env\n  name and the remote-backup wire payload to their previous literals.\n\nAddresses #1209\n\n\nClaude-Session: https://claude.ai/code/session_01HxuUbaMG5QNsMg6Q6UvLjy\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-30T11:39:06Z",
+          "tree_id": "483a7799254e0803705b7dedc0197c6c5eac8fe5",
+          "url": "https://github.com/endavis/infrafoundry/commit/7adf4464841bf00afb4c9c29cb95bb95ab0cf340"
+        },
+        "date": 1793360390746,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7821.159075322725,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010591356608999036",
+            "extra": "mean: 127.85828677941026 usec\nrounds: 8449"
           }
         ]
       }
