@@ -6,8 +6,9 @@ an `on_create` handler that installs Docker Engine and the agent.
 
 **Scope is install plus optional registration.** Registering the agent can be
 scripted (see [Scripted registration](#scripted-registration)); without the
-service account inputs it is a manual browser step. Adding the ONTAP cluster and
-deregistering the agent are manual steps documented below.
+service account inputs it is a manual browser step. An `ontap-cluster` package can add itself
+through the agent (see [Add the ONTAP cluster](#add-the-ontap-cluster)).
+Deregistering the agent is a manual step documented below.
 
 Requirements come from
 <https://docs.netapp.com/us-en/console-setup-admin/task-install-agent-on-prem.html>.
@@ -186,8 +187,10 @@ means the service account lacks an admin role.
 
 ### Add the ONTAP cluster
 
-In the NetApp Console, add the on-premises ONTAP cluster through the registered
-agent. This is manual; API-based discovery is a possible follow-up.
+An `ontap-cluster` package adds itself to the Console through this agent when
+its `console_client_id`, `console_client_secret` and `console_agent_id` inputs
+are set. See `example-config/envs/dev/proxmox/ontap-cluster/README.md`. For any
+other cluster, add it in the NetApp Console through the registered agent.
 
 ### Deregister before destroy
 

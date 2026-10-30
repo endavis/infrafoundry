@@ -462,6 +462,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_oci_k3s_cluster_blueprint.py",
     "tests/unit/test_ontap_cluster_bridge.py",
     "tests/unit/test_ontap_cluster_console_restore.py",
+    "tests/unit/test_ontap_console_discover.py",
     "tests/unit/test_ontap_password_required.py",
     "tests/unit/test_ontap_svm_routes.py",
     "tests/unit/test_opnsense_vm_blueprint.py",
