@@ -13,6 +13,10 @@ ontap_admin_password: "changeme123"
 # Set to true to validate SSL certificates
 ontap_validate_certs: false
 
+# MTU of the Cluster broadcast domain (IPspace Cluster). 1500 works on any
+# network; raise it only when the cluster ports are jumbo end to end.
+ontap_cluster_mtu: 1500
+
 # ONTAP feature licenses (comma-separated license keys)
 # Leave empty to skip license installation
 ontap_licenses: []
