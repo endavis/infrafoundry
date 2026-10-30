@@ -22,7 +22,7 @@ import os
 import posixpath
 import re
 import shlex
-import subprocess  # nosec B404 - needed for git branch detection
+import subprocess  # nosec B404  # needed for git branch detection
 import sys
 from pathlib import Path
 
@@ -982,7 +982,7 @@ def get_current_branch() -> str | None:
     Returns None if not in a git repository or in detached HEAD state.
     """
     try:
-        result = subprocess.run(  # nosec B603 B607 - trusted git command
+        result = subprocess.run(  # nosec B603 B607  # trusted git command
             ["git", "branch", "--show-current"],
             capture_output=True,
             text=True,
@@ -1086,7 +1086,7 @@ def _envrc_example_modified() -> bool:
     is a guardrail (ADR-9019).
     """
     try:
-        result = subprocess.run(  # nosec B603 B607 - trusted git command
+        result = subprocess.run(  # nosec B603 B607  # trusted git command
             ["git", "diff", "--quiet", "HEAD", "--", _ENVRC_EXAMPLE],
             capture_output=True,
             timeout=5,
@@ -1913,7 +1913,7 @@ def check_env_dump(tokens: list[str]) -> tuple[bool, str]:
                 break
             rest.append(candidate)
 
-        # nosec B105 - bandit's hardcoded-password heuristic fires on this
+        # nosec B105  # bandit's hardcoded-password heuristic fires on this
         # string comparison; the literal is a shell command name.
         if token == "printenv":  # nosec B105
             # `printenv` alone dumps everything; `printenv NAME` prints one.

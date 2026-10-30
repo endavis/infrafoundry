@@ -47,7 +47,7 @@ def secrets_init(ctx: click.Context, key_file: str | None) -> None:
     # Generate age key using subprocess with hardcoded command (not user input)
     import subprocess  # nosec B404
 
-    result = subprocess.run(  # nosec B603, B607
+    result = subprocess.run(  # nosec B603 B607
         ["age-keygen", "-o", str(key_path)],
         capture_output=True,
         text=True,
@@ -91,7 +91,7 @@ def secrets_encrypt(file: str) -> None:
         if not file_path.exists():
             raise click.ClickException(f"File not found: {file_path}")
 
-        result = subprocess.run(  # nosec B603, B607
+        result = subprocess.run(  # nosec B603 B607
             ["sops", "--encrypt", "--in-place", str(file_path)],
             capture_output=True,
             text=True,
@@ -128,7 +128,7 @@ def secrets_decrypt(file: str) -> None:
         if not file_path.exists():
             raise click.ClickException(f"File not found: {file_path}")
 
-        result = subprocess.run(  # nosec B603, B607
+        result = subprocess.run(  # nosec B603 B607
             ["sops", "--decrypt", str(file_path)],
             capture_output=True,
             text=True,

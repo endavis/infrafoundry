@@ -78,9 +78,7 @@ class OPNsenseProvider(
     """OPNsense provider for managing firewall rules, VLANs, and routing."""
 
     _OPNSENSE_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
-        "api_url": "opnsense_api_url",
-        "api_key": "opnsense_api_key",
-        "api_secret": "opnsense_api_secret",  # nosec B105
+        key: f"opnsense_{key}" for key in ("api_url", "api_key", "api_secret")
     }
 
     #: Types with a registered manager that ``get_resource_types`` still

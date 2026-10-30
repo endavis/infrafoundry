@@ -2,7 +2,7 @@
 
 import os
 import shutil
-import subprocess  # nosec B404 - subprocess is required for doit tasks
+import subprocess  # nosec B404  # subprocess is required for doit tasks
 import sys
 from typing import Any
 

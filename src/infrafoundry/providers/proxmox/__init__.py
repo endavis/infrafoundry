@@ -45,12 +45,8 @@ class ProxmoxProvider(
     """Proxmox VE provider for managing VMs, containers, templates, and networks."""
 
     _PROXMOX_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
-        "api_url": "proxmox_api_url",
-        "api_token": "proxmox_api_token",  # nosec B105
-        "api_token_id": "proxmox_api_token_id",  # nosec B105
-        "api_token_secret": "proxmox_api_token_secret",  # nosec B105
-        "node": "proxmox_node",
-        "storage": "proxmox_storage",
+        key: f"proxmox_{key}"
+        for key in ("api_url", "api_token", "api_token_id", "api_token_secret", "node", "storage")
     }
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:

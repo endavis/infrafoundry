@@ -1,7 +1,7 @@
 """Pulumi runner implementation (example of pluggable runner)."""
 
 import json
-import subprocess  # nosec B404 - required for running pulumi
+import subprocess  # nosec B404  # required for running pulumi
 from pathlib import Path
 from typing import Any, override
 

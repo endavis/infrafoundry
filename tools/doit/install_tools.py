@@ -9,7 +9,7 @@ import json
 import os
 import platform
 import shutil
-import subprocess  # nosec B404 - subprocess is required for version checks
+import subprocess  # nosec B404  # subprocess is required for version checks
 import sys
 import tarfile
 import tempfile
@@ -120,7 +120,7 @@ def get_latest_github_release(repo: str) -> str:
     if github_token:
         request.add_header("Authorization", f"token {github_token}")
 
-    with urllib.request.urlopen(request) as response:  # nosec B310 - URL is hardcoded GitHub API
+    with urllib.request.urlopen(request) as response:  # nosec B310  # URL is hardcoded GitHub API
         data = json.loads(response.read().decode())
         tag_name: str = data["tag_name"]
         return tag_name.lstrip("v")
@@ -143,7 +143,7 @@ def fetch_sha256_from_sums(sums_url: str, filename: str) -> str:
     Raises:
         IntegrityError: If *filename* is not listed in the checksums file.
     """
-    with urllib.request.urlopen(sums_url) as response:  # nosec B310 - hardcoded release host
+    with urllib.request.urlopen(sums_url) as response:  # nosec B310  # hardcoded release host
         sums: str = response.read().decode()
     for line in sums.splitlines():
         parts = line.split()
@@ -222,11 +222,11 @@ def download_github_release_binary(
     dest_path = install_dir / dest_name
 
     print(f"Downloading {url}...")
-    urllib.request.urlretrieve(url, dest_path)  # nosec B310 - GitHub release URL; integrity via verify_download below
+    urllib.request.urlretrieve(url, dest_path)  # nosec B310  # GitHub release URL; integrity via verify_download below
     # Verify before the executable bit goes on: a file that never becomes
     # executable cannot be run by a caller that ignores the exception.
     verify_download(dest_path, url, sha256)
-    dest_path.chmod(0o755)  # nosec B103 - rwxr-xr-x is required for executable binary
+    dest_path.chmod(0o755)
 
     return dest_path
 
@@ -284,14 +284,14 @@ def download_and_extract_archive(
         temp_path = Path(tmp.name)
     try:
         print(f"Downloading {url}...")
-        urllib.request.urlretrieve(url, temp_path)  # nosec B310 - integrity via verify_download below, before the archive is opened
+        urllib.request.urlretrieve(url, temp_path)  # nosec B310  # integrity via verify_download below, before the archive is opened
         # Before opening the archive: extraction hardening (data_filter, zip-slip
         # checks) limits what a malicious archive can write, but parsing one at
         # all is avoidable when we already know it is the wrong bytes.
         verify_download(temp_path, url, sha256)
 
         if archive_kind == "tar":
-            with tarfile.open(temp_path, "r:gz") as tar:  # nosec B202 - data_filter set below when available
+            with tarfile.open(temp_path, "r:gz") as tar:
                 if hasattr(tarfile, "data_filter"):
                     tar.extraction_filter = tarfile.data_filter
                 for member in tar.getmembers():
@@ -306,7 +306,7 @@ def download_and_extract_archive(
                     out_path = dest_dir / basename
                     with open(out_path, "wb") as out:
                         shutil.copyfileobj(src, out)
-                    out_path.chmod(0o755)  # nosec B103 - executable bit required
+                    out_path.chmod(0o755)
                     extracted[basename] = out_path
         else:  # zip
             with zipfile.ZipFile(temp_path) as zf:
@@ -324,7 +324,7 @@ def download_and_extract_archive(
                         raise RuntimeError(f"Refusing to extract outside dest_dir: {entry}")
                     data = zf.read(entry)
                     out_path.write_bytes(data)
-                    out_path.chmod(0o755)  # nosec B103 - executable bit required
+                    out_path.chmod(0o755)
                     extracted[basename] = out_path
 
         missing = [b for b in extract_binaries if b not in extracted]
@@ -464,9 +464,9 @@ def install_tool(
                 install_dir = get_install_dir()
                 dest_path = install_dir / name
                 print(f"Downloading {url}...")
-                urllib.request.urlretrieve(url, dest_path)  # nosec B310 - integrity via verify_download below, before chmod
+                urllib.request.urlretrieve(url, dest_path)  # nosec B310  # integrity via verify_download below, before chmod
                 verify_download(dest_path, url, expected_sha)
-                dest_path.chmod(0o755)  # nosec B103 - executable bit required
+                dest_path.chmod(0o755)
             else:
                 download_github_release_binary(
                     repo=repo,

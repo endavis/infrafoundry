@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess  # nosec B404 - required for running checkov
+import subprocess  # nosec B404  # required for running checkov
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -144,7 +144,7 @@ class SecurityScanner(BaseManager):
     def get_version(self) -> str | None:
         """Get checkov version."""
         try:
-            result = subprocess.run(  # nosec B603 - using list args, not shell
+            result = subprocess.run(  # nosec B603  # using list args, not shell
                 [self.checkov_path, "--version"],
                 capture_output=True,
                 text=True,
@@ -221,7 +221,7 @@ class SecurityScanner(BaseManager):
 
         self._log_debug(f"Running: {' '.join(cmd)}")
 
-        result = subprocess.run(  # nosec B603 - using list args, not shell
+        result = subprocess.run(  # nosec B603  # using list args, not shell
             cmd,
             capture_output=True,
             text=True,

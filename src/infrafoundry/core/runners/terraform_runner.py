@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import re
-import subprocess  # nosec B404 - required for running terraform
+import subprocess  # nosec B404  # required for running terraform
 import threading
 from pathlib import Path
 from typing import IO, Any, cast, override

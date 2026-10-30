@@ -194,6 +194,9 @@ class SystemRemoteBackupManager(BaseComponentManager):
         )
 
 
+_GDRIVE_PASSWORD_FIELD = "GDrivePassword"  # nosec B105  # wire field name, not a password literal
+
+
 def _build_wire_payload(snake_payload: dict[str, Any]) -> dict[str, Any]:
     """Translate snake_case YAML field names back to OPNsense's wire form.
 
@@ -213,7 +216,7 @@ def _build_wire_payload(snake_payload: dict[str, Any]) -> dict[str, Any]:
         "gdrive_enabled": "GDriveEnabled",
         "gdrive_email": "GDriveEmail",
         "gdrive_backup_count": "GDriveBackupCount",
-        "gdrive_password": "GDrivePassword",  # nosec B105 -- snake->Camel field-name map, not a password literal
+        "gdrive_password": _GDRIVE_PASSWORD_FIELD,
         "gdrive_p12_key": "GDriveP12key",
         "gdrive_folder_id": "GDriveFolderID",
         "gdrive_prefix_hostname": "GDrivePrefixHostname",

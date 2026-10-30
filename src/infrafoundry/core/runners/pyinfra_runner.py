@@ -1,6 +1,6 @@
 """PyInfra runner implementation."""
 
-import subprocess  # nosec B404 - required for running pyinfra
+import subprocess  # nosec B404  # required for running pyinfra
 import sys
 from pathlib import Path
 from typing import Any, cast, override

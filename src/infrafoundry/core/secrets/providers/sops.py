@@ -1,6 +1,6 @@
 import logging
 import shutil
-import subprocess  # nosec B404 - required for running sops
+import subprocess  # nosec B404  # required for running sops
 from pathlib import Path
 from typing import Any, cast
 
