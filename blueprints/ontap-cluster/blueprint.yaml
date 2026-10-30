@@ -62,6 +62,13 @@ inputs:
   # IPspace (#1158).
   - name: cluster_bridge
     default: ""
+  # MTU of the Cluster broadcast domain. The simulator defaults to 9000, which
+  # drops cluster packets on a network below that (#1206). Raise it only when
+  # the cluster-port network is jumbo end to end.
+  - name: cluster_mtu
+    description: "MTU of the ONTAP Cluster broadcast domain (cluster interconnect)"
+    type: integer
+    default: 1500
 
   # --- MAC Addresses (optional — set for DHCP reservations) ---
   - name: node01_mgmt_mac

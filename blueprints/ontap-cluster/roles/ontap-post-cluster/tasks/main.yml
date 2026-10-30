@@ -6,6 +6,7 @@
 #
 # This role runs against the cluster management endpoint (not
 # Proxmox hosts) and handles:
+#   - Cluster interconnect MTU
 #   - License installation
 #   - Disk assignment
 #   - Aggregate creation
@@ -54,6 +55,21 @@
 - name: Display discovered nodes
   ansible.builtin.debug:
     msg: "Discovered ONTAP nodes: {{ ontap_discovered_nodes }}"
+
+# ---------------------------------------------------------------
+# Cluster interconnect MTU
+# The simulator leaves the Cluster broadcast domain at 9000. On a
+# network below that (e.g. a 1500 VXLAN vnet) large cluster packets
+# are dropped. na_ontap_broadcast_domain only changes the MTU here:
+# no ports are given, so the domain's ports are left alone.
+# ---------------------------------------------------------------
+- name: Set Cluster broadcast domain MTU
+  netapp.ontap.na_ontap_broadcast_domain:
+    <<: *ontap_conn
+    state: present
+    name: Cluster
+    ipspace: Cluster
+    mtu: "{{ ontap_cluster_mtu | int }}"
 
 # ---------------------------------------------------------------
 # License installation

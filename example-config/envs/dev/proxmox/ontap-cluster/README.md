@@ -12,6 +12,14 @@ foundry -c example-config infra apply --env dev --package ontap-cluster
 See `blueprints/ontap-cluster/blueprint.yaml` for the full variable reference,
 prerequisites, and the description of the post-deploy event handler.
 
+## Cluster interconnect MTU
+
+`cluster_mtu` (default `1500`) sets the MTU of the ONTAP `Cluster` broadcast
+domain. The simulator ships with 9000, which drops cluster packets (EMS
+`vifmgr.cluscheck.ctdpktloss`) on any network below that. 1500 works anywhere.
+Raise it only when the network under the cluster ports (`e0a`/`e0b`) is jumbo
+end to end.
+
 ## Adding the cluster to the NetApp Console
 
 After setup, the cluster can add itself to the NetApp Console through a
