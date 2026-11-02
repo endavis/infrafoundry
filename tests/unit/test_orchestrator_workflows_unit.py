@@ -2256,3 +2256,69 @@ def test_package_on_destroy_requires_runs_once_on_real_bus(
     _run_destroy(console, bus, resources, deleted, resource_filter)
 
     assert seen == [{"x": 1}] * expected_runs
+
+
+# --- Apply lifecycle events (#1231) ---
+
+
+def test_package_on_create_requires_gets_only_own_package_vars(
+    console: Console, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two packages' on_create handlers with requires each see only their variables."""
+    from infrafoundry.core.deployment_executor import DeploymentExecutor
+
+    bus = UnifiedEventBus()
+    seen: list[tuple[str, dict[str, Any]]] = []
+
+    def fake_execute(self: PythonHandler, context: EventContext) -> EventResult:
+        seen.append((str(self.config["_package"]), dict(context.package_variables or {})))
+        return EventResult()
+
+    monkeypatch.setattr(PythonHandler, "execute", fake_execute)
+    for pkg, names in (("pa", ["a1", "a2"]), ("pb", ["b1"])):
+        bus.register_handler(
+            EventType.RESOURCE_CREATED,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "requires": names,
+                "_package": pkg,
+            },
+        )
+    resources = [
+        _pkg_resource("a1", {"x": 1}),
+        _pkg_resource("a2", {"x": 1}),
+        _pkg_resource("b1", {"y": 2}),
+    ]
+    outcomes = [
+        ResourceOutcome(address=f"proxmox_vm.{r.name}", action="create", resource_name=r.name)
+        for r in resources
+    ]
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.apply = MagicMock(return_value={"success": True, "resource_outcomes": outcomes})
+    tf_runner.get_resource_ids = MagicMock(return_value={})
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    runner_registry.create_runner.return_value = tf_runner
+    state_manager = MagicMock()
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    provider = MagicMock()
+    provider.get_terraform_resource_types.return_value = {}
+
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=bus,
+        providers={"proxmox": provider},
+    )
+    executor.apply_serial(
+        env_name="dev",
+        deployment_id=1,
+        resources_by_provider={"proxmox": resources},
+        resource_filter=None,
+        auto_approve=True,
+    )
+
+    assert sorted(seen, key=lambda s: s[0]) == [("pa", {"x": 1}), ("pb", {"y": 2})]

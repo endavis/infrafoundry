@@ -1,6 +1,7 @@
 """Base provider interface for infrastructure plugins."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,33 @@ class ResourceConfig(BaseModel):
     events: dict[str, list[dict[str, Any]]] | None = None
     package_variables: dict[str, Any] | None = None
     import_id: str | None = None
+
+
+def group_by_package_variables(
+    resources: Iterable[tuple[str, dict[str, Any] | None]],
+) -> list[tuple[list[str], dict[str, Any]]]:
+    """Group resource names by equal package variables, in first-seen order.
+
+    Resources without package variables share the ``{}`` group. Duplicate
+    names within a group are kept once.
+
+    Args:
+        resources: ``(resource_name, package_variables)`` pairs
+
+    Returns:
+        ``(names, package_variables)`` per distinct variables mapping
+    """
+    groups: list[tuple[list[str], dict[str, Any]]] = []
+    for name, package_variables in resources:
+        variables = package_variables or {}
+        for names, group_vars in groups:
+            if group_vars == variables:
+                if name not in names:
+                    names.append(name)
+                break
+        else:
+            groups.append(([name], variables))
+    return groups
 
 
 class ProviderBase(ABC):

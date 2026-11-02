@@ -31,7 +31,7 @@ from infrafoundry.core.protocols import (
     ValidatesReferencesInContext,
     VerifiesDestroy,
 )
-from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider import ProviderBase, ResourceConfig, group_by_package_variables
 from infrafoundry.core.result_types import PlanResult
 from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
@@ -1703,18 +1703,11 @@ class DestroyOrchestrator(HookExecutionMixin):
         Raises:
             EventAbortedError: If a handler fails with ``abort`` set
         """
-        groups: list[tuple[dict[str, Any], list[str]]] = []
-        for resource in destroyed_resources:
-            variables = resource.package_variables or {}
-            for group_vars, names in groups:
-                if group_vars == variables:
-                    if resource.name not in names:
-                        names.append(resource.name)
-                    break
-            else:
-                groups.append((variables, [resource.name]))
+        groups = group_by_package_variables(
+            (r.name, r.package_variables) for r in destroyed_resources
+        )
 
-        for group_vars, names in groups:
+        for names, group_vars in groups:
             handler_results = self.event_manager.emit_event(
                 EventType.RESOURCE_DELETED,
                 env_name,

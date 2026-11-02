@@ -286,6 +286,12 @@ handler must not need the destroyed resources). It receives
 `INFRAFOUNDRY_PACKAGE_VARS` for its package, as `on_create` does on apply.
 Per-resource emits are resource-scoped.
 
+On apply, `on_create` works the same way: after every provider finishes, the
+created resources are grouped by package variables and one `RESOURCE_CREATED`
+is emitted per group. A package-level handler with `requires` therefore sees
+only its own package's variables, never another package's. An env-level handler
+without `requires` fires once per group, not once per apply.
+
 ### Declaring resource events
 
 Events are declared directly on the resource definition:

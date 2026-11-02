@@ -1207,3 +1207,76 @@ def test_aggregate_group_handler_failure_raises_from_apply_serial() -> None:
             resource_filter=None,
             auto_approve=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# Aggregate RESOURCE_CREATED grouped by package variables (#1231)
+# ---------------------------------------------------------------------------
+
+
+def _pkg_res(name: str, variables: dict[str, Any] | None) -> MagicMock:
+    res = _resource_with_events(name)
+    res.package_variables = variables
+    return res
+
+
+def _apply_created(
+    names: list[str],
+    resources: list[MagicMock],
+    emit_results: list[EventResult] | None = None,
+) -> tuple[Any, list[Any]]:
+    outcomes = [
+        ResourceOutcome(address=f"proxmox_vm.{n}", action="create", resource_name=n) for n in names
+    ]
+    executor, event_manager, _ = _make_executor_with_outcomes(outcomes, emit_results)
+    executor.apply_serial(
+        env_name="dev",
+        deployment_id=1,
+        resources_by_provider={"proxmox": resources},
+        resource_filter=None,
+        auto_approve=True,
+        package_filter="pkg",
+    )
+    aggregates = [
+        c
+        for c in event_manager.emit_event.call_args_list
+        if c.args[0] == EventType.RESOURCE_CREATED and "resources" in c.args[2]
+    ]
+    return event_manager, aggregates
+
+
+def test_apply_emits_one_aggregate_per_package_variables_group() -> None:
+    resources = [
+        _pkg_res("a1", {"x": 1}),
+        _pkg_res("b1", {"x": 2}),
+        _pkg_res("a2", {"x": 1}),
+    ]
+    _, aggregates = _apply_created(["a1", "b1", "a2"], resources)
+
+    assert [(c.kwargs["target_resources"], c.kwargs["package_variables"]) for c in aggregates] == [
+        (["a1", "a2"], {"x": 1}),
+        (["b1"], {"x": 2}),
+    ]
+    assert all(c.kwargs["package_filter"] == "pkg" for c in aggregates)
+
+
+def test_apply_single_package_emits_one_aggregate_with_variables() -> None:
+    resources = [_pkg_res("a", {"x": 1}), _pkg_res("b", {"x": 1})]
+    _, aggregates = _apply_created(["a", "b"], resources)
+
+    assert len(aggregates) == 1
+    assert aggregates[0].kwargs["target_resources"] == ["a", "b"]
+    assert aggregates[0].kwargs["package_variables"] == {"x": 1}
+
+
+def test_apply_without_package_variables_still_emits() -> None:
+    _, aggregates = _apply_created(["a"], [_pkg_res("a", None)])
+
+    assert len(aggregates) == 1
+    assert aggregates[0].kwargs["package_variables"] == {}
+
+
+def test_apply_aggregate_abort_raises() -> None:
+    abort = EventResult(success=False, abort=True, reason="stop", handler_name="h")
+    with pytest.raises(EventAbortedError):
+        _apply_created(["a"], [_pkg_res("a", {"x": 1})], [abort])

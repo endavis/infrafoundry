@@ -267,6 +267,8 @@ events:
 
 The group semantics apply to `on_destroy` too: a handler with `requires` fires
 once, after all required resources are destroyed, with its package's variables.
+On apply, `on_create` emits one `RESOURCE_CREATED` per package-variables group
+(not one merged event), so handlers never see another package's variables.
 
 ### Drift Events
 

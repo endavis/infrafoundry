@@ -391,6 +391,11 @@ A package-level `on_destroy` handler with `requires` runs once, after every
 required resource has been destroyed (after terraform destroy, so the resources
 are already gone), with its package's variables in `INFRAFOUNDRY_PACKAGE_VARS`.
 
+On apply, a package-level `on_create` handler with `requires` likewise gets only
+its own package's variables: created resources are grouped by package variables
+and one event is emitted per group. An env-level handler without `requires`
+fires once per group rather than once per apply.
+
 ### Declaring events on a resource
 
 Add an `events` key to a resource definition inside a package resource template:

@@ -12,7 +12,7 @@ from infrafoundry.core.events import EventAbortedError, EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError, ResourceFilterError
 from infrafoundry.core.execution_planner import ExecutionPlanner
 from infrafoundry.core.protocols import Applyable, StateAware
-from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider import ProviderBase, ResourceConfig, group_by_package_variables
 from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
@@ -228,23 +228,24 @@ class DeploymentExecutor:
                                 seen_created.add(name)
                                 all_created.append(name)
         if all_created:
-            # Collect package_variables from created resources for group handlers
-            merged_pkg_vars: dict[str, Any] = {}
-            for resources in resources_by_provider.values():
-                for r in resources:
-                    if r.name in seen_created and r.package_variables:
-                        merged_pkg_vars.update(r.package_variables)
-            handler_results = self.event_manager.emit_event(
-                EventType.RESOURCE_CREATED,
-                env_name,
-                {"action": "create", "resources": all_created},
-                target_resources=all_created,
-                package_variables=merged_pkg_vars,
-                package_filter=package_filter,
-            )
-            for hr in handler_results:
-                if not hr.success and hr.abort:
-                    raise EventAbortedError(EventType.RESOURCE_CREATED, hr)
+            # One event per package-variables group so each package's group
+            # handlers see only their own variables.
+            by_name = {r.name: r for rs in resources_by_provider.values() for r in rs}
+            created = [
+                (n, by_name[n].package_variables if n in by_name else None) for n in all_created
+            ]
+            for names, group_vars in group_by_package_variables(created):
+                handler_results = self.event_manager.emit_event(
+                    EventType.RESOURCE_CREATED,
+                    env_name,
+                    {"action": "create", "resources": names},
+                    target_resources=names,
+                    package_variables=group_vars,
+                    package_filter=package_filter,
+                )
+                for hr in handler_results:
+                    if not hr.success and hr.abort:
+                        raise EventAbortedError(EventType.RESOURCE_CREATED, hr)
 
         return results
 
