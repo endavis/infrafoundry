@@ -115,3 +115,7 @@ ansible-playbook -i "$INVENTORY" "$PLAYBOOK" -v
 # Add the cluster to the NetApp Console when the console_* inputs are set (#1140).
 # Skips with a message when they are not; secrets stay in INFRAFOUNDRY_PACKAGE_VARS.
 python3 "${BLUEPRINT_DIR}/scripts/ontap-console-discover.py"
+
+# Register the cluster with AIQUM when aiqum_address and aiqum_admin_password are set (#1225).
+# Skips with a message when they are not.
+python3 "${BLUEPRINT_DIR}/scripts/ontap-aiqum-register.py"

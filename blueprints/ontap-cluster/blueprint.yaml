@@ -171,7 +171,8 @@ inputs:
   # --- NetApp Console discovery (optional) ---
   # Set console_client_id, console_client_secret and console_agent_id to add the
   # cluster to the NetApp Console through that agent after setup. Leave all three
-  # empty to skip. Put the client ID and secret in secrets.yaml.
+  # empty to skip. Put the client ID and secret in secrets.yaml. Destroying the
+  # package removes the cluster from the Console again (#1225).
   - name: console_client_id
     description: "NetApp Console service account client ID; enables discovery"
     default: ""
@@ -194,6 +195,32 @@ inputs:
     description: "ONTAP user the agent logs in as; ontap_password is its password"
     default: admin
 
+  # --- AIQUM registration (optional) ---
+  # Set aiqum_address and aiqum_admin_password to add the cluster to Active IQ
+  # Unified Manager after setup and remove it on destroy (#1225). Leave both
+  # empty to skip. Put the password in secrets.yaml.
+  - name: aiqum_address
+    description: "AIQUM host or IP; enables AIQUM registration"
+    default: ""
+  - name: aiqum_admin_user
+    description: "AIQUM admin user"
+    default: umadmin
+  - name: aiqum_admin_password
+    description: "AIQUM admin password (secret; set in secrets.yaml)"
+    default: ""
+  - name: aiqum_cluster_user
+    description: "ONTAP user AIQUM logs in as; ontap_password is its password"
+    default: admin
+  # AIQUM's certificate is verified. For its self-signed certificate, point
+  # aiqum_ca_cert at a PEM file that trusts it; aiqum_tls_insecure skips the
+  # check entirely and sends the passwords over an unverified connection.
+  - name: aiqum_ca_cert
+    description: "PEM file of the CA (or self-signed cert) AIQUM presents; empty: system trust store"
+    default: ""
+  - name: aiqum_tls_insecure
+    description: "Skip AIQUM certificate verification (not recommended)"
+    default: "false"
+
 resources:
   - vm.yaml
   - dhcp.yaml
@@ -206,6 +233,16 @@ events:
       description: "Run ONTAP lab Ansible playbook after both VMs are created"
       timeout: 3600
       continue_on_error: false
+      requires:
+        - "{{ node01_name }}"
+        - "{{ node02_name }}"
+  on_destroy:
+    - type: script
+      name: ontap-cluster-cleanup
+      script: scripts/ontap-destroy-cleanup.sh
+      description: "Remove the cluster from the NetApp Console and AIQUM"
+      timeout: 600
+      continue_on_error: true
       requires:
         - "{{ node01_name }}"
         - "{{ node02_name }}"

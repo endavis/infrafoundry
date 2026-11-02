@@ -124,6 +124,32 @@ infra apply --package aiqum
                  +-- Step 8: Send test alert email (if alert created)
 ```
 
+## Keeping AIQUM in step with ontap-cluster
+
+Step 5 adds only the cluster present when AIQUM is installed. To keep AIQUM in step with
+cluster rebuilds and destroys, set the optional `aiqum_*` inputs on the `ontap-cluster`
+package: `aiqum_address` and `aiqum_admin_password` (put the password in the package's
+`secrets.yaml`), plus `aiqum_admin_user` (default `umadmin`) and `aiqum_cluster_user`
+(default `admin`; its password is `ontap_password`). Create then registers the cluster
+(skipped when a data source already matches by address or name), and destroy removes it.
+
+The requests carry the AIQUM admin and ONTAP passwords, so AIQUM's certificate is verified.
+For AIQUM's self-signed certificate, set `aiqum_ca_cert` to a PEM file that trusts it, for
+example the certificate exported from the AIQUM web UI. `aiqum_tls_insecure: "true"` skips
+the check, which is not recommended.
+
+Entries left behind by a destroy done before this existed must be removed once by hand:
+
+```bash
+# AIQUM: list the data sources, then delete the stale one by its key
+curl -sk -u umadmin:<password> https://<aiqum>/api/admin/datasources/clusters
+curl -sk -u umadmin:<password> -X DELETE https://<aiqum>/api/admin/datasources/clusters/<key>
+
+# NetApp Console: delete the stale on-prem working environment (bearer token and agent ID)
+curl -s -X DELETE -H "Authorization: Bearer <token>" -H "x-agent-id: <agent-id>" \
+  https://api.bluexp.netapp.com/occm/api/onprem/working-environments/<publicId>
+```
+
 ## Firewall Ports
 
 AIQUM requires these ports open (configured automatically by the install script):

@@ -89,6 +89,10 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeConsole]:
                 self._reply(200, state.workspaces)
             elif path == "/occm/api/onprem/working-environments" and method == "GET":
                 self._reply(200, state.systems)
+            elif method == "DELETE" and path.startswith("/occm/api/onprem/working-environments/"):
+                public_id = path.rsplit("/", 1)[1]
+                state.systems = [s for s in state.systems if s.get("publicId") != public_id]
+                self._reply(200, {})
             elif path == "/occm/api/onprem/working-environments":
                 if state.post_status != 200:
                     self._reply(state.post_status, {"message": f"bad password {PASSWORD}"})
@@ -104,6 +108,9 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeConsole]:
 
         def do_POST(self) -> None:
             self._handle("POST")
+
+        def do_DELETE(self) -> None:
+            self._handle("DELETE")
 
         def log_message(self, format: str, *args: Any) -> None:
             return
@@ -211,18 +218,20 @@ def test_ambiguous_workspace_fails_without_posting(fake: FakeConsole) -> None:
     assert _posts(fake) == []
 
 
-def _run_script(fake_base: str, package_vars: dict[str, Any]) -> subprocess.CompletedProcess[str]:
+def _run_script(
+    fake_base: str, package_vars: dict[str, Any], *args: str
+) -> subprocess.CompletedProcess[str]:
     """Run the script as a subprocess against the fake Console."""
     wrapper = (
-        "import runpy, sys; sys.argv = [sys.argv[1]]; "
+        "import runpy, sys; sys.argv = sys.argv[1:]; "
         "g = runpy.run_path(sys.argv[0], run_name='discover'); "
         f"g['TOKEN_URL'] = {fake_base + '/oauth/token'!r}; g['API_URL'] = {fake_base!r}; "
         "g['main'].__globals__.update(TOKEN_URL=g['TOKEN_URL'], API_URL=g['API_URL']); "
-        "sys.exit(g['main']())"
+        "sys.exit(g['main'](sys.argv[1:]))"
     )
     env = {**os.environ, "INFRAFOUNDRY_PACKAGE_VARS": json.dumps(package_vars)}
     return subprocess.run(
-        [sys.executable, "-c", wrapper, str(SCRIPT)],
+        [sys.executable, "-c", wrapper, str(SCRIPT), *args],
         capture_output=True,
         text=True,
         env=env,
@@ -244,6 +253,68 @@ def test_main_redacts_secrets_on_error(fake: FakeConsole) -> None:
     assert "HTTP 400" in result.stderr
     assert PASSWORD not in result.stderr + result.stdout
     assert SECRET not in result.stderr + result.stdout
+
+
+def _deletes(fake: FakeConsole) -> list[tuple[str, dict[str, str]]]:
+    return [(path, h) for method, path, h, _ in fake.requests if method == "DELETE"]
+
+
+def test_remove_deletes_matches_by_name_and_address(fake: FakeConsole) -> None:
+    fake.systems = [
+        {"name": "lab", "publicId": "OnPrem-1"},
+        {
+            "name": "renamed",
+            "publicId": "OnPrem-2",
+            "ontapClusterProperties": {"clusterAddress": "172.21.0.80"},
+        },
+        {"name": "other", "publicId": "OnPrem-3"},
+    ]
+
+    msg = disc.remove(disc.load_config(FULL_VARS))
+
+    assert "OnPrem-1" in msg and "OnPrem-2" in msg
+    deletes = _deletes(fake)
+    assert [p for p, _ in deletes] == [
+        "/occm/api/onprem/working-environments/OnPrem-1",
+        "/occm/api/onprem/working-environments/OnPrem-2",
+    ]
+    for _, headers in deletes:
+        assert headers["x-agent-id"] == AGENT
+        assert headers["authorization"] == f"Bearer {TOKEN}"
+    assert [s["publicId"] for s in fake.systems] == ["OnPrem-3"]
+
+
+def test_remove_with_no_match_makes_no_delete(fake: FakeConsole) -> None:
+    fake.systems = [{"name": "other", "publicId": "OnPrem-3"}]
+
+    msg = disc.remove(disc.load_config(FULL_VARS))
+
+    assert "nothing to do" in msg
+    assert _deletes(fake) == []
+
+
+def test_main_remove_skips_without_inputs() -> None:
+    result = _run_script("http://127.0.0.1:9", {"cluster_mgmt_ip": "172.21.0.80"}, "--remove")
+    assert result.returncode == 0
+    assert "skipping" in result.stdout
+
+
+def test_main_remove_deletes_through_cli(fake: FakeConsole) -> None:
+    fake.systems = [{"name": "lab", "publicId": "OnPrem-1"}]
+    result = _run_script(disc.API_URL, FULL_VARS, "--remove")
+
+    assert result.returncode == 0, result.stderr
+    assert "removed from the NetApp Console" in result.stdout
+    assert fake.systems == []
+
+
+def test_main_remove_reports_errors_redacted() -> None:
+    bad = _run_script("http://127.0.0.1:9", FULL_VARS, "--remove")
+
+    assert bad.returncode == 1
+    assert "ERROR: NetApp Console removal" in bad.stderr
+    assert PASSWORD not in bad.stderr + bad.stdout
+    assert SECRET not in bad.stderr + bad.stdout
 
 
 def test_script_is_executable_and_wired_into_post_terraform() -> None:

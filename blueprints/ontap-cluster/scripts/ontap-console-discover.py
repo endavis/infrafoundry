@@ -4,6 +4,9 @@
 Reads ``INFRAFOUNDRY_PACKAGE_VARS`` (a JSON object of package variables, secrets
 included) from the environment. No secret is taken from argv or printed.
 
+With ``--remove`` the script instead deletes the cluster's working environment(s)
+from the NetApp Console (used by the blueprint's ``on_destroy`` event, #1225).
+
 Discovery runs only when ``console_client_id``, ``console_client_secret`` and
 ``console_agent_id`` are all set. With none of them set it logs a skip and exits 0;
 with only some set it fails and names the missing ones.
@@ -23,6 +26,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
@@ -130,6 +134,16 @@ def find_existing(systems: list[dict[str, Any]], cfg: Config) -> dict[str, Any] 
         if props.get("clusterAddress") == cfg.cluster_ip:
             return system
     return None
+
+
+def find_all_matching(systems: list[dict[str, Any]], cfg: Config) -> list[dict[str, Any]]:
+    """Return every on-prem system :func:`find_existing` would match (name or address)."""
+    matches: list[dict[str, Any]] = []
+    for system in systems:
+        props = system.get("ontapClusterProperties") or {}
+        if system.get("name") == cfg.system_name or props.get("clusterAddress") == cfg.cluster_ip:
+            matches.append(system)
+    return matches
 
 
 def build_discover_body(cfg: Config, workspace_id: str) -> dict[str, Any]:
@@ -265,8 +279,42 @@ def discover(cfg: Config) -> str:
     )
 
 
-def main() -> int:
-    """Entry point."""
+def remove(cfg: Config) -> str:
+    """Delete every Console working environment that matches the cluster.
+
+    Returns:
+        A one-line result message.
+    """
+    token = fetch_token(cfg)
+    url = API_URL + ONPREM_PATH
+    systems = _request(f"{url}?fields=ontapClusterProperties", token=token, agent_id=cfg.agent_id)
+    matches = find_all_matching(systems if isinstance(systems, list) else [], cfg)
+    if not matches:
+        return f"cluster {cfg.cluster_ip} is not in the NetApp Console; nothing to do"
+    removed: list[str] = []
+    for system in matches:
+        public_id = str(system.get("publicId") or "")
+        if not public_id:
+            raise DiscoveryError(f"Console system '{system.get('name')}' has no publicId")
+        _request(
+            f"{url}/{urllib.parse.quote(public_id, safe='')}",
+            method="DELETE",
+            token=token,
+            agent_id=cfg.agent_id,
+        )
+        removed.append(f"'{system.get('name')}' ({public_id})")
+    return f"removed from the NetApp Console: {', '.join(removed)}"
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Entry point.
+
+    Args:
+        argv: Command-line arguments (default: ``sys.argv[1:]``); ``--remove``
+            deletes the cluster from the Console instead of adding it.
+    """
+    args = sys.argv[1:] if argv is None else argv
+    removing = "--remove" in args
     raw = os.environ.get("INFRAFOUNDRY_PACKAGE_VARS")
     if not raw:
         print("ERROR: INFRAFOUNDRY_PACKAGE_VARS is not set", file=sys.stderr)
@@ -281,9 +329,10 @@ def main() -> int:
         if cfg is None:
             print("NetApp Console discovery: no console_* inputs set, skipping")
             return 0
-        print(f"NetApp Console discovery: {discover(cfg)}")
+        print(f"NetApp Console discovery: {remove(cfg) if removing else discover(cfg)}")
     except DiscoveryError as exc:
-        print(f"ERROR: NetApp Console discovery: {redact(str(exc), secrets)}", file=sys.stderr)
+        action = "removal" if removing else "discovery"
+        print(f"ERROR: NetApp Console {action}: {redact(str(exc), secrets)}", file=sys.stderr)
         return 1
     return 0
 
