@@ -29,8 +29,21 @@ SERVER_NAME="${INFRAFOUNDRY_VAR_server_name}"
 JUMPHOST="${INFRAFOUNDRY_VAR_jumphost:-}"
 K3S_SERVER_ARGS="${INFRAFOUNDRY_VAR_k3s_server_args}"
 CLUSTER_NAME="${INFRAFOUNDRY_VAR_cluster_name}"
+K3S_VERSION="${INFRAFOUNDRY_VAR_k3s_version:-}"
 KUBECONFIG_DIR=$(eval echo "${INFRAFOUNDRY_VAR_kubeconfig_dir}")
 KUBECONFIG_LOCAL="${KUBECONFIG_DIR}/${CLUSTER_NAME}.yaml"
+
+# Pin the k3s release only when k3s_version is set; empty keeps the installer's
+# latest-release default. The value is spliced into a remote shell command, so
+# restrict it to release-tag characters (e.g. v1.30.4+k3s1).
+K3S_VERSION_ENV=""
+if [ -n "${K3S_VERSION}" ]; then
+    if ! [[ "${K3S_VERSION}" =~ ^[A-Za-z0-9._+-]+$ ]]; then
+        echo "ERROR: invalid k3s_version '${K3S_VERSION}'" >&2
+        exit 1
+    fi
+    K3S_VERSION_ENV="INSTALL_K3S_VERSION=${K3S_VERSION} "
+fi
 
 # --- Read agents list from the JSON-serialized package vars via python3 ---
 mapfile -t AGENT_NAMES < <(python3 -c 'import json,sys
@@ -236,7 +249,7 @@ echo ""
 echo "--- Phase 3: Installing k3s server on ${SERVER_NAME} ---"
 
 remote_root_cmd "${SERVER_IP}" "
-    curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='server' sh -s - \
+    curl -sfL https://get.k3s.io | ${K3S_VERSION_ENV}INSTALL_K3S_EXEC='server' sh -s - \
         --write-kubeconfig-mode 644 \
         ${K3S_SERVER_ARGS} \
         --node-name ${SERVER_NAME}
@@ -278,7 +291,7 @@ for i in "${!AGENT_IPS[@]}"; do
     echo "  Installing k3s agent on ${name} (${ip})..."
 
     remote_root_cmd "${ip}" "
-        curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='agent' sh -s - \
+        curl -sfL https://get.k3s.io | ${K3S_VERSION_ENV}INSTALL_K3S_EXEC='agent' sh -s - \
             --server https://${SERVER_IP}:6443 \
             --token ${K3S_TOKEN} \
             --node-name ${name}

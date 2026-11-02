@@ -17,6 +17,9 @@ The test depends only on files checked into this repository:
 It does NOT depend on the private infra-config/ config repo.
 """
 
+import json
+import os
+import subprocess
 import textwrap
 from pathlib import Path
 
@@ -402,3 +405,85 @@ def test_k3s_install_declares_the_kubeconfig_as_an_output(loader: PackageLoader)
     rendered = {key: env.from_string(output[key]).render(**variables) for key in output}
 
     assert rendered == {"source": "~/.kube/k3s-dev.yaml", "dest": "~/.kube/k3s-dev.yaml"}
+
+
+PROXMOX_SCRIPT = (
+    REPO_ROOT / "blueprints" / "k3s-cluster" / "scripts" / "proxmox" / "k3s-post-terraform.sh"
+)
+
+_SSH_STUB = """#!/bin/sh
+printf '%s\\n' "$*" >> "$SSH_LOG"
+case "$*" in
+*"sysctl -n"*) printf '1\\n1\\n1\\n' ;;
+*"get nodes --no-headers"*) printf 'a Ready x\\nb Ready x\\nc Ready x\\n' ;;
+esac
+"""
+
+
+def _run_post_terraform(tmp_path: Path, *, k3s_version: str | None, jumphost: str) -> list[str]:
+    """Run the Proxmox post-terraform script with stubbed ssh; return logged ssh calls."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log = tmp_path / "ssh.log"
+    stubs = {
+        "ssh": _SSH_STUB,
+        "ssh-add": "#!/bin/sh\necho key\n",
+        "sleep": "#!/bin/sh\nexit 0\n",
+    }
+    for name, body in stubs.items():
+        stub = bin_dir / name
+        stub.write_text(body)
+        stub.chmod(0o755)
+
+    env = {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "HOME": str(tmp_path),
+        "SSH_LOG": str(log),
+        "INFRAFOUNDRY_VAR_server_ip": "172.21.0.1",
+        "INFRAFOUNDRY_VAR_server_name": "srv",
+        "INFRAFOUNDRY_VAR_jumphost": jumphost,
+        "INFRAFOUNDRY_VAR_k3s_server_args": "--disable traefik",
+        "INFRAFOUNDRY_VAR_cluster_name": "c",
+        "INFRAFOUNDRY_VAR_kubeconfig_dir": str(tmp_path / "kube"),
+        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"agents": [{"name": "ag1", "ip": "172.21.0.2"}]}),
+    }
+    if k3s_version is not None:
+        env["INFRAFOUNDRY_VAR_k3s_version"] = k3s_version
+    result = subprocess.run(
+        ["bash", str(PROXMOX_SCRIPT)], env=env, capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr
+    return log.read_text().splitlines()
+
+
+def _install_calls(calls: list[str]) -> list[str]:
+    return [c for c in calls if "INSTALL_K3S_EXEC=" in c]
+
+
+@pytest.mark.parametrize("jumphost", ["", "jump.example"])
+def test_k3s_version_is_passed_to_server_and_agent_installs(tmp_path: Path, jumphost: str) -> None:
+    """A set k3s_version reaches the remote sh of both installs (#1226)."""
+    installs = _install_calls(
+        _run_post_terraform(tmp_path, k3s_version="v1.30.4+k3s1", jumphost=jumphost)
+    )
+
+    assert len(installs) == 2
+    for call in installs:
+        assert "INSTALL_K3S_VERSION=v1.30.4+k3s1 INSTALL_K3S_EXEC=" in call
+
+
+@pytest.mark.parametrize("k3s_version", [None, ""])
+def test_empty_k3s_version_omits_install_k3s_version(
+    tmp_path: Path, k3s_version: str | None
+) -> None:
+    """Without k3s_version the installs keep the latest-release default (#1226)."""
+    installs = _install_calls(_run_post_terraform(tmp_path, k3s_version=k3s_version, jumphost=""))
+
+    assert len(installs) == 2
+    assert all("INSTALL_K3S_VERSION" not in call for call in installs)
+
+
+def test_invalid_k3s_version_is_rejected(tmp_path: Path) -> None:
+    """A k3s_version with shell metacharacters never reaches the remote command."""
+    with pytest.raises(AssertionError, match="invalid k3s_version"):
+        _run_post_terraform(tmp_path, k3s_version="v1; rm -rf /", jumphost="")
