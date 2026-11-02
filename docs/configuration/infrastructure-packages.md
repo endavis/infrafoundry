@@ -387,6 +387,10 @@ events fire based on **what actually happened** to the resource during apply:
 | `on_update` | Resource was modified in place (terraform `~ update`) |
 | `on_destroy` | Resource is being destroyed (terraform `- destroy`) |
 
+A package-level `on_destroy` handler with `requires` runs once, after every
+required resource has been destroyed (after terraform destroy, so the resources
+are already gone), with its package's variables in `INFRAFOUNDRY_PACKAGE_VARS`.
+
 ### Declaring events on a resource
 
 Add an `events` key to a resource definition inside a package resource template:
@@ -521,6 +525,7 @@ vm:
         - type: script
           name: cluster-teardown
           script: scripts/cluster-teardown.sh
+          # Runs after terraform destroy; the resource is already gone.
   - name: {{ cluster_name }}-node2
     cores: 4
     memory: 16384

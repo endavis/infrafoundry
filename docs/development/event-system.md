@@ -280,6 +280,12 @@ apply or destroy, rather than on runner completion. This replaces the
    `events` configuration
 4. Matching handlers execute with resource context
 
+On destroy, a package-level `on_destroy` handler with `requires` fires once,
+after every required resource is destroyed (after terraform destroy, so the
+handler must not need the destroyed resources). It receives
+`INFRAFOUNDRY_PACKAGE_VARS` for its package, as `on_create` does on apply.
+Per-resource emits are resource-scoped.
+
 ### Declaring resource events
 
 Events are declared directly on the resource definition:

@@ -20,7 +20,7 @@ from infrafoundry.core import warnings as infra_warnings
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.drift_detector import DriftDetector
-from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.events import EventAbortedError, EventManager, EventType
 from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.known_hosts import forget_on_jumphost, hosts_to_forget
@@ -1449,7 +1449,9 @@ class DestroyOrchestrator(HookExecutionMixin):
                     package_filter,
                 )
 
-                self._finalize_destroyed_resources(env_name, provider_name, resource_ids)
+                self._finalize_destroyed_resources(
+                    env_name, provider_name, resource_ids, package_filter
+                )
 
                 deleted = {o.resource_name for o in all_outcomes if o.action == "delete"}
                 destroyed_resources.extend(r for r in resources if r.name in deleted)
@@ -1468,6 +1470,9 @@ class DestroyOrchestrator(HookExecutionMixin):
                 results[provider_name] = provider_results
 
             self._forget_destroyed_hosts(destroyed_resources, all_resources)
+
+            # Aggregate RESOURCE_DELETED for group handlers (requires: [...])
+            self._emit_aggregate_destroy_events(env_name, destroyed_resources, package_filter)
 
             # Execute environment-level after_destroy hooks
             self._execute_env_hooks(env_name, "after_destroy", env_config)
@@ -1567,6 +1572,7 @@ class DestroyOrchestrator(HookExecutionMixin):
         env_name: str,
         provider_name: str,
         resource_ids: dict[str, int],
+        package_filter: str | None = None,
     ) -> None:
         for resource_name, resource_id in resource_ids.items():
             self.state_manager.update_resource_state(
@@ -1577,6 +1583,9 @@ class DestroyOrchestrator(HookExecutionMixin):
                 EventType.RESOURCE_DELETED,
                 env_name,
                 {"resource_id": resource_id, "provider": provider_name, "name": resource_name},
+                target_resources=[resource_name],
+                package_filter=package_filter,
+                resource_scoped=True,
             )
 
     def _forget_destroyed_hosts(
@@ -1642,12 +1651,11 @@ class DestroyOrchestrator(HookExecutionMixin):
                 outcome.resource_name,
             )
 
+            qualified_owner = f"{provider_name}:{outcome.resource_name}"
             for handler_config in handlers:
+                tagged_config = {**handler_config, "_resource_owner": qualified_owner}
                 try:
-                    self.event_manager.register_handler(
-                        EventType.RESOURCE_DELETED,
-                        handler_config,
-                    )
+                    self.event_manager.register_handler(EventType.RESOURCE_DELETED, tagged_config)
                 except ValueError as e:
                     logger.error(
                         "Failed to register on_destroy handler for resource '%s': %s",
@@ -1656,7 +1664,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                     )
                     continue
 
-            self.event_manager.emit_event(
+            handler_results = self.event_manager.emit_event(
                 EventType.RESOURCE_DELETED,
                 env_name,
                 {
@@ -1665,11 +1673,59 @@ class DestroyOrchestrator(HookExecutionMixin):
                     "address": outcome.address,
                     "action": outcome.action,
                 },
+                resource_scoped=True,
                 provider=provider_name,
                 resource=outcome.resource_name,
-                target_resources=resource_filter,
+                target_resources=[qualified_owner, outcome.resource_name],
+                package_variables=resource.package_variables or {},
                 package_filter=package_filter,
             )
+            for hr in handler_results:
+                if not hr.success and hr.abort:
+                    raise EventAbortedError(EventType.RESOURCE_DELETED, hr)
+
+    def _emit_aggregate_destroy_events(
+        self,
+        env_name: str,
+        destroyed_resources: list[ResourceConfig],
+        package_filter: str | None = None,
+    ) -> None:
+        """Emit one aggregate RESOURCE_DELETED per package-variables group.
+
+        Runs after every provider has been destroyed, so group handlers
+        (``requires: [...]``) fire once, with their package's variables.
+
+        Args:
+            env_name: Environment name
+            destroyed_resources: Resources with a delete outcome
+            package_filter: Optional package name to restrict event handlers
+
+        Raises:
+            EventAbortedError: If a handler fails with ``abort`` set
+        """
+        groups: list[tuple[dict[str, Any], list[str]]] = []
+        for resource in destroyed_resources:
+            variables = resource.package_variables or {}
+            for group_vars, names in groups:
+                if group_vars == variables:
+                    if resource.name not in names:
+                        names.append(resource.name)
+                    break
+            else:
+                groups.append((variables, [resource.name]))
+
+        for group_vars, names in groups:
+            handler_results = self.event_manager.emit_event(
+                EventType.RESOURCE_DELETED,
+                env_name,
+                {"action": "delete", "resources": names},
+                target_resources=names,
+                package_variables=group_vars,
+                package_filter=package_filter,
+            )
+            for hr in handler_results:
+                if not hr.success and hr.abort:
+                    raise EventAbortedError(EventType.RESOURCE_DELETED, hr)
 
     def _print_header(
         self, label: str, env_name: str, resource_filter: list[str] | None, style: str

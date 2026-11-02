@@ -265,6 +265,9 @@ events:
         - ontap-node2
 ```
 
+The group semantics apply to `on_destroy` too: a handler with `requires` fires
+once, after all required resources are destroyed, with its package's variables.
+
 ### Drift Events
 
 `DRIFT_DETECTED` carries the provider and the runner's `DriftInfo`:

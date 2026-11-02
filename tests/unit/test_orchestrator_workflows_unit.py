@@ -12,7 +12,14 @@ import pytest
 from rich.console import Console
 
 from infrafoundry.core.config.models import EnvironmentConfig
-from infrafoundry.core.events import EventType
+from infrafoundry.core.events import (
+    EventAbortedError,
+    EventContext,
+    EventResult,
+    EventType,
+    UnifiedEventBus,
+)
+from infrafoundry.core.events.handlers.python import PythonHandler
 from infrafoundry.core.exceptions import FilteredDestroyRefusedError, ProviderFilterError
 from infrafoundry.core.orchestrator_workflows import (
     ApplyOrchestrator,
@@ -2060,3 +2067,192 @@ def test_provider_filter_excluding_proxmox_is_not_refused(console: Console) -> N
 
     runner_destroy.assert_not_called()
     state_manager.create_deployment.assert_called_once()
+
+
+# --- Destroy lifecycle events (#1228) ---
+
+
+def _pkg_resource(name: str, variables: dict[str, Any] | None) -> ResourceConfig:
+    return ResourceConfig(
+        name=name,
+        provider="proxmox",
+        type="vm",
+        config={"id": name},
+        package_variables=variables,
+    )
+
+
+def _run_destroy(
+    console: Console,
+    event_manager: Any,
+    resources: list[ResourceConfig],
+    deleted: list[str],
+    resource_filter: list[str] | None = None,
+) -> None:
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 40
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+
+    outcomes = [
+        ResourceOutcome(address=f"proxmox_vm.{n}", action="delete", resource_name=n)
+        for n in deleted
+    ]
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.is_iac_runner = True
+    tf_runner.destroy = MagicMock(return_value={"success": True, "resource_outcomes": outcomes})
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    providers = cast("dict[str, ProviderBase]", {"proxmox": MagicMock()})
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: (resources, {"proxmox": resources}),
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], len(rbp["proxmox"]))
+        ],
+        get_current_user=lambda: "tester",
+    )
+    orchestrator.runners = cast("dict[str, BaseRunner]", {"terraform": tf_runner})
+    orchestrator.destroy(
+        env_name="dev",
+        resource_filter=resource_filter,
+        auto_approve=True,
+        confirm_callback=lambda: True,
+    )
+
+
+def _deleted_calls(event_manager: MagicMock) -> list[Any]:
+    return [
+        c
+        for c in event_manager.emit_event.call_args_list
+        if c.args[0] == EventType.RESOURCE_DELETED
+    ]
+
+
+def test_destroy_emits_one_aggregate_with_package_variables(console: Console) -> None:
+    """An unfiltered destroy emits one non-scoped RESOURCE_DELETED per package."""
+    event_manager = MagicMock()
+    event_manager.emit_event.return_value = []
+    resources = [_pkg_resource("a", {"x": 1}), _pkg_resource("b", {"x": 1})]
+
+    _run_destroy(console, event_manager, resources, ["a", "b"])
+
+    aggregates = [c for c in _deleted_calls(event_manager) if not c.kwargs.get("resource_scoped")]
+    assert len(aggregates) == 1
+    assert aggregates[0].kwargs["target_resources"] == ["a", "b"]
+    assert aggregates[0].kwargs["package_variables"] == {"x": 1}
+
+
+def test_destroy_emits_one_aggregate_per_distinct_package_variables(console: Console) -> None:
+    """Packages with different variables never share an aggregate emit."""
+    event_manager = MagicMock()
+    event_manager.emit_event.return_value = []
+    resources = [_pkg_resource("a", {"x": 1}), _pkg_resource("b", {"x": 2})]
+
+    _run_destroy(console, event_manager, resources, ["a", "b"])
+
+    aggregates = [c for c in _deleted_calls(event_manager) if not c.kwargs.get("resource_scoped")]
+    assert len(aggregates) == 2
+    seen = {
+        (tuple(c.kwargs["target_resources"]), c.kwargs["package_variables"]["x"])
+        for c in aggregates
+    }
+    assert seen == {(("a",), 1), (("b",), 2)}
+
+
+def test_destroy_finalize_emits_are_resource_scoped(console: Console) -> None:
+    """Per-resource RESOURCE_DELETED emits after destroy are resource-scoped."""
+    event_manager = MagicMock()
+    event_manager.emit_event.return_value = []
+    resources = [_pkg_resource("a", None)]
+
+    _run_destroy(console, event_manager, resources, ["a"])
+
+    finalize = [c for c in _deleted_calls(event_manager) if "resource_id" in c.args[2]]
+    assert len(finalize) == 1
+    assert finalize[0].kwargs["resource_scoped"] is True
+    assert finalize[0].kwargs["target_resources"] == ["a"]
+
+
+def test_destroy_without_delete_outcomes_emits_no_aggregate(console: Console) -> None:
+    """No delete outcomes means no aggregate RESOURCE_DELETED."""
+    event_manager = MagicMock()
+    event_manager.emit_event.return_value = []
+
+    _run_destroy(console, event_manager, [_pkg_resource("a", {"x": 1})], [])
+
+    aggregates = [c for c in _deleted_calls(event_manager) if not c.kwargs.get("resource_scoped")]
+    assert aggregates == []
+
+
+def test_destroy_aggregate_abort_raises(console: Console) -> None:
+    """An aborting handler result on the aggregate raises EventAbortedError."""
+    event_manager = MagicMock()
+
+    def emit(event_type: EventType, *args: Any, **kwargs: Any) -> list[EventResult]:
+        is_aggregate = not kwargs.get("resource_scoped") and "package_variables" in kwargs
+        if event_type == EventType.RESOURCE_DELETED and is_aggregate:
+            return [EventResult(success=False, abort=True, reason="boom", handler_name="h")]
+        return []
+
+    event_manager.emit_event.side_effect = emit
+
+    with pytest.raises(EventAbortedError):
+        _run_destroy(console, event_manager, [_pkg_resource("a", {"x": 1})], ["a"])
+
+
+def test_destroy_aggregate_continue_on_error_does_not_raise(console: Console) -> None:
+    """A failed, non-aborting handler result does not raise."""
+    event_manager = MagicMock()
+    event_manager.emit_event.return_value = [
+        EventResult(success=False, abort=False, reason="meh", handler_name="h")
+    ]
+
+    _run_destroy(console, event_manager, [_pkg_resource("a", {"x": 1})], ["a"])
+
+
+@pytest.mark.parametrize(
+    ("resource_filter", "deleted", "expected_runs"),
+    [(None, ["a", "b"], 1), (["a"], ["a"], 0)],
+)
+def test_package_on_destroy_requires_runs_once_on_real_bus(
+    console: Console,
+    monkeypatch: pytest.MonkeyPatch,
+    resource_filter: list[str] | None,
+    deleted: list[str],
+    expected_runs: int,
+) -> None:
+    """A package-level on_destroy handler with requires runs once, with its variables."""
+    bus = UnifiedEventBus()
+    # The orchestrator clears config handlers before BEFORE_DESTROY; real runs
+    # re-register package handlers from config, so keep the one registered here.
+    monkeypatch.setattr(bus, "clear_handlers", lambda: None)
+    seen: list[dict[str, Any]] = []
+
+    def fake_execute(self: PythonHandler, context: EventContext) -> EventResult:
+        seen.append(dict(context.package_variables or {}))
+        return EventResult()
+
+    monkeypatch.setattr(PythonHandler, "execute", fake_execute)
+    bus.register_handler(
+        EventType.RESOURCE_DELETED,
+        {
+            "type": "python",
+            "module": "dummy",
+            "function": "handler",
+            "requires": ["a", "b"],
+            "_package": "pkg",
+        },
+    )
+    resources = [_pkg_resource("a", {"x": 1}), _pkg_resource("b", {"x": 1})]
+
+    _run_destroy(console, bus, resources, deleted, resource_filter)
+
+    assert seen == [{"x": 1}] * expected_runs
