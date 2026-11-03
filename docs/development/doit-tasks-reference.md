@@ -36,7 +36,7 @@ doit <task_name>
 | [Security](#security-tasks) | `security`, `audit`, `licenses`, `sbom` | Security scanning and SBOM |
 | [Documentation](#documentation-tasks) | `docs_serve`, `docs_build`, `docs_deploy`, `docs_toc` | Documentation management |
 | [Dependencies](#dependency-tasks) | `install`, `install_dev`, `update_deps` | Package management |
-| [GitHub Workflow](#github-workflow-tasks) | `issue`, `pr`, `pr_merge`, `adr`, `labels_sync`, `delegation_context`, `env_create`, `env_list`, `publish_setup` | Issue, PR, and environment management |
+| [GitHub Workflow](#github-workflow-tasks) | `issue`, `pr`, `pr_merge`, `adr`, `labels_sync`, `delegation_context`, `agent_cmd`, `env_create`, `env_list`, `publish_setup` | Issue, PR, and environment management |
 | [Release](#release-tasks) | `release`, `release_tag`, `publish` | Version and release management |
 | [Version](#version-tasks) | `bump`, `changelog` | Version bumping and changelog |
 | [Setup](#setup-tasks) | `pre_commit_install`, `completions`, `install_direnv`, `install_jq`, `worktree` | Development environment |
@@ -890,9 +890,35 @@ doit delegation_context --kind=pr --n=42 --out=tmp/agents/claude/multi-review-42
   empty file.
 
 **Output location:** by convention, `--out` is `tmp/agents/<host>/<task>-<n>/` (for example
-`tmp/agents/claude/multi-review-123/`), per `AGENTS.md`'s temp-file convention. The orchestrating
+`tmp/agents/claude/multi-review-123/`), per [AGENTS.md — Temporary Files](../../AGENTS.md#temporary-files). The orchestrating
 skill that creates the directory deletes it once every delegated agent has returned — this task
 does not clean up after itself.
+
+### `agent_cmd`
+
+Resolve a cross-agent role to a subagent, an inline run, or a ready CLI command, from the
+per-user config. See [Agent Roles and Models](ai/agent-roles.md).
+
+```bash
+doit agent_cmd --role=code --host=claude
+doit agent_cmd --role=review --host=claude --cli=codex
+doit agent_cmd --check
+```
+
+**What it does:**
+- `--role` is one of `plan`, `plan_review`, `code`, `review`, `adversarial_review`; `--host` is
+  the CLI the caller runs in (`claude`, `codex`, `copilot`, `agy` or `antigravity`).
+- Reads `$XDG_CONFIG_HOME/pyproject-template/agents.toml` (else
+  `~/.config/pyproject-template/agents.toml`) and the gitignored
+  `.config/pyproject_template/agents.local.toml`, local over user.
+- Prints one JSON line last on stdout: `{"mode": "subagent"}` (optionally with `model`, and on Codex `effort`),
+  `{"mode": "inline"}`, or `{"mode": "cli", "cli": "...", "command": "..."}`. With no config the
+  command is today's invocation.
+- `--cli` fixes the target CLI; the role's model and effort apply only when its configured CLI
+  matches.
+- `--check` validates each configured model against `agy models`, `codex debug models` and
+  `copilot help config`, and exits 1 on any error. It needs no `--role` or `--host`.
+- Config errors and bad arguments go to stderr with exit code 1.
 
 **Options:**
 - `--kind` (required): `issue` or `pr`.

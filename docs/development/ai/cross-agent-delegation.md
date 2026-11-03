@@ -157,7 +157,7 @@ inaccessible issue/PR aborts the task with a clear error — never a silent empt
 for the full reference.
 
 By convention the output directory is `tmp/agents/<host>/<task>-<n>/` (for example
-`tmp/agents/claude/multi-review-123/`), per `AGENTS.md`'s temp-file convention. `implement-issue`
+`tmp/agents/claude/multi-review-123/`), per [AGENTS.md — Temporary Files](../../../AGENTS.md#temporary-files). `implement-issue`
 runs in a per-issue worktree, so it passes an absolute `--out` inside that worktree
 (`$WORKTREE/tmp/agents/<host>/implement-issue-<n>/`) and the directory never lands in the main
 checkout. The delegated
@@ -181,6 +181,31 @@ reads (its own `gh issue view`/`gh pr view` in Step 1 of `multi-review`/`multi-p
 Planner brief when Codex itself is the host, run directly in the host's own session, not delegated)
 — see [Headless Codex host limits](#headless-codex-host-limits) below and [Command Blocking — Codex
 CLI](command-blocking.md#codex-cli) for the measured sandbox-network facts (#980).
+
+## Roles and models
+
+The table above is what every CLI runs when nothing is configured. A person can pick, per role
+(`plan`, `plan_review`, `code`, `review`, `adversarial_review`), which CLI runs it and on which
+model, in a per-user config; see [Agent Roles and Models](agent-roles.md). Delegation surfaces run
+`uv run doit agent_cmd --role=<role> --host=<host> [--cli=<target>]` and use its JSON result: a
+`subagent` (optionally with a model), `inline`, or a `cli` command. With no config the command is
+exactly the row above. The flags a model adds per CLI:
+
+| CLI | Model and effort flags added |
+| :--- | :--- |
+| `claude` | `--model <model>` |
+| `codex` | `-m <model> -c model_reasoning_effort=<effort>`, placed before the prompt |
+| `copilot` | `--model <model> --reasoning-effort <effort>` |
+| `agy` | `--model <model>` (no separate effort) |
+
+Whether a host's own subagent can run a chosen model:
+
+| Host | Subagent with a chosen model | Status |
+| :--- | :--- | :--- |
+| Claude Code | Agent tool `model` (`opus`, `sonnet`, `haiku`, `fable`) | verified mechanism |
+| Copilot | `task` tool `model`: the schema allowed only `auto`; a model passed outside it ran on another model. Per-agent models: the user's `subagents.agents.<agent-name>` setting (`/subagents`) | probed live in 1.0.105 (#1151): a configured model resolves to `cli` |
+| Codex | `spawn_agent` `model` and `reasoning_effort` with `fork_turns: "none"` (a full-history fork inherits the parent's and accepts no override) | verified live in 0.166.0 (#1151): a configured model or effort resolves to `subagent` |
+| agy | no subagent mechanism | `cli`, or inline in the session |
 
 ## Headless Codex host limits
 
@@ -308,6 +333,8 @@ Codex does not read `.claude/commands/`, `.copilot/commands/`, or `.github/skill
 | Codex CLI | Sequential | Nested agents not verified. |
 | GitHub Copilot CLI | Sequential | `--fleet`/`task` nesting not verified. |
 | Antigravity CLI | Sequential | No subagent flag found. |
+
+The run has two phases. In phase 1 each issue's agent stops after the commit and push, so no PR exists yet. In phase 2 the orchestrator itself opens the PRs one at a time, with no agent, rebasing each branch on `origin/main` first (a CI fix needing real code goes to an `implement-worker` subagent), so a PR never waits on a later rebase; the sequential hosts run both phases in the session.
 
 See [slash-commands.md](slash-commands.md#implement-issues-a-b) and [ADR-9028](../../decisions/9028-implement-issues-runs-issues-in-parallel-background-agents.md).
 

@@ -113,6 +113,10 @@ include them in actionable drift.
 - `LICENSE` — InfraFoundry ships its own license; never overwrite.
 - `README.template.md` — the README template for newly generated projects
   (#1169).
+- `.github/workflows/nightly-matrix.yml` — upstream's nightly all-OS CI run;
+  InfraFoundry CI is Linux-only per
+  [ADR-0001](../decisions/0001-linux-only-ci-testing.md), and `ci.yml` has no
+  `all_os` input to call (#1233).
 
 ## 2. Infrafoundry-specific files (upstream changes never apply)
 

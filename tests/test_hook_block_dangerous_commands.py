@@ -54,6 +54,93 @@ def _set_stdin(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
     monkeypatch.setattr(sys, "stdin", io.StringIO(payload))
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        # the delimiter word continues past the part a plain name covers
+        "cat <<E\\OF\nEOF\n(printenv)\nE",
+        "cat <<'E'\\OF\nEOF\nx=$(printenv)\nE",
+        "cat <<EOF\r\nEOF\n(printenv)\nEOF",
+        # a delimiter line split by a backslash-newline ends the body
+        "cat <<EOF\nEO\\\nF\n(printenv)",
+        # a default value in a parameter expansion is run
+        "echo ${x:-$(printenv)}",
+        "echo ${x:-`printenv`}",
+        'echo "${x:-$(printenv)}"',
+        'echo "${x:-`printenv`}"',
+        "echo ${x:-${y:-$(printenv)}}",
+        "cat <<EOF\n${x:-$(printenv)}\nEOF",
+        # quoted parts inside the expansion are read as the skipper reads them
+        'echo ${x:-"$(printenv)"}',
+        'echo ${x:-"\'"$(printenv)}',
+        'echo ${x:-"}"$(printenv)}',
+        "echo ${x:-$'}'$(printenv)}",
+        "echo ${x:-$'\\''$(printenv)}",
+        "echo ${x:-'}'$(printenv)}",
+        'echo "${x:-"}"$(printenv)}"',
+        'echo "${x:-\'}$(printenv)}"',
+    ],
+)
+def test_check_command_scans_lines_the_shell_runs_and_expansion_defaults(
+    hook: types.ModuleType, command: str
+) -> None:
+    """Lines outside a heredoc body and substitutions in ${...} are scanned."""
+    is_dangerous, _reason = hook.check_command(command)
+    assert is_dangerous
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cat <<'EOF'\nmentions $(printenv) here\nEOF",
+        "cat <<EOF\nplain text\nEOF\necho done",
+        "git commit -m \"$(cat <<'EOF'\nfix: a thing $(printenv)\n\nEOF\n)\"",
+        "echo ${VAR:-default}",
+        'echo "${VAR:-default}"',
+        "echo ${#arr[@]}",
+        "echo ${x:-'$(printenv)'}",
+        "echo ${x:-$(echo hi)}",
+    ],
+)
+def test_check_command_allows_well_formed_heredocs_and_plain_expansions(
+    hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    """A quoted heredoc body and a plain ${...} expansion stay allowed."""
+    monkeypatch.setattr(hook, "get_current_branch", lambda: "feature/test")
+    is_dangerous, reason = hook.check_command(command)
+    assert not is_dangerous, reason
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("echo ${x:-$(a)}", ["a"]),
+        ("echo ${x:-`a`}", ["a"]),
+        ('echo "${x:-$(a)} $(b)"', ["a", "b"]),
+        ("echo ${x:-${y:-$(a)}} $(b)", ["a", "b"]),
+        ("echo ${x:-'$(a)'}", []),
+        ("echo \"${x:-'$(a)'}\"", ["a"]),
+        ("echo ${x:-$((1+2))}", []),
+        ("echo ${#arr[@]}", []),
+        ('echo ${x:-"$(a)"}', ["a"]),
+        ('echo ${x:-"}"$(a)}', ["a"]),
+        ("echo ${x:-$'}'$(a)}", ["a"]),
+        ("echo ${x:-$'\\''$(a)}", ["a"]),
+        ("echo ${x:-$'$(a)'}", []),
+        ("echo ${x:-'}'$(a)}", ["a"]),
+        ('echo "${x:-"}"$(a)}"', ["a"]),
+        ("cat <<'E'\\OF\nEOF\nx=$(a)\nE", ["a"]),
+        ("cat <<E\\OF\nEOF\n(a)\nE", ["a"]),
+        ("cat <<EOF\nEO\\\nF\n(a)", ["a"]),
+    ],
+)
+def test_substitution_payloads_in_parameter_expansions(
+    hook: types.ModuleType, command: str, expected: list[str]
+) -> None:
+    """Bodies inside ${...} are collected; quoted and arithmetic text is not."""
+    assert hook._substitution_payloads(command) == expected
+
+
 def _bash_payload(command: str) -> str:
     """Build a Claude/Gemini/Codex Bash tool payload."""
     return json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
@@ -703,6 +790,12 @@ requires_posix_sh = pytest.mark.skipif(
 )
 
 
+requires_posix_paths = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the hook reads patch paths as POSIX paths",
+)
+
+
 def _run_launcher(
     payload: str, *, cwd: Path | None = None, script: Path | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -1039,6 +1132,118 @@ def test_write_target_that_cannot_be_protected_is_allowed(
     hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch, command: str
 ) -> None:
     assert _run(hook, monkeypatch, command) == 0
+
+
+# A write command's operands end at `;`, `&&`, `||`, `|` or an unquoted newline,
+# so a later command's expansion is not read as its destination (#1131)
+_WRITE_COMMAND_END_ALLOWED = [
+    'cp src/x.py tmp/tr.bak; out=$(true); echo "$out"',
+    'cp tmp/tr.bak src/x.py; rm tmp/tr.bak; out=$(true); echo "$out"',
+    'cp a b; echo "$x"',
+    'cp a b && echo "$x"',
+    'cp a b || echo "$x"',
+    'cp a b | cat "$x"',
+    'cp a b\nout=$(true); echo "$out"',
+    'cp a b\necho "$x"',
+    'cp a b\n\necho "$x"',
+    '\ncp a b\necho "$x"\n',
+    'mv a b; echo "$x"',
+    'mv a b\necho "$x"',
+    'mv a b && echo "$x"',
+    'install a b; echo "$x"',
+    'install a b || echo "$x"',
+    'rsync a b; echo "$x"',
+    'rsync a b\necho "$x"',
+    'ln a b; echo "$x"',
+    'ln a b && echo "$x"',
+    'dd if=a of=b; echo "$x"',
+    'dd if=a of=b\necho "$x"',
+    'dd if=a of=b || echo "$x"',
+    'cp a b ; out=$(true); echo "$out"',
+]
+
+_WRITE_COMMAND_END_BLOCKED = [
+    "cp a $f",
+    "cp a b; cp a $f",
+    "cp a b && cp a $f",
+    "cp a b || cp a $f",
+    "cp a b;cp a $f",
+    "cp a b\ncp a $f",
+    "cp a b\ncp a .envrc.loca?",
+    "cp a b; cp c .bashrc",
+    "cp a b;cp c ~/.bash*",
+    'cp a "$f"',
+    "cp a $(echo b) $f",
+    "cp a $(true; echo x) $f",
+    "echo $(cp a $f)",
+    "cp a ';' $f",
+    "cp a 'b;' $f",
+    'cp a "b\nc" $f',
+    "echo hi\necho x >> .envrc.local",
+    "echo hi\ncp a $f",
+    "mv a $f",
+    "mv a b\nmv a $f",
+    "mv a b; mv a $f",
+    "install a $f",
+    "install a b; install a $f",
+    "rsync a b; rsync a $f",
+    "ln a b; ln a $f",
+    "dd if=a of=$f",
+    "dd if=a of=b; dd if=a of=$f",
+    "dd if=a of=b\ndd if=a of=$f",
+    # the allowed `.envrc.local` copy is the whole command or nothing
+    "echo x > .envrc.local.example\ncp .envrc.local.example .envrc.local",
+    "cp .envrc.local.example .envrc.local\necho x",
+    "cp .envrc.local.example .envrc.local; echo x",
+    # a command the tokens cannot be read for keeps the wider scan
+    "cp a $(true; echo) $f ; ((1))",
+    "cp a $(true; echo) $f\ncat <<EOF\nx\nEOF",
+]
+
+
+@pytest.mark.parametrize("command", _WRITE_COMMAND_END_ALLOWED)
+def test_later_command_expansion_is_not_a_write_destination(
+    hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    assert _run(hook, monkeypatch, command) == 0
+
+
+@pytest.mark.parametrize("command", _WRITE_COMMAND_END_BLOCKED)
+def test_expansion_in_a_write_commands_own_operands_is_blocked(
+    hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    assert _run(hook, monkeypatch, command) == 2
+
+
+def test_documented_envrc_copy_is_still_allowed_alone(
+    hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert _run(hook, monkeypatch, "cp .envrc.local.example .envrc.local") == 0
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("a\nb", "a ; b"),
+        ("\na\nb\n", "a ; b"),
+        ("a\n\nb", "a ;  ; b"),
+        ("a b", "a b"),
+        ("\na b\n", "a b"),
+        ('echo "a\nb"\nc', 'echo "a\nb" ; c'),
+        ("echo 'a\nb'\nc", "echo 'a\nb' ; c"),
+        ("echo $(a\nb)\nc", "echo $(a\nb) ; c"),
+        ("echo `a\nb`\nc", "echo `a\nb` ; c"),
+        ("echo a\\\nb\nc", "echo a\\\nb\nc"),
+        ("echo a\\\nb", "echo a\\\nb"),
+        ("echo 'a\nb", "echo 'a\nb"),
+        ("echo $(a\nb", "echo $(a\nb"),
+        ("cat <<EOF\nx\nEOF", "cat <<EOF\nx\nEOF"),
+        ("a # c\nb", "a # c\nb"),
+        ("cat <<< x\nb", "cat <<< x ; b"),
+    ],
+)
+def test_newlines_as_separators(hook: types.ModuleType, text: str, expected: str) -> None:
+    assert hook._newlines_as_separators(text) == expected
 
 
 # A redirect after `git checkout`/`git restore` is no checkout argument (#1088)
@@ -1911,6 +2116,346 @@ def _assert_patch_allows(hook: types.ModuleType, command: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "template",
+    [
+        "git -C .config/fish apply {p}",
+        "git -C.config/fish apply {p}",
+        "git --work-tree=.config/fish apply {p}",
+        "git --work-tree .config/fish apply {p}",
+        "GIT_WORK_TREE=.config/fish git apply {p}",
+        "env GIT_WORK_TREE=.config/fish git apply {p}",
+        "git --git-dir=.git --work-tree=.config/fish apply {p}",
+        "git --git-dir .git --work-tree /repo/.config/fish apply {p}",
+        "GIT_WORK_TREE=/x git --work-tree=.config/fish apply {p}",
+        "git -C /repo --work-tree=.config/fish apply {p}",
+    ],
+)
+def test_git_apply_work_tree_protected_target_blocks(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    """A bare ``config.fish`` is protected only under the moved work tree (#1133)."""
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    _assert_patch_blocks(hook, template.format(p=(patch_dir / "wt.patch").as_posix()))
+
+
+@requires_posix_paths
+@pytest.mark.parametrize(
+    "template",
+    [
+        "git -C docs apply {p}",
+        "git --work-tree=docs apply {p}",
+        "git --work-tree docs apply {p}",
+        "GIT_WORK_TREE=docs git apply {p}",
+        "git --git-dir=.git --work-tree=docs apply {p}",
+        "GIT_WORK_TREE=.config/fish git --work-tree=docs apply {p}",
+    ],
+)
+def test_git_apply_work_tree_unprotected_target_allows(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    _assert_patch_allows(hook, template.format(p=(patch_dir / "wt.patch").as_posix()))
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "git --work-tree=$TREE apply {p}",
+        "git --work-tree $TREE apply {p}",
+        "git -C $TREE apply {p}",
+        "git --work-tree= apply {p}",
+        "GIT_WORK_TREE=$TREE git apply {p}",
+        "GIT_WORK_TREE= git apply {p}",
+        "export GIT_WORK_TREE=$TREE; git apply {p}",
+        "printf -v GIT_WORK_TREE .config/fish; git apply {p}",
+    ],
+)
+def test_git_apply_unresolvable_work_tree_blocks(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    """A work tree the hook cannot spell out stands in as an unknown write."""
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    command = template.format(p=(patch_dir / "wt.patch").as_posix())
+    tokens = hook.tokenize(command)
+    git_idx = tokens.index("git")
+    assert hook._git_patch_targets(tokens, git_idx, read_files=True) == [_PATCH_STAND_IN]
+
+
+_COVERED_VALUE_OPTIONS = ["--attr-source", "--exec-path", "--namespace", "--super-prefix"]
+
+
+def _wt_targets(hook: types.ModuleType, command: str) -> list[str]:
+    tokens = hook.tokenize(command)
+    targets: list[str] = hook._git_patch_targets(tokens, tokens.index("git"), read_files=True)
+    return targets
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "git --work-tree=fish -C .config apply {p}",
+        "git --work-tree fish -C .config apply {p}",
+        "GIT_WORK_TREE=fish git -C .config apply {p}",
+        "git -C ./.config/./fish apply {p}",
+        "git -C docs -C /repo/.config/fish apply {p}",
+        "git --git-dir=.git --work-tree=.config/fish -c core.worktree=docs apply {p}",
+        "git -ccore.worktree=docs --work-tree=.config/fish apply {p}",
+        "GIT_DIR=.git GIT_WORK_TREE=.config/fish git apply {p}",
+    ],
+)
+def test_git_apply_work_tree_order_and_dots_block(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    """``-C`` applies wherever it stands; ``.`` segments are folded (#1133)."""
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    _assert_patch_blocks(hook, template.format(p=(patch_dir / "wt.patch").as_posix()))
+
+
+@requires_posix_paths
+@pytest.mark.parametrize(
+    "template",
+    [
+        "git --work-tree=fish -C docs apply {p}",
+        "git -C docs --work-tree=fish apply {p}",
+        "git -C .config/fish -C /repo/docs apply {p}",
+        "git -C ./docs/./ apply {p}",
+        "git --work-tree=./docs apply {p}",
+    ],
+)
+def test_git_apply_work_tree_order_and_dots_allow(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    _assert_patch_allows(hook, template.format(p=(patch_dir / "wt.patch").as_posix()))
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "git -C .. apply {p}",
+        "git -C docs/.. apply {p}",
+        "git -C docs/../.. apply {p}",
+        "git -C ../docs apply {p}",
+        "git -C docs -C .. apply {p}",
+        "git -C .config/fish/.. apply {p}",
+        "git -C '..\\docs' apply {p}",
+        "git --work-tree=.. apply {p}",
+        "git --work-tree=../x apply {p}",
+        "git --work-tree=.config/../docs apply {p}",
+        "git --work-tree ../docs apply {p}",
+        "git -C docs --work-tree=../../x apply {p}",
+        "GIT_WORK_TREE=../x git apply {p}",
+        "GIT_WORK_TREE=.config/../docs git apply {p}",
+        "env GIT_WORK_TREE=.. git apply {p}",
+        "git --work-tree=docs apply --directory=../x {p}",
+        "git apply --directory=../x {p}",
+        "git apply --directory ../x {p}",
+        "git apply --directory=docs/../x {p}",
+        "git apply --directory='docs\\..\\x' {p}",
+    ],
+)
+def test_git_apply_dotdot_segment_fails_closed(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    """A ``..`` segment in a root the hook would have to fold is never resolved."""
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    command = template.format(p=(patch_dir / "wt.patch").as_posix())
+    assert _wt_targets(hook, command) == [_PATCH_STAND_IN], command
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "git -C ... apply {p}",
+        "git -C ..docs apply {p}",
+        "git --work-tree=docs.. apply {p}",
+        "git apply --directory=..docs {p}",
+    ],
+)
+def test_git_apply_dotdot_lookalike_is_not_a_segment(hook: types.ModuleType, template: str) -> None:
+    tokens = hook.tokenize(template.format(p="x.patch"))
+    assert hook._git_work_tree_root(tokens, 0, tokens.index("apply"))[1] is False
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "git --git-dir=.git apply {p}",
+        "git --git-dir .git apply {p}",
+        "GIT_DIR=.git git apply {p}",
+        "env GIT_DIR=.git git apply {p}",
+        "GIT_COMMON_DIR=.git git apply {p}",
+        "env GIT_COMMON_DIR=.git git apply {p}",
+        "GIT_CEILING_DIRECTORIES=/repo git apply {p}",
+        "env GIT_CEILING_DIRECTORIES=/repo git apply {p}",
+        "GIT_DISCOVERY_ACROSS_FILESYSTEM=1 git apply {p}",
+        "env GIT_DISCOVERY_ACROSS_FILESYSTEM=1 git apply {p}",
+        "GIT_INDEX_FILE=x git apply {p}",
+        "git -c core.worktree=.config/fish apply {p}",
+        "git -ccore.worktree=.config/fish apply {p}",
+        "git -c core.worktree=docs apply {p}",
+        "git -c user.name=x apply {p}",
+        "git --config-env=core.worktree=WT apply {p}",
+        "git --config-env core.worktree=WT apply {p}",
+        "git -c include.path=x apply {p}",
+        "GIT_CONFIG_COUNT=1 git apply {p}",
+        "GIT_CONFIG_PARAMETERS='core.worktree=x' git apply {p}",
+        "GIT_CONFIG_GLOBAL=x GIT_CONFIG_KEY_0=core.worktree git apply {p}",
+        "git -C docs --git-dir=.git apply {p}",
+        "printf -v GIT_COMMON_DIR %s x; git apply {p}",
+    ],
+)
+def test_git_apply_git_env_or_config_may_move_work_tree_blocks(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    """Any ``GIT_*`` word or config option may move the work tree (#1133)."""
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    command = template.format(p=(patch_dir / "wt.patch").as_posix())
+    assert _wt_targets(hook, command) == [_PATCH_STAND_IN], command
+
+
+@requires_posix_paths
+@pytest.mark.parametrize(
+    "template",
+    [
+        "git -c core.worktree=.config/fish --work-tree=docs apply {p}",
+        "git --git-dir=.git --work-tree=docs apply {p}",
+        "GIT_DIR=.git git --work-tree=docs apply {p}",
+        "GIT_DIR=.git GIT_WORK_TREE=docs git apply {p}",
+        "GIT_COMMON_DIR=.git GIT_WORK_TREE=docs git apply {p}",
+        "GIT_CEILING_DIRECTORIES=/repo git --work-tree=docs apply {p}",
+        "GIT_DISCOVERY_ACROSS_FILESYSTEM=1 GIT_WORK_TREE=docs git apply {p}",
+        "env GIT_CEILING_DIRECTORIES=/repo GIT_WORK_TREE=docs git apply {p}",
+        "GIT_CONFIG_COUNT=1 git --work-tree=docs apply {p}",
+        "git --config-env=core.worktree=WT --work-tree=docs apply {p}",
+        "git -c user.name=x --work-tree=docs apply {p}",
+    ],
+)
+def test_git_apply_literal_work_tree_overrides_config(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    _assert_patch_allows(hook, template.format(p=(patch_dir / "wt.patch").as_posix()))
+
+
+def _root(hook: types.ModuleType, command: str) -> tuple[str | None, bool]:
+    tokens = hook.tokenize(command)
+    result: tuple[str | None, bool] = hook._git_work_tree_root(
+        tokens, tokens.index("git"), tokens.index("apply")
+    )
+    return result
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cd sub && git apply p",
+        "cd sub; git -C docs apply p",
+        "cd sub && git --work-tree=docs apply p",
+        "pushd sub; git apply p",
+        "popd; git apply p",
+        "env -C sub git apply p",
+        "env -Csub git apply p",
+        "env --chdir=sub git apply p",
+        "cd /repo/sub && git -c user.name=x --work-tree=docs apply p",
+    ],
+)
+def test_git_apply_cwd_moved_before_git_is_unresolvable(
+    hook: types.ModuleType, command: str
+) -> None:
+    """A relative root has no meaning once the shell has changed directory."""
+    assert _root(hook, command) == (None, True), command
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("cd sub && git -C /repo apply p", "/repo"),
+        ("cd sub && git -C /repo -C docs apply p", "/repo/docs"),
+        ("cd sub && git --work-tree=/repo/docs apply p", "/repo/docs"),
+        ("cd sub && git --work-tree /repo/docs apply p", "/repo/docs"),
+        ("cd sub && GIT_WORK_TREE=/repo/docs git apply p", "/repo/docs"),
+        ("env -C sub git -C /repo/./docs apply p", "/repo/docs"),
+        ("cd sub && git -C /repo --work-tree=docs apply p", "/repo/docs"),
+    ],
+)
+def test_git_apply_absolute_root_resets_moved_cwd(
+    hook: types.ModuleType, command: str, expected: str
+) -> None:
+    assert _root(hook, command) == (expected, False), command
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git apply p",
+        "git -C docs apply p",
+        "git --work-tree=docs apply p",
+        "GIT_WORK_TREE=docs git apply p",
+        "git -C ./docs apply p",
+    ],
+)
+def test_git_apply_cwd_not_moved_stays_resolvable(hook: types.ModuleType, command: str) -> None:
+    assert _root(hook, command)[1] is False, command
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "cd sub && git apply {p}",
+        "cd sub && git -C docs apply {p}",
+        "env -C sub git apply {p}",
+    ],
+)
+def test_git_apply_cwd_moved_blocks(hook: types.ModuleType, patch_dir: Path, template: str) -> None:
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    _assert_patch_blocks(hook, template.format(p=(patch_dir / "wt.patch").as_posix()))
+
+
+def _value_options(hook: types.ModuleType) -> list[str]:
+    return sorted(hook._GIT_GLOBAL_OPTS_WITH_VALUE - {"-C", "-c", "--work-tree"})
+
+
+_VALUE_OPTION_COMMANDS = (
+    "git {option} VALUE {prefix} apply {p}",
+    "git {prefix} {option} VALUE apply {p}",
+    "git {option}=VALUE {prefix} apply {p}",
+)
+
+
+@pytest.mark.parametrize("option", _COVERED_VALUE_OPTIONS)
+@pytest.mark.parametrize(
+    "prefix", ["-C .config/fish", "--work-tree=.config/fish", "--work-tree .config/fish"]
+)
+def test_git_apply_work_tree_after_value_taking_option_blocks(
+    hook: types.ModuleType, patch_dir: Path, option: str, prefix: str
+) -> None:
+    """A value-taking global option before the subcommand never hides the tree."""
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    p = (patch_dir / "wt.patch").as_posix()
+    for template in _VALUE_OPTION_COMMANDS:
+        _assert_patch_blocks(hook, template.format(option=option, prefix=prefix, p=p))
+
+
+@requires_posix_paths
+@pytest.mark.parametrize("option", _COVERED_VALUE_OPTIONS)
+@pytest.mark.parametrize("prefix", ["-C docs", "--work-tree=docs"])
+def test_git_apply_work_tree_after_value_taking_option_allows(
+    hook: types.ModuleType, patch_dir: Path, option: str, prefix: str
+) -> None:
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    p = (patch_dir / "wt.patch").as_posix()
+    for template in _VALUE_OPTION_COMMANDS:
+        _assert_patch_allows(hook, template.format(option=option, prefix=prefix, p=p))
+
+
+def test_git_apply_value_option_list_is_covered(hook: types.ModuleType) -> None:
+    """Every value-taking global option has a case above or in its own test."""
+    own_tests = {"-C", "-c", "--work-tree", "--git-dir", "--config-env", "--list-cmds"}
+    assert sorted(hook._GIT_GLOBAL_OPTS_WITH_VALUE - own_tests) == _COVERED_VALUE_OPTIONS
+
+
+@pytest.mark.parametrize(
     ("data", "expected"),
     [
         (_unified("src/a.py"), {"a/src/a.py", "b/src/a.py"}),
@@ -2320,3 +2865,345 @@ def test_patch_backup_naming_inherited_by_the_hook_is_unresolvable(
     assert hook.check_command("patch -p1 -i ok.patch")[0]
     monkeypatch.delenv(name)
     assert not hook.check_command("patch -p1 -i ok.patch")[0]
+
+
+# --- command word normalised once (#1132) ---
+
+_QUALIFIED_RULES = [
+    "git push --force origin main",
+    "git push origin HEAD:main",
+    "git push origin --delete main",
+    "git branch -D main",
+    "gh pr create --title x",
+    "gh pr merge 1",
+    "gh issue create --title x",
+    "uv add requests",
+    "doit release",
+    "gh pr edit 1 --add-label ready-to-merge",
+    "git merge feature/x",
+    "printenv",
+    "env",
+    "cat ~/.netrc",
+    "sudo rm file",
+    "rm -rf /",
+    "git apply bad.patch",
+    "git am bad.patch",
+    "patch -p1 -i bad.patch",
+    "git checkout -- .envrc.local.example",
+    'bash -c "gh pr merge 1"',
+]
+
+
+def _qualify(command: str, hook: types.ModuleType) -> str:
+    """Rewrite each rule-keyed command word in *command* to a path-qualified form."""
+    out = []
+    for word in command.split(" "):
+        if word in hook._RULE_COMMAND_WORDS:
+            word = f"/usr/bin/{word}"
+        out.append(word)
+    return " ".join(out)
+
+
+@pytest.mark.parametrize("command", _QUALIFIED_RULES)
+def test_path_qualified_command_word_gets_the_bare_result(
+    hook: types.ModuleType,
+    patch_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+) -> None:
+    monkeypatch.setattr(hook, "get_current_branch", lambda: "main")
+    monkeypatch.delenv("ALLOW_AI_READY_TO_MERGE", raising=False)
+    qualified = _qualify(command, hook)
+    assert qualified != command
+    assert hook.check_command(command)[0], command
+    assert hook.check_command(qualified) == hook.check_command(command)
+
+
+@pytest.mark.parametrize(
+    ("tokens", "expected"),
+    [
+        (["/usr/bin/git", "status"], ["git", "status"]),
+        (["true", "&&", "./bin/gh", "pr"], ["true", "&&", "gh", "pr"]),
+        (["FOO=1", "/usr/bin/git", "push"], ["FOO=1", "git", "push"]),
+        (["sudo", "-n", "/usr/bin/rm", "x"], ["sudo", "-n", "rm", "x"]),
+        (["timeout", "5", "/usr/bin/git"], ["timeout", "5", "git"]),
+        (["then", "/usr/bin/git"], ["then", "git"]),
+        # Not command words, options and redirects.
+        (["cat", "src/foo.py", "/opt/tool"], ["cat", "src/foo.py", "/opt/tool"]),
+        (
+            ["cat", "--x=/usr/bin/git", ">/usr/bin/git"],
+            ["cat", "--x=/usr/bin/git", ">/usr/bin/git"],
+        ),
+    ],
+)
+def test_normalise_command_words_reduces_rule_words(
+    hook: types.ModuleType, tokens: list[str], expected: list[str]
+) -> None:
+    assert hook._normalise_command_words(tokens) == expected
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "if true; then ",
+        "! ",
+        "{ ",
+        "( ",
+        "$( ",
+        "nohup ",
+        "time ",
+        "exec ",
+        "xargs ",
+        "doas ",
+        "stdbuf -o0 ",
+        "timeout 5 ",
+        "timeout -s KILL 5 ",
+        "true\n",
+        "echo x > out; ",
+    ],
+)
+def test_path_qualified_rule_word_after_a_keyword_or_wrapper_is_blocked(
+    hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch, prefix: str
+) -> None:
+    monkeypatch.setattr(hook, "get_current_branch", lambda: "main")
+    for rule in ("git push origin main", "gh pr merge 1"):
+        bare = f"{prefix}{rule}"
+        assert hook.check_command(bare)[0], bare
+        qualified = bare.replace(rule.split()[0], f"/usr/bin/{rule.split()[0]}", 1)
+        assert hook.check_command(qualified)[0], qualified
+
+
+def test_operand_path_ending_in_a_command_word_keeps_its_path(
+    hook: types.ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A patch file or write target named like a command is still that path."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "dir").mkdir()
+    (tmp_path / "dir" / "git").write_bytes(_unified("src/foo.py"))
+    (tmp_path / "dir" / "patch").write_bytes(_unified(".bashrc"))
+    monkeypatch.setattr(hook, "get_current_branch", lambda: "feature/test")
+    # A harmless patch file named `git` is read from dir/git, not from `git`.
+    assert hook.check_command("patch -p1 -i dir/git") == (False, "")
+    assert hook.check_command("git apply dir/git") == (False, "")
+    # A protected patch file named `patch` is still read from dir/patch.
+    assert hook.check_command("patch -p1 -i dir/patch")[0]
+    assert hook.check_command("git apply dir/patch")[0]
+    # A redirect target named like a command is not rewritten.
+    assert hook.check_command("echo x > dir/git") == (False, "")
+    assert hook.check_command("cat dir/git") == (False, "")
+
+
+@pytest.mark.parametrize(
+    "command", ["/usr/bin/git status", "/usr/bin/gh pr view 1", "/bin/cat README.md"]
+)
+def test_path_qualified_safe_commands_stay_allowed(
+    hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    monkeypatch.setattr(hook, "get_current_branch", lambda: "feature/test")
+    assert hook.check_command(command) == (False, "")
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "cd x; git -C /abs --work-tree=rel apply {p}",
+        "cd x; git --work-tree=rel -C /abs apply {p}",
+        "cd x; git --work-tree=/abs -C rel apply {p}",
+        "cd x; git -C rel --work-tree=/abs apply {p}",
+        "env -C x git -C rel --work-tree=rel2 apply {p}",
+        "cd x; GIT_WORK_TREE=/abs git -C rel apply {p}",
+        "cd x; GIT_WORK_TREE=rel git -C /abs apply {p}",
+        "cd x; git --work-tree=~/rel apply {p}",
+    ],
+)
+def test_git_apply_moved_cwd_relative_final_root_blocks(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    """The final root decides, not an earlier absolute option (#1133)."""
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    command = template.format(p=(patch_dir / "wt.patch").as_posix())
+    assert _wt_targets(hook, command) == [_PATCH_STAND_IN], command
+
+
+@requires_posix_paths
+@pytest.mark.parametrize(
+    "template",
+    [
+        "env -C x git -C rel --work-tree=/abs/docs apply {p}",
+        "env -C x git --work-tree=rel -C /abs/docs apply {p}",
+        "env -C x git -C /abs --work-tree=docs apply {p}",
+        "env -C x git --work-tree=docs -C /abs apply {p}",
+    ],
+)
+def test_git_apply_moved_cwd_absolute_final_root_allows(
+    hook: types.ModuleType, patch_dir: Path, template: str
+) -> None:
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    _assert_patch_allows(hook, template.format(p=(patch_dir / "wt.patch").as_posix()))
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "sudo -D x git apply {p}",
+        "sudo --chdir=x git apply {p}",
+        "nsenter -w x git apply {p}",
+        "unshare --wd=x git apply {p}",
+        "chroot x git apply {p}",
+        "env -i git apply {p}",
+        "doas -u u git apply {p}",
+    ],
+)
+def test_wrapper_options_may_move_cwd(hook: types.ModuleType, command: str) -> None:
+    tokens = hook.tokenize(command.format(p="x.patch"))
+    assert hook._cwd_moved(tokens, tokens.index("git")) is True
+
+
+@pytest.mark.parametrize(
+    "command", ["sudo git apply {p}", "env VAR=1 git apply {p}", "git apply {p}"]
+)
+def test_bare_wrapper_does_not_move_cwd(hook: types.ModuleType, command: str) -> None:
+    tokens = hook.tokenize(command.format(p="x.patch"))
+    assert hook._cwd_moved(tokens, tokens.index("git")) is False
+
+
+@pytest.mark.parametrize("command", ["sudo -D x git apply {p}", "env -i git apply {p}"])
+def test_wrapper_options_make_patch_target_unresolvable(
+    hook: types.ModuleType, patch_dir: Path, command: str
+) -> None:
+    (patch_dir / "wt.patch").write_bytes(_unified("config.fish"))
+    p = (patch_dir / "wt.patch").as_posix()
+    assert _wt_targets(hook, command.format(p=p)) == [_PATCH_STAND_IN]
+
+
+@pytest.mark.parametrize("operator", ["'>'", "'>>'", '">"', "\\>", "$'>'"])
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "git restore --source=HEAD~1",
+        "git restore -s HEAD~1",
+        "git checkout HEAD~1 --",
+        "git checkout HEAD~1",
+    ],
+)
+def test_quoted_operator_word_does_not_swallow_broad_pathspec(
+    hook: types.ModuleType, prefix: str, operator: str
+) -> None:
+    # the tokens lost the quoting, so a quoted `>` read as a redirect hid the `.` (#1134)
+    assert hook.check_command(f"{prefix} {operator} .")[0] is True
+
+
+@pytest.mark.parametrize(
+    ("command", "blocked"),
+    [
+        ("git restore --source=HEAD~1 . > out", True),
+        ("git checkout . > /dev/null", False),
+        ("git restore . > out", False),
+        ("git restore --source=HEAD~1 f.txt > out.txt", False),
+    ],
+)
+def test_unquoted_redirects_keep_their_behaviour(
+    hook: types.ModuleType, command: str, blocked: bool
+) -> None:
+    assert hook.check_command(command)[0] is blocked
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("git restore '>' .", True),
+        ('git restore ">>" .', True),
+        ("git restore \\> .", True),
+        ("git restore > out", False),
+        ("git restore 'a>' .", False),
+        ("git restore . ; echo", False),
+        ("echo 'unclosed", False),
+    ],
+)
+def test_has_quoted_redirect_word(hook: types.ModuleType, command: str, expected: bool) -> None:
+    assert hook._has_quoted_redirect_word(command) is expected
+
+
+@pytest.mark.parametrize(
+    ("tokens", "expected"),
+    [
+        (["if", "true", ";", "then", "printenv", ";", "fi"], [0, 1, 3, 4, 6]),
+        (["!", "printenv"], [0, 1]),
+        (["time", "-p", "env"], [0, 1, 2]),
+        (["while", "true", ";", "do", "env", ";", "done"], [0, 1, 3, 4, 6]),
+        (["echo", "then", "printenv"], [0]),
+        (["echo", "if", "x"], [0]),
+    ],
+)
+def test_command_start_indices_follow_keywords(
+    hook: types.ModuleType, tokens: list[str], expected: list[int]
+) -> None:
+    """A reserved word at a command start makes the next token a start."""
+    assert hook._command_start_indices(tokens) == expected
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("x=$(printenv)", ["printenv"]),
+        ("x=`printenv`", ["printenv"]),
+        ('echo "$(printenv) $(env)"', ["printenv", "env"]),
+        ("diff <(a) >(b)", ["a", "b"]),
+        ("(printenv)", ["printenv"]),
+        ("true && (env)", ["env"]),
+        ("x=$(echo $(printenv))", ["echo $(printenv)"]),
+        ("echo '$(printenv)'", []),
+        ("echo $'$(printenv)'", []),
+        ('echo "\\$(printenv)"', []),
+        ("echo $((1 + 2))", []),
+        ("arr=(printenv)", []),
+        ("f() { :; }", []),
+        ("echo $(printenv", []),
+        ("x=$(a) $(b", ["a"]),
+        ("then(a)", ["a"]),
+        ("do(a)", ["a"]),
+        ("else(a)", ["a"]),
+        ("{(a); }", ["a"]),
+        ("!(a)", ["a"]),
+        ("f(){ :; }", []),
+        ("x+=(a)", []),
+        ("x=(a)", []),
+        ("x=$(cat <<EOF\nEOF\n) $(b)", ["b"]),
+        ("echo \"$(cat <<'EOF'\nbody $(a)\nEOF\n)\" $(b)", ["b"]),
+        ("cat <<EOF\nv $(a) `b`\nEOF", ["a", "b"]),
+        ("cat <<'EOF'\nv $(a)\nEOF", []),
+        ("cat <<-EOF\n\tv $(a)\n\tEOF\n$(b)", ["a", "b"]),
+        ("cat <<EOF\nv \\$(a)\nEOF", []),
+        ("cat <<< $(a)", ["a"]),
+    ],
+)
+def test_substitution_payloads(hook: types.ModuleType, command: str, expected: list[str]) -> None:
+    """Bodies of substitutions and subshells are returned; quoted text is not."""
+    assert hook._substitution_payloads(command) == expected
+
+
+def test_all_substitution_payloads_follows_nesting(hook: types.ModuleType) -> None:
+    """Nested bodies are all returned, whatever the depth."""
+    command = "echo $(a $(b $(c $(d $(e)))))"
+    assert hook._all_substitution_payloads(command) == [
+        "a $(b $(c $(d $(e))))",
+        "b $(c $(d $(e)))",
+        "c $(d $(e))",
+        "d $(e)",
+        "e",
+    ]
+
+
+def test_all_substitution_payloads_reads_unquoted_heredoc_bodies(hook: types.ModuleType) -> None:
+    """An unquoted-delimiter heredoc body is read; a quoted one is not."""
+    assert hook._all_substitution_payloads("cat <<EOF\n$(a $(b))\nEOF") == ["a $(b)", "b"]
+    assert hook._all_substitution_payloads("cat <<'EOF'\n$(a)\nEOF") == []
+
+
+def test_all_substitution_payloads_gives_up_past_the_limit(hook: types.ModuleType) -> None:
+    """Too many bodies are reported as unreadable, and the command is blocked."""
+    command = " ".join(f"$(x{n})" for n in range(hook._MAX_SUBSTITUTION_PAYLOADS + 1))
+    assert hook._all_substitution_payloads(command) is None
+    is_dangerous, reason = hook.check_command(command)
+    assert is_dangerous
+    assert "too deeply" in reason

@@ -123,6 +123,8 @@ def test_step_3_states_the_host_writes_condition_and_the_review() -> None:
     assert "findings comment" in step3
     assert "cites" in step3
     assert "Plan-review brief" in step3
+    assert "second review" in step3
+    assert "changed the plan's design" in step3
 
 
 def test_planner_brief_treats_passed_findings_as_settled() -> None:
@@ -132,9 +134,72 @@ def test_planner_brief_treats_passed_findings_as_settled() -> None:
     assert "contradicts" in planner or "any the code contradicts" in planner
 
 
-def test_plan_review_brief_reads_only_named_files_and_does_not_probe() -> None:
+def test_planner_brief_plan_shape_carries_code_locations() -> None:
+    planner = _section(_skill_text(), "## Planner brief", "## Plan-review brief")
+    for token in (
+        "Base commit:",
+        "Symbols:",
+        "Pattern:",
+        "Tests:",
+        "### Test Commands",
+        "## Implementation Plan for #<n>: <title>",
+        "### Files to Create/Modify",
+    ):
+        assert token in planner
+
+
+def test_planner_brief_treats_line_ranges_as_hints() -> None:
+    planner = _section(_skill_text(), "## Planner brief", "## Plan-review brief")
+    assert "The symbol is the pointer; line ranges are hints" in planner
+
+
+def test_coder_brief_reads_from_the_plan_locations() -> None:
+    coder = _section(_skill_text(), "## Coder brief", "## Per-host subagent notes")
+    assert "named symbols and ranges, not whole files" in coder
+    assert "base commit differs from `HEAD`" in coder
+    assert "each read outside its pointers" in coder
+
+
+def test_implement_worker_starts_from_the_plan_locations() -> None:
+    text = IMPLEMENT_WORKER.read_text(encoding="utf-8")
+    assert "named symbols" in text
+    assert "deviation" in text
+
+
+def test_coder_brief_summary_has_checks_run_and_reads_fields() -> None:
+    coder = _section(_skill_text(), "## Coder brief", "## Per-host subagent notes")
+    assert "**Checks run**" in coder
+    assert "**Reads beyond the plan's pointers**" in coder
+    assert "marked run or skipped with a reason" in coder
+    assert "each marked as a deviation" in coder
+
+
+def test_step_5_reads_the_coders_two_summary_fields() -> None:
+    step5 = _section(_skill_text(), "### Step 5", "### Step 6")
+    assert "**Checks run**" in step5
+    assert "**Reads beyond the plan's pointers**" in step5
+    assert "unmet" in step5
+    assert "Step 8 reports" in step5
+
+
+def test_step_8_reports_the_coders_field_deviations() -> None:
+    step8 = _section(_skill_text(), "### Step 8", "## Ask-first triggers")
+    assert "**Checks run**" in step8
+    assert "**Reads beyond the plan's pointers**" in step8
+
+
+def test_implement_worker_returns_the_two_summary_fields() -> None:
+    text = IMPLEMENT_WORKER.read_text(encoding="utf-8")
+    assert "**Checks run**" in text
+    assert "**Reads beyond the plan's pointers**" in text
+
+
+def test_plan_review_brief_reads_the_plan_pointers_within_a_budget() -> None:
     review = _section(_skill_text(), "## Plan-review brief", "## Coder brief")
-    assert "the files the plan names" in review
+    assert "Symbols:" in review
+    assert "whole file only when the plan rewrites most of it" in review
+    assert "about 15 tool calls" in review
+    assert "direct callers" in review
     assert "do not probe" in review
     assert "NO ISSUES" in review
     assert "worktree root" in review

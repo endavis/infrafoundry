@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -600,7 +601,7 @@ def test_template_update_check_is_wired_for_session_start() -> None:
 
     Copilot is deliberately not wired separately: probe showed it runs the Claude-format
     SessionStart hook in `.claude/settings.json`, so its own entry would print twice.
-    Codex stays commented out because its probe could not run.
+    Codex is wired with its own SessionStart block (#1149).
     """
     script = "template-update-check.py"
     assert (REPO_ROOT / "tools" / "hooks" / "ai" / script).exists()
@@ -610,7 +611,7 @@ def test_template_update_check_is_wired_for_session_start() -> None:
         entries = claude["hooks"]["SessionStart"]
         commands = [h["command"] for e in entries for h in e["hooks"]]
         assert any(script in c and "--host=claude" in c for c in commands)
-        assert all(e.get("matcher") == "startup" for e in entries if script in str(e))
+        assert all(e.get("matcher") == "startup|resume" for e in entries if script in str(e))
 
     if agent_is_present("antigravity"):
         agy = json.loads((REPO_ROOT / ".agents" / "hooks.json").read_text(encoding="utf-8"))
@@ -630,8 +631,9 @@ def test_template_update_check_is_wired_for_session_start() -> None:
         )
 
     if agent_is_present("codex"):
-        config = (REPO_ROOT / ".codex" / "config.toml").read_text(encoding="utf-8")
-        assert "[[hooks.SessionStart]]" not in config.replace("# [[hooks.SessionStart]]", ""), (
-            "Codex SessionStart is unverified; keep the block commented out until probed"
-        )
-        assert script in config
+        codex = tomllib.loads((REPO_ROOT / ".codex" / "config.toml").read_text(encoding="utf-8"))
+        groups = codex["hooks"]["SessionStart"]
+        wired = [g for g in groups if any(script in h["command"] for h in g["hooks"])]
+        assert wired, "Codex SessionStart must run the template update check"
+        assert all(g["matcher"] == "^(startup|resume)$" for g in wired)
+        assert any("--host=codex" in h["command"] for g in wired for h in g["hooks"])

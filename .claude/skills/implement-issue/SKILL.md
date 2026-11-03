@@ -85,7 +85,20 @@ issue (or posts one together with the plan) and the plan cites that comment. "Th
 clear" does not qualify. The plan uses the Planner brief's exact shape. Before posting it, run the
 **Plan-review brief** below on the draft, in a subagent or through another agent CLI with the same
 non-interactive invocation as "with \<agent\>"; fix or reject each point it raises. The review
-reads only the draft, the findings and the files the plan names.
+reads the draft, the findings and the code locations the plan names, within the brief's budget. A
+second review runs only when the first changed the plan's design; edits that only apply its points
+need none.
+
+**Roles.** Who runs the Planner brief (`plan`), the Plan-review brief (`plan_review`) and the Coder
+brief (`code`) comes from the person's agent-role config. Before each, run
+`uv run doit agent_cmd --role=<role> --host=<host>` and read the last stdout line (JSON). If `mode`
+is `subagent`, run the brief in the host's subagent with that `model` (and `effort`, Codex only) when
+given (none means the subagent's own default). On Codex spawn it with `fork_turns: "none"` plus
+`model` and `reasoning_effort`; the briefs are self-contained through the context directory, so no
+parent history is needed, and a full-history fork ignores both. If `inline`, run it in the session. If `cli`, run its `command` with
+`'<prompt>'` replaced by the brief's prompt, from `$WORKTREE`. With no config the result is today's
+behaviour, and a task failure also falls back to it. See
+[Agent roles](../../../docs/development/ai/agent-roles.md).
 
 In every other case run the **Planner brief** below in a subagent, using the host's subagent tool (see
 [Per-host subagent notes](#per-host-subagent-notes)), telling it the context directory above (an absolute path inside the worktree) and the worktree root
@@ -100,13 +113,18 @@ There is no approval wait — the plan is posted, not proposed.
 
 ### Step 4: Code (inline, subagent, or delegated)
 
-Do the coding inline, without a subagent, when Step 2 skipped planning and the change is one of:
+Do the coding inline, without a subagent, only when ALL of these hold: Step 2 skipped planning, the
+change does not alter behavior, and it is one of:
 
 - a version bump of an existing dependency, such as a `pip-audit` fix: `pyproject.toml` and
   `uv.lock` only;
-- a documentation-only change to one or two files, such as a typo, a broken link or a stale
-  example;
-- any other change to one or two files with no new module and no change in behavior.
+- a documentation-only change, such as a typo, a broken link or a stale example;
+- a behavior-preserving edit, such as a rename.
+
+Behavior-changing work goes to the Coder brief in `implement-worker`, however few files it touches:
+every bug fix with a regression test, and every code path change. File count alone never qualifies
+for inline coding. When the caller's prompt, such as an `implement-issues` per-issue agent's, says
+to run the Coder brief as a nested subagent, that overrides this list.
 
 Inline coding follows the Coder brief all the same: read the rules it lists, add tests when code
 changes, and run the touched tests plus `uv run doit lint` and `uv run doit type_check`. `doit check`
@@ -121,7 +139,7 @@ fetch, so `comments.json` needs to pick it up (when Step 3 did not run, this is 
 uv run doit delegation_context --kind=issue --n=<n> --out=$WORKTREE/tmp/agents/<host>/implement-issue-<n>/
 ```
 
-Run the **Coder brief** below in a subagent, telling it the context directory above and the worktree
+Resolve the `code` role first (see **Roles** in Step 3), then run the **Coder brief** below in a subagent, telling it the context directory above and the worktree
 root `$WORKTREE`. When the user
 says **"implement issue N with \<agent\>"**, run the Coder brief through that agent's CLI instead,
 using the non-interactive invocation for that host documented in
@@ -134,12 +152,18 @@ run that never fetched it has nothing to delete).
 
 ### Step 5: Check the work
 
-- Diff the branch against the issue's success criteria; anything missing is a gap to close before
-  committing, not a note for the PR description.
+- Build a requirements list before committing: the issue's Success Criteria; for a bug, its Expected
+  behavior plus every concrete fix item named anywhere in the body (for example Additional Context).
+  Diff the branch against it and mark each requirement met or unmet. Close an unmet one before
+  committing. An unmet requirement, including one deliberately dropped, is an ask-first trigger,
+  never a note in the PR body.
 - Run `uv run doit check` and `uv run doit docs_build` from `$WORKTREE`, and fix whatever either one finds.
   This is the run's single full `doit check`, run once: the Coder does not run it, and the host does
   not rely on a subagent's "check passed" claim (`.claude/rules/verified-claims.md`).
 - Confirm ADR, nav (`mkdocs.yml`) and documentation updates landed if the plan called for them.
+- Read the Coder's two summary fields, **Checks run** and **Reads beyond the plan's pointers**
+  (inline coding fills the same two). A budget item missing from **Checks run** is unmet: run it or
+  report it. An extra check or an unexplained read is a deviation that Step 8 reports.
 
 ### Step 6: Commit and open the PR
 
@@ -152,6 +176,9 @@ uv run doit pr --title="<type>: <subject>" --body-file=<pr-body-file>
 ```
 
 The PR body follows `.github/pull_request_template.md` and includes `Addresses #<n>`.
+
+When the caller's prompt, such as an `implement-issues` per-issue agent's, says to stop after the
+push, skip `doit pr` and Step 7 and report the pushed branch.
 
 ### Step 7: CI loop
 
@@ -168,16 +195,18 @@ The PR body follows `.github/pull_request_template.md` and includes `Addresses #
 
 Report: the PR URL, a summary of the change, whether a plan was posted and why (or why not), who wrote
 it (host or Planner), how many times `doit check` ran this run, whether
-coding ran inline or in a subagent, any deviations from the plan, and the CI state (green, or the round-capped failures from Step 7).
+coding ran inline or in a subagent, a requirement-by-requirement met/unmet table (from Step 5's
+requirements list), any deviations from the plan (including the Coder's **Checks run** and **Reads beyond the plan's pointers** deviations), and the CI state (green, or the round-capped failures from Step 7).
 Also report the worktree path (`$WORKTREE`) and the merge command, which the user runs from the main
 checkout: `uv run doit pr_merge --pr=<pr> --auto-close`. It removes the worktree and its branch.
 
 ## Ask-first triggers
 
 Stop and ask the user, at any step, when one of these fires: a new dependency, scope growing beyond
-the issue, an architecture choice, a breaking change the issue did not already describe, a failing test
-that would need changing to pass, or a blocked command (see `AGENTS.md` — When Blocked Protocol). Do
-not resolve any of these unilaterally and keep going.
+the issue, a requirement of the issue that cannot be met as written (unsafe, contradicted by a review
+finding, or needing a different design), an architecture choice, a breaking change the issue did not
+already describe, a failing test that would need changing to pass, or a blocked command (see [AGENTS.md — When Blocked Protocol](../../../AGENTS.md#4-when-blocked-protocol)). Narrowing
+the scope is a trigger just as growing it is. Do not resolve any of these unilaterally and keep going.
 
 This skill **never** adds the `ready-to-merge` label, never merges a PR, and never closes the issue
 it is implementing. Those stay the user's decisions.
@@ -199,7 +228,8 @@ path:
    `docs/decisions/`.
 3. Explore the codebase for the files, modules, and tests the change touches, and the existing
    patterns in that area. If more than one approach is reasonable, pick one and say why in the plan
-   rather than leaving it open — nothing downstream can ask the user.
+   rather than leaving it open — nothing downstream can ask the user. Note what you read (symbols,
+   patterns, tests) so the Coder need not read it again.
 4. Findings the caller passes are settled: do not re-measure or re-probe them, and flag in the
    Overview any the code contradicts. Explore and probe only what they do not cover. Without
    findings, step 3 applies as written.
@@ -209,16 +239,24 @@ path:
    ```
    ## Implementation Plan for #<n>: <title>
 
+   Base commit: `<sha from git rev-parse HEAD>`
+
    ### Overview
    What will be done and why.
 
    ### Files to Create/Modify
    - [ ] `path/to/file.py` — what changes
+     - Symbols: `name` (~L10-40), the functions or sections it changes
+     - Pattern: `path/to/other.py:55`, an existing example to copy
+     - Tests: `tests/test_file.py`, plus the fixtures to reuse
    - [ ] `tests/test_file.py` — what it covers
 
    ### Test Plan
    - [ ] Test case 1
    - [ ] Test case 2
+
+   ### Test Commands
+   - `uv run pytest tests/test_file.py`
 
    ### Documentation
    - [ ] Docs that need updating
@@ -228,6 +266,9 @@ path:
    - [ ] `doit check` passes
    ```
 
+   The symbol is the pointer; line ranges are hints and go stale when the branch moves. A new file
+   has no symbols to name, so give its pattern and tests instead.
+
 ## Plan-review brief
 
 Give this to the reviewing subagent (or another agent's CLI) when the host wrote the plan, with the
@@ -235,9 +276,14 @@ worktree root as an absolute path and the context directory:
 
 1. Work only under the worktree root. Use absolute paths and start each shell command with
    `cd <root> &&`.
-2. Read the draft plan and the findings from the file under `<context-dir>` the caller names. Read
-   only the files the plan names. Do not explore the codebase, do not probe, and make no `gh` call.
-3. Return a critique of design errors, missed edge cases and conflicts with project rules, or
+2. Read the draft plan and the findings from the file under `<context-dir>` the caller names. Your
+   reading list is the plan's own per-file `Symbols:`, `Pattern:` and `Tests:` pointers.
+   Read the named symbols and ranges, not whole files, and open a
+   whole file only when the plan rewrites most of it. Do not explore the codebase, do not probe,
+   and make no `gh` call.
+3. Budget about 15 tool calls. A few may go beyond the list, for example to the direct callers of a
+   changed symbol.
+4. Return a critique of design errors, missed edge cases and conflicts with project rules, or
    `NO ISSUES`. Do not edit files and do not post anything.
 
 ## Coder brief
@@ -257,15 +303,21 @@ name, the worktree root as an absolute path, and any issue-specific notes:
    unreadable, print `DELEGATION-ERROR:` and stop.
 3. Implement the plan (or the issue): create and edit files, follow existing patterns, and write
    tests — this is mandatory whenever there is code to test, with no exceptions for "small" changes.
-   All new code is type-annotated for mypy strict mode.
+   All new code is type-annotated for mypy strict mode. Start from the plan's locations: read the
+   named symbols and ranges, not whole files. If the plan's base commit differs from `HEAD`, treat
+   the ranges as hints only. Explore beyond the plan's pointers only when one is wrong or missing.
 4. Checking budget, run from the worktree root through `uv run`: the tests covering the change; one
    revert check (undo the fix, confirm the new tests fail, restore — using `git show HEAD:<path>`
    or a WIP commit); only what project rules require, such as the `mutation-triage` and
    `property-tests` skills when they apply; `uv run doit lint`; `uv run doit type_check`. Run
    nothing beyond that unless the plan asks: no extra mutmut runs, no flakiness reruns. Do not run
    `uv run doit check`; the full `doit check` runs once, in Step 5. Fix failures.
-5. Return a summary: files created or modified, test results, every check command you ran, and any
-   deviations from the plan.
+5. Return a summary: files created or modified, test results, and two fixed fields.
+   **Checks run**: every check command you ran, with each budget item from step 4 (the touched
+   tests, the revert check, the rule-required skills if any, `doit lint`, `doit type_check`)
+   marked run or skipped with a reason, and every extra check, each marked as a deviation.
+   **Reads beyond the plan's pointers**: each read outside its pointers with its reason, or "none".
+   Skipping a budget item or running an extra check is a deviation from the plan.
 6. Never use a bare `git stash`: the stash stack is shared with the main checkout, every worktree
    and every session, so a `pop` can take another session's entry. To compare against unchanged
    code, write `git show HEAD:<path>` to a scratch file under the worktree's `tmp/`, or make a
@@ -289,14 +341,16 @@ run the brief in the session itself instead of failing the step.
   from `CLAUDE_CODE_SUBAGENT_MODEL`) for the Coder brief. Verified
   with `claude -p --permission-mode plan "<prompt asking which skill handles 'implement issue N'>"`,
   which named `implement-issue`.
-- **Codex CLI:** `multi_agent`. `codex features list` reports `multi_agent` as `stable`/`true`
+- **Codex CLI:** `multi_agent`. `spawn_agent` accepts `model` and `reasoning_effort` when spawned with `fork_turns: "none"` (verified live in 0.166.0, #1151: the child ran the chosen model and effort while the parent kept its own); a full-history fork inherits the parent's and accepts no override. So a configured Codex model or effort on a Codex host resolves to `subagent`. `codex features list` reports `multi_agent` as `stable`/`true`
   (`multi_agent_v2` exists but is `stable`/`false` — not enabled). `codex debug prompt-input` lists
   `implement-issue` (source `.agents/skills/implement-issue/SKILL.md`) among the skills available to
   the session. A headless Codex host (`codex exec -a never`) can read GitHub through `.codex/rules/gh.rules` but cannot write to it or delegate to another agent CLI — see [Headless Codex host limits](../../../docs/development/ai/cross-agent-delegation.md#headless-codex-host-limits). It cannot run Step 4's "with \<agent\>" delegation, Step 6's `doit pr`, or Step 7's CI-log fetch headless; Codex hosts this skill interactively instead.
 - **GitHub Copilot CLI:** `--fleet` ("run the prompt in fleet mode (parallel subagent...)", per
   `copilot --help`) for parallel subagent work; the `task` tool for the Coder brief, the same
   mechanism `.claude/agents/implement-worker.md` already documents being read through for Copilot.
-  `copilot skill list | grep implement-issue` finds the skill.
+  `copilot skill list | grep implement-issue` finds the skill. The `task` tool has a `model` parameter, but in
+  1.0.105 its schema allowed only `auto`, and a model outside it ran on another model (#1151), so a
+  configured model resolves to `cli` mode. Per-agent models are Copilot's own `/subagents` setting.
   A delegated Copilot run must set `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true`, as the
   documented invocation does, or its dangerous-command hook does not load under `-p` (#1042).
 - **Antigravity CLI (`agy`):** no dedicated subagent/delegation flag found — `agy --help` lists no

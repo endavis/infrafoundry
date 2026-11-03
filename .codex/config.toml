@@ -49,21 +49,18 @@ timeout = 30
 statusMessage = "Checking file edit"
 
 # =============================================================================
-# SESSION-START HOOK — Template update notice (left commented: unverified)
+# SESSION-START HOOK — Template update notice
 # =============================================================================
-# Codex 0.163.0 accepts `SessionStart` in its hook config, but the probe that
-# would confirm it fires and that `systemMessage` reaches the user could not run
-# (usage limit hit before the first turn). Uncomment after verifying; see
+# Runs on new and resumed sessions and prints a yellow `systemMessage`; see
 # docs/template/updates.md. Opt out with PYPROJECT_TEMPLATE_UPDATE_CHECK=0.
-#
-# [[hooks.SessionStart]]
-# matcher = "^startup$"
-#
-# [[hooks.SessionStart.hooks]]
-# type = "command"
-# command = 'python3 "$(git rev-parse --show-toplevel)/tools/hooks/ai/template-update-check.py" --host=codex'
-# timeout = 5
-# statusMessage = "Checking for template updates"
+[[hooks.SessionStart]]
+matcher = "^(startup|resume)$"
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = 'python3 "$(git rev-parse --show-toplevel)/tools/hooks/ai/template-update-check.py" --host=codex'
+timeout = 5
+statusMessage = "Checking for template updates"
 
 # =============================================================================
 # SHELL ENVIRONMENT POLICY

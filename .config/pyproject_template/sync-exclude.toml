@@ -63,4 +63,7 @@ exclude = [
 
     # Template-skeleton README for newly generated projects (#1169).
     "README.template.md",
+
+    # Nightly all-OS CI run; InfraFoundry CI is Linux-only (ADR-0001, #1233).
+    ".github/workflows/nightly-matrix.yml",
 ]

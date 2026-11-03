@@ -446,14 +446,18 @@ def _skip_backtick(text: str, i: int) -> int:
     raise _OpenConstructError
 
 
-def _skip_dollar(text: str, i: int, *, ansi: bool) -> int:
-    """Return the index after the ``$`` construct at *i* (``$(``, ``${``, ``$'``)."""
+def _skip_dollar(text: str, i: int, *, ansi: bool, in_double: bool = False) -> int:
+    """Return the index after the ``$`` construct at *i* (``$(``, ``${``, ``$'``).
+
+    *in_double* says the construct sits in a double quote, where a ``'`` inside
+    ``${...}`` is an ordinary character.
+    """
     if ansi and text.startswith("$'", i):
         return _skip_ansi(text, i + 2)
     if text.startswith("$(", i):
         return _skip_paren(text, i + 2)
     if text.startswith("${", i):
-        return _skip_brace(text, i + 2)
+        return _skip_brace(text, i + 2, in_double=in_double)
     return i + 1
 
 
@@ -466,7 +470,7 @@ def _skip_double(text: str, i: int) -> int:
         elif char == '"':
             return i + 1
         elif char == "$":
-            i = _skip_dollar(text, i, ansi=False)
+            i = _skip_dollar(text, i, ansi=False, in_double=True)
         elif char == "`":
             i = _skip_backtick(text, i + 1)
         else:
@@ -474,18 +478,22 @@ def _skip_double(text: str, i: int) -> int:
     raise _OpenConstructError
 
 
-def _skip_brace(text: str, i: int) -> int:
-    """Return the index after the ``}`` that closes the ``${`` whose body starts at *i*."""
+def _skip_brace(text: str, i: int, *, in_double: bool = False) -> int:
+    """Return the index after the ``}`` that closes the ``${`` whose body starts at *i*.
+
+    *in_double* says the expansion sits in a double quote, where a ``'`` and a
+    ``$'`` are ordinary text; bare, they quote.
+    """
     while i < len(text):
         char = text[i]
         if char == "\\":
             i += 2
-        elif char == "'":
+        elif char == "'" and not in_double:
             i = _skip_single(text, i + 1)
         elif char == '"':
             i = _skip_double(text, i + 1)
         elif char == "$":
-            i = _skip_dollar(text, i, ansi=True)
+            i = _skip_dollar(text, i, ansi=not in_double, in_double=in_double)
         elif char == "`":
             i = _skip_backtick(text, i + 1)
         elif char == "}":
@@ -1214,6 +1222,288 @@ def _heredoc_payloads(command: str) -> list[str]:
     return payloads
 
 
+def _expansion_payloads(text: str, i: int, payloads: list[str], *, in_double: bool) -> None:
+    """Collect the ``$(...)`` and backtick bodies inside a ``${...}`` at *i*.
+
+    A default or alternate value (``${x:-$(cmd)}``) is expanded by the shell, so
+    the command in it runs. The end of the expansion comes from
+    :func:`_skip_brace`, the function every caller uses to step past it, and the
+    text inside is read with the same quoting rules, so this scan and the skip
+    cannot disagree about where the expansion ends or which parts are quoted.
+    *in_double* says the expansion sits in a double quote, where a ``'`` is an
+    ordinary character; bare, it quotes.
+    Text that cannot be read is left unreported, as the caller skips the whole
+    expansion anyway.
+    """
+    try:
+        stop = _skip_brace(text, i + 2, in_double=in_double) - 1
+        j = i + 2
+        while j < stop:
+            char = text[j]
+            if char == "\\":
+                j += 2
+            elif char == "'" and not in_double:
+                j = _skip_single(text, j + 1)
+            elif char == '"':
+                j = _double_quoted_payloads(text, j + 1, payloads)
+            elif char == "`":
+                end = _skip_backtick(text, j + 1)
+                payloads.append(text[j + 1 : end - 1])
+                j = end
+            elif text.startswith("$(", j) and not text.startswith("$((", j):
+                end = _skip_paren(text, j + 2)
+                payloads.append(text[j + 2 : end - 1])
+                j = end
+            elif text.startswith("${", j):
+                _expansion_payloads(text, j, payloads, in_double=in_double)
+                j = _skip_dollar(text, j, ansi=not in_double, in_double=in_double)
+            elif char == "$":
+                j = _skip_dollar(text, j, ansi=not in_double, in_double=in_double)
+            else:
+                j += 1
+    except _OpenConstructError:
+        return
+
+
+def _double_quoted_payloads(text: str, i: int, payloads: list[str]) -> int:
+    """Collect the bodies of ``$(...)`` and backticks in a double-quoted string.
+
+    *i* is the index after the opening ``"``. Returns the index after the
+    closing quote. An arithmetic ``$((...))`` and an escaped ``\\$`` hold no
+    command, and are skipped.
+    """
+    while i < len(text):
+        char = text[i]
+        if char == "\\":
+            i += 2
+        elif char == '"':
+            return i + 1
+        elif char == "`":
+            end = _skip_backtick(text, i + 1)
+            payloads.append(text[i + 1 : end - 1])
+            i = end
+        elif text.startswith("$(", i) and not text.startswith("$((", i):
+            end = _skip_paren(text, i + 2)
+            payloads.append(text[i + 2 : end - 1])
+            i = end
+        elif char == "$":
+            if text.startswith("${", i):
+                _expansion_payloads(text, i, payloads, in_double=True)
+            i = _skip_dollar(text, i, ansi=False)
+        else:
+            i += 1
+    raise _OpenConstructError
+
+
+def _heredoc_body_payloads(body: str, payloads: list[str]) -> None:
+    """Collect the ``$(...)`` and backtick bodies in an unquoted-delimiter heredoc body.
+
+    The shell expands these in such a body as it does inside double quotes,
+    except that a ``"`` is an ordinary character. An arithmetic ``$((...))``
+    and an escaped ``\\$`` hold no command. A construct that cannot be read is
+    passed over a character at a time.
+    """
+    i = 0
+    while i < len(body):
+        char = body[i]
+        try:
+            if char == "\\":
+                i += 2
+            elif char == "`":
+                end = _skip_backtick(body, i + 1)
+                payloads.append(body[i + 1 : end - 1])
+                i = end
+            elif body.startswith("$((", i):
+                i = _skip_paren(body, i + 2)
+            elif body.startswith("$(", i):
+                end = _skip_paren(body, i + 2)
+                payloads.append(body[i + 2 : end - 1])
+                i = end
+            elif char == "$":
+                if body.startswith("${", i):
+                    _expansion_payloads(body, i, payloads, in_double=True)
+                i = _skip_dollar(body, i, ansi=False)
+            else:
+                i += 1
+        except _OpenConstructError:
+            i += 1
+
+
+def _consume_heredoc_bodies(
+    command: str, pos: int, pending: list[tuple[str, bool, bool]], payloads: list[str]
+) -> int:
+    """Read the bodies of the heredocs in *pending*, starting at line start *pos*.
+
+    Each entry is ``(delimiter, unquoted, strip_tabs)``. The body of a
+    quoted-delimiter heredoc is skipped; the substitutions in an unquoted one
+    are collected into *payloads*. Returns the index after the last terminator.
+    """
+    for delimiter, unquoted, strip_tabs in pending:
+        body: list[str] = []
+        while pos < len(command):
+            newline = command.find("\n", pos)
+            line_end = len(command) if newline == -1 else newline
+            line = command[pos:line_end]
+            pos = line_end + 1
+            logical = line
+            if unquoted:
+                # Bash joins a line ending in an odd number of backslashes
+                # with the next before comparing it to the delimiter, as
+                # :func:`_heredoc_logical_line` does.
+                joined_to = pos
+                while (len(logical) - len(logical.rstrip("\\"))) % 2 == 1 and joined_to < len(
+                    command
+                ):
+                    next_end = command.find("\n", joined_to)
+                    next_end = len(command) if next_end == -1 else next_end
+                    logical = logical[:-1] + command[joined_to:next_end]
+                    joined_to = next_end + 1
+                if (logical.lstrip("\t") if strip_tabs else logical) == delimiter:
+                    pos = joined_to
+                    break
+            elif (line.lstrip("\t") if strip_tabs else line) == delimiter:
+                break
+            body.append(line)
+        if unquoted:
+            _heredoc_body_payloads("\n".join(body), payloads)
+    return min(pos, len(command))
+
+
+def _opens_subshell(command: str, i: int) -> bool:
+    """Whether the ``(`` at *i* opens a subshell rather than something else.
+
+    Not a subshell: ``$(``, ``<(`` and ``>(`` (read elsewhere), an assignment
+    ``name=(...)`` or ``name+=(...)``, and a function definition ``f()``. A
+    ``(`` right after a reserved word (``then(...)``, ``do(...)``) is one.
+    """
+    previous = command[i - 1] if i else " "
+    if previous in "$<>=":
+        return False
+    if previous.isalnum() or previous == "_":
+        word = re.search(r"[^\s;&|()<>]*\Z", command[:i])
+        return word is not None and word.group() in _COMMAND_KEYWORDS
+    return True
+
+
+def _substitution_payloads(command: str) -> list[str]:
+    """Return the body of each command substitution, process substitution and subshell.
+
+    These bodies are shell the current shell runs: ``$(...)`` and backticks
+    (bare or inside double quotes), ``<(...)`` and ``>(...)``, and a ``(...)``
+    group in command position. :func:`check_command` re-scans each one, as it
+    does a ``bash -c`` payload, so a check anchored on a command position
+    sees the command inside. Text in single quotes, ``$'...'``, an escaped
+    ``$``, an arithmetic ``$((...))``, an array literal ``a=(...)`` and a
+    function definition ``f()`` hold no such body and are skipped, as is the
+    body of a heredoc with a quoted delimiter. The body of one with an
+    unquoted delimiter is read for substitutions.
+
+    A nested body is returned inside its parent only; :func:`check_command`
+    reaches it through :func:`_all_substitution_payloads`. A construct that
+    cannot be read, such as a heredoc inside ``$(...)``, is passed over and the
+    scan goes on after its first character, so a later substitution is found.
+    """
+    payloads: list[str] = []
+    pending: list[tuple[str, bool, bool]] = []
+    i = 0
+    while i < len(command):
+        start = i
+        char = command[i]
+        previous = command[i - 1] if i else " "
+        try:
+            if char == "\\":
+                i += 2
+            elif char == "'":
+                i = _skip_single(command, i + 1)
+            elif char == '"':
+                i = _double_quoted_payloads(command, i + 1, payloads)
+            elif command.startswith("$'", i):
+                i = _skip_ansi(command, i + 2)
+            elif command.startswith("$((", i):
+                i = _skip_paren(command, i + 2)
+            elif command.startswith("$(", i) or (char in "<>" and command.startswith("(", i + 1)):
+                end = _skip_paren(command, i + 2)
+                payloads.append(command[i + 2 : end - 1])
+                i = end
+            elif char == "$":
+                if command.startswith("${", i):
+                    _expansion_payloads(command, i, payloads, in_double=False)
+                i = _skip_dollar(command, i, ansi=False)
+            elif char == "`":
+                end = _skip_backtick(command, i + 1)
+                payloads.append(command[i + 1 : end - 1])
+                i = end
+            elif char == "(" and _opens_subshell(command, i):
+                end = _skip_paren(command, i + 1)
+                payloads.append(command[i + 1 : end - 1])
+                i = end
+            elif char == "<" and previous != "<" and (marker := _HEREDOC_START.match(command, i)):
+                after = command[marker.end() : marker.end() + 1]
+                if after and after != "\n" and after not in _HEREDOC_WORD_ENDS:
+                    # The delimiter word goes on past what the marker regex
+                    # took, so the shell's delimiter is not the one matched
+                    # and where the body ends is unknown. Register no
+                    # heredoc, so the lines that follow are read as commands,
+                    # as :func:`_heredocs` leaves such a body unstripped.
+                    i = marker.end()
+                    continue
+                delimiter = marker.group(3) or marker.group(4) or marker.group(5)
+                pending.append((delimiter, marker.group(5) is not None, bool(marker.group(1))))
+                i = marker.end()
+            elif char == "\n" and pending:
+                i = _consume_heredoc_bodies(command, i + 1, pending, payloads)
+                pending.clear()
+            else:
+                i += 1
+        except _OpenConstructError:
+            i = start + 1
+    return list(dict.fromkeys(payloads))
+
+
+def _unquoted_heredoc_bodies(command: str) -> list[str]:
+    """Return the body of each heredoc in *command* whose delimiter is unquoted."""
+    lines = command.split("\n")
+    bodies: list[str] = []
+    for marker_line, _words, body_start, body_end in _heredocs(lines, unclear_as_body=True):
+        match, _quote = _heredoc_marker_match(lines[marker_line])
+        if match is not None and match.group(5) is None:
+            continue  # a quoted delimiter: the body is not expanded
+        bodies.append("\n".join(lines[body_start:body_end]))
+    return bodies
+
+
+# Most substitution bodies read from one command, so a pathological input
+# cannot make the scan unbounded.
+_MAX_SUBSTITUTION_PAYLOADS = 256
+
+
+def _all_substitution_payloads(command: str) -> list[str] | None:
+    """Return every substitution body in *command*, nested ones included.
+
+    Nesting is followed here, one level at a time, so it does not use the
+    recursion budget of :func:`check_command`. Returns None when the input
+    holds more than ``_MAX_SUBSTITUTION_PAYLOADS`` bodies, which the caller
+    treats as unreadable.
+    """
+    result: list[str] = []
+    seen = {command}
+    queue = [command]
+    while queue:
+        text = queue.pop(0)
+        found = _substitution_payloads(_strip_shell_comments(_without_heredoc_bodies(text)))
+        for body in _unquoted_heredoc_bodies(text):
+            _heredoc_body_payloads(body, found)
+        for payload in found:
+            if payload in seen:
+                continue
+            seen.add(payload)
+            if len(result) >= _MAX_SUBSTITUTION_PAYLOADS:
+                return None
+            result.append(payload)
+            queue.append(payload)
+    return result
+
+
 def _joined_continuation_lines(lines: list[str]) -> list[str]:
     """Join each line ending in an odd number of backslashes with the next one.
 
@@ -1290,6 +1580,41 @@ def redirect_reason(command: str, reason: str) -> str:
     if reason and _is_commit_message_heredoc(command):
         return _COMMIT_HEREDOC_REDIRECT
     return reason
+
+
+# Command names the rules key on. A path-qualified spelling (``/usr/bin/git``,
+# ``./bin/gh``) runs the same program, so :func:`_normalise_command_words`
+# reduces it to the bare name before any rule sees the tokens (#1132).
+_RULE_COMMAND_WORDS = (
+    frozenset(
+        {"git", "gh", "uv", "doit", "patch", "rm", "sudo", "env", "printenv"}
+        | {"bash", "sh", "zsh", "dash"}
+    )
+    | _CREDENTIAL_READER_COMMANDS
+)
+
+
+def _normalise_command_words(tokens: list[str]) -> list[str]:
+    """Return *tokens* with each path-qualified rule word reduced to its basename.
+
+    The one place a command word is normalised. Every non-option token whose
+    basename is a rule command word is reduced, wherever it sits, so a rule
+    word after a keyword, wrapper, option or substitution is still seen
+    (fails closed). The result has the same length as *tokens*, so an index
+    in one list is the same token in the other.
+
+    Only rules that key on a command word read this list. Checks that treat a
+    token as a filesystem path (patch sources, redirect and stdin targets,
+    credential-store paths, persistence targets) read the original tokens.
+    """
+    normalised = list(tokens)
+    for index, token in enumerate(tokens):
+        if "/" not in token or token[0] in "-<>&":
+            continue
+        base = token.rsplit("/", 1)[-1]
+        if base.lower() in _RULE_COMMAND_WORDS:
+            normalised[index] = base
+    return normalised
 
 
 def check_dangerous_flags(tokens: list[str]) -> tuple[bool, str]:
@@ -1679,6 +2004,8 @@ def _collapse_extglobs(tokens: list[str]) -> list[str]:
 
 # A `;`, `&&` or `||` attached to a word still ends the command there (#1093).
 _GLUED_COMMAND_END = re.compile(r";|&&|\|\|")
+# The same operators, only where they end a word
+_GLUED_END_OF_WORD = re.compile(r"(?:;|&&|\|\|)$")
 
 
 _EXACT_COMMAND_END = _COMMAND_SEPARATORS | {"&", "|&", "(", ")"}
@@ -1738,12 +2065,31 @@ def _working_tree_moved(tokens: list[str], git_idx: int, sub: int, paths: list[s
     return False
 
 
+def _has_quoted_redirect_word(command: str) -> bool:
+    """Return True if *command* holds a word that may be a quoted redirect operator.
+
+    A word with quoting or an escape whose remaining characters are all redirect
+    punctuation, at least one of them ``<`` or ``>`` (``'>'``, ``"\\>>"``, ``\\>``).
+    The tokens the scans read have lost that quoting, so they cannot tell it
+    from a real operator (#1134). Over-approximates on purpose: it fails closed.
+    Never raises.
+    """
+    for text, is_operator in operator_tokens(command):
+        if is_operator or not any(c in text for c in "'\"\\"):
+            continue
+        bare = "".join(c for c in text if c not in "'\"\\$")
+        if bare and set(bare) <= set(_REDIRECT_PUNCTUATION) and ("<" in bare or ">" in bare):
+            return True
+    return False
+
+
 def _scan_command_words(
     tokens: list[str],
     start: int,
     *,
     glued_separators: bool = False,
     exact_operators: bool = False,
+    literal_redirects: bool = False,
 ) -> tuple[list[str], list[tuple[str, str]], list[str]]:
     """Return the words of the command whose arguments begin at *start*.
 
@@ -1766,6 +2112,11 @@ def _scan_command_words(
     holding ``;`` is a literal argument and the flag stays off (#1093).
     *exact_operators* is for :func:`_exact_operator_tokens`, where every token
     equal to an operator string is a real operator (#1117).
+
+    *literal_redirects* is for a command holding a quoted word made of redirect
+    punctuation (``'>'``). The tokens lost their quoting, so such a word cannot
+    be told from a real operator; with the flag set a redirect-looking token is
+    an ordinary operand, never an operator that swallows the next word (#1134).
     """
     rest: list[str] = []
     redirects: list[tuple[str, str]] = []
@@ -1786,7 +2137,12 @@ def _scan_command_words(
                 rest.append(t[: glued.start()])
             glued_at = idx
             break
-        if t and set(t) <= set(_REDIRECT_PUNCTUATION) and ("<" in t or ">" in t):
+        if (
+            not literal_redirects
+            and t
+            and set(t) <= set(_REDIRECT_PUNCTUATION)
+            and ("<" in t or ">" in t)
+        ):
             # a redirect operator as :func:`_redirect_tokens` yields it. A
             # preceding fd number (`2` of `2>`) stays: it can be neither a
             # protected name nor a broad pathspec
@@ -1803,6 +2159,7 @@ def _git_restore_targets(
     *,
     glued_separators: bool = False,
     exact_operators: bool = False,
+    literal_redirects: bool = False,
 ) -> list[str]:
     """Return the protected paths a ``git checkout``/``git restore`` at
     *git_idx* would overwrite (#1055).
@@ -1828,12 +2185,20 @@ def _git_restore_targets(
     *exact_operators* is for :func:`_exact_operator_tokens`, where every token
     equal to an operator string is a real operator: the scan then ends at
     ``&``, ``|&``, ``(`` and ``)`` as well, as bash ends the command there.
+
+    *literal_redirects* is passed to :func:`_scan_command_words`: the tokens lost
+    their quoting, so when the command holds a quoted redirect-looking word, one
+    in the tokens is read as an operand rather than an operator (#1134).
     """
     sub = _git_subcommand_index(tokens, git_idx)
     if sub is None or tokens[sub] not in {"checkout", "restore"}:
         return []
     rest, redirects, after_glued = _scan_command_words(
-        tokens, sub + 1, glued_separators=glued_separators, exact_operators=exact_operators
+        tokens,
+        sub + 1,
+        glued_separators=glued_separators,
+        exact_operators=exact_operators,
+        literal_redirects=literal_redirects,
     )
     # the file or fd a redirect points at is no checkout argument, but the
     # tokens lost their quoting (`'>'`), so it is still checked against the
@@ -2061,11 +2426,38 @@ def _is_first_command(tokens: list[str], idx: int) -> bool:
     )
 
 
+# Wrappers that run a command after options of their own, some of which change
+# the directory (`sudo -D`, `nsenter -w`, `unshare --wd`, `env -C`, `chroot`).
+_CWD_WRAPPERS = _COMMAND_PREFIX_WRAPPERS | frozenset(
+    {"doas", "nsenter", "unshare", "chroot", "setpriv", "runuser", "su", "ionice", "nohup", "time"}
+)
+# these change the root or directory with no option at all
+_CWD_ALWAYS_MOVING = frozenset({"chroot"})
+
+
 def _cwd_moved(tokens: list[str], idx: int) -> bool:
-    """Return True when a word before *idx* may change the working directory."""
-    return any(
-        t in {"cd", "pushd", "popd", "-C"} or t.startswith(("--chdir", "-C")) for t in tokens[:idx]
-    )
+    """Return True when a word before *idx* may change the working directory.
+
+    Fails closed: any option given to a prefix wrapper (``sudo -D x``,
+    ``nsenter -w x``, ``env -i``) counts, as its own options may move the
+    directory. A wrapper's options are read up to its command word;
+    ``NAME=value`` assignments are skipped.
+    """
+    words = [t.strip(";&|()") for t in tokens[:idx]]
+    if any(t in {"cd", "pushd", "popd", "-C"} or t.startswith(("--chdir", "-C")) for t in words):
+        return True
+    for i, word in enumerate(words):
+        base = word.rsplit("/", 1)[-1].lower()
+        if base not in _CWD_WRAPPERS:
+            continue
+        if base in _CWD_ALWAYS_MOVING:
+            return True
+        for nxt in words[i + 1 :]:
+            if nxt.startswith("-") and len(nxt) > 1:
+                return True
+            if not _ASSIGNMENT_RE.match(nxt):
+                break
+    return False
 
 
 def _patch_source_targets(
@@ -2100,7 +2492,9 @@ def _patch_source_targets(
         named.extend(paths)
     hits: list[str] = []
     for path in named:
-        for candidate in (path, posixpath.join(root, path)) if root else (path,):
+        for candidate in (
+            (path, posixpath.normpath(posixpath.join(root, path))) if root else (path,)
+        ):
             if _is_env_persistence_target(candidate):
                 hits.append(candidate)
     return hits
@@ -2167,6 +2561,78 @@ def _split_stdin_sources(
         else:
             operands.append(t)
     return operands, stdin_files, unresolvable, has_output
+
+
+def _has_dotdot(value: str) -> bool:
+    """Return True when a ``/`` or ``\\`` separated *value* has a ``..`` segment."""
+    return ".." in value.replace("\\", "/").split("/")
+
+
+def _git_work_tree_root(tokens: list[str], git_idx: int, sub: int) -> tuple[str | None, bool]:
+    """Return ``(root, unresolvable)``: where git writes a patch's paths (#1133).
+
+    Fails closed: the root is *unresolvable* unless it is simple. Every ``-C``
+    among the options before the subcommand is joined in order (an absolute one
+    resets the directory), wherever it stands. The last ``--work-tree`` (else a
+    literal ``GIT_WORK_TREE=<dir>`` assigned before ``git``) is then resolved
+    against that final directory, and ``.`` segments are folded. Unresolvable:
+
+    - a ``..`` segment in a ``-C``, ``--work-tree`` or ``GIT_WORK_TREE`` value;
+    - a value with an expansion, an empty value, or ``GIT_WORK_TREE`` set any way
+      but a literal assignment;
+    - any other ``GIT_*`` word before ``git``, or ``-c``, ``--config-env`` or
+      ``--git-dir``, which may move the work tree, unless a literal
+      ``--work-tree`` or ``GIT_WORK_TREE`` names it (the git dir's config is
+      not read);
+    - a working directory moved before ``git`` (``cd``, ``pushd``, ``env -C``),
+      unless an absolute ``--work-tree``, ``GIT_WORK_TREE`` or ``-C`` resets it.
+    """
+    env_tree: str | None = None
+    moved = False
+    for t in tokens[:git_idx]:
+        if t.startswith("GIT_WORK_TREE="):
+            env_tree = t.partition("=")[2]
+        elif "GIT_WORK_TREE" in t:
+            return None, True
+        elif "GIT_" in t:
+            moved = True
+    cwd = ""
+    tree: str | None = None
+    opts = tokens[git_idx + 1 : sub]
+    i = 0
+    while i < len(opts):
+        t = opts[i]
+        i += 1
+        # (option name, value) for the options that matter; else skip like
+        # `_git_subcommand_index` does
+        name, value = t, None
+        if t in _GIT_GLOBAL_OPTS_WITH_VALUE:
+            value = opts[i] if i < len(opts) else ""
+            i += 1
+        elif t.startswith("-C") or t.startswith("-c"):
+            name, value = t[:2], t[2:]
+        elif t.startswith("--") and "=" in t:
+            name, _, value = t.partition("=")
+        if name in {"-c", "--config-env", "--git-dir"}:
+            moved = True
+        elif name in {"-C", "--work-tree"}:
+            if not value or any(c in _DYNAMIC_CHARS for c in value) or _has_dotdot(value):
+                return None, True
+            if name == "-C":
+                cwd = posixpath.join(cwd, value)
+            else:
+                tree = value
+    if tree is None and env_tree is not None:
+        tree = env_tree
+        if not tree or any(c in _DYNAMIC_CHARS for c in tree) or _has_dotdot(tree):
+            return None, True
+    if tree is None and moved:
+        return None, True
+    final = posixpath.join(cwd, tree) if tree is not None else cwd
+    if _cwd_moved(tokens, git_idx) and (not posixpath.isabs(final) or final.startswith("~")):
+        return None, True
+    root = posixpath.normpath(final or ".")
+    return (None if root == "." else root), False
 
 
 def _git_patch_targets(
@@ -2236,6 +2702,8 @@ def _git_patch_targets(
                 value = t.partition("=")[2] if has_value else (args[i] if i < len(args) else "")
                 i += 0 if has_value else 1
                 if full == "--directory":
+                    if _has_dotdot(value):
+                        return [*targets, _ENVRC_EXAMPLE]
                     root = value
                 elif full == "--build-fake-ancestor":
                     fake_ancestors.append(value)
@@ -2268,6 +2736,15 @@ def _git_patch_targets(
         return [*targets, _ENVRC_EXAMPLE]
     opts = tokens[git_idx + 1 : sub]
     cwd_moved = _cwd_moved(tokens, git_idx) or any(t.startswith("-C") for t in opts)
+    tree, tree_unresolvable = _git_work_tree_root(tokens, git_idx, sub)
+    if tree_unresolvable:
+        return [*targets, _ENVRC_EXAMPLE]
+    if tree is not None:
+        root = posixpath.join(tree, root) if root else tree
+    if root:
+        root = posixpath.normpath(root)
+        if root == ".":
+            root = None
     return targets + _patch_source_targets(
         [(src, None) for src in operands + stdin_files],
         read_files=read_files and _is_first_command(tokens, git_idx),
@@ -2424,6 +2901,8 @@ def _bash_confirmed_write_targets(
     exact_operators: bool = False,
     restore_scan: bool = True,
     read_patch_files: bool = False,
+    literal_redirects: bool = False,
+    glued_ends_write_command: bool = False,
 ) -> list[str]:
     """Return every persistence-protected path/basename targeted by a
     *confirmed* Bash write.
@@ -2451,6 +2930,7 @@ def _bash_confirmed_write_targets(
     """
     targets: list[str] = []
     tokens = _collapse_extglobs(tokens)
+    words = _normalise_command_words(tokens)
     n = len(tokens)
     for i, tok in enumerate(tokens):
         # Pattern A: standalone redirect operator, including `>|`, `&>` and
@@ -2471,14 +2951,33 @@ def _bash_confirmed_write_targets(
                 targets.append(tok[1:])
             continue
 
+        # The patterns below key on a command word; operands stay in *tokens*.
+        tok = words[i]
+
         # Pattern C: write command followed by persistence target as positional
         if tok in _WRITE_COMMANDS:
             positionals: list[str] = []
             seg_open = True
+            # The command's own operands. With *glued_ends_write_command* a
+            # token that ends in `;`, `&&` or `||` is the last one, and only
+            # the part before the operator counts (#1131). A token with text
+            # after the operator (`b;cp`) keeps the old, wider scan.
+            write_words: list[str] = []
             for j in range(i + 1, n):
                 t = tokens[j]
                 if t in _COMMAND_SEPARATORS:
                     break
+                glued_end = (
+                    _GLUED_END_OF_WORD.search(t)
+                    if glued_ends_write_command and glued_separators
+                    else None
+                )
+                if glued_end:
+                    if glued_end.start():
+                        write_words.append(t[: glued_end.start()])
+                    break
+                write_words.append(t)
+            for t in write_words:
                 if t.startswith("-"):
                     continue
                 if tok == "dd":
@@ -2561,6 +3060,7 @@ def _bash_confirmed_write_targets(
                     i,
                     glued_separators=glued_separators,
                     exact_operators=exact_operators,
+                    literal_redirects=literal_redirects,
                 )
             )
 
@@ -2590,6 +3090,62 @@ def _bash_confirmed_write_targets(
             )
 
     return targets
+
+
+def _newlines_as_separators(text: str) -> str:
+    """Return *text* with each unquoted newline written as `` ; ``.
+
+    :func:`tokenize`, :func:`_redirect_tokens` and :func:`_exact_operator_tokens`
+    read a newline as whitespace, so a write command's operand scan ran on into
+    the next line (#1131). A newline inside ``'...'``, ``"..."``, a backslash
+    escape, ``$(...)``, a backtick substitution or ``<(...)`` is not a separator
+    and is kept; so is a backslash-newline continuation. Leading and trailing
+    newlines are dropped. When *text* holds a here-document, a comment or a
+    construct that cannot be read, it is returned unchanged, which keeps the
+    old scan.
+    """
+    body = text.strip("\n")
+    if "\n" not in body:
+        return body
+    out: list[str] = []
+    i = 0
+    n = len(body)
+    try:
+        while i < n:
+            char = body[i]
+            if char == "\n":
+                out.append(" ; ")
+                i += 1
+                continue
+            if char == "\\":
+                if body.startswith("\n", i + 1):
+                    return text
+                end = i + 2
+            elif char == "'":
+                end = _skip_single(body, i + 1)
+            elif char == '"':
+                end = _skip_double(body, i + 1)
+            elif char == "$":
+                end = _skip_dollar(body, i, ansi=True)
+            elif char == "`":
+                end = _skip_backtick(body, i + 1)
+            elif char in "<>" and body.startswith("(", i + 1):
+                end = _skip_paren(body, i + 2)
+            elif char == "<" and body.startswith("<<<", i):
+                end = i + 3
+            elif char == "<" and body.startswith("<", i + 1):
+                return text  # a here-document
+            elif char == "#" and (i == 0 or body[i - 1].isspace() or body[i - 1] in "&|;()<>"):
+                return text  # a comment
+            else:
+                end = i + 1
+            if end > n:
+                return text
+            out.append(body[i:end])
+            i = end
+    except (_OpenConstructError, RecursionError):
+        return text
+    return "".join(out)
 
 
 def _redirect_tokens(command: str) -> list[str]:
@@ -2652,6 +3208,8 @@ def check_env_persistence_in_bash(
     exact_operators: bool = False,
     restore_scan: bool = True,
     read_patch_files: bool = False,
+    literal_redirects: bool = False,
+    glued_ends_write_command: bool = False,
 ) -> tuple[bool, str]:
     """Block Bash commands that would persist ALLOW_AI_READY_TO_MERGE, or
     that write to a protected file at all.
@@ -2692,6 +3250,8 @@ def check_env_persistence_in_bash(
         exact_operators=exact_operators,
         restore_scan=restore_scan,
         read_patch_files=read_patch_files,
+        literal_redirects=literal_redirects,
+        glued_ends_write_command=glued_ends_write_command,
     ):
         if _matches_env_persistence_target(target, dynamic=True):
             if _depth == 0 and tuple(tokens) in _ALLOWED_ENV_PERSISTENCE_WRITES:
@@ -3102,7 +3662,7 @@ def check_merge_to_protected(command: str) -> tuple[bool, str]:
     terminator, hiding a real ``git merge`` from this scan entirely (#1011,
     gap 3).
     """
-    tokens = _structural_tokens(command)
+    tokens = _normalise_command_words(_structural_tokens(command))
     tokens_lower = [t.lower() for t in tokens]
 
     for git_idx in range(len(tokens_lower)):
@@ -3127,20 +3687,34 @@ def check_merge_to_protected(command: str) -> tuple[bool, str]:
     return False, ""
 
 
+# Reserved words after which a command begins: ``if printenv; then ...``,
+# ``! printenv``, ``{ printenv; }``, ``time printenv``.
+_COMMAND_KEYWORDS = frozenset(
+    {"!", "{", "if", "then", "do", "else", "elif", "while", "until", "time"}
+)
+
+
 def _command_start_indices(tokens: list[str]) -> list[int]:
     """Return the indices at which a command begins.
 
-    A command starts at position 0 and after any shell separator. Anchoring on
-    these is what separates *running* a command from merely *mentioning* it:
-    a heredoc body tokenizes exactly like an argument list, so a scan over all
-    positions treats documentation and test fixtures as invocations. Both
+    A command starts at position 0, after any shell separator, and after a
+    reserved word (:data:`_COMMAND_KEYWORDS`) that itself sits at a start, so
+    ``then printenv`` counts while ``echo then printenv`` does not. Anchoring
+    on these is what separates *running* a command from merely *mentioning*
+    it: a heredoc body tokenizes exactly like an argument list, so a scan over
+    all positions treats documentation and test fixtures as invocations. Both
     checks below hit that while this repository's own tests were being written.
     """
-    starts = [0]
+    start_set = {0}
     for index, token in enumerate(tokens):
         if token in _SHELL_OPERATORS and index + 1 < len(tokens):
-            starts.append(index + 1)
-    return starts
+            start_set.add(index + 1)
+    for index, word in enumerate(tokens):
+        if index in start_set and word in _COMMAND_KEYWORDS and index + 1 < len(tokens):
+            start_set.add(index + 1)
+            if word == "time" and tokens[index + 1] == "-p" and index + 2 < len(tokens):
+                start_set.add(index + 2)
+    return sorted(start_set)
 
 
 def _is_secret_name(name: str) -> bool:
@@ -3161,10 +3735,11 @@ def check_env_dump(tokens: list[str]) -> tuple[bool, str]:
     separator (``hi;printenv``) stuck to its neighbour, so neither ever placed
     a command at the start of a line or after a glued ``;`` (#1011, gap 2).
     """
+    words = _normalise_command_words(tokens)
     for index in _command_start_indices(tokens):
-        if index >= len(tokens) or tokens[index] not in _ENV_DUMP_COMMANDS:
+        if index >= len(tokens) or words[index] not in _ENV_DUMP_COMMANDS:
             continue
-        token = tokens[index]
+        token = words[index]
         # Stop at the next separator: later tokens belong to another command.
         rest = []
         for candidate in tokens[index + 1 :]:
@@ -3247,8 +3822,9 @@ def check_credential_file_read(tokens: list[str]) -> tuple[bool, str]:
     separator (``hi;cat``) stuck to its neighbour, so neither ever placed a
     command at the start of a line or after a glued ``;`` (#1011, gap 2).
     """
+    words = _normalise_command_words(tokens)
     for index in _command_start_indices(tokens):
-        if index >= len(tokens) or tokens[index] not in _CREDENTIAL_READER_COMMANDS:
+        if index >= len(tokens) or words[index] not in _CREDENTIAL_READER_COMMANDS:
             continue
         skip_next = False
         for argument in tokens[index + 1 :]:
@@ -3269,7 +3845,7 @@ def check_credential_file_read(tokens: list[str]) -> tuple[bool, str]:
     return False, ""
 
 
-def check_command(command: str, _depth: int = 0) -> tuple[bool, str]:
+def check_command(command: str, _depth: int = 0, _expanded: bool = False) -> tuple[bool, str]:
     """
     Check if command contains dangerous patterns.
 
@@ -3290,7 +3866,8 @@ def check_command(command: str, _depth: int = 0) -> tuple[bool, str]:
     Returns:
         (is_dangerous, reason)
     """
-    tokens = tokenize(command)
+    raw_tokens = tokenize(command)
+    tokens = _normalise_command_words(raw_tokens)
 
     # Check for dangerous standalone flags
     is_dangerous, reason = check_dangerous_flags(tokens)
@@ -3316,7 +3893,7 @@ def check_command(command: str, _depth: int = 0) -> tuple[bool, str]:
     # separator `&` and `>/tmp/x`.
     structural = _structural_tokens(stripped)
     for check, legacy in (
-        (check_env_dump, tokens),
+        (check_env_dump, raw_tokens),
         (check_credential_file_read, tokenize(stripped)),
     ):
         for check_tokens in (structural, legacy):
@@ -3329,7 +3906,7 @@ def check_command(command: str, _depth: int = 0) -> tuple[bool, str]:
     # command: `shlex.split` keeps a glued `true;git` as one word, so the scan
     # missed any command glued to `;`, `&&`, `||`, `|` or `&` (#1023). The
     # first pass keeps every block these checks had before.
-    command_structural = _structural_tokens(command)
+    command_structural = _normalise_command_words(_structural_tokens(command))
     for check in (
         check_push_to_protected,
         check_delete_protected_branch,
@@ -3360,18 +3937,30 @@ def check_command(command: str, _depth: int = 0) -> tuple[bool, str]:
     # A third pass runs on the exact operator tokens, where `&`, `|&`, `(` and
     # `)` also end a checkout/restore argument scan. The scan runs on every
     # pass, so the exact pass only adds coverage (#1117).
-    exact_tokens = _exact_operator_tokens(stripped)
+    # An unquoted newline ends a command, but the tokens drop it: write it as
+    # `;` first so a write command's operands end at the line (#1131).
+    lined = _newlines_as_separators(stripped)
+    exact_tokens = _exact_operator_tokens(lined)
     # A patch file is read only for the top-level command, and not when the
     # command has several lines: the tokens lose a newline, so an earlier line
     # could have written the file (#1105).
     read_patch_files = _depth == 0 and "\n" not in stripped.strip()
-    passes: list[tuple[list[str], bool, bool]] = [
-        (tokens, True, False),
-        (_redirect_tokens(stripped), False, False),
+    # The redirect tokens lost the quoting of a word like `'>'`, so when the
+    # command holds one, the scans read redirect-looking tokens as operands
+    # instead of operators that swallow the next word (#1134).
+    literal_redirects = _has_quoted_redirect_word(stripped)
+    passes: list[tuple[list[str], bool, bool, bool]] = [
+        (
+            tokenize(_newlines_as_separators(command)),
+            True,
+            False,
+            exact_tokens is not None,
+        ),
+        (_redirect_tokens(lined), False, False, False),
     ]
     if exact_tokens is not None:
-        passes.append((exact_tokens, False, True))
-    for check_tokens, glued, exact in passes:
+        passes.append((exact_tokens, False, True, False))
+    for check_tokens, glued, exact, glued_ends in passes:
         is_dangerous, reason = check_env_persistence_in_bash(
             check_tokens,
             _depth,
@@ -3379,6 +3968,8 @@ def check_command(command: str, _depth: int = 0) -> tuple[bool, str]:
             exact_operators=exact,
             restore_scan=True,
             read_patch_files=read_patch_files,
+            literal_redirects=literal_redirects,
+            glued_ends_write_command=glued_ends,
         )
         if is_dangerous:
             return True, reason
@@ -3388,6 +3979,21 @@ def check_command(command: str, _depth: int = 0) -> tuple[bool, str]:
     if _depth < 3:
         for payload in _wrapped_payloads(tokens) + _heredoc_payloads(command):
             is_dangerous, reason = check_command(payload, _depth + 1)
+            if is_dangerous:
+                return True, reason
+
+    # Substitution bodies, nested ones included, are collected in one pass and
+    # each is checked at one level down, so nesting does not use the wrapper
+    # depth budget above. A checked body does not collect its own again.
+    if not _expanded:
+        try:
+            substitutions = _all_substitution_payloads(command)
+        except RecursionError:
+            substitutions = None
+        if substitutions is None:
+            return True, "Command substitutions are nested too deeply to scan"
+        for payload in substitutions:
+            is_dangerous, reason = check_command(payload, _depth + 1, _expanded=True)
             if is_dangerous:
                 return True, reason
 

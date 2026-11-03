@@ -140,6 +140,7 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [9027](9027-implement-issue-works-in-a-per-issue-worktree.md) | implement-issue works in a per-issue worktree | Accepted |
 | [9028](9028-implement-issues-runs-issues-in-parallel-background-agents.md) | implement-issues runs issues in parallel background agents | Accepted |
 | [9029](9029-implement-issue-host-plan-and-coder-checking-budget.md) | implement-issue host plan and Coder checking budget | Accepted |
+| [9030](9030-cross-agent-roles-resolve-through-a-per-user-config.md) | Cross-agent roles resolve through a per-user config | Accepted |
 
 ### Project-level ADRs (0001+)
 

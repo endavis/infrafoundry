@@ -15,7 +15,9 @@ This script ships with projects, and ``tools/pyproject_template/`` is removed on
 (ADR-9017), so it imports only the standard library.
 
 Usage: ``template-update-check.py [--host={claude,copilot,codex,antigravity}]``. The host picks the
-output shape; without it the hook prints a plain line.
+output shape; without it the hook prints a plain line. ``claude`` and ``codex`` get a yellow
+``systemMessage`` (plain when ``NO_COLOR`` is set and non-empty); ``claude`` also carries an
+``additionalContext`` relay line, because Copilot CLI runs this hook and drops ``systemMessage``.
 
 For documentation, see: docs/template/updates.md
 """
@@ -28,6 +30,7 @@ import subprocess  # nosec B404  # runs git with list args, never a shell
 import sys
 import time
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
 
 # Local copy of tools/pyproject_template/utils.py TEMPLATE_REPO (ADR-9017); a template-owned
@@ -38,6 +41,9 @@ OPT_OUT_ENV = "PYPROJECT_TEMPLATE_UPDATE_CHECK"
 CACHE_TTL_SECONDS = 24 * 60 * 60
 LS_REMOTE_TIMEOUT_SECONDS = 2
 MIN_SHA_MATCH = 7
+YELLOW = "\033[33m"
+RESET = "\033[0m"
+RELAY_PREFIX = "Tell the user, in one line: "
 
 ROOT: Path = Path(__file__).resolve().parents[3]
 SETTINGS_RELATIVE = Path(".config") / "pyproject_template" / "settings.toml"
@@ -153,16 +159,34 @@ def build_message(recorded: str) -> str:
     )
 
 
-def format_output(message: str, host: str | None) -> str:
+def colorize(text: str, env: Mapping[str, str] | None = None) -> str:
+    """Wrap ``text`` in yellow, unless ``NO_COLOR`` is set and non-empty (no-color.org)."""
+    values = os.environ if env is None else env
+    if values.get("NO_COLOR", ""):
+        return text
+    return f"{YELLOW}{text}{RESET}"
+
+
+def format_output(message: str, host: str | None, env: Mapping[str, str] | None = None) -> str:
     """Shape ``message`` for ``host``; with no host, a plain line."""
-    if host in ("claude", "codex"):
-        return json.dumps({"systemMessage": message})
+    if host == "claude":
+        # Claude shows systemMessage to the user. Copilot runs this same hook but drops
+        # systemMessage, so a plain top-level additionalContext asks the model to relay it;
+        # Claude ignores unknown top-level keys.
+        return json.dumps(
+            {
+                "systemMessage": colorize(message, env),
+                "additionalContext": f"{RELAY_PREFIX}{message}",
+            }
+        )
+    if host == "codex":
+        return json.dumps({"systemMessage": colorize(message, env)})
     if host == "copilot":
         return json.dumps({"additionalContext": message})
     if host == "antigravity":
         # agy injects steps into the model's context; it has no user-facing field, so ask the
         # model to relay the notice. Shape confirmed by probe (SessionStartHookResult).
-        text = f"Tell the user, in one line: {message}"
+        text = f"{RELAY_PREFIX}{message}"
         return json.dumps({"injectSteps": [{"systemMessage": {"systemMessage": text}}]})
     return message
 

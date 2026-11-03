@@ -194,6 +194,7 @@ nav:
     - ADR-9027 implement-issue worktree: decisions/9027-implement-issue-works-in-a-per-issue-worktree.md
     - ADR-9028 implement-issues parallel: decisions/9028-implement-issues-runs-issues-in-parallel-background-agents.md
     - ADR-9029 implement-issue host plan and checking budget: decisions/9029-implement-issue-host-plan-and-coder-checking-budget.md
+    - ADR-9030 Agent roles: decisions/9030-cross-agent-roles-resolve-through-a-per-user-config.md
 
   - Providers:
     - ESXi: providers/esxi.md
@@ -238,6 +239,7 @@ nav:
         - LSP Tool and Diagnostics: development/ai/lsp-tool.md
         - Token-Efficiency Add-Ons: development/ai/token-efficiency-add-ons.md
         - Cross-Agent Delegation: development/ai/cross-agent-delegation.md
+        - Agent Roles and Models: development/ai/agent-roles.md
         - Ruff-fix Hook: development/ai/ruff-fix-hook.md
         - Statusline: development/ai/statusline.md
         - Per-Stack Rule Files: development/ai/rule-files.md

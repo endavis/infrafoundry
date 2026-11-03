@@ -316,14 +316,65 @@ def test_git_failure_in_template_check_is_not_the_template(
     assert hook.is_template_repo(Path(".")) is False
 
 
+YELLOW = "\033[33m"
+RESET = "\033[0m"
+
+
 def test_format_output_per_host(hook: types.ModuleType) -> None:
     msg = "pyproject-template has updates"
-    assert json.loads(hook.format_output(msg, "claude")) == {"systemMessage": msg}
-    assert json.loads(hook.format_output(msg, "codex")) == {"systemMessage": msg}
-    assert json.loads(hook.format_output(msg, "copilot")) == {"additionalContext": msg}
-    agy = json.loads(hook.format_output(msg, "antigravity"))
-    assert msg in agy["injectSteps"][0]["systemMessage"]["systemMessage"]
-    assert hook.format_output(msg, None) == msg
+    env: dict[str, str] = {}
+    claude = json.loads(hook.format_output(msg, "claude", env))
+    assert claude == {
+        "systemMessage": f"{YELLOW}{msg}{RESET}",
+        "additionalContext": f"Tell the user, in one line: {msg}",
+    }
+    assert json.loads(hook.format_output(msg, "codex", env)) == {
+        "systemMessage": f"{YELLOW}{msg}{RESET}"
+    }
+    assert json.loads(hook.format_output(msg, "copilot", env)) == {"additionalContext": msg}
+    agy = json.loads(hook.format_output(msg, "antigravity", env))
+    assert agy["injectSteps"][0]["systemMessage"]["systemMessage"] == (
+        f"Tell the user, in one line: {msg}"
+    )
+    assert hook.format_output(msg, None, env) == msg
+
+
+def test_no_color_makes_system_message_plain(hook: types.ModuleType) -> None:
+    msg = "m"
+    for host in ("claude", "codex"):
+        out = json.loads(hook.format_output(msg, host, {"NO_COLOR": "1"}))
+        assert out["systemMessage"] == msg
+
+
+def test_empty_no_color_still_colours(hook: types.ModuleType) -> None:
+    out = json.loads(hook.format_output("m", "codex", {"NO_COLOR": ""}))
+    assert out["systemMessage"] == f"{YELLOW}m{RESET}"
+
+
+def test_format_output_reads_process_env_by_default(
+    hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NO_COLOR", "1")
+    assert json.loads(hook.format_output("m", "codex"))["systemMessage"] == "m"
+    monkeypatch.delenv("NO_COLOR")
+    assert json.loads(hook.format_output("m", "codex"))["systemMessage"] == f"{YELLOW}m{RESET}"
+
+
+def test_main_codex_prints_yellow_system_message_only(
+    hook: types.ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _write_settings(tmp_path, OLD)
+    monkeypatch.delenv("PYPROJECT_TEMPLATE_UPDATE_CHECK", raising=False)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setattr(hook, "ROOT", tmp_path)
+    monkeypatch.setattr(hook.subprocess, "run", FakeGit())
+    assert hook.main(["--host=codex"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert list(out) == ["systemMessage"]
+    assert out["systemMessage"].startswith(YELLOW)
 
 
 def test_main_prints_for_host_and_exits_zero(
@@ -337,7 +388,9 @@ def test_main_prints_for_host_and_exits_zero(
     monkeypatch.setattr(hook, "ROOT", tmp_path)
     monkeypatch.setattr(hook.subprocess, "run", FakeGit())
     assert hook.main(["--host=claude"]) == 0
-    assert "systemMessage" in json.loads(capsys.readouterr().out)
+    out = json.loads(capsys.readouterr().out)
+    assert "systemMessage" in out
+    assert out["additionalContext"].startswith("Tell the user, in one line: ")
 
 
 def test_main_never_raises(hook: types.ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
