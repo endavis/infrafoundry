@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import shutil
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -295,6 +295,10 @@ class PackageMover:
         # 5. Terraform state operations
         # Get addresses across ALL providers (handles cross-provider resources)
         addresses_by_provider = self.get_terraform_addresses(source_env, provider_name, source_path)
+        # Resolve the package's resource names now: the source dir is gone before the DB update
+        # and the rollback needs the same names.
+        resource_names = self._get_rendered_resource_names(source_env, provider_name, source_path)
+        db_providers = sorted({provider_name, *addresses_by_provider})
 
         # Plan state copy for each provider that has matching resources
         providers_to_copy: list[str] = []
@@ -440,10 +444,24 @@ class PackageMover:
             rollback_stack.append(_undo_state_rm)
 
             # Step 5: Update state DB
-            db_updated = self._update_state_db(source_env, target_env, provider_name, package_name)
+            db_updated = self._update_state_db(
+                source_env,
+                target_env,
+                provider_name,
+                package_name,
+                resource_names=resource_names,
+                providers=db_providers,
+            )
 
             def _undo_state_db() -> None:
-                self._update_state_db(target_env, source_env, provider_name, package_name)
+                self._update_state_db(
+                    target_env,
+                    source_env,
+                    provider_name,
+                    package_name,
+                    resource_names=resource_names,
+                    providers=db_providers,
+                )
 
             rollback_stack.append(_undo_state_db)
 
@@ -607,17 +625,23 @@ class PackageMover:
         target_env: str,
         provider_name: str,
         package_name: str,
+        resource_names: Sequence[str] = (),
+        providers: Sequence[str] | None = None,
     ) -> bool:
         """Update resource records in the InfraFoundry state DB.
 
-        Moves resources belonging to the package from source to target
-        environment. Raises on failure instead of silently returning False.
+        Moves only the resources whose name is in ``resource_names`` from source to
+        target environment; other packages' resources on the same provider stay put.
+        An empty ``resource_names`` moves nothing. Raises on failure instead of
+        silently returning False.
 
         Args:
             source_env: Source environment name
             target_env: Target environment name
             provider_name: Provider name
             package_name: Package name (used for logging)
+            resource_names: Names of the package's resources (exact match)
+            providers: Providers the package spans (defaults to ``provider_name``)
 
         Returns:
             True if resources were updated, False if no resources found
@@ -625,11 +649,20 @@ class PackageMover:
         Raises:
             RuntimeError: If the state DB update fails
         """
+        names = set(resource_names)
+        if not names:
+            return False
+
         try:
             state_mgr = self._get_state_manager()
             state_mgr.initialize()
 
-            resources = state_mgr.get_resources(environment=source_env, provider=provider_name)
+            resources = [
+                r
+                for prov in (providers if providers is not None else [provider_name])
+                for r in state_mgr.get_resources(environment=source_env, provider=prov)
+                if r.name in names
+            ]
 
             updated_count = 0
             for resource in resources:

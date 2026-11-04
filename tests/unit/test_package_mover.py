@@ -439,7 +439,14 @@ class TestExecute:
 
         with patch.object(mover, "_update_state_db", return_value=True) as mock_db:
             mover.execute("prod", "my-cluster", "staging")
-            mock_db.assert_called_once_with("prod", "staging", "proxmox", "my-cluster")
+            mock_db.assert_called_once_with(
+                "prod",
+                "staging",
+                "proxmox",
+                "my-cluster",
+                resource_names=["my-cluster"],
+                providers=["proxmox"],
+            )
 
 
 class TestAddProviderToManifest:
@@ -622,3 +629,105 @@ class TestExecuteRollback:
 
         mock_state_mgr.initialize.assert_called()
         mock_state_mgr.get_resources.assert_called_once()
+
+
+class TestUpdateStateDbScope:
+    """_update_state_db moves only the moved package's resources (#1139)."""
+
+    @pytest.fixture
+    def state_mgr(self, tmp_path: Path) -> Any:
+        from infrafoundry.core.state.state_manager import StateManager
+
+        mgr = StateManager(connection_string=f"sqlite:///{tmp_path / 'isolated-state.db'}")
+        mgr.initialize()
+        return mgr
+
+    @pytest.fixture
+    def db_mover(
+        self,
+        config_dir: Path,
+        generated_dir: Path,
+        state_mgr: Any,
+        mock_terraform_runner: MagicMock,
+    ) -> PackageMover:
+        return PackageMover(
+            config_dir=config_dir,
+            generated_dir=generated_dir,
+            terraform_runner=mock_terraform_runner,
+            state_manager=state_mgr,
+        )
+
+    @staticmethod
+    def _track(state_mgr: Any, env: str, provider: str, name: str) -> None:
+        from infrafoundry.core.state.models import ResourceState
+
+        dep = state_mgr.create_deployment(environment=env, command="apply")
+        state_mgr.track_resource(
+            deployment_id=dep,
+            environment=env,
+            provider=provider,
+            resource_type="vm",
+            name=name,
+            state=ResourceState.ACTIVE,
+        )
+
+    @staticmethod
+    def _names(state_mgr: Any, env: str) -> set[str]:
+        return {r.name for r in state_mgr.get_resources(environment=env)}
+
+    def test_only_moved_package_rows_move(self, db_mover: PackageMover, state_mgr: Any) -> None:
+        for name in ("pkg-a-vm", "pkg-b-vm"):
+            self._track(state_mgr, "prod", "proxmox", name)
+
+        moved = db_mover._update_state_db(
+            "prod", "staging", "proxmox", "pkg-a", resource_names=["pkg-a-vm"]
+        )
+
+        assert moved is True
+        assert self._names(state_mgr, "staging") == {"pkg-a-vm"}
+        assert self._names(state_mgr, "prod") == {"pkg-b-vm"}
+
+    def test_rollback_direction_restores_only_same_rows(
+        self, db_mover: PackageMover, state_mgr: Any
+    ) -> None:
+        for name in ("pkg-a-vm", "pkg-b-vm"):
+            self._track(state_mgr, "prod", "proxmox", name)
+        self._track(state_mgr, "staging", "proxmox", "pre-existing")
+
+        db_mover._update_state_db(
+            "prod", "staging", "proxmox", "pkg-a", resource_names=["pkg-a-vm"]
+        )
+        db_mover._update_state_db(
+            "staging", "prod", "proxmox", "pkg-a", resource_names=["pkg-a-vm"]
+        )
+
+        assert self._names(state_mgr, "prod") == {"pkg-a-vm", "pkg-b-vm"}
+        assert self._names(state_mgr, "staging") == {"pre-existing"}
+
+    def test_empty_names_moves_nothing(self, db_mover: PackageMover, state_mgr: Any) -> None:
+        self._track(state_mgr, "prod", "proxmox", "pkg-a-vm")
+
+        assert db_mover._update_state_db("prod", "staging", "proxmox", "pkg-a") is False
+        assert (
+            db_mover._update_state_db("prod", "staging", "proxmox", "pkg-a", resource_names=[])
+            is False
+        )
+        assert self._names(state_mgr, "prod") == {"pkg-a-vm"}
+        assert self._names(state_mgr, "staging") == set()
+
+    def test_spans_listed_providers_only(self, db_mover: PackageMover, state_mgr: Any) -> None:
+        self._track(state_mgr, "prod", "proxmox", "pkg-a-vm")
+        self._track(state_mgr, "prod", "netapp", "pkg-a-vm")
+        self._track(state_mgr, "prod", "other", "pkg-a-vm")
+
+        db_mover._update_state_db(
+            "prod",
+            "staging",
+            "proxmox",
+            "pkg-a",
+            resource_names=["pkg-a-vm"],
+            providers=["proxmox", "netapp"],
+        )
+
+        remaining = state_mgr.get_resources(environment="prod")
+        assert [r.provider for r in remaining] == ["other"]
