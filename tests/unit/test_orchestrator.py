@@ -277,6 +277,67 @@ class TestOrchestratorValidateResources:
         ):
             orchestrator.validate_resources([resource])
 
+    def test_validate_resources_unsupported_type_reports_reason(self, tmp_path: Path) -> None:
+        """A type in get_unsupported_resource_types raises with the reason (#1149)."""
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        orchestrator = Orchestrator(config_manager)
+
+        provider = Mock(spec=ProviderBase)
+        provider.name = "proxmox"
+        provider.get_resource_types.return_value = ["vm"]
+        provider.get_unsupported_resource_types.return_value = {"old": "gone on 26.1"}
+        orchestrator.register_provider(provider)
+
+        resource = Mock()
+        resource.provider = "proxmox"
+        resource.type = "old"
+        resource.name = "r1"
+
+        with pytest.raises(ValueError, match=r"Resource 'r1' has type 'old'.*gone on 26\.1"):
+            orchestrator.validate_resources([resource])
+
+    def test_validate_resources_mock_hook_falls_back_to_generic(self, tmp_path: Path) -> None:
+        """A non-dict hook result (Mock) leaves the generic message unchanged."""
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        orchestrator = Orchestrator(config_manager)
+
+        provider = Mock(spec=ProviderBase)
+        provider.name = "proxmox"
+        provider.get_resource_types.return_value = ["vm"]
+        orchestrator.register_provider(provider)
+
+        resource = Mock()
+        resource.provider = "proxmox"
+        resource.type = "nope"
+        resource.name = "r1"
+
+        with pytest.raises(ValueError, match="does not support resource type 'nope'"):
+            orchestrator.validate_resources([resource])
+
+    def test_validate_resources_real_opnsense_provider(self, tmp_path: Path) -> None:
+        """system.dns is rejected with its reason; system.tuning passes (#1149)."""
+        from infrafoundry.providers.opnsense import OPNsenseProvider
+
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        orchestrator = Orchestrator(config_manager)
+        orchestrator.register_provider(OPNsenseProvider(tmp_path, tmp_path))
+
+        good = Mock()
+        good.provider = "opnsense"
+        good.type = "system.tuning"
+        good.name = "settings"
+        orchestrator.validate_resources([good])
+
+        bad = Mock()
+        bad.provider = "opnsense"
+        bad.type = "system.dns"
+        bad.name = "dns"
+        with pytest.raises(ValueError, match=r"not supported through the OPNsense API on 26\.1"):
+            orchestrator.validate_resources([bad])
+
     def test_validate_resources_empty_list(self, tmp_path: Path) -> None:
         """Test validation succeeds with empty resource list."""
         config_manager = Mock(spec=ConfigManager)

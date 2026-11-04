@@ -32,7 +32,8 @@ tags:
 **Amended:** 2026-05-12 (#788) — `radvd` per-component decision recorded (modern MVC controller `radvd/settings/*Entry`; **hybrid YAML-singleton/wire-list** pattern — operator authors a single dict-shape `radvd` resource whose `interfaces` mapping carries one inner mapping per interface, while the wire side stores per-interface UUID records). Identity is the wire `interface` field per record. Full-reconcile semantics: interfaces in live state but absent from YAML are DELETED (safe — deleting a record stops RA emission, no data loss). New shared finalization hook key `radvd_reconfigure` (third hook after `kea_reconfigure` and `unbound_reconfigure`) coalesces a single `radvd/service/reconfigure` call per apply. Live API probe (2026-05-10, captured in `tmp/agents/claude/probe-788.md`) confirmed the `*Entry` verb suffix (NOT `*Item`) and the wire field schema; per-interface `enabled` field replaces a global enable toggle.
 **Amended:** 2026-05-10 (#806) — Seven `opnsense.system.*` singleton per-component decisions recorded: `system.hostname`, `system.dns`, `system.ssh`, `system.webgui`, `system.firmware` (keystone — install-missing-only plugin behavior; never auto-removes; unblocks #790 acmeclient and #808 openvpn-legacy by installing `os-acme-client`, `os-dmidecode`, `os-gdrive-backup`, `os-openvpn-legacy`, `os-smart` on the cutover target), `system.remotebackup` (second direct-API surface to carry secret-bearing fields after `virtual_ips` from #723; trigger for the new `validators/_secrets.py` helper enforcing `secret://env_secrets/...` URIs at plan time for `gdrive_password` / `gdrive_p12_key`), and `system.tuning` (optional 7th — empty on both source and target boxes today; included so future operator sysctl tweaks have a typed home). All seven are dict-shape singletons under the nested `opnsense:` namespace from ADR-0016; the loader's `DOTTED_RESOURCE_SHAPES` map is extended for each. New shared scaffolding `components/_singleton.py` (`SingletonDiff`, `diff_singleton`, `enforce_singleton`) is reusable by upcoming singletons in #786, #787, #788, #790, #791, #792.
 **Amended:** 2026-06-18 (#789) — `cron_jobs` per-component decision recorded (stock direct-REST against `cron/settings/*` MVC controller; list-shape full-reconcile; description-suffix identity scheme `[infrafoundry:<name>]`; new `cron_reconfigure` finalization hook — fourth after `kea_reconfigure`, `unbound_reconfigure`, and `radvd_reconfigure`; destroy calls `reconfigure` directly; `plugin_conflicts()` guards against shared-command collisions; `lock: true` per-resource skips diff and destroy paths).
-**Amended:** 2026-10-27 (#1144, #1149) — `radvd` and `cron.jobs` are accepted by `OPNsenseProvider.get_resource_types()`, which is now derived from the direct-API manager table. Before this they had managers but were rejected before planning. The seven `system.*` singletons from #806 stay rejected through `OPNsenseProvider.UNVERIFIED_RESOURCE_TYPES`: on OPNsense 26.1 their services' read endpoints return 404 or an error (`system/general`, `system/settings`, `firmware/info`, `gdrivebackup/settings`, `diagnostics/system/sysctl`), so their per-component decisions below are not in effect until #1149 fixes them.
+**Amended:** 2026-10-27 (#1144, #1149) — `radvd` and `cron.jobs` are accepted by `OPNsenseProvider.get_resource_types()`, which is now derived from the direct-API manager table. Before this they had managers but were rejected before planning. The seven `system.*` singletons from #806 stay rejected: on OPNsense 26.1 their services' read endpoints return 404 or an error (`system/general`, `system/settings`, `firmware/info`, `gdrivebackup/settings`, `diagnostics/system/sysctl`). #1149 resolves this (see the next line).
+**Amended:** 2026-11-04 (#1149) — `system.firmware` and `system.tuning` move to the 26.1 `core/firmware/*` and `core/tunables/*` controllers and are accepted (reads verified live on 26.1.6_2; writes follow the MVC convention and are not yet verified live). `system.hostname`, `system.dns`, `system.ssh`, `system.webgui` and `system.remotebackup` have no API on 26.1 and are retired: they move to `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (type to reason), surfaced through the additive `ProviderBase.get_unsupported_resource_types()` hook so `infra plan`/`apply` and `infra doctor` report the reason. Their managers stay registered but are unreachable; deleting them is a follow-up.
 **Status:** Accepted
 
 ## Status
@@ -276,6 +277,8 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 ### `system.hostname` (#806, 2026-05-10)
 
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
+
 **Mechanism:** Stock direct-REST against `system/general/*` (default §1 path). New singleton component manager `SystemHostnameManager` (in `components/system_hostname.py`) drives `OPNsenseDirectRunner` for hostname/domain/timezone/language drift. First of the 7 `opnsense.system.*` singletons added in #806, all sharing the new `_singleton.py` helper (`SingletonDiff`, `diff_singleton`, `enforce_singleton`).
 
 - **Endpoints:** `GET system/general/get` / `POST system/general/set`. Wrapped via the new `SystemClient` class in `api_client.py` alongside the other `system.*` endpoints.
@@ -286,6 +289,8 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Cross-reference notes:** None. Self-contained singleton with no `SIBLING_RESOURCE_TYPE`.
 
 ### `system.dns` (#806, 2026-05-10)
+
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
 
 **Mechanism:** Stock direct-REST sharing the `system/general/*` controller with `system.hostname` — the same XML block in OPNsense's config carries both surfaces, but the InfraFoundry component split keeps them as independent singletons so an operator can edit DNS resolvers without touching hostname.
 
@@ -298,6 +303,8 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 ### `system.ssh` (#806, 2026-05-10)
 
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
+
 **Mechanism:** Stock direct-REST against `system/settings/*` (the SSH and WebGUI surfaces share that controller; this manager only writes the `ssh` subkey).
 
 - **Endpoints:** `GET system/settings/get` / `POST system/settings/set` (subkey `ssh`). Wrapped as `SystemClient.get_system_settings` / `set_system_settings`.
@@ -308,6 +315,8 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Cross-reference notes:** None. The `interfaces` list members are validated only as strings (a follow-up could resolve them against `interfaces.assignments` at plan time).
 
 ### `system.webgui` (#806, 2026-05-10)
+
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
 
 **Mechanism:** Stock direct-REST against `system/settings/*` (subkey `webgui` — shared controller with `system.ssh`).
 
@@ -320,21 +329,23 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 ### `system.firmware` (#806 keystone, 2026-05-10)
 
-**Mechanism:** **Asymmetric direct-REST** — read via `firmware/info`, write via `firmware/install/<plugin_name>` (one POST per missing plugin). This is the **keystone** of #806: without `firmware.plugins` automating the install of contrib plugins, the modern controllers for follow-up issues (#790 AcmeClient, #808 OpenVPN-legacy) don't exist on the cutover target and `infra apply` for those issues silently no-ops with 404s.
+**Mechanism:** Direct-REST against the 26.1 `core/firmware/*` controller (#1149): plugins read via `core/firmware/info`, settings read via `core/firmware/get`, plugins written via `core/firmware/install/<plugin_name>` (one POST per missing plugin; asynchronous on OPNsense, returns a job acknowledgement), settings written via `core/firmware/set`. This is the **keystone** of #806: without `firmware.plugins` automating the install of contrib plugins, the modern controllers for follow-up issues (#790 AcmeClient, #808 OpenVPN-legacy) don't exist on the cutover target and `infra apply` for those issues silently no-ops with 404s.
 
-- **Endpoints:** `GET firmware/info`, `POST firmware/install/<plugin_name>`, `POST firmware/lock/<plugin_name>` (pin), `POST firmware/remove/<plugin_name>` (**apply path NEVER calls** — see semantics below).
+- **Endpoints:** `GET core/firmware/info` and `GET core/firmware/get` (verified live, 26.1.6_2); `POST core/firmware/set`, `POST core/firmware/install/<plugin_name>`, `POST core/firmware/lock/<plugin_name>`, `POST core/firmware/remove/<plugin_name>` (**unverified live**; `remove`/`lock` are never called by apply).
 - **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`. Each installed plugin gets its own `ResourceOutcome` row with `action="add"` and `resource_name=<plugin_name>` so the runner's apply summary surfaces install counts.
-- **Wire schema:** `{plugins: list[str], mirror: str, flavour: str}`. The XML form is comma-joined for `plugins`; `build_desired_plugin_list` accepts either a comma-string or a list.
+- **Wire schema:** `{plugins: list[str], mirror, flavour, type, subscription, reboot}`. Settings come from `{"firmware": {...}}`; only the settings keys present in YAML are compared or written, so an omitted `mirror`/`flavour` is never blanked. `build_desired_plugin_list` accepts either a comma-string or a list.
 - **Apply semantics (per the #806 user decision, 2026-05-10):**
   - **Install-missing only.** Plugins in YAML but not on the box are installed, one POST per name.
   - **Extras → warning, never removed.** Plugins on the box but not in YAML are logged at WARNING level only — `remove_plugin` is **never called** from the apply path. Deliberate safety departure from the usual "live state == YAML state" symmetry: an operator who forgot to declare `os-tailscale` in YAML must not lose Tailscale on the next apply.
-  - **Settings drift surfaced but not auto-written.** `mirror` / `flavour` drift is reported at WARNING level; the operator acts via the GUI or a follow-up. The XML-only inference for #806 doesn't confirm a writable settings endpoint and the keystone use case is plugin install.
+  - **Settings drift is written.** Drifted YAML-named keys go out as `POST core/firmware/set` with `{"firmware": {<drifted keys>}}` (partial payload assumed from MVC `setBase`; unverified live). Logs carry keys, never values.
   - **Destroy is a no-op.** Don't auto-uninstall.
 - **Validator scope:** `SystemFirmwareValidator`. Validates `plugins` is a list of non-empty strings; warns (does not error) when a plugin name doesn't match the `os-<slug>` convention (operator may legitimately install non-`os-*` packages). Plain settings fields are type-checked.
-- **Rollback strategy:** Per-plugin install failures are reported by OPNsense's `firmware/install/*` synchronous response; failures fail the apply loud. No transactional rollback (an install that succeeded before another failed is not auto-removed). Plugin uninstalls are an explicit operator action.
+- **Rollback strategy:** Per-plugin install a `{"result": "failed"}` answer fails the apply loud. The install itself is asynchronous on OPNsense, so completion is not awaited and the behavior of a second install while one runs is unknown (unverified). No transactional rollback (an install that succeeded before another failed is not auto-removed). Plugin uninstalls are an explicit operator action.
 - **Cross-reference notes:** This component **is itself the cross-reference resolver** for follow-up issues — installing `os-acme-client` here unblocks #790, installing `os-openvpn-legacy` unblocks #808.
 
 ### `system.remotebackup` (#806, 2026-05-10)
+
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
 
 **Mechanism:** Stock direct-REST against the modern `gdrivebackup/settings/*` MVC controller. **Second direct-API surface** (after `virtual_ips` from #723) to carry secret-bearing fields — the trigger for the secret-required validator pattern in `validators/_secrets.py`.
 
@@ -346,15 +357,16 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Rollback strategy:** Same as §1's default.
 - **Cross-reference notes:** None. Self-contained singleton.
 
-### `system.tuning` (#806 optional 7th, 2026-05-10)
+### `system.tuning` (#806 optional 7th, 2026-05-10; reworked #1149)
 
-**Mechanism:** Stock direct-REST against `diagnostics/system/sysctl/*` MVC controller. Empty on both source and target boxes today; included in the #806 scaffold so future operator sysctl tweaks have a typed home rather than living as untyped YAML metadata.
+**Mechanism:** Direct-REST against the 26.1 `core/tunables/*` controller (#1149). Per-tunable add/update, matched by tunable name. Tunables not named in YAML (the box defaults) are never touched; destroy is a no-op.
 
-- **Endpoints:** `GET diagnostics/system/sysctl/get` / `POST diagnostics/system/sysctl/set`.
-- **Identity:** singleton — `name="settings"`, `get_resource_ids()` returns `{"settings": "global"}`.
-- **Wire schema:** `{items: list[{tunable, value, descr}]}`. The MVC controller returns items either as a list of dicts or as a dict keyed by UUID; `_coerce_items` normalizes both to a sorted list so equality is stable across calls.
-- **Validator scope:** `SystemTuningValidator`. Validates `items` is a list of dicts; each entry's `tunable` must be a non-empty string, `value` must be a scalar (str/int/bool/float), `descr` (optional) must be a string.
-- **Rollback strategy:** Same as §1's default. Empty on the cutover target so first apply with new tunables exercises the path.
+- **Endpoints:** `GET core/tunables/get` (verified live, 26.1.6_2; items under `sysctl.item`, keyed by uuid); `POST core/tunables/addItem`, `setItem/<uuid>`, `delItem/<uuid>` (never called) and `POST core/tunables/reconfigure` (**unverified live**, MVC convention).
+- **Identity:** singleton `settings` for the resource; each tunable is identified by its name. `get_resource_ids()` returns `{"settings": "global"}`.
+- **Wire schema:** `{items: list[{tunable, value, descr}]}` in YAML; the wire payload is `{"sysctl": {"tunable", "value", "descr"}}`. Booleans become `"1"`/`"0"`. An omitted `descr` keeps the live one.
+- **Apply:** `add_tunable` per new name, `set_tunable(uuid, ...)` per changed one; the `tunables_reconfigure` finalization hook fires one `core/tunables/reconfigure` when anything changed.
+- **Validator scope:** `SystemTuningValidator` (now wired into `OPNsenseValidator`). Validates `items` is a list of dicts; each `tunable` is a non-empty string and unique, `value` a scalar, `descr` (optional) a string.
+- **Rollback strategy:** Same as §1's default.
 - **Cross-reference notes:** None.
 
 ### `radvd` (#788, 2026-05-12)

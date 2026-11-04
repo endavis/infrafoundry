@@ -2322,3 +2322,54 @@ def test_package_on_create_requires_gets_only_own_package_vars(
     )
 
     assert sorted(seen, key=lambda s: s[0]) == [("pa", {"x": 1}), ("pb", {"y": 2})]
+
+
+class _UnsupportedProvider:
+    """Provider that lists an unsupported type through the optional hook."""
+
+    def __init__(self) -> None:
+        self.validate_connectivity = MagicMock()
+        self.validate_references = MagicMock()
+
+    def get_unsupported_resource_types(self) -> dict[str, str]:
+        return {"bad.type": "not supported on this box"}
+
+
+def _doctor_results(provider: Any, console: Console, rtype: str) -> dict[str, Any]:
+    config_manager = MagicMock()
+    config_manager.load_environment.return_value = SimpleNamespace(
+        model_dump=lambda: {"name": "dev"}
+    )
+    resource = _resource("thing", provider="opnsense")
+    resource.type = rtype
+    by_provider = {"opnsense": [resource]}
+    validation = ValidationOrchestrator(
+        config_manager,
+        console,
+        get_providers=lambda: {"opnsense": provider},
+        load_resources=lambda env: ([resource], by_provider),
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("opnsense", [resource], 1)
+        ],
+    )
+    return validation.validate("dev", resource_filter=None, verbose=False)
+
+
+def test_doctor_reports_unsupported_type_with_reason(console: Console) -> None:
+    """An unsupported type fails doctor with the provider's reason (#1149)."""
+    results = _doctor_results(_UnsupportedProvider(), console, "bad.type")
+
+    assert results["opnsense"]["passed"] is False
+    failed = [r for r in results["opnsense"]["report"].results if not r.passed]
+    assert [r.check_name for r in failed] == ["unsupported_resource_type_thing"]
+    assert "not supported on this box" in failed[0].message
+
+
+def test_doctor_adds_no_unsupported_check_without_hook(console: Console) -> None:
+    """A provider without the hook gets no such check."""
+    provider = MagicMock(spec=["validate_connectivity", "validate_references"])
+
+    results = _doctor_results(provider, console, "bad.type")
+
+    names = [r.check_name for r in results["opnsense"]["report"].results]
+    assert not any(n.startswith("unsupported_resource_type_") for n in names)

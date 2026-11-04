@@ -3,6 +3,7 @@
 import json
 import logging
 from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import quote
 
 import httpx
 from opnsense_openapi import OPNsenseClient as OpenAPIOPNsenseClient
@@ -667,11 +668,11 @@ class SystemClient:
     up with a singleton component manager declared in
     ``OPNsenseProvider.get_direct_api_resource_types()``.
 
-    Endpoint shapes are based on the XML structure of the source box
-    (recorded in ``tmp/agents/claude/probe-806.md``) and the standard
-    OPNsense REST conventions ``/api/<module>/<controller>/<verb>``. The
-    operator should re-verify endpoint shapes via a live probe after the
-    cutover.
+    ``system.firmware`` and ``system.tuning`` use the 26.1 ``core/firmware``
+    and ``core/tunables`` controllers (#1149): the reads were verified live
+    on 26.1.6_2, the writes follow the MVC convention and are unverified.
+    The general/settings/gdrivebackup methods are retained but 404 on 26.1;
+    their types are unsupported.
 
     Args:
         client: ``OPNsenseClient`` instance for making authenticated requests.
@@ -688,6 +689,8 @@ class SystemClient:
     def get_general_settings(self) -> dict[str, Any]:
         """Fetch the OPNsense system general settings (hostname/domain/dns).
 
+        404 on 26.1; type is unsupported (#1149).
+
         Returns:
             Raw API response. The wire envelope is typically nested under
             ``{"general": {...}}`` or ``{"system": {"general": {...}}}`` —
@@ -697,6 +700,8 @@ class SystemClient:
 
     def set_general_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Update OPNsense system general settings.
+
+        404 on 26.1; type is unsupported (#1149).
 
         Args:
             settings: Settings payload, typically wrapped in a ``general``
@@ -714,6 +719,8 @@ class SystemClient:
     def get_system_settings(self) -> dict[str, Any]:
         """Fetch the OPNsense system settings (ssh + webgui subkeys).
 
+        404 on 26.1; type is unsupported (#1149).
+
         Returns:
             Raw API response. Subkeys ``ssh`` and ``webgui`` are read by
             the per-surface services.
@@ -722,6 +729,8 @@ class SystemClient:
 
     def set_system_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Update OPNsense system settings.
+
+        404 on 26.1; type is unsupported (#1149).
 
         Args:
             settings: Payload for the ssh/webgui sub-blocks. The caller is
@@ -737,53 +746,75 @@ class SystemClient:
     # ------------------------------------------------------------------
 
     def get_firmware_info(self) -> dict[str, Any]:
-        """Fetch firmware/plugin info: version + installed plugins/packages.
+        """Fetch firmware info: version metadata plus the plugin/package list.
+
+        Verified live on OPNsense 26.1.6_2.
 
         Returns:
-            Raw API response. Notable fields:
-            - ``plugin``: list of installed/known plugins with ``installed`` flag.
-            - ``package``: list of installed/known packages.
-            - ``product_*``: version metadata.
+            Raw API response; the ``package`` / ``plugin`` lists carry an
+            ``installed`` flag (string ``"0"``/``"1"``).
         """
-        return self.client.request("GET", "firmware/info")
+        return self.client.request("GET", "core/firmware/info")
+
+    def get_firmware_settings(self) -> dict[str, Any]:
+        """Fetch firmware settings (mirror, flavour, type, ...).
+
+        Verified live on OPNsense 26.1.6_2.
+
+        Returns:
+            Raw response; settings live under the ``firmware`` key.
+        """
+        return self.client.request("GET", "core/firmware/get")
+
+    def set_firmware_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Update firmware settings.
+
+        Unverified against a live box: the ``{"firmware": {...}}`` partial
+        payload follows the MVC ``setBase`` convention (#1149).
+
+        Args:
+            payload: ``{"firmware": {<field>: <value>}}``.
+
+        Returns:
+            Response with ``result`` field.
+        """
+        return self.client.request("POST", "core/firmware/set", data=payload)
 
     def install_plugin(self, name: str) -> dict[str, Any]:
         """Install a single OPNsense plugin (e.g., ``os-acme-client``).
 
+        Unverified against a live box. The install is asynchronous on
+        OPNsense and returns a job acknowledgement (#1149).
+
         Args:
-            name: Plugin name. Usually starts with ``os-`` for community
-                / contrib plugins.
+            name: Plugin name; percent-encoded into the URL path.
 
         Returns:
             API response (typically a job-acknowledgement payload).
         """
-        return self.client.request("POST", f"firmware/install/{name}")
+        return self.client.request("POST", f"core/firmware/install/{quote(name, safe='')}")
 
     def remove_plugin(self, name: str) -> dict[str, Any]:
-        """Remove an OPNsense plugin.
-
-        Provided for symmetry with ``install_plugin``; the apply-path of
-        :class:`SystemFirmwareManager` does **NOT** call this — extras
-        are warned about, not removed (operator decision per #806).
+        """Remove an OPNsense plugin (unverified; apply never calls this).
 
         Args:
-            name: Plugin name to remove.
+            name: Plugin name to remove; percent-encoded into the URL path.
 
         Returns:
             API response.
         """
-        return self.client.request("POST", f"firmware/remove/{name}")
+        return self.client.request("POST", f"core/firmware/remove/{quote(name, safe='')}")
 
     def lock_plugin(self, name: str) -> dict[str, Any]:
-        """Pin a plugin to its current version (no auto-upgrade).
+        """Pin a plugin to its current version (unverified; apply never calls this).
 
         Args:
-            name: Plugin name to lock.
+            name: Plugin name to lock; percent-encoded into the URL path.
 
         Returns:
             API response.
         """
-        return self.client.request("POST", f"firmware/lock/{name}")
+        return self.client.request("POST", f"core/firmware/lock/{quote(name, safe='')}")
 
     # ------------------------------------------------------------------
     # system.remotebackup (gdrivebackup MVC)
@@ -791,6 +822,8 @@ class SystemClient:
 
     def get_remotebackup_settings(self) -> dict[str, Any]:
         """Fetch OPNsense remote-backup (Google Drive) settings.
+
+        404 on 26.1; type is unsupported (#1149).
 
         Returns:
             Raw API response. The wire envelope is typically
@@ -801,6 +834,8 @@ class SystemClient:
 
     def set_remotebackup_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Update OPNsense remote-backup (Google Drive) settings.
+
+        404 on 26.1; type is unsupported (#1149).
 
         Args:
             settings: Payload (envelope matches the GET shape).
@@ -814,25 +849,59 @@ class SystemClient:
     # system.tuning (sysctl tunables)
     # ------------------------------------------------------------------
 
-    def get_tuning_settings(self) -> dict[str, Any]:
-        """Fetch OPNsense system-tuning (sysctl) settings.
+    def get_tunables(self) -> dict[str, Any]:
+        """Fetch all system tunables (sysctl).
+
+        Verified live on OPNsense 26.1.6_2.
 
         Returns:
-            Raw API response. The MVC ``sysctl`` controller exposes
-            ``get`` for the current ``items`` collection.
+            Raw response; items live under ``sysctl.item``, keyed by uuid.
         """
-        return self.client.request("GET", "diagnostics/system/sysctl/get")
+        return self.client.request("GET", "core/tunables/get")
 
-    def set_tuning_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Update OPNsense system-tuning (sysctl) settings.
+    def add_tunable(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Add a tunable. Unverified write (MVC convention, #1149).
 
         Args:
-            settings: Payload of sysctl items to set.
+            payload: ``{"sysctl": {"tunable": ..., "value": ..., "descr": ...}}``.
 
         Returns:
             Response with ``result`` field.
         """
-        return self.client.request("POST", "diagnostics/system/sysctl/set", data=settings)
+        return self.client.request("POST", "core/tunables/addItem", data=payload)
+
+    def set_tunable(self, uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Update a tunable by uuid. Unverified write (MVC convention, #1149).
+
+        Args:
+            uuid: Tunable uuid; percent-encoded into the URL path.
+            payload: ``{"sysctl": {...}}``.
+
+        Returns:
+            Response with ``result`` field.
+        """
+        return self.client.request(
+            "POST", f"core/tunables/setItem/{quote(uuid, safe='')}", data=payload
+        )
+
+    def del_tunable(self, uuid: str) -> dict[str, Any]:
+        """Delete a tunable by uuid. Unverified; apply never calls this.
+
+        Args:
+            uuid: Tunable uuid; percent-encoded into the URL path.
+
+        Returns:
+            Response with ``result`` field.
+        """
+        return self.client.request("POST", f"core/tunables/delItem/{quote(uuid, safe='')}")
+
+    def reconfigure_tunables(self) -> dict[str, Any]:
+        """Apply pending tunable changes. Unverified write (#1149).
+
+        Returns:
+            Response with ``status`` field.
+        """
+        return self.client.request("POST", "core/tunables/reconfigure")
 
 
 class RadvdClient:

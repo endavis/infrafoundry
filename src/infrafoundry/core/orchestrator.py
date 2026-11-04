@@ -33,7 +33,12 @@ from infrafoundry.core.orchestrator_workflows import (
 from infrafoundry.core.policy import PolicyEngine, PolicyViolation
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.protocols import HasSnippetStrictness
-from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider import (
+    ProviderBase,
+    ResourceConfig,
+    unsupported_resource_message,
+    unsupported_resource_reason,
+)
 from infrafoundry.core.provider_registry_service import ProviderRegistryService
 from infrafoundry.core.requirements.manager import RequirementsManager
 from infrafoundry.core.runners import RunnerRegistry
@@ -370,7 +375,8 @@ class Orchestrator:
             resources: List of ResourceConfig objects to validate
 
         Raises:
-            ValueError: If a resource's provider doesn't support its type
+            ValueError: If a resource's provider doesn't support its type; the
+                message carries the provider's reason when it lists one (#1149)
         """
         for resource in resources:
             provider_name = resource.provider
@@ -387,6 +393,13 @@ class Orchestrator:
             provider = self.providers[provider_name]
             supported_types = provider.get_resource_types()
             if resource_type not in supported_types:
+                reason = unsupported_resource_reason(provider, resource_type)
+                if reason is not None:
+                    raise ValueError(
+                        unsupported_resource_message(
+                            provider_name, resource.name, resource_type, reason
+                        )
+                    )
                 raise ValueError(
                     f"Provider '{provider_name}' does not support resource type "
                     f"'{resource_type}' for resource '{resource.name}'. "

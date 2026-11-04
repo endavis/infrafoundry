@@ -1,28 +1,62 @@
-"""System tuning (sysctl) component manager for OPNsense (#806).
+"""System tuning (sysctl) component manager for OPNsense (#806, #1149).
 
-Singleton component manager for the ``system.tuning`` dotted resource
-type — the optional 7th #806 surface. Manages OPNsense system tunables
-(sysctl items) via the ``diagnostics/system/sysctl/*`` controller.
-
-Empty on both source and target boxes today; included so future operator
-sysctl tweaks have a typed home rather than living in YAML as untyped
-metadata.
+Manager for the ``system.tuning`` dotted resource type. Uses the 26.1
+``core/tunables/*`` controller: each tunable named in YAML is added or
+updated, matched by tunable name. Tunables not named in YAML (the box
+defaults) are never touched, and destroy is a no-op. The reads were
+verified live on 26.1.6_2; the writes are unverified (MVC convention).
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
+from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
 
 from ..services.system_tuning import SystemTuningService
-from ._singleton import SingletonDiff, diff_singleton, enforce_singleton
+from ._singleton import enforce_singleton
 from .base import BaseComponentManager
 
 
+class _TuningDiff:
+    """Plan-shape diff with the same surface as ``SingletonDiff``."""
+
+    def __init__(self, adds: list[dict[str, Any]], updates: list[dict[str, Any]]) -> None:
+        """Initialize with per-tunable adds and updates."""
+        self.adds = adds
+        self.updates = updates
+        self.deletes: list[Any] = []
+        self.locked: list[Any] = []
+
+    @property
+    def is_empty(self) -> bool:
+        """Return True when there is nothing to add or update."""
+        return not self.adds and not self.updates
+
+
 class SystemTuningManager(BaseComponentManager):
-    """Manager for OPNsense system-tuning singleton operations."""
+    """Manager for OPNsense system tunables (per-tunable add/update)."""
+
+    #: Fires one ``core/tunables/reconfigure`` per apply when any tunable
+    #: changed (the apply path never reconfigures itself).
+    FINALIZATION_HOOK: ClassVar[str] = "tunables_reconfigure"
+
+    def _changes(
+        self, env_name: str, resources: list[ResourceConfig], provider_name: str
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        enforce_singleton(resources, "system.tuning")
+        service = SystemTuningService.from_environment(env_name, provider_name, self.config_dir)
+        desired = service.build_desired_tunables(resources[0])
+        names = [entry["tunable"] for entry in desired]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise InvalidConfigurationError(
+                f"system.tuning lists tunable(s) more than once: {', '.join(duplicates)}"
+            )
+        live = service.extract_live_tunables(service.get_tunables())
+        return service.compute_changes(desired, live)
 
     def plan(
         self,
@@ -31,14 +65,11 @@ class SystemTuningManager(BaseComponentManager):
         *,
         add_only: bool = False,
         provider_name: str = "opnsense",
-    ) -> SingletonDiff:
-        """Compute the singleton diff for the sysctl items collection."""
+    ) -> _TuningDiff:
+        """Compute per-tunable adds and updates; live-only tunables are ignored."""
         del add_only
-        enforce_singleton(resources, "system.tuning")
-        service = SystemTuningService.from_environment(env_name, provider_name, self.config_dir)
-        live = service.extract_tuning_fields(service.get_settings())
-        desired = service.build_desired_tuning_fields(resources[0])
-        return SingletonDiff(diff_singleton(live, desired))
+        adds, updates = self._changes(env_name, resources, provider_name)
+        return _TuningDiff(adds, updates)
 
     def apply(
         self,
@@ -49,36 +80,39 @@ class SystemTuningManager(BaseComponentManager):
         add_only: bool = False,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
-        """Apply the singleton diff: write sysctl items if drifted."""
+        """Add and update the tunables named in YAML.
+
+        Reconfigure is not called here; the ``tunables_reconfigure``
+        finalization hook fires once when anything changed.
+        """
         del auto_approve, add_only
-        enforce_singleton(resources, "system.tuning")
+        adds, updates = self._changes(env_name, resources, provider_name)
         service = SystemTuningService.from_environment(env_name, provider_name, self.config_dir)
-        live = service.extract_tuning_fields(service.get_settings())
-        desired = service.build_desired_tuning_fields(resources[0])
-        diff = diff_singleton(live, desired)
-
-        if diff is None:
-            return {
-                "success": True,
-                "resources_created": 0,
-                "resources_updated": 0,
-                "resources_deleted": 0,
-                "resource_outcomes": [],
-            }
-
-        service.set_settings({"sysctl": diff})
+        outcomes: list[ResourceOutcome] = []
+        for entry in adds:
+            service.add_tunable(entry)
+            outcomes.append(
+                ResourceOutcome(
+                    address=f"opnsense_system_tunable.{entry['tunable']}",
+                    action="add",
+                    resource_name=entry["tunable"],
+                )
+            )
+        for entry in updates:
+            service.set_tunable(entry["uuid"], entry)
+            outcomes.append(
+                ResourceOutcome(
+                    address=f"opnsense_system_tunable.{entry['tunable']}",
+                    action="update",
+                    resource_name=entry["tunable"],
+                )
+            )
         return {
             "success": True,
-            "resources_created": 0,
-            "resources_updated": 1,
+            "resources_created": len(adds),
+            "resources_updated": len(updates),
             "resources_deleted": 0,
-            "resource_outcomes": [
-                ResourceOutcome(
-                    address="opnsense_system_tuning.settings",
-                    action="update",
-                    resource_name="settings",
-                )
-            ],
+            "resource_outcomes": outcomes,
         }
 
     def destroy(

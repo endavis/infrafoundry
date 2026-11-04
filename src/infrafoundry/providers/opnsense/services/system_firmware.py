@@ -22,22 +22,23 @@ This intentionally violates the usual "live state == YAML state" symmetry
 for safety: an operator who forgot to declare ``os-tailscale`` in YAML
 should not lose Tailscale on the next apply.
 
-Endpoint surface (well-known OPNsense REST verbs):
+Endpoint surface (26.1; #1149):
 
-- ``GET firmware/info`` — returns ``{plugin: [{name, installed, ...}, ...],
-  package: [...], product_*: ...}``.
-- ``POST firmware/install/<plugin_name>`` — install one plugin (audit log
-  + lengthy fetch).
-- ``POST firmware/remove/<plugin_name>`` — remove (apply path NEVER calls).
-- ``POST firmware/lock/<plugin_name>`` — pin a plugin.
+- ``GET core/firmware/info`` — plugin/package list (verified live, 26.1.6_2).
+- ``GET core/firmware/get`` — settings under ``{"firmware": {...}}``
+  (verified live, 26.1.6_2).
+- ``POST core/firmware/set`` — settings write; UNVERIFIED (MVC convention).
+- ``POST core/firmware/install/<plugin_name>`` — install one plugin;
+  UNVERIFIED. Asynchronous on OPNsense: returns a job acknowledgement.
+- ``POST core/firmware/remove|lock/<plugin_name>`` — UNVERIFIED; the apply
+  path NEVER calls them.
 
 Field schema:
 
-- ``plugins`` — list of plugin names that should be installed
-  (e.g., ``["os-tailscale", "os-acme-client"]``).
-- ``mirror`` — string (firmware mirror URL/name).
-- ``flavour`` — string (community / business).
-- ``reboot`` — string ("0"/"1") — auto-reboot after upgrade.
+- ``plugins`` — list of plugin names that should be installed.
+- ``mirror``, ``flavour``, ``type``, ``subscription``, ``reboot`` —
+  settings fields. Only the keys present in YAML are compared or written,
+  so an omitted ``mirror`` is never blanked.
 """
 
 from __future__ import annotations
@@ -48,10 +49,13 @@ from typing import Any
 from infrafoundry.core.provider import ResourceConfig
 
 from ..api_client import OPNsenseClient, SystemClient
+from ..components._singleton import diff_singleton
 from ._nested_emit import emit_nested_singleton_yaml
-from .base import BaseService
+from .base import BaseService, raise_on_failed_write
 
 logger = logging.getLogger(__name__)
+
+_SETTINGS_FIELDS = ("mirror", "flavour", "type", "subscription", "reboot")
 
 
 class SystemFirmwareService(BaseService):
@@ -74,9 +78,33 @@ class SystemFirmwareService(BaseService):
         """Fetch firmware/plugin info from OPNsense.
 
         Returns:
-            Raw API response from ``firmware/info``.
+            Raw API response from ``core/firmware/info``.
         """
         return self.system_client.get_firmware_info()
+
+    def get_firmware_settings(self) -> dict[str, Any]:
+        """Fetch firmware settings from OPNsense.
+
+        Returns:
+            Raw API response from ``core/firmware/get``.
+        """
+        return self.system_client.get_firmware_settings()
+
+    def set_firmware_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Write firmware settings.
+
+        Args:
+            payload: ``{"firmware": {<field>: <value>}}``.
+
+        Returns:
+            API response.
+
+        Raises:
+            APIError: If OPNsense answers ``{"result": "failed"}``.
+        """
+        response = self.system_client.set_firmware_settings(payload)
+        raise_on_failed_write(response, "set firmware settings")
+        return response
 
     def install_plugin(self, name: str) -> dict[str, Any]:
         """Install a single plugin.
@@ -87,7 +115,9 @@ class SystemFirmwareService(BaseService):
         Returns:
             API response.
         """
-        return self.system_client.install_plugin(name)
+        response = self.system_client.install_plugin(name)
+        raise_on_failed_write(response, f"install firmware plugin {name}")
+        return response
 
     # ------------------------------------------------------------------
     # Field extract / build
@@ -142,40 +172,49 @@ class SystemFirmwareService(BaseService):
         return sorted(set(names))
 
     def extract_firmware_settings_fields(self, api_response: dict[str, Any]) -> dict[str, Any]:
-        """Extract non-plugin firmware settings from a firmware/info response.
-
-        OPNsense's ``firmware/info`` exposes the configuration metadata
-        (``mirror``, ``flavour``, ``product_*``); not all of these are
-        operator-tunable but the readable ones are surfaced here so the
-        diff can detect drift in writeable fields like ``mirror`` and
-        ``flavour``.
+        """Extract firmware settings from a ``core/firmware/get`` response.
 
         Args:
-            api_response: Raw response from :meth:`get_firmware_info`.
+            api_response: Raw response from :meth:`get_firmware_settings`.
 
         Returns:
-            Flat ``{field: value}`` mapping for non-plugin firmware fields.
+            ``{field: str}`` for every settings field; ``{}`` when the
+            ``firmware`` envelope is missing or not a dict. ``plugins`` and
+            ``aux`` are ignored.
         """
-        return {
-            "mirror": _str(api_response.get("product_mirror") or api_response.get("mirror")),
-            "flavour": _str(api_response.get("product_flavour") or api_response.get("flavour")),
-        }
+        envelope = api_response.get("firmware")
+        if not isinstance(envelope, dict):
+            return {}
+        return {field: _str(envelope.get(field)) for field in _SETTINGS_FIELDS}
 
     def build_desired_firmware_settings_fields(self, resource: ResourceConfig) -> dict[str, Any]:
-        """Build the desired non-plugin firmware field map from a YAML singleton.
+        """Build the desired settings map: only keys present in YAML.
 
         Args:
             resource: ``system.firmware`` ``ResourceConfig``.
 
         Returns:
-            Flat ``{field: value}`` mapping mirroring
-            :meth:`extract_firmware_settings_fields`.
+            ``{field: str}`` for each settings field set in the YAML.
         """
         config = resource.config
-        return {
-            "mirror": _str(config.get("mirror")),
-            "flavour": _str(config.get("flavour")),
-        }
+        return {field: _str(config[field]) for field in _SETTINGS_FIELDS if field in config}
+
+    def settings_drift(
+        self, live: dict[str, Any], desired: dict[str, Any]
+    ) -> dict[str, str] | None:
+        """Compare only the keys named in YAML.
+
+        Args:
+            live: Output of :meth:`extract_firmware_settings_fields`.
+            desired: Output of :meth:`build_desired_firmware_settings_fields`.
+
+        Returns:
+            The desired keys/values on any difference, else ``None``.
+        """
+        if not desired:
+            return None
+        scoped = {key: live.get(key, "") for key in desired}
+        return diff_singleton(scoped, desired)
 
     # ------------------------------------------------------------------
     # Plugin reconciliation
@@ -217,11 +256,13 @@ class SystemFirmwareService(BaseService):
         """
         info = self.get_firmware_info()
         installed = self.extract_installed_plugins(info)
-        settings = self.extract_firmware_settings_fields(info)
+        settings = self.extract_firmware_settings_fields(self.get_firmware_settings())
         clean: dict[str, Any] = {}
         if installed:
             clean["plugins"] = installed
         for key, value in settings.items():
+            if key == "subscription":
+                continue
             if isinstance(value, str) and value:
                 clean[key] = value
         return emit_nested_singleton_yaml("system.firmware", clean)

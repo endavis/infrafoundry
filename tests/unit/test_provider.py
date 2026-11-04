@@ -84,3 +84,39 @@ class TestProviderBase:
         assert resource.type == "vm"
         assert resource.name == "test-vm"
         assert resource.config["cores"] == 4
+
+
+class TestUnsupportedResourceReason:
+    """Optional get_unsupported_resource_types hook and its guarded lookup (#1149)."""
+
+    def test_base_default_is_empty(self, tmp_path: Path) -> None:
+        provider = StubProviderImplementation("stub", tmp_path, tmp_path)
+
+        assert provider.get_unsupported_resource_types() == {}
+
+    def test_none_for_plain_object_and_mock_spec(self, tmp_path: Path) -> None:
+        from unittest.mock import Mock
+
+        from infrafoundry.core.provider import unsupported_resource_reason
+
+        assert unsupported_resource_reason(object(), "x") is None
+        assert unsupported_resource_reason(Mock(spec=ProviderBase), "x") is None
+
+    def test_none_for_absent_type_and_reason_for_present(self) -> None:
+        from infrafoundry.core.provider import unsupported_resource_reason
+
+        class _P:
+            def get_unsupported_resource_types(self) -> dict[str, str]:
+                return {"a": "because"}
+
+        assert unsupported_resource_reason(_P(), "b") is None
+        assert unsupported_resource_reason(_P(), "a") == "because"
+
+    def test_message_names_resource_type_provider_and_reason(self) -> None:
+        from infrafoundry.core.provider import unsupported_resource_message
+
+        message = unsupported_resource_message("opn", "res", "t.y", "why")
+
+        assert (
+            message == "Resource 'res' has type 't.y', which provider 'opn' does not support: why"
+        )

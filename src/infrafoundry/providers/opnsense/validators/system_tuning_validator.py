@@ -57,8 +57,21 @@ class SystemTuningValidator:
             )
             return
 
+        seen: set[str] = set()
         for index, entry in enumerate(items):
             self._validate_item(resource, check, index, entry)
+            if isinstance(entry, dict) and isinstance(entry.get("tunable"), str):
+                name = entry["tunable"]
+                if name in seen:
+                    self.report.add_check(
+                        check_name=f"{check}_items_duplicate",
+                        passed=False,
+                        message=(
+                            f"system.tuning '{resource.name}' lists tunable '{name}' more than once"
+                        ),
+                        level=ValidationLevel.ERROR,
+                    )
+                seen.add(name)
 
     def _validate_item(
         self,

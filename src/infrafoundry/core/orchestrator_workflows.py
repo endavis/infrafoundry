@@ -31,7 +31,13 @@ from infrafoundry.core.protocols import (
     ValidatesReferencesInContext,
     VerifiesDestroy,
 )
-from infrafoundry.core.provider import ProviderBase, ResourceConfig, group_by_package_variables
+from infrafoundry.core.provider import (
+    ProviderBase,
+    ResourceConfig,
+    group_by_package_variables,
+    unsupported_resource_message,
+    unsupported_resource_reason,
+)
 from infrafoundry.core.result_types import PlanResult
 from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
@@ -47,7 +53,7 @@ from infrafoundry.core.types import (
     RollbackDeploymentMetadata,
     RunnerEventData,
 )
-from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation import ValidationLevel, ValidationReport
 
 logger = logging.getLogger(__name__)
 
@@ -275,6 +281,20 @@ class ValidationOrchestrator:
 
             report = ValidationReport()
             self.console.print(f"[bold]Validating {provider_name}...[/bold]")
+
+            # Types the provider deliberately rejects fail doctor with the
+            # provider's reason, before any credential-dependent check (#1149).
+            for resource in resources:
+                reason = unsupported_resource_reason(provider, resource.type)
+                if reason is not None:
+                    report.add_check(
+                        f"unsupported_resource_type_{resource.name}",
+                        False,
+                        unsupported_resource_message(
+                            provider_name, resource.name, resource.type, reason
+                        ),
+                        ValidationLevel.ERROR,
+                    )
 
             # A filter limits what is checked, not what references resolve to.
             reference_resources = (

@@ -25,6 +25,12 @@ from infrafoundry.providers.opnsense.validators.resource_name_validator import (
 from infrafoundry.providers.opnsense.validators.static_route_validator import (
     StaticRouteValidator,
 )
+from infrafoundry.providers.opnsense.validators.system_firmware_validator import (
+    SystemFirmwareValidator,
+)
+from infrafoundry.providers.opnsense.validators.system_tuning_validator import (
+    SystemTuningValidator,
+)
 from infrafoundry.providers.opnsense.validators.unbound_forward_validator import (
     UnboundForwardValidator,
 )
@@ -49,6 +55,8 @@ __all__ = [
     "RadvdValidator",
     "ResourceNameValidator",
     "StaticRouteValidator",
+    "SystemFirmwareValidator",
+    "SystemTuningValidator",
     "UnboundForwardValidator",
     "UnboundHostAliasValidator",
     "UnboundHostOverrideValidator",

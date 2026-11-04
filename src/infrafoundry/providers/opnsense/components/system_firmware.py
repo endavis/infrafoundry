@@ -17,8 +17,10 @@ Apply semantics (per the #806 user decision, 2026-05-10):
   state" symmetry.
 - **Destroy is a no-op.** Don't auto-uninstall.
 
-Plus the small set of tunable settings fields (``mirror``, ``flavour``)
-follow the standard singleton diff/apply path.
+Settings drift (only keys present in YAML: ``mirror``, ``flavour``, ...) is
+written through ``core/firmware/set`` (#1149; the write is unverified live).
+Plugins are read from ``core/firmware/info`` and settings from
+``core/firmware/get``.
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
 
 from ..services.system_firmware import SystemFirmwareService
-from ._singleton import SingletonDiff, diff_singleton, enforce_singleton
+from ._singleton import SingletonDiff, enforce_singleton
 from .base import BaseComponentManager
 
 logger = logging.getLogger(__name__)
@@ -89,9 +91,9 @@ class SystemFirmwareManager(BaseComponentManager):
             )
 
         # Settings drift
-        live_settings = service.extract_firmware_settings_fields(info)
+        live_settings = service.extract_firmware_settings_fields(service.get_firmware_settings())
         desired_settings = service.build_desired_firmware_settings_fields(resources[0])
-        settings_diff = diff_singleton(live_settings, desired_settings)
+        settings_diff = service.settings_drift(live_settings, desired_settings)
 
         if settings_diff is None and not install_missing:
             return SingletonDiff(None)
@@ -112,7 +114,7 @@ class SystemFirmwareManager(BaseComponentManager):
         add_only: bool = False,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
-        """Apply: install missing plugins (one call per name), then settings.
+        """Apply: install missing plugins (one call per name), then write settings drift.
 
         Args:
             env_name: Active environment name.
@@ -155,22 +157,24 @@ class SystemFirmwareManager(BaseComponentManager):
             )
             created += 1
 
-        # Settings updates
-        live_settings = service.extract_firmware_settings_fields(info)
+        # Settings updates (keys only in logs, never values)
+        live_settings = service.extract_firmware_settings_fields(service.get_firmware_settings())
         desired_settings = service.build_desired_firmware_settings_fields(resources[0])
-        settings_diff = diff_singleton(live_settings, desired_settings)
+        settings_diff = service.settings_drift(live_settings, desired_settings)
         updated = 0
         if settings_diff is not None:
-            # Settings write goes through the firmware controller's set
-            # endpoint when one exists. The XML-only inference doesn't
-            # confirm a writable mirror/flavour endpoint; the keystone
-            # use case for #806 is plugin install, so settings drift is
-            # surfaced at plan time but not auto-written here. The
-            # operator can act on it via the GUI or a follow-up.
-            logger.warning(
-                "system.firmware: settings drift detected (%s); skipping "
-                "auto-write — use the GUI or file a follow-up",
+            logger.info(
+                "system.firmware: updating settings %s",
                 sorted(settings_diff.keys()),
+            )
+            service.set_firmware_settings({"firmware": settings_diff})
+            updated = 1
+            outcomes.append(
+                ResourceOutcome(
+                    address="opnsense_system_firmware.settings",
+                    action="update",
+                    resource_name="settings",
+                )
             )
 
         return {

@@ -153,6 +153,18 @@ class ProviderBase(ABC):
         """
         return {}
 
+    def get_unsupported_resource_types(self) -> dict[str, str]:
+        """Get resource types that are deliberately rejected, with the reason.
+
+        Optional hook (#1149). A type listed here is not in
+        ``get_resource_types()``; the orchestrator and ``infra doctor`` report
+        the reason instead of the generic "does not support" error.
+
+        Returns:
+            Dict mapping resource type to a human-readable reason
+        """
+        return {}
+
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* environment variables for this provider.
 
@@ -215,3 +227,47 @@ class ProviderBase(ABC):
         """
         # Default: no reference validation
         return None
+
+
+def unsupported_resource_reason(provider: object, resource_type: str) -> str | None:
+    """Return why a provider rejects ``resource_type``, or ``None``.
+
+    Guarded so a provider (or test double) without the optional
+    ``get_unsupported_resource_types`` hook, or one returning a non-dict, is
+    treated as having no unsupported types.
+
+    Args:
+        provider: Provider instance (any object)
+        resource_type: Resource type to look up
+
+    Returns:
+        The reason string, or ``None`` when the type is not listed
+    """
+    hook: object = getattr(provider, "get_unsupported_resource_types", None)
+    if not callable(hook):
+        return None
+    table: object = hook()
+    if not isinstance(table, dict):
+        return None
+    reason: object = table.get(resource_type)
+    return reason if isinstance(reason, str) and reason else None
+
+
+def unsupported_resource_message(
+    provider_name: str, resource: str, resource_type: str, reason: str
+) -> str:
+    """Build the error message for a resource of an unsupported type.
+
+    Args:
+        provider_name: Provider name
+        resource: Resource name
+        resource_type: The unsupported resource type
+        reason: Reason from :func:`unsupported_resource_reason`
+
+    Returns:
+        The message text
+    """
+    return (
+        f"Resource '{resource}' has type '{resource_type}', which provider "
+        f"'{provider_name}' does not support: {reason}"
+    )

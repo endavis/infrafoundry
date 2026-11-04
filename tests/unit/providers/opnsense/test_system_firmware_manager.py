@@ -15,26 +15,31 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrafoundry.core.exceptions import InvalidConfigurationError
+from infrafoundry.core.exceptions import APIError, InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.components.system_firmware import (
     SystemFirmwareManager,
 )
+from infrafoundry.providers.opnsense.services.system_firmware import SystemFirmwareService
 
 SERVICE_PATH = "infrafoundry.providers.opnsense.components.system_firmware.SystemFirmwareService"
 
 
-def _resource(*, plugins: list[str] | None = None) -> ResourceConfig:
+def _resource(
+    *, plugins: list[str] | None = None, extra: dict[str, str] | None = None
+) -> ResourceConfig:
     return ResourceConfig(
         name="settings",
         type="system.firmware",
         provider="opnsense",
         config={
             "plugins": plugins if plugins is not None else ["os-tailscale"],
+            **(extra or {}),
         },
     )
 
@@ -43,34 +48,37 @@ def _make_service_mock(
     *,
     installed: list[str] | None = None,
     settings: dict[str, str] | None = None,
-) -> MagicMock:
-    """Build a SystemFirmwareService mock.
+) -> SystemFirmwareService:
+    """Build a real ``SystemFirmwareService`` over a mocked ``SystemClient``.
 
-    The real service uses ``desired_vs_installed_plugins`` to compute
-    install_missing/extras, so the mock implements the same set algebra.
+    ``core/firmware/info`` and ``core/firmware/get`` are separate reads, so
+    the mock answers each with its live shape (``installed`` is ``"0"``/``"1"``).
     """
     installed_list = installed or []
-    settings_dict = settings or {"mirror": "", "flavour": ""}
-    service = MagicMock()
-    service.get_firmware_info.return_value = {
-        "plugin": [{"name": p, "installed": "1"} for p in installed_list]
+    service = SystemFirmwareService(MagicMock())
+    client = MagicMock()
+    client.get_firmware_info.return_value = {
+        "plugin": [{"name": p, "installed": "1", "locked": "N/A"} for p in installed_list]
+        + [{"name": "os-other", "installed": "0", "locked": "N/A"}]
     }
-    service.extract_installed_plugins.return_value = sorted(installed_list)
-    service.build_desired_plugin_list.side_effect = lambda r: sorted(
-        set(r.config.get("plugins", []))
-    )
-    service.extract_firmware_settings_fields.return_value = settings_dict
-    service.build_desired_firmware_settings_fields.side_effect = lambda r: {
-        "mirror": r.config.get("mirror", ""),
-        "flavour": r.config.get("flavour", ""),
+    client.get_firmware_settings.return_value = {
+        "firmware": {
+            "mirror": "",
+            "flavour": "",
+            "type": "",
+            "subscription": "",
+            "reboot": "0",
+            **(settings or {}),
+        }
     }
-
-    def _diff_plugins(desired: list[str], installed: list[str]) -> tuple[list[str], list[str]]:
-        return sorted(set(desired) - set(installed)), sorted(set(installed) - set(desired))
-
-    service.desired_vs_installed_plugins.side_effect = _diff_plugins
-    service.install_plugin.return_value = {"status": "ok"}
+    client.install_plugin.return_value = {"status": "ok"}
+    client.set_firmware_settings.return_value = {"result": "saved"}
+    service.system_client = client
     return service
+
+
+def _client(service: SystemFirmwareService) -> MagicMock:
+    return cast(MagicMock, service.system_client)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +118,7 @@ class TestApply:
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service
             result = manager.apply("test-env", [_resource(plugins=["os-tailscale"])])
-        service.install_plugin.assert_not_called()
+        _client(service).install_plugin.assert_not_called()
         assert result["resources_created"] == 0
         assert result["resources_updated"] == 0
 
@@ -120,7 +128,7 @@ class TestApply:
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service
             result = manager.apply("test-env", [_resource(plugins=["os-acme-client"])])
-        service.install_plugin.assert_called_once_with("os-acme-client")
+        _client(service).install_plugin.assert_called_once_with("os-acme-client")
         assert result["resources_created"] == 1
         outcome = result["resource_outcomes"][0]
         assert outcome.action == "add"
@@ -169,8 +177,8 @@ class TestPluginReconciliation:
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service
             result = manager.apply("test-env", [_resource(plugins=desired)])
-        assert service.install_plugin.call_count == 2
-        called_names = sorted(c.args[0] for c in service.install_plugin.call_args_list)
+        assert _client(service).install_plugin.call_count == 2
+        called_names = sorted(c.args[0] for c in _client(service).install_plugin.call_args_list)
         assert called_names == ["os-acme-client", "os-smart"]
         assert result["resources_created"] == 2
 
@@ -193,4 +201,85 @@ class TestPluginReconciliation:
         if diff.updates:
             assert diff.updates[0].get("install_missing", []) == []
         # Critical: ``remove_plugin`` MUST NOT be called for extras.
-        service.remove_plugin.assert_not_called()
+        _client(service).remove_plugin.assert_not_called()
+
+
+class TestSettings:
+    def test_plan_empty_when_yaml_omits_settings_and_live_has_mirror(self, tmp_path: Path) -> None:
+        manager = SystemFirmwareManager(tmp_path)
+        service = _make_service_mock(installed=["os-tailscale"], settings={"mirror": "https://m"})
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan("test-env", [_resource(plugins=["os-tailscale"])])
+        assert diff.is_empty
+
+    def test_plan_shows_settings_drift(self, tmp_path: Path) -> None:
+        manager = SystemFirmwareManager(tmp_path)
+        service = _make_service_mock(installed=["os-tailscale"], settings={"mirror": "old"})
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = manager.plan(
+                "test-env",
+                [_resource(plugins=["os-tailscale"], extra={"mirror": "new"})],
+            )
+        assert diff.updates[0]["settings"] == {"mirror": "new"}
+        assert diff.updates[0]["install_missing"] == []
+
+    def test_apply_installs_then_writes_drifted_keys_only(self, tmp_path: Path) -> None:
+        manager = SystemFirmwareManager(tmp_path)
+        service = _make_service_mock(installed=[], settings={"mirror": "old", "flavour": "latest"})
+        resource = _resource(
+            plugins=["os-acme-client", "os-smart"], extra={"mirror": "new", "flavour": "latest"}
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            result = manager.apply("test-env", [resource])
+        client = _client(service)
+        assert client.install_plugin.call_count == 2
+        client.set_firmware_settings.assert_called_once_with(
+            {"firmware": {"mirror": "new", "flavour": "latest"}}
+        )
+        assert result["resources_created"] == 2
+        assert result["resources_updated"] == 1
+        settings_outcome = result["resource_outcomes"][-1]
+        assert settings_outcome.address == "opnsense_system_firmware.settings"
+        assert settings_outcome.action == "update"
+
+    def test_apply_no_set_when_only_plugins_differ(self, tmp_path: Path) -> None:
+        manager = SystemFirmwareManager(tmp_path)
+        service = _make_service_mock(installed=[])
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            result = manager.apply("test-env", [_resource(plugins=["os-smart"])])
+        _client(service).set_firmware_settings.assert_not_called()
+        assert result["resources_updated"] == 0
+
+    def test_failed_set_raises_api_error(self, tmp_path: Path) -> None:
+        manager = SystemFirmwareManager(tmp_path)
+        service = _make_service_mock(installed=["os-tailscale"])
+        _client(service).set_firmware_settings.return_value = {
+            "result": "failed",
+            "validations": {"firmware.mirror": "bad"},
+        }
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            with pytest.raises(APIError):
+                manager.apply(
+                    "test-env",
+                    [_resource(plugins=["os-tailscale"], extra={"mirror": "new"})],
+                )
+
+    def test_logs_carry_keys_not_values(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        manager = SystemFirmwareManager(tmp_path)
+        service = _make_service_mock(installed=["os-tailscale"])
+        with caplog.at_level(logging.DEBUG), patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            manager.apply(
+                "test-env",
+                [_resource(plugins=["os-tailscale"], extra={"mirror": "secret-mirror-value"})],
+            )
+        text = " ".join(r.getMessage() for r in caplog.records)
+        assert "mirror" in text
+        assert "secret-mirror-value" not in text

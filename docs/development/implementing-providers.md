@@ -78,6 +78,21 @@ def set_environment(self, env_name: str) -> None:
 
 Providers can override these optional methods to add advanced functionality:
 
+### get_unsupported_resource_types()
+
+**Purpose:** Name resource types the provider deliberately rejects, with the reason.
+
+```python
+def get_unsupported_resource_types(self) -> dict[str, str]:
+    """Map each rejected resource type to a human-readable reason."""
+    return {}
+```
+
+A type listed here must not appear in `get_resource_types()`. `Orchestrator.validate_resources`
+(so `infra plan` and `infra apply`) and `infra doctor` then report the reason instead of the
+generic "does not support" error. The default returns `{}`. OPNsense uses it for the system
+types that have no API on 26.1 (#1149).
+
 ### validate_connectivity()
 
 **Purpose:** Validate connectivity to provider API and verify credentials.

@@ -25,6 +25,8 @@ from infrafoundry.providers.opnsense.validators import (
     RadvdValidator,
     ResourceNameValidator,
     StaticRouteValidator,
+    SystemFirmwareValidator,
+    SystemTuningValidator,
     UnboundForwardValidator,
     UnboundHostAliasValidator,
     UnboundValidator,
@@ -98,6 +100,8 @@ class OPNsenseValidator:
         self.kea_reservation_validator = KeaReservationValidator(report)
         self.radvd_validator = RadvdValidator(report)
         self.cron_jobs_validator = CronJobsValidator(report)
+        self.system_firmware_validator = SystemFirmwareValidator(report)
+        self.system_tuning_validator = SystemTuningValidator(report)
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
@@ -299,6 +303,8 @@ class OPNsenseValidator:
                 existing_interfaces,
             )
             self.cron_jobs_validator.validate(resource_refs["cron_jobs"])
+            self.system_firmware_validator.validate(resource_refs["system_firmware"])
+            self.system_tuning_validator.validate(resource_refs["system_tuning"])
             self.resource_name_validator.validate(resources)
 
         except Exception as exc:
@@ -337,6 +343,8 @@ class OPNsenseValidator:
         kea_dhcp6_subnets = [r for r in resources if r.type == "kea.dhcp6.subnets"]
         radvd = [r for r in resources if r.type == "radvd"]
         cron_jobs = [r for r in resources if r.type == "cron.jobs"]
+        system_firmware = [r for r in resources if r.type == "system.firmware"]
+        system_tuning = [r for r in resources if r.type == "system.tuning"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}
@@ -380,6 +388,8 @@ class OPNsenseValidator:
             "kea_dhcp6_subnet_names": kea_dhcp6_subnet_names,
             "radvd": radvd,
             "cron_jobs": cron_jobs,
+            "system_firmware": system_firmware,
+            "system_tuning": system_tuning,
         }
 
     def _get_existing_aliases(

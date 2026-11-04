@@ -82,21 +82,37 @@ class OPNsenseProvider(
     }
 
     #: Types with a registered manager that ``get_resource_types`` still
-    #: rejects: their services call endpoints that return 404 on OPNsense
-    #: 26.1 (``system/general``, ``system/settings``, ``firmware/info``,
-    #: ``gdrivebackup/settings``, ``diagnostics/system/sysctl``). Remove a
-    #: type once its service is verified against a live box (#1144, #1149).
-    UNVERIFIED_RESOURCE_TYPES: ClassVar[frozenset[str]] = frozenset(
-        {
-            "system.hostname",
-            "system.dns",
-            "system.ssh",
-            "system.webgui",
-            "system.firmware",
-            "system.remotebackup",
-            "system.tuning",
-        }
-    )
+    #: rejects as unverified. Empty since #1149 moved ``system.firmware`` and
+    #: ``system.tuning`` to the 26.1 endpoints; kept as the mechanism for a
+    #: future manager that has not been verified against a live box.
+    UNVERIFIED_RESOURCE_TYPES: ClassVar[frozenset[str]] = frozenset()
+
+    #: Types with a (now unreachable) manager whose endpoints 404 on OPNsense
+    #: 26.1 and have no API replacement. Mapped to the reason shown by
+    #: ``infra plan``/``apply`` and ``infra doctor`` (#1149). The page names
+    #: are the legacy GUI pages; the remotebackup page name is an inference.
+    UNSUPPORTED_RESOURCE_TYPES: ClassVar[dict[str, str]] = {
+        "system.hostname": (
+            "not supported through the OPNsense API on 26.1; configured on the "
+            "legacy System > Settings > General page"
+        ),
+        "system.dns": (
+            "not supported through the OPNsense API on 26.1; configured on the "
+            "legacy System > Settings > General page"
+        ),
+        "system.ssh": (
+            "not supported through the OPNsense API on 26.1; configured on the "
+            "legacy System > Settings > Administration page"
+        ),
+        "system.webgui": (
+            "not supported through the OPNsense API on 26.1; configured on the "
+            "legacy System > Settings > Administration page"
+        ),
+        "system.remotebackup": (
+            "not supported through the OPNsense API on 26.1; configured on the "
+            "legacy System > Configuration > Backups page (Google Drive)"
+        ),
+    }
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize OPNsense provider."""
@@ -335,6 +351,7 @@ class OPNsenseProvider(
             "unbound_reconfigure": self._reconfigure_unbound,
             "radvd_reconfigure": self._reconfigure_radvd,
             "cron_reconfigure": self._reconfigure_cron,
+            "tunables_reconfigure": self._reconfigure_tunables,
         }
 
     def _reconfigure_kea(self, env_name: str) -> None:
@@ -411,6 +428,21 @@ class OPNsenseProvider(
         service = CronJobsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
+    def _reconfigure_tunables(self, env_name: str) -> None:
+        """Reconfigure system tunables after any tunable mutation (#1149).
+
+        Used by :meth:`get_finalization_hooks` so one
+        ``core/tunables/reconfigure`` call fires per apply. Hook errors
+        propagate, failing the apply.
+
+        Args:
+            env_name: Active environment name.
+        """
+        from .services.system_tuning import SystemTuningService
+
+        service = SystemTuningService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
     # All OPNsense components are now managed by ``OPNsenseDirectRunner``
     # (ADR-0014). Per-component history:
     # - ``firewall_rules`` (#724, ADR-0015), ``aliases`` (#775, firewall_alias),
@@ -444,15 +476,21 @@ class OPNsenseProvider(
         """Get supported resource types.
 
         Derived from the direct-API manager table, less
-        ``UNVERIFIED_RESOURCE_TYPES``, so a new manager is accepted by
-        ``Orchestrator.validate_resources`` without a second list to keep
-        in step (#1144).
+        ``UNVERIFIED_RESOURCE_TYPES`` and ``UNSUPPORTED_RESOURCE_TYPES``, so
+        a new manager is accepted by ``Orchestrator.validate_resources``
+        without a second list to keep in step (#1144, #1149).
         """
         return [
             resource_type
             for resource_type in self.get_direct_api_resource_types()
             if resource_type not in self.UNVERIFIED_RESOURCE_TYPES
+            and resource_type not in self.UNSUPPORTED_RESOURCE_TYPES
         ]
+
+    @override
+    def get_unsupported_resource_types(self) -> dict[str, str]:
+        """Return the types rejected with a reason (a copy, #1149)."""
+        return dict(self.UNSUPPORTED_RESOURCE_TYPES)
 
     @override
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
@@ -493,6 +531,8 @@ class OPNsenseProvider(
             "unbound.forwards": [],
             "radvd": ["interfaces.assignments"],
             "cron.jobs": [],
+            "system.firmware": [],
+            "system.tuning": [],
         }
 
     @override

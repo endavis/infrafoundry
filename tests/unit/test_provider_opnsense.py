@@ -171,9 +171,12 @@ class TestOPNsenseResourceTypes:
         managed = set(provider.get_direct_api_resource_types())
         supported = set(provider.get_resource_types())
         unverified = OPNsenseProvider.UNVERIFIED_RESOURCE_TYPES
+        unsupported = set(provider.get_unsupported_resource_types())
 
-        assert supported | unverified == managed
+        assert supported | unverified | unsupported == managed
         assert not supported & unverified
+        assert not supported & unsupported
+        assert not set(unverified) & unsupported
 
     @pytest.mark.parametrize("resource_type", ["radvd", "cron.jobs"])
     def test_previously_rejected_types_are_supported(
@@ -181,10 +184,46 @@ class TestOPNsenseResourceTypes:
     ) -> None:
         assert resource_type in provider.get_resource_types()
 
-    def test_system_types_stay_rejected_until_verified(self, provider: OPNsenseProvider) -> None:
-        supported = provider.get_resource_types()
+    @pytest.mark.parametrize("resource_type", ["system.firmware", "system.tuning"])
+    def test_firmware_and_tuning_are_supported(
+        self, provider: OPNsenseProvider, resource_type: str
+    ) -> None:
+        assert resource_type in provider.get_resource_types()
+        assert resource_type in provider.get_dependencies()
 
-        assert not [t for t in supported if t.startswith("system.")]
+    @pytest.mark.parametrize(
+        "resource_type",
+        [
+            "system.hostname",
+            "system.dns",
+            "system.ssh",
+            "system.webgui",
+            "system.remotebackup",
+        ],
+    )
+    def test_retired_system_types_are_unsupported_with_reason(
+        self, provider: OPNsenseProvider, resource_type: str
+    ) -> None:
+        assert resource_type not in provider.get_resource_types()
+        reason = provider.get_unsupported_resource_types()[resource_type]
+        assert reason
+        assert "26.1" in reason
+
+    def test_unsupported_hook_returns_a_copy(self, provider: OPNsenseProvider) -> None:
+        table = provider.get_unsupported_resource_types()
+        table.clear()
+
+        assert provider.get_unsupported_resource_types()
+
+    def test_tunables_reconfigure_hook_calls_service(self, provider: OPNsenseProvider) -> None:
+        hooks = provider.get_finalization_hooks()
+        with patch(
+            "infrafoundry.providers.opnsense.services.system_tuning.SystemTuningService"
+            ".from_environment"
+        ) as from_env:
+            hooks["tunables_reconfigure"]("lab")
+
+        from_env.return_value.reconfigure.assert_called_once_with()
 
     def test_every_supported_type_has_a_loader_shape(self, provider: OPNsenseProvider) -> None:
         from infrafoundry.core.config.package_loader import DOTTED_RESOURCE_SHAPES
