@@ -279,11 +279,17 @@ class OPNsenseProvider(
         # applied before reservations because reservations resolve their
         # subnet UUID via ``search_dhcpv4_subnets`` / ``search_dhcpv6_subnets``
         # at apply time — a brand-new subnet must exist on the box before its
-        # reservations can reference it. Deletes run the other way: the kea
-        # managers declare ``SPLIT_DELETE_PHASE``, so the runner deletes their
-        # types in reverse table order first (reservations, then subnets) and
-        # only adds and updates in this order (#1264). Aliases are applied before
-        # ``nat_rules`` and ``firewall_rules`` so the alias names those
+        # reservations can reference it. Gateways and static routes are applied
+        # before ``firewall.rules`` so a rule's ``gateway:`` names a gateway that
+        # already exists (#1269). Deletes run the other way: every type that depends
+        # on another table type declares ``SPLIT_DELETE_PHASE`` (the kea managers,
+        # firewall rules, NAT, gateways, static routes and virtual IPs), so the runner
+        # deletes those types in reverse table order first and only adds and updates in
+        # this order, which removes a child before its parent (#1264, #1269). Exempt
+        # for now: ``interfaces.assignments`` (a second apply would repeat an SSH
+        # preflight), ``radvd`` (``add_only`` drops its updates) and
+        # ``unbound.host_aliases`` (OPNsense cascades the delete). Aliases are
+        # applied before ``nat_rules`` and ``firewall_rules`` so the alias names those
         # rules reference exist on the box first (#775).
         # ``unbound_host_override`` is applied before ``unbound_host_alias``
         # so a brand-new override exists on the box before any aliases
@@ -295,9 +301,9 @@ class OPNsenseProvider(
             "interfaces.assignments": InterfaceAssignmentManager,
             "firewall.aliases": AliasManager,
             "firewall.nat": NATRuleManager,
-            "firewall.rules": FirewallRuleManager,
             "routing.gateways": GatewayManager,
             "routing.static": StaticRouteManager,
+            "firewall.rules": FirewallRuleManager,
             "interfaces.virtual_ips": VirtualIPManager,
             "unbound.host_overrides": UnboundHostOverrideManager,
             "unbound.host_aliases": UnboundHostAliasManager,

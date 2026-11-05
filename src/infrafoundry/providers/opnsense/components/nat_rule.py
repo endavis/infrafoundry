@@ -39,6 +39,10 @@ class NATRuleManager(BaseComponentManager):
     #: managed set is needed (ADR-0018).
     DELETE_SCOPE: ClassVar[str] = "marker"
 
+    #: The runner deletes in a separate phase before this type's adds and updates,
+    #: so a row is deleted while the objects it depends on are still live (#1269).
+    SPLIT_DELETE_PHASE: ClassVar[bool] = True
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -75,6 +79,7 @@ class NATRuleManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        deletes_only: bool = False,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Apply the diff: add/update/delete rules and applyChanges.
@@ -85,6 +90,8 @@ class NATRuleManager(BaseComponentManager):
             auto_approve: Currently a no-op; the diff engine itself is
                 the gate.
             add_only: If True, suppress deletes.
+            deletes_only: If True, only delete: the runner's delete phase, run
+                before the adds and updates (#1269).
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -96,6 +103,10 @@ class NATRuleManager(BaseComponentManager):
         desired = nat_rule_configs_from_resources(resources)
         live = service.search_all()
         diff = service.compute_diff(desired, live, add_only=add_only)
+
+        if deletes_only:
+            diff.adds = []
+            diff.updates = []
 
         outcomes: list[ResourceOutcome] = []
         for rule in diff.adds:

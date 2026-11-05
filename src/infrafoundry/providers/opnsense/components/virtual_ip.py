@@ -60,6 +60,10 @@ class VirtualIPManager(BaseComponentManager):
     #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
     DELETE_SCOPE: ClassVar[str] = "managed_set"
 
+    #: The runner deletes in a separate phase before this type's adds and updates,
+    #: so a row is deleted while the objects it depends on are still live (#1269).
+    SPLIT_DELETE_PHASE: ClassVar[bool] = True
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -112,6 +116,7 @@ class VirtualIPManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        deletes_only: bool = False,
         managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
@@ -122,6 +127,8 @@ class VirtualIPManager(BaseComponentManager):
             resources: Virtual-IP ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
+            deletes_only: If True, only delete: the runner's delete phase, run
+                before the adds and updates (#1269).
             managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
                 only live objects matching them may be deleted; ``None`` deletes every
                 live object missing from YAML.
@@ -151,6 +158,10 @@ class VirtualIPManager(BaseComponentManager):
                 unresolved=unresolved_managed,
             ),
         )
+
+        if deletes_only:
+            diff.adds = []
+            diff.updates = []
 
         outcomes: list[ResourceOutcome] = []
         for vip in diff.adds:

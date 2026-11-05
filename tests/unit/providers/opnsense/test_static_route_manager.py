@@ -324,3 +324,39 @@ class TestListAndMigrate:
             result = manager.migrate("test-env")
         assert result == "resources: []\n"
         service_mock.export_to_yaml.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# deletes_only (delete phase, #1269)
+# ---------------------------------------------------------------------------
+
+
+class TestDeletesOnly:
+    def test_deletes_only_drops_adds_and_updates(self, tmp_path: Path) -> None:
+        manager = StaticRouteManager(tmp_path)
+        live_keep = _live("u-keep")
+        live_gone = _live("u-gone", network="10.9.0.0/24")
+        diff = Diff(
+            adds=[_route("new")],
+            updates=[(live_keep, _route("keep"))],
+            deletes=[live_gone],
+        )
+        service_mock = _make_service_mock(
+            diff=diff, apply_counts={"created": 0, "updated": 0, "deleted": 1}
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service_mock
+            result = manager.apply(
+                "test-env",
+                [_resource("keep")],
+                managed_resources=[_resource("gone")],
+                deletes_only=True,
+            )
+        sent = service_mock.apply_diff.call_args.args[0]
+        assert sent.adds == []
+        assert sent.updates == []
+        assert len(sent.deletes) == 1
+        assert result["resources_created"] == 0
+        assert result["resources_updated"] == 0
+        assert result["resources_deleted"] == 1
+        assert [o.action for o in result["resource_outcomes"]] == ["delete"]

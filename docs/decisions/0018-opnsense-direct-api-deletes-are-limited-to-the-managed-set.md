@@ -16,6 +16,8 @@ Accepted
 
 **Amended:** 2026-11-05 (#1264) - kea deletes run in a reverse-order phase, and a subnet delete is refused while reservations InfraFoundry does not manage still use it
 
+**Amended:** 2026-11-05 (#1269) - every type with a dependency in the dispatch table splits its deletes, and gateways and static routes are dispatched before firewall rules
+
 ## Decision
 
 `opnsense_direct` deletes only the objects InfraFoundry manages. The managed set comes from the state database, and a live object that InfraFoundry never applied is kept whether or not its type has YAML entries. This applies to all sixteen list types. It partly supersedes the "fully-managed by default" rule in [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md) section 5 for unmanaged objects.
@@ -43,6 +45,8 @@ A type with no YAML entries is dispatched only when the run has a managed set, i
 | `firewall.rules`, `firewall.nat`, `cron.jobs` | Marker name | Existing marker scoping |
 
 **Parent and child types.** The dispatch table applies `unbound.host_overrides` before `unbound.host_aliases`, and kea subnets before kea reservations. For kea, deletes run the other way (#1264). The four kea managers declare `SPLIT_DELETE_PHASE`, and the runner first calls each of them with `deletes_only=True` in reverse table order (reservations, then subnets). The forward pass then calls them with `add_only=True`. A managed reservation is therefore deleted while its subnet is still live, so its key resolves through the managed subnet row and the live CIDR, and the release is recorded from the first phase. `destroy` uses the same order. The orphan matching stays as a safety net: for a managed row whose parent does not resolve, the engine matches live orphans (aliases whose parent UUID is not any live override's, with the same hostname and domain, matched only when exactly one live orphan fits; reservations whose subnet UUID is not a live subnet's, with the same MAC or DUID). A managed row with neither a resolved parent nor an orphan match is skipped with a warning (fail closed), kept as managed and retried. YAML rows keep their strict resolution and still raise.
+
+**General rule (#1269).** Every type that depends on another table type declares `SPLIT_DELETE_PHASE`: besides the kea managers, `firewall.rules`, `firewall.nat`, `routing.gateways`, `routing.static` and `interfaces.virtual_ips`. A child then always deletes before its parent, whether or not the parent also splits. The dispatch table is also kept in dependency order, so `routing.gateways` and `routing.static` are applied before `firewall.rules`. Three dependent types are exempt: `interfaces.assignments` (its apply runs an SSH preflight, so a second call needs its own design), `radvd` (`add_only` drops its updates as well as deletes) and `unbound.host_aliases` (OPNsense cascades the delete).
 
 **Verified on a live box (#1264).** OPNsense kea `delSubnet` neither cascades to the subnet's reservations nor refuses: they stay, pointing at the deleted UUID. Unbound `delHostOverride` does cascade to its aliases, so unbound needs no delete phase.
 
@@ -74,4 +78,5 @@ Operator-facing behavior is described in [OPNsense resource coverage: how delete
 - [#1256](https://github.com/endavis/infrafoundry/issues/1256): feat: let `opnsense_direct` delete only the objects InfraFoundry manages.
 - [#1260](https://github.com/endavis/infrafoundry/issues/1260): dispatches `opnsense_direct` when an environment's last opnsense resource is removed.
 - [#1264](https://github.com/endavis/infrafoundry/issues/1264): kea deletes reservations before subnets and refuses a subnet delete that would orphan unmanaged reservations.
+- [#1269](https://github.com/endavis/infrafoundry/issues/1269): dispatches gateways and static routes before firewall rules and extends the delete phase to every dependent type.
 - [#1252](https://github.com/endavis/infrafoundry/issues/1252): documented and pinned the last-list-entry limitation this change removes.

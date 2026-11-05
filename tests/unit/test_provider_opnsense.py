@@ -22,6 +22,13 @@ _RETIRED_SYSTEM_TYPES = [
     "system.remotebackup",
 ]
 
+#: Dependent types that do not split deletes yet, each with the reason (#1269).
+_DELETE_PHASE_EXEMPT: dict[str, str] = {
+    "interfaces.assignments": "apply runs an SSH preflight, a second call needs its own design",
+    "radvd": "add_only drops updates as well as deletes",
+    "unbound.host_aliases": "OPNsense cascades a host override delete to its aliases",
+}
+
 
 class TestOPNsenseProviderReset:
     """Tests for OPNsense provider reset methods (delegation to manager)."""
@@ -297,15 +304,49 @@ class TestOPNsenseResourceTypes:
         for required in deps.values():
             assert set(required) <= supported
 
-    def test_delete_phase_types_follow_dependency_order(self, provider: OPNsenseProvider) -> None:
-        """A type that splits deletes comes after the split types it depends on (#1264)."""
+    def test_dispatch_table_follows_dependency_order(self, provider: OPNsenseProvider) -> None:
+        """Every dependency that is in the dispatch table comes earlier in it (#1269)."""
+        order = list(provider.get_direct_api_resource_types())
+        for type_name, required in provider.get_dependencies().items():
+            if type_name not in order:
+                continue
+            for dependency in required:
+                if dependency in order:
+                    assert order.index(dependency) < order.index(type_name), (
+                        f"{dependency} must be dispatched before {type_name}"
+                    )
+
+    def test_dependent_types_split_deletes(self, provider: OPNsenseProvider) -> None:
+        """A type with an in-table dependency deletes in the delete phase (#1269)."""
         table = provider.get_direct_api_resource_types()
-        order = list(table)
+        deps = provider.get_dependencies()
+        for type_name, cls in table.items():
+            if not set(deps.get(type_name, [])) & set(table):
+                continue
+            if type_name in _DELETE_PHASE_EXEMPT:
+                continue
+            assert getattr(cls, "SPLIT_DELETE_PHASE", None) is True, type_name
+
+    def test_split_parents_have_split_children(self, provider: OPNsenseProvider) -> None:
+        """A parent that splits deletes needs every child to split too (#1269)."""
+        table = provider.get_direct_api_resource_types()
+        deps = provider.get_dependencies()
         splitting = {
             t for t, cls in table.items() if getattr(cls, "SPLIT_DELETE_PHASE", None) is True
         }
-        assert splitting  # the kea managers opt in
-        deps = provider.get_dependencies()
-        for type_name in splitting:
-            for dependency in set(deps[type_name]) & splitting:
-                assert order.index(dependency) < order.index(type_name)
+        assert splitting
+        for parent in splitting:
+            for child, required in deps.items():
+                if child in table and parent in required:
+                    assert child in splitting, f"{child} depends on split type {parent}"
+
+    def test_gateway_dependents_split_deletes(self, provider: OPNsenseProvider) -> None:
+        table = provider.get_direct_api_resource_types()
+        for type_name in (
+            "firewall.rules",
+            "routing.gateways",
+            "routing.static",
+            "firewall.nat",
+            "interfaces.virtual_ips",
+        ):
+            assert getattr(table[type_name], "SPLIT_DELETE_PHASE", None) is True, type_name
