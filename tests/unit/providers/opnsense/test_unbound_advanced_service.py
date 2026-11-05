@@ -10,7 +10,11 @@ import pytest
 from infrafoundry.core.exceptions import APIError, InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense import endpoints
-from infrafoundry.providers.opnsense.services.unbound_advanced import UnboundAdvancedService
+from infrafoundry.providers.opnsense.services.unbound_advanced import (
+    UnboundAdvancedService,
+    _flatten,
+    _selected_entries,
+)
 
 LIVE_ADVANCED: dict[str, Any] = {
     "hideidentity": "0",
@@ -106,6 +110,39 @@ def test_build_set_payload_preserves_undeclared_fields() -> None:
     assert flat["privatedomain"] == "a.example,b.example"
     assert flat["privateaddress"] == "10.0.0.0/8,192.168.0.0/16"
     assert flat["insecuredomain"] == "x.example"
+
+
+LOG_VERBOSITY = [
+    {"value": "Level 0", "selected": 0},
+    {"value": "Level 1 (Default)", "selected": 1},
+    {"value": "Level 2", "selected": 0},
+]
+VAL_LOG_LEVEL = [
+    {"value": "Level 0 (Default)", "selected": 1},
+    {"value": "Level 1", "selected": 0},
+]
+
+
+def test_flatten_option_list_returns_selected_indexes() -> None:
+    assert _flatten(LOG_VERBOSITY) == "1"
+    assert _flatten(VAL_LOG_LEVEL) == "0"
+    assert _flatten([{"value": "a", "selected": 1}, {"value": "b", "selected": 1}]) == "0,1"
+
+
+def test_flatten_option_list_nothing_selected_is_empty() -> None:
+    assert _flatten([{"value": "a", "selected": 0}]) == ""
+
+
+def test_selected_entries_reads_option_list() -> None:
+    assert _selected_entries(LOG_VERBOSITY) == ["1"]
+    assert _selected_entries(VAL_LOG_LEVEL) == ["0"]
+
+
+def test_build_set_payload_flattens_option_list_fields() -> None:
+    advanced = {**LIVE_ADVANCED, "logverbosity": LOG_VERBOSITY, "valloglevel": VAL_LOG_LEVEL}
+    flat = _svc().build_set_payload(advanced, {})["unbound"]["advanced"]
+    assert flat["logverbosity"] == "1"
+    assert flat["valloglevel"] == "0"
 
 
 def test_build_set_payload_flattens_none_and_scalars() -> None:

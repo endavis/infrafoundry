@@ -14,7 +14,10 @@ The GET response renders these as option dicts (``{"a.example": {"selected": 1}}
 with ``{"": {"selected": 1}}`` meaning "no selection"; the normaliser also accepts a
 plain comma string.
 
-Write envelope (decision, unverified live): the apply posts
+Some advanced fields (``logverbosity``, ``valloglevel``) render as a list of option
+dicts instead; those flatten to the comma-joined indexes of the selected entries.
+
+Write envelope (verified live, #1263): the apply posts
 ``{"unbound": {"advanced": <whole live advanced section, flattened, declared fields
 overwritten>}}``. The key ``unbound`` is the GET envelope key. The bundled
 ``opnsense-openapi`` spec instead names the request body key ``settings`` for
@@ -47,8 +50,19 @@ def _split_entries(value: str) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
 
+def _selected_indexes(value: list[Any]) -> list[str]:
+    """Return the indexes of the selected entries of a list of option dicts."""
+    return [
+        str(index)
+        for index, entry in enumerate(value)
+        if isinstance(entry, dict) and entry.get("selected")
+    ]
+
+
 def _selected_entries(value: Any) -> list[str]:
-    """Return the non-empty selected entries of an option dict or comma string."""
+    """Return the non-empty selected entries of an option dict, option list or comma string."""
+    if isinstance(value, list):
+        return _selected_indexes(value)
     if isinstance(value, dict):
         return [
             str(key)
@@ -61,7 +75,13 @@ def _selected_entries(value: Any) -> list[str]:
 
 
 def _flatten(value: Any) -> str:
-    """Flatten a live field into its wire string."""
+    """Flatten a live field into its wire string.
+
+    A list of option dicts (``[{"value": "Level 0", "selected": 0}, ...]``) flattens to the
+    comma-joined indexes of the selected entries; index ``0`` is kept as ``"0"``.
+    """
+    if isinstance(value, list):
+        return ",".join(_selected_indexes(value))
     if isinstance(value, dict):
         return ",".join(
             str(key)
