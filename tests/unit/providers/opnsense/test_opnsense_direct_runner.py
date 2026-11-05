@@ -1693,3 +1693,38 @@ class TestUnresolvedManagedRowsAreNotReleased:
         managed = _managed(("unbound.forwards", "gone"))
         result = self._apply(provider_with_env, managed, MagicMock())
         assert [r["name"] for r in result["released_resources"]] == ["gone"]
+
+
+class TestNeedsManagedDispatch:
+    """``needs_managed_dispatch`` tells the orchestrator to run with no YAML (#1260)."""
+
+    def test_true_for_scoped_type_with_managed_rows(self, provider_with_env: MagicMock) -> None:
+        cls, _ = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+
+        managed = _managed(("unbound.forwards", "f1"))
+
+        assert OPNsenseDirectRunner().needs_managed_dispatch(provider_with_env, managed) is True
+
+    def test_false_for_type_without_delete_scope(self, provider_with_env: MagicMock) -> None:
+        cls, _ = _scoped_manager(None)
+        provider_with_env.get_direct_api_resource_types.return_value = {"system.tuning": cls}
+
+        managed = _managed(("system.tuning", "t1"))
+
+        assert OPNsenseDirectRunner().needs_managed_dispatch(provider_with_env, managed) is False
+
+    def test_false_for_other_provider(self, provider_with_env: MagicMock) -> None:
+        cls, _ = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+        provider_with_env.name = "proxmox"
+
+        managed = _managed(("unbound.forwards", "f1"))
+
+        assert OPNsenseDirectRunner().needs_managed_dispatch(provider_with_env, managed) is False
+
+    def test_false_for_empty_mapping(self, provider_with_env: MagicMock) -> None:
+        cls, _ = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+
+        assert OPNsenseDirectRunner().needs_managed_dispatch(provider_with_env, {}) is False

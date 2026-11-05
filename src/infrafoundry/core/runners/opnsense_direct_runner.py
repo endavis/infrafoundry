@@ -24,6 +24,8 @@ read the objects InfraFoundry applied before from the state database and pass th
 as ``managed_resources=``. A manager that declares ``DELETE_SCOPE`` deletes only
 those, and a type whose last YAML entry was removed is still dispatched so its
 managed objects go away. Live objects InfraFoundry never applied are left alone.
+The orchestrator also dispatches the provider when the environment has no opnsense
+YAML at all, if ``needs_managed_dispatch`` says managed objects remain (#1260).
 
 Drift detection (``DriftDetectable``) is intentionally not implemented in this
 PR; ``infra plan`` provides equivalent UX via the diff engine, and a full
@@ -242,6 +244,25 @@ class OPNsenseDirectRunner(BaseRunner):
         if scope in ("managed_set", "marker"):
             return str(scope)
         return None
+
+    def needs_managed_dispatch(
+        self, provider: ProviderBase, managed_resources: ManagedResources
+    ) -> bool:
+        """Return True if managed objects need deleting though no YAML remains (#1260).
+
+        Args:
+            provider: Provider with no resources in the environment's YAML.
+            managed_resources: Managed resources by type.
+
+        Returns:
+            True if some type with a delete scope has managed rows.
+        """
+        if not self._supports_direct_api(provider):
+            return False
+        table = self._resolve_dispatch_table(provider)
+        return bool(
+            self._types_to_dispatch(table, [], None, add_only=False, managed=managed_resources)
+        )
 
     def _types_to_dispatch(
         self,

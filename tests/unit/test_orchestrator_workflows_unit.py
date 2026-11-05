@@ -2458,3 +2458,228 @@ def test_doctor_adds_no_unsupported_check_without_hook(console: Console) -> None
 
     names = [r.check_name for r in results["opnsense"]["report"].results]
     assert not any(n.startswith("unsupported_resource_type_") for n in names)
+
+
+# ---------------------------------------------------------------------------
+# Managed-only provider dispatch (#1260)
+# ---------------------------------------------------------------------------
+
+
+def _managed_rows() -> list[Any]:
+    return [SimpleNamespace(resource_type="unbound.forwards", name="f1", config={"server": "x"})]
+
+
+class _StubDispatcher:
+    """Minimal runner satisfying ``DispatchesManagedSet``."""
+
+    is_iac_runner = True
+
+    def __init__(self, answer: Any) -> None:
+        self.answer = answer
+        self.needs_managed_dispatch = MagicMock(return_value=answer)
+
+
+def _dispatcher(answer: Any) -> _StubDispatcher:
+    return _StubDispatcher(answer)
+
+
+def _find(
+    runners: list[Any], rows: Any, in_yaml: dict[str, list[ResourceConfig]] | None = None
+) -> tuple[list[str], MagicMock]:
+    from infrafoundry.core.orchestrator_workflows import find_managed_only_providers
+
+    get_managed = MagicMock(return_value=rows)
+    found = find_managed_only_providers(
+        "dev",
+        in_yaml or {"proxmox": [_resource("vm1")]},
+        providers={"proxmox": MagicMock(), "opnsense": MagicMock()},
+        runners=runners,
+        get_managed_resources=get_managed,
+    )
+    return found, get_managed
+
+
+def test_find_managed_only_includes_provider_with_managed_rows() -> None:
+    found, get_managed = _find([_dispatcher(True)], _managed_rows())
+
+    assert found == ["opnsense"]
+    get_managed.assert_called_once_with("dev", "opnsense")
+
+
+@pytest.mark.parametrize("rows", [[], MagicMock()])
+def test_find_managed_only_skips_without_managed_rows(rows: Any) -> None:
+    dispatcher = _dispatcher(True)
+
+    found, _ = _find([dispatcher], rows)
+
+    assert found == []
+    dispatcher.needs_managed_dispatch.assert_not_called()
+
+
+@pytest.mark.parametrize("answer", [False, MagicMock()])
+def test_find_managed_only_requires_true_answer(answer: Any) -> None:
+    found, _ = _find([_dispatcher(answer)], _managed_rows())
+
+    assert found == []
+
+
+def test_find_managed_only_ignores_non_dispatchers() -> None:
+    non_iac = _dispatcher(True)
+    non_iac.is_iac_runner = False
+    plain = SimpleNamespace(is_iac_runner=True)
+
+    found, get_managed = _find([non_iac, plain], _managed_rows())
+
+    assert found == []
+    get_managed.assert_not_called()
+
+
+def test_find_managed_only_never_queries_providers_in_yaml() -> None:
+    found, get_managed = _find(
+        [_dispatcher(True)],
+        _managed_rows(),
+        {"proxmox": [_resource("vm1")], "opnsense": [_resource("x", "opnsense")]},
+    )
+
+    assert found == []
+    get_managed.assert_not_called()
+
+
+def _plan_managed_only(
+    console: Console,
+    *,
+    dry_run: bool = False,
+    resource_filter: list[str] | None = None,
+    add_only: bool = False,
+    provider_filter: list[str] | None = None,
+    finder: Any = "default",
+) -> tuple[MagicMock, MagicMock, list[str]]:
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 2
+    state_manager.get_managed_resources.return_value = []
+    runner = MagicMock()
+    runner.priority = 0
+    runner.plan = MagicMock(return_value={"success": True})
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    runner_registry.create_runner.return_value = runner
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock(), "opnsense": MagicMock()}
+    seen: list[str] = []
+
+    def iter_batches(
+        by_provider: dict[str, list[ResourceConfig]], filt: Any, reverse: bool, env: Any
+    ) -> list[ProviderResourceBatch]:
+        seen.extend(by_provider)
+        return [ProviderResourceBatch(n, r, len(r)) for n, r in by_provider.items()]
+
+    if finder == "default":
+        finder = MagicMock(return_value=["opnsense"])
+    orchestrator = PlanOrchestrator(
+        console,
+        state_manager,
+        MagicMock(),
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: ([_resource("vm1")], {"proxmox": [_resource("vm1")]}),
+        iter_provider_batches=iter_batches,
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+        find_managed_only_providers=finder,
+    )
+    orchestrator.plan(
+        env_name="dev",
+        dry_run=dry_run,
+        resource_filter=resource_filter,
+        enforce_policies=False,
+        add_only=add_only,
+        provider_filter=provider_filter,
+    )
+    return runner, finder, seen
+
+
+def test_plan_adds_managed_only_provider_with_empty_list(console: Console) -> None:
+    _, finder, seen = _plan_managed_only(console)
+
+    assert seen == ["proxmox", "opnsense"]
+    finder.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"dry_run": True}, {"add_only": True}, {"resource_filter": ["vm1"]}],
+)
+def test_plan_skips_finder_for_unsafe_runs(console: Console, kwargs: dict[str, Any]) -> None:
+    _, finder, seen = _plan_managed_only(console, **kwargs)
+
+    finder.assert_not_called()
+    assert seen == ["proxmox"]
+
+
+def test_plan_provider_filter_selects_managed_only_provider(console: Console) -> None:
+    _, _, seen = _plan_managed_only(console, provider_filter=["opnsense"])
+    assert seen == ["opnsense"]
+
+    _, _, seen = _plan_managed_only(console, provider_filter=["proxmox"])
+    assert seen == ["proxmox"]
+
+
+def test_plan_without_finder_is_unchanged(console: Console) -> None:
+    _, _, seen = _plan_managed_only(console, finder=None)
+
+    assert seen == ["proxmox"]
+
+
+def _apply_managed_only(console: Console, **kwargs: Any) -> tuple[MagicMock, MagicMock, MagicMock]:
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 3
+    apply_serial = MagicMock(return_value={})
+    apply_parallel = MagicMock(return_value={})
+    finder = MagicMock(return_value=["opnsense"])
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        MagicMock(),
+        lambda env: ([_resource("vm1")], {"proxmox": [_resource("vm1")]}),
+        apply_serial=apply_serial,
+        apply_parallel=apply_parallel,
+        get_current_user=lambda: "tester",
+        find_managed_only_providers=finder,
+    )
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=kwargs.pop("resource_filter", None),
+        auto_approve=True,
+        parallel=kwargs.pop("parallel", False),
+        max_workers=4,
+        **kwargs,
+    )
+    return apply_serial, apply_parallel, finder
+
+
+def test_apply_dispatches_managed_only_provider(console: Console) -> None:
+    apply_serial, _, finder = _apply_managed_only(console)
+
+    finder.assert_called_once()
+    by_provider = apply_serial.call_args.args[2]
+    assert by_provider["opnsense"] == []
+    assert list(by_provider) == ["proxmox", "opnsense"]
+
+
+def test_apply_managed_only_provider_selects_parallel_path(console: Console) -> None:
+    apply_serial, apply_parallel, _ = _apply_managed_only(console, parallel=True)
+
+    apply_parallel.assert_called_once()
+    apply_serial.assert_not_called()
+
+
+@pytest.mark.parametrize("kwargs", [{"add_only": True}, {"resource_filter": ["vm1"]}])
+def test_apply_skips_finder_for_unsafe_runs(console: Console, kwargs: dict[str, Any]) -> None:
+    apply_serial, _, finder = _apply_managed_only(console, **kwargs)
+
+    finder.assert_not_called()
+    assert "opnsense" not in apply_serial.call_args.args[2]

@@ -7,7 +7,7 @@ import os
 import tempfile
 import traceback
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +28,7 @@ from infrafoundry.core.managed_set import build_managed_resources
 from infrafoundry.core.protocols import (
     ChecksFilteredDestroy,
     Destroyable,
+    DispatchesManagedSet,
     Plannable,
     ValidatesReferencesInContext,
     VerifiesDestroy,
@@ -150,6 +151,63 @@ def _apply_provider_filter(
 
     requested_set = set(requested)
     return {name: resources_by_provider[name] for name in available if name in requested_set}
+
+
+def find_managed_only_providers(
+    env_name: str,
+    resources_by_provider: dict[str, list[ResourceConfig]],
+    *,
+    providers: dict[str, ProviderBase],
+    runners: Iterable[BaseRunner],
+    get_managed_resources: Callable[[str, str], Any],
+) -> list[str]:
+    """Find providers absent from the YAML whose managed objects need deleting (#1260).
+
+    Args:
+        env_name: Environment name.
+        resources_by_provider: Providers that have YAML resources.
+        providers: All registered providers by name.
+        runners: Runners to ask.
+        get_managed_resources: ``StateManager.get_managed_resources``.
+
+    Returns:
+        Names of providers to dispatch with an empty resource list.
+    """
+    dispatchers = [r for r in runners if r.is_iac_runner and isinstance(r, DispatchesManagedSet)]
+    if not dispatchers:
+        return []
+    found: list[str] = []
+    for name, provider in providers.items():
+        if name in resources_by_provider:
+            continue
+        managed = build_managed_resources(get_managed_resources(env_name, name), name)
+        if not managed:
+            continue
+        if any(d.needs_managed_dispatch(provider, managed) is True for d in dispatchers):
+            found.append(name)
+    return found
+
+
+def _add_managed_only_providers(
+    resources_by_provider: dict[str, list[ResourceConfig]],
+    env_name: str,
+    finder: Callable[[str, dict[str, list[ResourceConfig]]], list[str]] | None,
+    console: Console,
+) -> dict[str, list[ResourceConfig]]:
+    """Return ``resources_by_provider`` plus an empty entry per managed-only provider."""
+    if finder is None:
+        return resources_by_provider
+    extra = finder(env_name, resources_by_provider)
+    if not extra:
+        return resources_by_provider
+    result = dict(resources_by_provider)
+    for name in extra:
+        result[name] = []
+        console.print(
+            f"[dim]{name}: no resources in YAML; dispatching to remove the objects "
+            "InfraFoundry manages[/dim]"
+        )
+    return result
 
 
 class DriftOrchestrator:
@@ -440,6 +498,9 @@ class PlanOrchestrator(HookExecutionMixin):
         get_runner_priorities: Callable[[str], dict[str, int]],
         hook_manager: HookManager | None = None,
         load_environment: Callable[[str], EnvironmentConfig | None] | None = None,
+        find_managed_only_providers: (
+            Callable[[str, dict[str, list[ResourceConfig]]], list[str]] | None
+        ) = None,
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -457,6 +518,7 @@ class PlanOrchestrator(HookExecutionMixin):
         self._get_runner_priorities = get_runner_priorities
         self._hook_manager = hook_manager
         self._load_environment = load_environment
+        self._find_managed_only_providers = find_managed_only_providers
 
         # Dynamically create all registered runners
         self.runners: dict[str, BaseRunner] = {}
@@ -545,6 +607,13 @@ class PlanOrchestrator(HookExecutionMixin):
         try:
             self._print_header("Planning", env_name, resource_filter, style="bold cyan")
             all_resources, resources_by_provider = self._load_resources(env_name)
+            if not dry_run and not add_only and not resource_filter:
+                resources_by_provider = _add_managed_only_providers(
+                    resources_by_provider,
+                    env_name,
+                    self._find_managed_only_providers,
+                    self.console,
+                )
             resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
 
             if self._has_policies():
@@ -983,6 +1052,9 @@ class ApplyOrchestrator(HookExecutionMixin):
         get_current_user: Callable[[], str],
         hook_manager: HookManager | None = None,
         load_environment: Callable[[str], EnvironmentConfig | None] | None = None,
+        find_managed_only_providers: (
+            Callable[[str, dict[str, list[ResourceConfig]]], list[str]] | None
+        ) = None,
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -993,6 +1065,7 @@ class ApplyOrchestrator(HookExecutionMixin):
         self._get_current_user = get_current_user
         self._hook_manager = hook_manager
         self._load_environment = load_environment
+        self._find_managed_only_providers = find_managed_only_providers
 
     def apply(
         self,
@@ -1052,6 +1125,13 @@ class ApplyOrchestrator(HookExecutionMixin):
         try:
             self._print_header("Applying", env_name, resource_filter, "bold green")
             all_resources, resources_by_provider = self._load_resources(env_name)
+            if not add_only and not resource_filter:
+                resources_by_provider = _add_managed_only_providers(
+                    resources_by_provider,
+                    env_name,
+                    self._find_managed_only_providers,
+                    self.console,
+                )
             resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
             self._store_rollback_snapshot(deployment_id, env_name, all_resources)
 

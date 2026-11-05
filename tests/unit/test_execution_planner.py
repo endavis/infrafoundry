@@ -106,6 +106,16 @@ class TestExecutionPlannerPlanApply:
         assert batches[1].providers == ["proxmox"]
         assert batches[2].providers == ["kubernetes"]
 
+    def test_plan_apply_keeps_provider_with_empty_resources(self) -> None:
+        """A managed-only provider (empty list) still gets a batch (#1260)."""
+        planner = ExecutionPlanner(provider_order=["opnsense", "proxmox"])
+        resources = {"proxmox": [make_resource("proxmox", "vm1")], "opnsense": []}
+
+        batches = planner.plan_apply(resources)
+
+        assert [b.providers for b in batches] == [["opnsense"], ["proxmox"]]
+        assert batches[0].resources_by_provider == {"opnsense": []}
+
 
 class TestExecutionPlannerPlanDestroy:
     """Test plan_destroy functionality."""

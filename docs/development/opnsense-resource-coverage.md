@@ -103,7 +103,7 @@ opnsense:
 
 **`lan` and `wan` are protected.** A managed `lan` or `wan` assignment is never deleted; it is reported as unmanaged and a warning is logged, because removing the interface the API is reached through would lock you out. Other assignments are deletable, including one that carries the management address. Keep the management interface in YAML with `lock: true`.
 
-**Known gap.** Removing the environment's last `provider: opnsense` resource still leaves its objects on the box, because the provider is not dispatched when it has no resources. Tracked in #1260.
+**Removing the last opnsense resource.** When an environment has no `provider: opnsense` resources but InfraFoundry still manages opnsense objects, a full `infra plan` or `infra apply` dispatches opnsense and deletes them. Runs with `--add-only`, `-r`, `-p` or `--dry-run` do not. `-P opnsense` works, and `-P <other>` leaves opnsense out (#1260).
 
 ## Box-to-box migration runbook (template)
 

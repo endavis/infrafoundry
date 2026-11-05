@@ -146,14 +146,15 @@ class ExecutionPlanner:
 
         batches = []
         for provider in sorted_providers:
+            # Keep a provider with an empty list: apply dispatches it to remove
+            # the objects InfraFoundry manages when its YAML is gone (#1260).
             resources = resources_by_provider.get(provider, [])
-            if resources:
-                batches.append(
-                    ProviderBatch(
-                        providers=[provider],
-                        resources_by_provider={provider: resources},
-                    )
+            batches.append(
+                ProviderBatch(
+                    providers=[provider],
+                    resources_by_provider={provider: resources},
                 )
+            )
 
         return batches
 

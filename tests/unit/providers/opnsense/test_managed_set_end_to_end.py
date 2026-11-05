@@ -204,3 +204,73 @@ def test_unresolvable_managed_row_is_not_released_and_stays_managed(
     assert result["released_resources"] == [{"resource_type": TYPE, "name": "gone"}]
     _release(state, deployment_id, dict(result), managed)
     assert [r.name for r in state.get_managed_resources("dev", "opnsense")] == ["stuck"]
+
+
+def test_removing_last_opnsense_resource_dispatches_and_deletes(
+    state: StateManager, provider: MagicMock, tmp_path: Path
+) -> None:
+    """With no opnsense YAML at all, the provider is still dispatched (#1260)."""
+    from infrafoundry.core.orchestrator_workflows import find_managed_only_providers
+    from infrafoundry.core.runners.runner_registry import RunnerRegistry
+
+    deployment_id = state.create_deployment("dev", "apply")
+    _mark_applied(state, deployment_id, "f1", "mine.lan")
+    runner = OPNsenseDirectRunner()
+    live = [_live("u-mine", "mine.lan"), _live("u-hand", "hand.lan")]
+
+    def find() -> list[str]:
+        return find_managed_only_providers(
+            "dev",
+            {"proxmox": [ResourceConfig(name="v", type="vm", provider="proxmox", config={})]},
+            providers={"opnsense": provider},
+            runners=[runner],
+            get_managed_resources=state.get_managed_resources,
+        )
+
+    assert find() == ["opnsense"]
+
+    registry = RunnerRegistry()
+    registry.register(OPNsenseDirectRunner)
+    executor = DeploymentExecutor(
+        runner_registry=registry,
+        state_manager=state,
+        event_manager=MagicMock(),
+        providers={"opnsense": provider},
+    )
+    with (
+        patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]),
+        patch(SERVICE_PATH) as svc_cls,
+    ):
+        svc_cls.from_environment.return_value = _service(live)
+        plan = runner.plan(provider, managed_resources=_managed(state))
+        assert "1 to delete" in plan["changes_summary"]
+
+        service = _service(live)
+        svc_cls.from_environment.return_value = service
+        executor.apply_serial(
+            env_name="dev",
+            deployment_id=deployment_id,
+            resources_by_provider={"opnsense": []},
+            resource_filter=None,
+            auto_approve=True,
+        )
+
+    assert [d.uuid for d in service.apply_diff.call_args.args[0].deletes] == ["u-mine"]
+    assert _managed(state) == {}
+    assert find() == []
+
+
+def test_environment_without_opnsense_rows_is_not_dispatched(
+    state: StateManager, provider: MagicMock
+) -> None:
+    from infrafoundry.core.orchestrator_workflows import find_managed_only_providers
+
+    found = find_managed_only_providers(
+        "dev",
+        {},
+        providers={"opnsense": provider},
+        runners=[OPNsenseDirectRunner()],
+        get_managed_resources=state.get_managed_resources,
+    )
+
+    assert found == []

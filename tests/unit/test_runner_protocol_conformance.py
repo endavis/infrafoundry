@@ -20,6 +20,7 @@ import pytest
 from infrafoundry.core.protocols import (
     Applyable,
     Destroyable,
+    DispatchesManagedSet,
     DriftDetectable,
     Plannable,
     StateAware,
@@ -58,6 +59,11 @@ def _as_destroyable(runner: DestroyCapable) -> Destroyable:
     return runner
 
 
+def _as_dispatches_managed_set(runner: OPNsenseDirectRunner) -> DispatchesManagedSet:
+    """Return the runner typed as ``DispatchesManagedSet``; mypy rejects drift (#1260)."""
+    return runner
+
+
 def _as_state_aware(runner: TerraformRunner | OpenTofuRunner) -> StateAware:
     """Return the runner typed as ``StateAware``; mypy rejects this if one drifts."""
     return runner
@@ -90,6 +96,15 @@ def test_runner_is_plannable_and_applyable(cls: type[PlanCapable]) -> None:
 @pytest.mark.parametrize("cls", DESTROY_RUNNERS)
 def test_runner_is_destroyable(cls: type[DestroyCapable]) -> None:
     assert isinstance(_as_destroyable(cls()), Destroyable)
+
+
+def test_opnsense_direct_runner_dispatches_managed_set() -> None:
+    assert isinstance(_as_dispatches_managed_set(OPNsenseDirectRunner()), DispatchesManagedSet)
+
+
+@pytest.mark.parametrize("cls", [TerraformRunner, AnsibleRunner, PyInfraRunner])
+def test_other_runners_do_not_dispatch_managed_set(cls: type[Any]) -> None:
+    assert not isinstance(cls(), DispatchesManagedSet)
 
 
 @pytest.mark.parametrize("cls", [TerraformRunner, OpenTofuRunner])

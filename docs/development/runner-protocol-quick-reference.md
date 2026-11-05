@@ -23,12 +23,16 @@ from infrafoundry.core.protocols import (
     StateAware,        # Track resource IDs/state
     DriftDetectable,   # Detect configuration drift
     VerifiesDestroy,   # Confirm resources left state after destroy
+    DispatchesManagedSet,  # Ask whether a provider with no YAML still has managed objects to delete
 )
 ```
 
 `VerifiesDestroy` is optional. Only `TerraformRunner` and its subclass `OpenTofuRunner`
 implement it today. After a successful destroy, the destroy workflow uses it to check
 that every resource has left state.
+
+`DispatchesManagedSet` is optional. Only `OPNsenseDirectRunner` implements it. Plan and apply use
+it to dispatch a provider that has managed rows but no YAML resources (#1260).
 
 ### Runner Protocol Matrix
 

@@ -57,7 +57,7 @@ A type with no YAML entries is dispatched only when the run has a managed set, i
 
 ### Known limit
 
-Removing the environment's last `provider: opnsense` resource still leaves its objects on the box, because the provider is never dispatched when it has no resources. This is out of scope here and tracked in #1260.
+Removing the environment's last `provider: opnsense` resource used to leave its objects on the box, because the provider was never dispatched when it had no resources. #1260 closes this. The orchestrator asks managed-set runners (the `DispatchesManagedSet` protocol) whether a provider absent from YAML needs dispatching, and adds it with an empty resource list, for full non-dry-run runs only.
 
 Singleton types (`system.*`, `unbound.advanced`, `radvd`) are unaffected. `radvd` reconciles fully inside its own component.
 
@@ -68,4 +68,5 @@ Operator-facing behavior is described in [OPNsense resource coverage: how delete
 ## Related Issues
 
 - [#1256](https://github.com/endavis/infrafoundry/issues/1256): feat: let `opnsense_direct` delete only the objects InfraFoundry manages.
+- [#1260](https://github.com/endavis/infrafoundry/issues/1260): dispatches `opnsense_direct` when an environment's last opnsense resource is removed.
 - [#1252](https://github.com/endavis/infrafoundry/issues/1252): documented and pinned the last-list-entry limitation this change removes.

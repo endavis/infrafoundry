@@ -29,6 +29,7 @@ from infrafoundry.core.orchestrator_workflows import (
     RollbackOrchestrator,
     StatusOrchestrator,
     ValidationOrchestrator,
+    find_managed_only_providers,
 )
 from infrafoundry.core.policy import PolicyEngine, PolicyViolation
 from infrafoundry.core.policy_checker import PolicyChecker
@@ -160,6 +161,7 @@ class Orchestrator:
             get_runner_priorities=self.provider_registry.get_runner_priorities,
             hook_manager=self.hook_manager,
             load_environment=self.config_manager.load_environment,
+            find_managed_only_providers=self._find_managed_only_providers,
         )
         self.apply_orchestrator = ApplyOrchestrator(
             console=self.console,
@@ -171,6 +173,7 @@ class Orchestrator:
             get_current_user=self._get_current_user,
             hook_manager=self.hook_manager,
             load_environment=self.config_manager.load_environment,
+            find_managed_only_providers=self._find_managed_only_providers,
         )
         self.destroy_orchestrator = DestroyOrchestrator(
             console=self.console,
@@ -263,6 +266,18 @@ class Orchestrator:
         self._providers = value
         self.deployment_executor.providers = self._providers
         self.drift_detector.providers = self._providers
+
+    def _find_managed_only_providers(
+        self, env_name: str, resources_by_provider: dict[str, list[ResourceConfig]]
+    ) -> list[str]:
+        """Find providers with managed objects but no YAML resources (#1260)."""
+        return find_managed_only_providers(
+            env_name,
+            resources_by_provider,
+            providers=self.providers,
+            runners=list(self.deployment_executor.runners.values()),
+            get_managed_resources=self.state_manager.get_managed_resources,
+        )
 
     def _load_resources(
         self, env_name: str

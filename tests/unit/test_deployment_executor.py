@@ -1400,3 +1400,30 @@ def test_apply_with_unreadable_managed_set_passes_empty_mapping() -> None:
     _apply_opnsense(executor, [])
 
     assert runner.apply.call_args.kwargs["managed_resources"] == {}
+
+
+@pytest.mark.parametrize("mode", ["serial", "parallel"])
+def test_apply_dispatches_provider_with_empty_resource_list(mode: str) -> None:
+    """A managed-only provider (empty list) still reaches its runner (#1260)."""
+    executor, runner, _ = _opnsense_executor({"success": True})
+    by_provider: dict[str, list[ResourceConfig]] = {"opnsense": []}
+
+    if mode == "serial":
+        executor.apply_serial(
+            env_name="dev",
+            deployment_id=1,
+            resources_by_provider=by_provider,
+            resource_filter=None,
+            auto_approve=True,
+        )
+    else:
+        executor.apply_parallel(
+            env_name="dev",
+            deployment_id=1,
+            resources_by_provider=by_provider,
+            resource_filter=None,
+            auto_approve=True,
+            max_workers=2,
+        )
+
+    runner.apply.assert_called_once()

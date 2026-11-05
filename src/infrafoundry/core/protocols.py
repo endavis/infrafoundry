@@ -24,6 +24,7 @@ from infrafoundry.core.result_types import ApplyResult, DestroyResult, DriftInfo
 
 if TYPE_CHECKING:
     from infrafoundry.core.config.models import EnvironmentConfig
+    from infrafoundry.core.managed_set import ManagedResources
     from infrafoundry.core.provider import ProviderBase, ResourceConfig
     from infrafoundry.core.validation import ValidationReport
 
@@ -211,6 +212,30 @@ class VerifiesDestroy(Protocol):
 
         Returns:
             Names still present in state
+        """
+        ...
+
+
+@runtime_checkable
+class DispatchesManagedSet(Protocol):
+    """Protocol for runners that delete from the managed set (#1260).
+
+    ``isinstance`` against it checks that ``needs_managed_dispatch`` exists. The
+    orchestrator asks it whether a provider absent from the YAML still has
+    managed objects the runner must remove.
+    """
+
+    def needs_managed_dispatch(
+        self, provider: "ProviderBase", managed_resources: "ManagedResources"
+    ) -> bool:
+        """Return True if the runner must run for ``provider`` with no YAML resources.
+
+        Args:
+            provider: Provider that has no resources in the environment's YAML
+            managed_resources: Managed resources by type
+
+        Returns:
+            True if managed objects need deleting
         """
         ...
 
