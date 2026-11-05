@@ -64,6 +64,7 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "unbound.host_overrides": "list",
     "unbound.host_aliases": "list",
     "unbound.forwards": "list",
+    "unbound.advanced": "dict",
     "kea.dhcp4.subnets": "list",
     "kea.dhcp4.reservations": "list",
     "kea.dhcp6.subnets": "list",

@@ -55,10 +55,33 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/Syslog` | `syslog_settings` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#804](https://github.com/endavis/infrafoundry/issues/804) ships. |
 | `<OPNsense>/monit` | `monit_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#791](https://github.com/endavis/infrafoundry/issues/791) ships. |
 | `<OPNsense>/Hostwatch` | `hostwatch` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#792](https://github.com/endavis/infrafoundry/issues/792) ships. |
-| `<OPNsense>/unboundplus/general`, `<OPNsense>/unboundplus/advanced` | `unbound.settings` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#1091](https://github.com/endavis/infrafoundry/issues/1091) ships. |
+| `<OPNsense>/unboundplus/advanced` (`privatedomain`, `insecuredomain`, `privateaddress`) | `unbound.advanced` | Supported (direct-API; #1254). Only declared fields are compared; the whole `advanced` section is echoed back on write; destroy is a no-op; shares the `unbound_reconfigure` hook. The `set` envelope key is unverified live. |
+| `<OPNsense>/unboundplus/general`, the rest of `<OPNsense>/unboundplus/advanced` | `unbound.settings` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#1091](https://github.com/endavis/infrafoundry/issues/1091) ships. |
 | `<system>/timeservers`, `<system>/lb_use_sticky`, `<system>/pf_share_forward`, `<OPNsense>/Interfaces/settings`, `<OPNsense>/Firewall/Category` | `firewall.settings`, `interfaces.settings`, `firewall.categories`, NTP (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#1092](https://github.com/endavis/infrafoundry/issues/1092) ships. |
 
 Sections intentionally **out of IaC scope** (per ADR-0013): `<hasync>`, `<gres>`, `<gifs>`, `<laggs>`, `<bridges>`, `<ppps>`, `<wireless>`. These are set-once items and are migrated via selective `config.xml` import on the target box.
+
+## Unbound advanced settings (#1254)
+
+`opnsense.unbound.advanced` is a singleton dict with three list fields:
+
+| YAML | wire field |
+|---|---|
+| `private_domains` | `privatedomain` |
+| `insecure_domains` | `insecuredomain` |
+| `private_addresses` | `privateaddress` |
+
+An omitted key is not managed. An empty list (`[]`) is managed and clears the list. Lists are compared as sets. `insecure_domains` is for internal zones under a DNSSEC-signed parent. The `set` envelope key has not been verified live; after the first apply, re-run `infra plan` and expect no update.
+
+```yaml
+opnsense:
+  unbound:
+    advanced:
+      private_domains:
+        - test.example.net
+      insecure_domains:
+        - test.example.net
+```
 
 ## Box-to-box migration runbook (template)
 

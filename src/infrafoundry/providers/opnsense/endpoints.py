@@ -258,6 +258,9 @@ UNBOUND_HOST_OVERRIDE = _crud(
     delete="delHostOverride",
 )
 UNBOUND_RECONFIGURE = Endpoint("POST", "unbound/service/reconfigure")
+# Singleton settings document (the ``advanced`` section holds private/insecure domains).
+UNBOUND_SETTINGS_GET = Endpoint("GET", "unbound/settings/get")
+UNBOUND_SETTINGS_SET = Endpoint("POST", "unbound/settings/set")
 
 # --- radvd, cron ----------------------------------------------------------------------
 RADVD = _crud(
@@ -397,6 +400,7 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
         UNBOUND_RECONFIGURE,
     ),
     "unbound.forwards": (*UNBOUND_FORWARD.all(), UNBOUND_RECONFIGURE),
+    "unbound.advanced": (UNBOUND_SETTINGS_GET, UNBOUND_SETTINGS_SET, UNBOUND_RECONFIGURE),
     "kea.dhcp4.subnets": (*KEA_CRUD[("dhcpv4", "Subnet")].all(), *_KEA_V4),
     "kea.dhcp4.reservations": (
         *KEA_CRUD[("dhcpv4", "Reservation")].all(),

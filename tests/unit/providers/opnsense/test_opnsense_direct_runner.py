@@ -1013,6 +1013,33 @@ class TestUnboundReconfigureCoalescing:
 
         hook.assert_called_once_with("test-env")
 
+    def test_forwards_and_advanced_both_changing_fire_hook_once(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        runner = OPNsenseDirectRunner()
+        resources = [
+            _ufwd_resource("forward-1"),
+            ResourceConfig(
+                name="unbound.advanced",
+                type="unbound.advanced",
+                provider="opnsense",
+                config={"private_domains": ["a.example"]},
+            ),
+        ]
+        cls_ufwd, _ = _hook_manager(hook_key="unbound_reconfigure", created=1)
+        cls_uadv, _ = _hook_manager(hook_key="unbound_reconfigure", updated=1)
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "unbound.forwards": cls_ufwd,
+            "unbound.advanced": cls_uadv,
+        }
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"unbound_reconfigure": hook}
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+
+        hook.assert_called_once_with("test-env")
+
     def test_apply_touching_only_one_unbound_type_fires_hook_once(
         self, provider_with_env: MagicMock
     ) -> None:

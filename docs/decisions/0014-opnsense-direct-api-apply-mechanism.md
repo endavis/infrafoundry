@@ -375,6 +375,18 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Rollback strategy:** Same as §1's default.
 - **Cross-reference notes:** None.
 
+### `unbound.advanced` (#1254, 2026-11-05)
+
+**Mechanism:** Direct-REST singleton against the Unbound settings document. Manages the `advanced` section's private domains, insecure domains and private addresses. Only declared YAML keys are compared (as sets); `[]` means clear the list, an omitted key is unmanaged. Destroy is a no-op.
+
+- **Endpoints:** `GET unbound/settings/get` (response `{"unbound": {"advanced": {...}}}`, list fields as option dicts, `""` meaning no selection); `POST unbound/settings/set` and `POST unbound/service/reconfigure`. The `set` envelope key `unbound` (the GET envelope key, matching in-tree precedent) is **unverified live**; the bundled `opnsense-openapi` spec names the request body key `settings`, which looks like a generator default.
+- **Identity:** singleton named `unbound.advanced`. `get_resource_ids()` returns `{"unbound.advanced": "global"}`.
+- **Wire schema:** `private_domains` -> `privatedomain`, `insecure_domains` -> `insecuredomain`, `private_addresses` -> `privateaddress` (comma-separated). The write sends `{"unbound": {"advanced": <whole live advanced section, flattened, declared fields overwritten>}}`; nothing outside `advanced` is sent.
+- **Apply:** `set_settings` only when a declared field drifted; logs changed field names, never values. The `unbound_reconfigure` finalization hook fires the reconfigure.
+- **Validator scope:** `UnboundAdvancedValidator`: unknown keys, list-of-string shape, no commas or whitespace in entries, CIDR syntax for `private_addresses`.
+- **Rollback strategy:** Same as §1's default.
+- **Cross-reference notes:** Shares `unbound_reconfigure` with the three other Unbound managers.
+
 ### `radvd` (#788, 2026-05-12)
 
 **Mechanism:** **Hybrid YAML-singleton / wire-list** direct-REST against the modern OPNsense 26.x `radvd` MVC controller — IPv6 Router Advertisement emission per interface. The operator authors a single dict-shape `radvd` resource whose `interfaces` mapping holds one inner mapping per interface; the wire stores those as per-UUID records. Mirrors the `system.firmware` (#806) asymmetric "bulk read, per-item write" shape but with full-reconcile semantics on the write side instead of install-missing-only. **Cutover hard blocker** for hands-free IPv6: without per-interface RA emission on `opt1`/`opt2`/`opt3`/`opt6` (Infra/PT/Tailscale-infra/Apps VLANs), every IPv6-enabled host on those VLANs loses its default route the moment cutover finishes.
@@ -432,7 +444,7 @@ The contract is opt-in on both sides and graceful in absence:
 
 The first registered hook is `kea_reconfigure`, declared on all four Kea managers — `KeaDHCPv4SubnetManager`, `KeaDHCPv4ReservationManager`, `KeaDHCPv6SubnetManager`, and `KeaDHCPv6ReservationManager` — resolved by `OPNsenseProvider.get_finalization_hooks()` to a closure that calls `KeaDHCPService.reconfigure()`. Subnet and reservation changes across both wire families that land in the same `apply` share a single Kea reconfigure firing — preserving the legacy "one reconfigure per plan/apply" operational behavior. The hook key was originally `kea_dhcp6_reconfigure` when introduced in #758 (DHCPv6 only); it was renamed to `kea_reconfigure` in #777/#778 when DHCPv4 was migrated to direct-API and joined the same hook (the OPNsense `kea/service/reconfigure` endpoint is shared between v4 and v6).
 
-A second hook, `unbound_reconfigure` (#776), is declared on all three Unbound managers — `UnboundHostOverrideManager`, `UnboundHostAliasManager`, and `UnboundForwardManager`. The OPNsense Unbound service's reconfigure verb (`unbound/service/reconfigure`) is shared across every Unbound-managed component, so coalescing the hook key across all three managers produces exactly one reconfigure call per apply when any of the three changed state. Before #776 each manager called `service.reconfigure()` inline from its `apply` body, which produced up to three reconfigure calls in a multi-unbound apply; the retrofit removes the inline calls and lets the runner's hook plumbing coalesce them.
+A second hook, `unbound_reconfigure` (#776), is declared on four Unbound managers — `UnboundHostOverrideManager`, `UnboundHostAliasManager`, `UnboundForwardManager`, and `UnboundAdvancedManager` (#1254). The OPNsense Unbound service's reconfigure verb (`unbound/service/reconfigure`) is shared across every Unbound-managed component, so coalescing the hook key across all three managers produces exactly one reconfigure call per apply when any of the three changed state. Before #776 each manager called `service.reconfigure()` inline from its `apply` body, which produced up to three reconfigure calls in a multi-unbound apply; the retrofit removes the inline calls and lets the runner's hook plumbing coalesce them.
 
 A third hook, `radvd_reconfigure` (#788), is declared on `RadvdManager`. The radvd controller has its own reconfigure verb (`radvd/service/reconfigure`); since `radvd` is a single dotted resource type the hook only ever has one declarer, but the same hook plumbing is reused for symmetry and so future radvd-adjacent components (e.g., a hypothetical IPv6 prefix-delegation manager) can join the key.
 
@@ -505,6 +517,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#709](https://github.com/endavis/infrafoundry/issues/709): feat: add `OPNsenseDirectRunner` and migrate VLAN component to direct-API (first implementation).
 - Issue [#711](https://github.com/endavis/infrafoundry/issues/711): feat: add OPNsense `interface_assignments` component (read-only / migrate; dispatch-table refactor).
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): chore: write ADR-0014 codifying OPNsense direct-API apply mechanism (this ADR).
+- Issue [#1254](https://github.com/endavis/infrafoundry/issues/1254): feat: manage Unbound advanced settings (private and insecure domains) on OPNsense.
 - Issue [#1244](https://github.com/endavis/infrafoundry/issues/1244): refactor: remove the unreachable implementation of the five retired OPNsense system types.
 - Issue [#705](https://github.com/endavis/infrafoundry/issues/705): feat: spike direct-API VLAN component to inform ADR-0014 (closed; PR [#706](https://github.com/endavis/infrafoundry/pull/706) merged).
 - Issue [#701](https://github.com/endavis/infrafoundry/issues/701): the ADR-0013 work that deferred this decision (PR [#704](https://github.com/endavis/infrafoundry/pull/704)).

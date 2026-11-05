@@ -401,6 +401,33 @@ class TestParseNestedShapeMismatch:
         assert "firewall.aliases" in msg
         assert "list" in msg
 
+    def test_unbound_advanced_is_a_singleton_dict(self, temp_dir: Path) -> None:
+        """``unbound.advanced`` loads as one singleton next to the forwards list."""
+        from infrafoundry.core.config.package_loader import SINGLETON_RESOURCE_TYPES
+
+        assert "unbound.advanced" in SINGLETON_RESOURCE_TYPES
+        loader = PackageLoader(temp_dir)
+        data = {
+            "opnsense": {
+                "unbound": {
+                    "advanced": {"private_domains": ["test.example.net"]},
+                    "forwards": [{"name": "f1", "server": "172.21.0.53"}],
+                }
+            }
+        }
+        resources = loader._parse_resources_from_data(data, "t.yaml", "opnsense")
+        adv = [r for r in resources if r.type == "unbound.advanced"]
+        assert len(adv) == 1
+        assert adv[0].name == "unbound.advanced"
+        assert adv[0].config == {"private_domains": ["test.example.net"]}
+        assert any(r.type == "unbound.forwards" for r in resources)
+
+    def test_unbound_advanced_list_rejected(self, temp_dir: Path) -> None:
+        loader = PackageLoader(temp_dir)
+        data: dict[str, Any] = {"opnsense": {"unbound": {"advanced": [{"private_domains": []}]}}}
+        with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
+            loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
+
     def test_known_dict_path_with_list_leaf_rejected(self, temp_dir: Path) -> None:
         """``firewall.log: [...]`` (list where dict expected) errors."""
         loader = PackageLoader(temp_dir)

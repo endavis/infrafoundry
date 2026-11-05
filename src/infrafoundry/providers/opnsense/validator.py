@@ -29,6 +29,7 @@ from infrafoundry.providers.opnsense.validators import (
     StaticRouteValidator,
     SystemFirmwareValidator,
     SystemTuningValidator,
+    UnboundAdvancedValidator,
     UnboundForwardValidator,
     UnboundHostAliasValidator,
     UnboundValidator,
@@ -104,6 +105,7 @@ class OPNsenseValidator:
         self.cron_jobs_validator = CronJobsValidator(report)
         self.system_firmware_validator = SystemFirmwareValidator(report)
         self.system_tuning_validator = SystemTuningValidator(report)
+        self.unbound_advanced_validator = UnboundAdvancedValidator(report)
 
     def validate_endpoint_support(self, resources: list[ResourceConfig]) -> None:
         """Check the in-scope resource types' endpoints against the box's version (#1239).
@@ -338,6 +340,7 @@ class OPNsenseValidator:
                 index=xref_index,
             )
             self.unbound_forward_validator.validate(resource_refs["unbound_forwards"])
+            self.unbound_advanced_validator.validate(resource_refs["unbound_advanced"])
             self.kea_reservation_validator.validate(
                 resource_refs["kea_dhcp4_reservations"],
                 resource_refs["kea_dhcp6_reservations"],
@@ -380,6 +383,7 @@ class OPNsenseValidator:
         unbound_host_overrides = [r for r in resources if r.type == "unbound.host_overrides"]
         unbound_host_aliases = [r for r in resources if r.type == "unbound.host_aliases"]
         unbound_forwards = [r for r in resources if r.type == "unbound.forwards"]
+        unbound_advanced = [r for r in resources if r.type == "unbound.advanced"]
         interface_assignments = [r for r in resources if r.type == "interfaces.assignments"]
         nat_rules = [r for r in resources if r.type == "firewall.nat"]
         gateways = [r for r in resources if r.type == "routing.gateways"]
@@ -418,6 +422,7 @@ class OPNsenseValidator:
             "unbound_host_override_names": unbound_host_override_names,
             "unbound_host_aliases": unbound_host_aliases,
             "unbound_forwards": unbound_forwards,
+            "unbound_advanced": unbound_advanced,
             "interface_assignments": interface_assignments,
             "interface_assignment_names": interface_assignment_names,
             "nat_rules": nat_rules,

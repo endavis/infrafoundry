@@ -74,3 +74,10 @@ def test_registered_endpoints_include_uncalled_ones() -> None:
     assert endpoints.FILTER_SAVEPOINT in registered
     assert endpoints.FIRMWARE_REMOVE in registered
     assert endpoints.KEA_CRUD[("dhcpv6", "Reservation")].search in registered
+
+
+def test_unbound_advanced_registers_the_settings_endpoints() -> None:
+    registered = endpoints.RESOURCE_TYPE_ENDPOINTS["unbound.advanced"]
+    assert endpoints.UNBOUND_SETTINGS_GET in registered
+    assert endpoints.UNBOUND_SETTINGS_SET in registered
+    assert endpoints.UNBOUND_RECONFIGURE in registered

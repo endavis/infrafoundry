@@ -263,6 +263,7 @@ class OPNsenseProvider(
         from .components.static_route import StaticRouteManager
         from .components.system_firmware import SystemFirmwareManager
         from .components.system_tuning import SystemTuningManager
+        from .components.unbound_advanced import UnboundAdvancedManager
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
         from .components.unbound_host_override import UnboundHostOverrideManager
@@ -298,6 +299,7 @@ class OPNsenseProvider(
             "unbound.host_overrides": UnboundHostOverrideManager,
             "unbound.host_aliases": UnboundHostAliasManager,
             "unbound.forwards": UnboundForwardManager,
+            "unbound.advanced": UnboundAdvancedManager,
             "kea.dhcp4.subnets": KeaDHCPv4SubnetManager,
             "kea.dhcp4.reservations": KeaDHCPv4ReservationManager,
             "kea.dhcp6.subnets": KeaDHCPv6SubnetManager,
@@ -325,9 +327,9 @@ class OPNsenseProvider(
           when DHCPv4 was migrated to direct-API (#777, #778).
         - ``unbound_reconfigure`` (#776) — shared by
           :class:`UnboundHostOverrideManager`, :class:`UnboundHostAliasManager`,
-          and :class:`UnboundForwardManager` so a single
-          ``unbound/service/reconfigure`` call fires per apply when any of
-          the three unbound components changed state.
+          :class:`UnboundForwardManager` and :class:`UnboundAdvancedManager`
+          (#1254) so a single ``unbound/service/reconfigure`` call fires per
+          apply when any of the four unbound components changed state.
 
         The mechanism is generic — future components with shared post-apply
         work register their own key here.
@@ -398,8 +400,8 @@ class OPNsenseProvider(
 
         Used by :meth:`get_finalization_hooks` so the OPNsense direct-API
         runner can fire a single ``unbound/service/reconfigure`` call after
-        the host_override, host_alias, and forward managers have applied.
-        All three unbound services share the same reconfigure verb, so any
+        the host_override, host_alias, forward, and advanced managers have
+        applied. All unbound services share the same reconfigure verb, so any
         of the three service instances works; this implementation uses
         :class:`UnboundHostOverrideService` arbitrarily. Hook errors
         propagate, failing the apply.
@@ -549,6 +551,7 @@ class OPNsenseProvider(
             "interfaces.virtual_ips": ["interfaces.assignments"],
             "unbound.host_aliases": ["unbound.host_overrides"],
             "unbound.forwards": [],
+            "unbound.advanced": [],
             "radvd": ["interfaces.assignments"],
             "cron.jobs": [],
             "system.firmware": [],

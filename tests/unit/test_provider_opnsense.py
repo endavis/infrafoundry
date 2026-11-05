@@ -199,6 +199,17 @@ class TestOPNsenseResourceTypes:
         assert resource_type in provider.get_resource_types()
         assert resource_type in provider.get_dependencies()
 
+    def test_unbound_advanced_is_supported_and_shares_the_unbound_hook(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        types = provider.get_direct_api_resource_types()
+        assert "unbound.advanced" in provider.get_resource_types()
+        assert "unbound.advanced" in provider.get_dependencies()
+        assert (
+            types["unbound.advanced"].FINALIZATION_HOOK
+            == types["unbound.forwards"].FINALIZATION_HOOK
+        )
+
     @pytest.mark.parametrize(
         "resource_type",
         [
